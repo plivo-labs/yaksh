@@ -1,5 +1,3 @@
-from collections.abc import AsyncGenerator
-from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import APIRouter, FastAPI, HTTPException
@@ -11,13 +9,8 @@ from truman.api.routes import health
 from truman.config import settings
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
-    yield
-
-
 def create_app(frontend_dist: Path | None = None) -> FastAPI:
-    app = FastAPI(title="Truman", version=__version__, lifespan=lifespan)
+    app = FastAPI(title="Truman", version=__version__)
 
     api = APIRouter(prefix="/api")
     api.include_router(health.router)
