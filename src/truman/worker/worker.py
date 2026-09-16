@@ -1,0 +1,333 @@
+import asyncio
+import logging
+import os
+import socket
+import time
+import uuid
+from collections.abc import Coroutine
+from typing import Any
+
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+
+from truman.config import Settings
+from truman.domain.conversations import (
+    Caller,
+    CallOutcome,
+    CallRequest,
+    ConversationStatus,
+    EndReason,
+    Transcript,
+)
+from truman.simulation import conversations
+from truman.simulation.calls import STOP_IGNORED, CallerUnresponsiveError, LiveCall, run_call
+
+log = logging.getLogger(__name__)
+
+FINALIZE_ATTEMPTS = 5
+FINALIZE_RETRY_S = 1.0
+FINALIZE_TIMEOUT_S = 10.0
+MAX_BACKOFF_S = 30.0
+
+
+async def wait_any(
+    events: list[asyncio.Event], timeout: float | None, *extra: asyncio.Future[Any]
+) -> None:
+    """Return when any event is set, any extra future finishes, or the timeout passes."""
+    waiters = [asyncio.ensure_future(event.wait()) for event in events]
+    try:
+        await asyncio.wait({*waiters, *extra}, timeout=timeout, return_when=asyncio.FIRST_COMPLETED)
+    finally:
+        for waiter in waiters:
+            waiter.cancel()
+        await asyncio.gather(*waiters, return_exceptions=True)
+
+
+class Worker:
+    def __init__(
+        self,
+        sessionmaker: async_sessionmaker[AsyncSession],
+        caller: Caller,
+        settings: Settings,
+        *,
+        worker_id: str | None = None,
+    ) -> None:
+        self.worker_id = worker_id or f"{socket.gethostname()}:{os.getpid()}:{uuid.uuid4().hex[:8]}"
+        self.fatal = asyncio.Event()
+        self._stop = asyncio.Event()
+        self._sessionmaker = sessionmaker
+        self._caller = caller
+        self._settings = settings
+        self._tasks: dict[uuid.UUID, asyncio.Task[None]] = {}
+        self._live: dict[uuid.UUID, LiveCall] = {}
+
+    @property
+    def active(self) -> int:
+        return len(self._tasks)
+
+    @property
+    def stopping(self) -> bool:
+        return self._stop.is_set() or self.fatal.is_set()
+
+    async def run(self, stop: asyncio.Event) -> None:
+        log.info("worker %s started", self.worker_id)
+        self._stop = stop
+        delay = self._settings.worker_poll_interval_s
+        try:
+            while not self.stopping:
+                poll = asyncio.ensure_future(self.poll())
+                await wait_any([stop, self.fatal], self._settings.worker_lease_s, poll)
+                if not poll.done():
+                    if not self.stopping:
+                        log.error(
+                            "polling stalled for %ss; cancelling it", self._settings.worker_lease_s
+                        )
+                    await self._abandon(poll, "polling")
+                    delay = min(delay * 2, MAX_BACKOFF_S)
+                elif poll.exception() is None:
+                    delay = self._settings.worker_poll_interval_s
+                else:
+                    log.error("polling failed: %r; retrying in %.1fs", poll.exception(), delay)
+                    delay = min(delay * 2, MAX_BACKOFF_S)
+                await wait_any([stop, self.fatal], delay)
+        finally:
+            await self.drain()
+
+    async def poll(self) -> int:
+        async with self._sessionmaker() as session:
+            reaped = await conversations.reap_expired(session)
+        if reaped:
+            log.warning("marked %d conversations failed after their lease expired", reaped)
+        claimed = 0
+        while self.active < self._settings.max_active_conversations and not self.stopping:
+            async with self._sessionmaker() as session:
+                conversation = await conversations.claim_next(
+                    session, self.worker_id, self._settings.worker_lease_s
+                )
+                if conversation is None:
+                    break
+                try:
+                    request = await conversations.call_request(
+                        session, self._settings, conversation
+                    )
+                except Exception as exc:
+                    log.exception("cannot prepare conversation %s", conversation.id)
+                    await self._record_failure(conversation.id, exc)
+                    continue
+            sent = time.monotonic()
+            renewal = await self._run_bounded(
+                self._renew(conversation.id, None),
+                self._settings.worker_lease_s,
+                f"ownership check for {conversation.id}",
+            )
+            if renewal is None or renewal.exception() is not None:
+                log.warning("could not confirm ownership of conversation %s", conversation.id)
+                continue
+            status = renewal.result()
+            if status is None:
+                log.warning("lost conversation %s before it started", conversation.id)
+                continue
+            if status is ConversationStatus.ENDING:
+                outcome = CallOutcome(connected=False, end_reason=EndReason.USER_REQUEST)
+                await self._record(conversation.id, outcome, Transcript(), 0)
+                continue
+            self._start(request, confirmed_at=sent)
+            claimed += 1
+        return claimed
+
+    async def drain(self) -> None:
+        """Ask every active call to stop, then wait for each task to finish recording its result."""
+        for live in self._live.values():
+            live.request_stop(EndReason.PROCESS_RESTART)
+        tasks = list(self._tasks.values())
+        if not tasks:
+            return
+        _, pending = await asyncio.wait(tasks, timeout=self._execute_bound())
+        if not pending:
+            return
+        for task in pending:
+            task.cancel()
+        _, pending = await asyncio.wait(pending, timeout=self._settings.end_timeout_s * 2)
+        if pending:
+            log.critical("%d calls did not stop; abandoning them on exit", len(pending))
+
+    def _execute_bound(self) -> float:
+        """The longest _execute takes after a stop request.
+
+        A bounded call end, every result write with its cancellation cleanup and retry delay,
+        then the maintenance teardown.
+        """
+        end = self._settings.end_timeout_s
+        return end * 2 + FINALIZE_ATTEMPTS * (FINALIZE_TIMEOUT_S + end + FINALIZE_RETRY_S) + end * 2
+
+    def _start(self, request: CallRequest, *, confirmed_at: float) -> None:
+        live = LiveCall()
+        self._live[request.conversation_id] = live
+        task = asyncio.create_task(self._execute(request, live, confirmed_at))
+        self._tasks[request.conversation_id] = task
+        task.add_done_callback(lambda _: self._forget(request.conversation_id))
+
+    def _forget(self, conversation_id: uuid.UUID) -> None:
+        self._tasks.pop(conversation_id, None)
+        self._live.pop(conversation_id, None)
+
+    async def _execute(self, request: CallRequest, live: LiveCall, confirmed_at: float) -> None:
+        """Run the call and record its result, holding the lease until the result is written."""
+        maintenance = asyncio.create_task(
+            self._maintain(request.conversation_id, live, confirmed_at)
+        )
+        started = time.monotonic()
+        try:
+            outcome = await self._call(request, live)
+            duration_ms = int((time.monotonic() - started) * 1000)
+            await self._record(request.conversation_id, outcome, live.snapshot(), duration_ms)
+        finally:
+            await self._abandon(
+                maintenance,
+                f"lease maintenance for {request.conversation_id}",
+                timeout=self._settings.end_timeout_s * 2,
+            )
+
+    async def _call(self, request: CallRequest, live: LiveCall) -> CallOutcome:
+        try:
+            return await run_call(
+                self._caller, request, live, end_timeout_s=self._settings.end_timeout_s
+            )
+        except CallerUnresponsiveError:
+            log.critical(
+                "caller for conversation %s cannot be stopped; worker will exit",
+                request.conversation_id,
+            )
+            self.fatal.set()
+            return CallOutcome(
+                connected=live.connected, end_reason=live.end_reason, caller_error=STOP_IGNORED
+            )
+        except asyncio.CancelledError:
+            return (
+                live.outcome or CallOutcome(connected=live.connected, end_reason=live.end_reason)
+            ).model_copy(update={"end_reason": EndReason.PROCESS_RESTART})
+        except Exception as exc:
+            log.exception("caller failed for conversation %s", request.conversation_id)
+            return CallOutcome(
+                connected=live.connected, end_reason=EndReason.ERROR, caller_error=str(exc)
+            )
+
+    async def _record_failure(self, conversation_id: uuid.UUID, exc: Exception) -> None:
+        outcome = CallOutcome(connected=False, end_reason=EndReason.ERROR, caller_error=str(exc))
+        await self._record(conversation_id, outcome, Transcript(), 0)
+
+    async def _record(
+        self,
+        conversation_id: uuid.UUID,
+        outcome: CallOutcome,
+        transcript: Transcript,
+        duration_ms: int,
+    ) -> None:
+        what = f"recording conversation {conversation_id}"
+        for attempt in range(1, FINALIZE_ATTEMPTS + 1):
+            write = await self._run_bounded(
+                self._write_result(conversation_id, outcome, transcript, duration_ms),
+                FINALIZE_TIMEOUT_S,
+                what,
+            )
+            if write is None:
+                if self.fatal.is_set():
+                    return
+                log.error("%s timed out (attempt %d)", what, attempt)
+            elif write.exception() is not None:
+                log.error("%s failed (attempt %d): %r", what, attempt, write.exception())
+            elif not write.result():
+                log.error("conversation %s was no longer ours when it finished", conversation_id)
+                return
+            else:
+                return
+            await asyncio.sleep(FINALIZE_RETRY_S)
+        log.error("gave up %s; the reaper will mark it", what)
+
+    async def _write_result(
+        self,
+        conversation_id: uuid.UUID,
+        outcome: CallOutcome,
+        transcript: Transcript,
+        duration_ms: int,
+    ) -> bool:
+        async with self._sessionmaker() as session:
+            return await conversations.finalize(
+                session, conversation_id, self.worker_id, outcome, transcript, duration_ms
+            )
+
+    async def _maintain(
+        self, conversation_id: uuid.UUID, live: LiveCall, confirmed_at: float
+    ) -> None:
+        """Renew the lease every heartbeat and flush evidence; stop the call on end or lost lease.
+
+        The lease is measured from the moment a renewal was sent, never from when it returned.
+        """
+        lease_s = self._settings.worker_lease_s
+        what = f"lease renewal for {conversation_id}"
+        last_confirmed = confirmed_at
+        while True:
+            remaining = lease_s - (time.monotonic() - last_confirmed)
+            await asyncio.sleep(min(self._settings.worker_heartbeat_s, max(remaining, 0.0)))
+            remaining = lease_s - (time.monotonic() - last_confirmed)
+            if remaining <= 0:
+                log.warning("lease on conversation %s ran out; stopping the call", conversation_id)
+                live.request_stop(EndReason.PROCESS_RESTART)
+                return
+            progress = live.snapshot() if live.dirty else None
+            sent = time.monotonic()
+            renewal = await self._run_bounded(
+                self._renew(conversation_id, progress), remaining, what
+            )
+            if renewal is None:
+                log.warning("lease on conversation %s ran out mid-renewal", conversation_id)
+                live.request_stop(EndReason.PROCESS_RESTART)
+                return
+            if renewal.exception() is not None:
+                log.error("%s failed: %r", what, renewal.exception())
+                if progress is not None:
+                    live.dirty = True
+                continue
+            last_confirmed = sent
+            status = renewal.result()
+            if status is None:
+                log.warning("lost the lease on conversation %s", conversation_id)
+                live.request_stop(EndReason.PROCESS_RESTART)
+                return
+            if status is ConversationStatus.ENDING:
+                live.request_stop(EndReason.USER_REQUEST)
+
+    async def _renew(
+        self, conversation_id: uuid.UUID, progress: Transcript | None
+    ) -> ConversationStatus | None:
+        async with self._sessionmaker() as session:
+            return await conversations.renew_lease(
+                session, conversation_id, self.worker_id, self._settings.worker_lease_s, progress
+            )
+
+    async def _run_bounded[T](
+        self, work: Coroutine[Any, Any, T], timeout: float, what: str
+    ) -> asyncio.Future[T] | None:
+        """Run `work` for at most `timeout` seconds: its finished future, or None once abandoned."""
+        task = asyncio.ensure_future(work)
+        try:
+            await asyncio.wait({task}, timeout=timeout)
+        except asyncio.CancelledError:
+            await self._abandon(task, what)
+            raise
+        if task.done():
+            return task
+        await self._abandon(task, what)
+        return None
+
+    async def _abandon(
+        self, task: asyncio.Future[Any], what: str, *, timeout: float | None = None
+    ) -> bool:
+        """Cancel with a bound. Returns False, and marks the worker fatal, when it will not stop."""
+        task.cancel()
+        try:
+            await asyncio.wait({task}, timeout=timeout or self._settings.end_timeout_s)
+        finally:
+            if not task.done():
+                log.critical("%s cannot be stopped; worker will exit", what)
+                self.fatal.set()
+        return task.done()

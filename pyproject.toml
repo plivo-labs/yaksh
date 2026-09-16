@@ -47,8 +47,12 @@ src = ["src", "tests"]
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
 
+[tool.ruff.lint.isort]
+known-first-party = ["truman", "tests"]
+
 [tool.pyrefly]
 project-includes = ["src", "tests"]
+search-path = ["src", "."]
 python-version = "3.13"
 python-interpreter-path = ".venv/bin/python"
 
@@ -104,4 +108,5 @@ version_provider = "pep621"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["."]
 asyncio_mode = "auto"

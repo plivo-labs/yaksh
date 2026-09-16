@@ -7,7 +7,7 @@ from fastapi import APIRouter, FastAPI, HTTPException, status
 
 from truman import __version__
 from truman.api.errors import register_error_handlers
-from truman.api.routes import agents, health
+from truman.api.routes import agents, conversations, health
 from truman.config import Settings
 from truman.db.migrate import upgrade_to_head
 from truman.db.session import create_engine, create_sessionmaker
@@ -35,6 +35,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     api = APIRouter(prefix="/api/v1")
     api.include_router(health.router)
     api.include_router(agents.router)
+    api.include_router(conversations.router)
     app.include_router(api)
 
     @app.get("/api", include_in_schema=False)

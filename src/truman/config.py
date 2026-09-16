@@ -19,6 +19,10 @@ class Settings(BaseSettings):
     default_caller_number: str = "+15550100000"
     default_max_duration_s: int = 300
     max_active_conversations: int = 4
+    worker_poll_interval_s: float = 0.5
+    worker_heartbeat_s: float = 1.0
+    worker_lease_s: int = 30
+    end_timeout_s: float = 5.0
 
     # Required fields come from the environment; without this pyright demands them as arguments.
     def __init__(self, **values: Any) -> None:

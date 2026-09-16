@@ -1,4 +1,12 @@
+import asyncio
+import uuid
 from enum import StrEnum
+from pathlib import Path
+from typing import Protocol
+
+from pydantic import BaseModel, ConfigDict, Field
+
+from truman.domain.agents import E164, AgentConfig
 
 
 class Channel(StrEnum):
@@ -27,3 +35,97 @@ class EndReason(StrEnum):
 ACTIVE_STATUSES = frozenset(
     {ConversationStatus.QUEUED, ConversationStatus.RUNNING, ConversationStatus.ENDING}
 )
+
+
+class Role(StrEnum):
+    AGENT = "agent"
+    CALLER = "caller"
+
+
+class Provenance(StrEnum):
+    GENERATED = "generated"
+    TRANSMITTED = "transmitted"
+    CUT = "cut"
+
+
+class WireEventKind(StrEnum):
+    CONNECT_STARTED = "connect_started"
+    CONNECTED = "connected"
+    CALLER_SPEECH_START = "caller_speech_start"
+    CALLER_SPEECH_END = "caller_speech_end"
+    AGENT_AUDIO = "agent_audio"
+    CHECKPOINT = "checkpoint"
+    CLEAR_AUDIO = "clear_audio"
+    STOP = "stop"
+    CALLER_ERROR = "caller_error"
+
+
+class Turn(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    role: Role
+    text: str
+    started_at_ms: int
+    ended_at_ms: int
+    provenance: Provenance | None = None
+
+
+class WireEvent(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    kind: WireEventKind
+    at_ms: int
+
+
+class Validity(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    ok: bool
+    reasons: list[str] = Field(default_factory=list)
+
+
+class Transcript(BaseModel):
+    turns: list[Turn] = Field(default_factory=list)
+    wire_events: list[WireEvent] = Field(default_factory=list)
+    validity: Validity | None = None
+
+
+class ConversationCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    agent_id: uuid.UUID
+    persona_prompt: str = Field(min_length=1)
+    caller_number: E164 | None = None
+    max_duration_s: int | None = Field(default=None, ge=10, le=1800)
+
+
+class CallRequest(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    conversation_id: uuid.UUID
+    agent: AgentConfig
+    persona_prompt: str
+    caller_number: str
+    max_duration_s: int
+    output_dir: Path
+
+
+class CallOutcome(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    connected: bool
+    end_reason: EndReason
+    caller_error: str | None = None
+    recording_path: Path | None = None
+
+
+class CallObserver(Protocol):
+    def turn(self, turn: Turn) -> None: ...
+
+    def wire_event(self, event: WireEvent) -> None: ...
+
+
+class Caller(Protocol):
+    async def run(
+        self, request: CallRequest, observer: CallObserver, stop: asyncio.Event
+    ) -> CallOutcome: ...

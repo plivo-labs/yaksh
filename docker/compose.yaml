@@ -1,27 +1,39 @@
 name: truman
 
+x-truman: &truman
+  build:
+    context: ..
+    dockerfile: docker/Dockerfile
+  image: truman:local
+  env_file:
+    - path: .env
+      required: false
+  environment:
+    TRUMAN_API_HOST: 0.0.0.0
+    TRUMAN_API_PORT: 8000
+    TRUMAN_DATABASE_URL: postgresql+asyncpg://truman:truman@postgres:5432/truman
+    TRUMAN_DATA_DIR: /app/data
+  volumes:
+    - truman_data:/app/data
+  depends_on:
+    postgres:
+      condition: service_healthy
+  restart: unless-stopped
+
 services:
   truman:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile
-    image: truman:local
+    <<: *truman
     ports:
       - "8000:8000"
-    env_file:
-      - path: .env
-        required: false
-    environment:
-      TRUMAN_API_HOST: 0.0.0.0
-      TRUMAN_API_PORT: 8000
-      TRUMAN_DATABASE_URL: postgresql+asyncpg://truman:truman@postgres:5432/truman
-      TRUMAN_DATA_DIR: /app/data
-    volumes:
-      - truman_data:/app/data
-    depends_on:
-      postgres:
-        condition: service_healthy
-    restart: unless-stopped
+
+  worker:
+    <<: *truman
+    command:
+      - truman
+      - worker
+    stop_grace_period: 150s
+    healthcheck:
+      disable: true
 
   postgres:
     image: postgres:17-alpine

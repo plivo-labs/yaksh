@@ -118,7 +118,9 @@ class Conversation(Base):
     ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     duration_ms: Mapped[int | None] = mapped_column(Integer)
     recording_path: Mapped[str | None] = mapped_column(Text)
-    transcript_path: Mapped[str | None] = mapped_column(Text)
+    transcript: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    claimed_by: Mapped[str | None] = mapped_column(Text)
+    lease_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     __table_args__ = (
@@ -126,4 +128,5 @@ class Conversation(Base):
             ["agent_version_id", "agent_id"], ["agent_versions.id", "agent_versions.agent_id"]
         ),
         Index("ix_conversations_agent_created", "agent_id", text("created_at DESC")),
+        Index("ix_conversations_status_created", "status", "created_at"),
     )

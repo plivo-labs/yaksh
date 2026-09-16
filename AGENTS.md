@@ -12,7 +12,7 @@ src/truman/
   simulation/   defines scenarios and personas and orchestrates test conversations
   evaluation/   runs judges and computes scores
   api/          HTTP endpoints for the UI and integrations
-  worker/       background jobs
+  worker/       claims queued conversations from Postgres and runs them under a lease
   db/           database models and migrations
 frontend/       React UI
 docker/         container builds and self-hosted deployment
