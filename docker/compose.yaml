@@ -1,0 +1,17 @@
+name: truman
+
+services:
+  truman:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    image: truman:local
+    ports:
+      - "8000:8000"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      TRUMAN_API_HOST: 0.0.0.0
+      TRUMAN_API_PORT: 8000
+    restart: unless-stopped
