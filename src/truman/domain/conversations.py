@@ -26,6 +26,7 @@ class ConversationStatus(StrEnum):
 class EndReason(StrEnum):
     USER_REQUEST = "user_request"
     GOAL_REACHED = "goal_reached"
+    GOAL_ABANDONED = "goal_abandoned"
     AGENT_HANGUP = "agent_hangup"
     DURATION_LIMIT = "duration_limit"
     ERROR = "error"
@@ -43,7 +44,6 @@ class Role(StrEnum):
 
 
 class Provenance(StrEnum):
-    GENERATED = "generated"
     TRANSMITTED = "transmitted"
     CUT = "cut"
 

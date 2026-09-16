@@ -44,7 +44,13 @@ def worker() -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
     settings = Settings()
     upgrade_to_head(str(settings.database_url))
-    asyncio.run(run_worker(settings, StubCaller()))
+    if settings.caller == "stub":
+        caller: Caller = StubCaller()
+    else:
+        from truman.caller.pipecat import PipecatCaller
+
+        caller = PipecatCaller(settings)
+    asyncio.run(run_worker(settings, caller))
 
 
 async def run_worker(settings: Settings, caller: Caller) -> None:

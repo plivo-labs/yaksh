@@ -11,6 +11,18 @@ docker compose -f docker/compose.yaml up --build
 
 Open http://localhost:8000. The API is under `/api/v1` and takes the token as a bearer header.
 
+## Caller
+
+The worker phones agents with a [Pipecat](https://github.com/pipecat-ai/pipecat) pipeline: Deepgram hears the agent, an OpenAI model plays the persona, ElevenLabs speaks. Put the keys in `docker/.env` (or the environment):
+
+| Variable | Purpose |
+| --- | --- |
+| `DEEPGRAM_API_KEY` | Speech to text. `TRUMAN_DEEPGRAM_URL` points at a self-hosted Deepgram; empty means Deepgram cloud. |
+| `ELEVENLABS_API_KEY` | Text to speech. `TRUMAN_ELEVENLABS_VOICE_ID` picks the voice. |
+| `OPENAI_API_KEY`, or `AZURE_OPENAI_ENDPOINT` with `AZURE_OPENAI_API_KEY` (and `AZURE_OPENAI_API_VERSION`) | The persona model. `TRUMAN_PERSONA_MODEL` names the model or the Azure deployment, default `gpt-4.1`. |
+
+An agent's `upgrade_headers` and `extra_headers` may hold `env:NAME` values; the worker reads `NAME` from its environment when it connects, so secrets never reach the database. `TRUMAN_CALLER=stub` runs the worker with a canned caller and no providers, which is enough to develop the API and the UI.
+
 ## Develop
 
 ```sh
