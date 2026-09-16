@@ -6,7 +6,12 @@ readme = "README.md"
 license = "BSD-2-Clause"
 license-files = ["LICENSE"]
 requires-python = ">=3.13"
-dependencies = []
+dependencies = [
+    "fastapi>=0.141.1",
+    "pydantic-settings>=2.15.0",
+    "typer>=0.27.2",
+    "uvicorn[standard]>=0.53.0",
+]
 
 [project.scripts]
 truman = "truman.__main__:main"
@@ -26,6 +31,7 @@ dev = [
     "pytest-asyncio",
     "prek",
     "commitizen",
+    "httpx>=0.28.1",
 ]
 
 [tool.ruff]
@@ -39,6 +45,10 @@ select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
 [tool.pyrefly]
 project-includes = ["src", "tests"]
 python-version = "3.13"
+python-interpreter-path = ".venv/bin/python"
+
+[tool.pyrefly.errors]
+deprecated = "error"
 
 [tool.commitizen]
 name = "cz_conventional_commits"
