@@ -10,5 +10,5 @@ export default function App() {
         Open source, runs on your own infrastructure.
       </p>
     </main>
-  )
+  );
 }

@@ -1,12 +1,15 @@
 {
   "name": "frontend",
-  "private": true,
   "version": "0.0.0",
+  "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
+    "format": "oxfmt",
+    "format:check": "oxfmt --check",
+    "typecheck": "tsc -b",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -19,6 +22,7 @@
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.7",
     "@vitejs/plugin-react": "^6.1.1",
+    "oxfmt": "^0.68.0",
     "oxlint": "^1.81.0",
     "tailwindcss": "^4.3.3",
     "typescript": "7",
