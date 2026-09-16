@@ -1,3 +1,3 @@
 # Truman
 
-Open-source, self-hosted simulation and evaluation for voice agents, by [Plivo](https://plivo.com).
+Simulate, evaluate and improve AI agents. Open source, runs on your own infrastructure. Fully customizable, with the best defaults. By [Plivo](https://plivo.com).
