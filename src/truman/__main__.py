@@ -1,7 +1,8 @@
 import typer
 import uvicorn
 
-from truman.config import settings
+from truman.config import Settings
+from truman.db.migrate import upgrade_to_head
 
 cli = typer.Typer(no_args_is_help=True, add_completion=False)
 
@@ -12,8 +13,20 @@ def main_callback() -> None:
 
 
 @cli.command()
-def api(host: str = settings.api_host, port: int = settings.api_port, reload: bool = False) -> None:
-    uvicorn.run("truman.api:create_app", factory=True, host=host, port=port, reload=reload)
+def api(host: str | None = None, port: int | None = None, reload: bool = False) -> None:
+    settings = Settings()
+    uvicorn.run(
+        "truman.api:create_app",
+        factory=True,
+        host=host or settings.api_host,
+        port=port or settings.api_port,
+        reload=reload,
+    )
+
+
+@cli.command()
+def migrate() -> None:
+    upgrade_to_head(str(Settings().database_url))
 
 
 def main() -> None:

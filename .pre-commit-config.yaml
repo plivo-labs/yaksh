@@ -27,6 +27,12 @@ repos:
       - id: uv-lock
   - repo: local
     hooks:
+      - id: lint-imports
+        name: lint-imports
+        entry: .venv/bin/lint-imports
+        language: system
+        files: ^(src/.*\.py|pyproject\.toml)$
+        pass_filenames: false
       - id: pytest
         name: pytest
         entry: .venv/bin/python -m pytest -q

@@ -8,6 +8,7 @@ services:
       target: dev
     volumes:
       - ../src:/app/src
+      - truman_data:/app/data
     ports:
       - "8000:8000"
     env_file:
@@ -16,6 +17,11 @@ services:
     environment:
       TRUMAN_API_HOST: 0.0.0.0
       TRUMAN_API_PORT: 8000
+      TRUMAN_DATABASE_URL: postgresql+asyncpg://truman:truman@postgres:5432/truman
+      TRUMAN_DATA_DIR: /app/data
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   web:
     image: oven/bun:1.3.9-slim
@@ -31,5 +37,25 @@ services:
     depends_on:
       - api
 
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: truman
+      POSTGRES_PASSWORD: truman
+      POSTGRES_DB: truman
+    ports:
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U truman -d truman
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
 volumes:
+  postgres_data:
+  truman_data:
   web_node_modules:

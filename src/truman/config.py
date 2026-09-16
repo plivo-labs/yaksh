@@ -1,5 +1,7 @@
 from pathlib import Path
+from typing import Any
 
+from pydantic import Field, PostgresDsn, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -10,7 +12,14 @@ class Settings(BaseSettings):
 
     api_host: str = "127.0.0.1"
     api_port: int = 8000
+    api_token: SecretStr = Field(min_length=1)
+    database_url: PostgresDsn
+    data_dir: Path = REPO_ROOT / "data"
     frontend_dist: Path = REPO_ROOT / "frontend" / "dist"
+    default_caller_number: str = "+15550100000"
+    default_max_duration_s: int = 300
+    max_active_conversations: int = 4
 
-
-settings = Settings()
+    # Required fields come from the environment; without this pyright demands them as arguments.
+    def __init__(self, **values: Any) -> None:
+        super().__init__(**values)

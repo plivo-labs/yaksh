@@ -7,8 +7,11 @@ license = "BSD-2-Clause"
 license-files = ["LICENSE"]
 requires-python = ">=3.13"
 dependencies = [
+    "alembic>=1.20.0",
+    "asyncpg>=0.31.0",
     "fastapi>=0.141.1",
     "pydantic-settings>=2.15.0",
+    "sqlalchemy[asyncio]>=2.0.54",
     "typer>=0.27.2",
     "uvicorn[standard]>=0.53.0",
 ]
@@ -32,6 +35,8 @@ dev = [
     "prek",
     "commitizen",
     "httpx>=0.28.1",
+    "testcontainers[postgres]>=4.15.0",
+    "import-linter>=2.15",
 ]
 
 [tool.ruff]
@@ -49,6 +54,47 @@ python-interpreter-path = ".venv/bin/python"
 
 [tool.pyrefly.errors]
 deprecated = "error"
+
+[tool.importlinter]
+root_package = "truman"
+
+[[tool.importlinter.contracts]]
+name = "domain imports nothing from truman"
+type = "forbidden"
+source_modules = ["truman.domain"]
+forbidden_modules = [
+    "truman.api",
+    "truman.caller",
+    "truman.config",
+    "truman.db",
+    "truman.evaluation",
+    "truman.simulation",
+    "truman.worker",
+]
+
+[[tool.importlinter.contracts]]
+name = "simulation and evaluation never import the caller"
+type = "forbidden"
+source_modules = ["truman.simulation", "truman.evaluation"]
+forbidden_modules = ["truman.caller"]
+
+[[tool.importlinter.contracts]]
+name = "api and worker are entry points, nothing imports them"
+type = "forbidden"
+source_modules = [
+    "truman.domain",
+    "truman.db",
+    "truman.simulation",
+    "truman.evaluation",
+    "truman.caller",
+]
+forbidden_modules = ["truman.api", "truman.worker"]
+
+[[tool.importlinter.contracts]]
+name = "db holds no business logic"
+type = "forbidden"
+source_modules = ["truman.db"]
+forbidden_modules = ["truman.simulation", "truman.evaluation", "truman.caller"]
 
 [tool.commitizen]
 name = "cz_conventional_commits"

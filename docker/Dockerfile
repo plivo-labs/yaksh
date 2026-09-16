@@ -25,7 +25,8 @@ ENV PATH="/app/.venv/bin:$PATH" TRUMAN_API_HOST=0.0.0.0
 CMD ["truman", "api", "--reload"]
 
 FROM python:3.13-slim-trixie
-RUN groupadd --system truman && useradd --system --gid truman --home-dir /app truman
+RUN groupadd --system truman && useradd --system --gid truman --home-dir /app truman \
+    && mkdir -p /app/data && chown truman:truman /app/data
 WORKDIR /app
 COPY --from=backend --chown=truman:truman /app/.venv ./.venv
 COPY --from=frontend --chown=truman:truman /build/dist ./frontend/dist
@@ -36,5 +37,5 @@ ENV PATH="/app/.venv/bin:$PATH" \
 USER truman
 EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health')"
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health')"
 CMD ["truman", "api"]
