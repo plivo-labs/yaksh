@@ -1,0 +1,35 @@
+# python
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+dist/
+build/
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# node
+node_modules/
+frontend/dist/
+
+# environment
+.env
+.env.*
+!.env.example
+
+# runtime data
+data/
+*.wav
+*.mp3
+*.ogg
+*.pcm
+!tests/fixtures/**
+
+# editors and os
+.DS_Store
+.idea/
+.vscode/
+.zed/
