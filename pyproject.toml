@@ -21,10 +21,11 @@ packages = ["src/truman"]
 [dependency-groups]
 dev = [
     "ruff",
-    "mypy",
+    "pyrefly",
     "pytest",
     "pytest-asyncio",
-    "pre-commit",
+    "prek",
+    "commitizen",
 ]
 
 [tool.ruff]
@@ -35,11 +36,15 @@ src = ["src", "tests"]
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
 
-[tool.mypy]
-python_version = "3.13"
-strict = true
-packages = ["truman"]
-mypy_path = "src"
+[tool.pyrefly]
+project-includes = ["src", "tests"]
+python-version = "3.13"
+
+[tool.commitizen]
+name = "cz_conventional_commits"
+tag_format = "v$version"
+version_scheme = "pep440"
+version_provider = "pep621"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
