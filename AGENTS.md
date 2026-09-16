@@ -43,6 +43,7 @@ Imported call:    api -> worker -> evaluation -> saved results
 
 ## Conventions
 
+- Modern, battle-tested tooling and libraries, current stable versions: Python 3.13 with uv, ruff, mypy strict, pytest; FastAPI, SQLAlchemy 2, Alembic, Pydantic 2. No legacy tools kept for familiarity.
 - Work on `dev`; `main` is for releases.
 - Commit messages follow commitlint: conventional commits, one line, no trailers.
 - US English, no em dashes.
