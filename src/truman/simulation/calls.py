@@ -44,6 +44,11 @@ class LiveCall:
             self.end_reason = reason
             self.stop.set()
 
+    def stop_ignored(self) -> CallOutcome:
+        return CallOutcome(
+            connected=self.connected, end_reason=self.end_reason, caller_error=STOP_IGNORED
+        )
+
     def snapshot(self) -> Transcript:
         self.dirty = False
         return Transcript(turns=list(self.turns), wire_events=list(self.wire_events))
@@ -96,9 +101,7 @@ async def outcome_after_stop(
     if not run.done():
         raise CallerUnresponsiveError(STOP_IGNORED)
     if run.cancelled() or run.exception() is not None:
-        return CallOutcome(
-            connected=live.connected, end_reason=live.end_reason, caller_error=STOP_IGNORED
-        )
+        return live.stop_ignored()
     return run.result().model_copy(
         update={"end_reason": live.end_reason, "caller_error": STOP_IGNORED}
     )

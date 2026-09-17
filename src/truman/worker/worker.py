@@ -20,7 +20,7 @@ from truman.domain.conversations import (
     Transcript,
 )
 from truman.simulation import conversations
-from truman.simulation.calls import STOP_IGNORED, CallerUnresponsiveError, LiveCall, run_call
+from truman.simulation.calls import CallerUnresponsiveError, LiveCall, run_call
 
 log = logging.getLogger(__name__)
 
@@ -217,9 +217,7 @@ class Worker:
                 request.conversation_id,
             )
             self.fatal.set()
-            return CallOutcome(
-                connected=live.connected, end_reason=live.end_reason, caller_error=STOP_IGNORED
-            )
+            return live.stop_ignored()
         except asyncio.CancelledError:
             return (
                 live.outcome or CallOutcome(connected=live.connected, end_reason=live.end_reason)
