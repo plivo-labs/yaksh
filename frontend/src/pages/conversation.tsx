@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { cn } from "cn";
 
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Bubble, BubbleContent } from "@/components/ui/bubble";
 import { Button } from "@/components/ui/button";
@@ -46,7 +47,14 @@ export function ConversationPage() {
   useLiveUpdates(id, conversation.data?.status);
 
   if (conversation.isPending) return <Skeleton className="h-96 w-full" />;
-  if (conversation.isError) return <p className="text-destructive">{conversation.error.message}</p>;
+  if (conversation.isError) {
+    return (
+      <Alert variant="destructive">
+        <AlertTitle>Could not load the conversation</AlertTitle>
+        <AlertDescription>{conversation.error.message}</AlertDescription>
+      </Alert>
+    );
+  }
   const data = conversation.data;
   const active = ACTIVE_STATUSES.includes(data.status);
 

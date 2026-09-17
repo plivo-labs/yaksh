@@ -12,6 +12,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
   Field,
@@ -101,7 +102,14 @@ export function AgentFormPage() {
   const agent = useAgent(id);
   if (!id) return <AgentForm />;
   if (agent.isPending) return <Skeleton className="h-96 w-full max-w-2xl" />;
-  if (agent.isError) return <p className="text-destructive">{agent.error.message}</p>;
+  if (agent.isError) {
+    return (
+      <Alert variant="destructive">
+        <AlertTitle>Could not load the agent</AlertTitle>
+        <AlertDescription>{agent.error.message}</AlertDescription>
+      </Alert>
+    );
+  }
   return <AgentForm key={agent.data.id} agent={agent.data} />;
 }
 

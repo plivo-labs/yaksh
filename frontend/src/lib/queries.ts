@@ -63,14 +63,14 @@ export function useDeleteAgent() {
 export const CONVERSATIONS_PAGE = 25;
 
 export function useConversations(filters: Record<string, string>, page: number) {
-  const query = new URLSearchParams({
+  const search = new URLSearchParams({
     page: String(page),
     page_size: String(CONVERSATIONS_PAGE),
     ...filters,
   }).toString();
   return useQuery({
     queryKey: keys.conversations({ ...filters, page: String(page) }),
-    queryFn: () => api<Page<ConversationSummary>>(`/conversations?${query}`),
+    queryFn: () => api<Page<ConversationSummary>>(`/conversations?${search}`),
     refetchInterval: (query) =>
       query.state.data?.items.some((item) => ACTIVE_STATUSES.includes(item.status))
         ? 3_000

@@ -3,6 +3,7 @@ import { type SubmitEvent, type MouseEvent, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
 
 import { StatusBadge } from "@/components/status-badge";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -31,6 +32,7 @@ import {
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
@@ -126,11 +128,13 @@ export function ConversationsPage() {
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {agentItems.map((item) => (
-              <SelectItem key={item.value} value={item.value}>
-                {item.label}
-              </SelectItem>
-            ))}
+            <SelectGroup>
+              {agentItems.map((item) => (
+                <SelectItem key={item.value} value={item.value}>
+                  {item.label}
+                </SelectItem>
+              ))}
+            </SelectGroup>
           </SelectContent>
         </Select>
         <Select
@@ -142,11 +146,13 @@ export function ConversationsPage() {
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {statusItems.map((item) => (
-              <SelectItem key={item.value} value={item.value}>
-                {item.label}
-              </SelectItem>
-            ))}
+            <SelectGroup>
+              {statusItems.map((item) => (
+                <SelectItem key={item.value} value={item.value}>
+                  {item.label}
+                </SelectItem>
+              ))}
+            </SelectGroup>
           </SelectContent>
         </Select>
       </div>
@@ -154,12 +160,10 @@ export function ConversationsPage() {
       {conversations.isPending ? (
         <Skeleton className="h-40 w-full" />
       ) : conversations.isError ? (
-        <Empty>
-          <EmptyHeader>
-            <EmptyTitle>Could not load conversations</EmptyTitle>
-            <EmptyDescription>{conversations.error.message}</EmptyDescription>
-          </EmptyHeader>
-        </Empty>
+        <Alert variant="destructive">
+          <AlertTitle>Could not load conversations</AlertTitle>
+          <AlertDescription>{conversations.error.message}</AlertDescription>
+        </Alert>
       ) : conversations.data.items.length === 0 ? (
         <Empty>
           <EmptyHeader>
@@ -262,11 +266,13 @@ function StartDialog({ agents }: { agents: Agent[] }) {
   const navigate = useNavigate();
   const chosen = agentId || agents[0]?.id || "";
   const agentItems = agents.map((agent) => ({ value: agent.id, label: agent.name }));
+  const duration = Number(maxDuration);
+  const durationOk = Number.isInteger(duration) && duration >= 10 && duration <= 1800;
 
   const submit = (event: SubmitEvent) => {
     event.preventDefault();
     start.mutate(
-      { agent_id: chosen, persona_prompt: persona.trim(), max_duration_s: Number(maxDuration) },
+      { agent_id: chosen, persona_prompt: persona.trim(), max_duration_s: duration },
       { onSuccess: (conversation) => navigate(`/conversations/${conversation.id}`) },
     );
   };
@@ -294,11 +300,13 @@ function StartDialog({ agents }: { agents: Agent[] }) {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {agentItems.map((item) => (
-                    <SelectItem key={item.value} value={item.value}>
-                      {item.label}
-                    </SelectItem>
-                  ))}
+                  <SelectGroup>
+                    {agentItems.map((item) => (
+                      <SelectItem key={item.value} value={item.value}>
+                        {item.label}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
                 </SelectContent>
               </Select>
             </Field>
@@ -328,7 +336,10 @@ function StartDialog({ agents }: { agents: Agent[] }) {
           </FieldGroup>
           {start.error && <p className="text-sm text-destructive">{start.error.message}</p>}
           <DialogFooter>
-            <Button type="submit" disabled={start.isPending || !persona.trim() || !chosen}>
+            <Button
+              type="submit"
+              disabled={start.isPending || !persona.trim() || !chosen || !durationOk}
+            >
               {start.isPending && <Spinner />}
               Call
             </Button>

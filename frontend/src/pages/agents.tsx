@@ -1,6 +1,7 @@
 import { Bot, Plus } from "lucide-react";
 import { Link, useNavigate } from "react-router";
 
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
   Empty,
@@ -37,12 +38,10 @@ export function AgentsPage() {
       {agents.isPending ? (
         <Skeleton className="h-40 w-full" />
       ) : agents.isError ? (
-        <Empty>
-          <EmptyHeader>
-            <EmptyTitle>Could not load agents</EmptyTitle>
-            <EmptyDescription>{agents.error.message}</EmptyDescription>
-          </EmptyHeader>
-        </Empty>
+        <Alert variant="destructive">
+          <AlertTitle>Could not load agents</AlertTitle>
+          <AlertDescription>{agents.error.message}</AlertDescription>
+        </Alert>
       ) : agents.data.length === 0 ? (
         <Empty>
           <EmptyHeader>

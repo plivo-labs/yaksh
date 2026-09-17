@@ -1,4 +1,4 @@
-const TOKEN_KEY = "truman.token";
+export const TOKEN_KEY = "truman.token";
 export const UNAUTHORIZED_EVENT = "truman:unauthorized";
 
 export function getToken(): string {

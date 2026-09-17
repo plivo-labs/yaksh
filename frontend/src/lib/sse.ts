@@ -1,4 +1,4 @@
-import { authHeaders } from "@/lib/api";
+import { UNAUTHORIZED_EVENT, authHeaders } from "@/lib/api";
 
 export interface ServerEvent {
   event: string;
@@ -12,6 +12,7 @@ export async function subscribe(
   signal: AbortSignal,
 ): Promise<void> {
   const response = await fetch(`/api/v1${path}`, { headers: authHeaders(), signal });
+  if (response.status === 401) window.dispatchEvent(new Event(UNAUTHORIZED_EVENT));
   if (!response.ok || !response.body) throw new Error(`${response.status} ${response.statusText}`);
   const reader = response.body.getReader();
   const decoder = new TextDecoder();

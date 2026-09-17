@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import { UNAUTHORIZED_EVENT, getToken, setToken } from "@/lib/api";
+import { TOKEN_KEY, UNAUTHORIZED_EVENT, getToken, setToken } from "@/lib/api";
 
 export function useToken(): [string, (token: string) => void] {
   const [token, setState] = useState(getToken);
@@ -9,8 +9,15 @@ export function useToken(): [string, (token: string) => void] {
       setToken("");
       setState("");
     };
+    const follow = (event: StorageEvent) => {
+      if (event.key === TOKEN_KEY) setState(event.newValue ?? "");
+    };
     window.addEventListener(UNAUTHORIZED_EVENT, clear);
-    return () => window.removeEventListener(UNAUTHORIZED_EVENT, clear);
+    window.addEventListener("storage", follow);
+    return () => {
+      window.removeEventListener(UNAUTHORIZED_EVENT, clear);
+      window.removeEventListener("storage", follow);
+    };
   }, []);
   return [
     token,

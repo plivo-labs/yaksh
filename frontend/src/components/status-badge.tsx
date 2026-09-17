@@ -1,3 +1,5 @@
+import { cn } from "cn";
+
 import { Badge } from "@/components/ui/badge";
 import { words } from "@/lib/format";
 import type { ConversationStatus } from "@/lib/types";
@@ -17,7 +19,11 @@ export function StatusBadge({ status }: { status: ConversationStatus }) {
     <Badge variant="secondary" className="gap-1.5 capitalize">
       <span
         aria-hidden
-        className={`size-1.5 rounded-full ${DOT[status]} ${status === "running" ? "animate-pulse" : ""}`}
+        className={cn(
+          "size-1.5 rounded-full",
+          DOT[status],
+          status === "running" && "animate-pulse",
+        )}
       />
       {words(status)}
     </Badge>
