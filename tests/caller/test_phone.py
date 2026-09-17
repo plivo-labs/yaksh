@@ -182,7 +182,9 @@ async def test_an_unanswered_call_and_a_stop_while_ringing_end_without_a_stream(
         caller_error="the agent did not answer: no-answer (NO_ANSWER)",
     )
     assert stopped == CallOutcome(connected=False, end_reason=EndReason.USER_REQUEST)
-    assert hung_up == CallOutcome(connected=False, end_reason=EndReason.USER_REQUEST)
+    assert hung_up == CallOutcome(
+        connected=False, end_reason=EndReason.USER_REQUEST, call_uuid="call-3"
+    )
     assert [action for action in rig.seen if "create" not in action] == [
         {"cancel": "req-1"},
         {"hang_up": "call-3"},
@@ -242,6 +244,7 @@ async def test_a_stream_that_is_not_plivo_ends_the_call_before_any_provider_is_t
 
     assert outcome.connected is False and outcome.end_reason is EndReason.ERROR
     assert outcome.caller_error and "start event: connected" in outcome.caller_error
+    assert outcome.call_uuid == "call-9"
     assert observer.kinds() == [WireEventKind.CONNECT_STARTED, WireEventKind.ANSWERED]
     assert rig.registry.get(call.conversation_id) is None
     assert {"hang_up": "call-9"} not in rig.seen

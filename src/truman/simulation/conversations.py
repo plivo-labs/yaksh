@@ -304,6 +304,7 @@ async def finalize(
             duration_ms=duration_ms,
             transcript=transcript.model_dump(mode="json"),
             recording_path=str(outcome.recording_path) if outcome.recording_path else None,
+            call_uuid=outcome.call_uuid,
             claimed_by=None,
             lease_expires_at=None,
         )

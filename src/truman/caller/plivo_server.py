@@ -20,9 +20,11 @@ log = logging.getLogger(__name__)
 
 STREAM_XML = (
     '<?xml version="1.0" encoding="UTF-8"?><Response>'
-    '<Stream bidirectional="true" keepCallAlive="true" contentType="audio/x-mulaw;rate=8000">'
+    '<Stream bidirectional="true" keepCallAlive="true" contentType="audio/x-mulaw;rate=8000" '
+    'statusCallbackUrl="{status_url}" statusCallbackMethod="POST">'
     "{stream_url}</Stream></Response>"
 )
+REPORT_KEYS = ("Event", "Status", "Cause", "Reason", "Error")
 HANGUP_XML = '<?xml version="1.0" encoding="UTF-8"?><Response><Hangup/></Response>'
 NO_CALL = "no call expects this stream"
 
@@ -61,6 +63,10 @@ async def fields(request: Request) -> dict[str, str]:
     return {key: str(value) for key, value in (*request.query_params.items(), *form.items())}
 
 
+def summary(report: dict[str, str]) -> dict[str, str]:
+    return {key: value for key, value in report.items() if any(k in key for k in REPORT_KEYS)}
+
+
 def stream_base(public_url: str) -> str:
     if public_url.startswith("https://"):
         return "wss://" + public_url.removeprefix("https://").rstrip("/")
@@ -84,14 +90,19 @@ def create_app(registry: StreamRegistry, public_url: str) -> FastAPI:
         if entry is None:
             return Response(HANGUP_XML, media_type="application/xml")
         entry.callbacks.put_nowait(await fields(request))
-        url = f"{stream_base(public_url)}/stream/{conversation_id}"
-        return Response(STREAM_XML.format(stream_url=url), media_type="application/xml")
+        xml = STREAM_XML.format(
+            stream_url=f"{stream_base(public_url)}/stream/{conversation_id}",
+            status_url=f"{public_url.rstrip('/')}/callbacks/{conversation_id}",
+        )
+        return Response(xml, media_type="application/xml")
 
     @app.post("/callbacks/{conversation_id}")
     async def callback(conversation_id: str, request: Request) -> Response:
+        report = await fields(request)
+        log.info("plivo reported %s for conversation %s", summary(report), conversation_id)
         entry = expected(conversation_id)
         if entry is not None:
-            entry.callbacks.put_nowait(await fields(request))
+            entry.callbacks.put_nowait(report)
         return Response(status_code=200)
 
     @app.websocket("/stream/{conversation_id}")

@@ -132,14 +132,14 @@ class Dialer:
                         observer.wire_event(WireEvent(kind=WireEventKind.ANSWERED, at_ms=at_ms()))
                         deadline = loop.time() + STREAM_GRACE_S
                     elif not entry.socket.done():
-                        return ended_early(status, fields.get("HangupCause"))
+                        return ended_early(status, fields.get("HangupCause"), call_uuid)
                     continue
                 if entry.socket.done():
                     return Connected(entry.socket.result(), request_uuid, call_uuid)
                 await self._end(request_uuid, call_uuid)
                 if stopped.done():
-                    return unreached(EndReason.USER_REQUEST, None)
-                return unreached(EndReason.ERROR, silence(call_uuid))
+                    return unreached(EndReason.USER_REQUEST, None, call_uuid)
+                return unreached(EndReason.ERROR, silence(call_uuid), call_uuid)
         finally:
             stopped.cancel()
             report.cancel()
@@ -155,8 +155,12 @@ class Dialer:
             log.warning("could not end the call attempt: %s", error)
 
 
-def unreached(end_reason: EndReason, error: str | None) -> CallOutcome:
-    return CallOutcome(connected=False, end_reason=end_reason, caller_error=error)
+def unreached(
+    end_reason: EndReason, error: str | None, call_uuid: str | None = None
+) -> CallOutcome:
+    return CallOutcome(
+        connected=False, end_reason=end_reason, caller_error=error, call_uuid=call_uuid
+    )
 
 
 def silence(call_uuid: str | None) -> str:
@@ -165,13 +169,17 @@ def silence(call_uuid: str | None) -> str:
     return "the agent answered but its audio stream never reached the worker"
 
 
-def ended_early(status: str, cause: str | None) -> CallOutcome:
+def ended_early(status: str, cause: str | None, call_uuid: str | None) -> CallOutcome:
     detail = (f"{status} ({cause})" if cause else status) or "no status"
     if status in UNANSWERED:
-        return unreached(EndReason.NO_ANSWER, f"the agent did not answer: {detail}")
+        return unreached(EndReason.NO_ANSWER, f"the agent did not answer: {detail}", call_uuid)
     if status == "completed":
-        return unreached(EndReason.AGENT_HANGUP, "the agent hung up before the stream started")
-    return unreached(EndReason.ERROR, f"the call ended before its stream started: {detail}")
+        return unreached(
+            EndReason.AGENT_HANGUP, "the agent hung up before the stream started", call_uuid
+        )
+    return unreached(
+        EndReason.ERROR, f"the call ended before its stream started: {detail}", call_uuid
+    )
 
 
 class Checkpoints(FrameProcessor):
@@ -368,12 +376,6 @@ class Recorder(AudioBufferProcessor):
             recording.writeframes(bytes(self._audio))
 
 
-def plivo_credentials(settings: Settings) -> tuple[str, str]:
-    if settings.plivo_auth_id is None or settings.plivo_auth_token is None:
-        raise ValueError("phone calls need PLIVO_AUTH_ID and PLIVO_AUTH_TOKEN")
-    return settings.plivo_auth_id.get_secret_value(), settings.plivo_auth_token.get_secret_value()
-
-
 async def settled() -> None:
     """Reports for audio that played just before a cut are still in flight; give them a moment."""
     await asyncio.sleep(ACK_GRACE_S)
@@ -414,7 +416,7 @@ class PhoneCaller:
             dialed = await self._dialer.dial(request, entry, observer, clock.ms, stop)
             if isinstance(dialed, CallOutcome):
                 return dialed
-            return await self._talk(request, observer, stop, clock, dialed.socket)
+            return await self._talk(request, observer, stop, clock, dialed)
         finally:
             self._registry.forget(request.conversation_id)
 
@@ -424,13 +426,16 @@ class PhoneCaller:
         observer: CallObserver,
         stop: asyncio.Event,
         clock: Clock,
-        socket: WebSocket,
+        dialed: Connected,
     ) -> CallOutcome:
+        socket = dialed.socket
         try:
             stream_id, call_id, encoding = await handshake(socket)
         except (WebSocketDisconnect, ValueError, KeyError) as error:
             log.warning("stream for conversation %s: %r", request.conversation_id, error)
-            return unreached(EndReason.ERROR, f"the stream ended before it started: {error}")
+            return unreached(
+                EndReason.ERROR, f"the stream ended before it started: {error}", dialed.call_uuid
+            )
         log.info(
             "stream %s for conversation %s, call %s, %s",
             stream_id,
@@ -490,6 +495,7 @@ class PhoneCaller:
             end_reason=state.end_reason or EndReason.ERROR,
             caller_error=state.error,
             recording_path=recorder.path,
+            call_uuid=call_id,
         )
 
     async def _hang_up(self, call_id: str) -> None:

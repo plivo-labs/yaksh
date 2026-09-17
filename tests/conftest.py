@@ -120,7 +120,10 @@ class FakeCaller:
         )
         observer.wire_event(WireEvent(kind=WireEventKind.STOP, at_ms=6))
         return CallOutcome(
-            connected=True, end_reason=EndReason.AGENT_HANGUP, recording_path=self.recording_path
+            connected=True,
+            end_reason=EndReason.AGENT_HANGUP,
+            recording_path=self.recording_path,
+            call_uuid="call-42",
         )
 
 

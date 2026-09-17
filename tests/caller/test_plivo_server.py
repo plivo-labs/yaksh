@@ -44,6 +44,9 @@ async def test_the_answer_xml_streams_a_waiting_conversation_and_hangs_up_others
         "application/xml"
     )
     assert f"wss://truman.example.com/stream/{conversation_id}" in answer.text
+    assert (
+        f'statusCallbackUrl="https://truman.example.com/callbacks/{conversation_id}"' in answer.text
+    )
     assert 'bidirectional="true"' in answer.text and 'keepCallAlive="true"' in answer.text
     assert 'contentType="audio/x-mulaw;rate=8000"' in answer.text
     assert unknown.status_code == 200 and unknown.text == HANGUP_XML

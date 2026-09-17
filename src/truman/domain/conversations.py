@@ -120,6 +120,7 @@ class CallOutcome(BaseModel):
     end_reason: EndReason
     caller_error: str | None = None
     recording_path: Path | None = None
+    call_uuid: str | None = None
 
 
 class CallObserver(Protocol):

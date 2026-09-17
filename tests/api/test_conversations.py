@@ -77,6 +77,7 @@ async def test_a_conversation_runs_to_completion_with_its_transcript(
     done = await wait_for(client, started["id"], {"completed"})
 
     assert done["end_reason"] == "agent_hangup" and done["validity"] == {"ok": True, "reasons": []}
+    assert done["call_uuid"] == "call-42"
     assert [turn["role"] for turn in done["transcript"]] == ["agent", "caller"]
     assert done["transcript"][1]["provenance"] == "transmitted"
     assert [event["kind"] for event in done["wire_events"]] == [
