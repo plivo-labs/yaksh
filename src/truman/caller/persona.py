@@ -328,7 +328,7 @@ async def hang_up(state: CallState, worker: Stoppable, running: asyncio.Task[Non
     try:
         if state.end_reason in DRAINED and not worker.has_finished():
             await worker.stop_when_done()
-            await asyncio.wait({running}, timeout=END_GRACE_S)
+            await until_done(running)
     finally:
         if not running.done():
             if not worker.has_finished():
