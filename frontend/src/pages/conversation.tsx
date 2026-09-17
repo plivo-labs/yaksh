@@ -33,7 +33,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
-import { authHeaders } from "@/lib/api";
+import { UNAUTHORIZED_EVENT, authHeaders } from "@/lib/api";
 import { clock, duration, when, words } from "@/lib/format";
 import { keys, useAgent, useConversation, useEndConversation } from "@/lib/queries";
 import { subscribe } from "@/lib/sse";
@@ -269,19 +269,24 @@ function Transcript({ turns, active }: { turns: Turn[]; active: boolean }) {
 
 function Recording({ url }: { url: string | null }) {
   const [blob, setBlob] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
   useEffect(() => {
     if (!url) return;
     const controller = new AbortController();
     let objectUrl: string | null = null;
     fetch(url, { headers: authHeaders(), signal: controller.signal })
-      .then((response) => (response.ok ? response.blob() : null))
-      .then((audio) => {
-        if (audio) {
-          objectUrl = URL.createObjectURL(audio);
-          setBlob(objectUrl);
-        }
+      .then((response) => {
+        if (response.status === 401) window.dispatchEvent(new Event(UNAUTHORIZED_EVENT));
+        if (!response.ok) throw new Error(response.statusText);
+        return response.blob();
       })
-      .catch(() => undefined);
+      .then((audio) => {
+        objectUrl = URL.createObjectURL(audio);
+        setBlob(objectUrl);
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setFailed(true);
+      });
     return () => {
       controller.abort();
       if (objectUrl) URL.revokeObjectURL(objectUrl);
@@ -298,7 +303,11 @@ function Recording({ url }: { url: string | null }) {
           <audio controls src={blob} className="w-full" />
         ) : (
           <p className="text-sm text-muted-foreground">
-            {url ? "Loading." : "Available once the call has ended."}
+            {failed
+              ? "The recording did not load. Reload the page to try again."
+              : url
+                ? "Loading."
+                : "Available once the call has ended."}
           </p>
         )}
       </CardContent>
