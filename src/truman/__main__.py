@@ -12,6 +12,7 @@ from truman.config import Settings
 from truman.db.migrate import upgrade_to_head
 from truman.db.session import create_engine, create_sessionmaker
 from truman.domain.conversations import Caller
+from truman.simulation import conversations
 from truman.worker.worker import Worker
 
 cli = typer.Typer(no_args_is_help=True, add_completion=False)
@@ -55,7 +56,10 @@ def worker() -> None:
 
 async def run_worker(settings: Settings, caller: Caller) -> None:
     engine = create_engine(str(settings.database_url))
-    worker = Worker(create_sessionmaker(engine), caller, settings)
+    sessionmaker = create_sessionmaker(engine)
+    async with sessionmaker() as session:
+        await conversations.sync_numbers(session, settings.plivo_numbers)
+    worker = Worker(sessionmaker, caller, settings)
     stop = asyncio.Event()
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGINT, signal.SIGTERM):

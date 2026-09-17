@@ -4,11 +4,12 @@ from collections.abc import AsyncIterator
 from datetime import timedelta
 from typing import Any
 
-from sqlalchemy import ColumnElement, and_, func, select, update
+from sqlalchemy import ColumnElement, and_, delete, func, select, update
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from truman.config import Settings
-from truman.db.models import Agent, AgentVersion, Conversation
+from truman.db.models import Agent, AgentVersion, Conversation, PhoneNumber
 from truman.domain.agents import AgentConfig, Direction, Transport
 from truman.domain.conversations import (
     ACTIVE_STATUSES,
@@ -218,9 +219,11 @@ async def reap_expired(session: AsyncSession) -> int:
         )
         .returning(Conversation.id)
     )
-    count = len(reaped.all())
+    ids = list(reaped.all())
+    if ids:
+        await release_numbers(session, ids)
     await session.commit()
-    return count
+    return len(ids)
 
 
 def resolve_status(outcome: CallOutcome) -> ConversationStatus:
@@ -271,8 +274,60 @@ async def finalize(
         )
         .returning(Conversation.id)
     )
+    if recorded is not None:
+        await release_numbers(session, [conversation_id])
     await session.commit()
     return recorded is not None
+
+
+async def sync_numbers(session: AsyncSession, numbers: list[str]) -> None:
+    """Make the pool match the settings: add new numbers, drop free ones no longer configured."""
+    if numbers:
+        await session.execute(
+            insert(PhoneNumber)
+            .values([{"number": number} for number in numbers])
+            .on_conflict_do_nothing()
+        )
+    await session.execute(
+        delete(PhoneNumber).where(
+            PhoneNumber.number.notin_(numbers), PhoneNumber.conversation_id.is_(None)
+        )
+    )
+    await session.commit()
+
+
+async def lease_number(session: AsyncSession, conversation_id: uuid.UUID) -> str | None:
+    """Lease the least recently used free number to the conversation, or None when all are taken."""
+    candidate = (
+        select(PhoneNumber.number)
+        .where(PhoneNumber.conversation_id.is_(None))
+        .order_by(PhoneNumber.leased_at.nulls_first(), PhoneNumber.number)
+        .limit(1)
+        .with_for_update(skip_locked=True)
+        .scalar_subquery()
+    )
+    number = await session.scalar(
+        update(PhoneNumber)
+        .where(PhoneNumber.number == candidate)
+        .values(conversation_id=conversation_id, leased_at=func.now())
+        .returning(PhoneNumber.number)
+    )
+    if number is not None:
+        await session.execute(
+            update(Conversation)
+            .where(Conversation.id == conversation_id)
+            .values(caller_number=number)
+        )
+    await session.commit()
+    return number
+
+
+async def release_numbers(session: AsyncSession, conversation_ids: list[uuid.UUID]) -> None:
+    await session.execute(
+        update(PhoneNumber)
+        .where(PhoneNumber.conversation_id.in_(conversation_ids))
+        .values(conversation_id=None)
+    )
 
 
 async def stream_events(
