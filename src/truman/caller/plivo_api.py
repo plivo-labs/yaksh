@@ -52,13 +52,13 @@ class PlivoApi:
         self.auth_token = auth_token
         self.base_url = base_url.rstrip("/")
         self._account = f"{self.base_url}/v1/Account/{auth_id}"
-        self._auth = aiohttp.BasicAuth(auth_id, auth_token)
+        self._headers = {"Authorization": aiohttp.encode_basic_auth(auth_id, auth_token)}
 
     async def create_call(self, call: OutboundCall) -> str:
         """Ask Plivo to dial; returns the request uuid that identifies the call until it answers."""
         try:
             async with (
-                aiohttp.ClientSession(auth=self._auth, timeout=TIMEOUT) as session,
+                aiohttp.ClientSession(headers=self._headers, timeout=TIMEOUT) as session,
                 session.post(f"{self._account}/Call/", json=call.params()) as response,
             ):
                 body = await response.text()
@@ -77,7 +77,7 @@ class PlivoApi:
         numbers: list[AccountNumber] = []
         url: str | None = f"{self._account}/Number/?limit=20"
         try:
-            async with aiohttp.ClientSession(auth=self._auth, timeout=TIMEOUT) as session:
+            async with aiohttp.ClientSession(headers=self._headers, timeout=TIMEOUT) as session:
                 for _ in range(MAX_PAGES):
                     if url is None:
                         break
@@ -107,7 +107,7 @@ class PlivoApi:
     async def _delete(self, url: str) -> None:
         try:
             async with (
-                aiohttp.ClientSession(auth=self._auth, timeout=TIMEOUT) as session,
+                aiohttp.ClientSession(headers=self._headers, timeout=TIMEOUT) as session,
                 session.delete(url) as response,
             ):
                 if response.status >= 400 and response.status != 404:
