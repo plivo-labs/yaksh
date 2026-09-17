@@ -23,7 +23,8 @@ class ConversationSummary(BaseModel):
     agent_name: str
     channel: Channel
     persona_prompt: str
-    caller_number: str
+    caller_number: str | None
+    call_uuid: str | None
     max_duration_s: int
     status: ConversationStatus
     end_reason: EndReason | None

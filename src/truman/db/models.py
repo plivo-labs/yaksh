@@ -63,6 +63,9 @@ class Agent(Base):
             "transport <> 'plivo_websocket' OR websocket_url IS NOT NULL",
             name="websocket_url_required",
         ),
+        CheckConstraint(
+            "transport <> 'phone' OR agent_number IS NOT NULL", name="agent_number_required"
+        ),
         Index(
             "ix_agents_external_id_live",
             "external_id",
@@ -107,7 +110,8 @@ class Conversation(Base):
     agent_version_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
     channel: Mapped[Channel] = mapped_column(pg_enum(Channel, "channel"), default=Channel.VOICE)
     persona_prompt: Mapped[str] = mapped_column(Text)
-    caller_number: Mapped[str] = mapped_column(Text)
+    caller_number: Mapped[str | None] = mapped_column(Text)
+    call_uuid: Mapped[str | None] = mapped_column(Text)
     max_duration_s: Mapped[int] = mapped_column(Integer)
     status: Mapped[ConversationStatus] = mapped_column(
         pg_enum(ConversationStatus, "conversation_status"), default=ConversationStatus.QUEUED
@@ -130,3 +134,13 @@ class Conversation(Base):
         Index("ix_conversations_agent_created", "agent_id", text("created_at DESC")),
         Index("ix_conversations_status_created", "status", "created_at"),
     )
+
+
+class PhoneNumber(Base):
+    """A caller id Truman owns; leased to one conversation at a time, rotated by last use."""
+
+    __tablename__ = "phone_numbers"
+
+    number: Mapped[str] = mapped_column(Text, primary_key=True)
+    conversation_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("conversations.id"))
+    leased_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

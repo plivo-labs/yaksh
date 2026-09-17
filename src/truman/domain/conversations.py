@@ -50,6 +50,8 @@ class Provenance(StrEnum):
 
 class WireEventKind(StrEnum):
     CONNECT_STARTED = "connect_started"
+    RINGING = "ringing"
+    ANSWERED = "answered"
     CONNECTED = "connected"
     CALLER_SPEECH_START = "caller_speech_start"
     CALLER_SPEECH_END = "caller_speech_end"

@@ -151,9 +151,12 @@ async def call_request(
     session: AsyncSession, settings: Settings, conversation: Conversation
 ) -> CallRequest:
     version = await session.get_one(AgentVersion, conversation.agent_version_id)
+    agent = AgentConfig.model_validate(version.config)
+    if agent.transport is Transport.PHONE or conversation.caller_number is None:
+        raise ValidationError("phone agents cannot be called yet")
     return CallRequest(
         conversation_id=conversation.id,
-        agent=AgentConfig.model_validate(version.config),
+        agent=agent,
         persona_prompt=conversation.persona_prompt,
         caller_number=conversation.caller_number,
         max_duration_s=conversation.max_duration_s,

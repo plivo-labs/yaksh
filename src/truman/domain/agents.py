@@ -60,9 +60,11 @@ class AgentConfig(BaseModel):
     brief: str | None = None
 
     @model_validator(mode="after")
-    def websocket_url_required(self) -> "AgentConfig":
+    def address_required(self) -> "AgentConfig":
         if self.transport is Transport.PLIVO_WEBSOCKET and self.websocket_url is None:
             raise ValueError("websocket_url is required when transport is plivo_websocket")
+        if self.transport is Transport.PHONE and self.agent_number is None:
+            raise ValueError("agent_number is required when transport is phone")
         return self
 
 

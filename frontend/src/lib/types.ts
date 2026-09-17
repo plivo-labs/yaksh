@@ -20,6 +20,8 @@ export type Role = "agent" | "caller";
 export type Provenance = "transmitted" | "cut";
 export type WireEventKind =
   | "connect_started"
+  | "ringing"
+  | "answered"
   | "connected"
   | "caller_speech_start"
   | "caller_speech_end"
@@ -94,7 +96,8 @@ export interface ConversationSummary {
   agent_name: string;
   channel: "voice";
   persona_prompt: string;
-  caller_number: string;
+  caller_number: string | null;
+  call_uuid: string | null;
   max_duration_s: number;
   status: ConversationStatus;
   end_reason: EndReason | null;

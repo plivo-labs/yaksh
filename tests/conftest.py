@@ -142,7 +142,9 @@ async def client(settings: Settings) -> AsyncIterator[AsyncClient]:
     await app.state.engine.dispose()
     engine = create_async_engine(settings.database_url.encoded_string())
     async with engine.begin() as connection:
-        await connection.execute(text("TRUNCATE conversations, agent_versions, agents"))
+        await connection.execute(
+            text("TRUNCATE phone_numbers, conversations, agent_versions, agents")
+        )
     await engine.dispose()
 
 

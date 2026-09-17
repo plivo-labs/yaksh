@@ -102,3 +102,17 @@ def test_an_empty_token_is_refused_at_startup() -> None:
         Settings.model_validate(
             {"api_token": "", "database_url": "postgresql+asyncpg://truman:truman@db/truman"}
         )
+
+
+async def test_a_phone_agent_needs_a_number(client: AsyncClient) -> None:
+    without = await client.post(
+        "/api/v1/agents", json={"name": "Desk", "transport": "phone", "websocket_url": None}
+    )
+    with_number = await client.post(
+        "/api/v1/agents",
+        json={"name": "Desk", "transport": "phone", "agent_number": "+14155550100"},
+    )
+
+    assert without.status_code == 422
+    assert "agent_number is required" in without.json()["error"]["details"][0]["msg"]
+    assert with_number.status_code == 201 and with_number.json()["agent_number"] == "+14155550100"

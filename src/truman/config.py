@@ -1,8 +1,10 @@
 from pathlib import Path
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
-from pydantic import Field, PostgresDsn, SecretStr
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import Field, PostgresDsn, SecretStr, field_validator
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
+
+from truman.domain.agents import E164
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -44,6 +46,19 @@ class Settings(BaseSettings):
     )
     openai_api_key: SecretStr | None = Field(default=None, validation_alias="OPENAI_API_KEY")
     persona_model: str = "gpt-4.1"
+    plivo_auth_id: SecretStr | None = Field(default=None, validation_alias="PLIVO_AUTH_ID")
+    plivo_auth_token: SecretStr | None = Field(default=None, validation_alias="PLIVO_AUTH_TOKEN")
+    plivo_numbers: Annotated[list[E164], NoDecode] = ["+17862242321"]
+    public_url: str | None = None
+    stream_port: int = 8770
+    ring_timeout_s: int = 30
+
+    @field_validator("plivo_numbers", mode="before")
+    @classmethod
+    def split_numbers(cls, value: Any) -> Any:
+        if isinstance(value, str):
+            return [number.strip() for number in value.split(",") if number.strip()]
+        return value
 
     # Required fields come from the environment; without this pyright demands them as arguments.
     def __init__(self, **values: Any) -> None:
