@@ -12,9 +12,10 @@
   },
   "overrides": [
     {
-      "files": ["src/components/ui/**"],
+      "files": ["src/components/ui/**", "src/hooks/**"],
       "rules": {
-        "react/only-export-components": "off"
+        "react/only-export-components": "off",
+        "react/set-state-in-effect": "off"
       }
     }
   ]

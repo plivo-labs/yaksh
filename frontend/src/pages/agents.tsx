@@ -1,0 +1,107 @@
+import { Bot, Plus } from "lucide-react";
+import { Link, useNavigate } from "react-router";
+
+import { Button } from "@/components/ui/button";
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { when, words } from "@/lib/format";
+import { useAgents } from "@/lib/queries";
+
+export function AgentsPage() {
+  const agents = useAgents();
+  const navigate = useNavigate();
+  return (
+    <div className="grid gap-6">
+      <div className="flex items-start justify-between gap-4">
+        <h1 className="font-heading text-2xl font-semibold tracking-tight">Agents</h1>
+        <Button nativeButton={false} render={<Link to="/agents/new" />}>
+          <Plus />
+          New agent
+        </Button>
+      </div>
+      {agents.isPending ? (
+        <Skeleton className="h-40 w-full" />
+      ) : agents.isError ? (
+        <Empty>
+          <EmptyHeader>
+            <EmptyTitle>Could not load agents</EmptyTitle>
+            <EmptyDescription>{agents.error.message}</EmptyDescription>
+          </EmptyHeader>
+        </Empty>
+      ) : agents.data.length === 0 ? (
+        <Empty>
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <Bot />
+            </EmptyMedia>
+            <EmptyTitle>No agents yet</EmptyTitle>
+            <EmptyDescription>Register the agent you want to call.</EmptyDescription>
+          </EmptyHeader>
+          <EmptyContent>
+            <Button nativeButton={false} render={<Link to="/agents/new" />} variant="outline">
+              Register an agent
+            </Button>
+          </EmptyContent>
+        </Empty>
+      ) : (
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Name</TableHead>
+              <TableHead>Direction</TableHead>
+              <TableHead>Transport</TableHead>
+              <TableHead>Endpoint</TableHead>
+              <TableHead>Speaks first</TableHead>
+              <TableHead className="text-right">Version</TableHead>
+              <TableHead>Updated</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {agents.data.map((agent) => (
+              <TableRow
+                key={agent.id}
+                className="cursor-pointer"
+                onClick={() => navigate(`/agents/${agent.id}`)}
+              >
+                <TableCell className="font-medium">
+                  <Link
+                    to={`/agents/${agent.id}`}
+                    className="rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+                    onClick={(event) => event.stopPropagation()}
+                  >
+                    {agent.name}
+                  </Link>
+                </TableCell>
+                <TableCell className="capitalize">{agent.direction}</TableCell>
+                <TableCell>{words(agent.transport)}</TableCell>
+                <TableCell className="max-w-72 truncate font-mono text-xs">
+                  {agent.websocket_url ?? agent.agent_number ?? ""}
+                </TableCell>
+                <TableCell>{agent.agent_speaks_first ? "Yes" : "No"}</TableCell>
+                <TableCell className="text-right font-mono text-xs">
+                  {agent.current_version}
+                </TableCell>
+                <TableCell className="font-mono text-xs">{when(agent.updated_at)}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      )}
+    </div>
+  );
+}

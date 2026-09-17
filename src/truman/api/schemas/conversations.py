@@ -20,6 +20,7 @@ class ConversationSummary(BaseModel):
     agent_id: uuid.UUID
     agent_version_id: uuid.UUID
     agent_version: int
+    agent_name: str
     channel: Channel
     persona_prompt: str
     caller_number: str

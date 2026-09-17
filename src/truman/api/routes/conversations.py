@@ -34,7 +34,9 @@ async def summary(session: AsyncSession, conversation: Conversation) -> Conversa
         for name in ConversationSummary.model_fields
         if hasattr(conversation, name)
     }
-    data["agent_version"] = await conversations.version_number(session, conversation)
+    data["agent_version"], data["agent_name"] = await conversations.pinned_agent(
+        session, conversation
+    )
     data["recording_url"] = recording_url(conversation)
     return ConversationSummary.model_validate(data)
 

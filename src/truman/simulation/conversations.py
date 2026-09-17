@@ -8,7 +8,7 @@ from sqlalchemy import ColumnElement, and_, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from truman.config import Settings
-from truman.db.models import AgentVersion, Conversation
+from truman.db.models import Agent, AgentVersion, Conversation
 from truman.domain.agents import AgentConfig, Direction, Transport
 from truman.domain.conversations import (
     ACTIVE_STATUSES,
@@ -79,11 +79,16 @@ async def list_conversations(
     return list(rows), total or 0
 
 
-async def version_number(session: AsyncSession, conversation: Conversation) -> int:
-    number = await session.scalar(
-        select(AgentVersion.version).where(AgentVersion.id == conversation.agent_version_id)
-    )
-    return number or 0
+async def pinned_agent(session: AsyncSession, conversation: Conversation) -> tuple[int, str]:
+    """The version number and agent name a conversation was started against."""
+    row = (
+        await session.execute(
+            select(AgentVersion.version, Agent.name)
+            .join(Agent, Agent.id == AgentVersion.agent_id)
+            .where(AgentVersion.id == conversation.agent_version_id)
+        )
+    ).one()
+    return row.version, row.name
 
 
 def transcript_of(conversation: Conversation) -> Transcript:
