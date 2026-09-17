@@ -1,28 +1,20 @@
-"""The Pipecat caller: a persona that phones the agent over a Plivo audio stream."""
+"""The websocket caller: a persona that dials the agent's Plivo stream endpoint directly."""
 
 import asyncio
-import contextlib
 import json
 import logging
 import os
 import uuid
-from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Any
 
-from pipecat.adapters.schemas.function_schema import FunctionSchema
-from pipecat.adapters.schemas.tools_schema import ToolsSchema
-from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.frames.frames import (
     CancelFrame,
     EndFrame,
-    ErrorFrame,
     Frame,
-    FunctionCallResultProperties,
     InputAudioRawFrame,
     InterruptionFrame,
     LLMFullResponseEndFrame,
-    LLMRunFrame,
     OutputAudioRawFrame,
     StartFrame,
     TTSAudioRawFrame,
@@ -30,18 +22,8 @@ from pipecat.frames.frames import (
     TTSStoppedFrame,
     TTSTextFrame,
 )
-from pipecat.pipeline.pipeline import Pipeline
-from pipecat.pipeline.worker import PipelineParams, PipelineWorker
-from pipecat.processors.aggregators.llm_context import LLMContext
-from pipecat.processors.aggregators.llm_response_universal import LLMContextAggregatorPair
-from pipecat.processors.audio.vad_processor import VADProcessor
 from pipecat.processors.frame_processor import FrameDirection
 from pipecat.serializers.base_serializer import FrameSerializer
-from pipecat.services.azure.llm import AzureLLMService
-from pipecat.services.deepgram.stt import DeepgramSTTService
-from pipecat.services.elevenlabs.tts import ElevenLabsTTSService
-from pipecat.services.llm_service import FunctionCallParams
-from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.transports.base_output import BaseOutputTransport
 from pipecat.transports.base_transport import BaseTransport
 from pipecat.transports.websocket.client import (
@@ -53,15 +35,9 @@ from pipecat.transports.websocket.client import (
 )
 from pipecat.workers.runner import WorkerRunner
 
+from truman.caller.persona import CallState, Persona, hang_up, note_failure, provider_keys
 from truman.caller.plivo import SAMPLE_RATE, Clock, Playout, Wire, start_message
-from truman.caller.transcript import (
-    OFFSET,
-    PLAYOUT,
-    AgentTurnTap,
-    GeneratedTap,
-    TranscriptBuilder,
-    WireTap,
-)
+from truman.caller.transcript import OFFSET, PLAYOUT, TranscriptBuilder, WireTap
 from truman.config import Settings
 from truman.domain.conversations import (
     CallObserver,
@@ -73,34 +49,6 @@ from truman.domain.conversations import (
 )
 
 log = logging.getLogger(__name__)
-
-END_GRACE_S = 3.0
-DRAINED = frozenset({EndReason.GOAL_REACHED, EndReason.GOAL_ABANDONED})
-
-PERSONA_INSTRUCTIONS = (
-    "You are a person on a phone call with a voice assistant. Stay in character throughout; "
-    "never mention being simulated, a test, or an AI.\n\n"
-    "{persona}\n\n"
-    "The assistant's words arrive as the user's messages. Reply with only what you would say "
-    "next: one short spoken turn, in the first person, in plain sentences, with no lists, "
-    "markdown or stage directions. Ask for or give one thing at a time, as a real caller "
-    "would, and do not repeat what the assistant has already understood. When your goal is "
-    "achieved, or it is clear the assistant cannot help, say nothing more and call end_call "
-    "with whether you succeeded and why."
-)
-
-END_CALL = FunctionSchema(
-    name="end_call",
-    description=(
-        "End the call. Call this instead of speaking once your goal is achieved "
-        "or it is clear the assistant cannot help."
-    ),
-    properties={
-        "success": {"type": "boolean", "description": "Whether you achieved your goal."},
-        "reason": {"type": "string", "description": "One sentence on why you are ending the call."},
-    },
-    required=["success", "reason"],
-)
 
 
 def resolve_headers(headers: dict[str, str]) -> dict[str, str]:
@@ -236,35 +184,9 @@ class CallerTransport(WebsocketClientTransport):
         return self._output
 
 
-@dataclass
-class CallState:
-    connected: bool = False
-    end_reason: EndReason | None = None
-    error: str | None = None
-
-
-class Stoppable(Protocol):
-    def has_finished(self) -> bool: ...
-
-    async def stop_when_done(self) -> None: ...
-
-    async def cancel(self) -> None: ...
-
-
 class PipecatCaller:
     def __init__(self, settings: Settings) -> None:
-        keys = {
-            "DEEPGRAM_API_KEY": settings.deepgram_api_key,
-            "ELEVENLABS_API_KEY": settings.elevenlabs_api_key,
-        }
-        if settings.azure_openai_endpoint:
-            keys["AZURE_OPENAI_API_KEY"] = settings.azure_openai_api_key
-        else:
-            keys["OPENAI_API_KEY or AZURE_OPENAI_ENDPOINT"] = settings.openai_api_key
-        missing = [name for name, value in keys.items() if value is None]
-        if missing:
-            raise ValueError(f"the pipecat caller needs {', '.join(missing)}")
-        self._keys = {name: value.get_secret_value() for name, value in keys.items() if value}
+        self._keys = provider_keys(settings)
         self._settings = settings
 
     async def run(
@@ -273,13 +195,6 @@ class PipecatCaller:
         clock = Clock()
         wire = Wire(str(uuid.uuid4()), clock, observer)
         state = CallState()
-        ended = asyncio.Event()
-
-        def end(reason: EndReason) -> None:
-            if state.end_reason is None:
-                state.end_reason = reason
-                ended.set()
-
         observer.wire_event(WireEvent(kind=WireEventKind.CONNECT_STARTED, at_ms=clock.ms()))
         opening = start_message(
             str(request.conversation_id),
@@ -302,135 +217,62 @@ class PipecatCaller:
             wire,
             opening,
         )
-        llm = self._llm(PERSONA_INSTRUCTIONS.format(persona=request.persona_prompt))
-        stt = DeepgramSTTService(
-            api_key=self._keys["DEEPGRAM_API_KEY"],
-            base_url=self._settings.deepgram_url,
-            sample_rate=SAMPLE_RATE,
-            settings=DeepgramSTTService.Settings(model=self._settings.deepgram_model),
-        )
-        tts = ElevenLabsTTSService(
-            api_key=self._keys["ELEVENLABS_API_KEY"],
-            sample_rate=SAMPLE_RATE,
-            settings=ElevenLabsTTSService.Settings(voice=self._settings.elevenlabs_voice_id),
-        )
-        context = LLMContext(tools=ToolsSchema(standard_tools=[END_CALL]))
-        aggregators = LLMContextAggregatorPair(context)
         transcript = TranscriptBuilder(clock, observer)
-        pipeline = Pipeline(
-            [
-                transport.input(),
-                VADProcessor(vad_analyzer=SileroVADAnalyzer(sample_rate=SAMPLE_RATE)),
-                stt,
-                aggregators.user(),
-                AgentTurnTap(transcript),
-                llm,
-                GeneratedTap(transcript),
-                tts,
-                transport.output(),
-                WireTap(transcript, wire.settle),
-                aggregators.assistant(),
-            ]
+        persona = Persona(
+            self._settings,
+            self._keys,
+            request,
+            clock,
+            observer,
+            transcript,
+            transport_input=transport.input(),
+            transport_output=transport.output(),
+            wire_tap=WireTap(transcript, wire.settle),
+            state=state,
         )
-        worker = PipelineWorker(
-            pipeline,
-            params=PipelineParams(
-                audio_in_sample_rate=SAMPLE_RATE, audio_out_sample_rate=SAMPLE_RATE
-            ),
-            idle_timeout_secs=None,
-            cancel_timeout_secs=END_GRACE_S,
-            enable_rtvi=False,
-        )
-
-        async def end_call(params: FunctionCallParams) -> None:
-            success = bool(params.arguments.get("success"))
-            log.info(
-                "persona ended conversation %s: success=%s, %s",
-                request.conversation_id,
-                success,
-                params.arguments.get("reason"),
-            )
-            await params.result_callback(
-                {"status": "call ended"}, properties=FunctionCallResultProperties(run_llm=False)
-            )
-            end(EndReason.GOAL_REACHED if success else EndReason.GOAL_ABANDONED)
-
-        llm.register_function(END_CALL.name, end_call, cancel_on_interruption=False)
 
         @transport.event_handler("on_connected")
         async def on_connected(_transport: Any, _websocket: Any) -> None:
             state.connected = True
             observer.wire_event(WireEvent(kind=WireEventKind.CONNECTED, at_ms=clock.ms()))
             if not request.agent.agent_speaks_first:
-                await worker.queue_frame(LLMRunFrame())
+                await persona.speak_first()
 
         @transport.event_handler("on_disconnected")
         async def on_disconnected(_transport: Any, _websocket: Any) -> None:
             if not wire.closed.is_set():
-                end(EndReason.AGENT_HANGUP)
-
-        @worker.event_handler("on_pipeline_error")
-        async def on_error(_worker: Any, frame: ErrorFrame) -> None:
-            observer.wire_event(WireEvent(kind=WireEventKind.CALLER_ERROR, at_ms=clock.ms()))
-            state.error = state.error or frame.error
-            processor = getattr(frame, "processor", None)
-            if frame.fatal or (processor is not None and not processor.is_usable):
-                end(EndReason.ERROR)
-
-        @worker.event_handler("on_setup_timeout")
-        async def on_setup_timeout(_worker: Any) -> None:
-            state.error = (
-                state.error or "the pipeline could not be set up: a provider did not connect"
-            )
+                state.end(EndReason.AGENT_HANGUP)
 
         runner = WorkerRunner(handle_sigint=False)
-        await runner.add_workers(worker)
+        await runner.add_workers(persona.worker)
         running = asyncio.create_task(runner.run())
         signals = [
             asyncio.ensure_future(waiter)
-            for waiter in (ended.wait(), stop.wait(), wire.hung_up.wait())
+            for waiter in (state.ended.wait(), stop.wait(), wire.hung_up.wait())
         ]
         try:
             await asyncio.wait({*signals, running}, return_when=asyncio.FIRST_COMPLETED)
             if stop.is_set():
-                end(EndReason.USER_REQUEST)
+                state.end(EndReason.USER_REQUEST)
             if wire.failed:
                 state.error = state.error or wire.failed
-                end(EndReason.ERROR)
+                state.end(EndReason.ERROR)
             if wire.hung_up.is_set():
-                end(EndReason.AGENT_HANGUP)
+                state.end(EndReason.AGENT_HANGUP)
             if running.done():
                 note_failure(running, state)
                 state.error = state.error or "the pipeline stopped on its own"
-                end(EndReason.ERROR)
+                state.end(EndReason.ERROR)
         except asyncio.CancelledError:
-            end(EndReason.PROCESS_RESTART)
+            state.end(EndReason.PROCESS_RESTART)
         finally:
             for signal in signals:
                 signal.cancel()
-            await hang_up(state, worker, running)
-        broken = [service.name for service in (stt, llm, tts) if not service.is_usable]
+            await hang_up(state, persona.worker, running)
+        broken = persona.unusable()
         if broken:
             state.error = state.error or f"{', '.join(broken)} stopped working"
         return outcome(state, wire, request.output_dir / "recording.wav")
-
-    def _llm(self, instructions: str) -> OpenAILLMService:
-        settings = self._settings
-        if settings.azure_openai_endpoint:
-            return AzureLLMService(
-                endpoint=settings.azure_openai_endpoint,
-                api_key=self._keys["AZURE_OPENAI_API_KEY"],
-                api_version=settings.azure_openai_api_version,
-                settings=AzureLLMService.Settings(
-                    model=settings.persona_model, system_instruction=instructions
-                ),
-            )
-        return OpenAILLMService(
-            api_key=self._keys["OPENAI_API_KEY or AZURE_OPENAI_ENDPOINT"],
-            settings=OpenAILLMService.Settings(
-                model=settings.persona_model, system_instruction=instructions
-            ),
-        )
 
 
 def outcome(state: CallState, wire: Wire, recording: Path) -> CallOutcome:
@@ -444,40 +286,3 @@ def outcome(state: CallState, wire: Wire, recording: Path) -> CallOutcome:
         caller_error=state.error,
         recording_path=wire.write_recording(recording),
     )
-
-
-async def hang_up(state: CallState, worker: Stoppable, running: asyncio.Task[None]) -> None:
-    """Let the pipeline play out after the persona hung up, cancel it otherwise, never leave it.
-
-    Cancellation does not make this return early: an outcome handed over while the pipeline is
-    alive cannot be trusted, so the wait outlives cancellation and the worker's stop deadline
-    escalates to a process exit instead.
-    """
-    try:
-        if state.end_reason in DRAINED and not worker.has_finished():
-            await worker.stop_when_done()
-            await asyncio.wait({running}, timeout=END_GRACE_S)
-    finally:
-        if not running.done():
-            if not worker.has_finished():
-                await until_done(asyncio.ensure_future(cancel_pipeline(worker)))
-            await until_done(running)
-        note_failure(running, state)
-
-
-async def cancel_pipeline(worker: Stoppable) -> None:
-    with contextlib.suppress(Exception):
-        await worker.cancel()
-
-
-async def until_done(task: asyncio.Future[Any]) -> None:
-    while not task.done():
-        with contextlib.suppress(asyncio.CancelledError):
-            await asyncio.wait({task})
-
-
-def note_failure(running: asyncio.Task[None], state: CallState) -> None:
-    if running.cancelled() or running.exception() is None:
-        return
-    log.error("pipeline failed: %r", running.exception())
-    state.error = state.error or repr(running.exception())
