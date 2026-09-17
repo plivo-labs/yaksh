@@ -116,6 +116,12 @@ export function ConversationPage() {
                 <CardDescription>
                   From {data.caller_number ?? "a number assigned at call time"}, up to{" "}
                   {data.max_duration_s}s
+                  {data.call_uuid && (
+                    <>
+                      {" · Plivo call "}
+                      <span className="font-mono">{data.call_uuid}</span>
+                    </>
+                  )}
                 </CardDescription>
               </CardHeader>
               <CardContent className="whitespace-pre-wrap text-sm">

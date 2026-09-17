@@ -64,7 +64,7 @@ export function AgentsPage() {
               <TableHead>Name</TableHead>
               <TableHead>Direction</TableHead>
               <TableHead>Transport</TableHead>
-              <TableHead>Endpoint</TableHead>
+              <TableHead>Number</TableHead>
               <TableHead>Speaks first</TableHead>
               <TableHead className="text-right">Version</TableHead>
               <TableHead>Updated</TableHead>
@@ -89,7 +89,7 @@ export function AgentsPage() {
                 <TableCell className="capitalize">{agent.direction}</TableCell>
                 <TableCell>{words(agent.transport)}</TableCell>
                 <TableCell className="max-w-72 truncate font-mono text-xs">
-                  {agent.websocket_url ?? agent.agent_number ?? ""}
+                  {agent.agent_number ?? agent.websocket_url ?? ""}
                 </TableCell>
                 <TableCell>{agent.agent_speaks_first ? "Yes" : "No"}</TableCell>
                 <TableCell className="text-right font-mono text-xs">

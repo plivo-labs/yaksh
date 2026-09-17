@@ -28,16 +28,12 @@ import { Spinner } from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useAgent, useDeleteAgent, useSaveAgent } from "@/lib/queries";
-import type { Agent, AgentInput, Direction, Transport } from "@/lib/types";
+import type { Agent, AgentInput } from "@/lib/types";
 
 interface Draft {
   name: string;
   external_id: string;
-  direction: Direction;
-  transport: Transport;
-  websocket_url: string;
-  upgrade_headers: string;
-  extra_headers: string;
+  agent_number: string;
   agent_speaks_first: boolean;
   brief: string;
 }
@@ -45,53 +41,34 @@ interface Draft {
 const EMPTY: Draft = {
   name: "",
   external_id: "",
-  direction: "inbound",
-  transport: "plivo_websocket",
-  websocket_url: "",
-  upgrade_headers: "",
-  extra_headers: "",
+  agent_number: "",
   agent_speaks_first: true,
   brief: "",
 };
-
-function headersToText(headers: Record<string, string>): string {
-  return Object.entries(headers)
-    .map(([name, value]) => `${name}: ${value}`)
-    .join("\n");
-}
-
-function textToHeaders(text: string): Record<string, string> {
-  const headers: Record<string, string> = {};
-  for (const line of text.split("\n")) {
-    const colon = line.indexOf(":");
-    if (colon > 0) headers[line.slice(0, colon).trim()] = line.slice(colon + 1).trim();
-  }
-  return headers;
-}
 
 function toDraft(agent: Agent): Draft {
   return {
     name: agent.name,
     external_id: agent.external_id ?? "",
-    direction: agent.direction,
-    transport: agent.transport,
-    websocket_url: agent.websocket_url ?? "",
-    upgrade_headers: headersToText(agent.upgrade_headers),
-    extra_headers: headersToText(agent.extra_headers),
+    agent_number: agent.agent_number ?? "",
     agent_speaks_first: agent.agent_speaks_first,
     brief: agent.brief ?? "",
   };
 }
 
-function toInput(draft: Draft): AgentInput {
+const E164 = /^\+[1-9]\d{6,14}$/;
+
+function normalizeNumber(typed: string): string {
+  return typed.replaceAll(/[\s-]/g, "");
+}
+
+function toInput(draft: Draft, agent?: Agent): AgentInput {
   return {
     name: draft.name.trim(),
     external_id: draft.external_id.trim() || null,
-    direction: draft.direction,
-    transport: draft.transport,
-    websocket_url: draft.websocket_url.trim() || null,
-    upgrade_headers: textToHeaders(draft.upgrade_headers),
-    extra_headers: textToHeaders(draft.extra_headers),
+    direction: agent?.direction ?? "inbound",
+    transport: "phone",
+    agent_number: normalizeNumber(draft.agent_number),
     agent_speaks_first: draft.agent_speaks_first,
     brief: draft.brief.trim() || null,
   };
@@ -110,6 +87,17 @@ export function AgentFormPage() {
       </Alert>
     );
   }
+  if (agent.data.transport !== "phone") {
+    return (
+      <Alert>
+        <AlertTitle>{agent.data.name} is a stream agent</AlertTitle>
+        <AlertDescription>
+          It is reached at {agent.data.websocket_url} and is managed through the API. The console
+          registers agents by phone number.
+        </AlertDescription>
+      </Alert>
+    );
+  }
   return <AgentForm key={agent.data.id} agent={agent.data} />;
 }
 
@@ -123,9 +111,12 @@ function AgentForm({ agent }: { agent?: Agent }) {
   const set = <K extends keyof Draft>(key: K, value: Draft[K]) =>
     setDraft((current) => ({ ...current, [key]: value }));
 
+  const numberOk = E164.test(normalizeNumber(draft.agent_number));
+
   const submit = (event: SubmitEvent) => {
     event.preventDefault();
-    save.mutate(toInput(draft), { onSuccess: () => navigate("/agents") });
+    if (!numberOk) return;
+    save.mutate(toInput(draft, agent), { onSuccess: () => navigate("/agents") });
   };
 
   return (
@@ -151,43 +142,25 @@ function AgentForm({ agent }: { agent?: Agent }) {
         </Field>
 
         <Field>
-          <FieldLabel htmlFor="websocket_url">Stream endpoint</FieldLabel>
+          <FieldLabel htmlFor="agent_number">Phone number</FieldLabel>
           <Input
-            id="websocket_url"
+            id="agent_number"
             required
-            placeholder="wss://agent.example.com/stream"
-            value={draft.websocket_url}
-            onChange={(e) => set("websocket_url", e.target.value)}
+            type="tel"
+            inputMode="tel"
+            placeholder="+1 415 555 0100"
+            aria-invalid={draft.agent_number !== "" && !numberOk}
+            value={draft.agent_number}
+            onChange={(e) => set("agent_number", e.target.value)}
           />
-          <FieldDescription>Where the agent accepts a Plivo audio stream.</FieldDescription>
-        </Field>
-
-        <div className="grid grid-cols-2 gap-4">
-          <Field>
-            <FieldLabel htmlFor="upgrade_headers">Handshake headers</FieldLabel>
-            <Textarea
-              id="upgrade_headers"
-              rows={3}
-              placeholder="Authorization: env:AGENT_TOKEN"
-              value={draft.upgrade_headers}
-              onChange={(e) => set("upgrade_headers", e.target.value)}
-            />
+          {draft.agent_number !== "" && !numberOk ? (
+            <FieldError>Use the international format, like +14155550100.</FieldError>
+          ) : (
             <FieldDescription>
-              One per line. Use env:NAME to read a secret from the worker's environment.
+              The number Truman dials, with the country code. Calls come from your Plivo numbers.
             </FieldDescription>
-          </Field>
-          <Field>
-            <FieldLabel htmlFor="extra_headers">Start event headers</FieldLabel>
-            <Textarea
-              id="extra_headers"
-              rows={3}
-              placeholder="X-PH-new_call: true"
-              value={draft.extra_headers}
-              onChange={(e) => set("extra_headers", e.target.value)}
-            />
-            <FieldDescription>Sent as extra_headers in the stream's start event.</FieldDescription>
-          </Field>
-        </div>
+          )}
+        </Field>
 
         <Field orientation="horizontal" className="rounded-md border px-4 py-3">
           <FieldContent>
