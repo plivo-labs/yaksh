@@ -1,4 +1,5 @@
 import asyncio
+import json
 import uuid
 from collections.abc import AsyncIterator
 from pathlib import Path
@@ -22,6 +23,7 @@ PROVIDERS = ("deepgram_api_key", "elevenlabs_api_key", "openai_api_key")
 AGENT_NUMBER = "+14155550100"
 POOL_NUMBER = "+17862242321"
 RETRIES = "rc=5&ct=2000&rd=1000&rp=5xx,ct"
+START = {"streamId": "stream-1", "callId": "call-1", "mediaFormat": {"encoding": "audio/x-l16"}}
 
 
 class Rig:
@@ -126,10 +128,12 @@ async def test_the_stream_arrives_after_the_agent_rings_and_answers(
     xml = await rig.answer(call.conversation_id, "call-1")
     async with websockets.connect(
         f"ws://127.0.0.1:{rig.worker.port}/stream/{call.conversation_id}"
-    ):
+    ) as plivo:
+        await plivo.send(json.dumps({"event": "start", "start": START}))
         connected = await asyncio.wait_for(dialing, 2)
         assert isinstance(connected, Connected)
-        assert connected.request_uuid == "req-1" and connected.call_uuid == "call-1"
+        assert (connected.stream_id, connected.call_uuid) == ("stream-1", "call-1")
+        assert connected.encoding == "audio/x-l16"
         assert f"/stream/{call.conversation_id}" in xml
         rig.registry.forget(call.conversation_id)
 
@@ -248,4 +252,4 @@ async def test_a_stream_that_is_not_plivo_ends_the_call_before_any_provider_is_t
     assert outcome.call_uuid == "call-9"
     assert observer.kinds() == [WireEventKind.CONNECT_STARTED, WireEventKind.ANSWERED]
     assert rig.registry.get(call.conversation_id) is None
-    assert {"hang_up": "call-9"} not in rig.seen
+    assert rig.seen[-1] == {"hang_up": "call-9"}

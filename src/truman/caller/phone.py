@@ -63,12 +63,13 @@ MULAW = "audio/x-mulaw"
 @dataclass
 class Connected:
     socket: WebSocket
-    request_uuid: str
-    call_uuid: str | None
+    stream_id: str
+    call_uuid: str
+    encoding: str
 
 
 class Dialer:
-    """Rings the agent from the leased number and hands over the stream socket once it lands.
+    """Rings the agent from the leased number and hands over the stream once Plivo opens it.
 
     Plivo reports the call through the answer fetch and the callbacks queued on the registry
     entry; the wait ends with the socket, a stop, a report that the call ended, or silence past
@@ -135,7 +136,7 @@ class Dialer:
                         return ended_early(status, fields.get("HangupCause"), call_uuid)
                     continue
                 if entry.socket.done():
-                    return Connected(entry.socket.result(), request_uuid, call_uuid)
+                    return await self._open(entry.socket.result(), request_uuid, call_uuid)
                 await self._end(request_uuid, call_uuid)
                 if stopped.done():
                     return unreached(EndReason.USER_REQUEST, None, call_uuid)
@@ -144,6 +145,18 @@ class Dialer:
             stopped.cancel()
             report.cancel()
             await asyncio.gather(stopped, report, return_exceptions=True)
+
+    async def _open(
+        self, socket: WebSocket, request_uuid: str, call_uuid: str | None
+    ) -> Connected | CallOutcome:
+        try:
+            stream_id, call_id, encoding = await handshake(socket)
+        except (WebSocketDisconnect, ValueError, KeyError) as error:
+            await self._end(request_uuid, call_uuid)
+            return unreached(
+                EndReason.ERROR, f"the stream ended before it started: {error}", call_uuid
+            )
+        return Connected(socket, stream_id, call_id, encoding)
 
     async def _end(self, request_uuid: str, call_uuid: str | None) -> None:
         try:
@@ -425,7 +438,10 @@ class PhoneCaller:
             dialed = await self._dialer.dial(request, entry, observer, clock.ms, stop)
             if isinstance(dialed, CallOutcome):
                 return dialed
-            return await self._talk(request, observer, stop, clock, dialed)
+            try:
+                return await self._talk(request, observer, stop, clock, dialed)
+            finally:
+                await self._hang_up(dialed.call_uuid)
         finally:
             self._registry.forget(request.conversation_id)
 
@@ -437,26 +453,20 @@ class PhoneCaller:
         clock: Clock,
         dialed: Connected,
     ) -> CallOutcome:
-        socket = dialed.socket
-        try:
-            stream_id, call_id, encoding = await handshake(socket)
-        except (WebSocketDisconnect, ValueError, KeyError) as error:
-            log.warning("stream for conversation %s: %r", request.conversation_id, error)
-            return unreached(
-                EndReason.ERROR, f"the stream ended before it started: {error}", dialed.call_uuid
-            )
         log.info(
             "stream %s for conversation %s, call %s, %s",
-            stream_id,
+            dialed.stream_id,
             request.conversation_id,
-            call_id,
-            encoding,
+            dialed.call_uuid,
+            dialed.encoding,
         )
         transcript = TranscriptBuilder(clock, observer)
-        checkpoints = Checkpoints(stream_id, transcript)
-        serializer = StreamSerializer(stream_id, encoding, clock, observer, checkpoints)
+        checkpoints = Checkpoints(dialed.stream_id, transcript)
+        serializer = StreamSerializer(
+            dialed.stream_id, dialed.encoding, clock, observer, checkpoints
+        )
         transport = FastAPIWebsocketTransport(
-            socket,
+            dialed.socket,
             FastAPIWebsocketParams(
                 serializer=serializer,
                 add_wav_header=False,
@@ -508,14 +518,13 @@ class PhoneCaller:
         finally:
             if greeting is not None:
                 greeting.cancel()
-            await self._hang_up(call_id)
         state.error = state.error or serializer.failure
         return CallOutcome(
             connected=state.connected,
             end_reason=state.end_reason or EndReason.ERROR,
             caller_error=state.error,
             recording_path=recorder.path,
-            call_uuid=call_id,
+            call_uuid=dialed.call_uuid,
         )
 
     async def _hang_up(self, call_id: str) -> None:
