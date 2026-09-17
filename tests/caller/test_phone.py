@@ -121,6 +121,7 @@ async def test_the_stream_arrives_after_the_agent_rings_and_answers(
     dialing = dial(rig, call, observer, asyncio.Event())
 
     await rig.report(call.conversation_id, CallStatus="ringing", CallUUID="call-1")
+    await rig.report(call.conversation_id, CallStatus="ringing", CallUUID="call-1")
     xml = await rig.answer(call.conversation_id, "call-1")
     async with websockets.connect(
         f"ws://127.0.0.1:{rig.worker.port}/stream/{call.conversation_id}"

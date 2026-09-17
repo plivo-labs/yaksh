@@ -91,6 +91,7 @@ class Dialer:
         except PlivoError as error:
             return unreached(EndReason.ERROR, str(error))
         call_uuid: str | None = None
+        ringing = False
         loop = asyncio.get_running_loop()
         deadline = loop.time() + self._ring_timeout_s + CALLBACK_GRACE_S
         stopped = asyncio.ensure_future(stop.wait())
@@ -108,7 +109,11 @@ class Dialer:
                     call_uuid = fields.get("CallUUID") or call_uuid
                     status = fields.get("CallStatus", "")
                     if status == RINGING:
-                        observer.wire_event(WireEvent(kind=WireEventKind.RINGING, at_ms=at_ms()))
+                        if not ringing:
+                            ringing = True
+                            observer.wire_event(
+                                WireEvent(kind=WireEventKind.RINGING, at_ms=at_ms())
+                            )
                     elif status == IN_PROGRESS:
                         observer.wire_event(WireEvent(kind=WireEventKind.ANSWERED, at_ms=at_ms()))
                         deadline = loop.time() + STREAM_GRACE_S
