@@ -1,7 +1,6 @@
 import asyncio
 import sys
 import uuid
-from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -11,7 +10,7 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy import insert, update
 from sqlalchemy.ext.asyncio import create_async_engine
 
-from tests.conftest import TOKEN, FakeCaller
+from tests.conftest import TOKEN, FakeCaller, create_agent_id, start, wait_for, wait_until
 from truman.config import Settings
 from truman.db.models import Conversation
 from truman.db.session import create_engine, create_sessionmaker
@@ -20,40 +19,7 @@ from truman.simulation import conversations
 from truman.simulation.calls import STOP_IGNORED
 from truman.worker.worker import FINALIZE_ATTEMPTS, Worker
 
-AGENT = {"name": "Front desk", "agent_number": "+14155550100"}
 FINAL = {"completed", "failed", "invalid", "cancelled"}
-
-
-async def create_agent(client: AsyncClient, **overrides: Any) -> str:
-    response = await client.post("/api/v1/agents", json={**AGENT, **overrides})
-    assert response.status_code == 201, response.text
-    return response.json()["id"]
-
-
-async def start(client: AsyncClient, agent_id: str, **overrides: Any) -> dict[str, Any]:
-    body = {"agent_id": agent_id, "persona_prompt": "I want to book a room", **overrides}
-    response = await client.post("/api/v1/conversations", json=body)
-    assert response.status_code == 202, response.text
-    return response.json()
-
-
-async def wait_for(
-    client: AsyncClient, conversation_id: str, statuses: set[str], timeout: float = 5.0
-) -> dict[str, Any]:
-    deadline = asyncio.get_running_loop().time() + timeout
-    while True:
-        conversation = (await client.get(f"/api/v1/conversations/{conversation_id}")).json()
-        if conversation["status"] in statuses:
-            return conversation
-        assert asyncio.get_running_loop().time() < deadline, conversation
-        await asyncio.sleep(0.05)
-
-
-async def wait_until(condition: Callable[[], bool], timeout: float = 5.0) -> None:
-    deadline = asyncio.get_running_loop().time() + timeout
-    while not condition():
-        assert asyncio.get_running_loop().time() < deadline
-        await asyncio.sleep(0.02)
 
 
 async def wait_for_event(client: AsyncClient, conversation_id: str, kind: str) -> None:
@@ -70,7 +36,7 @@ async def wait_for_event(client: AsyncClient, conversation_id: str, kind: str) -
 async def test_a_conversation_runs_to_completion_with_its_transcript(
     client: AsyncClient, worker: Worker, caller: FakeCaller
 ) -> None:
-    agent_id = await create_agent(client)
+    agent_id = await create_agent_id(client)
     started = await start(client, agent_id)
     assert started["status"] == "queued" and started["agent_version"] == 1
 
@@ -95,7 +61,7 @@ async def test_a_conversation_runs_to_completion_with_its_transcript(
 async def test_ending_a_queued_conversation_cancels_it_without_a_call(
     client: AsyncClient, caller: FakeCaller
 ) -> None:
-    agent_id = await create_agent(client)
+    agent_id = await create_agent_id(client)
     started = await start(client, agent_id)
 
     ended = await client.post(f"/api/v1/conversations/{started['id']}/end")
@@ -110,7 +76,7 @@ async def test_ending_a_running_conversation_hangs_up_and_is_idempotent(
     client: AsyncClient, worker: Worker, caller: FakeCaller
 ) -> None:
     caller.release.clear()
-    agent_id = await create_agent(client)
+    agent_id = await create_agent_id(client)
     started = await start(client, agent_id)
     running = await wait_for(client, started["id"], {"running"})
     for _ in range(40):
@@ -130,7 +96,7 @@ async def test_ending_a_running_conversation_hangs_up_and_is_idempotent(
 
 
 async def test_starting_and_deleting_an_agent_cannot_both_succeed(client: AsyncClient) -> None:
-    agent_id = await create_agent(client)
+    agent_id = await create_agent_id(client)
     body = {"agent_id": agent_id, "persona_prompt": "race"}
 
     started, deleted = await asyncio.gather(
@@ -144,7 +110,7 @@ async def test_starting_and_deleting_an_agent_cannot_both_succeed(client: AsyncC
 async def test_two_workers_never_run_the_same_conversation_twice(
     client: AsyncClient, settings: Settings, caller: FakeCaller
 ) -> None:
-    agent_id = await create_agent(client)
+    agent_id = await create_agent_id(client)
     ids = [(await start(client, agent_id))["id"] for _ in range(3)]
     engine = create_engine(settings.database_url.encoded_string())
     sessionmaker = create_sessionmaker(engine)
@@ -165,7 +131,7 @@ async def test_an_exception_after_connecting_keeps_the_evidence(
     client: AsyncClient, worker: Worker, caller: FakeCaller
 ) -> None:
     caller.mode = "raise_after_connect"
-    agent_id = await create_agent(client)
+    agent_id = await create_agent_id(client)
     started = await start(client, agent_id)
 
     done = await wait_for(client, started["id"], FINAL)
@@ -181,7 +147,7 @@ async def test_a_caller_that_ignores_stop_is_cut_off_and_capacity_is_released(
     client: AsyncClient, worker: Worker, caller: FakeCaller
 ) -> None:
     caller.mode = "ignore_stop"
-    agent_id = await create_agent(client)
+    agent_id = await create_agent_id(client)
     started = await start(client, agent_id)
     await wait_for_event(client, started["id"], "connected")
 
@@ -199,7 +165,7 @@ async def test_an_expired_lease_is_marked_failed_while_a_live_one_is_not(
     client: AsyncClient, worker: Worker, caller: FakeCaller, settings: Settings
 ) -> None:
     caller.release.clear()
-    agent_id = await create_agent(client)
+    agent_id = await create_agent_id(client)
     live = await start(client, agent_id)
     await wait_for(client, live["id"], {"running"})
     orphan_id = uuid.uuid4()
@@ -232,7 +198,7 @@ async def test_an_expired_lease_is_marked_failed_while_a_live_one_is_not(
 async def test_a_conversation_waits_until_a_worker_picks_it_up(
     client: AsyncClient, settings: Settings, caller: FakeCaller
 ) -> None:
-    agent_id = await create_agent(client)
+    agent_id = await create_agent_id(client)
     started = await start(client, agent_id)
     await asyncio.sleep(0.3)
     assert (await client.get(f"/api/v1/conversations/{started['id']}")).json()["status"] == "queued"
@@ -253,7 +219,7 @@ async def test_a_refused_connection_is_failed_and_still_readable(
     client: AsyncClient, worker: Worker, caller: FakeCaller
 ) -> None:
     caller.mode = "refuse"
-    agent_id = await create_agent(client)
+    agent_id = await create_agent_id(client)
     started = await start(client, agent_id)
 
     done = await wait_for(client, started["id"], FINAL)
@@ -266,8 +232,8 @@ async def test_a_refused_connection_is_failed_and_still_readable(
 async def test_a_conversation_gets_its_number_from_the_pool_and_outbound_agents_are_refused(
     client: AsyncClient,
 ) -> None:
-    agent = await create_agent(client)
-    outbound = await create_agent(client, direction="outbound")
+    agent = await create_agent_id(client)
+    outbound = await create_agent_id(client, direction="outbound")
 
     queued = await start(client, agent)
     chosen = await client.post(
@@ -294,7 +260,7 @@ async def test_conversations_cannot_start_while_phone_calls_are_off(
     async with AsyncClient(
         transport=ASGITransport(app=app), base_url="http://test", headers=headers
     ) as client:
-        agent = await create_agent(client)
+        agent = await create_agent_id(client)
         response = await client.post(
             "/api/v1/conversations", json={"agent_id": agent, "persona_prompt": "hello"}
         )
@@ -307,7 +273,7 @@ async def test_conversations_cannot_start_while_phone_calls_are_off(
 async def test_a_conversation_keeps_the_agent_version_it_started_with(
     client: AsyncClient, worker: Worker
 ) -> None:
-    agent_id = await create_agent(client)
+    agent_id = await create_agent_id(client)
     started = await start(client, agent_id)
     await wait_for(client, started["id"], {"completed"})
 
@@ -321,7 +287,7 @@ async def test_capacity_queues_extra_conversations(
     client: AsyncClient, settings: Settings, caller: FakeCaller
 ) -> None:
     caller.release.clear()
-    agent_id = await create_agent(client)
+    agent_id = await create_agent_id(client)
     first, second = await start(client, agent_id), await start(client, agent_id)
     engine = create_engine(settings.database_url.encoded_string())
     limited = settings.model_copy(update={"max_active_conversations": 1})
@@ -344,7 +310,7 @@ async def test_events_stream_turns_and_the_final_status(
     client: AsyncClient, worker: Worker, caller: FakeCaller, settings: Settings
 ) -> None:
     caller.release.clear()
-    agent_id = await create_agent(client)
+    agent_id = await create_agent_id(client)
     started = await start(client, agent_id)
     engine = create_engine(settings.database_url.encoded_string())
     events = conversations.stream_events(
@@ -367,7 +333,7 @@ async def test_events_stream_turns_and_the_final_status(
 async def test_the_events_route_serves_server_sent_events(
     client: AsyncClient, worker: Worker
 ) -> None:
-    agent_id = await create_agent(client)
+    agent_id = await create_agent_id(client)
     started = await start(client, agent_id)
     await wait_for(client, started["id"], {"completed"})
 
@@ -384,7 +350,7 @@ async def test_worker_shutdown_stops_the_caller_and_keeps_the_evidence(
     caller.release.clear()
     caller.recording_path = tmp_path / "recording.wav"
     caller.recording_path.write_bytes(b"RIFF")
-    agent_id = await create_agent(client)
+    agent_id = await create_agent_id(client)
     started = await start(client, agent_id)
     unhurried = settings.model_copy(update={"worker_lease_s": 30})
     engine = create_engine(settings.database_url.encoded_string())
@@ -427,7 +393,7 @@ async def test_shutdown_waits_while_result_writes_time_out_and_unwind_slowly(
     monkeypatch.setattr("truman.worker.worker.FINALIZE_TIMEOUT_S", 0.2)
     monkeypatch.setattr("truman.worker.worker.FINALIZE_RETRY_S", 0.05)
     caller.release.clear()
-    agent_id = await create_agent(client)
+    agent_id = await create_agent_id(client)
     started = await start(client, agent_id)
     unhurried = settings.model_copy(update={"worker_lease_s": 30})
     engine = create_engine(settings.database_url.encoded_string())
@@ -452,7 +418,7 @@ async def test_a_worker_that_cannot_renew_its_lease_stops_the_call(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     caller.release.clear()
-    agent_id = await create_agent(client)
+    agent_id = await create_agent_id(client)
     started = await start(client, agent_id)
     await wait_until(lambda: caller.calls == 1)
 
@@ -486,7 +452,7 @@ async def test_a_result_write_that_fails_past_the_lease_is_retried_and_kept(
 
     monkeypatch.setattr("truman.simulation.conversations.finalize", slow_then_flaky)
     monkeypatch.setattr("truman.worker.worker.FINALIZE_RETRY_S", 0.05)
-    agent_id = await create_agent(client)
+    agent_id = await create_agent_id(client)
     started = await start(client, agent_id)
 
     done = await wait_for(client, started["id"], FINAL, timeout=settings.worker_lease_s + 5)
@@ -502,7 +468,7 @@ async def test_a_renewal_that_hangs_stops_the_call_within_the_lease(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     caller.release.clear()
-    agent_id = await create_agent(client)
+    agent_id = await create_agent_id(client)
     started = await start(client, agent_id)
     await wait_until(lambda: caller.calls == 1)
 
@@ -518,7 +484,7 @@ async def test_a_renewal_that_hangs_stops_the_call_within_the_lease(
 async def test_an_expired_owner_can_neither_renew_nor_record(
     client: AsyncClient, settings: Settings
 ) -> None:
-    agent_id = await create_agent(client)
+    agent_id = await create_agent_id(client)
     started = await start(client, agent_id)
     engine = create_async_engine(settings.database_url.encoded_string())
     async with engine.begin() as connection:
@@ -550,7 +516,7 @@ async def test_a_caller_that_survives_cancellation_makes_the_worker_exit(
     client: AsyncClient, settings: Settings, caller: FakeCaller
 ) -> None:
     caller.mode = "immortal"
-    agent_id = await create_agent(client)
+    agent_id = await create_agent_id(client)
     started = await start(client, agent_id)
     engine = create_engine(settings.database_url.encoded_string())
     worker = Worker(create_sessionmaker(engine), caller, settings, worker_id="doomed")
@@ -583,7 +549,7 @@ async def test_a_conversation_that_cannot_be_prepared_fails_without_stopping_the
         return await real_call_request(*args, **kwargs)
 
     monkeypatch.setattr("truman.simulation.conversations.call_request", flaky)
-    agent_id = await create_agent(client)
+    agent_id = await create_agent_id(client)
     first = await start(client, agent_id)
     failed = await wait_for(client, first["id"], FINAL)
     second = await start(client, agent_id)
@@ -625,7 +591,7 @@ asyncio.run(run_worker(settings, Immortal(), StreamRegistry(), None))
 async def test_a_worker_with_an_uncancellable_caller_exits_nonzero(
     client: AsyncClient, settings: Settings, tmp_path: Path
 ) -> None:
-    agent_id = await create_agent(client)
+    agent_id = await create_agent_id(client)
     started = await start(client, agent_id)
     process = await asyncio.create_subprocess_exec(
         sys.executable,
@@ -662,7 +628,7 @@ async def test_a_call_whose_preparation_outlives_the_lease_is_not_started(
         return await real_call_request(*args, **kwargs)
 
     monkeypatch.setattr("truman.simulation.conversations.call_request", slow)
-    agent_id = await create_agent(client)
+    agent_id = await create_agent_id(client)
     started = await start(client, agent_id)
 
     done = await wait_for(client, started["id"], FINAL, timeout=10)
@@ -702,7 +668,7 @@ async def test_a_stalled_result_write_does_not_hold_capacity(
     monkeypatch.setattr("truman.worker.worker.FINALIZE_TIMEOUT_S", 0.2)
     monkeypatch.setattr("truman.worker.worker.FINALIZE_ATTEMPTS", 2)
     monkeypatch.setattr("truman.worker.worker.FINALIZE_RETRY_S", 0.05)
-    agent_id = await create_agent(client)
+    agent_id = await create_agent_id(client)
     await start(client, agent_id)
     await start(client, agent_id)
     engine = create_engine(settings.database_url.encoded_string())
@@ -752,7 +718,7 @@ asyncio.run(run_worker(settings, HoldsUntilStop(), StreamRegistry(), None))
 async def test_shutdown_with_an_uncancellable_result_write_still_exits(
     client: AsyncClient, settings: Settings, tmp_path: Path
 ) -> None:
-    agent_id = await create_agent(client)
+    agent_id = await create_agent_id(client)
     started = await start(client, agent_id)
     process = await asyncio.create_subprocess_exec(
         sys.executable,

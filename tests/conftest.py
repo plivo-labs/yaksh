@@ -34,6 +34,45 @@ POOL = [AccountNumber(number=f"+1555010{n:04d}") for n in range(8)]
 OFFLINE_DATABASE_URL = "postgresql+asyncpg://truman:truman@localhost:5432/truman"
 
 
+AGENT = {"name": "Front desk", "agent_number": "+14155550100"}
+
+
+async def create_agent(client: AsyncClient, **overrides: Any) -> dict[str, Any]:
+    response = await client.post("/api/v1/agents", json={**AGENT, **overrides})
+    assert response.status_code == 201, response.text
+    return response.json()
+
+
+async def create_agent_id(client: AsyncClient, **overrides: Any) -> str:
+    return (await create_agent(client, **overrides))["id"]
+
+
+async def start(client: AsyncClient, agent_id: str, **overrides: Any) -> dict[str, Any]:
+    body = {"agent_id": agent_id, "persona_prompt": "I want to book a room", **overrides}
+    response = await client.post("/api/v1/conversations", json=body)
+    assert response.status_code == 202, response.text
+    return response.json()
+
+
+async def wait_for(
+    client: AsyncClient, conversation_id: str, statuses: set[str], timeout: float = 5.0
+) -> dict[str, Any]:
+    deadline = asyncio.get_running_loop().time() + timeout
+    while True:
+        conversation = (await client.get(f"/api/v1/conversations/{conversation_id}")).json()
+        if conversation["status"] in statuses:
+            return conversation
+        assert asyncio.get_running_loop().time() < deadline, conversation
+        await asyncio.sleep(0.05)
+
+
+async def wait_until(condition: Callable[[], bool], timeout: float = 5.0) -> None:
+    deadline = asyncio.get_running_loop().time() + timeout
+    while not condition():
+        assert asyncio.get_running_loop().time() < deadline
+        await asyncio.sleep(0.02)
+
+
 def make_settings(tmp_path: Path, **overrides: Any) -> Settings:
     values: dict[str, Any] = {
         "api_token": TOKEN,

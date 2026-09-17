@@ -1,25 +1,17 @@
 import asyncio
-from typing import Any
 
 import pytest
 from httpx import AsyncClient
 from pydantic import ValidationError
 
+from tests.conftest import AGENT, create_agent
 from truman.config import Settings
-
-AGENT = {"name": "Front desk", "agent_number": "+14155550100"}
-
-
-async def create(client: AsyncClient, **overrides: Any) -> dict[str, Any]:
-    response = await client.post("/api/v1/agents", json={**AGENT, **overrides})
-    assert response.status_code == 201, response.text
-    return response.json()
 
 
 async def test_changing_config_creates_a_version_but_renaming_does_not(
     client: AsyncClient,
 ) -> None:
-    agent = await create(client)
+    agent = await create_agent(client)
     url = f"/api/v1/agents/{agent['id']}"
     assert agent["current_version"] == 1
 
@@ -45,7 +37,7 @@ async def test_invalid_updates_are_rejected_before_the_database(client: AsyncCli
     assert created.status_code == 422
     assert created.json()["error"]["code"] == "validation_error"
 
-    agent = await create(client)
+    agent = await create_agent(client)
     url = f"/api/v1/agents/{agent['id']}"
     assert (await client.patch(url, json={"agent_number": None})).status_code == 422
     assert (await client.patch(url, json={"agent_number": "4155550100"})).status_code == 422
@@ -56,7 +48,7 @@ async def test_invalid_updates_are_rejected_before_the_database(client: AsyncCli
 
 
 async def test_external_id_is_unique_among_live_agents(client: AsyncClient) -> None:
-    first = await create(client, external_id="flow-42")
+    first = await create_agent(client, external_id="flow-42")
 
     duplicate = await client.post("/api/v1/agents", json={**AGENT, "external_id": "flow-42"})
     assert duplicate.status_code == 409
@@ -66,13 +58,13 @@ async def test_external_id_is_unique_among_live_agents(client: AsyncClient) -> N
     assert (await client.get(f"/api/v1/agents/{first['id']}")).status_code == 404
     assert (await client.get(f"/api/v1/agents/{first['id']}/versions/1")).status_code == 200
 
-    reused = await create(client, external_id="flow-42")
+    reused = await create_agent(client, external_id="flow-42")
     listed = (await client.get("/api/v1/agents", params={"external_id": "flow-42"})).json()
     assert [item["id"] for item in listed["items"]] == [reused["id"]]
 
 
 async def test_concurrent_edits_get_distinct_versions(client: AsyncClient) -> None:
-    agent = await create(client)
+    agent = await create_agent(client)
     url = f"/api/v1/agents/{agent['id']}"
 
     responses = await asyncio.gather(

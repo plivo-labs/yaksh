@@ -7,8 +7,7 @@ from httpx import AsyncClient
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from tests.api.test_conversations import create_agent, start, wait_for, wait_until
-from tests.conftest import FakeCaller
+from tests.conftest import FakeCaller, create_agent_id, start, wait_for, wait_until
 from truman.__main__ import sync_pool
 from truman.caller.plivo_api import PlivoApi
 from truman.config import Settings
@@ -33,7 +32,7 @@ async def enabled_numbers(session: AsyncSession) -> dict[str, bool]:
 
 
 async def queue_phone_conversation(client: AsyncClient) -> uuid.UUID:
-    return uuid.UUID((await start(client, await create_agent(client)))["id"])
+    return uuid.UUID((await start(client, await create_agent_id(client)))["id"])
 
 
 async def test_concurrent_leases_get_distinct_numbers_and_a_finished_call_frees_its_number(
