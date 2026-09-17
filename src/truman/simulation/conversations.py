@@ -161,7 +161,6 @@ async def claim_next(session: AsyncSession, worker_id: str, lease_s: int) -> Con
 async def call_request(
     session: AsyncSession, settings: Settings, conversation: Conversation
 ) -> CallRequest:
-    """Build the request for a claimed conversation, leasing a pool number when it has none."""
     version = await session.get_one(AgentVersion, conversation.agent_version_id)
     agent = AgentConfig.model_validate(version.config)
     number = conversation.caller_number

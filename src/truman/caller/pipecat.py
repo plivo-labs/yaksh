@@ -118,7 +118,6 @@ class CallerOutput(WebsocketClientOutputTransport):
             )
 
     async def stop(self, frame: EndFrame) -> None:
-        """Play out what is queued, hang up, then disconnect."""
         await BaseOutputTransport.stop(self, frame)
         await self._stop_wire()
         await self._session.disconnect()

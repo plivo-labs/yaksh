@@ -66,7 +66,6 @@ END_CALL = FunctionSchema(
 
 
 def provider_keys(settings: Settings) -> dict[str, str]:
-    """The provider secrets the persona needs; a missing one is named and refused at startup."""
     keys = {
         "DEEPGRAM_API_KEY": settings.deepgram_api_key,
         "ELEVENLABS_API_KEY": settings.elevenlabs_api_key,

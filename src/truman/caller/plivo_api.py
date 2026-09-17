@@ -63,7 +63,6 @@ class PlivoApi:
         await self._delete(f"{self._account}/Request/{request_uuid}/")
 
     async def hang_up(self, call_uuid: str) -> None:
-        """Hang up a live call; gone already is fine."""
         await self._delete(f"{self._account}/Call/{call_uuid}/")
 
     async def _delete(self, url: str) -> None:

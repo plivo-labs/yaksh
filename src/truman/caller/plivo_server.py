@@ -29,8 +29,6 @@ NO_CALL = "no call expects this stream"
 
 @dataclass
 class PendingStream:
-    """One conversation waiting for Plivo: the socket lands here, the callbacks queue here."""
-
     socket: asyncio.Future[WebSocket] = field(
         default_factory=lambda: asyncio.get_running_loop().create_future()
     )
@@ -59,7 +57,6 @@ class StreamRegistry:
 
 
 async def fields(request: Request) -> dict[str, str]:
-    """What Plivo reports about a call, from the query string and the form alike."""
     form = await request.form()
     return {key: str(value) for key, value in (*request.query_params.items(), *form.items())}
 
@@ -140,7 +137,6 @@ class PlivoServer:
         log.info("plivo server listening on port %d", self.port)
 
     async def stop(self, timeout_s: float) -> None:
-        """Ask uvicorn to finish; a server that will not stop in time is cancelled."""
         if self._task is None:
             return
         self._server.should_exit = True
