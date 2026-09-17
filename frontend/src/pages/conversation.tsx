@@ -202,11 +202,13 @@ function place<T>(list: T[], index: number, item: T): T[] {
 
 function pause(ms: number, signal: AbortSignal): Promise<void> {
   return new Promise((resolve) => {
-    const timer = setTimeout(resolve, ms);
-    signal.addEventListener("abort", () => {
+    const done = () => {
       clearTimeout(timer);
+      signal.removeEventListener("abort", done);
       resolve();
-    });
+    };
+    const timer = setTimeout(done, ms);
+    signal.addEventListener("abort", done);
   });
 }
 
