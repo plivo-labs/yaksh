@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from tests.conftest import FakeCaller, create_agent_id, start, wait_for, wait_until
 from truman.__main__ import sync_pool
-from truman.caller.plivo_api import PlivoApi
+from truman.caller.plivo_api import PlivoApi, PlivoError
 from truman.config import Settings
 from truman.db.models import Conversation, PhoneNumber
 from truman.db.session import create_engine, create_sessionmaker
@@ -162,23 +162,26 @@ async def test_the_allowlist_and_voice_capability_decide_which_numbers_are_lease
 
 
 class Listing(PlivoApi):
-    """A Plivo client whose account lists exactly these numbers."""
+    """A Plivo client whose account lists exactly these numbers, or cannot be reached."""
 
-    def __init__(self, numbers: list[AccountNumber]) -> None:
+    def __init__(self, numbers: list[AccountNumber] | PlivoError) -> None:
         super().__init__("MAXXXX", "token")
         self.numbers = numbers
 
     async def list_numbers(self) -> list[AccountNumber]:
+        if isinstance(self.numbers, PlivoError):
+            raise self.numbers
         return self.numbers
 
 
-async def test_an_empty_listing_keeps_the_last_synced_pool(
+async def test_an_empty_listing_or_an_unreachable_plivo_keeps_the_last_synced_pool(
     client: AsyncClient, settings: Settings
 ) -> None:
     engine = create_engine(settings.database_url.encoded_string())
     sessions = create_sessionmaker(engine)
     await sync_pool(sessions, Listing(account(NUMBER)), [])
     await sync_pool(sessions, Listing([]), [])
+    await sync_pool(sessions, Listing(PlivoError("plivo is down")), [])
     async with sessions() as session:
         assert await enabled_numbers(session) == {NUMBER: True}
     await engine.dispose()
