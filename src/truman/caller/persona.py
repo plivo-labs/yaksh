@@ -116,7 +116,7 @@ def llm_service(settings: Settings, keys: dict[str, str], instructions: str) -> 
 
 @dataclass
 class CallState:
-    """How the call stands; the first end reason wins and later ones are ignored."""
+    """How the call stands; the first end reason and the first error win."""
 
     connected: bool = False
     end_reason: EndReason | None = None
@@ -127,6 +127,9 @@ class CallState:
         if self.end_reason is None:
             self.end_reason = reason
             self.ended.set()
+
+    def blame(self, error: str | None) -> None:
+        self.error = self.error or error
 
 
 class Silence:
@@ -259,16 +262,14 @@ class Persona:
         @self.worker.event_handler("on_pipeline_error")
         async def on_error(_worker: Any, frame: ErrorFrame) -> None:
             observer.wire_event(WireEvent(kind=WireEventKind.CALLER_ERROR, at_ms=clock.ms()))
-            state.error = state.error or frame.error
+            state.blame(frame.error)
             processor = getattr(frame, "processor", None)
             if frame.fatal or (processor is not None and not processor.is_usable):
                 state.end(EndReason.ERROR)
 
         @self.worker.event_handler("on_setup_timeout")
         async def on_setup_timeout(_worker: Any) -> None:
-            state.error = (
-                state.error or "the pipeline could not be set up: a provider did not connect"
-            )
+            state.blame("the pipeline could not be set up: a provider did not connect")
 
     async def speak_first(self) -> None:
         await self.worker.queue_frame(LLMRunFrame())
@@ -305,7 +306,7 @@ async def converse(
                 state.end(reason)
         if running.done():
             note_failure(running, state)
-            state.error = state.error or "the pipeline stopped on its own"
+            state.blame("the pipeline stopped on its own")
             state.end(EndReason.ERROR)
     except asyncio.CancelledError:
         state.end(EndReason.PROCESS_RESTART)
@@ -315,7 +316,7 @@ async def converse(
         await hang_up(state, persona.worker, running)
     broken = persona.unusable()
     if broken:
-        state.error = state.error or f"{', '.join(broken)} stopped working"
+        state.blame(f"{', '.join(broken)} stopped working")
 
 
 async def hang_up(state: CallState, worker: Stoppable, running: asyncio.Task[None]) -> None:
@@ -352,4 +353,4 @@ def note_failure(running: asyncio.Task[None], state: CallState) -> None:
     if running.cancelled() or running.exception() is None:
         return
     log.error("pipeline failed: %r", running.exception())
-    state.error = state.error or repr(running.exception())
+    state.blame(repr(running.exception()))

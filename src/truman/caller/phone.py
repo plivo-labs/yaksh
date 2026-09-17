@@ -520,7 +520,7 @@ class PhoneCaller:
         finally:
             if greeting is not None:
                 greeting.cancel()
-        state.error = state.error or serializer.failure
+        state.blame(serializer.failure)
         return CallOutcome(
             connected=state.connected,
             end_reason=state.end_reason or EndReason.ERROR,
