@@ -22,11 +22,13 @@ from pipecat.frames.frames import (
     FunctionCallResultProperties,
     InputAudioRawFrame,
     InterruptionFrame,
+    LLMFullResponseEndFrame,
     LLMRunFrame,
     OutputAudioRawFrame,
     StartFrame,
     TTSAudioRawFrame,
     TTSStartedFrame,
+    TTSStoppedFrame,
     TTSTextFrame,
 )
 from pipecat.pipeline.pipeline import Pipeline
@@ -194,6 +196,9 @@ class CallerOutput(WebsocketClientOutputTransport):
         elif isinstance(frame, TTSTextFrame) and self._arriving is not None:
             frame.metadata[PLAYOUT] = self._arriving
             frame.metadata[OFFSET] = self._arriving.offset_of(frame.pts)
+            self._arriving.words += 1
+        elif isinstance(frame, TTSStoppedFrame | LLMFullResponseEndFrame) and self._arriving:
+            frame.metadata[PLAYOUT] = self._arriving
         await super().process_frame(frame, direction)
 
     async def write_transport_frame(self, frame: Frame) -> None:

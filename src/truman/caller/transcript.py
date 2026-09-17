@@ -48,6 +48,7 @@ class TranscriptBuilder:
         self._open = False
         self._ended = False
         self._playout: Playout | None = None
+        self._closed: Playout | None = None
         self._words: list[tuple[str, int, Playout | None]] = []
         self._words_started = 0
         self._self_spaced = False
@@ -96,22 +97,35 @@ class TranscriptBuilder:
     def transmitted(
         self, word: str, offset: int, playout: Playout | None, *, self_spaced: bool
     ) -> None:
-        """A spoken word whose audio starts `offset` bytes into its reply."""
+        """A spoken word whose audio starts `offset` bytes into its reply.
+
+        Words and the reply's end travel on different transport tasks, so a word can land after
+        its reply closed; a stamped word for the reply that just closed is dropped rather than
+        starting a phantom reply.
+        """
+        if playout is not None and playout is self._closed:
+            return
         if not self._open:
             self._open_reply(playout)
         if not self._words:
             self._words_started = self._clock.ms()
             self._self_spaced = self_spaced
         self._words.append((word, offset, playout))
+        self.audio_progressed()
 
-    def reply_ended(self) -> None:
-        """The TTS finished the reply; it closes once the wire has sent its audio."""
+    def reply_ended(self, playout: Playout | None = None) -> None:
+        """The TTS finished the reply; it closes once the wire has sent its audio and every
+        stamped word is in."""
+        if playout is not None and playout is not self._playout:
+            return
         self._ended = True
         self.audio_progressed()
 
     def audio_progressed(self) -> None:
         playout = self._playout
-        caught_up = playout is None or playout.sent + FRAME_BYTES >= playout.arrived
+        caught_up = playout is None or (
+            playout.sent + FRAME_BYTES >= playout.arrived and len(self._words) >= playout.words
+        )
         if self._open and self._ended and caught_up:
             self._close(cut=False)
 
@@ -134,6 +148,8 @@ class TranscriptBuilder:
             return
         self._open = False
         self._ended = False
+        if self._playout is not None:
+            self._closed = self._playout
         self._playout = None
         now = self._clock.ms()
         generated = self._generated.popleft() if self._generated else None
@@ -260,7 +276,7 @@ class WireTap(FrameProcessor):
             elif isinstance(frame, TTSAudioRawFrame):
                 self._transcript.audio_progressed()
             elif isinstance(frame, LLMFullResponseEndFrame | TTSStoppedFrame):
-                self._transcript.reply_ended()
+                self._transcript.reply_ended(frame.metadata.get(PLAYOUT))
             elif isinstance(frame, EndFrame):
                 self._transcript.call_ended()
             elif isinstance(frame, InterruptionFrame | CancelFrame):

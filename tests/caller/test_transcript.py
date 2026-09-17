@@ -55,6 +55,41 @@ def test_a_finished_reply_is_recorded_once_the_wire_has_sent_it() -> None:
     ]
 
 
+def test_a_last_word_that_lands_after_the_end_frame_stays_in_its_turn() -> None:
+    observer = Observer()
+    builder = TranscriptBuilder(Clock(), observer)
+    generated(builder, "Yes please.")
+    playout = played(arrived=9_600, sent=9_600)
+    playout.words = 2
+    builder.caller_started(playout)
+    builder.transmitted("Yes", 0, playout, self_spaced=False)
+
+    builder.reply_ended(playout)
+    assert observer.turns == []
+    builder.transmitted("please.", 6_400, playout, self_spaced=False)
+
+    assert [(turn.provenance, turn.text) for turn in observer.turns] == [
+        (Provenance.TRANSMITTED, "Yes please.")
+    ]
+
+
+def test_a_word_of_a_closed_reply_does_not_start_a_new_one() -> None:
+    observer = Observer()
+    builder = TranscriptBuilder(Clock(), observer)
+    generated(builder, "Yes please.")
+    playout = played(arrived=9_600, sent=9_600)
+    builder.caller_started(playout)
+    builder.transmitted("Yes", 0, playout, self_spaced=False)
+    builder.reply_ended(playout)
+
+    builder.transmitted("please.", 6_400, playout, self_spaced=False)
+    builder.call_ended()
+
+    assert [(turn.provenance, turn.text) for turn in observer.turns] == [
+        (Provenance.TRANSMITTED, "Yes")
+    ]
+
+
 def test_a_reply_without_audio_is_all_cut_even_when_its_words_were_released() -> None:
     observer = Observer()
     builder = TranscriptBuilder(Clock(), observer)

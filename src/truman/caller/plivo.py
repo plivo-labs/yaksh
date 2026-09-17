@@ -45,12 +45,14 @@ class Clock:
 
 
 class Playout:
-    """One reply's audio: bytes that arrived from the TTS, and bytes the wire has sent."""
+    """One reply's audio: bytes that arrived from the TTS, bytes the wire has sent, and how
+    many words were stamped against it."""
 
     def __init__(self) -> None:
         self.arrived = 0
         self.sent = 0
         self.origin: int | None = None
+        self.words = 0
 
     def offset_of(self, pts: int | None) -> int:
         """Where audio stamped `pts` on the pipeline clock starts, in bytes of the reply."""
