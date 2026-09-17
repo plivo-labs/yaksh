@@ -6,7 +6,7 @@ from truman.api.auth import require_token
 from truman.api.deps import SessionDep
 from truman.api.pagination import Page, PageDep
 from truman.api.schemas.agents import AgentRead, AgentVersionRead
-from truman.domain.agents import AgentCreate, AgentUpdate, Direction, Transport
+from truman.domain.agents import AgentCreate, AgentUpdate, Direction
 from truman.simulation import agents
 
 router = APIRouter(prefix="/agents", tags=["agents"], dependencies=[Depends(require_token)])
@@ -23,7 +23,6 @@ async def list_agents(
     page: PageDep,
     external_id: str | None = None,
     direction: Direction | None = None,
-    transport: Transport | None = None,
 ) -> Page[AgentRead]:
     rows, total = await agents.list_agents(
         session,
@@ -31,7 +30,6 @@ async def list_agents(
         limit=page.page_size,
         external_id=external_id,
         direction=direction,
-        transport=transport,
     )
     return Page(
         items=[AgentRead.model_validate(row) for row in rows],

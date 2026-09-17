@@ -31,6 +31,5 @@ class AgentVersionRead(BaseModel):
     agent_id: uuid.UUID
     version: int
     change: AgentChange
-    label: str | None
     config: AgentConfig
     created_at: datetime

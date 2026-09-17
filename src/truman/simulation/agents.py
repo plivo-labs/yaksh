@@ -14,7 +14,6 @@ from truman.domain.agents import (
     AgentCreate,
     AgentUpdate,
     Direction,
-    Transport,
 )
 from truman.domain.conversations import ACTIVE_STATUSES
 from truman.domain.errors import ConflictError, NotFoundError, ValidationError
@@ -99,15 +98,12 @@ async def list_agents(
     limit: int,
     external_id: str | None = None,
     direction: Direction | None = None,
-    transport: Transport | None = None,
 ) -> tuple[list[Agent], int]:
     query = select(Agent).where(Agent.deleted_at.is_(None))
     if external_id is not None:
         query = query.where(Agent.external_id == external_id)
     if direction is not None:
         query = query.where(Agent.direction == direction)
-    if transport is not None:
-        query = query.where(Agent.transport == transport)
     total = await session.scalar(select(func.count()).select_from(query.subquery()))
     rows = await session.scalars(
         query.order_by(Agent.created_at.desc(), Agent.id).offset(offset).limit(limit)

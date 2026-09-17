@@ -77,7 +77,6 @@ class AgentVersion(Base):
     agent_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("agents.id"))
     version: Mapped[int] = mapped_column(Integer)
     change: Mapped[AgentChange] = mapped_column(pg_enum(AgentChange, "agent_change"))
-    label: Mapped[str | None] = mapped_column(Text)
     config: Mapped[dict[str, Any]] = mapped_column(JSONB)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 

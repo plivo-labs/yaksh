@@ -1,5 +1,5 @@
-export type Direction = "inbound" | "outbound";
-export type Transport = "phone";
+type Direction = "inbound" | "outbound";
+type Transport = "phone";
 export type ConversationStatus =
   | "queued"
   | "running"
@@ -8,7 +8,7 @@ export type ConversationStatus =
   | "failed"
   | "invalid"
   | "cancelled";
-export type EndReason =
+type EndReason =
   | "user_request"
   | "goal_reached"
   | "goal_abandoned"
@@ -18,9 +18,9 @@ export type EndReason =
   | "duration_limit"
   | "error"
   | "process_restart";
-export type Role = "agent" | "caller";
-export type Provenance = "transmitted" | "cut";
-export type WireEventKind =
+type Role = "agent" | "caller";
+type Provenance = "transmitted" | "cut";
+type WireEventKind =
   | "connect_started"
   | "ringing"
   | "answered"
@@ -80,7 +80,7 @@ export interface WireEvent {
   at_ms: number;
 }
 
-export interface Validity {
+interface Validity {
   ok: boolean;
   reasons: string[];
 }
