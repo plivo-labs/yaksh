@@ -480,7 +480,7 @@ class PhoneCaller:
             transport_input=transport.input(),
             transport_output=transport.output(),
             before_output=[checkpoints],
-            after_output=[recorder, SpeechMarks(clock, observer), WireTap(transcript, settled)],
+            after_output=[SpeechMarks(clock, observer), WireTap(transcript, settled), recorder],
             state=state,
         )
 
