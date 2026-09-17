@@ -51,6 +51,16 @@ services:
     depends_on:
       - api
 
+  tunnel:
+    image: cloudflare/cloudflared:2026.9.1
+    profiles:
+      - tunnel
+    command:
+      - tunnel
+      - --no-autoupdate
+      - --url
+      - http://worker:8770
+
   postgres:
     image: postgres:17-alpine
     environment:
