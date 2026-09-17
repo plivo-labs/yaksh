@@ -197,7 +197,7 @@ async def reap_expired(session: AsyncSession) -> int:
         update(Conversation)
         .where(
             Conversation.status.in_(LIVE_STATUSES),
-            Conversation.lease_expires_at < func.now(),
+            Conversation.lease_expires_at <= func.now(),
         )
         .values(
             status=ConversationStatus.FAILED,
