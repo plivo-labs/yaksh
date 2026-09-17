@@ -31,6 +31,8 @@ services:
     command:
       - truman
       - worker
+    # Must exceed the worker's drain bound: Worker._execute_bound plus its
+    # cancel wait plus bounded_dispose, about 120 s at the default end timeout.
     stop_grace_period: 150s
 
   web:
