@@ -50,7 +50,7 @@ function toDraft(agent: Agent): Draft {
   return {
     name: agent.name,
     external_id: agent.external_id ?? "",
-    agent_number: agent.agent_number ?? "",
+    agent_number: agent.agent_number,
     agent_speaks_first: agent.agent_speaks_first,
     brief: agent.brief ?? "",
   };
@@ -84,17 +84,6 @@ export function AgentFormPage() {
       <Alert variant="destructive">
         <AlertTitle>Could not load the agent</AlertTitle>
         <AlertDescription>{agent.error.message}</AlertDescription>
-      </Alert>
-    );
-  }
-  if (agent.data.transport !== "phone") {
-    return (
-      <Alert>
-        <AlertTitle>{agent.data.name} is a stream agent</AlertTitle>
-        <AlertDescription>
-          It is reached at {agent.data.websocket_url} and is managed through the API. The console
-          registers agents by phone number.
-        </AlertDescription>
       </Alert>
     );
   }

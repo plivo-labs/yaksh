@@ -20,7 +20,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { when, words } from "@/lib/format";
+import { when } from "@/lib/format";
 import { useAgents } from "@/lib/queries";
 
 export function AgentsPage() {
@@ -62,8 +62,6 @@ export function AgentsPage() {
           <TableHeader>
             <TableRow>
               <TableHead>Name</TableHead>
-              <TableHead>Direction</TableHead>
-              <TableHead>Transport</TableHead>
               <TableHead>Number</TableHead>
               <TableHead>Speaks first</TableHead>
               <TableHead className="text-right">Version</TableHead>
@@ -86,11 +84,7 @@ export function AgentsPage() {
                     {agent.name}
                   </Link>
                 </TableCell>
-                <TableCell className="capitalize">{agent.direction}</TableCell>
-                <TableCell>{words(agent.transport)}</TableCell>
-                <TableCell className="max-w-72 truncate font-mono text-xs">
-                  {agent.agent_number ?? agent.websocket_url ?? ""}
-                </TableCell>
+                <TableCell className="font-mono text-xs">{agent.agent_number}</TableCell>
                 <TableCell>{agent.agent_speaks_first ? "Yes" : "No"}</TableCell>
                 <TableCell className="text-right font-mono text-xs">
                   {agent.current_version}

@@ -1,5 +1,5 @@
 export type Direction = "inbound" | "outbound";
-export type Transport = "plivo_websocket" | "phone";
+export type Transport = "phone";
 export type ConversationStatus =
   | "queued"
   | "running"
@@ -47,10 +47,7 @@ export interface Agent {
   external_id: string | null;
   direction: Direction;
   transport: Transport;
-  websocket_url: string | null;
-  upgrade_headers: Record<string, string>;
-  extra_headers: Record<string, string>;
-  agent_number: string | null;
+  agent_number: string;
   outbound_numbers: string[];
   agent_speaks_first: boolean;
   brief: string | null;
