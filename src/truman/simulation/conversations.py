@@ -325,6 +325,11 @@ async def sync_numbers(
     missing = [number for number in allowlist if number not in listed]
     if missing:
         raise UnknownNumbersError(f"the Plivo account does not have {', '.join(missing)}")
+    enabled = [
+        entry.number
+        for entry in numbers
+        if (entry.number in allowlist if allowlist else entry.voice)
+    ]
     if numbers:
         rows = insert(PhoneNumber).values(
             [
@@ -332,7 +337,7 @@ async def sync_numbers(
                     "number": entry.number,
                     "alias": entry.alias,
                     "region": entry.region,
-                    "enabled": entry.number in allowlist if allowlist else entry.voice,
+                    "enabled": entry.number in enabled,
                 }
                 for entry in numbers
             ]
@@ -353,11 +358,7 @@ async def sync_numbers(
         )
     )
     await session.commit()
-    return [
-        entry.number
-        for entry in numbers
-        if (entry.number in allowlist if allowlist else entry.voice)
-    ]
+    return enabled
 
 
 async def lease_number(session: AsyncSession, conversation_id: uuid.UUID) -> str | None:
