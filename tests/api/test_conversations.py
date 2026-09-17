@@ -391,7 +391,7 @@ async def test_worker_shutdown_stops_the_caller_and_keeps_the_evidence(
     worker = Worker(create_sessionmaker(engine), caller, unhurried, worker_id="shutting-down")
     stop = asyncio.Event()
     task = asyncio.create_task(worker.run(stop))
-    await wait_for(client, started["id"], {"running"})
+    await wait_for_event(client, started["id"], "connected")
 
     stop.set()
     await task
