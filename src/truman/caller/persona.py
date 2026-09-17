@@ -4,6 +4,7 @@ a call ends."""
 import asyncio
 import contextlib
 import logging
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
@@ -22,6 +23,7 @@ from pipecat.services.deepgram.stt import DeepgramSTTService
 from pipecat.services.elevenlabs.tts import ElevenLabsTTSService
 from pipecat.services.llm_service import FunctionCallParams
 from pipecat.services.openai.llm import OpenAILLMService
+from pipecat.workers.runner import WorkerRunner
 
 from truman.caller.audio import SAMPLE_RATE, Clock
 from truman.caller.transcript import AgentTurnTap, GeneratedTap, TranscriptBuilder
@@ -124,8 +126,8 @@ class Stoppable(Protocol):
 class Persona:
     """One call's persona pipeline around a transport, with the transcript taps in place.
 
-    `wire_tap` sits right after the transport output, where the transport's stamps on spoken
-    words are complete.
+    `after_output` processors sit right after the transport output, where the transport's
+    stamps on spoken words are complete.
     """
 
     def __init__(
@@ -139,7 +141,7 @@ class Persona:
         *,
         transport_input: FrameProcessor,
         transport_output: FrameProcessor,
-        wire_tap: FrameProcessor,
+        after_output: Sequence[FrameProcessor],
         state: CallState,
     ) -> None:
         instructions = PERSONA_INSTRUCTIONS.format(persona=request.persona_prompt)
@@ -169,7 +171,7 @@ class Persona:
                 GeneratedTap(transcript),
                 self.tts,
                 transport_output,
-                wire_tap,
+                *after_output,
                 aggregators.assistant(),
             ]
         )
@@ -217,6 +219,41 @@ class Persona:
 
     def unusable(self) -> list[str]:
         return [service.name for service in (self.stt, self.llm, self.tts) if not service.is_usable]
+
+
+async def converse(
+    persona: Persona,
+    state: CallState,
+    stop: asyncio.Event,
+    wake: Mapping[asyncio.Event, EndReason] | None = None,
+) -> None:
+    """Run the pipeline until the call ends, a stop arrives, or a transport event in `wake`
+    fires with its end reason; then hang up and note anything that broke."""
+    runner = WorkerRunner(handle_sigint=False)
+    await runner.add_workers(persona.worker)
+    running = asyncio.create_task(runner.run())
+    wake = wake or {}
+    waiters = [asyncio.ensure_future(event.wait()) for event in (state.ended, stop, *wake)]
+    try:
+        await asyncio.wait({*waiters, running}, return_when=asyncio.FIRST_COMPLETED)
+        if stop.is_set():
+            state.end(EndReason.USER_REQUEST)
+        for event, reason in wake.items():
+            if event.is_set():
+                state.end(reason)
+        if running.done():
+            note_failure(running, state)
+            state.error = state.error or "the pipeline stopped on its own"
+            state.end(EndReason.ERROR)
+    except asyncio.CancelledError:
+        state.end(EndReason.PROCESS_RESTART)
+    finally:
+        for waiter in waiters:
+            waiter.cancel()
+        await hang_up(state, persona.worker, running)
+    broken = persona.unusable()
+    if broken:
+        state.error = state.error or f"{', '.join(broken)} stopped working"
 
 
 async def hang_up(state: CallState, worker: Stoppable, running: asyncio.Task[None]) -> None:

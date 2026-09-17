@@ -14,13 +14,9 @@ from pipecat.frames.frames import (
     Frame,
     InputAudioRawFrame,
     InterruptionFrame,
-    LLMFullResponseEndFrame,
     OutputAudioRawFrame,
     StartFrame,
-    TTSAudioRawFrame,
     TTSStartedFrame,
-    TTSStoppedFrame,
-    TTSTextFrame,
 )
 from pipecat.processors.frame_processor import FrameDirection
 from pipecat.serializers.base_serializer import FrameSerializer
@@ -33,12 +29,11 @@ from pipecat.transports.websocket.client import (
     WebsocketClientSession,
     WebsocketClientTransport,
 )
-from pipecat.workers.runner import WorkerRunner
 
-from truman.caller.audio import SAMPLE_RATE, Clock, Playout
-from truman.caller.persona import CallState, Persona, hang_up, note_failure, provider_keys
+from truman.caller.audio import PLAYOUT, SAMPLE_RATE, Clock, Playout, Stamper
+from truman.caller.persona import CallState, Persona, converse, provider_keys
 from truman.caller.plivo_emulator import Wire, start_message
-from truman.caller.transcript import OFFSET, PLAYOUT, TranscriptBuilder, WireTap
+from truman.caller.transcript import TranscriptBuilder, WireTap
 from truman.config import Settings
 from truman.domain.conversations import (
     CallObserver,
@@ -107,7 +102,7 @@ class CallerOutput(WebsocketClientOutputTransport):
         self._input = input_transport
         self._opening = opening
         self._wire_task: asyncio.Task[None] | None = None
-        self._arriving: Playout | None = None
+        self._stamper = Stamper()
         self._playing: Playout | None = None
 
     async def start(self, frame: StartFrame) -> None:
@@ -133,18 +128,7 @@ class CallerOutput(WebsocketClientOutputTransport):
     async def process_frame(self, frame: Frame, direction: FrameDirection) -> None:
         if isinstance(frame, InterruptionFrame):
             self._wire.drop_outbound()
-        elif isinstance(frame, TTSStartedFrame):
-            self._arriving = frame.metadata[PLAYOUT] = Playout()
-        elif isinstance(frame, TTSAudioRawFrame) and self._arriving is not None:
-            if self._arriving.origin is None:
-                self._arriving.origin = self.get_clock().get_time()
-            self._arriving.arrived += len(frame.audio)
-        elif isinstance(frame, TTSTextFrame) and self._arriving is not None:
-            frame.metadata[PLAYOUT] = self._arriving
-            frame.metadata[OFFSET] = self._arriving.offset_of(frame.pts)
-            self._arriving.words += 1
-        elif isinstance(frame, TTSStoppedFrame | LLMFullResponseEndFrame) and self._arriving:
-            frame.metadata[PLAYOUT] = self._arriving
+        self._stamper.stamp(frame, self.get_clock().get_time())
         await super().process_frame(frame, direction)
 
     async def write_transport_frame(self, frame: Frame) -> None:
@@ -227,7 +211,7 @@ class PipecatCaller:
             transcript,
             transport_input=transport.input(),
             transport_output=transport.output(),
-            wire_tap=WireTap(transcript, wire.settle),
+            after_output=[WireTap(transcript, wire.settle)],
             state=state,
         )
 
@@ -243,35 +227,7 @@ class PipecatCaller:
             if not wire.closed.is_set():
                 state.end(EndReason.AGENT_HANGUP)
 
-        runner = WorkerRunner(handle_sigint=False)
-        await runner.add_workers(persona.worker)
-        running = asyncio.create_task(runner.run())
-        signals = [
-            asyncio.ensure_future(waiter)
-            for waiter in (state.ended.wait(), stop.wait(), wire.hung_up.wait())
-        ]
-        try:
-            await asyncio.wait({*signals, running}, return_when=asyncio.FIRST_COMPLETED)
-            if stop.is_set():
-                state.end(EndReason.USER_REQUEST)
-            if wire.failed:
-                state.error = state.error or wire.failed
-                state.end(EndReason.ERROR)
-            if wire.hung_up.is_set():
-                state.end(EndReason.AGENT_HANGUP)
-            if running.done():
-                note_failure(running, state)
-                state.error = state.error or "the pipeline stopped on its own"
-                state.end(EndReason.ERROR)
-        except asyncio.CancelledError:
-            state.end(EndReason.PROCESS_RESTART)
-        finally:
-            for signal in signals:
-                signal.cancel()
-            await hang_up(state, persona.worker, running)
-        broken = persona.unusable()
-        if broken:
-            state.error = state.error or f"{', '.join(broken)} stopped working"
+        await converse(persona, state, stop, {wire.hung_up: EndReason.AGENT_HANGUP})
         return outcome(state, wire, request.output_dir / "recording.wav")
 
 
