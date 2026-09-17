@@ -1,5 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router";
 
 import { StatusBadge } from "@/components/status-badge";
@@ -17,8 +17,18 @@ import {
 import { cn } from "cn";
 
 import { Badge } from "@/components/ui/badge";
+import { Bubble, BubbleContent } from "@/components/ui/bubble";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Message, MessageContent, MessageHeader } from "@/components/ui/message";
+import {
+  MessageScroller,
+  MessageScrollerButton,
+  MessageScrollerContent,
+  MessageScrollerItem,
+  MessageScrollerProvider,
+  MessageScrollerViewport,
+} from "@/components/ui/message-scroller";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
@@ -186,54 +196,57 @@ function pause(ms: number, signal: AbortSignal): Promise<void> {
 }
 
 function Transcript({ turns, active }: { turns: Turn[]; active: boolean }) {
-  const pane = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const viewport = pane.current?.querySelector("[data-slot=scroll-area-viewport]");
-    if (active) viewport?.scrollTo({ top: viewport.scrollHeight });
-  }, [active, turns.length]);
   return (
     <Card className="lg:min-h-0">
       <CardHeader className="shrink-0">
         <CardTitle>Transcript</CardTitle>
       </CardHeader>
       <CardContent className="lg:min-h-0 lg:flex-1">
-        <ScrollArea ref={pane} className="h-full">
-          <div className="grid content-start gap-4 lg:pr-4">
-            {turns.length === 0 && (
-              <p className="text-sm text-muted-foreground">
-                {active ? "Waiting for the first words." : "Nothing was said."}
-              </p>
-            )}
-            {turns.map((turn, index) => (
-              <div
-                key={index}
-                className={cn(
-                  "grid gap-1 transition-[opacity,translate] duration-200 ease-out starting:translate-y-1 starting:opacity-0 motion-reduce:starting:translate-y-0",
-                  turn.role === "caller" && "justify-items-end text-right",
-                )}
-              >
-                <div className="flex items-center gap-2 font-mono text-xs text-muted-foreground">
-                  <span>{turn.role === "agent" ? "Agent" : "Caller"}</span>
-                  <span>{clock(turn.started_at_ms)}</span>
-                  {turn.provenance === "cut" && <Badge variant="outline">cut off</Badge>}
-                </div>
-                <p
-                  className={`max-w-prose text-sm leading-relaxed ${
-                    turn.provenance === "cut" ? "text-muted-foreground line-through" : ""
-                  }`}
-                >
-                  {turn.text}
-                </p>
-              </div>
-            ))}
-            {active && turns.length > 0 && (
-              <p className="flex items-center gap-2 text-xs text-muted-foreground">
-                <Spinner className="size-3" />
-                Live
-              </p>
-            )}
-          </div>
-        </ScrollArea>
+        {turns.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            {active ? "Waiting for the first words." : "Nothing was said."}
+          </p>
+        ) : (
+          <MessageScrollerProvider autoScroll>
+            <MessageScroller>
+              <MessageScrollerViewport className="lg:pr-4">
+                <MessageScrollerContent className="gap-4">
+                  {turns.map((turn, index) => (
+                    <MessageScrollerItem
+                      key={index}
+                      messageId={String(index)}
+                      className="transition-[opacity,translate] duration-200 ease-out starting:translate-y-1 starting:opacity-0 motion-reduce:starting:translate-y-0"
+                    >
+                      <Message align={turn.role === "caller" ? "end" : "start"}>
+                        <MessageContent>
+                          <MessageHeader className="gap-2 font-mono">
+                            <span>{turn.role === "agent" ? "Agent" : "Caller"}</span>
+                            <span>{clock(turn.started_at_ms)}</span>
+                            {turn.provenance === "cut" && <Badge variant="outline">cut off</Badge>}
+                          </MessageHeader>
+                          <Bubble variant={turn.role === "caller" ? "default" : "outline"}>
+                            <BubbleContent
+                              className={cn(turn.provenance === "cut" && "line-through opacity-60")}
+                            >
+                              {turn.text}
+                            </BubbleContent>
+                          </Bubble>
+                        </MessageContent>
+                      </Message>
+                    </MessageScrollerItem>
+                  ))}
+                  {active && (
+                    <p className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <Spinner className="size-3" />
+                      Live
+                    </p>
+                  )}
+                </MessageScrollerContent>
+              </MessageScrollerViewport>
+              <MessageScrollerButton />
+            </MessageScroller>
+          </MessageScrollerProvider>
+        )}
       </CardContent>
     </Card>
   );
