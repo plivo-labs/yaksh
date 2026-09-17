@@ -330,7 +330,8 @@ async def test_events_stream_turns_and_the_final_status(
     await engine.dispose()
 
     assert [event for event, _ in seen if event == "turn"] == ["turn", "turn"]
-    assert seen[0] == ("status", {"status": "queued"}) or seen[0][0] in {"wire_event", "status"}
+    statuses = [data["status"] for event, data in seen if event == "status"]
+    assert statuses == ["queued", "running", "completed"][-len(statuses) :]
     assert seen[-1] == ("status", {"status": "completed"})
 
 
@@ -345,7 +346,7 @@ async def test_the_events_route_serves_server_sent_events(
 
     assert response.headers["content-type"].startswith("text/event-stream")
     assert "event: turn" in response.text and "event: status" in response.text
-    assert '"status": "completed"' in response.text.replace("status:", "status:")
+    assert '"status": "completed"' in response.text
 
 
 async def test_worker_shutdown_stops_the_caller_and_keeps_the_evidence(
@@ -356,8 +357,9 @@ async def test_worker_shutdown_stops_the_caller_and_keeps_the_evidence(
     caller.recording_path.write_bytes(b"RIFF")
     agent_id = await create_agent(client)
     started = await start(client, agent_id)
+    unhurried = settings.model_copy(update={"worker_lease_s": 30})
     engine = create_engine(settings.database_url.encoded_string())
-    worker = Worker(create_sessionmaker(engine), caller, settings, worker_id="shutting-down")
+    worker = Worker(create_sessionmaker(engine), caller, unhurried, worker_id="shutting-down")
     stop = asyncio.Event()
     task = asyncio.create_task(worker.run(stop))
     await wait_for(client, started["id"], {"running"})
@@ -398,8 +400,9 @@ async def test_shutdown_waits_while_result_writes_time_out_and_unwind_slowly(
     caller.release.clear()
     agent_id = await create_agent(client)
     started = await start(client, agent_id)
+    unhurried = settings.model_copy(update={"worker_lease_s": 30})
     engine = create_engine(settings.database_url.encoded_string())
-    worker = Worker(create_sessionmaker(engine), caller, settings, worker_id="shutting-down")
+    worker = Worker(create_sessionmaker(engine), caller, unhurried, worker_id="shutting-down")
     stop = asyncio.Event()
     task = asyncio.create_task(worker.run(stop))
     await wait_for_event(client, started["id"], "connected")
