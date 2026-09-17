@@ -7,7 +7,7 @@ from pydantic import ValidationError
 
 from truman.config import Settings
 
-AGENT = {"name": "Front desk", "websocket_url": "wss://agent.example.com/stream"}
+AGENT = {"name": "Front desk", "agent_number": "+14155550100"}
 
 
 async def create(client: AsyncClient, **overrides: Any) -> dict[str, Any]:
@@ -41,19 +41,18 @@ async def test_changing_config_creates_a_version_but_renaming_does_not(
 
 
 async def test_invalid_updates_are_rejected_before_the_database(client: AsyncClient) -> None:
-    created = await client.post("/api/v1/agents", json={"name": "No url"})
+    created = await client.post("/api/v1/agents", json={"name": "No number"})
     assert created.status_code == 422
     assert created.json()["error"]["code"] == "validation_error"
 
     agent = await create(client)
     url = f"/api/v1/agents/{agent['id']}"
-    assert (await client.patch(url, json={"websocket_url": None})).status_code == 422
+    assert (await client.patch(url, json={"agent_number": None})).status_code == 422
+    assert (await client.patch(url, json={"agent_number": "4155550100"})).status_code == 422
     assert (await client.patch(url, json={"name": None})).status_code == 422
 
-    phone = await client.patch(
-        url, json={"transport": "phone", "websocket_url": None, "agent_number": "+14155550100"}
-    )
-    assert phone.status_code == 200, phone.text
+    moved = await client.patch(url, json={"agent_number": "+14155550199"})
+    assert moved.status_code == 200 and moved.json()["agent_number"] == "+14155550199"
 
 
 async def test_external_id_is_unique_among_live_agents(client: AsyncClient) -> None:
@@ -104,15 +103,12 @@ def test_an_empty_token_is_refused_at_startup() -> None:
         )
 
 
-async def test_a_phone_agent_needs_a_number(client: AsyncClient) -> None:
-    without = await client.post(
-        "/api/v1/agents", json={"name": "Desk", "transport": "phone", "websocket_url": None}
-    )
+async def test_an_agent_needs_a_number(client: AsyncClient) -> None:
+    without = await client.post("/api/v1/agents", json={"name": "Desk"})
     with_number = await client.post(
-        "/api/v1/agents",
-        json={"name": "Desk", "transport": "phone", "agent_number": "+14155550100"},
+        "/api/v1/agents", json={"name": "Desk", "agent_number": "+14155550100"}
     )
 
     assert without.status_code == 422
-    assert "agent_number is required" in without.json()["error"]["details"][0]["msg"]
+    assert without.json()["error"]["details"][0]["loc"][-1] == "agent_number"
     assert with_number.status_code == 201 and with_number.json()["agent_number"] == "+14155550100"

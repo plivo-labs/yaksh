@@ -95,7 +95,7 @@ async def rig(monkeypatch: pytest.MonkeyPatch) -> AsyncIterator[Rig]:
 def request(tmp_path: Path) -> CallRequest:
     return CallRequest(
         conversation_id=uuid.uuid4(),
-        agent=AgentConfig.model_validate({"transport": "phone", "agent_number": AGENT_NUMBER}),
+        agent=AgentConfig.model_validate({"agent_number": AGENT_NUMBER}),
         persona_prompt="Book a cleaning.",
         caller_number=POOL_NUMBER,
         max_duration_s=120,

@@ -7,11 +7,11 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from httpx import AsyncClient
+from httpx import ASGITransport, AsyncClient
 from sqlalchemy import insert, update
 from sqlalchemy.ext.asyncio import create_async_engine
 
-from tests.conftest import FakeCaller
+from tests.conftest import TOKEN, FakeCaller
 from truman.config import Settings
 from truman.db.models import Conversation
 from truman.db.session import create_engine, create_sessionmaker
@@ -20,7 +20,7 @@ from truman.simulation import conversations
 from truman.simulation.calls import STOP_IGNORED
 from truman.worker.worker import FINALIZE_ATTEMPTS, Worker
 
-AGENT = {"name": "Front desk", "websocket_url": "wss://agent.example.com/stream"}
+AGENT = {"name": "Front desk", "agent_number": "+14155550100"}
 FINAL = {"completed", "failed", "invalid", "cancelled"}
 
 
@@ -263,29 +263,45 @@ async def test_a_refused_connection_is_failed_and_still_readable(
     assert [event["kind"] for event in done["wire_events"]] == ["connect_started"]
 
 
-async def test_phone_agents_queue_with_a_pool_number_and_outbound_agents_are_refused(
+async def test_a_conversation_gets_its_number_from_the_pool_and_outbound_agents_are_refused(
     client: AsyncClient,
 ) -> None:
-    phone = await create_agent(
-        client, transport="phone", websocket_url=None, agent_number="+14155550100"
-    )
+    agent = await create_agent(client)
     outbound = await create_agent(client, direction="outbound")
 
-    queued = await client.post(
-        "/api/v1/conversations", json={"agent_id": phone, "persona_prompt": "hello"}
-    )
+    queued = await start(client, agent)
     chosen = await client.post(
         "/api/v1/conversations",
-        json={"agent_id": phone, "persona_prompt": "hello", "caller_number": "+15550100000"},
+        json={"agent_id": agent, "persona_prompt": "hello", "caller_number": "+15550100000"},
     )
     refused = await client.post(
         "/api/v1/conversations", json={"agent_id": outbound, "persona_prompt": "hello"}
     )
 
-    assert queued.status_code == 202, queued.text
-    assert queued.json()["status"] == "queued" and queued.json()["caller_number"] is None
-    assert chosen.status_code == 422 and "number pool" in chosen.json()["error"]["message"]
+    assert queued["status"] == "queued" and queued["caller_number"] is None
+    assert chosen.status_code == 422
+    assert chosen.json()["error"]["details"][0]["loc"][-1] == "caller_number"
     assert refused.status_code == 422 and "not supported yet" in refused.json()["error"]["message"]
+
+
+async def test_conversations_cannot_start_while_phone_calls_are_off(
+    settings: Settings, tmp_path: Path
+) -> None:
+    from truman.api import create_app
+
+    app = create_app(settings.model_copy(update={"caller": "phone"}))
+    headers = {"Authorization": f"Bearer {TOKEN}"}
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test", headers=headers
+    ) as client:
+        agent = await create_agent(client)
+        response = await client.post(
+            "/api/v1/conversations", json={"agent_id": agent, "persona_prompt": "hello"}
+        )
+    await app.state.engine.dispose()
+
+    assert response.status_code == 422
+    assert "phone calls are off" in response.json()["error"]["message"]
 
 
 async def test_a_conversation_keeps_the_agent_version_it_started_with(

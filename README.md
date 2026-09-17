@@ -21,11 +21,11 @@ The worker phones agents with a [Pipecat](https://github.com/pipecat-ai/pipecat)
 | `ELEVENLABS_API_KEY` | Text to speech. `TRUMAN_ELEVENLABS_VOICE_ID` picks the voice. |
 | `OPENAI_API_KEY`, or `AZURE_OPENAI_ENDPOINT` with `AZURE_OPENAI_API_KEY` (and `AZURE_OPENAI_API_VERSION`) | The persona model. `TRUMAN_PERSONA_MODEL` names the model or the Azure deployment, default `gpt-4.1`. |
 
-An agent's `upgrade_headers` and `extra_headers` may hold `env:NAME` values; the worker reads `NAME` from its environment when it connects, so secrets never reach the database. `TRUMAN_CALLER=stub` runs the worker with a canned caller and no providers, which is enough to develop the API and the UI.
+`TRUMAN_CALLER=stub` runs the worker with a canned caller and no providers or Plivo account, which is enough to develop the API and the UI.
 
 ## Phone
 
-Agents with `transport: phone` are called on the real phone network through [Plivo](https://www.plivo.com): the worker dials the agent's number from one of your Plivo numbers, receives the call audio over a Plivo stream and hangs up through the API. Plivo has to reach the worker, so it needs a public HTTPS address.
+Agents are called on the real phone network through [Plivo](https://www.plivo.com): the worker dials the agent's number from one of your Plivo numbers, receives the call audio over a Plivo stream and hangs up through the API. Plivo has to reach the worker, so it needs a public HTTPS address; until these settings are in place, conversations cannot be started.
 
 | Variable | Purpose |
 | --- | --- |
@@ -45,7 +45,7 @@ Create the agent with its number, then start a conversation; the wire events sho
 
 ```sh
 curl -X POST localhost:8000/api/v1/agents -H "Authorization: Bearer $TRUMAN_API_TOKEN" -H 'Content-Type: application/json' \
-  -d '{"name": "Support line", "transport": "phone", "agent_number": "+14155550100"}'
+  -d '{"name": "Support line", "agent_number": "+14155550100"}'
 curl -X POST localhost:8000/api/v1/conversations -H "Authorization: Bearer $TRUMAN_API_TOKEN" -H 'Content-Type: application/json' \
   -d '{"agent_id": "<id from the previous call>", "persona_prompt": "You want to book a table for two tonight."}'
 ```

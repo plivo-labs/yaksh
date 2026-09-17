@@ -32,9 +32,6 @@ def config_of(agent: Agent) -> AgentConfig:
 def apply_config(agent: Agent, config: AgentConfig) -> None:
     agent.direction = config.direction
     agent.transport = config.transport
-    agent.websocket_url = str(config.websocket_url) if config.websocket_url else None
-    agent.upgrade_headers = dict(config.upgrade_headers)
-    agent.extra_headers = dict(config.extra_headers)
     agent.agent_number = config.agent_number
     agent.outbound_numbers = list(config.outbound_numbers)
     agent.trigger = config.trigger.model_dump(mode="json") if config.trigger else None

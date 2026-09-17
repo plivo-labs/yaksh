@@ -33,10 +33,7 @@ async def enabled_numbers(session: AsyncSession) -> dict[str, bool]:
 
 
 async def queue_phone_conversation(client: AsyncClient) -> uuid.UUID:
-    agent_id = await create_agent(
-        client, transport="phone", websocket_url=None, agent_number="+14155550100"
-    )
-    return uuid.UUID((await start(client, agent_id))["id"])
+    return uuid.UUID((await start(client, await create_agent(client)))["id"])
 
 
 async def test_concurrent_leases_get_distinct_numbers_and_a_finished_call_frees_its_number(

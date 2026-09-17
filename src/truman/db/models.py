@@ -6,7 +6,6 @@ from typing import Any
 from sqlalchemy import (
     ARRAY,
     Boolean,
-    CheckConstraint,
     DateTime,
     Enum,
     ForeignKey,
@@ -44,10 +43,7 @@ class Agent(Base):
     external_id: Mapped[str | None] = mapped_column(Text)
     direction: Mapped[Direction] = mapped_column(pg_enum(Direction, "agent_direction"))
     transport: Mapped[Transport] = mapped_column(pg_enum(Transport, "agent_transport"))
-    websocket_url: Mapped[str | None] = mapped_column(Text)
-    upgrade_headers: Mapped[dict[str, str]] = mapped_column(JSONB, default=dict)
-    extra_headers: Mapped[dict[str, str]] = mapped_column(JSONB, default=dict)
-    agent_number: Mapped[str | None] = mapped_column(Text)
+    agent_number: Mapped[str] = mapped_column(Text)
     outbound_numbers: Mapped[list[str]] = mapped_column(ARRAY(Text), default=list)
     trigger: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     agent_speaks_first: Mapped[bool] = mapped_column(Boolean, default=True)
@@ -60,13 +56,6 @@ class Agent(Base):
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     __table_args__ = (
-        CheckConstraint(
-            "transport <> 'plivo_websocket' OR websocket_url IS NOT NULL",
-            name="websocket_url_required",
-        ),
-        CheckConstraint(
-            "transport <> 'phone' OR agent_number IS NOT NULL", name="agent_number_required"
-        ),
         Index(
             "ix_agents_external_id_live",
             "external_id",

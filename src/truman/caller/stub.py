@@ -22,8 +22,11 @@ async def stopped(stop: asyncio.Event, delay_s: float) -> bool:
     return True
 
 
+STUB_NUMBER = "+15550100000"
+
+
 class StubCaller:
-    """Plays a canned conversation without audio, until the Pipecat caller replaces it."""
+    """Plays a canned conversation without audio or providers, for API and UI development."""
 
     def __init__(self, *, connect_delay_s: float = 0.2, turn_delay_s: float = 0.5) -> None:
         self.connect_delay_s = connect_delay_s

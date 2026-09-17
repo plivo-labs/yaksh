@@ -2,15 +2,13 @@ from enum import StrEnum
 from typing import Annotated, Any, Literal
 
 from pydantic import (
-    AnyUrl,
     BaseModel,
     ConfigDict,
     Field,
     HttpUrl,
     StringConstraints,
-    UrlConstraints,
+    ValidationInfo,
     field_validator,
-    model_validator,
 )
 
 
@@ -20,7 +18,8 @@ class Direction(StrEnum):
 
 
 class Transport(StrEnum):
-    PLIVO_WEBSOCKET = "plivo_websocket"
+    """How Truman reaches an agent; phone only today, kept as the seam for other ways."""
+
     PHONE = "phone"
 
 
@@ -31,7 +30,6 @@ class AgentChange(StrEnum):
 
 
 E164 = Annotated[str, StringConstraints(pattern=r"^\+[1-9]\d{6,14}$")]
-WebsocketUrl = Annotated[AnyUrl, UrlConstraints(allowed_schemes=["ws", "wss"])]
 Headers = dict[str, str]
 
 
@@ -49,23 +47,12 @@ class AgentConfig(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     direction: Direction = Direction.INBOUND
-    transport: Transport = Transport.PLIVO_WEBSOCKET
-    websocket_url: WebsocketUrl | None = None
-    upgrade_headers: Headers = Field(default_factory=dict)
-    extra_headers: Headers = Field(default_factory=dict)
-    agent_number: E164 | None = None
+    transport: Transport = Transport.PHONE
+    agent_number: E164
     outbound_numbers: list[E164] = Field(default_factory=list)
     trigger: Trigger | None = None
     agent_speaks_first: bool = True
     brief: str | None = None
-
-    @model_validator(mode="after")
-    def address_required(self) -> "AgentConfig":
-        if self.transport is Transport.PLIVO_WEBSOCKET and self.websocket_url is None:
-            raise ValueError("websocket_url is required when transport is plivo_websocket")
-        if self.transport is Transport.PHONE and self.agent_number is None:
-            raise ValueError("agent_number is required when transport is phone")
-        return self
 
 
 class AgentCreate(AgentConfig):
@@ -83,20 +70,17 @@ class AgentUpdate(BaseModel):
     external_id: str | None = None
     direction: Direction | None = None
     transport: Transport | None = None
-    websocket_url: WebsocketUrl | None = None
-    upgrade_headers: Headers | None = None
-    extra_headers: Headers | None = None
     agent_number: E164 | None = None
     outbound_numbers: list[E164] | None = None
     trigger: Trigger | None = None
     agent_speaks_first: bool | None = None
     brief: str | None = None
 
-    @field_validator("name")
+    @field_validator("name", "agent_number")
     @classmethod
-    def name_cannot_be_cleared(cls, value: str | None) -> str | None:
+    def cannot_be_cleared(cls, value: str | None, info: ValidationInfo) -> str | None:
         if value is None:
-            raise ValueError("name cannot be null")
+            raise ValueError(f"{info.field_name} cannot be null")
         return value
 
     def changes(self) -> dict[str, Any]:

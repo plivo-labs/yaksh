@@ -6,7 +6,7 @@ from typing import Protocol
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from truman.domain.agents import E164, AgentConfig
+from truman.domain.agents import AgentConfig
 
 
 class Channel(StrEnum):
@@ -98,7 +98,6 @@ class ConversationCreate(BaseModel):
 
     agent_id: uuid.UUID
     persona_prompt: str = Field(min_length=1)
-    caller_number: E164 | None = None
     max_duration_s: int | None = Field(default=None, ge=10, le=1800)
 
 

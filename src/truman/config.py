@@ -20,14 +20,13 @@ class Settings(BaseSettings):
     database_url: PostgresDsn
     data_dir: Path = REPO_ROOT / "data"
     frontend_dist: Path = REPO_ROOT / "frontend" / "dist"
-    default_caller_number: str = "+15550100000"
     default_max_duration_s: int = 300
     max_active_conversations: int = 4
     worker_poll_interval_s: float = 0.5
     worker_heartbeat_s: float = 1.0
     worker_lease_s: int = 30
     end_timeout_s: float = 5.0
-    caller: Literal["pipecat", "stub"] = "pipecat"
+    caller: Literal["phone", "stub"] = "phone"
     deepgram_api_key: SecretStr | None = Field(default=None, validation_alias="DEEPGRAM_API_KEY")
     deepgram_url: str = ""
     deepgram_model: str = "nova-3"
@@ -52,6 +51,14 @@ class Settings(BaseSettings):
     public_url: str | None = None
     stream_port: int = 8770
     ring_timeout_s: int = 30
+
+    @property
+    def phone_enabled(self) -> bool:
+        return (
+            self.plivo_auth_id is not None
+            and self.plivo_auth_token is not None
+            and self.public_url is not None
+        )
 
     @field_validator("plivo_numbers", mode="before")
     @classmethod

@@ -25,9 +25,12 @@ from truman.domain.conversations import (
     WireEvent,
     WireEventKind,
 )
+from truman.domain.numbers import AccountNumber
+from truman.simulation import conversations
 from truman.worker.worker import Worker
 
 TOKEN = "test-token"
+POOL = [AccountNumber(number=f"+1555010{n:04d}") for n in range(8)]
 OFFLINE_DATABASE_URL = "postgresql+asyncpg://truman:truman@localhost:5432/truman"
 
 
@@ -41,6 +44,7 @@ def make_settings(tmp_path: Path, **overrides: Any) -> Settings:
         "worker_heartbeat_s": 0.05,
         "worker_lease_s": 2,
         "end_timeout_s": 0.5,
+        "caller": "stub",
     }
     return Settings.model_validate({**values, **overrides})
 
@@ -153,6 +157,8 @@ def settings(database_url: str, tmp_path: Path) -> Settings:
 @pytest.fixture
 async def client(settings: Settings) -> AsyncIterator[AsyncClient]:
     app = create_app(settings)
+    async with create_sessionmaker(app.state.engine)() as session:
+        await conversations.sync_numbers(session, POOL, [])
     transport = ASGITransport(app=app)
     headers = {"Authorization": f"Bearer {TOKEN}"}
     async with AsyncClient(transport=transport, base_url="http://test", headers=headers) as client:
