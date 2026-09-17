@@ -30,7 +30,7 @@ Agents with `transport: phone` are called on the real phone network through [Pli
 | Variable | Purpose |
 | --- | --- |
 | `PLIVO_AUTH_ID`, `PLIVO_AUTH_TOKEN` | The Plivo account that owns the numbers and places the calls. |
-| `TRUMAN_PLIVO_NUMBERS` | Comma-separated E.164 numbers on that account to call from. Each running phone conversation takes one, so the pool bounds phone concurrency. |
+| `TRUMAN_PLIVO_NUMBERS` | Optional. By default the worker calls from every voice-capable number on the account; set a comma-separated E.164 list to use only those. Each running phone conversation takes one number, so the pool bounds phone concurrency. |
 | `TRUMAN_PUBLIC_URL` | The public `https://` address that reaches the worker's port 8770. Phone calls are off without it. |
 | `TRUMAN_RING_TIMEOUT_S` | How long the agent's number rings before the call ends as `no_answer`, default 30. |
 

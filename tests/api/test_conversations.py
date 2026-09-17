@@ -601,7 +601,7 @@ settings = Settings.model_validate({
     "worker_poll_interval_s": 0.05, "worker_heartbeat_s": 0.05, "worker_lease_s": 2,
     "end_timeout_s": 0.3,
 })
-asyncio.run(run_worker(settings, Immortal(), StreamRegistry()))
+asyncio.run(run_worker(settings, Immortal(), StreamRegistry(), None))
 """
 
 
@@ -728,7 +728,7 @@ settings = Settings.model_validate({
     "worker_poll_interval_s": 0.05, "worker_heartbeat_s": 0.05, "worker_lease_s": 2,
     "end_timeout_s": 0.3,
 })
-asyncio.run(run_worker(settings, HoldsUntilStop(), StreamRegistry()))
+asyncio.run(run_worker(settings, HoldsUntilStop(), StreamRegistry(), None))
 """
 
 
@@ -774,7 +774,7 @@ settings = Settings.model_validate({
     "worker_poll_interval_s": 0.05, "worker_heartbeat_s": 0.05, "worker_lease_s": 2,
     "end_timeout_s": 0.3,
 })
-asyncio.run(main.run_worker(settings, main.StubCaller(), main.StreamRegistry()))
+asyncio.run(main.run_worker(settings, main.StubCaller(), main.StreamRegistry(), None))
 """
 
 

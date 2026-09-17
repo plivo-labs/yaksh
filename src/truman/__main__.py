@@ -5,8 +5,9 @@ import signal
 
 import typer
 import uvicorn
-from sqlalchemy.ext.asyncio import AsyncEngine
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
+from truman.caller.plivo_api import PlivoApi, PlivoError
 from truman.caller.plivo_server import PlivoServer, StreamRegistry, create_app
 from truman.caller.router import TransportRouter
 from truman.caller.stub import StubCaller
@@ -49,29 +50,67 @@ def worker() -> None:
     settings = Settings()
     upgrade_to_head(str(settings.database_url))
     registry = StreamRegistry()
-    caller: Caller = StubCaller() if settings.caller == "stub" else callers(settings, registry)
-    asyncio.run(run_worker(settings, caller, registry))
+    api = plivo_api(settings)
+    caller: Caller = StubCaller() if settings.caller == "stub" else callers(settings, registry, api)
+    try:
+        asyncio.run(run_worker(settings, caller, registry, api))
+    except conversations.UnknownNumbersError as error:
+        logging.critical("TRUMAN_PLIVO_NUMBERS: %s", error)
+        raise SystemExit(1) from None
 
 
-def callers(settings: Settings, registry: StreamRegistry) -> Caller:
-    from truman.caller.phone import PhoneCaller, plivo_credentials
+def plivo_api(settings: Settings) -> PlivoApi | None:
+    if settings.plivo_auth_id is None or settings.plivo_auth_token is None:
+        return None
+    return PlivoApi(
+        settings.plivo_auth_id.get_secret_value(), settings.plivo_auth_token.get_secret_value()
+    )
+
+
+def callers(settings: Settings, registry: StreamRegistry, api: PlivoApi | None) -> Caller:
+    from truman.caller.phone import PhoneCaller
     from truman.caller.pipecat import PipecatCaller
-    from truman.caller.plivo_api import PlivoApi
 
     by_transport: dict[Transport, Caller] = {Transport.PLIVO_WEBSOCKET: PipecatCaller(settings)}
-    if settings.public_url:
-        api = PlivoApi(*plivo_credentials(settings))
-        by_transport[Transport.PHONE] = PhoneCaller(settings, registry, api)
-    else:
+    if api is None:
+        logging.warning("phone calls are off: set PLIVO_AUTH_ID and PLIVO_AUTH_TOKEN")
+    elif settings.public_url is None:
         logging.warning("phone calls are off: set TRUMAN_PUBLIC_URL to the address Plivo can reach")
+    else:
+        by_transport[Transport.PHONE] = PhoneCaller(settings, registry, api)
     return TransportRouter(by_transport)
 
 
-async def run_worker(settings: Settings, caller: Caller, registry: StreamRegistry) -> None:
+async def sync_pool(
+    sessionmaker: async_sessionmaker[AsyncSession], api: PlivoApi, allowlist: list[str]
+) -> None:
+    """Refresh the number pool from the account; when Plivo cannot be reached, the last synced
+    pool stands."""
+    try:
+        numbers = await api.list_numbers()
+    except PlivoError as error:
+        logging.warning("keeping the last synced number pool: %s", error)
+        return
+    if not numbers:
+        logging.warning("keeping the last synced number pool: the account listed no numbers")
+        return
+    async with sessionmaker() as session:
+        enabled = await conversations.sync_numbers(session, numbers, allowlist)
+    logging.info(
+        "number pool: %d of %d account numbers enabled: %s",
+        len(enabled),
+        len(numbers),
+        ", ".join(enabled[:10]) + (", ..." if len(enabled) > 10 else ""),
+    )
+
+
+async def run_worker(
+    settings: Settings, caller: Caller, registry: StreamRegistry, api: PlivoApi | None
+) -> None:
     engine = create_engine(str(settings.database_url))
     sessionmaker = create_sessionmaker(engine)
-    async with sessionmaker() as session:
-        await conversations.sync_numbers(session, settings.plivo_numbers)
+    if api is not None:
+        await sync_pool(sessionmaker, api, settings.plivo_numbers)
     worker = Worker(sessionmaker, caller, settings)
     server = None
     if settings.public_url:

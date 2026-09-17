@@ -17,6 +17,7 @@ from sqlalchemy import (
     UniqueConstraint,
     func,
     text,
+    true,
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
@@ -137,10 +138,14 @@ class Conversation(Base):
 
 
 class PhoneNumber(Base):
-    """A caller id Truman owns; leased to one conversation at a time, rotated by last use."""
+    """A number on the Plivo account; when enabled, leased to one conversation at a time and
+    rotated by last use."""
 
     __tablename__ = "phone_numbers"
 
     number: Mapped[str] = mapped_column(Text, primary_key=True)
+    alias: Mapped[str | None] = mapped_column(Text)
+    region: Mapped[str | None] = mapped_column(Text)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True, server_default=true())
     conversation_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("conversations.id"))
     leased_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

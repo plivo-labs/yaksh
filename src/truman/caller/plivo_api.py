@@ -1,13 +1,20 @@
 """The Plivo REST calls Truman makes: place a call, cancel one still ringing, hang one up."""
 
 import json
+import logging
 from dataclasses import dataclass
 from typing import Any
 
 import aiohttp
+from pydantic import ValidationError
+
+from truman.domain.numbers import AccountNumber
+
+log = logging.getLogger(__name__)
 
 PLIVO_API = "https://api.plivo.com"
 TIMEOUT = aiohttp.ClientTimeout(total=10)
+MAX_PAGES = 100
 
 
 class PlivoError(Exception):
@@ -43,7 +50,8 @@ class PlivoApi:
     def __init__(self, auth_id: str, auth_token: str, *, base_url: str = PLIVO_API) -> None:
         self.auth_id = auth_id
         self.auth_token = auth_token
-        self._account = f"{base_url.rstrip('/')}/v1/Account/{auth_id}"
+        self.base_url = base_url.rstrip("/")
+        self._account = f"{self.base_url}/v1/Account/{auth_id}"
         self._auth = aiohttp.BasicAuth(auth_id, auth_token)
 
     async def create_call(self, call: OutboundCall) -> str:
@@ -63,6 +71,32 @@ class PlivoApi:
         except (ValueError, KeyError, TypeError) as error:
             raise PlivoError(f"create call answered without a request uuid: {body}") from error
 
+    async def list_numbers(self) -> list[AccountNumber]:
+        """Every number on the account, following Plivo's pages; entries that are not phone
+        numbers are skipped."""
+        numbers: list[AccountNumber] = []
+        url: str | None = f"{self._account}/Number/?limit=20"
+        try:
+            async with aiohttp.ClientSession(auth=self._auth, timeout=TIMEOUT) as session:
+                for _ in range(MAX_PAGES):
+                    if url is None:
+                        break
+                    async with session.get(url) as response:
+                        body = await response.text()
+                        if response.status >= 400:
+                            raise PlivoError(
+                                f"listing numbers failed with {response.status}: {body}"
+                            )
+                    page = json.loads(body)
+                    numbers.extend(account_numbers(page.get("objects") or []))
+                    next_path = (page.get("meta") or {}).get("next")
+                    url = f"{self.base_url}{next_path}" if next_path else None
+        except (aiohttp.ClientError, TimeoutError, ValueError) as error:
+            raise PlivoError(f"listing numbers did not reach Plivo: {error!r}") from error
+        if url is not None:
+            raise PlivoError(f"listing numbers did not end after {MAX_PAGES} pages")
+        return numbers
+
     async def cancel_request(self, request_uuid: str) -> None:
         """Stop a call that has not been answered; gone already is fine."""
         await self._delete(f"{self._account}/Request/{request_uuid}/")
@@ -81,3 +115,21 @@ class PlivoApi:
                     raise PlivoError(f"delete {url} failed with {response.status}: {body}")
         except (aiohttp.ClientError, TimeoutError) as error:
             raise PlivoError(f"delete {url} did not reach Plivo: {error!r}") from error
+
+
+def account_numbers(entries: list[dict[str, Any]]) -> list[AccountNumber]:
+    numbers: list[AccountNumber] = []
+    for entry in entries:
+        digits = str(entry.get("number") or "").lstrip("+")
+        try:
+            numbers.append(
+                AccountNumber(
+                    number=f"+{digits}",
+                    alias=entry.get("alias") or None,
+                    region=entry.get("region") or None,
+                    voice=bool(entry.get("voice_enabled")) and bool(entry.get("active", True)),
+                )
+            )
+        except ValidationError:
+            log.warning("skipping an account entry that is not a phone number: %r", digits)
+    return numbers

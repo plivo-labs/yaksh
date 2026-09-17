@@ -22,6 +22,7 @@ from truman.domain.conversations import (
     Validity,
 )
 from truman.domain.errors import NotFoundError, ValidationError
+from truman.domain.numbers import AccountNumber
 from truman.simulation.agents import get_agent
 
 LIVE_STATUSES = frozenset({ConversationStatus.RUNNING, ConversationStatus.ENDING})
@@ -31,6 +32,10 @@ WORKER_STOPPED = "worker stopped during the call; outcome unknown, not retried"
 
 class PoolExhaustedError(Exception):
     """Every pool number is on a call; the conversation goes back to the queue."""
+
+
+class UnknownNumbersError(Exception):
+    """The allowlist names numbers the Plivo account does not have."""
 
 
 async def create_conversation(
@@ -130,7 +135,11 @@ async def claim_next(session: AsyncSession, worker_id: str, lease_s: int) -> Con
 
     A conversation without a caller number takes one from the pool, so it waits while none is free.
     """
-    free_number = select(PhoneNumber.number).where(PhoneNumber.conversation_id.is_(None)).exists()
+    free_number = (
+        select(PhoneNumber.number)
+        .where(PhoneNumber.enabled.is_(True), PhoneNumber.conversation_id.is_(None))
+        .exists()
+    )
     candidate = (
         select(Conversation.id)
         .where(
@@ -306,27 +315,56 @@ async def finalize(
     return recorded is not None
 
 
-async def sync_numbers(session: AsyncSession, numbers: list[str]) -> None:
-    """Make the pool match the settings: add new numbers, drop free ones no longer configured."""
+async def sync_numbers(
+    session: AsyncSession, numbers: list[AccountNumber], allowlist: list[str]
+) -> list[str]:
+    """Make the pool match the Plivo account: every voice number is enabled, or only the
+    allowlisted ones when there is an allowlist; numbers gone from the account are dropped once
+    free. Returns the enabled numbers."""
+    listed = {entry.number for entry in numbers}
+    missing = [number for number in allowlist if number not in listed]
+    if missing:
+        raise UnknownNumbersError(f"the Plivo account does not have {', '.join(missing)}")
     if numbers:
+        rows = insert(PhoneNumber).values(
+            [
+                {
+                    "number": entry.number,
+                    "alias": entry.alias,
+                    "region": entry.region,
+                    "enabled": entry.number in allowlist if allowlist else entry.voice,
+                }
+                for entry in numbers
+            ]
+        )
         await session.execute(
-            insert(PhoneNumber)
-            .values([{"number": number} for number in numbers])
-            .on_conflict_do_nothing()
+            rows.on_conflict_do_update(
+                index_elements=[PhoneNumber.number],
+                set_={
+                    "alias": rows.excluded.alias,
+                    "region": rows.excluded.region,
+                    "enabled": rows.excluded.enabled,
+                },
+            )
         )
     await session.execute(
         delete(PhoneNumber).where(
-            PhoneNumber.number.notin_(numbers), PhoneNumber.conversation_id.is_(None)
+            PhoneNumber.number.notin_(listed), PhoneNumber.conversation_id.is_(None)
         )
     )
     await session.commit()
+    return [
+        entry.number
+        for entry in numbers
+        if (entry.number in allowlist if allowlist else entry.voice)
+    ]
 
 
 async def lease_number(session: AsyncSession, conversation_id: uuid.UUID) -> str | None:
     """Lease the least recently used free number to the conversation, or None when all are taken."""
     candidate = (
         select(PhoneNumber.number)
-        .where(PhoneNumber.conversation_id.is_(None))
+        .where(PhoneNumber.enabled.is_(True), PhoneNumber.conversation_id.is_(None))
         .order_by(PhoneNumber.leased_at.nulls_first(), PhoneNumber.number)
         .limit(1)
         .with_for_update(skip_locked=True)

@@ -48,7 +48,7 @@ class Settings(BaseSettings):
     persona_model: str = "gpt-4.1"
     plivo_auth_id: SecretStr | None = Field(default=None, validation_alias="PLIVO_AUTH_ID")
     plivo_auth_token: SecretStr | None = Field(default=None, validation_alias="PLIVO_AUTH_TOKEN")
-    plivo_numbers: Annotated[list[E164], NoDecode] = ["+17862242321"]
+    plivo_numbers: Annotated[list[E164], NoDecode] = []
     public_url: str | None = None
     stream_port: int = 8770
     ring_timeout_s: int = 30

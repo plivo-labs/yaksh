@@ -28,6 +28,40 @@ async def plivo() -> AsyncIterator[tuple[PlivoApi, list[dict[str, Any]]]]:
             return Response("<html>bad gateway</html>", status_code=502)
         return Response('{"request_uuid": "req-1", "message": "call queued"}', status_code=201)
 
+    @app.get("/v1/Account/{auth_id}/Number/")
+    async def numbers(auth_id: str, offset: int = 0) -> dict[str, Any]:
+        if auth_id == "LOOPING":
+            next_page = f"/v1/Account/{auth_id}/Number/?limit=20&offset={offset + 20}"
+            return {"meta": {"next": next_page}, "objects": [{"number": "12025550100"}]}
+        pages = {
+            0: {
+                "meta": {"next": f"/v1/Account/{auth_id}/Number/?limit=20&offset=20"},
+                "objects": [
+                    {
+                        "number": "17862242321",
+                        "alias": "",
+                        "region": "Florida, UNITED STATES",
+                        "voice_enabled": True,
+                        "active": True,
+                    },
+                    {
+                        "number": "18005550100",
+                        "alias": "SMS only",
+                        "voice_enabled": False,
+                        "active": True,
+                    },
+                ],
+            },
+            20: {
+                "meta": {"next": None},
+                "objects": [
+                    {"number": "919999999999", "voice_enabled": True},
+                    {"number": "short", "voice_enabled": True},
+                ],
+            },
+        }
+        return pages[offset]
+
     @app.delete("/v1/Account/{auth_id}/Request/{request_uuid}/")
     async def cancel(auth_id: str, request_uuid: str) -> Response:
         seen.append({"cancelled": request_uuid})
@@ -96,3 +130,28 @@ async def test_refusals_are_errors_and_a_gone_call_is_not(
     await api.hang_up("gone")
 
     assert seen[-2:] == [{"cancelled": "req-1"}, {"hung_up": "gone"}]
+
+
+async def test_account_numbers_are_listed_across_pages_in_e164(
+    plivo: tuple[PlivoApi, list[dict[str, Any]]],
+) -> None:
+    api, _ = plivo
+
+    numbers = await api.list_numbers()
+
+    assert [(n.number, n.alias, n.region, n.voice) for n in numbers] == [
+        ("+17862242321", None, "Florida, UNITED STATES", True),
+        ("+18005550100", "SMS only", None, False),
+        ("+919999999999", None, None, True),
+    ]
+
+
+async def test_a_listing_that_never_ends_is_an_error(
+    plivo: tuple[PlivoApi, list[dict[str, Any]]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    api, _ = plivo
+    monkeypatch.setattr("truman.caller.plivo_api.MAX_PAGES", 3)
+    looping = PlivoApi("LOOPING", "token", base_url=api.base_url)
+
+    with pytest.raises(PlivoError, match="3 pages"):
+        await looping.list_numbers()
