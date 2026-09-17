@@ -30,11 +30,13 @@ async def served() -> AsyncIterator[tuple[StreamRegistry, PlivoServer]]:
 async def test_the_answer_xml_streams_a_waiting_conversation_and_hangs_up_others() -> None:
     registry = StreamRegistry()
     conversation_id = uuid.uuid4()
-    registry.expect(conversation_id)
+    entry = registry.expect(conversation_id)
     async with AsyncClient(
         transport=ASGITransport(app=create_app(registry, PUBLIC_URL)), base_url="http://worker"
     ) as client:
-        answer = await client.post(f"/answer/{conversation_id}", data={"CallUUID": "abc"})
+        answer = await client.post(
+            f"/answer/{conversation_id}", data={"CallUUID": "abc", "CallStatus": "in-progress"}
+        )
         unknown = await client.get(f"/answer/{uuid.uuid4()}")
         garbled = await client.get("/answer/not-a-conversation")
 
@@ -46,6 +48,7 @@ async def test_the_answer_xml_streams_a_waiting_conversation_and_hangs_up_others
     assert 'contentType="audio/x-mulaw;rate=8000"' in answer.text
     assert unknown.status_code == 200 and unknown.text == HANGUP_XML
     assert garbled.status_code == 200 and garbled.text == HANGUP_XML
+    assert entry.callbacks.get_nowait() == {"CallUUID": "abc", "CallStatus": "in-progress"}
 
 
 async def test_callbacks_reach_the_waiting_conversation_and_are_always_acknowledged() -> None:

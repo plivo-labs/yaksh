@@ -58,6 +58,12 @@ class StreamRegistry:
             entry.finished.set()
 
 
+async def fields(request: Request) -> dict[str, str]:
+    """What Plivo reports about a call, from the query string and the form alike."""
+    form = await request.form()
+    return {key: str(value) for key, value in (*request.query_params.items(), *form.items())}
+
+
 def stream_base(public_url: str) -> str:
     if public_url.startswith("https://"):
         return "wss://" + public_url.removeprefix("https://").rstrip("/")
@@ -75,19 +81,20 @@ def create_app(registry: StreamRegistry, public_url: str) -> FastAPI:
             return None
 
     @app.api_route("/answer/{conversation_id}", methods=["GET", "POST"])
-    async def answer(conversation_id: str) -> Response:
+    async def answer(conversation_id: str, request: Request) -> Response:
         """Plivo fetches this when the agent answers; an error here reads as a platform fault."""
-        if expected(conversation_id) is None:
+        entry = expected(conversation_id)
+        if entry is None:
             return Response(HANGUP_XML, media_type="application/xml")
+        entry.callbacks.put_nowait(await fields(request))
         url = f"{stream_base(public_url)}/stream/{conversation_id}"
         return Response(STREAM_XML.format(stream_url=url), media_type="application/xml")
 
     @app.post("/callbacks/{conversation_id}")
     async def callback(conversation_id: str, request: Request) -> Response:
-        form = await request.form()
         entry = expected(conversation_id)
         if entry is not None:
-            entry.callbacks.put_nowait({key: str(value) for key, value in form.items()})
+            entry.callbacks.put_nowait(await fields(request))
         return Response(status_code=200)
 
     @app.websocket("/stream/{conversation_id}")

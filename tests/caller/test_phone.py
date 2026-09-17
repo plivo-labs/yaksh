@@ -1,0 +1,197 @@
+import asyncio
+import uuid
+from collections.abc import AsyncIterator
+from pathlib import Path
+from typing import Any
+
+import pytest
+import websockets
+from fastapi import FastAPI, Request, Response
+from httpx import AsyncClient
+
+from tests.caller.test_plivo import Observer
+from truman.caller import phone
+from truman.caller.phone import Connected, Dialer
+from truman.caller.plivo_api import PlivoApi
+from truman.caller.plivo_server import PlivoServer, StreamRegistry, create_app
+from truman.domain.agents import AgentConfig
+from truman.domain.conversations import CallOutcome, CallRequest, EndReason, WireEventKind
+
+AGENT_NUMBER = "+14155550100"
+POOL_NUMBER = "+17862242321"
+
+
+class Rig:
+    """The worker's stream server, a fake Plivo API that records what it was asked, and a dialer."""
+
+    def __init__(self, worker: PlivoServer, plivo: PlivoServer, registry: StreamRegistry) -> None:
+        self.worker = worker
+        self.registry = registry
+        self.seen: list[dict[str, Any]] = []
+        self.public_url = f"http://127.0.0.1:{worker.port}"
+        self.dialer = Dialer(
+            PlivoApi("MAXXXX", "token", base_url=f"http://127.0.0.1:{plivo.port}"),
+            self.public_url,
+            ring_timeout_s=1,
+        )
+
+    async def report(self, conversation_id: uuid.UUID, **fields: str) -> None:
+        async with AsyncClient(base_url=self.public_url) as client:
+            response = await client.post(f"/callbacks/{conversation_id}", data=fields)
+        assert response.status_code == 200
+
+    async def answer(self, conversation_id: uuid.UUID, call_uuid: str) -> str:
+        async with AsyncClient(base_url=self.public_url) as client:
+            response = await client.post(
+                f"/answer/{conversation_id}",
+                data={"CallStatus": "in-progress", "CallUUID": call_uuid},
+            )
+        assert response.status_code == 200
+        return response.text
+
+
+@pytest.fixture
+async def rig(monkeypatch: pytest.MonkeyPatch) -> AsyncIterator[Rig]:
+    monkeypatch.setattr(phone, "CALLBACK_GRACE_S", 0.5)
+    monkeypatch.setattr(phone, "STREAM_GRACE_S", 0.5)
+    fake = FastAPI()
+    registry = StreamRegistry()
+    worker = PlivoServer(create_app(registry, "http://placeholder"), port=0)
+    plivo = PlivoServer(fake, port=0)
+    await worker.start()
+    await plivo.start()
+    rig = Rig(worker, plivo, registry)
+
+    @fake.post("/v1/Account/{auth_id}/Call/")
+    async def create(request: Request) -> Response:
+        rig.seen.append({"create": await request.json()})
+        return Response('{"request_uuid": "req-1"}', status_code=201)
+
+    @fake.delete("/v1/Account/{auth_id}/Request/{request_uuid}/")
+    async def cancel(request_uuid: str) -> Response:
+        rig.seen.append({"cancel": request_uuid})
+        return Response(status_code=204)
+
+    @fake.delete("/v1/Account/{auth_id}/Call/{call_uuid}/")
+    async def hang_up(call_uuid: str) -> Response:
+        rig.seen.append({"hang_up": call_uuid})
+        return Response(status_code=204)
+
+    yield rig
+    await worker.stop(2.0)
+    await plivo.stop(2.0)
+
+
+def request(tmp_path: Path) -> CallRequest:
+    return CallRequest(
+        conversation_id=uuid.uuid4(),
+        agent=AgentConfig.model_validate({"transport": "phone", "agent_number": AGENT_NUMBER}),
+        persona_prompt="Book a cleaning.",
+        caller_number=POOL_NUMBER,
+        max_duration_s=120,
+        output_dir=tmp_path,
+    )
+
+
+async def seen(observer: Observer, kind: WireEventKind) -> None:
+    while kind not in observer.kinds():
+        await asyncio.sleep(0.01)
+
+
+def dial(rig: Rig, call: CallRequest, observer: Observer, stop: asyncio.Event) -> asyncio.Task[Any]:
+    entry = rig.registry.expect(call.conversation_id)
+    return asyncio.create_task(rig.dialer.dial(call, entry, observer, lambda: 0, stop))
+
+
+async def test_the_stream_arrives_after_the_agent_rings_and_answers(
+    rig: Rig, tmp_path: Path
+) -> None:
+    call = request(tmp_path)
+    observer = Observer()
+    dialing = dial(rig, call, observer, asyncio.Event())
+
+    await rig.report(call.conversation_id, CallStatus="ringing", CallUUID="call-1")
+    xml = await rig.answer(call.conversation_id, "call-1")
+    async with websockets.connect(
+        f"ws://127.0.0.1:{rig.worker.port}/stream/{call.conversation_id}"
+    ):
+        connected = await asyncio.wait_for(dialing, 2)
+        assert isinstance(connected, Connected)
+        assert connected.request_uuid == "req-1" and connected.call_uuid == "call-1"
+        assert f"/stream/{call.conversation_id}" in xml
+        rig.registry.forget(call.conversation_id)
+
+    assert observer.kinds() == [WireEventKind.RINGING, WireEventKind.ANSWERED]
+    assert rig.seen == [
+        {
+            "create": {
+                "from": POOL_NUMBER,
+                "to": AGENT_NUMBER,
+                "answer_url": f"{rig.public_url}/answer/{call.conversation_id}",
+                "answer_method": "POST",
+                "hangup_url": f"{rig.public_url}/callbacks/{call.conversation_id}",
+                "hangup_method": "POST",
+                "ring_url": f"{rig.public_url}/callbacks/{call.conversation_id}",
+                "ring_method": "POST",
+                "ring_timeout": 1,
+                "time_limit": 120 + phone.TIME_LIMIT_MARGIN_S,
+            }
+        }
+    ]
+
+
+async def test_an_unanswered_call_and_a_stop_while_ringing_end_without_a_stream(
+    rig: Rig, tmp_path: Path
+) -> None:
+    unanswered = request(tmp_path)
+    dialing = dial(rig, unanswered, Observer(), asyncio.Event())
+    await rig.report(unanswered.conversation_id, CallStatus="ringing")
+    await rig.report(unanswered.conversation_id, CallStatus="no-answer", HangupCause="NO_ANSWER")
+    no_answer = await asyncio.wait_for(dialing, 2)
+
+    stop = asyncio.Event()
+    cancelled = request(tmp_path)
+    dialing = dial(rig, cancelled, Observer(), stop)
+    await rig.report(cancelled.conversation_id, CallStatus="ringing")
+    stop.set()
+    stopped = await asyncio.wait_for(dialing, 2)
+
+    stop = asyncio.Event()
+    answered = request(tmp_path)
+    observer = Observer()
+    dialing = dial(rig, answered, observer, stop)
+    await rig.answer(answered.conversation_id, "call-3")
+    await asyncio.wait_for(seen(observer, WireEventKind.ANSWERED), 2)
+    stop.set()
+    hung_up = await asyncio.wait_for(dialing, 2)
+
+    assert no_answer == CallOutcome(
+        connected=False,
+        end_reason=EndReason.NO_ANSWER,
+        caller_error="the agent did not answer: no-answer (NO_ANSWER)",
+    )
+    assert stopped == CallOutcome(connected=False, end_reason=EndReason.USER_REQUEST)
+    assert hung_up == CallOutcome(connected=False, end_reason=EndReason.USER_REQUEST)
+    assert [action for action in rig.seen if "create" not in action] == [
+        {"cancel": "req-1"},
+        {"hang_up": "call-3"},
+    ]
+
+
+async def test_silence_from_plivo_and_a_missing_stream_time_out(rig: Rig, tmp_path: Path) -> None:
+    silent = request(tmp_path)
+    nothing = await asyncio.wait_for(dial(rig, silent, Observer(), asyncio.Event()), 5)
+
+    answered = request(tmp_path)
+    dialing = dial(rig, answered, Observer(), asyncio.Event())
+    await rig.answer(answered.conversation_id, "call-2")
+    no_stream = await asyncio.wait_for(dialing, 5)
+
+    assert nothing.end_reason is EndReason.ERROR and nothing.caller_error
+    assert "TRUMAN_PUBLIC_URL" in nothing.caller_error
+    assert no_stream.end_reason is EndReason.ERROR and no_stream.caller_error
+    assert "never reached the worker" in no_stream.caller_error
+    assert [action for action in rig.seen if "create" not in action] == [
+        {"cancel": "req-1"},
+        {"hang_up": "call-2"},
+    ]

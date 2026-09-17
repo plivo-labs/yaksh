@@ -28,6 +28,7 @@ class EndReason(StrEnum):
     GOAL_REACHED = "goal_reached"
     GOAL_ABANDONED = "goal_abandoned"
     AGENT_HANGUP = "agent_hangup"
+    NO_ANSWER = "no_answer"
     DURATION_LIMIT = "duration_limit"
     ERROR = "error"
     PROCESS_RESTART = "process_restart"
