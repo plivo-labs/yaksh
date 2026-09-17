@@ -114,7 +114,8 @@ export function ConversationPage() {
               <CardHeader>
                 <CardTitle>Persona</CardTitle>
                 <CardDescription>
-                  From {data.caller_number}, up to {data.max_duration_s}s
+                  From {data.caller_number ?? "a number assigned at call time"}, up to{" "}
+                  {data.max_duration_s}s
                 </CardDescription>
               </CardHeader>
               <CardContent className="whitespace-pre-wrap text-sm">

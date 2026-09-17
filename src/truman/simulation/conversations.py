@@ -32,8 +32,14 @@ async def create_conversation(
     session: AsyncSession, settings: Settings, command: ConversationCreate
 ) -> Conversation:
     agent = await get_agent(session, command.agent_id, lock=True)
-    if agent.direction is not Direction.INBOUND or agent.transport is not Transport.PLIVO_WEBSOCKET:
-        raise ValidationError("not supported yet: only inbound agents over plivo_websocket")
+    if agent.direction is not Direction.INBOUND:
+        raise ValidationError("not supported yet: only inbound agents")
+    if agent.transport is Transport.PHONE:
+        if command.caller_number is not None:
+            raise ValidationError("caller_number is leased from the number pool for phone agents")
+        caller_number = None
+    else:
+        caller_number = command.caller_number or settings.default_caller_number
     version_id = await session.scalar(
         select(AgentVersion.id).where(
             AgentVersion.agent_id == agent.id, AgentVersion.version == agent.current_version
@@ -44,7 +50,7 @@ async def create_conversation(
         agent_id=agent.id,
         agent_version_id=version_id,
         persona_prompt=command.persona_prompt,
-        caller_number=command.caller_number or settings.default_caller_number,
+        caller_number=caller_number,
         max_duration_s=command.max_duration_s or settings.default_max_duration_s,
     )
     session.add(conversation)

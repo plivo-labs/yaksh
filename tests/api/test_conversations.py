@@ -262,17 +262,29 @@ async def test_a_refused_connection_is_failed_and_still_readable(
     assert [event["kind"] for event in done["wire_events"]] == ["connect_started"]
 
 
-async def test_unsupported_agents_are_rejected_at_start(client: AsyncClient) -> None:
-    agent_id = await create_agent(
+async def test_phone_agents_queue_with_a_pool_number_and_outbound_agents_are_refused(
+    client: AsyncClient,
+) -> None:
+    phone = await create_agent(
         client, transport="phone", websocket_url=None, agent_number="+14155550100"
     )
+    outbound = await create_agent(client, direction="outbound")
 
-    response = await client.post(
-        "/api/v1/conversations", json={"agent_id": agent_id, "persona_prompt": "hello"}
+    queued = await client.post(
+        "/api/v1/conversations", json={"agent_id": phone, "persona_prompt": "hello"}
+    )
+    chosen = await client.post(
+        "/api/v1/conversations",
+        json={"agent_id": phone, "persona_prompt": "hello", "caller_number": "+15550100000"},
+    )
+    refused = await client.post(
+        "/api/v1/conversations", json={"agent_id": outbound, "persona_prompt": "hello"}
     )
 
-    assert response.status_code == 422
-    assert "not supported yet" in response.json()["error"]["message"]
+    assert queued.status_code == 202, queued.text
+    assert queued.json()["status"] == "queued" and queued.json()["caller_number"] is None
+    assert chosen.status_code == 422 and "number pool" in chosen.json()["error"]["message"]
+    assert refused.status_code == 422 and "not supported yet" in refused.json()["error"]["message"]
 
 
 async def test_a_conversation_keeps_the_agent_version_it_started_with(
