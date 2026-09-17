@@ -1,4 +1,6 @@
-"""The caller's side of a Plivo audio stream.
+"""Truman playing Plivo's side of a stream toward the agent under test.
+
+This emulator stands in until the phone leg lands and Plivo carries the audio itself.
 
 Plivo carries 8 kHz mu-law in 20 ms frames both ways, and the agent under test expects a
 continuous inbound stream. One clock therefore sends caller audio or silence every tick and
@@ -20,12 +22,9 @@ from typing import Any
 
 import audioop
 
+from truman.caller.audio import FRAME_BYTES, FRAME_S, SAMPLE_RATE, SILENCE, Clock, Playout
 from truman.domain.conversations import CallObserver, WireEvent, WireEventKind
 
-SAMPLE_RATE = 8000
-FRAME_S = 0.02
-FRAME_BYTES = 320
-SILENCE = b"\x00" * FRAME_BYTES
 STOP_SEND_S = 1.0
 SPEECH_PEAK = 500
 GAP_BYTES = SAMPLE_RATE * 2 // 5
@@ -34,31 +33,6 @@ STALLED = "the agent stopped reading the stream"
 
 Send = Callable[[str], Awaitable[bool]]
 Push = Callable[[bytes], Awaitable[None]]
-
-
-class Clock:
-    def __init__(self) -> None:
-        self._started = time.monotonic()
-
-    def ms(self) -> int:
-        return int((time.monotonic() - self._started) * 1000)
-
-
-class Playout:
-    """One reply's audio: bytes that arrived from the TTS, bytes the wire has sent, and how
-    many words were stamped against it."""
-
-    def __init__(self) -> None:
-        self.arrived = 0
-        self.sent = 0
-        self.origin: int | None = None
-        self.words = 0
-
-    def offset_of(self, pts: int | None) -> int:
-        """Where audio stamped `pts` on the pipeline clock starts, in bytes of the reply."""
-        if pts is None or self.origin is None:
-            return self.arrived
-        return max(0, (pts - self.origin) * SAMPLE_RATE * 2 // 1_000_000_000)
 
 
 def start_message(call_id: str, stream_id: str, extra_headers: dict[str, str]) -> str:

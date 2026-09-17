@@ -7,26 +7,13 @@ from typing import Any
 
 import audioop
 
-from truman.caller.plivo import FRAME_BYTES, SILENCE, Clock, Playout, Wire
-from truman.domain.conversations import Turn, WireEvent, WireEventKind
+from tests.conftest import Observer
+from truman.caller.audio import FRAME_BYTES, SILENCE, Clock, Playout
+from truman.caller.plivo_emulator import Wire
+from truman.domain.conversations import WireEventKind
 
 SPEECH_FRAME = b"\x00\x10" * (FRAME_BYTES // 2)
 SILENCE_PAYLOAD = base64.b64encode(audioop.lin2ulaw(SILENCE, 2)).decode()
-
-
-class Observer:
-    def __init__(self) -> None:
-        self.events: list[WireEvent] = []
-        self.turns: list[Turn] = []
-
-    def turn(self, turn: Turn) -> None:
-        self.turns.append(turn)
-
-    def wire_event(self, event: WireEvent) -> None:
-        self.events.append(event)
-
-    def kinds(self) -> list[WireEventKind]:
-        return [event.kind for event in self.events]
 
 
 class Socket:

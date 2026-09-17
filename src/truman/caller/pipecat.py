@@ -35,8 +35,9 @@ from pipecat.transports.websocket.client import (
 )
 from pipecat.workers.runner import WorkerRunner
 
+from truman.caller.audio import SAMPLE_RATE, Clock, Playout
 from truman.caller.persona import CallState, Persona, hang_up, note_failure, provider_keys
-from truman.caller.plivo import SAMPLE_RATE, Clock, Playout, Wire, start_message
+from truman.caller.plivo_emulator import Wire, start_message
 from truman.caller.transcript import OFFSET, PLAYOUT, TranscriptBuilder, WireTap
 from truman.config import Settings
 from truman.domain.conversations import (

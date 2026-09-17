@@ -53,6 +53,21 @@ async def first(*events: asyncio.Event) -> asyncio.Event:
     return waiters[next(iter(done))]
 
 
+class Observer:
+    def __init__(self) -> None:
+        self.events: list[WireEvent] = []
+        self.turns: list[Turn] = []
+
+    def turn(self, turn: Turn) -> None:
+        self.turns.append(turn)
+
+    def wire_event(self, event: WireEvent) -> None:
+        self.events.append(event)
+
+    def kinds(self) -> list[WireEventKind]:
+        return [event.kind for event in self.events]
+
+
 class FakeCaller:
     """A caller the tests steer: gates for connecting and finishing, and failure modes."""
 

@@ -9,7 +9,7 @@ import websockets
 from fastapi import FastAPI, Request, Response
 from httpx import AsyncClient
 
-from tests.caller.test_plivo import Observer
+from tests.conftest import Observer
 from truman.caller import phone
 from truman.caller.phone import Connected, Dialer
 from truman.caller.plivo_api import PlivoApi

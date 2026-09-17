@@ -2,11 +2,11 @@ import asyncio
 import uuid
 from pathlib import Path
 
-from tests.caller.test_plivo import Observer
-from tests.conftest import make_settings
+from tests.conftest import Observer, make_settings
+from truman.caller.audio import Clock
 from truman.caller.persona import CallState, hang_up
 from truman.caller.pipecat import PipecatCaller, outcome
-from truman.caller.plivo import STALLED, Clock, Wire
+from truman.caller.plivo_emulator import STALLED, Wire
 from truman.domain.agents import AgentConfig
 from truman.domain.conversations import CallRequest, EndReason, WireEventKind
 

@@ -2,7 +2,7 @@ import asyncio
 import uuid
 from pathlib import Path
 
-from tests.caller.test_plivo import Observer
+from tests.conftest import Observer
 from truman.caller.router import TransportRouter
 from truman.domain.agents import AgentConfig, Transport
 from truman.domain.conversations import CallObserver, CallOutcome, CallRequest, EndReason

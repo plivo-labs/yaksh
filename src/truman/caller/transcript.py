@@ -23,7 +23,7 @@ from pipecat.frames.frames import (
 from pipecat.processors.aggregators.llm_context import LLMContext
 from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
 
-from truman.caller.plivo import FRAME_BYTES, Clock, Playout
+from truman.caller.audio import FRAME_BYTES, Clock, Playout
 from truman.domain.conversations import CallObserver, Provenance, Role, Turn
 
 PLAYOUT = "truman.playout"

@@ -1,8 +1,8 @@
 from pipecat.frames.frames import InterruptionFrame, TTSStartedFrame, TTSTextFrame
 from pipecat.tests.utils import run_test
 
-from tests.caller.test_plivo import Observer
-from truman.caller.plivo import FRAME_BYTES, Clock, Playout
+from tests.conftest import Observer
+from truman.caller.audio import FRAME_BYTES, Clock, Playout
 from truman.caller.transcript import OFFSET, PLAYOUT, TranscriptBuilder, WireTap
 from truman.domain.conversations import Provenance, Role
 

@@ -23,7 +23,7 @@ from pipecat.services.elevenlabs.tts import ElevenLabsTTSService
 from pipecat.services.llm_service import FunctionCallParams
 from pipecat.services.openai.llm import OpenAILLMService
 
-from truman.caller.plivo import SAMPLE_RATE, Clock
+from truman.caller.audio import SAMPLE_RATE, Clock
 from truman.caller.transcript import AgentTurnTap, GeneratedTap, TranscriptBuilder
 from truman.config import Settings
 from truman.domain.conversations import (
