@@ -140,7 +140,7 @@ class Dialer:
                 await self._end(request_uuid, call_uuid)
                 if stopped.done():
                     return unreached(EndReason.USER_REQUEST, None, call_uuid)
-                return unreached(EndReason.ERROR, silence(call_uuid), call_uuid)
+                return unreached(EndReason.ERROR, no_signal_reason(call_uuid), call_uuid)
         finally:
             stopped.cancel()
             report.cancel()
@@ -176,7 +176,7 @@ def unreached(
     )
 
 
-def silence(call_uuid: str | None) -> str:
+def no_signal_reason(call_uuid: str | None) -> str:
     if call_uuid is None:
         return "Plivo reported nothing about the call; is TRUMAN_PUBLIC_URL reachable from Plivo?"
     return "the agent answered but its audio stream never reached the worker"
