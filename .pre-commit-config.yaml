@@ -39,25 +39,24 @@ repos:
         language: system
         files: ^(src|tests)/.*\.py$|^pyproject\.toml$
         pass_filenames: false
-  - repo: https://github.com/oxc-project/mirrors-oxlint
-    rev: v1.82.0
-    hooks:
-      - id: oxlint
-        args: [-c, frontend/.oxlintrc.json]
-        files: ^frontend/
-  - repo: https://github.com/oxc-project/mirrors-oxfmt
-    rev: v0.67.0
-    hooks:
-      - id: oxfmt
-        args: [--check, -c, frontend/.oxfmtrc.json]
-        files: ^frontend/
   - repo: local
     hooks:
+      - id: oxlint
+        name: oxlint
+        entry: bun run --cwd frontend lint
+        language: system
+        files: ^frontend/
+        pass_filenames: false
+      - id: oxfmt
+        name: oxfmt
+        entry: bun run --cwd frontend format:check
+        language: system
+        files: ^frontend/
+        pass_filenames: false
       - id: tsc
         name: tsc
-        entry: tsc -b frontend
-        language: node
-        additional_dependencies: ["typescript@7.0.2"]
+        entry: bun run --cwd frontend typecheck
+        language: system
         files: ^frontend/
         pass_filenames: false
   - repo: https://github.com/commitizen-tools/commitizen
