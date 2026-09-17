@@ -13,6 +13,7 @@ export type EndReason =
   | "goal_reached"
   | "goal_abandoned"
   | "agent_hangup"
+  | "agent_silent"
   | "no_answer"
   | "duration_limit"
   | "error"

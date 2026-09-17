@@ -122,6 +122,11 @@ async def test_the_serializer_speaks_linear_audio_and_reports_what_plivo_says() 
     )
     assert await serializer.deserialize(json.dumps({"event": "stop"})) is None
     assert await serializer.deserialize("not json") is None
+    hiccup = json.dumps({"event": "playFailed", "reason": "codec mismatch"})
+    assert await serializer.deserialize(hiccup) is None
+    assert not serializer.failed.is_set()
+    failure = json.dumps({"event": "error", "reason": "stream torn down"})
+    assert await serializer.deserialize(failure) is None
 
     assert play == {
         "event": "playAudio",
@@ -141,5 +146,8 @@ async def test_the_serializer_speaks_linear_audio_and_reports_what_plivo_says() 
         WireEventKind.AGENT_AUDIO,
         WireEventKind.CHECKPOINT,
         WireEventKind.STOP,
+        WireEventKind.CALLER_ERROR,
+        WireEventKind.CALLER_ERROR,
     ]
-    assert serializer.stopped.is_set()
+    assert serializer.stopped.is_set() and serializer.failed.is_set()
+    assert serializer.failure == "plivo reported an error: stream torn down"

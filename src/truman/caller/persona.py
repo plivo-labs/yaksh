@@ -11,11 +11,20 @@ from typing import Any, Protocol
 from pipecat.adapters.schemas.function_schema import FunctionSchema
 from pipecat.adapters.schemas.tools_schema import ToolsSchema
 from pipecat.audio.vad.silero import SileroVADAnalyzer
-from pipecat.frames.frames import ErrorFrame, FunctionCallResultProperties, LLMRunFrame
+from pipecat.audio.vad.vad_analyzer import VADParams
+from pipecat.frames.frames import (
+    ErrorFrame,
+    FunctionCallResultProperties,
+    LLMRunFrame,
+    TTSSpeakFrame,
+)
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.worker import PipelineParams, PipelineWorker
 from pipecat.processors.aggregators.llm_context import LLMContext
-from pipecat.processors.aggregators.llm_response_universal import LLMContextAggregatorPair
+from pipecat.processors.aggregators.llm_response_universal import (
+    LLMContextAggregatorPair,
+    LLMUserAggregatorParams,
+)
 from pipecat.processors.audio.vad_processor import VADProcessor
 from pipecat.processors.frame_processor import FrameProcessor
 from pipecat.services.azure.llm import AzureLLMService
@@ -40,6 +49,10 @@ log = logging.getLogger(__name__)
 
 END_GRACE_S = 3.0
 DRAINED = frozenset({EndReason.GOAL_REACHED, EndReason.GOAL_ABANDONED})
+VAD = VADParams(confidence=0.5, start_secs=0.1, stop_secs=0.6)
+IDLE_S = 15.0
+IDLE_NUDGES = 2
+NUDGE = "Hello? Are you still there?"
 
 PERSONA_INSTRUCTIONS = (
     "You are a person on a phone call with a voice assistant. Stay in character throughout; "
@@ -115,6 +128,21 @@ class CallState:
             self.ended.set()
 
 
+class Silence:
+    """How many times the persona has nudged a quiet agent in the current stretch of silence."""
+
+    def __init__(self, nudges: int) -> None:
+        self._limit = nudges
+        self._nudges = 0
+
+    def heard(self) -> None:
+        self._nudges = 0
+
+    def give_up(self) -> bool:
+        self._nudges += 1
+        return self._nudges > self._limit
+
+
 class Stoppable(Protocol):
     def has_finished(self) -> bool: ...
 
@@ -159,12 +187,13 @@ class Persona:
             settings=ElevenLabsTTSService.Settings(voice=settings.elevenlabs_voice_id),
         )
         aggregators = LLMContextAggregatorPair(
-            LLMContext(tools=ToolsSchema(standard_tools=[END_CALL]))
+            LLMContext(tools=ToolsSchema(standard_tools=[END_CALL])),
+            user_params=LLMUserAggregatorParams(user_idle_timeout=IDLE_S),
         )
         pipeline = Pipeline(
             [
                 transport_input,
-                VADProcessor(vad_analyzer=SileroVADAnalyzer(sample_rate=SAMPLE_RATE)),
+                VADProcessor(vad_analyzer=SileroVADAnalyzer(sample_rate=SAMPLE_RATE, params=VAD)),
                 self.stt,
                 aggregators.user(),
                 AgentTurnTap(transcript),
@@ -201,6 +230,19 @@ class Persona:
             state.end(EndReason.GOAL_REACHED if success else EndReason.GOAL_ABANDONED)
 
         self.llm.register_function(END_CALL.name, end_call, cancel_on_interruption=False)
+        self._transcript = transcript
+        silence = Silence(IDLE_NUDGES)
+
+        @aggregators.user().event_handler("on_user_turn_started")
+        async def on_agent_turn(_aggregator: Any) -> None:
+            silence.heard()
+
+        @aggregators.user().event_handler("on_user_turn_idle")
+        async def on_idle(_aggregator: Any) -> None:
+            if silence.give_up():
+                state.end(EndReason.AGENT_SILENT)
+                return
+            await self.worker.queue_frame(TTSSpeakFrame(NUDGE))
 
         @self.worker.event_handler("on_pipeline_error")
         async def on_error(_worker: Any, frame: ErrorFrame) -> None:
@@ -218,6 +260,12 @@ class Persona:
 
     async def speak_first(self) -> None:
         await self.worker.queue_frame(LLMRunFrame())
+
+    async def greet_if_silent(self) -> None:
+        """An agent that should speak first but says nothing gets a hello, as a caller would."""
+        await asyncio.sleep(IDLE_S)
+        if not self._transcript.agent_spoke and not self._transcript.agent_speaking:
+            await self.speak_first()
 
     def unusable(self) -> list[str]:
         return [service.name for service in (self.stt, self.llm, self.tts) if not service.is_usable]

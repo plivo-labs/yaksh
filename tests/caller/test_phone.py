@@ -21,6 +21,7 @@ PROVIDERS = ("deepgram_api_key", "elevenlabs_api_key", "openai_api_key")
 
 AGENT_NUMBER = "+14155550100"
 POOL_NUMBER = "+17862242321"
+RETRIES = "rc=5&ct=2000&rd=1000&rp=5xx,ct"
 
 
 class Rig:
@@ -140,9 +141,9 @@ async def test_the_stream_arrives_after_the_agent_rings_and_answers(
                 "to": AGENT_NUMBER,
                 "answer_url": f"{rig.public_url}/answer/{call.conversation_id}",
                 "answer_method": "POST",
-                "hangup_url": f"{rig.public_url}/callbacks/{call.conversation_id}",
+                "hangup_url": f"{rig.public_url}/callbacks/{call.conversation_id}?{RETRIES}",
                 "hangup_method": "POST",
-                "ring_url": f"{rig.public_url}/callbacks/{call.conversation_id}",
+                "ring_url": f"{rig.public_url}/callbacks/{call.conversation_id}?{RETRIES}",
                 "ring_method": "POST",
                 "ring_timeout": 1,
                 "time_limit": 120 + phone.TIME_LIMIT_MARGIN_S,

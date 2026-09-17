@@ -33,7 +33,7 @@ from pipecat.transports.websocket.fastapi import FastAPIWebsocketParams, FastAPI
 from truman.caller.audio import GAP_BYTES, SAMPLE_RATE, SPEECH_PEAK, Clock, Playout, Stamper
 from truman.caller.persona import CallState, Persona, converse, provider_keys
 from truman.caller.plivo_api import OutboundCall, PlivoApi, PlivoError
-from truman.caller.plivo_server import PendingStream, StreamRegistry
+from truman.caller.plivo_server import CALLBACK_RETRIES, PendingStream, StreamRegistry
 from truman.caller.transcript import TranscriptBuilder, WireTap
 from truman.config import Settings
 from truman.domain.conversations import (
@@ -95,8 +95,8 @@ class Dialer:
             from_number=request.caller_number,
             to_number=request.agent.agent_number,
             answer_url=f"{self._base}/answer/{conversation_id}",
-            hangup_url=f"{self._base}/callbacks/{conversation_id}",
-            ring_url=f"{self._base}/callbacks/{conversation_id}",
+            hangup_url=f"{self._base}/callbacks/{conversation_id}?{CALLBACK_RETRIES}",
+            ring_url=f"{self._base}/callbacks/{conversation_id}?{CALLBACK_RETRIES}",
             ring_timeout_s=self._ring_timeout_s,
             time_limit_s=request.max_duration_s + TIME_LIMIT_MARGIN_S,
         )
@@ -271,6 +271,8 @@ class StreamSerializer(FrameSerializer):
         self._checkpoints = checkpoints
         self._quiet = GAP_BYTES
         self.stopped = asyncio.Event()
+        self.failed = asyncio.Event()
+        self.failure: str | None = None
 
     async def serialize(self, frame: Frame) -> str | bytes | None:
         if isinstance(frame, InterruptionFrame):
@@ -312,6 +314,13 @@ class StreamSerializer(FrameSerializer):
             case "stop":
                 self._event(WireEventKind.STOP)
                 self.stopped.set()
+            case "playFailed":
+                self._event(WireEventKind.CALLER_ERROR)
+                log.warning("plivo could not play audio: %s", message.get("reason"))
+            case "error":
+                self._event(WireEventKind.CALLER_ERROR)
+                self.failure = self.failure or f"plivo reported an error: {message.get('reason')}"
+                self.failed.set()
         return None
 
     def _heard(self, pcm: bytes) -> None:
@@ -486,10 +495,21 @@ class PhoneCaller:
         async def on_disconnected(_transport: Any, _socket: Any) -> None:
             state.end(EndReason.AGENT_HANGUP)
 
+        greeting = None
+        if request.agent.agent_speaks_first:
+            greeting = asyncio.create_task(persona.greet_if_silent())
         try:
-            await converse(persona, state, stop, {serializer.stopped: EndReason.AGENT_HANGUP})
+            await converse(
+                persona,
+                state,
+                stop,
+                {serializer.stopped: EndReason.AGENT_HANGUP, serializer.failed: EndReason.ERROR},
+            )
         finally:
+            if greeting is not None:
+                greeting.cancel()
             await self._hang_up(call_id)
+        state.error = state.error or serializer.failure
         return CallOutcome(
             connected=state.connected,
             end_reason=state.end_reason or EndReason.ERROR,

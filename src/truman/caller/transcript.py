@@ -49,16 +49,21 @@ class TranscriptBuilder:
         self._words: list[tuple[str, int, Playout | None]] = []
         self._words_started = 0
         self._self_spaced = False
+        self.agent_speaking = False
+        self.agent_spoke = False
 
     def agent_started(self) -> None:
+        self.agent_speaking = True
         if self._agent_started is None:
             self._agent_started = self._clock.ms()
             self._agent_stopped = None
 
     def agent_stopped(self) -> None:
+        self.agent_speaking = False
         self._agent_stopped = self._clock.ms()
 
     def agent_said(self, text: str) -> None:
+        self.agent_spoke = True
         now = self._clock.ms()
         started = now if self._agent_started is None else self._agent_started
         stopped = now if self._agent_stopped is None else self._agent_stopped

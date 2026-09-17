@@ -11,6 +11,7 @@ import logging
 import uuid
 from collections.abc import Generator
 from dataclasses import dataclass, field
+from html import escape
 
 import uvicorn
 from fastapi import FastAPI, Request, WebSocket
@@ -25,6 +26,7 @@ STREAM_XML = (
     "{stream_url}</Stream></Response>"
 )
 REPORT_KEYS = ("Event", "Status", "Cause", "Reason", "Error")
+CALLBACK_RETRIES = "rc=5&ct=2000&rd=1000&rp=5xx,ct"
 HANGUP_XML = '<?xml version="1.0" encoding="UTF-8"?><Response><Hangup/></Response>'
 NO_CALL = "no call expects this stream"
 
@@ -92,7 +94,9 @@ def create_app(registry: StreamRegistry, public_url: str) -> FastAPI:
         entry.callbacks.put_nowait(await fields(request))
         xml = STREAM_XML.format(
             stream_url=f"{stream_base(public_url)}/stream/{conversation_id}",
-            status_url=f"{public_url.rstrip('/')}/callbacks/{conversation_id}",
+            status_url=escape(
+                f"{public_url.rstrip('/')}/callbacks/{conversation_id}?{CALLBACK_RETRIES}"
+            ),
         )
         return Response(xml, media_type="application/xml")
 
