@@ -151,7 +151,7 @@ class Dialer:
     ) -> Connected | CallOutcome:
         try:
             stream_id, call_id, encoding = await handshake(socket)
-        except (WebSocketDisconnect, ValueError, KeyError) as error:
+        except (WebSocketDisconnect, ValueError) as error:
             await self._end(request_uuid, call_uuid)
             return unreached(
                 EndReason.ERROR, f"the stream ended before it started: {error}", call_uuid
@@ -410,9 +410,11 @@ async def handshake(socket: WebSocket) -> tuple[str, str, str]:
         raise ValueError(
             f"the stream did not open with a Plivo start event: {message.get('event')}"
         )
-    start = message["start"]
-    encoding = str((start.get("mediaFormat") or {}).get("encoding") or MULAW)
-    return str(start["streamId"]), str(start["callId"]), encoding
+    try:
+        start = message["start"]
+        return str(start["streamId"]), str(start["callId"]), str(start["mediaFormat"]["encoding"])
+    except (KeyError, TypeError) as error:
+        raise ValueError(f"the Plivo start event is incomplete: {message}") from error
 
 
 class PhoneCaller:
