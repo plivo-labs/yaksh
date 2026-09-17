@@ -10,6 +10,7 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from truman.config import Settings
+from truman.db.models import Conversation
 from truman.domain.conversations import (
     Caller,
     CallOutcome,
@@ -98,25 +99,16 @@ class Worker:
         if reaped:
             log.warning("marked %d conversations failed after their lease expired", reaped)
         claimed = 0
+        lease_s = self._settings.worker_lease_s
         while self.active < self._settings.max_active_conversations and not self.stopping:
             async with self._sessionmaker() as session:
-                conversation = await conversations.claim_next(
-                    session, self.worker_id, self._settings.worker_lease_s
-                )
-                if conversation is None:
-                    break
-                try:
-                    request = await conversations.call_request(
-                        session, self._settings, conversation
-                    )
-                except Exception as exc:
-                    log.exception("cannot prepare conversation %s", conversation.id)
-                    await self._record_failure(conversation.id, exc)
-                    continue
+                conversation = await conversations.claim_next(session, self.worker_id, lease_s)
+            if conversation is None:
+                break
             sent = time.monotonic()
             renewal = await self._run_bounded(
                 self._renew(conversation.id, None),
-                self._settings.worker_lease_s,
+                lease_s,
                 f"ownership check for {conversation.id}",
             )
             if renewal is None or renewal.exception() is not None:
@@ -127,12 +119,38 @@ class Worker:
                 log.warning("lost conversation %s before it started", conversation.id)
                 continue
             if status is ConversationStatus.ENDING:
-                outcome = CallOutcome(connected=False, end_reason=EndReason.USER_REQUEST)
-                await self._record(conversation.id, outcome, Transcript(), 0)
+                await self._record_cancelled(conversation.id)
+                continue
+            try:
+                request = await self._prepare(conversation)
+            except conversations.PoolExhaustedError:
+                # Another worker took the last free number between the claim and the lease.
+                await self._requeue(conversation.id)
+                continue
+            except Exception as exc:
+                log.exception("cannot prepare conversation %s", conversation.id)
+                await self._record_failure(conversation.id, exc)
+                continue
+            if time.monotonic() - sent >= lease_s:
+                log.warning("preparing conversation %s outlived the lease", conversation.id)
                 continue
             self._start(request, confirmed_at=sent)
             claimed += 1
         return claimed
+
+    async def _prepare(self, conversation: Conversation) -> CallRequest:
+        async with self._sessionmaker() as session:
+            return await conversations.call_request(session, self._settings, conversation)
+
+    async def _requeue(self, conversation_id: uuid.UUID) -> None:
+        async with self._sessionmaker() as session:
+            returned = await conversations.requeue(session, conversation_id, self.worker_id)
+        if not returned:
+            await self._record_cancelled(conversation_id)
+
+    async def _record_cancelled(self, conversation_id: uuid.UUID) -> None:
+        outcome = CallOutcome(connected=False, end_reason=EndReason.USER_REQUEST)
+        await self._record(conversation_id, outcome, Transcript(), 0)
 
     async def drain(self) -> None:
         """Ask every active call to stop, then wait for each task to finish recording its result."""

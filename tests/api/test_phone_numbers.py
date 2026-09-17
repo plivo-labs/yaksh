@@ -5,12 +5,14 @@ from datetime import UTC, datetime, timedelta
 from httpx import AsyncClient
 from sqlalchemy import select, update
 
-from tests.api.test_conversations import create_agent, start
+from tests.api.test_conversations import create_agent, start, wait_for, wait_until
+from tests.conftest import FakeCaller
 from truman.config import Settings
 from truman.db.models import Conversation, PhoneNumber
 from truman.db.session import create_engine, create_sessionmaker
 from truman.domain.conversations import CallOutcome, ConversationStatus, EndReason, Transcript
 from truman.simulation import conversations
+from truman.worker.worker import Worker
 
 NUMBER = "+17862242321"
 OTHER = "+18005550100"
@@ -98,3 +100,28 @@ async def test_reaping_a_lost_lease_frees_its_number_and_syncing_keeps_leased_on
         )
         assert free == {NUMBER, "+18005550101"}
     await engine.dispose()
+
+
+async def test_phone_conversations_run_from_a_leased_number_and_wait_for_a_free_one(
+    client: AsyncClient, worker: Worker, caller: FakeCaller, settings: Settings
+) -> None:
+    engine = create_engine(settings.database_url.encoded_string())
+    async with create_sessionmaker(engine)() as session:
+        await conversations.sync_numbers(session, [NUMBER])
+    await engine.dispose()
+    caller.release.clear()
+    first = await queue_phone_conversation(client)
+    second = await queue_phone_conversation(client)
+
+    await wait_until(lambda: caller.calls == 1)
+    await asyncio.sleep(settings.worker_poll_interval_s * 4)
+    running = (await client.get(f"/api/v1/conversations/{first}")).json()
+    waiting = (await client.get(f"/api/v1/conversations/{second}")).json()
+    caller.release.set()
+    done_first = await wait_for(client, str(first), {"completed"})
+    done_second = await wait_for(client, str(second), {"completed"})
+
+    assert running["status"] == "running" and running["caller_number"] == NUMBER
+    assert waiting["status"] == "queued" and waiting["caller_number"] is None
+    assert done_first["caller_number"] == done_second["caller_number"] == NUMBER
+    assert caller.calls == 2
