@@ -8,10 +8,12 @@ import uvicorn
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from truman.caller.plivo_server import PlivoServer, StreamRegistry, create_app
+from truman.caller.router import TransportRouter
 from truman.caller.stub import StubCaller
 from truman.config import Settings
 from truman.db.migrate import upgrade_to_head
 from truman.db.session import create_engine, create_sessionmaker
+from truman.domain.agents import Transport
 from truman.domain.conversations import Caller
 from truman.simulation import conversations
 from truman.worker.worker import Worker
@@ -51,7 +53,7 @@ def worker() -> None:
     else:
         from truman.caller.pipecat import PipecatCaller
 
-        caller = PipecatCaller(settings)
+        caller = TransportRouter({Transport.PLIVO_WEBSOCKET: PipecatCaller(settings)})
     asyncio.run(run_worker(settings, caller))
 
 
