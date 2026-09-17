@@ -164,19 +164,21 @@ async def claim_next(session: AsyncSession, worker_id: str, lease_s: int) -> Con
     return conversation
 
 
-async def call_request(
-    session: AsyncSession, settings: Settings, conversation: Conversation
-) -> CallRequest:
-    version = await session.get_one(AgentVersion, conversation.agent_version_id)
-    agent = AgentConfig.model_validate(version.config)
-    number = conversation.caller_number
-    if number is None:
-        number = await lease_number(session, conversation.id)
+async def caller_number(session: AsyncSession, conversation: Conversation) -> str:
+    """The number the conversation calls from, leased from the pool when it has none yet."""
+    number = conversation.caller_number or await lease_number(session, conversation.id)
     if number is None:
         raise PoolExhaustedError("no pool number is free")
+    return number
+
+
+async def call_request(
+    session: AsyncSession, settings: Settings, conversation: Conversation, number: str
+) -> CallRequest:
+    version = await session.get_one(AgentVersion, conversation.agent_version_id)
     return CallRequest(
         conversation_id=conversation.id,
-        agent=agent,
+        agent=AgentConfig.model_validate(version.config),
         persona_prompt=conversation.persona_prompt,
         caller_number=number,
         max_duration_s=conversation.max_duration_s,

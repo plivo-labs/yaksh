@@ -140,7 +140,8 @@ class Worker:
 
     async def _prepare(self, conversation: Conversation) -> CallRequest:
         async with self._sessionmaker() as session:
-            return await conversations.call_request(session, self._settings, conversation)
+            number = await conversations.caller_number(session, conversation)
+            return await conversations.call_request(session, self._settings, conversation, number)
 
     async def _requeue(self, conversation_id: uuid.UUID) -> None:
         async with self._sessionmaker() as session:
