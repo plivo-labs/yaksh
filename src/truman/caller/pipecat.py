@@ -13,7 +13,6 @@ from typing import Any, Protocol
 from pipecat.adapters.schemas.function_schema import FunctionSchema
 from pipecat.adapters.schemas.tools_schema import ToolsSchema
 from pipecat.audio.vad.silero import SileroVADAnalyzer
-from pipecat.audio.vad.vad_analyzer import VADParams
 from pipecat.frames.frames import (
     CancelFrame,
     EndFrame,
@@ -77,7 +76,6 @@ log = logging.getLogger(__name__)
 
 END_GRACE_S = 3.0
 DRAINED = frozenset({EndReason.GOAL_REACHED, EndReason.GOAL_ABANDONED})
-VAD = VADParams(stop_secs=0.4)
 
 PERSONA_INSTRUCTIONS = (
     "You are a person on a phone call with a voice assistant. Stay in character throughout; "
@@ -304,7 +302,7 @@ class PipecatCaller:
             wire,
             opening,
         )
-        llm = self._llm()
+        llm = self._llm(PERSONA_INSTRUCTIONS.format(persona=request.persona_prompt))
         stt = DeepgramSTTService(
             api_key=self._keys["DEEPGRAM_API_KEY"],
             base_url=self._settings.deepgram_url,
@@ -316,21 +314,13 @@ class PipecatCaller:
             sample_rate=SAMPLE_RATE,
             settings=ElevenLabsTTSService.Settings(voice=self._settings.elevenlabs_voice_id),
         )
-        context = LLMContext(
-            messages=[
-                {
-                    "role": "system",
-                    "content": PERSONA_INSTRUCTIONS.format(persona=request.persona_prompt),
-                }
-            ],
-            tools=ToolsSchema(standard_tools=[END_CALL]),
-        )
+        context = LLMContext(tools=ToolsSchema(standard_tools=[END_CALL]))
         aggregators = LLMContextAggregatorPair(context)
         transcript = TranscriptBuilder(clock, observer)
         pipeline = Pipeline(
             [
                 transport.input(),
-                VADProcessor(vad_analyzer=SileroVADAnalyzer(sample_rate=SAMPLE_RATE, params=VAD)),
+                VADProcessor(vad_analyzer=SileroVADAnalyzer(sample_rate=SAMPLE_RATE)),
                 stt,
                 aggregators.user(),
                 AgentTurnTap(transcript),
@@ -424,18 +414,22 @@ class PipecatCaller:
             state.error = state.error or f"{', '.join(broken)} stopped working"
         return outcome(state, wire, request.output_dir / "recording.wav")
 
-    def _llm(self) -> OpenAILLMService:
+    def _llm(self, instructions: str) -> OpenAILLMService:
         settings = self._settings
         if settings.azure_openai_endpoint:
             return AzureLLMService(
                 endpoint=settings.azure_openai_endpoint,
                 api_key=self._keys["AZURE_OPENAI_API_KEY"],
                 api_version=settings.azure_openai_api_version,
-                settings=AzureLLMService.Settings(model=settings.persona_model),
+                settings=AzureLLMService.Settings(
+                    model=settings.persona_model, system_instruction=instructions
+                ),
             )
         return OpenAILLMService(
             api_key=self._keys["OPENAI_API_KEY or AZURE_OPENAI_ENDPOINT"],
-            settings=OpenAILLMService.Settings(model=settings.persona_model),
+            settings=OpenAILLMService.Settings(
+                model=settings.persona_model, system_instruction=instructions
+            ),
         )
 
 
