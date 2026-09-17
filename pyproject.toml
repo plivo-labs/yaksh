@@ -13,6 +13,7 @@ dependencies = [
     "fastapi>=0.141.1",
     "pipecat-ai[deepgram,elevenlabs,silero]>=1.10.0",
     "pydantic-settings>=2.15.0",
+    "python-multipart>=0.0.32",
     "sqlalchemy[asyncio]>=2.0.54",
     "typer>=0.27.2",
     "uvicorn[standard]>=0.53.0",
