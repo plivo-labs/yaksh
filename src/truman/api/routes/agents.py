@@ -31,12 +31,7 @@ async def list_agents(
         external_id=external_id,
         direction=direction,
     )
-    return Page(
-        items=[AgentRead.model_validate(row) for row in rows],
-        total=total,
-        page=page.page,
-        page_size=page.page_size,
-    )
+    return Page.of([AgentRead.model_validate(row) for row in rows], total, page)
 
 
 @router.get("/{agent_id}")
@@ -61,12 +56,7 @@ async def list_versions(
     rows, total = await agents.list_versions(
         session, agent_id, offset=page.offset, limit=page.page_size
     )
-    return Page(
-        items=[AgentVersionRead.model_validate(row) for row in rows],
-        total=total,
-        page=page.page,
-        page_size=page.page_size,
-    )
+    return Page.of([AgentVersionRead.model_validate(row) for row in rows], total, page)
 
 
 @router.get("/{agent_id}/versions/{version}")

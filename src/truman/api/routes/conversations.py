@@ -76,12 +76,7 @@ async def list_conversations(
     rows, total = await conversations.list_conversations(
         session, offset=page.offset, limit=page.page_size, agent_id=agent_id, status=status
     )
-    return Page(
-        items=await summaries(session, rows),
-        total=total,
-        page=page.page,
-        page_size=page.page_size,
-    )
+    return Page.of(await summaries(session, rows), total, page)
 
 
 @router.get("/{conversation_id}")
