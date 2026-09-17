@@ -1,6 +1,6 @@
 import asyncio
 import uuid
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Sequence
 from datetime import timedelta
 from typing import Any
 
@@ -92,16 +92,16 @@ async def list_conversations(
     return list(rows), total or 0
 
 
-async def pinned_agent(session: AsyncSession, conversation: Conversation) -> tuple[int, str]:
-    """The version number and agent name a conversation was started against."""
-    row = (
-        await session.execute(
-            select(AgentVersion.version, Agent.name)
-            .join(Agent, Agent.id == AgentVersion.agent_id)
-            .where(AgentVersion.id == conversation.agent_version_id)
-        )
-    ).one()
-    return row.version, row.name
+async def pinned_agents(
+    session: AsyncSession, conversations: Sequence[Conversation]
+) -> dict[uuid.UUID, tuple[int, str]]:
+    """The version number and agent name each conversation was started against, by version id."""
+    rows = await session.execute(
+        select(AgentVersion.id, AgentVersion.version, Agent.name)
+        .join(Agent, Agent.id == AgentVersion.agent_id)
+        .where(AgentVersion.id.in_({row.agent_version_id for row in conversations}))
+    )
+    return {row.id: (row.version, row.name) for row in rows}
 
 
 def transcript_of(conversation: Conversation) -> Transcript:

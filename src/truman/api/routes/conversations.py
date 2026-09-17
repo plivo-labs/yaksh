@@ -28,17 +28,23 @@ def recording_url(conversation: Conversation) -> str | None:
     return f"/api/v1/conversations/{conversation.id}/recording"
 
 
+async def summaries(session: AsyncSession, rows: list[Conversation]) -> list[ConversationSummary]:
+    pinned = await conversations.pinned_agents(session, rows)
+    items = []
+    for row in rows:
+        data = {
+            name: getattr(row, name)
+            for name in ConversationSummary.model_fields
+            if hasattr(row, name)
+        }
+        data["agent_version"], data["agent_name"] = pinned[row.agent_version_id]
+        data["recording_url"] = recording_url(row)
+        items.append(ConversationSummary.model_validate(data))
+    return items
+
+
 async def summary(session: AsyncSession, conversation: Conversation) -> ConversationSummary:
-    data = {
-        name: getattr(conversation, name)
-        for name in ConversationSummary.model_fields
-        if hasattr(conversation, name)
-    }
-    data["agent_version"], data["agent_name"] = await conversations.pinned_agent(
-        session, conversation
-    )
-    data["recording_url"] = recording_url(conversation)
-    return ConversationSummary.model_validate(data)
+    return (await summaries(session, [conversation]))[0]
 
 
 async def detail(session: AsyncSession, conversation: Conversation) -> ConversationRead:
@@ -71,7 +77,7 @@ async def list_conversations(
         session, offset=page.offset, limit=page.page_size, agent_id=agent_id, status=status
     )
     return Page(
-        items=[await summary(session, row) for row in rows],
+        items=await summaries(session, rows),
         total=total,
         page=page.page,
         page_size=page.page_size,
