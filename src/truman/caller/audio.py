@@ -16,6 +16,8 @@ SAMPLE_RATE = 8000
 FRAME_S = 0.02
 FRAME_BYTES = 320
 SILENCE = b"\x00" * FRAME_BYTES
+SPEECH_PEAK = 500
+GAP_BYTES = SAMPLE_RATE * 2 // 5
 PLAYOUT = "truman.playout"
 OFFSET = "truman.offset"
 

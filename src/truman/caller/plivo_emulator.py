@@ -22,12 +22,19 @@ from typing import Any
 
 import audioop
 
-from truman.caller.audio import FRAME_BYTES, FRAME_S, SAMPLE_RATE, SILENCE, Clock, Playout
+from truman.caller.audio import (
+    FRAME_BYTES,
+    FRAME_S,
+    GAP_BYTES,
+    SAMPLE_RATE,
+    SILENCE,
+    SPEECH_PEAK,
+    Clock,
+    Playout,
+)
 from truman.domain.conversations import CallObserver, WireEvent, WireEventKind
 
 STOP_SEND_S = 1.0
-SPEECH_PEAK = 500
-GAP_BYTES = SAMPLE_RATE * 2 // 5
 SEND_TIMEOUT_S = 2.0
 STALLED = "the agent stopped reading the stream"
 

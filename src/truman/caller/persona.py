@@ -126,8 +126,8 @@ class Stoppable(Protocol):
 class Persona:
     """One call's persona pipeline around a transport, with the transcript taps in place.
 
-    `after_output` processors sit right after the transport output, where the transport's
-    stamps on spoken words are complete.
+    `before_output` processors sit right before the transport output and `after_output` right
+    after it, where the stamps on spoken words are complete.
     """
 
     def __init__(
@@ -143,6 +143,7 @@ class Persona:
         transport_output: FrameProcessor,
         after_output: Sequence[FrameProcessor],
         state: CallState,
+        before_output: Sequence[FrameProcessor] = (),
     ) -> None:
         instructions = PERSONA_INSTRUCTIONS.format(persona=request.persona_prompt)
         self.llm = llm_service(settings, keys, instructions)
@@ -170,6 +171,7 @@ class Persona:
                 self.llm,
                 GeneratedTap(transcript),
                 self.tts,
+                *before_output,
                 transport_output,
                 *after_output,
                 aggregators.assistant(),

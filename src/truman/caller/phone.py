@@ -1,6 +1,7 @@
 """The phone caller: dial the agent through Plivo, then talk over the stream Plivo opens."""
 
 import asyncio
+import base64
 import json
 import logging
 import wave
@@ -9,19 +10,27 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+import audioop
 from fastapi import WebSocket, WebSocketDisconnect
-from pipecat.frames.frames import Frame, OutputAudioRawFrame, TTSStartedFrame
-from pipecat.processors.audio.audio_buffer_processor import AudioBufferProcessor
-from pipecat.processors.frame_processor import FrameDirection
-from pipecat.serializers.plivo import PlivoFrameSerializer
-from pipecat.transports.websocket.fastapi import (
-    FastAPIWebsocketClient,
-    FastAPIWebsocketOutputTransport,
-    FastAPIWebsocketParams,
-    FastAPIWebsocketTransport,
+from pipecat.frames.frames import (
+    AudioRawFrame,
+    BotStartedSpeakingFrame,
+    BotStoppedSpeakingFrame,
+    Frame,
+    InputAudioRawFrame,
+    InterruptionFrame,
+    OutputTransportMessageFrame,
+    OutputTransportMessageUrgentFrame,
+    TTSAudioRawFrame,
+    TTSStartedFrame,
+    TTSStoppedFrame,
 )
+from pipecat.processors.audio.audio_buffer_processor import AudioBufferProcessor
+from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
+from pipecat.serializers.base_serializer import FrameSerializer
+from pipecat.transports.websocket.fastapi import FastAPIWebsocketParams, FastAPIWebsocketTransport
 
-from truman.caller.audio import PLAYOUT, SAMPLE_RATE, Clock, Playout, Stamper
+from truman.caller.audio import GAP_BYTES, SAMPLE_RATE, SPEECH_PEAK, Clock, Playout, Stamper
 from truman.caller.persona import CallState, Persona, converse, provider_keys
 from truman.caller.plivo_api import OutboundCall, PlivoApi, PlivoError
 from truman.caller.plivo_server import PendingStream, StreamRegistry
@@ -44,6 +53,11 @@ TIME_LIMIT_MARGIN_S = 10
 RINGING = "ringing"
 IN_PROGRESS = "in-progress"
 UNANSWERED = frozenset({"no-answer", "timeout", "busy"})
+ACK_GRACE_S = 0.2
+HANGUP_TIMEOUT_S = 2.0
+CHUNK_BYTES = SAMPLE_RATE * 2 // 5
+LINEAR = "audio/x-l16"
+MULAW = "audio/x-mulaw"
 
 
 @dataclass
@@ -160,40 +174,170 @@ def ended_early(status: str, cause: str | None) -> CallOutcome:
     return unreached(EndReason.ERROR, f"the call ended before its stream started: {detail}")
 
 
-class PhoneOutput(FastAPIWebsocketOutputTransport):
-    """Stamps each reply's playout; until checkpoints land, audio counts as heard once written."""
+class Checkpoints(FrameProcessor):
+    """Before the transport output: stamps each reply's playout and, after every chunk of its
+    audio, asks Plivo to report once the audio queued so far has played; each report moves the
+    reply's sent mark, so provenance follows what the agent has actually heard."""
+
+    def __init__(self, stream_id: str, transcript: TranscriptBuilder) -> None:
+        super().__init__(enable_direct_mode=True)
+        self._stream_id = stream_id
+        self._transcript = transcript
+        self._stamper = Stamper()
+        self._reply = 0
+        self._pending: dict[str, Playout] = {}
+
+    async def process_frame(self, frame: Frame, direction: FrameDirection) -> None:
+        await super().process_frame(frame, direction)
+        if direction is not FrameDirection.DOWNSTREAM:
+            await self.push_frame(frame, direction)
+            return
+        if isinstance(frame, TTSStartedFrame):
+            self._reply += 1
+            self._pending.clear()
+        if isinstance(frame, TTSAudioRawFrame):
+            for piece in pieces(frame):
+                self._stamper.stamp(piece, self.get_clock().get_time())
+                await self.push_frame(piece, direction)
+                await self._mark()
+            return
+        self._stamper.stamp(frame, self.get_clock().get_time())
+        await self.push_frame(frame, direction)
+        if isinstance(frame, TTSStoppedFrame):
+            await self._mark()
+
+    async def _mark(self) -> None:
+        playout = self._stamper.arriving
+        if playout is None or playout.arrived == 0:
+            return
+        name = f"{self._reply}:{playout.arrived}"
+        if name in self._pending:
+            return
+        self._pending[name] = playout
+        await self.push_frame(
+            OutputTransportMessageFrame(
+                {"event": "checkpoint", "streamId": self._stream_id, "name": name}
+            )
+        )
+
+    def played(self, name: str) -> None:
+        playout = self._pending.pop(name, None)
+        if playout is None:
+            return
+        playout.sent = max(playout.sent, int(name.rsplit(":", 1)[1]))
+        self._transcript.audio_progressed()
+
+
+def pieces(frame: TTSAudioRawFrame) -> list[TTSAudioRawFrame]:
+    """A reply's audio in slices short enough for a checkpoint after each."""
+    if len(frame.audio) <= CHUNK_BYTES:
+        return [frame]
+    return [
+        TTSAudioRawFrame(
+            audio=frame.audio[start : start + CHUNK_BYTES],
+            sample_rate=frame.sample_rate,
+            num_channels=frame.num_channels,
+            context_id=frame.context_id,
+        )
+        for start in range(0, len(frame.audio), CHUNK_BYTES)
+    ]
+
+
+class StreamSerializer(FrameSerializer):
+    """Plivo's stream protocol in the encoding the stream opened with, plus the reports Truman
+    listens for."""
 
     def __init__(
         self,
-        transport: FastAPIWebsocketTransport,
-        client: FastAPIWebsocketClient,
-        params: FastAPIWebsocketParams,
-        **kwargs: Any,
+        stream_id: str,
+        encoding: str,
+        clock: Clock,
+        observer: CallObserver,
+        checkpoints: Checkpoints,
     ) -> None:
-        super().__init__(transport, client, params, **kwargs)
-        self._stamper = Stamper()
-        self._playing: Playout | None = None
+        super().__init__()
+        self._stream_id = stream_id
+        self._linear = encoding.split(";")[0].strip() == LINEAR
+        self._clock = clock
+        self._observer = observer
+        self._checkpoints = checkpoints
+        self._quiet = GAP_BYTES
+        self.stopped = asyncio.Event()
+
+    async def serialize(self, frame: Frame) -> str | bytes | None:
+        if isinstance(frame, InterruptionFrame):
+            self._event(WireEventKind.CLEAR_AUDIO)
+            return json.dumps({"event": "clearAudio", "streamId": self._stream_id})
+        if isinstance(frame, AudioRawFrame):
+            if not frame.audio:
+                return None
+            audio = frame.audio if self._linear else audioop.lin2ulaw(frame.audio, 2)
+            media = {
+                "contentType": LINEAR if self._linear else MULAW,
+                "sampleRate": SAMPLE_RATE,
+                "payload": base64.b64encode(audio).decode(),
+            }
+            return json.dumps({"event": "playAudio", "media": media})
+        if isinstance(frame, OutputTransportMessageFrame | OutputTransportMessageUrgentFrame):
+            return None if self.should_ignore_frame(frame) else json.dumps(frame.message)
+        return None
+
+    async def deserialize(self, data: str | bytes) -> Frame | None:
+        try:
+            message = json.loads(data)
+        except (json.JSONDecodeError, TypeError):
+            return None
+        if not isinstance(message, dict):
+            return None
+        match message.get("event"):
+            case "media":
+                payload = (message.get("media") or {}).get("payload")
+                if not payload:
+                    return None
+                raw = base64.b64decode(payload)
+                pcm = raw if self._linear else audioop.ulaw2lin(raw, 2)
+                self._heard(pcm)
+                return InputAudioRawFrame(audio=pcm, sample_rate=SAMPLE_RATE, num_channels=1)
+            case "playedStream":
+                self._event(WireEventKind.CHECKPOINT)
+                self._checkpoints.played(str(message.get("name")))
+            case "stop":
+                self._event(WireEventKind.STOP)
+                self.stopped.set()
+        return None
+
+    def _heard(self, pcm: bytes) -> None:
+        """The first packet with speech after a quiet stretch is the agent starting to talk."""
+        if audioop.max(pcm, 2) > SPEECH_PEAK:
+            if self._quiet >= GAP_BYTES:
+                self._event(WireEventKind.AGENT_AUDIO)
+            self._quiet = 0
+        else:
+            self._quiet += len(pcm)
+
+    def _event(self, kind: WireEventKind) -> None:
+        self._observer.wire_event(WireEvent(kind=kind, at_ms=self._clock.ms()))
+
+
+class SpeechMarks(FrameProcessor):
+    """After the transport output: when the persona's audio starts and stops going out."""
+
+    def __init__(self, clock: Clock, observer: CallObserver) -> None:
+        super().__init__(enable_direct_mode=True)
+        self._clock = clock
+        self._observer = observer
 
     async def process_frame(self, frame: Frame, direction: FrameDirection) -> None:
-        self._stamper.stamp(frame, self.get_clock().get_time())
         await super().process_frame(frame, direction)
+        if direction is FrameDirection.DOWNSTREAM:
+            if isinstance(frame, BotStartedSpeakingFrame):
+                self._mark(WireEventKind.CALLER_SPEECH_START)
+            elif isinstance(frame, BotStoppedSpeakingFrame):
+                self._mark(WireEventKind.CALLER_SPEECH_END)
+        await self.push_frame(frame, direction)
 
-    async def write_transport_frame(self, frame: Frame) -> None:
-        if isinstance(frame, TTSStartedFrame):
-            self._playing = frame.metadata.get(PLAYOUT)
-        await super().write_transport_frame(frame)
-
-    async def write_audio_frame(self, frame: OutputAudioRawFrame) -> bool:
-        written = await super().write_audio_frame(frame)
-        if written and self._playing is not None:
-            self._playing.sent += len(frame.audio)
-        return written
-
-
-class PhoneTransport(FastAPIWebsocketTransport):
-    def __init__(self, websocket: WebSocket, params: FastAPIWebsocketParams) -> None:
-        super().__init__(websocket, params)
-        self._output = PhoneOutput(self, self._client, self._params, name=self._output_name)
+    def _mark(self, kind: WireEventKind) -> None:
+        self._observer.wire_event(WireEvent(kind=kind, at_ms=self._clock.ms()))
 
 
 class Recorder(AudioBufferProcessor):
@@ -231,18 +375,20 @@ def plivo_credentials(settings: Settings) -> tuple[str, str]:
 
 
 async def settled() -> None:
-    return None
+    """Reports for audio that played just before a cut are still in flight; give them a moment."""
+    await asyncio.sleep(ACK_GRACE_S)
 
 
-async def handshake(socket: WebSocket) -> tuple[str, str]:
-    """Plivo opens a stream with its start event; the stream and call ids are in it."""
+async def handshake(socket: WebSocket) -> tuple[str, str, str]:
+    """Plivo opens a stream with its start event: the stream and call ids and the encoding."""
     message = json.loads(await socket.receive_text())
     if message.get("event") != "start":
         raise ValueError(
             f"the stream did not open with a Plivo start event: {message.get('event')}"
         )
     start = message["start"]
-    return str(start["streamId"]), str(start["callId"])
+    encoding = str((start.get("mediaFormat") or {}).get("encoding") or MULAW)
+    return str(start["streamId"]), str(start["callId"]), encoding
 
 
 class PhoneCaller:
@@ -281,19 +427,24 @@ class PhoneCaller:
         socket: WebSocket,
     ) -> CallOutcome:
         try:
-            stream_id, call_id = await handshake(socket)
+            stream_id, call_id, encoding = await handshake(socket)
         except (WebSocketDisconnect, ValueError, KeyError) as error:
             log.warning("stream for conversation %s: %r", request.conversation_id, error)
             return unreached(EndReason.ERROR, f"the stream ended before it started: {error}")
         log.info(
-            "stream %s for conversation %s, call %s", stream_id, request.conversation_id, call_id
+            "stream %s for conversation %s, call %s, %s",
+            stream_id,
+            request.conversation_id,
+            call_id,
+            encoding,
         )
-        transport = PhoneTransport(
+        transcript = TranscriptBuilder(clock, observer)
+        checkpoints = Checkpoints(stream_id, transcript)
+        serializer = StreamSerializer(stream_id, encoding, clock, observer, checkpoints)
+        transport = FastAPIWebsocketTransport(
             socket,
             FastAPIWebsocketParams(
-                serializer=PlivoFrameSerializer(
-                    stream_id, call_id, self._api.auth_id, self._api.auth_token
-                ),
+                serializer=serializer,
                 add_wav_header=False,
                 audio_in_enabled=True,
                 audio_out_enabled=True,
@@ -304,7 +455,6 @@ class PhoneCaller:
             ),
         )
         state = CallState()
-        transcript = TranscriptBuilder(clock, observer)
         recorder = Recorder(request.output_dir / "recording.wav")
         persona = Persona(
             self._settings,
@@ -315,7 +465,8 @@ class PhoneCaller:
             transcript,
             transport_input=transport.input(),
             transport_output=transport.output(),
-            after_output=[recorder, WireTap(transcript, settled)],
+            before_output=[checkpoints],
+            after_output=[recorder, SpeechMarks(clock, observer), WireTap(transcript, settled)],
             state=state,
         )
 
@@ -330,10 +481,19 @@ class PhoneCaller:
         async def on_disconnected(_transport: Any, _socket: Any) -> None:
             state.end(EndReason.AGENT_HANGUP)
 
-        await converse(persona, state, stop)
+        try:
+            await converse(persona, state, stop, {serializer.stopped: EndReason.AGENT_HANGUP})
+        finally:
+            await self._hang_up(call_id)
         return CallOutcome(
             connected=state.connected,
             end_reason=state.end_reason or EndReason.ERROR,
             caller_error=state.error,
             recording_path=recorder.path,
         )
+
+    async def _hang_up(self, call_id: str) -> None:
+        try:
+            await asyncio.wait_for(self._api.hang_up(call_id), HANGUP_TIMEOUT_S)
+        except (PlivoError, TimeoutError) as error:
+            log.warning("could not hang up call %s: %r", call_id, error)
