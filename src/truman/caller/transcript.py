@@ -55,18 +55,18 @@ class TranscriptBuilder:
     def agent_started(self) -> None:
         if self._agent_started is None:
             self._agent_started = self._clock.ms()
+            self._agent_stopped = None
 
     def agent_stopped(self) -> None:
         self._agent_stopped = self._clock.ms()
 
     def agent_said(self, text: str) -> None:
         now = self._clock.ms()
+        started = now if self._agent_started is None else self._agent_started
+        stopped = now if self._agent_stopped is None else self._agent_stopped
         self._observer.turn(
             Turn(
-                role=Role.AGENT,
-                text=text,
-                started_at_ms=now if self._agent_started is None else self._agent_started,
-                ended_at_ms=now if self._agent_stopped is None else self._agent_stopped,
+                role=Role.AGENT, text=text, started_at_ms=started, ended_at_ms=max(started, stopped)
             )
         )
         self._agent_started = self._agent_stopped = None

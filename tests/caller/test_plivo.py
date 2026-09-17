@@ -10,7 +10,7 @@ import audioop
 from truman.caller.plivo import FRAME_BYTES, SILENCE, Clock, Playout, Wire
 from truman.domain.conversations import Turn, WireEvent, WireEventKind
 
-SPEECH_FRAME = b"\x10\x00" * (FRAME_BYTES // 2)
+SPEECH_FRAME = b"\x00\x10" * (FRAME_BYTES // 2)
 SILENCE_PAYLOAD = base64.b64encode(audioop.lin2ulaw(SILENCE, 2)).decode()
 
 
@@ -48,13 +48,16 @@ class Socket:
         return sum(1 for m in self.events("media") if m["media"]["payload"] != SILENCE_PAYLOAD)
 
 
-def play_audio(ms: int) -> dict[str, Any]:
-    ulaw = audioop.lin2ulaw(SPEECH_FRAME * (ms // 20), 2)
+def play_audio(ms: int, frame: bytes = SPEECH_FRAME) -> dict[str, Any]:
+    ulaw = audioop.lin2ulaw(frame * (ms // 20), 2)
     return {"event": "playAudio", "media": {"payload": base64.b64encode(ulaw).decode()}}
 
 
+OPENING = json.dumps({"event": "start"})
+
+
 async def running(wire: Wire, socket: Socket) -> asyncio.Task[None]:
-    task = asyncio.create_task(wire.run(socket.send, socket.push))
+    task = asyncio.create_task(wire.run(socket.send, socket.push, OPENING))
     await asyncio.sleep(0)
     return task
 
@@ -71,6 +74,7 @@ async def test_a_checkpoint_is_acknowledged_once_its_audio_has_played() -> None:
     await asyncio.sleep(0.6)
     task.cancel()
 
+    assert socket.sent[0]["event"] == "start"
     assert [m["name"] for m in socket.events("playedStream")] == ["greeting"]
     assert socket.pushed[-1] == SILENCE
     assert observer.kinds() == [WireEventKind.AGENT_AUDIO, WireEventKind.CHECKPOINT]
@@ -179,7 +183,7 @@ async def test_a_send_that_stalls_ends_the_wire_within_its_bound() -> None:
 
         async def send(self, message: str) -> bool:
             self.entered += 1
-            if self.entered > 1:
+            if self.entered > 2:
                 await asyncio.sleep(3600)
             return await super().send(message)
 
@@ -194,3 +198,44 @@ async def test_a_send_that_stalls_ends_the_wire_within_its_bound() -> None:
     assert task.done() and time.monotonic() - started < 1.0
     assert wire.failed and wire.hung_up.is_set() and not await sending
     assert observer.kinds()[-1] is WireEventKind.CALLER_ERROR
+
+
+async def test_a_socket_the_agent_closed_counts_as_its_hangup() -> None:
+    class Closed(Socket):
+        async def send(self, message: str) -> bool:
+            return await super().send(message) and len(self.sent) < 3
+
+    observer, socket = Observer(), Closed()
+    wire = Wire("stream", Clock(), observer)
+    task = await running(wire, socket)
+
+    await asyncio.wait({task}, timeout=2)
+
+    assert task.done() and wire.hung_up.is_set() and wire.failed is None
+    assert not socket.events("stop") and WireEventKind.STOP not in observer.kinds()
+
+
+def test_agent_audio_is_stamped_once_per_reply_even_when_silence_is_streamed() -> None:
+    observer = Observer()
+    wire = Wire("stream", Clock(), observer)
+
+    wire.handle(play_audio(200, SILENCE))
+    wire.handle(play_audio(100))
+    wire.handle(play_audio(100))
+    wire.handle(play_audio(400, SILENCE))
+    wire.handle(play_audio(100))
+
+    assert observer.kinds() == [WireEventKind.AGENT_AUDIO, WireEventKind.AGENT_AUDIO]
+
+
+async def test_agent_audio_is_stamped_again_after_a_reply_with_nothing_streamed_between() -> None:
+    observer, socket = Observer(), Socket()
+    wire = Wire("stream", Clock(), observer)
+    task = await running(wire, socket)
+
+    wire.handle(play_audio(100))
+    await asyncio.sleep(0.5)
+    wire.handle(play_audio(100))
+    task.cancel()
+
+    assert observer.kinds() == [WireEventKind.AGENT_AUDIO, WireEventKind.AGENT_AUDIO]

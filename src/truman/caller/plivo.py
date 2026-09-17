@@ -27,6 +27,8 @@ FRAME_S = 0.02
 FRAME_BYTES = 320
 SILENCE = b"\x00" * FRAME_BYTES
 STOP_SEND_S = 1.0
+SPEECH_PEAK = 500
+GAP_BYTES = SAMPLE_RATE * 2 // 5
 SEND_TIMEOUT_S = 2.0
 STALLED = "the agent stopped reading the stream"
 
@@ -117,7 +119,7 @@ class Wire:
         self._sequence = 0
         self._speaking = False
         self._last_speech_ms = 0
-        self._gap = True
+        self._quiet = GAP_BYTES
         self._playout: Playout | None = None
         self._in_flight = asyncio.Event()
         self._in_flight.set()
@@ -161,14 +163,18 @@ class Wire:
                 self._event(WireEventKind.STOP)
                 self.hung_up.set()
 
-    async def run(self, send: Send, push: Push) -> None:
-        """Every tick: pending acknowledgments, one caller frame out, one agent frame in.
+    async def run(self, send: Send, push: Push, opening: str) -> None:
+        """Open the stream, then every tick: acknowledgments, one caller frame out, one agent
+        frame in.
 
-        Ends by telling the agent the stream stopped, unless the agent went away first. A
-        send that stalls past the bound fails the call: the agent has stopped reading.
+        Ends by telling the agent the stream stopped, unless the agent went away first, which
+        counts as its hangup. A send that stalls past the bound fails the call: the agent has
+        stopped reading.
         """
         next_tick = time.monotonic()
         try:
+            if not await self._deliver(send, opening):
+                return
             while True:
                 for ack in self._acks:
                     if not await self._deliver(send, ack):
@@ -199,7 +205,9 @@ class Wire:
             if self.failed:
                 self._event(WireEventKind.CALLER_ERROR)
                 self.hung_up.set()
-            elif not self._socket_lost and not self.hung_up.is_set():
+            elif self._socket_lost:
+                self.hung_up.set()
+            elif not self.hung_up.is_set():
                 with contextlib.suppress(Exception):
                     await asyncio.wait_for(send(stop_message()), STOP_SEND_S)
                 self._event(WireEventKind.STOP)
@@ -236,9 +244,17 @@ class Wire:
         self._observer.wire_event(WireEvent(kind=kind, at_ms=self._clock.ms()))
 
     def _receive(self, pcm: bytes) -> None:
-        if self._gap:
-            self._event(WireEventKind.AGENT_AUDIO)
-            self._gap = False
+        """Buffer agent audio; the first packet with speech after a quiet stretch is an event.
+
+        Quiet is silence received or played, since an agent may stream silence between
+        replies or send nothing at all.
+        """
+        if audioop.max(pcm, 2) > SPEECH_PEAK:
+            if self._quiet >= GAP_BYTES:
+                self._event(WireEventKind.AGENT_AUDIO)
+            self._quiet = 0
+        else:
+            self._quiet += len(pcm)
         self._in.extend(pcm)
         self._received += len(pcm)
 
@@ -286,6 +302,6 @@ class Wire:
             self._played += taken
         else:
             pcm = SILENCE
-            self._gap = True
+            self._quiet += FRAME_BYTES
         self.agent_pcm.extend(pcm)
         return pcm

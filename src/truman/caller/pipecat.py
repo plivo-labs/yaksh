@@ -151,10 +151,12 @@ class CallerOutput(WebsocketClientOutputTransport):
         params: WebsocketClientParams,
         wire: Wire,
         input_transport: WebsocketClientInputTransport,
+        opening: str,
     ) -> None:
         super().__init__(transport, session, params)
         self._wire = wire
         self._input = input_transport
+        self._opening = opening
         self._wire_task: asyncio.Task[None] | None = None
         self._arriving: Playout | None = None
         self._playing: Playout | None = None
@@ -162,7 +164,9 @@ class CallerOutput(WebsocketClientOutputTransport):
     async def start(self, frame: StartFrame) -> None:
         await super().start(frame)
         if self._wire_task is None:
-            self._wire_task = self.create_task(self._wire.run(self._session.send, self._pace_in))
+            self._wire_task = self.create_task(
+                self._wire.run(self._session.send, self._pace_in, self._opening)
+            )
 
     async def stop(self, frame: EndFrame) -> None:
         """Play out what is queued, hang up, then disconnect."""
@@ -213,13 +217,19 @@ class CallerOutput(WebsocketClientOutputTransport):
 
 
 class CallerTransport(WebsocketClientTransport):
-    def __init__(self, uri: str, params: WebsocketClientParams, wire: Wire) -> None:
+    """Opens the stream only once the pipeline runs, so the agent's first words are not
+    queued behind the caller's own startup."""
+
+    def __init__(self, uri: str, params: WebsocketClientParams, wire: Wire, opening: str) -> None:
         super().__init__(uri, params)
         self._wire = wire
+        self._opening = opening
 
     def output(self) -> WebsocketClientOutputTransport:
         if not self._output:
-            self._output = CallerOutput(self, self._session, self._params, self._wire, self.input())
+            self._output = CallerOutput(
+                self, self._session, self._params, self._wire, self.input(), self._opening
+            )
         return self._output
 
 
@@ -268,6 +278,11 @@ class PipecatCaller:
                 ended.set()
 
         observer.wire_event(WireEvent(kind=WireEventKind.CONNECT_STARTED, at_ms=clock.ms()))
+        opening = start_message(
+            str(request.conversation_id),
+            wire.stream_id,
+            resolve_headers(request.agent.extra_headers),
+        )
         transport = CallerTransport(
             str(request.agent.websocket_url),
             WebsocketClientParams(
@@ -282,8 +297,20 @@ class PipecatCaller:
                 audio_out_end_silence_secs=0,
             ),
             wire,
+            opening,
         )
         llm = self._llm()
+        stt = DeepgramSTTService(
+            api_key=self._keys["DEEPGRAM_API_KEY"],
+            base_url=self._settings.deepgram_url,
+            sample_rate=SAMPLE_RATE,
+            settings=DeepgramSTTService.Settings(model=self._settings.deepgram_model),
+        )
+        tts = ElevenLabsTTSService(
+            api_key=self._keys["ELEVENLABS_API_KEY"],
+            sample_rate=SAMPLE_RATE,
+            settings=ElevenLabsTTSService.Settings(voice=self._settings.elevenlabs_voice_id),
+        )
         context = LLMContext(
             messages=[
                 {
@@ -299,22 +326,12 @@ class PipecatCaller:
             [
                 transport.input(),
                 VADProcessor(vad_analyzer=SileroVADAnalyzer(sample_rate=SAMPLE_RATE, params=VAD)),
-                DeepgramSTTService(
-                    api_key=self._keys["DEEPGRAM_API_KEY"],
-                    base_url=self._settings.deepgram_url,
-                    sample_rate=SAMPLE_RATE,
-                ),
+                stt,
                 aggregators.user(),
                 AgentTurnTap(transcript),
                 llm,
                 GeneratedTap(transcript),
-                ElevenLabsTTSService(
-                    api_key=self._keys["ELEVENLABS_API_KEY"],
-                    sample_rate=SAMPLE_RATE,
-                    settings=ElevenLabsTTSService.Settings(
-                        voice=self._settings.elevenlabs_voice_id
-                    ),
-                ),
+                tts,
                 transport.output(),
                 WireTap(transcript, wire.settle),
                 aggregators.assistant(),
@@ -346,14 +363,7 @@ class PipecatCaller:
         llm.register_function(END_CALL.name, end_call, cancel_on_interruption=False)
 
         @transport.event_handler("on_connected")
-        async def on_connected(_transport: Any, websocket: Any) -> None:
-            await websocket.send(
-                start_message(
-                    str(request.conversation_id),
-                    wire.stream_id,
-                    resolve_headers(request.agent.extra_headers),
-                )
-            )
+        async def on_connected(_transport: Any, _websocket: Any) -> None:
             state.connected = True
             observer.wire_event(WireEvent(kind=WireEventKind.CONNECTED, at_ms=clock.ms()))
             if not request.agent.agent_speaks_first:
@@ -361,7 +371,8 @@ class PipecatCaller:
 
         @transport.event_handler("on_disconnected")
         async def on_disconnected(_transport: Any, _websocket: Any) -> None:
-            end(EndReason.AGENT_HANGUP)
+            if not wire.closed.is_set():
+                end(EndReason.AGENT_HANGUP)
 
         @worker.event_handler("on_pipeline_error")
         async def on_error(_worker: Any, frame: ErrorFrame) -> None:
@@ -403,6 +414,9 @@ class PipecatCaller:
             for signal in signals:
                 signal.cancel()
             await hang_up(state, worker, running)
+        broken = [service.name for service in (stt, llm, tts) if not service.is_usable]
+        if broken:
+            state.error = state.error or f"{', '.join(broken)} stopped working"
         return outcome(state, wire, request.output_dir / "recording.wav")
 
     def _llm(self) -> OpenAILLMService:

@@ -28,6 +28,7 @@ class Settings(BaseSettings):
     caller: Literal["pipecat", "stub"] = "pipecat"
     deepgram_api_key: SecretStr | None = Field(default=None, validation_alias="DEEPGRAM_API_KEY")
     deepgram_url: str = ""
+    deepgram_model: str = "nova-3"
     elevenlabs_api_key: SecretStr | None = Field(
         default=None, validation_alias="ELEVENLABS_API_KEY"
     )

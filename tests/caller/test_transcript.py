@@ -87,8 +87,8 @@ def test_a_reply_cut_before_any_audio_is_all_cut() -> None:
 def test_an_agent_turn_is_timed_by_its_speech_and_worded_by_the_aggregator() -> None:
     observer = Observer()
     builder = TranscriptBuilder(Clock(), observer)
-    builder.agent_started()
     builder.agent_stopped()
+    builder.agent_started()
 
     builder.agent_said("Hello, how can I help?")
 
