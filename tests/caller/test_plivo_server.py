@@ -50,7 +50,8 @@ async def test_the_answer_xml_streams_a_waiting_conversation_and_hangs_up_others
         in answer.text
     )
     assert 'bidirectional="true"' in answer.text and 'keepCallAlive="true"' in answer.text
-    assert 'contentType="audio/x-mulaw;rate=8000"' in answer.text
+    assert 'contentType="audio/x-l16;rate=8000"' in answer.text
+    assert f'extraHeaders="conversation_id={conversation_id}"' in answer.text
     assert unknown.status_code == 200 and unknown.text == HANGUP_XML
     assert garbled.status_code == 200 and garbled.text == HANGUP_XML
     assert entry.callbacks.get_nowait() == {"CallUUID": "abc", "CallStatus": "in-progress"}

@@ -21,7 +21,8 @@ log = logging.getLogger(__name__)
 
 STREAM_XML = (
     '<?xml version="1.0" encoding="UTF-8"?><Response>'
-    '<Stream bidirectional="true" keepCallAlive="true" contentType="audio/x-mulaw;rate=8000" '
+    '<Stream bidirectional="true" keepCallAlive="true" contentType="audio/x-l16;rate=8000" '
+    'extraHeaders="conversation_id={conversation_id}" '
     'statusCallbackUrl="{status_url}" statusCallbackMethod="POST">'
     "{stream_url}</Stream></Response>"
 )
@@ -93,6 +94,7 @@ def create_app(registry: StreamRegistry, public_url: str) -> FastAPI:
             return Response(HANGUP_XML, media_type="application/xml")
         entry.callbacks.put_nowait(await fields(request))
         xml = STREAM_XML.format(
+            conversation_id=conversation_id,
             stream_url=f"{stream_base(public_url)}/stream/{conversation_id}",
             status_url=escape(
                 f"{public_url.rstrip('/')}/callbacks/{conversation_id}?{CALLBACK_RETRIES}"
