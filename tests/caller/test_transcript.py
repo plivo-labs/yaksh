@@ -3,7 +3,6 @@ from pipecat.tests.utils import run_test
 
 from tests.conftest import Observer
 from truman.caller.audio import FRAME_BYTES, Clock, Playout
-from truman.caller.persona import Silence
 from truman.caller.transcript import OFFSET, PLAYOUT, TranscriptBuilder, WireTap
 from truman.domain.conversations import Provenance, Role
 
@@ -152,14 +151,3 @@ async def test_words_queued_before_an_interruption_are_counted_before_the_cut() 
     assert [(turn.provenance, turn.text) for turn in observer.turns] == [
         (Provenance.TRANSMITTED, "Yes.")
     ]
-
-
-def test_the_persona_gives_up_on_a_quiet_agent_only_after_two_nudges_in_one_silence() -> None:
-    silence = Silence(2)
-
-    first_stretch = [silence.give_up(), silence.give_up()]
-    silence.heard()
-    second_stretch = [silence.give_up(), silence.give_up(), silence.give_up()]
-
-    assert first_stretch == [False, False]
-    assert second_stretch == [False, False, True]

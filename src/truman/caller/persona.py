@@ -4,7 +4,7 @@ a call ends."""
 import asyncio
 import contextlib
 import logging
-from collections.abc import Mapping, Sequence
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
@@ -23,6 +23,7 @@ from pipecat.pipeline.worker import PipelineParams, PipelineWorker
 from pipecat.processors.aggregators.llm_context import LLMContext
 from pipecat.processors.aggregators.llm_response_universal import (
     LLMContextAggregatorPair,
+    LLMUserAggregator,
     LLMUserAggregatorParams,
 )
 from pipecat.processors.audio.vad_processor import VADProcessor
@@ -143,6 +144,24 @@ class Silence:
         return self._nudges > self._limit
 
 
+def watch_silence(
+    user: LLMUserAggregator, state: CallState, nudge: Callable[[], Awaitable[None]]
+) -> None:
+    """A quiet agent gets a nudge; silence through every nudge ends the call."""
+    silence = Silence(IDLE_NUDGES)
+
+    @user.event_handler("on_user_turn_started")
+    async def on_agent_turn(_aggregator: Any, _strategy: Any) -> None:
+        silence.heard()
+
+    @user.event_handler("on_user_turn_idle")
+    async def on_idle(_aggregator: Any) -> None:
+        if silence.give_up():
+            state.end(EndReason.AGENT_SILENT)
+            return
+        await nudge()
+
+
 class Stoppable(Protocol):
     def has_finished(self) -> bool: ...
 
@@ -231,18 +250,11 @@ class Persona:
 
         self.llm.register_function(END_CALL.name, end_call, cancel_on_interruption=False)
         self._transcript = transcript
-        silence = Silence(IDLE_NUDGES)
 
-        @aggregators.user().event_handler("on_user_turn_started")
-        async def on_agent_turn(_aggregator: Any) -> None:
-            silence.heard()
-
-        @aggregators.user().event_handler("on_user_turn_idle")
-        async def on_idle(_aggregator: Any) -> None:
-            if silence.give_up():
-                state.end(EndReason.AGENT_SILENT)
-                return
+        async def nudge() -> None:
             await self.worker.queue_frame(TTSSpeakFrame(NUDGE))
+
+        watch_silence(aggregators.user(), state, nudge)
 
         @self.worker.event_handler("on_pipeline_error")
         async def on_error(_worker: Any, frame: ErrorFrame) -> None:
