@@ -9,13 +9,15 @@ import websockets
 from fastapi import FastAPI, Request, Response
 from httpx import AsyncClient
 
-from tests.conftest import Observer
+from tests.conftest import Observer, make_settings
 from truman.caller import phone
-from truman.caller.phone import Connected, Dialer
+from truman.caller.phone import Connected, Dialer, PhoneCaller
 from truman.caller.plivo_api import PlivoApi
 from truman.caller.plivo_server import PlivoServer, StreamRegistry, create_app
 from truman.domain.agents import AgentConfig
 from truman.domain.conversations import CallOutcome, CallRequest, EndReason, WireEventKind
+
+PROVIDERS = ("deepgram_api_key", "elevenlabs_api_key", "openai_api_key")
 
 AGENT_NUMBER = "+14155550100"
 POOL_NUMBER = "+17862242321"
@@ -29,11 +31,19 @@ class Rig:
         self.registry = registry
         self.seen: list[dict[str, Any]] = []
         self.public_url = f"http://127.0.0.1:{worker.port}"
-        self.dialer = Dialer(
-            PlivoApi("MAXXXX", "token", base_url=f"http://127.0.0.1:{plivo.port}"),
-            self.public_url,
+        self.api = PlivoApi("MAXXXX", "token", base_url=f"http://127.0.0.1:{plivo.port}")
+        self.dialer = Dialer(self.api, self.public_url, ring_timeout_s=1)
+
+    def caller(self, tmp_path: Path) -> PhoneCaller:
+        settings = make_settings(
+            tmp_path,
+            **dict.fromkeys(PROVIDERS, "test"),
+            plivo_auth_id="MAXXXX",
+            plivo_auth_token="token",
+            public_url=self.public_url,
             ring_timeout_s=1,
         )
+        return PhoneCaller(settings, self.registry, self.api)
 
     async def report(self, conversation_id: uuid.UUID, **fields: str) -> None:
         async with AsyncClient(base_url=self.public_url) as client:
@@ -195,3 +205,42 @@ async def test_silence_from_plivo_and_a_missing_stream_time_out(rig: Rig, tmp_pa
         {"cancel": "req-1"},
         {"hang_up": "call-2"},
     ]
+
+
+async def test_the_phone_caller_reports_an_unanswered_call_and_frees_its_stream_entry(
+    rig: Rig, tmp_path: Path
+) -> None:
+    call = request(tmp_path)
+    observer = Observer()
+    running = asyncio.create_task(rig.caller(tmp_path).run(call, observer, asyncio.Event()))
+    await asyncio.wait_for(seen(observer, WireEventKind.CONNECT_STARTED), 2)
+    await rig.report(call.conversation_id, CallStatus="ringing")
+    await rig.report(call.conversation_id, CallStatus="no-answer")
+
+    outcome = await asyncio.wait_for(running, 2)
+
+    assert outcome.connected is False and outcome.end_reason is EndReason.NO_ANSWER
+    assert observer.kinds() == [WireEventKind.CONNECT_STARTED, WireEventKind.RINGING]
+    assert rig.registry.get(call.conversation_id) is None
+
+
+async def test_a_stream_that_is_not_plivo_ends_the_call_before_any_provider_is_touched(
+    rig: Rig, tmp_path: Path
+) -> None:
+    call = request(tmp_path)
+    observer = Observer()
+    running = asyncio.create_task(rig.caller(tmp_path).run(call, observer, asyncio.Event()))
+    await asyncio.wait_for(seen(observer, WireEventKind.CONNECT_STARTED), 2)
+    await rig.answer(call.conversation_id, "call-9")
+    async with websockets.connect(
+        f"ws://127.0.0.1:{rig.worker.port}/stream/{call.conversation_id}"
+    ) as stranger:
+        await stranger.send('{"event": "connected", "protocol": "Call"}')
+        await stranger.send('{"event": "start", "start": {"streamSid": "MZ1", "callSid": "CA1"}}')
+        outcome = await asyncio.wait_for(running, 2)
+
+    assert outcome.connected is False and outcome.end_reason is EndReason.ERROR
+    assert outcome.caller_error and "start event: connected" in outcome.caller_error
+    assert observer.kinds() == [WireEventKind.CONNECT_STARTED, WireEventKind.ANSWERED]
+    assert rig.registry.get(call.conversation_id) is None
+    assert {"hang_up": "call-9"} not in rig.seen

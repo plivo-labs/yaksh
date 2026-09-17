@@ -585,7 +585,7 @@ async def test_events_for_an_unknown_conversation_is_a_json_404(client: AsyncCli
 
 IMMORTAL_WORKER = """
 import asyncio, contextlib, sys
-from truman.__main__ import run_worker
+from truman.__main__ import StreamRegistry, run_worker
 from truman.config import Settings
 from truman.domain.conversations import WireEvent, WireEventKind
 
@@ -601,7 +601,7 @@ settings = Settings.model_validate({
     "worker_poll_interval_s": 0.05, "worker_heartbeat_s": 0.05, "worker_lease_s": 2,
     "end_timeout_s": 0.3,
 })
-asyncio.run(run_worker(settings, Immortal()))
+asyncio.run(run_worker(settings, Immortal(), StreamRegistry()))
 """
 
 
@@ -704,7 +704,7 @@ async def test_a_stalled_result_write_does_not_hold_capacity(
 
 STUCK_WRITE_WORKER = """
 import asyncio, contextlib, sys
-from truman.__main__ import run_worker
+from truman.__main__ import StreamRegistry, run_worker
 from truman.config import Settings
 from truman.domain.conversations import CallOutcome, EndReason, WireEvent, WireEventKind
 from truman.simulation import conversations
@@ -728,7 +728,7 @@ settings = Settings.model_validate({
     "worker_poll_interval_s": 0.05, "worker_heartbeat_s": 0.05, "worker_lease_s": 2,
     "end_timeout_s": 0.3,
 })
-asyncio.run(run_worker(settings, HoldsUntilStop()))
+asyncio.run(run_worker(settings, HoldsUntilStop(), StreamRegistry()))
 """
 
 
@@ -774,7 +774,7 @@ settings = Settings.model_validate({
     "worker_poll_interval_s": 0.05, "worker_heartbeat_s": 0.05, "worker_lease_s": 2,
     "end_timeout_s": 0.3,
 })
-asyncio.run(main.run_worker(settings, main.StubCaller()))
+asyncio.run(main.run_worker(settings, main.StubCaller(), main.StreamRegistry()))
 """
 
 

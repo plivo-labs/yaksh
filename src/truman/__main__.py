@@ -48,16 +48,26 @@ def worker() -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
     settings = Settings()
     upgrade_to_head(str(settings.database_url))
-    if settings.caller == "stub":
-        caller: Caller = StubCaller()
+    registry = StreamRegistry()
+    caller: Caller = StubCaller() if settings.caller == "stub" else callers(settings, registry)
+    asyncio.run(run_worker(settings, caller, registry))
+
+
+def callers(settings: Settings, registry: StreamRegistry) -> Caller:
+    from truman.caller.phone import PhoneCaller, plivo_credentials
+    from truman.caller.pipecat import PipecatCaller
+    from truman.caller.plivo_api import PlivoApi
+
+    by_transport: dict[Transport, Caller] = {Transport.PLIVO_WEBSOCKET: PipecatCaller(settings)}
+    if settings.public_url:
+        api = PlivoApi(*plivo_credentials(settings))
+        by_transport[Transport.PHONE] = PhoneCaller(settings, registry, api)
     else:
-        from truman.caller.pipecat import PipecatCaller
-
-        caller = TransportRouter({Transport.PLIVO_WEBSOCKET: PipecatCaller(settings)})
-    asyncio.run(run_worker(settings, caller))
+        logging.warning("phone calls are off: set TRUMAN_PUBLIC_URL to the address Plivo can reach")
+    return TransportRouter(by_transport)
 
 
-async def run_worker(settings: Settings, caller: Caller) -> None:
+async def run_worker(settings: Settings, caller: Caller, registry: StreamRegistry) -> None:
     engine = create_engine(str(settings.database_url))
     sessionmaker = create_sessionmaker(engine)
     async with sessionmaker() as session:
@@ -65,7 +75,6 @@ async def run_worker(settings: Settings, caller: Caller) -> None:
     worker = Worker(sessionmaker, caller, settings)
     server = None
     if settings.public_url:
-        registry = StreamRegistry()
         server = PlivoServer(create_app(registry, settings.public_url), settings.stream_port)
         await server.start()
     stop = asyncio.Event()

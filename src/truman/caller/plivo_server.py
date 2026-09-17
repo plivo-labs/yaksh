@@ -100,10 +100,13 @@ def create_app(registry: StreamRegistry, public_url: str) -> FastAPI:
         await websocket.accept()
         entry = expected(conversation_id)
         if entry is None or entry.socket.done():
+            log.warning("refused a stream for conversation %s: %s", conversation_id, NO_CALL)
             await websocket.close(code=1008, reason=NO_CALL)
             return
+        log.info("stream connected for conversation %s", conversation_id)
         entry.socket.set_result(websocket)
         await entry.finished.wait()
+        log.info("stream released for conversation %s", conversation_id)
 
     return app
 

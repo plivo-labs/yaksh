@@ -41,6 +41,8 @@ class OutboundCall:
 
 class PlivoApi:
     def __init__(self, auth_id: str, auth_token: str, *, base_url: str = PLIVO_API) -> None:
+        self.auth_id = auth_id
+        self.auth_token = auth_token
         self._account = f"{base_url.rstrip('/')}/v1/Account/{auth_id}"
         self._auth = aiohttp.BasicAuth(auth_id, auth_token)
 
