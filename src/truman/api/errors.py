@@ -14,7 +14,6 @@ CODES = {
     status.HTTP_404_NOT_FOUND: "not_found",
     status.HTTP_409_CONFLICT: "conflict",
     status.HTTP_422_UNPROCESSABLE_CONTENT: "validation_error",
-    status.HTTP_429_TOO_MANY_REQUESTS: "at_capacity",
 }
 
 
