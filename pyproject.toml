@@ -88,6 +88,12 @@ source_modules = ["truman.simulation", "truman.evaluation"]
 forbidden_modules = ["truman.caller"]
 
 [[tool.importlinter.contracts]]
+name = "evaluation never imports simulation"
+type = "forbidden"
+source_modules = ["truman.evaluation"]
+forbidden_modules = ["truman.simulation"]
+
+[[tool.importlinter.contracts]]
 name = "api and worker are entry points, nothing imports them"
 type = "forbidden"
 source_modules = [
