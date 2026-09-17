@@ -48,13 +48,16 @@ class PlivoApi:
 
     async def create_call(self, call: OutboundCall) -> str:
         """Ask Plivo to dial; returns the request uuid that identifies the call until it answers."""
-        async with (
-            aiohttp.ClientSession(auth=self._auth, timeout=TIMEOUT) as session,
-            session.post(f"{self._account}/Call/", json=call.params()) as response,
-        ):
-            body = await response.text()
-            if response.status >= 400:
-                raise PlivoError(f"create call failed with {response.status}: {body}")
+        try:
+            async with (
+                aiohttp.ClientSession(auth=self._auth, timeout=TIMEOUT) as session,
+                session.post(f"{self._account}/Call/", json=call.params()) as response,
+            ):
+                body = await response.text()
+                if response.status >= 400:
+                    raise PlivoError(f"create call failed with {response.status}: {body}")
+        except (aiohttp.ClientError, TimeoutError) as error:
+            raise PlivoError(f"create call did not reach Plivo: {error!r}") from error
         try:
             return str(json.loads(body)["request_uuid"])
         except (ValueError, KeyError, TypeError) as error:
@@ -68,10 +71,13 @@ class PlivoApi:
         await self._delete(f"{self._account}/Call/{call_uuid}/")
 
     async def _delete(self, url: str) -> None:
-        async with (
-            aiohttp.ClientSession(auth=self._auth, timeout=TIMEOUT) as session,
-            session.delete(url) as response,
-        ):
-            if response.status >= 400 and response.status != 404:
-                body = await response.text()
-                raise PlivoError(f"delete {url} failed with {response.status}: {body}")
+        try:
+            async with (
+                aiohttp.ClientSession(auth=self._auth, timeout=TIMEOUT) as session,
+                session.delete(url) as response,
+            ):
+                if response.status >= 400 and response.status != 404:
+                    body = await response.text()
+                    raise PlivoError(f"delete {url} failed with {response.status}: {body}")
+        except (aiohttp.ClientError, TimeoutError) as error:
+            raise PlivoError(f"delete {url} did not reach Plivo: {error!r}") from error
