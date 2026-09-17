@@ -7,6 +7,7 @@ import typer
 import uvicorn
 from sqlalchemy.ext.asyncio import AsyncEngine
 
+from truman.caller.plivo_server import PlivoServer, StreamRegistry, create_app
 from truman.caller.stub import StubCaller
 from truman.config import Settings
 from truman.db.migrate import upgrade_to_head
@@ -60,6 +61,11 @@ async def run_worker(settings: Settings, caller: Caller) -> None:
     async with sessionmaker() as session:
         await conversations.sync_numbers(session, settings.plivo_numbers)
     worker = Worker(sessionmaker, caller, settings)
+    server = None
+    if settings.public_url:
+        registry = StreamRegistry()
+        server = PlivoServer(create_app(registry, settings.public_url), settings.stream_port)
+        await server.start()
     stop = asyncio.Event()
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGINT, signal.SIGTERM):
@@ -67,6 +73,8 @@ async def run_worker(settings: Settings, caller: Caller) -> None:
     try:
         await worker.run(stop)
     finally:
+        if server is not None:
+            await server.stop(settings.end_timeout_s)
         if worker.fatal.is_set() or not await bounded_dispose(engine, settings.end_timeout_s):
             # A leaked task would keep asyncio.run's teardown waiting forever.
             logging.shutdown()
