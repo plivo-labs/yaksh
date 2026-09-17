@@ -22,13 +22,6 @@ import {
   FieldLabel,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
@@ -47,15 +40,6 @@ interface Draft {
   agent_speaks_first: boolean;
   brief: string;
 }
-
-const DIRECTIONS = [
-  { value: "inbound", label: "Inbound" },
-  { value: "outbound", label: "Outbound" },
-];
-const TRANSPORTS = [
-  { value: "plivo_websocket", label: "Plivo websocket" },
-  { value: "phone", label: "Phone" },
-];
 
 const EMPTY: Draft = {
   name: "",
@@ -158,51 +142,11 @@ function AgentForm({ agent }: { agent?: Agent }) {
           />
         </Field>
 
-        <div className="grid grid-cols-2 gap-4">
-          <Field>
-            <FieldLabel htmlFor="direction">Direction</FieldLabel>
-            <Select
-              items={DIRECTIONS}
-              value={draft.direction}
-              onValueChange={(value) => set("direction", (value ?? draft.direction) as Direction)}
-            >
-              <SelectTrigger id="direction" className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {DIRECTIONS.map((item) => (
-                  <SelectItem key={item.value} value={item.value}>
-                    {item.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Field>
-          <Field>
-            <FieldLabel htmlFor="transport">Transport</FieldLabel>
-            <Select
-              items={TRANSPORTS}
-              value={draft.transport}
-              onValueChange={(value) => set("transport", (value ?? draft.transport) as Transport)}
-            >
-              <SelectTrigger id="transport" className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {TRANSPORTS.map((item) => (
-                  <SelectItem key={item.value} value={item.value}>
-                    {item.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Field>
-        </div>
-
         <Field>
           <FieldLabel htmlFor="websocket_url">Stream endpoint</FieldLabel>
           <Input
             id="websocket_url"
+            required
             placeholder="wss://agent.example.com/stream"
             value={draft.websocket_url}
             onChange={(e) => set("websocket_url", e.target.value)}
