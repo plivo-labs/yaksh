@@ -96,8 +96,8 @@ class Dialer:
             from_number=request.caller_number,
             to_number=request.agent.agent_number,
             answer_url=f"{self._base}/answer/{conversation_id}",
-            hangup_url=f"{self._base}/callbacks/{conversation_id}?{CALLBACK_RETRIES}",
-            ring_url=f"{self._base}/callbacks/{conversation_id}?{CALLBACK_RETRIES}",
+            hangup_url=f"{self._base}/callbacks/{conversation_id}#{CALLBACK_RETRIES}",
+            ring_url=f"{self._base}/callbacks/{conversation_id}#{CALLBACK_RETRIES}",
             ring_timeout_s=self._ring_timeout_s,
             time_limit_s=request.max_duration_s + TIME_LIMIT_MARGIN_S,
         )

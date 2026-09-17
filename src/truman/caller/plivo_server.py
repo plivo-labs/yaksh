@@ -97,7 +97,7 @@ def create_app(registry: StreamRegistry, public_url: str) -> FastAPI:
             conversation_id=conversation_id,
             stream_url=f"{stream_base(public_url)}/stream/{conversation_id}",
             status_url=escape(
-                f"{public_url.rstrip('/')}/callbacks/{conversation_id}?{CALLBACK_RETRIES}"
+                f"{public_url.rstrip('/')}/callbacks/{conversation_id}#{CALLBACK_RETRIES}"
             ),
         )
         return Response(xml, media_type="application/xml")

@@ -46,7 +46,7 @@ async def test_the_answer_xml_streams_a_waiting_conversation_and_hangs_up_others
     )
     assert f"wss://truman.example.com/stream/{conversation_id}" in answer.text
     assert (
-        f'statusCallbackUrl="https://truman.example.com/callbacks/{conversation_id}?{RETRIES}"'
+        f'statusCallbackUrl="https://truman.example.com/callbacks/{conversation_id}#{RETRIES}"'
         in answer.text
     )
     assert 'bidirectional="true"' in answer.text and 'keepCallAlive="true"' in answer.text
