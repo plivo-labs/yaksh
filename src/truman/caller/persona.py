@@ -89,10 +89,10 @@ def provider_keys(settings: Settings) -> dict[str, str]:
     if settings.azure_openai_endpoint:
         keys["AZURE_OPENAI_API_KEY"] = settings.azure_openai_api_key
     else:
-        keys["OPENAI_API_KEY or AZURE_OPENAI_ENDPOINT"] = settings.openai_api_key
+        keys["OPENAI_API_KEY"] = settings.openai_api_key
     missing = [name for name, value in keys.items() if value is None]
     if missing:
-        raise ValueError(f"the pipecat caller needs {', '.join(missing)}")
+        raise ValueError(f"the caller needs {', '.join(missing)}")
     return {name: value.get_secret_value() for name, value in keys.items() if value}
 
 
@@ -107,7 +107,7 @@ def llm_service(settings: Settings, keys: dict[str, str], instructions: str) -> 
             ),
         )
     return OpenAILLMService(
-        api_key=keys["OPENAI_API_KEY or AZURE_OPENAI_ENDPOINT"],
+        api_key=keys["OPENAI_API_KEY"],
         settings=OpenAILLMService.Settings(
             model=settings.persona_model, system_instruction=instructions
         ),
