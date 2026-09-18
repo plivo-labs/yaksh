@@ -55,7 +55,7 @@ IN_PROGRESS = "in-progress"
 UNANSWERED = frozenset({"no-answer", "timeout", "busy"})
 ACK_GRACE_S = 0.2
 HANGUP_TIMEOUT_S = 2.0
-CHUNK_BYTES = SAMPLE_RATE * 2 // 5
+CHUNK_BYTES = SAMPLE_RATE * 2 // 2
 LINEAR = "audio/x-l16"
 MULAW = "audio/x-mulaw"
 
@@ -322,7 +322,6 @@ class StreamSerializer(FrameSerializer):
                 self._heard(pcm)
                 return InputAudioRawFrame(audio=pcm, sample_rate=SAMPLE_RATE, num_channels=1)
             case "playedStream":
-                self._event(WireEventKind.CHECKPOINT)
                 self._checkpoints.played(str(message.get("name")))
             case "stop":
                 self._event(WireEventKind.STOP)

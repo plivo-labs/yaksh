@@ -74,16 +74,16 @@ async def test_checkpoints_follow_the_audio_and_their_reports_close_the_reply() 
     ]
 
 
-async def test_long_replies_get_a_checkpoint_every_200_ms() -> None:
+async def test_long_replies_get_a_checkpoint_every_500_ms() -> None:
     checkpoints = Checkpoints(STREAM, TranscriptBuilder(Clock(), Observer()))
-    long = TTSAudioRawFrame(LOUD * 27, SAMPLE_RATE, 1)
+    long = TTSAudioRawFrame(LOUD * 65, SAMPLE_RATE, 1)
 
     downstream, _ = await run_test(checkpoints, frames_to_send=[TTSStartedFrame(), long])
 
     audio = [len(f.audio) for f in downstream if isinstance(f, TTSAudioRawFrame)]
     names = [f.message["name"] for f in downstream if isinstance(f, OutputTransportMessageFrame)]
-    assert audio == [CHUNK_BYTES, CHUNK_BYTES, FRAME_BYTES * 27 - 2 * CHUNK_BYTES]
-    assert names == [f"1:{CHUNK_BYTES}", f"1:{2 * CHUNK_BYTES}", f"1:{FRAME_BYTES * 27}"]
+    assert audio == [CHUNK_BYTES, CHUNK_BYTES, FRAME_BYTES * 65 - 2 * CHUNK_BYTES]
+    assert names == [f"1:{CHUNK_BYTES}", f"1:{2 * CHUNK_BYTES}", f"1:{FRAME_BYTES * 65}"]
 
 
 async def test_a_mulaw_stream_is_decoded_and_answered_in_mulaw() -> None:
@@ -144,7 +144,6 @@ async def test_the_serializer_speaks_linear_audio_and_reports_what_plivo_says() 
         WireEventKind.CLEAR_AUDIO,
         WireEventKind.AGENT_AUDIO,
         WireEventKind.AGENT_AUDIO,
-        WireEventKind.CHECKPOINT,
         WireEventKind.STOP,
         WireEventKind.CALLER_ERROR,
         WireEventKind.CALLER_ERROR,

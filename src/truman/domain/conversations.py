@@ -58,7 +58,6 @@ class WireEventKind(StrEnum):
     CALLER_SPEECH_START = "caller_speech_start"
     CALLER_SPEECH_END = "caller_speech_end"
     AGENT_AUDIO = "agent_audio"
-    CHECKPOINT = "checkpoint"
     CLEAR_AUDIO = "clear_audio"
     STOP = "stop"
     CALLER_ERROR = "caller_error"

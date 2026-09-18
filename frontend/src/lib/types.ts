@@ -28,7 +28,6 @@ type WireEventKind =
   | "caller_speech_start"
   | "caller_speech_end"
   | "agent_audio"
-  | "checkpoint"
   | "clear_audio"
   | "stop"
   | "caller_error";
