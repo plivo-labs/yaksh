@@ -49,7 +49,6 @@ export interface Agent {
   direction: Direction;
   transport: Transport;
   agent_number: string;
-  outbound_numbers: string[];
   agent_speaks_first: boolean;
   brief: string | null;
   current_version: number;

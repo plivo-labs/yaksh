@@ -1,11 +1,10 @@
 from enum import StrEnum
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any
 
 from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
-    HttpUrl,
     StringConstraints,
     ValidationInfo,
     field_validator,
@@ -29,17 +28,6 @@ class AgentChange(StrEnum):
 
 
 E164 = Annotated[str, StringConstraints(pattern=r"^\+[1-9]\d{6,14}$")]
-Headers = dict[str, str]
-
-
-class Trigger(BaseModel):
-    model_config = ConfigDict(extra="forbid", frozen=True)
-
-    url: HttpUrl
-    method: Literal["POST", "PUT"] = "POST"
-    headers: Headers = Field(default_factory=dict)
-    secret_env: str | None = None
-    body: dict[str, Any] = Field(default_factory=dict)
 
 
 class AgentConfig(BaseModel):
@@ -48,8 +36,6 @@ class AgentConfig(BaseModel):
     direction: Direction = Direction.INBOUND
     transport: Transport = Transport.PHONE
     agent_number: E164
-    outbound_numbers: list[E164] = Field(default_factory=list)
-    trigger: Trigger | None = None
     agent_speaks_first: bool = True
     brief: str | None = None
 
@@ -70,8 +56,6 @@ class AgentUpdate(BaseModel):
     direction: Direction | None = None
     transport: Transport | None = None
     agent_number: E164 | None = None
-    outbound_numbers: list[E164] | None = None
-    trigger: Trigger | None = None
     agent_speaks_first: bool | None = None
     brief: str | None = None
 

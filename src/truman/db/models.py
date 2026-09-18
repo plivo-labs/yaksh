@@ -4,7 +4,6 @@ from enum import StrEnum
 from typing import Any
 
 from sqlalchemy import (
-    ARRAY,
     Boolean,
     DateTime,
     Enum,
@@ -44,8 +43,6 @@ class Agent(Base):
     direction: Mapped[Direction] = mapped_column(pg_enum(Direction, "agent_direction"))
     transport: Mapped[Transport] = mapped_column(pg_enum(Transport, "agent_transport"))
     agent_number: Mapped[str] = mapped_column(Text)
-    outbound_numbers: Mapped[list[str]] = mapped_column(ARRAY(Text), default=list)
-    trigger: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     agent_speaks_first: Mapped[bool] = mapped_column(Boolean, default=True)
     brief: Mapped[str | None] = mapped_column(Text)
     current_version: Mapped[int] = mapped_column(Integer, default=1)

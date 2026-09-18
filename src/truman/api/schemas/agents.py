@@ -3,7 +3,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict
 
-from truman.domain.agents import AgentChange, AgentConfig, Direction, Transport, Trigger
+from truman.domain.agents import AgentChange, AgentConfig, Direction, Transport
 
 
 class AgentRead(BaseModel):
@@ -15,8 +15,6 @@ class AgentRead(BaseModel):
     direction: Direction
     transport: Transport
     agent_number: str
-    outbound_numbers: list[str]
-    trigger: Trigger | None
     agent_speaks_first: bool
     brief: str | None
     current_version: int

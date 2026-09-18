@@ -29,13 +29,8 @@ def config_of(agent: Agent) -> AgentConfig:
 
 
 def apply_config(agent: Agent, config: AgentConfig) -> None:
-    agent.direction = config.direction
-    agent.transport = config.transport
-    agent.agent_number = config.agent_number
-    agent.outbound_numbers = list(config.outbound_numbers)
-    agent.trigger = config.trigger.model_dump(mode="json") if config.trigger else None
-    agent.agent_speaks_first = config.agent_speaks_first
-    agent.brief = config.brief
+    for field in AgentConfig.model_fields:
+        setattr(agent, field, getattr(config, field))
 
 
 def validate_config(data: dict[str, Any]) -> AgentConfig:

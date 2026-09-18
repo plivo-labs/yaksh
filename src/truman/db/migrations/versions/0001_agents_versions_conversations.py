@@ -67,8 +67,6 @@ def upgrade() -> None:
         sa.Column("upgrade_headers", postgresql.JSONB(), nullable=False),
         sa.Column("extra_headers", postgresql.JSONB(), nullable=False),
         sa.Column("agent_number", sa.Text(), nullable=True),
-        sa.Column("outbound_numbers", postgresql.ARRAY(sa.Text()), nullable=False),
-        sa.Column("trigger", postgresql.JSONB(), nullable=True),
         sa.Column("agent_speaks_first", sa.Boolean(), nullable=False),
         sa.Column("brief", sa.Text(), nullable=True),
         sa.Column("current_version", sa.Integer(), nullable=False),
