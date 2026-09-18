@@ -86,6 +86,8 @@ def create_app(registry: StreamRegistry, public_url: str) -> FastAPI:
         except ValueError:
             return None
 
+    # TODO: verify X-Plivo-Signature-V2 on /answer and /callbacks with the auth token, as QES
+    # does. Today the conversation id is the only guard on all three routes.
     @app.api_route("/answer/{conversation_id}", methods=["GET", "POST"])
     async def answer(conversation_id: str, request: Request) -> Response:
         """Plivo fetches this when the agent answers; an error here reads as a platform fault."""
