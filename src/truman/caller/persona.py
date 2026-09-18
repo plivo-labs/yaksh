@@ -10,6 +10,7 @@ from typing import Any, Protocol
 
 from pipecat.adapters.schemas.function_schema import FunctionSchema
 from pipecat.adapters.schemas.tools_schema import ToolsSchema
+from pipecat.audio.turn.smart_turn.local_smart_turn_v3 import LocalSmartTurnAnalyzerV3
 from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.audio.vad.vad_analyzer import VADParams
 from pipecat.frames.frames import (
@@ -33,6 +34,8 @@ from pipecat.services.deepgram.stt import DeepgramSTTService
 from pipecat.services.elevenlabs.tts import ElevenLabsTTSService
 from pipecat.services.llm_service import FunctionCallParams
 from pipecat.services.openai.llm import OpenAILLMService
+from pipecat.turns.user_stop import TurnAnalyzerUserTurnStopStrategy
+from pipecat.turns.user_turn_strategies import UserTurnStrategies
 from pipecat.workers.runner import WorkerRunner
 
 from truman.caller.audio import SAMPLE_RATE, Clock
@@ -210,7 +213,14 @@ class Persona:
         )
         aggregators = LLMContextAggregatorPair(
             LLMContext(tools=ToolsSchema(standard_tools=[END_CALL])),
-            user_params=LLMUserAggregatorParams(user_idle_timeout=IDLE_S),
+            user_params=LLMUserAggregatorParams(
+                user_idle_timeout=IDLE_S,
+                user_turn_strategies=UserTurnStrategies(
+                    stop=[
+                        TurnAnalyzerUserTurnStopStrategy(turn_analyzer=LocalSmartTurnAnalyzerV3())
+                    ]
+                ),
+            ),
         )
         pipeline = Pipeline(
             [
