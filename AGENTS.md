@@ -10,7 +10,7 @@ src/truman/
   domain/       shared data models and interfaces
   caller/       runs the simulated caller and connects to the customer's agent
   simulation/   defines scenarios and personas and orchestrates test conversations
-  evaluation/   runs judges and computes scores
+  evaluation/   runs judges and computes scores (planned, empty today)
   api/          HTTP endpoints for the UI and integrations
   worker/       claims queued conversations from Postgres and runs them under a lease
   db/           database models and migrations
@@ -22,7 +22,7 @@ tests/          automated tests and fixtures
 
 ## How a run flows
 
-Two stages, each a separate job, each retryable on its own.
+Two stages, each a separate job, each retryable on its own. Today the simulated test runs up to the saved conversation; the evaluation stage and imported calls are planned.
 
 ```
 Simulated test:   api -> worker -> simulation -> caller -> saved conversation
