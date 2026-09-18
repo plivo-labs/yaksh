@@ -22,6 +22,18 @@ from truman.worker.worker import FINALIZE_ATTEMPTS, Worker
 FINAL = {"completed", "failed", "invalid", "cancelled"}
 
 
+async def stuck_worker(kind: str, settings: Settings, data_dir: Path) -> asyncio.subprocess.Process:
+    return await asyncio.create_subprocess_exec(
+        sys.executable,
+        "-m",
+        "tests.stuck_workers",
+        kind,
+        settings.database_url.encoded_string(),
+        str(data_dir),
+        cwd=Path(__file__).parents[2],
+    )
+
+
 async def wait_for_event(client: AsyncClient, conversation_id: str, kind: str) -> None:
     async def seen() -> bool:
         detail = (await client.get(f"/api/v1/conversations/{conversation_id}")).json()
@@ -566,40 +578,12 @@ async def test_events_for_an_unknown_conversation_is_a_json_404(client: AsyncCli
     assert response.json()["error"]["code"] == "not_found"
 
 
-IMMORTAL_WORKER = """
-import asyncio, contextlib, sys
-from truman.__main__ import StreamRegistry, run_worker
-from truman.config import Settings
-from truman.domain.conversations import WireEvent, WireEventKind
-
-class Immortal:
-    async def run(self, request, observer, stop):
-        observer.wire_event(WireEvent(kind=WireEventKind.CONNECTED, at_ms=0))
-        while True:
-            with contextlib.suppress(asyncio.CancelledError):
-                await asyncio.sleep(3600)
-
-settings = Settings.model_validate({
-    "api_token": "t", "database_url": sys.argv[1], "data_dir": sys.argv[2],
-    "worker_poll_interval_s": 0.05, "worker_heartbeat_s": 0.05, "worker_lease_s": 2,
-    "end_timeout_s": 0.3,
-})
-asyncio.run(run_worker(settings, Immortal(), StreamRegistry(), None))
-"""
-
-
 async def test_a_worker_with_an_uncancellable_caller_exits_nonzero(
     client: AsyncClient, settings: Settings, tmp_path: Path
 ) -> None:
     agent_id = await create_agent_id(client)
     started = await start(client, agent_id)
-    process = await asyncio.create_subprocess_exec(
-        sys.executable,
-        "-c",
-        IMMORTAL_WORKER,
-        settings.database_url.encoded_string(),
-        str(tmp_path),
-    )
+    process = await stuck_worker("immortal", settings, tmp_path)
     try:
         await wait_for_event(client, started["id"], "connected")
         await client.post(f"/api/v1/conversations/{started['id']}/end")
@@ -685,48 +669,12 @@ async def test_a_stalled_result_write_does_not_hold_capacity(
     assert not worker.fatal.is_set()
 
 
-STUCK_WRITE_WORKER = """
-import asyncio, contextlib, sys
-from truman.__main__ import StreamRegistry, run_worker
-from truman.config import Settings
-from truman.domain.conversations import CallOutcome, EndReason, WireEvent, WireEventKind
-from truman.simulation import conversations
-from truman.worker import worker as worker_module
-
-class HoldsUntilStop:
-    async def run(self, request, observer, stop):
-        observer.wire_event(WireEvent(kind=WireEventKind.CONNECTED, at_ms=0))
-        await stop.wait()
-        return CallOutcome(connected=True, end_reason=EndReason.USER_REQUEST)
-
-async def stuck(*args, **kwargs):
-    while True:
-        with contextlib.suppress(asyncio.CancelledError):
-            await asyncio.sleep(3600)
-
-conversations.finalize = stuck
-worker_module.FINALIZE_TIMEOUT_S = 1
-settings = Settings.model_validate({
-    "api_token": "t", "database_url": sys.argv[1], "data_dir": sys.argv[2],
-    "worker_poll_interval_s": 0.05, "worker_heartbeat_s": 0.05, "worker_lease_s": 2,
-    "end_timeout_s": 0.3,
-})
-asyncio.run(run_worker(settings, HoldsUntilStop(), StreamRegistry(), None))
-"""
-
-
 async def test_shutdown_with_an_uncancellable_result_write_still_exits(
     client: AsyncClient, settings: Settings, tmp_path: Path
 ) -> None:
     agent_id = await create_agent_id(client)
     started = await start(client, agent_id)
-    process = await asyncio.create_subprocess_exec(
-        sys.executable,
-        "-c",
-        STUCK_WRITE_WORKER,
-        settings.database_url.encoded_string(),
-        str(tmp_path),
-    )
+    process = await stuck_worker("stuck_write", settings, tmp_path)
     try:
         await wait_for_event(client, started["id"], "connected")
         await asyncio.sleep(0.5)
@@ -740,37 +688,10 @@ async def test_shutdown_with_an_uncancellable_result_write_still_exits(
     assert exit_code == 1
 
 
-STUCK_DISPOSAL_WORKER = """
-import asyncio, contextlib, sys
-from sqlalchemy.ext.asyncio import AsyncEngine
-from truman import __main__ as main
-from truman.config import Settings
-
-async def stuck(self) -> None:
-    while True:
-        with contextlib.suppress(asyncio.CancelledError):
-            await asyncio.sleep(3600)
-
-AsyncEngine.dispose = stuck
-settings = Settings.model_validate({
-    "api_token": "t", "database_url": sys.argv[1], "data_dir": sys.argv[2],
-    "worker_poll_interval_s": 0.05, "worker_heartbeat_s": 0.05, "worker_lease_s": 2,
-    "end_timeout_s": 0.3,
-})
-asyncio.run(main.run_worker(settings, main.StubCaller(), main.StreamRegistry(), None))
-"""
-
-
 async def test_shutdown_with_stuck_engine_disposal_still_exits(
     client: AsyncClient, settings: Settings, tmp_path: Path
 ) -> None:
-    process = await asyncio.create_subprocess_exec(
-        sys.executable,
-        "-c",
-        STUCK_DISPOSAL_WORKER,
-        settings.database_url.encoded_string(),
-        str(tmp_path),
-    )
+    process = await stuck_worker("stuck_disposal", settings, tmp_path)
     try:
         await asyncio.sleep(1.5)
         process.terminate()
