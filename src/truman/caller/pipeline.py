@@ -1,5 +1,5 @@
-"""The persona around any transport: its ears, brain and voice, the transcript taps, and how
-a call ends."""
+"""The pipeline that plays a persona over a transport: its ears, brain and voice, the
+transcript taps, and how a call ends."""
 
 import asyncio
 import contextlib

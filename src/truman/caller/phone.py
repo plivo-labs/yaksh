@@ -31,7 +31,7 @@ from pipecat.serializers.base_serializer import FrameSerializer
 from pipecat.transports.websocket.fastapi import FastAPIWebsocketParams, FastAPIWebsocketTransport
 
 from truman.caller.audio import GAP_BYTES, SAMPLE_RATE, SPEECH_PEAK, Clock, Playout, Stamper
-from truman.caller.persona import CallState, Persona, converse, provider_keys
+from truman.caller.pipeline import CallState, Persona, converse, provider_keys
 from truman.caller.plivo_api import OutboundCall, PlivoApi, PlivoError
 from truman.caller.plivo_server import CALLBACK_RETRIES, PendingStream, StreamRegistry
 from truman.caller.transcript import TranscriptBuilder, WireTap

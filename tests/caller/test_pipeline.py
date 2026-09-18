@@ -13,7 +13,7 @@ from pipecat.tests.utils import SleepFrame, run_test
 from pipecat.turns.user_stop import SpeechTimeoutUserTurnStopStrategy
 from pipecat.turns.user_turn_strategies import UserTurnStrategies
 
-from truman.caller.persona import CallState, watch_silence
+from truman.caller.pipeline import CallState, watch_silence
 from truman.domain.conversations import EndReason
 
 
