@@ -2,6 +2,7 @@
 
 from collections import deque
 from collections.abc import Awaitable, Callable
+from dataclasses import dataclass, field
 from typing import Any
 
 from pipecat.frames.frames import (
@@ -27,6 +28,41 @@ from truman.caller.audio import OFFSET, PLAYOUT, Clock, Playout
 from truman.domain.conversations import CallObserver, Provenance, Role, Turn
 
 
+@dataclass
+class Reply:
+    """The persona reply being spoken: its playout, the words released so far, and whether
+    the TTS has finished it."""
+
+    playout: Playout | None
+    words: list[tuple[str, int, Playout | None]] = field(default_factory=list)
+    started_ms: int = 0
+    self_spaced: bool = False
+    ended: bool = False
+
+    def add(
+        self, word: str, offset: int, playout: Playout | None, now_ms: int, *, self_spaced: bool
+    ) -> None:
+        if not self.words:
+            self.started_ms = now_ms
+            self.self_spaced = self_spaced
+        self.words.append((word, offset, playout))
+
+    def finished(self) -> bool:
+        """Ended, and the wire has played its audio and every stamped word is in."""
+        return self.ended and (self.playout is None or self.playout.caught_up(len(self.words)))
+
+    def heard(self) -> list[str]:
+        """The leading words whose audio, up to the next word, has played."""
+        heard: list[str] = []
+        for index, (word, _, playout) in enumerate(self.words):
+            following = self.words[index + 1 : index + 2]
+            end = following[0][1] if following else None
+            if playout is None or not playout.heard_until(end):
+                break
+            heard.append(word)
+        return heard
+
+
 class TranscriptBuilder:
     """Assembles turns from pipeline events.
 
@@ -42,13 +78,8 @@ class TranscriptBuilder:
         self._agent_stopped: int | None = None
         self._generating: list[str] | None = None
         self._generated: deque[str] = deque()
-        self._open = False
-        self._ended = False
-        self._playout: Playout | None = None
+        self._reply: Reply | None = None
         self._closed: Playout | None = None
-        self._words: list[tuple[str, int, Playout | None]] = []
-        self._words_started = 0
-        self._self_spaced = False
         self.agent_speaking = False
         self.agent_spoke = False
 
@@ -90,11 +121,11 @@ class TranscriptBuilder:
         self._generating = None
 
     def caller_started(self, playout: Playout | None) -> None:
-        if self._open and self._playout is playout:
+        if self._reply is not None and self._reply.playout is playout:
             return
-        if self._open:
+        if self._reply is not None:
             self._close(cut=False)
-        self._open_reply(playout)
+        self._reply = Reply(playout)
 
     def transmitted(
         self, word: str, offset: int, playout: Playout | None, *, self_spaced: bool
@@ -107,76 +138,53 @@ class TranscriptBuilder:
         """
         if playout is not None and playout is self._closed:
             return
-        if not self._open:
-            self._open_reply(playout)
-        if not self._words:
-            self._words_started = self._clock.ms()
-            self._self_spaced = self_spaced
-        self._words.append((word, offset, playout))
+        if self._reply is None:
+            self._reply = Reply(playout)
+        self._reply.add(word, offset, playout, self._clock.ms(), self_spaced=self_spaced)
         self.audio_progressed()
 
     def reply_ended(self, playout: Playout | None = None) -> None:
         """The TTS finished the reply; it closes once the wire has sent its audio and every
         stamped word is in."""
-        if playout is not None and playout is not self._playout:
+        if self._reply is None or (playout is not None and playout is not self._reply.playout):
             return
-        self._ended = True
+        self._reply.ended = True
         self.audio_progressed()
 
     def audio_progressed(self) -> None:
-        playout = self._playout
-        caught_up = playout is None or playout.caught_up(len(self._words))
-        if self._open and self._ended and caught_up:
+        if self._reply is not None and self._reply.finished():
             self._close(cut=False)
 
     def call_ended(self) -> None:
-        if self._open:
+        if self._reply is not None:
             self._close(cut=False)
 
     def caller_interrupted(self) -> None:
         self.generation_ended()
         self._close(cut=True)
 
-    def _open_reply(self, playout: Playout | None) -> None:
-        self._open = True
-        self._ended = False
-        self._playout = playout
-        self._words = []
-
     def _close(self, *, cut: bool) -> None:
-        if not self._open and not cut:
+        reply = self._reply
+        if reply is None and not cut:
             return
-        self._open = False
-        self._ended = False
-        if self._playout is not None:
-            self._closed = self._playout
-        self._playout = None
+        reply = reply if reply is not None else Reply(None)
+        self._reply = None
+        if reply.playout is not None:
+            self._closed = reply.playout
         now = self._clock.ms()
         generated = self._generated.popleft() if self._generated else None
-        heard = self._heard()
-        text = ("" if self._self_spaced else " ").join(heard).strip()
+        heard = reply.heard()
+        text = ("" if reply.self_spaced else " ").join(heard).strip()
         if text:
-            self._caller_turn(text, self._words_started, now, Provenance.TRANSMITTED)
-        if cut or len(heard) < len(self._words) or not text:
+            self._caller_turn(text, reply.started_ms, now, Provenance.TRANSMITTED)
+        if cut or len(heard) < len(reply.words) or not text:
             rest = (
                 generated.split()[len(heard) :]
                 if generated
-                else [word for word, _, _ in self._words[len(heard) :]]
+                else [word for word, _, _ in reply.words[len(heard) :]]
             )
             if rest:
                 self._caller_turn(" ".join(rest), now, now, Provenance.CUT)
-        self._words = []
-
-    def _heard(self) -> list[str]:
-        """The leading words whose audio, up to the next word, has played."""
-        heard: list[str] = []
-        for index, (word, _, playout) in enumerate(self._words):
-            following = self._words[index + 1 : index + 2]
-            end = following[0][1] if following else None
-            if playout is None or not playout.heard_until(end):
-                break
-            heard.append(word)
-        return heard
 
     def _caller_turn(self, text: str, started: int, ended: int, provenance: Provenance) -> None:
         self._observer.turn(
