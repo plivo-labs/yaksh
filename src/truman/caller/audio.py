@@ -29,20 +29,46 @@ class Clock:
 
 
 class Playout:
-    """One reply's audio: bytes that arrived from the TTS, bytes the wire has sent, and how
-    many words were stamped against it."""
+    """One reply's audio: bytes that arrived from the TTS, bytes Plivo reported as played,
+    and how many words were stamped against it.
+
+    Audio counts as played with one frame of slack, which covers the trailing partial chunk
+    the media sender drops.
+    """
 
     def __init__(self) -> None:
-        self.arrived = 0
-        self.sent = 0
-        self.origin: int | None = None
-        self.words = 0
+        self._arrived = 0
+        self._sent = 0
+        self._origin: int | None = None
+        self._words = 0
 
-    def offset_of(self, pts: int | None) -> int:
-        """Where audio stamped `pts` on the pipeline clock starts, in bytes of the reply."""
-        if pts is None or self.origin is None:
-            return self.arrived
-        return max(0, (pts - self.origin) * SAMPLE_RATE * 2 // 1_000_000_000)
+    @property
+    def arrived(self) -> int:
+        return self._arrived
+
+    def received(self, size: int, now_ns: int) -> None:
+        if self._origin is None:
+            self._origin = now_ns
+        self._arrived += size
+
+    def stamp_word(self, pts: int | None) -> int:
+        """Count a word and return where its audio starts, in bytes of the reply."""
+        self._words += 1
+        if pts is None or self._origin is None:
+            return self._arrived
+        return max(0, (pts - self._origin) * SAMPLE_RATE * 2 // 1_000_000_000)
+
+    def played(self, through: int) -> None:
+        self._sent = max(self._sent, through)
+
+    def caught_up(self, words_in: int) -> bool:
+        """All audio played and every stamped word has come through."""
+        return self._sent + FRAME_BYTES >= self._arrived and words_in >= self._words
+
+    def heard_until(self, end: int | None) -> bool:
+        """Whether the audio up to byte `end`, or to the end of the reply, has played."""
+        limit = self._arrived if end is None else end
+        return self._sent > 0 and limit <= self._sent + FRAME_BYTES
 
 
 class Stamper:
@@ -56,12 +82,9 @@ class Stamper:
         if isinstance(frame, TTSStartedFrame):
             self.arriving = frame.metadata[PLAYOUT] = Playout()
         elif isinstance(frame, TTSAudioRawFrame) and self.arriving is not None:
-            if self.arriving.origin is None:
-                self.arriving.origin = now_ns
-            self.arriving.arrived += len(frame.audio)
+            self.arriving.received(len(frame.audio), now_ns)
         elif isinstance(frame, TTSTextFrame) and self.arriving is not None:
             frame.metadata[PLAYOUT] = self.arriving
-            frame.metadata[OFFSET] = self.arriving.offset_of(frame.pts)
-            self.arriving.words += 1
+            frame.metadata[OFFSET] = self.arriving.stamp_word(frame.pts)
         elif isinstance(frame, TTSStoppedFrame | LLMFullResponseEndFrame) and self.arriving:
             frame.metadata[PLAYOUT] = self.arriving

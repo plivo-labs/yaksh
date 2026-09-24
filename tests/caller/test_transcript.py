@@ -9,7 +9,8 @@ from truman.domain.conversations import Provenance, Role
 
 def played(arrived: int, sent: int) -> Playout:
     playout = Playout()
-    playout.arrived, playout.sent = arrived, sent
+    playout.received(arrived, 0)
+    playout.played(sent)
     return playout
 
 
@@ -47,7 +48,7 @@ def test_a_finished_reply_is_recorded_once_the_wire_has_sent_it() -> None:
 
     builder.reply_ended()
     assert observer.turns == []
-    playout.sent = 9_600 - FRAME_BYTES // 2
+    playout.played(9_600 - FRAME_BYTES // 2)
     builder.audio_progressed()
 
     assert [(turn.provenance, turn.text) for turn in observer.turns] == [
@@ -60,7 +61,8 @@ def test_a_last_word_that_lands_after_the_end_frame_stays_in_its_turn() -> None:
     builder = TranscriptBuilder(Clock(), observer)
     generated(builder, "Yes please.")
     playout = played(arrived=9_600, sent=9_600)
-    playout.words = 2
+    playout.stamp_word(None)
+    playout.stamp_word(None)
     builder.caller_started(playout)
     builder.transmitted("Yes", 0, playout, self_spaced=False)
 

@@ -23,7 +23,7 @@ from pipecat.frames.frames import (
 from pipecat.processors.aggregators.llm_context import LLMContext
 from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
 
-from truman.caller.audio import FRAME_BYTES, OFFSET, PLAYOUT, Clock, Playout
+from truman.caller.audio import OFFSET, PLAYOUT, Clock, Playout
 from truman.domain.conversations import CallObserver, Provenance, Role, Turn
 
 
@@ -125,9 +125,7 @@ class TranscriptBuilder:
 
     def audio_progressed(self) -> None:
         playout = self._playout
-        caught_up = playout is None or (
-            playout.sent + FRAME_BYTES >= playout.arrived and len(self._words) >= playout.words
-        )
+        caught_up = playout is None or playout.caught_up(len(self._words))
         if self._open and self._ended and caught_up:
             self._close(cut=False)
 
@@ -170,17 +168,12 @@ class TranscriptBuilder:
         self._words = []
 
     def _heard(self) -> list[str]:
-        """The leading words whose audio, up to the next word, the wire sent in full.
-
-        One frame of slack covers the trailing partial chunk the media sender drops.
-        """
+        """The leading words whose audio, up to the next word, has played."""
         heard: list[str] = []
         for index, (word, _, playout) in enumerate(self._words):
-            if playout is None or playout.sent <= 0:
-                break
             following = self._words[index + 1 : index + 2]
-            end = following[0][1] if following else playout.arrived
-            if end > playout.sent + FRAME_BYTES:
+            end = following[0][1] if following else None
+            if playout is None or not playout.heard_until(end):
                 break
             heard.append(word)
         return heard

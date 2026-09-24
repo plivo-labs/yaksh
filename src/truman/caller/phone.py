@@ -206,7 +206,7 @@ class Checkpoints(FrameProcessor):
         self._transcript = transcript
         self._stamper = Stamper()
         self._reply = 0
-        self._pending: dict[str, Playout] = {}
+        self._pending: dict[str, tuple[Playout, int]] = {}
 
     async def process_frame(self, frame: Frame, direction: FrameDirection) -> None:
         await super().process_frame(frame, direction)
@@ -234,7 +234,7 @@ class Checkpoints(FrameProcessor):
         name = f"{self._reply}:{playout.arrived}"
         if name in self._pending:
             return
-        self._pending[name] = playout
+        self._pending[name] = (playout, playout.arrived)
         await self.push_frame(
             OutputTransportMessageFrame(
                 {"event": "checkpoint", "streamId": self._stream_id, "name": name}
@@ -242,10 +242,11 @@ class Checkpoints(FrameProcessor):
         )
 
     def played(self, name: str) -> None:
-        playout = self._pending.pop(name, None)
-        if playout is None:
+        pending = self._pending.pop(name, None)
+        if pending is None:
             return
-        playout.sent = max(playout.sent, int(name.rsplit(":", 1)[1]))
+        playout, through = pending
+        playout.played(through)
         self._transcript.audio_progressed()
 
 

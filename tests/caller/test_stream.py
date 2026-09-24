@@ -60,7 +60,7 @@ async def test_checkpoints_follow_the_audio_and_their_reports_close_the_reply() 
     transcript.reply_ended(playout)
     assert observer.turns == []
     checkpoints.played(names[0])
-    assert observer.turns == [] and playout.sent == FRAME_BYTES * 5
+    assert observer.turns == [] and not playout.caught_up(2)
     checkpoints.played(names[-1])
 
     assert names == [f"1:{FRAME_BYTES * 5}", f"1:{FRAME_BYTES * 8}"]
@@ -68,7 +68,7 @@ async def test_checkpoints_follow_the_audio_and_their_reports_close_the_reply() 
     assert [
         m.message["streamId"] for m in downstream if isinstance(m, OutputTransportMessageFrame)
     ] == [STREAM] * 2
-    assert playout.sent == playout.arrived == FRAME_BYTES * 8 and playout.words == 2
+    assert playout.arrived == FRAME_BYTES * 8 and playout.caught_up(2) and not playout.caught_up(1)
     assert [(t.provenance, t.text) for t in observer.turns] == [
         (Provenance.TRANSMITTED, "Hello there")
     ]
