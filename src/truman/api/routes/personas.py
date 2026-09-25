@@ -1,0 +1,64 @@
+import uuid
+
+from fastapi import APIRouter, Depends, status
+
+from truman.api.auth import require_token
+from truman.api.deps import SessionDep, VoiceCatalogsDep
+from truman.api.pagination import Page, PageDep
+from truman.api.schemas.personas import PersonaRead, PersonaVersionRead
+from truman.domain.personas import PersonaCreate, PersonaUpdate
+from truman.simulation import personas
+
+router = APIRouter(prefix="/personas", tags=["personas"], dependencies=[Depends(require_token)])
+
+
+@router.post("", status_code=status.HTTP_201_CREATED)
+async def create_persona(
+    command: PersonaCreate, session: SessionDep, catalogs: VoiceCatalogsDep
+) -> PersonaRead:
+    return PersonaRead.of(await personas.create_persona(session, catalogs, command))
+
+
+@router.get("")
+async def list_personas(session: SessionDep, page: PageDep) -> Page[PersonaRead]:
+    rows, total = await personas.list_personas(session, offset=page.offset, limit=page.page_size)
+    return Page.of([PersonaRead.of(row) for row in rows], total, page)
+
+
+@router.get("/{persona_id}")
+async def get_persona(persona_id: uuid.UUID, session: SessionDep) -> PersonaRead:
+    return PersonaRead.of(await personas.get_persona(session, persona_id))
+
+
+@router.patch("/{persona_id}")
+async def update_persona(
+    persona_id: uuid.UUID,
+    update: PersonaUpdate,
+    session: SessionDep,
+    catalogs: VoiceCatalogsDep,
+) -> PersonaRead:
+    return PersonaRead.of(await personas.update_persona(session, catalogs, persona_id, update))
+
+
+@router.delete("/{persona_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_persona(persona_id: uuid.UUID, session: SessionDep) -> None:
+    await personas.delete_persona(session, persona_id)
+
+
+@router.get("/{persona_id}/versions")
+async def list_versions(
+    persona_id: uuid.UUID, session: SessionDep, page: PageDep
+) -> Page[PersonaVersionRead]:
+    rows, total = await personas.list_versions(
+        session, persona_id, offset=page.offset, limit=page.page_size
+    )
+    return Page.of([PersonaVersionRead.model_validate(row) for row in rows], total, page)
+
+
+@router.get("/{persona_id}/versions/{version}")
+async def get_version(
+    persona_id: uuid.UUID, version: int, session: SessionDep
+) -> PersonaVersionRead:
+    return PersonaVersionRead.model_validate(
+        await personas.get_version(session, persona_id, version)
+    )

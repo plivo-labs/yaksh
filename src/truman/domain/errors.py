@@ -8,3 +8,7 @@ class ConflictError(Exception):
 
 class ValidationError(Exception):
     pass
+
+
+class UnavailableError(Exception):
+    """An outside service Truman depends on did not answer or refused the request."""

@@ -1,4 +1,4 @@
-"""agents, agent versions, conversations
+"""initial schema: agents, personas, their versions, conversations
 
 Revision ID: 0001
 Revises:
@@ -40,7 +40,19 @@ end_reason = postgresql.ENUM(
     name="end_reason",
     create_type=False,
 )
-ENUMS = (agent_direction, agent_transport, channel, conversation_status, end_reason)
+persona_language = postgresql.ENUM(
+    "en", "hi", "hinglish", name="persona_language", create_type=False
+)
+voice_provider = postgresql.ENUM("elevenlabs", name="voice_provider", create_type=False)
+ENUMS = (
+    agent_direction,
+    agent_transport,
+    channel,
+    conversation_status,
+    end_reason,
+    persona_language,
+    voice_provider,
+)
 
 
 def upgrade() -> None:
@@ -112,6 +124,62 @@ def upgrade() -> None:
     )
 
     op.create_table(
+        "personas",
+        sa.Column(
+            "id",
+            postgresql.UUID(as_uuid=True),
+            server_default=sa.text("uuidv7()"),
+            nullable=False,
+        ),
+        sa.Column("name", sa.Text(), nullable=False),
+        sa.Column("builtin_key", sa.Text(), nullable=True),
+        sa.Column("prompt", sa.Text(), nullable=False),
+        sa.Column("language", persona_language, nullable=False),
+        sa.Column("voice_provider", voice_provider, nullable=False),
+        sa.Column("voice_id", sa.Text(), nullable=False),
+        sa.Column("voice_speed", sa.Float(), nullable=False),
+        sa.Column("voice_stability", sa.Float(), nullable=False),
+        sa.Column("current_version", sa.Integer(), nullable=False),
+        sa.Column(
+            "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
+        sa.Column(
+            "updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
+        sa.Column("deleted_at", sa.DateTime(timezone=True), nullable=True),
+        sa.PrimaryKeyConstraint("id", name="pk_personas"),
+        sa.UniqueConstraint("builtin_key", name="uq_personas_builtin_key"),
+    )
+    op.create_index(
+        "ix_personas_name_live",
+        "personas",
+        [sa.text("lower(name)")],
+        unique=True,
+        postgresql_where=sa.text("deleted_at IS NULL"),
+    )
+
+    op.create_table(
+        "persona_versions",
+        sa.Column(
+            "id",
+            postgresql.UUID(as_uuid=True),
+            server_default=sa.text("uuidv7()"),
+            nullable=False,
+        ),
+        sa.Column("persona_id", postgresql.UUID(as_uuid=True), nullable=False),
+        sa.Column("version", sa.Integer(), nullable=False),
+        sa.Column("config", postgresql.JSONB(), nullable=False),
+        sa.Column(
+            "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
+        sa.ForeignKeyConstraint(
+            ["persona_id"], ["personas.id"], name="fk_persona_versions_persona_id_personas"
+        ),
+        sa.PrimaryKeyConstraint("id", name="pk_persona_versions"),
+        sa.UniqueConstraint("persona_id", "version", name="uq_persona_versions_persona_id_version"),
+    )
+
+    op.create_table(
         "conversations",
         sa.Column(
             "id",
@@ -155,6 +223,8 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     op.drop_table("conversations")
+    op.drop_table("persona_versions")
+    op.drop_table("personas")
     op.drop_table("agent_versions")
     op.drop_table("agents")
     bind = op.get_bind()

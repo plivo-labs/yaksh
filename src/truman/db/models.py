@@ -7,6 +7,7 @@ from sqlalchemy import (
     Boolean,
     DateTime,
     Enum,
+    Float,
     ForeignKey,
     ForeignKeyConstraint,
     Index,
@@ -23,6 +24,7 @@ from sqlalchemy.orm import Mapped, MappedColumn, mapped_column
 from truman.db.base import Base
 from truman.domain.agents import Direction, Transport
 from truman.domain.conversations import Channel, ConversationStatus, EndReason
+from truman.domain.personas import Language, VoiceProvider
 
 
 def pg_enum[E: StrEnum](enum: type[E], name: str) -> Enum:
@@ -108,6 +110,47 @@ class Conversation(Base):
         Index("ix_conversations_agent_created", "agent_id", text("created_at DESC")),
         Index("ix_conversations_status_created", "status", "created_at"),
     )
+
+
+class Persona(Base):
+    __tablename__ = "personas"
+
+    id: Mapped[uuid.UUID] = uuid_primary_key()
+    name: Mapped[str] = mapped_column(Text)
+    builtin_key: Mapped[str | None] = mapped_column(Text, unique=True)
+    prompt: Mapped[str] = mapped_column(Text)
+    language: Mapped[Language] = mapped_column(pg_enum(Language, "persona_language"))
+    voice_provider: Mapped[VoiceProvider] = mapped_column(pg_enum(VoiceProvider, "voice_provider"))
+    voice_id: Mapped[str] = mapped_column(Text)
+    voice_speed: Mapped[float] = mapped_column(Float)
+    voice_stability: Mapped[float] = mapped_column(Float)
+    current_version: Mapped[int] = mapped_column(Integer, default=1)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    __table_args__ = (
+        Index(
+            "ix_personas_name_live",
+            func.lower(text("name")),
+            unique=True,
+            postgresql_where=text("deleted_at IS NULL"),
+        ),
+    )
+
+
+class PersonaVersion(Base):
+    __tablename__ = "persona_versions"
+
+    id: Mapped[uuid.UUID] = uuid_primary_key()
+    persona_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("personas.id"))
+    version: Mapped[int] = mapped_column(Integer)
+    config: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (UniqueConstraint("persona_id", "version"),)
 
 
 class PhoneNumber(Base):

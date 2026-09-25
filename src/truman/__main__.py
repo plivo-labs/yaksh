@@ -6,6 +6,7 @@ import signal
 import typer
 import uvicorn
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
+from uvicorn.config import LOGGING_CONFIG
 
 from truman.caller.plivo_api import PlivoApi, PlivoError
 from truman.caller.plivo_server import PlivoServer, StreamRegistry, create_app
@@ -18,6 +19,14 @@ from truman.simulation import conversations
 from truman.worker.worker import Worker
 
 cli = typer.Typer(no_args_is_help=True, add_completion=False)
+
+API_LOGGING = {
+    **LOGGING_CONFIG,
+    "loggers": {
+        **LOGGING_CONFIG["loggers"],
+        "truman": {"handlers": ["default"], "level": "INFO", "propagate": False},
+    },
+}
 
 
 @cli.callback()
@@ -34,6 +43,7 @@ def api(host: str | None = None, port: int | None = None, reload: bool = False) 
         host=host or settings.api_host,
         port=port or settings.api_port,
         reload=reload,
+        log_config=API_LOGGING,
     )
 
 

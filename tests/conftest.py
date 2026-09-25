@@ -25,7 +25,10 @@ from truman.domain.conversations import (
     WireEvent,
     WireEventKind,
 )
+from truman.domain.errors import UnavailableError
 from truman.domain.numbers import AccountNumber
+from truman.domain.personas import VoiceProvider
+from truman.domain.voices import VoiceInfo
 from truman.simulation import conversations
 from truman.worker.worker import Worker
 
@@ -35,6 +38,17 @@ OFFLINE_DATABASE_URL = "postgresql+asyncpg://truman:truman@localhost:5432/truman
 
 
 AGENT = {"name": "Front desk", "agent_number": "+14155550100"}
+ENGLISH_VOICE = VoiceInfo(
+    id="voice-en", name="Chris", category="premade", languages=frozenset({"en"})
+)
+HINDI_VOICE = VoiceInfo(
+    id="voice-hi", name="Ananya", category="professional", languages=frozenset({"en", "hi"})
+)
+PERSONA = {
+    "name": "Rushed caller",
+    "prompt": "You are in a hurry.",
+    "voice": {"provider": "elevenlabs", "id": ENGLISH_VOICE.id},
+}
 
 
 async def create_agent(client: AsyncClient, **overrides: Any) -> dict[str, Any]:
@@ -45,6 +59,12 @@ async def create_agent(client: AsyncClient, **overrides: Any) -> dict[str, Any]:
 
 async def create_agent_id(client: AsyncClient, **overrides: Any) -> str:
     return (await create_agent(client, **overrides))["id"]
+
+
+async def create_persona(client: AsyncClient, **overrides: Any) -> dict[str, Any]:
+    response = await client.post("/api/v1/personas", json={**PERSONA, **overrides})
+    assert response.status_code == 201, response.text
+    return response.json()
 
 
 async def start(client: AsyncClient, agent_id: str, **overrides: Any) -> dict[str, Any]:
@@ -172,6 +192,29 @@ class FakeCaller:
         )
 
 
+class FakeCatalog:
+    """Voices of one provider account; `down` makes every call fail as if the provider
+    were unreachable."""
+
+    def __init__(self) -> None:
+        self.voices = {voice.id: voice for voice in (ENGLISH_VOICE, HINDI_VOICE)}
+        self.lookups: list[str] = []
+        self.down = False
+
+    async def list_voices(self) -> list[VoiceInfo]:
+        self._answer()
+        return list(self.voices.values())
+
+    async def get_voice(self, voice_id: str) -> VoiceInfo | None:
+        self._answer()
+        self.lookups.append(voice_id)
+        return self.voices.get(voice_id)
+
+    def _answer(self) -> None:
+        if self.down:
+            raise UnavailableError("the voice provider did not answer")
+
+
 @pytest.fixture(scope="session")
 def database_url() -> Iterator[str]:
     with PostgresContainer("postgres:18-alpine", driver="asyncpg") as postgres:
@@ -196,8 +239,21 @@ def settings(database_url: str, tmp_path: Path) -> Settings:
 
 
 @pytest.fixture
-async def client(settings: Settings) -> AsyncIterator[AsyncClient]:
+def catalog() -> FakeCatalog:
+    return FakeCatalog()
+
+
+@pytest.fixture
+def catalogs(catalog: FakeCatalog) -> dict[VoiceProvider, FakeCatalog]:
+    return {VoiceProvider.ELEVENLABS: catalog}
+
+
+@pytest.fixture
+async def client(
+    settings: Settings, catalogs: dict[VoiceProvider, FakeCatalog]
+) -> AsyncIterator[AsyncClient]:
     app = create_app(settings)
+    app.state.voice_catalogs = catalogs
     async with create_sessionmaker(app.state.engine)() as session:
         await conversations.sync_numbers(session, POOL, [])
     transport = ASGITransport(app=app)
@@ -208,7 +264,10 @@ async def client(settings: Settings) -> AsyncIterator[AsyncClient]:
     engine = create_async_engine(settings.database_url.encoded_string())
     async with engine.begin() as connection:
         await connection.execute(
-            text("TRUNCATE phone_numbers, conversations, agent_versions, agents")
+            text(
+                "TRUNCATE phone_numbers, conversations, agent_versions, agents,"
+                " persona_versions, personas"
+            )
         )
     await engine.dispose()
 

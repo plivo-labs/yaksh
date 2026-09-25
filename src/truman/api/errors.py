@@ -7,13 +7,14 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException
 
-from truman.domain.errors import ConflictError, NotFoundError, ValidationError
+from truman.domain.errors import ConflictError, NotFoundError, UnavailableError, ValidationError
 
 CODES = {
     status.HTTP_401_UNAUTHORIZED: "unauthorized",
     status.HTTP_404_NOT_FOUND: "not_found",
     status.HTTP_409_CONFLICT: "conflict",
     status.HTTP_422_UNPROCESSABLE_CONTENT: "validation_error",
+    status.HTTP_503_SERVICE_UNAVAILABLE: "unavailable",
 }
 
 
@@ -42,6 +43,10 @@ def register_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(ValidationError)
     async def invalid(_: Request, exc: ValidationError) -> JSONResponse:
         return error_response(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc))
+
+    @app.exception_handler(UnavailableError)
+    async def unavailable(_: Request, exc: UnavailableError) -> JSONResponse:
+        return error_response(status.HTTP_503_SERVICE_UNAVAILABLE, str(exc))
 
     @app.exception_handler(RequestValidationError)
     async def request_invalid(_: Request, exc: RequestValidationError) -> JSONResponse:
