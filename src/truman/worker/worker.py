@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from truman.config import Settings
 from truman.db.models import Conversation
+from truman.diagnostics import describe_exception
 from truman.domain.conversations import (
     Caller,
     CallOutcome,
@@ -228,11 +229,15 @@ class Worker:
         except Exception as exc:
             log.exception("caller failed for conversation %s", request.conversation_id)
             return CallOutcome(
-                connected=live.connected, end_reason=EndReason.ERROR, caller_error=str(exc)
+                connected=live.connected,
+                end_reason=EndReason.ERROR,
+                caller_error=describe_exception(exc),
             )
 
     async def _record_failure(self, conversation_id: uuid.UUID, exc: Exception) -> None:
-        outcome = CallOutcome(connected=False, end_reason=EndReason.ERROR, caller_error=str(exc))
+        outcome = CallOutcome(
+            connected=False, end_reason=EndReason.ERROR, caller_error=describe_exception(exc)
+        )
         await self._record(conversation_id, outcome, Transcript())
 
     async def _record(

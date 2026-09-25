@@ -124,3 +124,37 @@ async def test_a_caller_that_never_connects_is_stopped_at_the_dial_deadline_with
 
     assert outcome.end_reason is EndReason.ERROR
     assert outcome.caller_error == "the call did not connect within 0.1s"
+
+
+class RaisesWhenCancelled:
+    async def run(
+        self, request: CallRequest, observer: CallObserver, stop: asyncio.Event
+    ) -> CallOutcome:
+        try:
+            await asyncio.sleep(3600)
+        except asyncio.CancelledError:
+            raise RuntimeError("boom") from None
+        raise AssertionError("unreachable")
+
+
+async def test_a_caller_that_fails_while_it_is_cancelled_keeps_its_error() -> None:
+    live = LiveCall()
+    live.request_stop(EndReason.USER_REQUEST)
+
+    outcome = await run_call(
+        RaisesWhenCancelled(), REQUEST, live, end_timeout_s=0.1, dial_timeout_s=5
+    )
+
+    assert outcome.caller_error == f"{STOP_IGNORED}; then it failed: RuntimeError: boom"
+
+
+async def test_a_deadline_stop_names_its_reason_before_the_caller_failure() -> None:
+    live = LiveCall()
+
+    outcome = await run_call(
+        RaisesWhenCancelled(), REQUEST, live, end_timeout_s=0.1, dial_timeout_s=0.1
+    )
+
+    assert outcome.caller_error == (
+        f"the call did not connect within 0.1s; {STOP_IGNORED}; then it failed: RuntimeError: boom"
+    )

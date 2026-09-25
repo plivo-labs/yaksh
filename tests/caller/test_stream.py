@@ -120,11 +120,12 @@ async def test_the_serializer_speaks_linear_audio_and_reports_what_plivo_says() 
     assert (
         await serializer.deserialize(json.dumps({"event": "playedStream", "name": "9:9"})) is None
     )
-    assert await serializer.deserialize(json.dumps({"event": "stop"})) is None
-    assert await serializer.deserialize("not json") is None
     hiccup = json.dumps({"event": "playFailed", "reason": "codec mismatch"})
     assert await serializer.deserialize(hiccup) is None
     assert not serializer.failed.is_set()
+    assert serializer.failure == "plivo could not play audio: codec mismatch"
+    assert await serializer.deserialize(json.dumps({"event": "stop"})) is None
+    assert await serializer.deserialize("not json") is None
     failure = json.dumps({"event": "error", "reason": "stream torn down"})
     assert await serializer.deserialize(failure) is None
 
@@ -144,9 +145,25 @@ async def test_the_serializer_speaks_linear_audio_and_reports_what_plivo_says() 
         WireEventKind.CLEAR_AUDIO,
         WireEventKind.AGENT_AUDIO,
         WireEventKind.AGENT_AUDIO,
-        WireEventKind.STOP,
         WireEventKind.CALLER_ERROR,
+        WireEventKind.STOP,
         WireEventKind.CALLER_ERROR,
     ]
     assert serializer.stopped.is_set() and serializer.failed.is_set()
-    assert serializer.failure == "plivo reported an error: stream torn down"
+    assert serializer.failure == (
+        "plivo reported an error: stream torn down; "
+        "before it, plivo could not play audio: codec mismatch"
+    )
+
+
+async def test_audio_that_plivo_cannot_play_after_the_stream_stopped_is_not_a_failure() -> None:
+    observer = Observer()
+    transcript = TranscriptBuilder(Clock(), observer)
+    checkpoints = Checkpoints(STREAM, transcript)
+    serializer = StreamSerializer(STREAM, "audio/x-l16;rate=8000", Clock(), observer, checkpoints)
+
+    await serializer.deserialize(json.dumps({"event": "stop"}))
+    await serializer.deserialize(json.dumps({"event": "playFailed", "reason": "stream closed"}))
+
+    assert serializer.failure is None
+    assert observer.kinds() == [WireEventKind.STOP]

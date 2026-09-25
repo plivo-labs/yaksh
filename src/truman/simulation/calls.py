@@ -2,6 +2,7 @@ import asyncio
 import contextlib
 import logging
 
+from truman.diagnostics import describe_exception
 from truman.domain.conversations import (
     Caller,
     CallOutcome,
@@ -54,8 +55,10 @@ class LiveCall:
             self.stop_detail = detail
             self.stop.set()
 
-    def stop_ignored(self) -> CallOutcome:
-        error = STOP_IGNORED if self.stop_detail is None else f"{self.stop_detail}; {STOP_IGNORED}"
+    def stop_ignored(self, failure: str | None = None) -> CallOutcome:
+        """The outcome of a caller that had to be cancelled; `failure` is what it raised."""
+        parts = [self.stop_detail, STOP_IGNORED, failure and f"then it failed: {failure}"]
+        error = "; ".join(part for part in parts if part)
         return CallOutcome(connected=self.connected, end_reason=self.end_reason, caller_error=error)
 
     def snapshot(self) -> Transcript:
@@ -133,8 +136,10 @@ async def outcome_after_stop(
     await asyncio.wait({run}, timeout=end_timeout_s)
     if not run.done():
         raise CallerUnresponsiveError(STOP_IGNORED)
-    if run.cancelled() or run.exception() is not None:
+    if run.cancelled():
         return live.stop_ignored()
+    if (error := run.exception()) is not None:
+        return live.stop_ignored(describe_exception(error))
     return run.result().model_copy(
         update={"end_reason": live.end_reason, "caller_error": STOP_IGNORED}
     )

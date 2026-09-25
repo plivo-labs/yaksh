@@ -179,8 +179,8 @@ async def test_an_exception_after_connecting_keeps_the_evidence(
     done = await wait_for(client, started["id"], FINAL)
 
     assert done["status"] == "invalid" and done["end_reason"] == "error"
-    assert done["failure_reason"] == "tts exploded"
-    assert done["validity"] == {"ok": False, "reasons": ["tts exploded"]}
+    assert done["failure_reason"] == "RuntimeError: tts exploded"
+    assert done["validity"] == {"ok": False, "reasons": ["RuntimeError: tts exploded"]}
     assert "connected" in [event["kind"] for event in done["wire_events"]]
     assert done["transcript"][0]["text"] == "Hello, how can I help?"
 
@@ -598,7 +598,8 @@ async def test_a_conversation_that_cannot_be_prepared_fails_without_stopping_the
     second = await start(client, agent_id)
     completed = await wait_for(client, second["id"], {"completed"})
 
-    assert failed["status"] == "failed" and failed["failure_reason"] == "version row missing"
+    assert failed["status"] == "failed"
+    assert failed["failure_reason"] == "RuntimeError: version row missing"
     assert completed["status"] == "completed" and caller.calls == 1
 
 

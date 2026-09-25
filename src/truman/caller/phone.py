@@ -383,12 +383,18 @@ class StreamSerializer(FrameSerializer):
             case "stop":
                 self._event(WireEventKind.STOP)
                 self.stopped.set()
-            case "playFailed":
+            case "playFailed" if not self.stopped.is_set():
                 self._event(WireEventKind.CALLER_ERROR)
                 log.warning("plivo could not play audio: %s", message.get("reason"))
+                self.failure = (
+                    self.failure or f"plivo could not play audio: {message.get('reason')}"
+                )
             case "error":
                 self._event(WireEventKind.CALLER_ERROR)
-                self.failure = self.failure or f"plivo reported an error: {message.get('reason')}"
+                fatal = f"plivo reported an error: {message.get('reason')}"
+                self.failure = (
+                    fatal if self.failure is None else f"{fatal}; before it, {self.failure}"
+                )
                 self.failed.set()
         return None
 
