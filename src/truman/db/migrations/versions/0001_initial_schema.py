@@ -1,4 +1,4 @@
-"""initial schema: agents, voices, personas, their versions, conversations
+"""initial schema
 
 Revision ID: 0001
 Revises:
@@ -14,83 +14,35 @@ down_revision = None
 branch_labels = None
 depends_on = None
 
-agent_direction = postgresql.ENUM("inbound", "outbound", name="agent_direction", create_type=False)
-agent_transport = postgresql.ENUM(
-    "plivo_websocket", "phone", name="agent_transport", create_type=False
-)
-channel = postgresql.ENUM("voice", name="channel", create_type=False)
-conversation_status = postgresql.ENUM(
-    "queued",
-    "running",
-    "ending",
-    "completed",
-    "failed",
-    "invalid",
-    "cancelled",
-    name="conversation_status",
-    create_type=False,
-)
-end_reason = postgresql.ENUM(
-    "user_request",
-    "goal_reached",
-    "agent_hangup",
-    "duration_limit",
-    "error",
-    "process_restart",
-    name="end_reason",
-    create_type=False,
-)
-language = postgresql.ENUM("en", "hinglish", name="language", create_type=False)
-voice_provider = postgresql.ENUM("elevenlabs", name="voice_provider", create_type=False)
-voice_gender = postgresql.ENUM("male", "female", "neutral", name="voice_gender", create_type=False)
-ENUMS = (
-    agent_direction,
-    agent_transport,
-    channel,
-    conversation_status,
-    end_reason,
-    language,
-    voice_provider,
-    voice_gender,
-)
-
 
 def upgrade() -> None:
-    bind = op.get_bind()
-    for enum in ENUMS:
-        enum.create(bind, checkfirst=True)
-
     op.create_table(
         "agents",
-        sa.Column(
-            "id",
-            postgresql.UUID(as_uuid=True),
-            server_default=sa.text("uuidv7()"),
-            nullable=False,
-        ),
+        sa.Column("id", sa.UUID(), server_default=sa.text("uuidv7()"), nullable=False),
         sa.Column("name", sa.Text(), nullable=False),
         sa.Column("external_id", sa.Text(), nullable=True),
-        sa.Column("direction", agent_direction, nullable=False),
-        sa.Column("transport", agent_transport, nullable=False),
-        sa.Column("websocket_url", sa.Text(), nullable=True),
-        sa.Column("upgrade_headers", postgresql.JSONB(), nullable=False),
-        sa.Column("extra_headers", postgresql.JSONB(), nullable=False),
-        sa.Column("agent_number", sa.Text(), nullable=True),
+        sa.Column(
+            "direction", sa.Enum("inbound", "outbound", name="agent_direction"), nullable=False
+        ),
+        sa.Column("transport", sa.Enum("phone", name="agent_transport"), nullable=False),
+        sa.Column("agent_number", sa.Text(), nullable=False),
         sa.Column("agent_speaks_first", sa.Boolean(), nullable=False),
         sa.Column("brief", sa.Text(), nullable=True),
         sa.Column("current_version", sa.Integer(), nullable=False),
         sa.Column(
-            "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
         ),
         sa.Column(
-            "updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
         ),
         sa.Column("deleted_at", sa.DateTime(timezone=True), nullable=True),
-        sa.CheckConstraint(
-            "transport <> 'plivo_websocket' OR websocket_url IS NOT NULL",
-            name="ck_agents_websocket_url_required",
-        ),
-        sa.PrimaryKeyConstraint("id", name="pk_agents"),
+        sa.PrimaryKeyConstraint("id", name=op.f("pk_agents")),
     )
     op.create_index(
         "ix_agents_external_id_live",
@@ -99,55 +51,82 @@ def upgrade() -> None:
         unique=True,
         postgresql_where=sa.text("deleted_at IS NULL"),
     )
-
     op.create_table(
-        "agent_versions",
-        sa.Column(
-            "id",
-            postgresql.UUID(as_uuid=True),
-            server_default=sa.text("uuidv7()"),
-            nullable=False,
-        ),
-        sa.Column("agent_id", postgresql.UUID(as_uuid=True), nullable=False),
-        sa.Column("version", sa.Integer(), nullable=False),
-        sa.Column("label", sa.Text(), nullable=True),
-        sa.Column("config", postgresql.JSONB(), nullable=False),
-        sa.Column(
-            "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
-        ),
-        sa.ForeignKeyConstraint(
-            ["agent_id"], ["agents.id"], name="fk_agent_versions_agent_id_agents"
-        ),
-        sa.PrimaryKeyConstraint("id", name="pk_agent_versions"),
-        sa.UniqueConstraint("agent_id", "version", name="uq_agent_versions_agent_id_version"),
-        sa.UniqueConstraint("id", "agent_id", name="uq_agent_versions_id_agent_id"),
-    )
-
-    op.create_table(
-        "voices",
-        sa.Column(
-            "id",
-            postgresql.UUID(as_uuid=True),
-            server_default=sa.text("uuidv7()"),
-            nullable=False,
-        ),
-        sa.Column("provider", voice_provider, nullable=False),
-        sa.Column("provider_voice_id", sa.Text(), nullable=False),
+        "personas",
+        sa.Column("id", sa.UUID(), server_default=sa.text("uuidv7()"), nullable=False),
         sa.Column("name", sa.Text(), nullable=False),
-        sa.Column("gender", voice_gender, nullable=True),
-        sa.Column("accent", sa.Text(), nullable=True),
-        sa.Column("languages", postgresql.ARRAY(language), nullable=False),
-        sa.Column("listed_languages", postgresql.ARRAY(language), nullable=False),
-        sa.Column("builtin", sa.Boolean(), nullable=False),
+        sa.Column("builtin_key", sa.Text(), nullable=True),
+        sa.Column("prompt", sa.Text(), nullable=False),
+        sa.Column("language", sa.Enum("en", "hinglish", name="language"), nullable=False),
+        sa.Column("voice_provider", sa.Enum("elevenlabs", name="voice_provider"), nullable=False),
+        sa.Column("voice_id", sa.Text(), nullable=False),
+        sa.Column("voice_speed", sa.Float(), nullable=False),
+        sa.Column("voice_stability", sa.Float(), nullable=False),
         sa.Column(
-            "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+            "voice_gender", sa.Enum("male", "female", "neutral", name="voice_gender"), nullable=True
+        ),
+        sa.Column("current_version", sa.Integer(), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
         ),
         sa.Column(
-            "updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
         ),
         sa.Column("deleted_at", sa.DateTime(timezone=True), nullable=True),
-        sa.CheckConstraint("cardinality(languages) > 0", name="ck_voices_languages_not_empty"),
-        sa.PrimaryKeyConstraint("id", name="pk_voices"),
+        sa.PrimaryKeyConstraint("id", name=op.f("pk_personas")),
+        sa.UniqueConstraint("builtin_key", name=op.f("uq_personas_builtin_key")),
+    )
+    op.create_index(
+        "ix_personas_name_live",
+        "personas",
+        [sa.literal_column("lower(name)")],
+        unique=True,
+        postgresql_where=sa.text("deleted_at IS NULL"),
+    )
+    op.create_table(
+        "voices",
+        sa.Column("id", sa.UUID(), server_default=sa.text("uuidv7()"), nullable=False),
+        sa.Column("provider", sa.Enum("elevenlabs", name="voice_provider"), nullable=False),
+        sa.Column("provider_voice_id", sa.Text(), nullable=False),
+        sa.Column("name", sa.Text(), nullable=False),
+        sa.Column(
+            "gender", sa.Enum("male", "female", "neutral", name="voice_gender"), nullable=True
+        ),
+        sa.Column("accent", sa.Text(), nullable=True),
+        sa.Column(
+            "languages",
+            postgresql.ARRAY(sa.Enum("en", "hinglish", name="language")),
+            nullable=False,
+        ),
+        sa.Column(
+            "listed_languages",
+            postgresql.ARRAY(sa.Enum("en", "hinglish", name="language")),
+            nullable=False,
+        ),
+        sa.Column("builtin", sa.Boolean(), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.Column("deleted_at", sa.DateTime(timezone=True), nullable=True),
+        sa.CheckConstraint(
+            "cardinality(languages) > 0", name=op.f("ck_voices_languages_not_empty")
+        ),
+        sa.PrimaryKeyConstraint("id", name=op.f("pk_voices")),
     )
     op.create_index(
         "ix_voices_provider_voice_live",
@@ -156,127 +135,165 @@ def upgrade() -> None:
         unique=True,
         postgresql_where=sa.text("deleted_at IS NULL"),
     )
-
     op.create_table(
-        "personas",
-        sa.Column(
-            "id",
-            postgresql.UUID(as_uuid=True),
-            server_default=sa.text("uuidv7()"),
-            nullable=False,
-        ),
-        sa.Column("name", sa.Text(), nullable=False),
-        sa.Column("builtin_key", sa.Text(), nullable=True),
-        sa.Column("prompt", sa.Text(), nullable=False),
-        sa.Column("language", language, nullable=False),
-        sa.Column("voice_provider", voice_provider, nullable=False),
-        sa.Column("voice_id", sa.Text(), nullable=False),
-        sa.Column("voice_speed", sa.Float(), nullable=False),
-        sa.Column("voice_stability", sa.Float(), nullable=False),
-        sa.Column("voice_gender", voice_gender, nullable=True),
-        sa.Column("current_version", sa.Integer(), nullable=False),
-        sa.Column(
-            "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
-        ),
-        sa.Column(
-            "updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
-        ),
-        sa.Column("deleted_at", sa.DateTime(timezone=True), nullable=True),
-        sa.PrimaryKeyConstraint("id", name="pk_personas"),
-        sa.UniqueConstraint("builtin_key", name="uq_personas_builtin_key"),
-    )
-    op.create_index(
-        "ix_personas_name_live",
-        "personas",
-        [sa.text("lower(name)")],
-        unique=True,
-        postgresql_where=sa.text("deleted_at IS NULL"),
-    )
-
-    op.create_table(
-        "persona_versions",
-        sa.Column(
-            "id",
-            postgresql.UUID(as_uuid=True),
-            server_default=sa.text("uuidv7()"),
-            nullable=False,
-        ),
-        sa.Column("persona_id", postgresql.UUID(as_uuid=True), nullable=False),
+        "agent_versions",
+        sa.Column("id", sa.UUID(), server_default=sa.text("uuidv7()"), nullable=False),
+        sa.Column("agent_id", sa.UUID(), nullable=False),
         sa.Column("version", sa.Integer(), nullable=False),
-        sa.Column("config", postgresql.JSONB(), nullable=False),
+        sa.Column("config", postgresql.JSONB(astext_type=sa.Text()), nullable=False),
         sa.Column(
-            "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
         ),
         sa.ForeignKeyConstraint(
-            ["persona_id"], ["personas.id"], name="fk_persona_versions_persona_id_personas"
+            ["agent_id"], ["agents.id"], name=op.f("fk_agent_versions_agent_id_agents")
         ),
-        sa.PrimaryKeyConstraint("id", name="pk_persona_versions"),
-        sa.UniqueConstraint("persona_id", "version", name="uq_persona_versions_persona_id_version"),
-        sa.UniqueConstraint("id", "persona_id", name="uq_persona_versions_id_persona_id"),
+        sa.PrimaryKeyConstraint("id", name=op.f("pk_agent_versions")),
+        sa.UniqueConstraint("agent_id", "version", name=op.f("uq_agent_versions_agent_id_version")),
+        sa.UniqueConstraint("id", "agent_id", name=op.f("uq_agent_versions_id_agent_id")),
     )
-
     op.create_table(
-        "conversations",
+        "persona_versions",
+        sa.Column("id", sa.UUID(), server_default=sa.text("uuidv7()"), nullable=False),
+        sa.Column("persona_id", sa.UUID(), nullable=False),
+        sa.Column("version", sa.Integer(), nullable=False),
+        sa.Column("config", postgresql.JSONB(astext_type=sa.Text()), nullable=False),
         sa.Column(
-            "id",
-            postgresql.UUID(as_uuid=True),
-            server_default=sa.text("uuidv7()"),
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
             nullable=False,
         ),
-        sa.Column("agent_id", postgresql.UUID(as_uuid=True), nullable=False),
-        sa.Column("agent_version_id", postgresql.UUID(as_uuid=True), nullable=False),
-        sa.Column("channel", channel, nullable=False),
-        sa.Column("persona_id", postgresql.UUID(as_uuid=True), nullable=False),
-        sa.Column("persona_version_id", postgresql.UUID(as_uuid=True), nullable=False),
+        sa.ForeignKeyConstraint(
+            ["persona_id"], ["personas.id"], name=op.f("fk_persona_versions_persona_id_personas")
+        ),
+        sa.PrimaryKeyConstraint("id", name=op.f("pk_persona_versions")),
+        sa.UniqueConstraint("id", "persona_id", name=op.f("uq_persona_versions_id_persona_id")),
+        sa.UniqueConstraint(
+            "persona_id", "version", name=op.f("uq_persona_versions_persona_id_version")
+        ),
+    )
+    op.create_table(
+        "conversations",
+        sa.Column("id", sa.UUID(), server_default=sa.text("uuidv7()"), nullable=False),
+        sa.Column("agent_id", sa.UUID(), nullable=False),
+        sa.Column("agent_version_id", sa.UUID(), nullable=False),
+        sa.Column("channel", sa.Enum("voice", name="channel"), nullable=False),
+        sa.Column("persona_id", sa.UUID(), nullable=False),
+        sa.Column("persona_version_id", sa.UUID(), nullable=False),
         sa.Column("goal", sa.Text(), nullable=False),
-        sa.Column("language", language, nullable=False),
+        sa.Column("language", sa.Enum("en", "hinglish", name="language"), nullable=False),
         sa.Column("instructions", sa.Text(), nullable=False),
         sa.Column("nudge", sa.Text(), nullable=False),
-        sa.Column("caller_number", sa.Text(), nullable=False),
+        sa.Column("caller_number", sa.Text(), nullable=True),
+        sa.Column("call_uuid", sa.Text(), nullable=True),
         sa.Column("max_duration_s", sa.Integer(), nullable=False),
-        sa.Column("status", conversation_status, nullable=False),
-        sa.Column("end_reason", end_reason, nullable=True),
+        sa.Column(
+            "status",
+            sa.Enum(
+                "queued",
+                "running",
+                "ending",
+                "completed",
+                "failed",
+                "invalid",
+                "cancelled",
+                name="conversation_status",
+            ),
+            nullable=False,
+        ),
+        sa.Column(
+            "end_reason",
+            sa.Enum(
+                "user_request",
+                "goal_reached",
+                "goal_abandoned",
+                "agent_hangup",
+                "agent_silent",
+                "no_answer",
+                "duration_limit",
+                "error",
+                "process_restart",
+                name="end_reason",
+            ),
+            nullable=True,
+        ),
         sa.Column("failure_reason", sa.Text(), nullable=True),
         sa.Column("started_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("ended_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("duration_ms", sa.Integer(), nullable=True),
         sa.Column("recording_path", sa.Text(), nullable=True),
-        sa.Column("transcript_path", sa.Text(), nullable=True),
+        sa.Column("transcript", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
+        sa.Column("claimed_by", sa.Text(), nullable=True),
+        sa.Column("lease_expires_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column(
-            "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
         ),
         sa.ForeignKeyConstraint(
-            ["agent_id"], ["agents.id"], name="fk_conversations_agent_id_agents"
+            ["agent_id"], ["agents.id"], name=op.f("fk_conversations_agent_id_agents")
         ),
         sa.ForeignKeyConstraint(
             ["agent_version_id", "agent_id"],
             ["agent_versions.id", "agent_versions.agent_id"],
-            name="fk_conversations_agent_version_id_agent_id_agent_versions",
+            name=op.f("fk_conversations_agent_version_id_agent_id_agent_versions"),
         ),
         sa.ForeignKeyConstraint(
-            ["persona_id"], ["personas.id"], name="fk_conversations_persona_id_personas"
+            ["persona_id"], ["personas.id"], name=op.f("fk_conversations_persona_id_personas")
         ),
         sa.ForeignKeyConstraint(
             ["persona_version_id", "persona_id"],
             ["persona_versions.id", "persona_versions.persona_id"],
-            name="fk_conversations_persona_version_id_persona_id_persona_versions",
+            name=op.f("fk_conversations_persona_version_id_persona_id_persona_versions"),
         ),
-        sa.PrimaryKeyConstraint("id", name="pk_conversations"),
+        sa.PrimaryKeyConstraint("id", name=op.f("pk_conversations")),
     )
     op.create_index(
         "ix_conversations_agent_created",
         "conversations",
-        ["agent_id", sa.text("created_at DESC")],
+        ["agent_id", sa.literal_column("created_at DESC")],
+        unique=False,
+    )
+    op.create_index(
+        "ix_conversations_status_created", "conversations", ["status", "created_at"], unique=False
+    )
+    op.create_table(
+        "phone_numbers",
+        sa.Column("number", sa.Text(), nullable=False),
+        sa.Column("alias", sa.Text(), nullable=True),
+        sa.Column("region", sa.Text(), nullable=True),
+        sa.Column("enabled", sa.Boolean(), server_default=sa.text("true"), nullable=False),
+        sa.Column("conversation_id", sa.UUID(), nullable=True),
+        sa.Column("leased_at", sa.DateTime(timezone=True), nullable=True),
+        sa.ForeignKeyConstraint(
+            ["conversation_id"],
+            ["conversations.id"],
+            name=op.f("fk_phone_numbers_conversation_id_conversations"),
+        ),
+        sa.PrimaryKeyConstraint("number", name=op.f("pk_phone_numbers")),
     )
 
 
 def downgrade() -> None:
+    op.drop_table("phone_numbers")
     op.drop_table("conversations")
     op.drop_table("persona_versions")
-    op.drop_table("personas")
-    op.drop_table("voices")
     op.drop_table("agent_versions")
+    op.drop_table("voices")
+    op.drop_table("personas")
     op.drop_table("agents")
-    bind = op.get_bind()
-    for enum in reversed(ENUMS):
-        enum.drop(bind, checkfirst=True)
+    for enum in (
+        "end_reason",
+        "conversation_status",
+        "channel",
+        "voice_gender",
+        "voice_provider",
+        "language",
+        "agent_transport",
+        "agent_direction",
+    ):
+        op.execute(f"DROP TYPE {enum}")
