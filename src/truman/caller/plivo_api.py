@@ -9,6 +9,7 @@ import aiohttp
 from pydantic import ValidationError
 
 from truman.domain.numbers import AccountNumber
+from truman.integrations.http import describe
 
 log = logging.getLogger(__name__)
 
@@ -65,7 +66,7 @@ class PlivoApi:
                 if response.status >= 400:
                     raise PlivoError(f"create call failed with {response.status}: {body}")
         except (aiohttp.ClientError, TimeoutError) as error:
-            raise PlivoError(f"create call did not reach Plivo: {error!r}") from error
+            raise PlivoError(f"create call did not reach Plivo: {describe(error)}") from error
         try:
             return str(json.loads(body)["request_uuid"])
         except (ValueError, KeyError, TypeError) as error:
@@ -92,7 +93,7 @@ class PlivoApi:
                     next_path = (page.get("meta") or {}).get("next")
                     url = f"{self.base_url}{next_path}" if next_path else None
         except (aiohttp.ClientError, TimeoutError, ValueError) as error:
-            raise PlivoError(f"listing numbers did not reach Plivo: {error!r}") from error
+            raise PlivoError(f"listing numbers did not reach Plivo: {describe(error)}") from error
         if url is not None:
             raise PlivoError(f"listing numbers did not end after {MAX_PAGES} pages")
         return numbers
@@ -114,7 +115,7 @@ class PlivoApi:
                     body = await response.text()
                     raise PlivoError(f"delete {url} failed with {response.status}: {body}")
         except (aiohttp.ClientError, TimeoutError) as error:
-            raise PlivoError(f"delete {url} did not reach Plivo: {error!r}") from error
+            raise PlivoError(f"delete {url} did not reach Plivo: {describe(error)}") from error
 
 
 def account_numbers(entries: list[dict[str, Any]]) -> list[AccountNumber]:

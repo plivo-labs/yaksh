@@ -11,6 +11,7 @@ import pydantic
 
 from truman.domain.errors import UnavailableError
 from truman.domain.voices import VoiceInfo
+from truman.integrations.http import describe
 
 ELEVENLABS_API = "https://api.elevenlabs.io"
 TIMEOUT = aiohttp.ClientTimeout(total=10)
@@ -52,7 +53,7 @@ class ElevenLabsCatalog:
                 status, text = response.status, await response.text()
         except (aiohttp.ClientError, TimeoutError, UnicodeDecodeError) as error:
             raise UnavailableError(
-                f"the ElevenLabs voice lookup failed: {failure(error)}"
+                f"the ElevenLabs voice lookup failed: {describe(error)}"
             ) from error
         if status >= 400:
             if voice_not_found(text):
@@ -91,13 +92,10 @@ class ElevenLabsCatalog:
                         )
                     params = {"page_size": PAGE_SIZE, "next_page_token": token}
         except (aiohttp.ClientError, TimeoutError, UnicodeDecodeError) as error:
-            raise UnavailableError(f"the ElevenLabs voice list failed: {failure(error)}") from error
+            raise UnavailableError(
+                f"the ElevenLabs voice list failed: {describe(error)}"
+            ) from error
         raise UnavailableError(f"the ElevenLabs voice list did not end after {MAX_PAGES} pages")
-
-
-def failure(error: Exception) -> str:
-    """The error without its repr: aiohttp's repr carries the request headers, and so the key."""
-    return f"{type(error).__name__}: {error}"
 
 
 def excerpt(text: str) -> str:

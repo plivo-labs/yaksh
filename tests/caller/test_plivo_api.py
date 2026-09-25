@@ -4,6 +4,7 @@ from typing import Any
 
 import pytest
 from fastapi import FastAPI, Request, Response
+from fastapi.responses import RedirectResponse
 
 from truman.caller.plivo_api import OutboundCall, PlivoApi, PlivoError
 from truman.caller.plivo_server import PlivoServer
@@ -26,6 +27,8 @@ async def plivo() -> AsyncIterator[tuple[PlivoApi, list[dict[str, Any]]]]:
             return Response('{"error": "Unknown caller id"}', status_code=400)
         if body["to"] == "+10000000001":
             return Response("<html>bad gateway</html>", status_code=502)
+        if body["to"] == "+10000000002":
+            return RedirectResponse(request.url.path)
         return Response('{"request_uuid": "req-1", "message": "call queued"}', status_code=201)
 
     @app.get("/v1/Account/{auth_id}/Number/")
@@ -155,3 +158,15 @@ async def test_a_listing_that_never_ends_is_an_error(
 
     with pytest.raises(PlivoError, match="3 pages"):
         await looping.list_numbers()
+
+
+async def test_a_failed_request_never_reports_the_credentials(
+    plivo: tuple[PlivoApi, list[dict[str, Any]]],
+) -> None:
+    api, _ = plivo
+    basic = base64.b64encode(f"{AUTH_ID}:{AUTH_TOKEN}".encode()).decode()
+
+    with pytest.raises(PlivoError, match="TooManyRedirects") as failed:
+        await api.create_call(call("+10000000002"))
+
+    assert AUTH_TOKEN not in str(failed.value) and basic not in str(failed.value)

@@ -48,6 +48,7 @@ from truman.domain.conversations import (
     WireEvent,
     WireEventKind,
 )
+from truman.integrations.http import describe
 
 log = logging.getLogger(__name__)
 
@@ -360,7 +361,9 @@ async def until_done(task: asyncio.Future[Any]) -> None:
 
 
 def note_failure(running: asyncio.Task[None], state: CallState) -> None:
-    if running.cancelled() or running.exception() is None:
+    error = None if running.cancelled() else running.exception()
+    if error is None:
         return
-    log.error("pipeline failed: %r", running.exception())
-    state.blame(repr(running.exception()))
+    failure = describe(error)
+    log.error("pipeline failed: %s", failure)
+    state.blame(failure)
