@@ -13,14 +13,8 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import {
-  Empty,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-} from "@/components/ui/empty";
-import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import {
   Pagination,
@@ -172,9 +166,6 @@ export function ConversationsPage() {
               <PhoneCall />
             </EmptyMedia>
             <EmptyTitle>No conversations yet</EmptyTitle>
-            <EmptyDescription>
-              Start one: pick an agent, a persona and what the caller wants.
-            </EmptyDescription>
           </EmptyHeader>
         </Empty>
       ) : (
@@ -210,9 +201,6 @@ export function ConversationsPage() {
                 </TableCell>
                 <TableCell className="max-w-96 truncate">
                   {conversation.persona_name}
-                  <span className="ml-1.5 font-mono text-xs text-muted-foreground">
-                    v{conversation.persona_version}
-                  </span>
                   <span className="ml-2 text-muted-foreground">{conversation.goal}</span>
                 </TableCell>
                 <TableCell>
@@ -349,9 +337,6 @@ function StartDialog({ agents }: { agents: Agent[] }) {
                   </SelectGroup>
                 </SelectContent>
               </Select>
-              <FieldDescription>
-                Who calls: how they talk, their language and voice.
-              </FieldDescription>
             </Field>
             <Field>
               <FieldLabel htmlFor="goal">Goal</FieldLabel>
@@ -364,7 +349,6 @@ function StartDialog({ agents }: { agents: Agent[] }) {
                 value={goal}
                 onChange={(event) => setGoal(event.target.value)}
               />
-              <FieldDescription>What the caller wants from this call.</FieldDescription>
             </Field>
             <Field>
               <FieldLabel htmlFor="max_duration">Hang up after (seconds)</FieldLabel>

@@ -5,6 +5,7 @@ from httpx import AsyncClient
 
 from tests.conftest import ENGLISH_VOICE, HINDI_VOICE, PERSONA, FakeCatalog, create_persona
 from truman.domain.personas import Language, VoiceProvider
+from truman.simulation.languages import LANGUAGES
 
 
 async def test_changing_config_creates_a_version_but_renaming_does_not(
@@ -101,7 +102,7 @@ async def test_an_update_checks_the_voice_only_when_it_changes(
     url = f"/api/v1/personas/{persona['id']}"
     catalog.lookups.clear()
 
-    await client.patch(url, json={"prompt": "You are calm.", "language": "hi"})
+    await client.patch(url, json={"prompt": "You are calm.", "language": "hinglish"})
     slower = {**persona["voice"], "speed": 0.9}
     assert (await client.patch(url, json={"voice": slower})).status_code == 200
     assert catalog.lookups == []
@@ -172,3 +173,28 @@ async def test_the_voice_gender_comes_from_the_provider_and_follows_the_voice(
 
     claimed = await client.post("/api/v1/personas", json={**PERSONA, "voice_gender": "female"})
     assert claimed.status_code == 422
+
+
+async def test_a_preview_speaks_the_language_sample_with_the_call_settings(
+    client: AsyncClient, catalog: FakeCatalog
+) -> None:
+    voice = {"provider": "elevenlabs", "id": HINDI_VOICE.id, "speed": 1.15, "stability": 0.3}
+
+    heard = await client.post(
+        "/api/v1/voices/preview", json={"voice": voice, "language": "hinglish"}
+    )
+    unknown = await client.post(
+        "/api/v1/voices/preview",
+        json={"voice": {**voice, "id": "nope"}, "language": "hinglish"},
+    )
+
+    assert heard.status_code == 200 and heard.headers["content-type"] == "audio/wav"
+    assert heard.content == b"RIFF fake wav"
+    spoken_voice, language, text = catalog.spoken[0]
+    assert (spoken_voice.speed, spoken_voice.stability, language) == (1.15, 0.3, Language.HINGLISH)
+    assert text == LANGUAGES[Language.HINGLISH].sample
+    assert unknown.status_code == 422
+
+    catalog.down = True
+    down = await client.post("/api/v1/voices/preview", json={"voice": voice, "language": "en"})
+    assert down.status_code == 503

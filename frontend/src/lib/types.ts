@@ -19,8 +19,8 @@ type EndReason =
   | "error"
   | "process_restart";
 type Role = "agent" | "caller";
-export type Language = "en" | "hi" | "hinglish" | "en_hi";
-type VoiceGender = "male" | "female" | "neutral";
+export type Language = "en" | "hinglish";
+export type VoiceGender = "male" | "female" | "neutral";
 type Provenance = "transmitted" | "cut";
 type WireEventKind =
   | "connect_started"
@@ -35,6 +35,11 @@ type WireEventKind =
   | "caller_error";
 
 export const ACTIVE_STATUSES: ConversationStatus[] = ["queued", "running", "ending"];
+
+export const LANGUAGE_NAMES: Record<Language, string> = {
+  en: "English",
+  hinglish: "Hinglish",
+};
 
 export interface Page<T> {
   items: T[];
@@ -72,6 +77,20 @@ export interface Voice {
   id: string;
   speed: number;
   stability: number;
+}
+
+export interface VoiceInfo {
+  id: string;
+  name: string;
+  gender: string | null;
+  accent: string | null;
+}
+
+export interface PersonaInput {
+  name: string;
+  prompt: string;
+  language: Language;
+  voice: Voice;
 }
 
 export interface Persona {

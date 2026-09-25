@@ -3,14 +3,7 @@ import { Link, useNavigate } from "react-router";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import {
-  Empty,
-  EmptyContent,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-} from "@/components/ui/empty";
+import { Empty, EmptyContent, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
@@ -49,7 +42,6 @@ export function AgentsPage() {
               <Bot />
             </EmptyMedia>
             <EmptyTitle>No agents yet</EmptyTitle>
-            <EmptyDescription>Register the agent you want to call.</EmptyDescription>
           </EmptyHeader>
           <EmptyContent>
             <Button nativeButton={false} render={<Link to="/agents/new" />} variant="outline">

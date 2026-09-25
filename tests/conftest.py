@@ -215,6 +215,7 @@ class FakeCatalog:
         self.voices = {voice.id: voice for voice in (ENGLISH_VOICE, HINDI_VOICE)}
         self.lookups: list[str] = []
         self.listed_for: list[Language | None] = []
+        self.spoken: list[tuple[Voice, Language, str]] = []
         self.down = False
 
     async def list_voices(self, language: Language | None = None) -> list[VoiceInfo]:
@@ -226,6 +227,11 @@ class FakeCatalog:
         self._answer()
         self.lookups.append(voice_id)
         return self.voices.get(voice_id)
+
+    async def speak(self, voice: Voice, language: Language, text: str) -> bytes | None:
+        self._answer()
+        self.spoken.append((voice, language, text))
+        return b"RIFF fake wav" if voice.id in self.voices else None
 
     def _answer(self) -> None:
         if self.down:

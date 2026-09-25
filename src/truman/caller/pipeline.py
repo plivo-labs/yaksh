@@ -50,6 +50,7 @@ from truman.domain.conversations import (
     WireEventKind,
 )
 from truman.domain.personas import Language
+from truman.integrations import elevenlabs
 
 log = logging.getLogger(__name__)
 
@@ -58,16 +59,11 @@ DRAINED = frozenset({EndReason.GOAL_REACHED, EndReason.GOAL_ABANDONED})
 VAD = VADParams(confidence=0.5, start_secs=0.1, stop_secs=0.6)
 IDLE_S = 15.0
 IDLE_NUDGES = 2
-ELEVENLABS_MODEL = "eleven_flash_v2_5"
-
-# Deepgram language and ElevenLabs language pin per persona language. Hinglish transcribes
-# best as "hi". English and Hindi together need Deepgram's "multi" and no pin, so ElevenLabs
-# detects the language from the text.
-SPEECH_LANGUAGES: dict[Language, tuple[str, str | None]] = {
-    Language.EN: ("en", "en"),
-    Language.HI: ("hi", "hi"),
-    Language.HINGLISH: ("hi", "hi"),
-    Language.EN_HI: ("multi", None),
+# Deepgram language per persona language. Hinglish uses the Hindi model, which also
+# transcribes the English words in it.
+DEEPGRAM_LANGUAGES: dict[Language, str] = {
+    Language.EN: "en",
+    Language.HINGLISH: "hi",
 }
 
 END_CALL = FunctionSchema(
@@ -199,24 +195,23 @@ class Persona:
         before_output: Sequence[FrameProcessor] = (),
     ) -> None:
         self.llm = llm_service(settings, keys, request.instructions)
-        stt_language, tts_language = SPEECH_LANGUAGES[request.language]
         self.stt = DeepgramSTTService(
             api_key=keys["DEEPGRAM_API_KEY"],
             base_url=settings.deepgram_url,
             sample_rate=SAMPLE_RATE,
             settings=DeepgramSTTService.Settings(
-                model=settings.deepgram_model, language=stt_language
+                model=settings.deepgram_model, language=DEEPGRAM_LANGUAGES[request.language]
             ),
         )
         self.tts = ElevenLabsTTSService(
             api_key=keys["ELEVENLABS_API_KEY"],
             sample_rate=SAMPLE_RATE,
             settings=ElevenLabsTTSService.Settings(
-                model=ELEVENLABS_MODEL,
+                model=elevenlabs.MODEL,
                 voice=request.voice.id,
                 speed=request.voice.speed,
                 stability=request.voice.stability,
-                language=tts_language,
+                language=elevenlabs.LANGUAGE_PINS[request.language],
             ),
         )
         aggregators = LLMContextAggregatorPair(

@@ -40,9 +40,7 @@ end_reason = postgresql.ENUM(
     name="end_reason",
     create_type=False,
 )
-persona_language = postgresql.ENUM(
-    "en", "hi", "hinglish", "en_hi", name="persona_language", create_type=False
-)
+persona_language = postgresql.ENUM("en", "hinglish", name="persona_language", create_type=False)
 voice_provider = postgresql.ENUM("elevenlabs", name="voice_provider", create_type=False)
 voice_gender = postgresql.ENUM("male", "female", "neutral", name="voice_gender", create_type=False)
 ENUMS = (

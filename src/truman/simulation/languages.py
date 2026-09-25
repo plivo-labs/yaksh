@@ -1,5 +1,5 @@
-"""How a persona speaks each language: the prompt line and the idle nudge. Provider codes
-belong to the caller and the integrations, not here."""
+"""How a persona speaks each language: the prompt line, the idle nudge and the sentence a
+voice preview speaks. Provider codes belong to the caller and the integrations, not here."""
 
 from dataclasses import dataclass
 
@@ -10,23 +10,20 @@ from truman.domain.personas import Language, VoiceGender
 class LanguagePolicy:
     instruction: str
     nudge: str
+    sample: str
 
-
-ENGLISH_NUDGE = "Hello? Are you still there?"
-HINDI_NUDGE = "हेलो? आप वहाँ हैं?"
 
 LANGUAGES: dict[Language, LanguagePolicy] = {
-    Language.EN: LanguagePolicy("Speak English.", ENGLISH_NUDGE),
-    Language.HI: LanguagePolicy("Speak Hindi in Devanagari script.", HINDI_NUDGE),
+    Language.EN: LanguagePolicy(
+        "Speak English.",
+        "Hello? Are you still there?",
+        "Hi, I'm calling about my booking for next Tuesday. Can you check it for me?",
+    ),
     Language.HINGLISH: LanguagePolicy(
         "Speak Hinglish: Devanagari script, with common English words kept in English. "
         'Example: "मेरा appointment confirm हो गया है।"',
-        HINDI_NUDGE,
-    ),
-    Language.EN_HI: LanguagePolicy(
-        "You speak English and Hindi. Use the language the agent uses. "
-        "Write Hindi in Devanagari script.",
-        ENGLISH_NUDGE,
+        "हेलो? आप वहाँ हैं?",
+        "नमस्ते, मुझे next Tuesday की booking के बारे में बात करनी है। क्या आप check कर सकते हैं?",
     ),
 }
 

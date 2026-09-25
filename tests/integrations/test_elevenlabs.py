@@ -1,3 +1,5 @@
+import io
+import wave
 from collections.abc import AsyncIterator
 from typing import Any
 
@@ -7,7 +9,7 @@ from fastapi.responses import JSONResponse, RedirectResponse
 
 from truman.caller.plivo_server import PlivoServer
 from truman.domain.errors import UnavailableError
-from truman.domain.personas import Language
+from truman.domain.personas import Language, Voice, VoiceProvider
 from truman.integrations.elevenlabs import LIST_TTL_S, ElevenLabsCatalog
 
 API_KEY = "el-key"
@@ -49,6 +51,17 @@ async def elevenlabs() -> AsyncIterator[tuple[str, list[dict[str, Any]]]]:
         english_only = {**VOICE, "voice_id": "v2", "labels": None}
         english_only["verified_languages"] = [{"language": "en", "model_id": "eleven_turbo_v2_5"}]
         return {"voices": [english_only], "has_more": False}
+
+    @app.post("/v1/text-to-speech/{voice_id}")
+    async def speak(voice_id: str, request: Request) -> Response:
+        seen.append(
+            {"speak": voice_id, "query": dict(request.query_params), **await request.json()}
+        )
+        if voice_id == "gone":
+            return Response('{"detail": {"code": "voice_not_found"}}', status_code=400)
+        if voice_id == "busy":
+            return Response('{"detail": {"code": "too_many_concurrent_requests"}}', status_code=429)
+        return Response(b"\x01\x00" * 800, media_type="audio/basic")
 
     @app.get("/v1/voices/{voice_id}")
     async def voice(voice_id: str) -> Response:
@@ -115,6 +128,8 @@ async def test_an_unreachable_provider_is_reported_as_unavailable() -> None:
         await catalog.get_voice("v1")
     with pytest.raises(UnavailableError):
         await catalog.list_voices()
+    with pytest.raises(UnavailableError):
+        await catalog.speak(Voice(provider=VoiceProvider.ELEVENLABS, id="v1"), Language.EN, "Hi")
 
 
 async def test_a_broken_answer_is_unavailable_with_its_status_and_never_the_key(
@@ -141,8 +156,34 @@ async def test_a_language_filters_the_cached_list_to_voices_verified_for_it(
     catalog = ElevenLabsCatalog(API_KEY, base_url=base_url)
 
     everyone = await catalog.list_voices()
-    for language in (Language.HI, Language.HINGLISH, Language.EN_HI):
-        assert [voice.id for voice in await catalog.list_voices(language)] == ["v1"]
+    assert [voice.id for voice in await catalog.list_voices(Language.HINGLISH)] == ["v1"]
     assert [voice.id for voice in await catalog.list_voices(Language.EN)] == ["v1", "v2"]
 
     assert len(everyone) == 2 and len(seen) == 2
+
+
+async def test_speech_uses_the_call_model_voice_settings_and_language_pin(
+    elevenlabs: tuple[str, list[dict[str, Any]]],
+) -> None:
+    base_url, seen = elevenlabs
+    catalog = ElevenLabsCatalog(API_KEY, base_url=base_url)
+    voice = Voice(provider=VoiceProvider.ELEVENLABS, id="v1", speed=0.8, stability=0.3)
+
+    hinglish = await catalog.speak(voice, Language.HINGLISH, "नमस्ते")
+    await catalog.speak(voice, Language.EN, "Hello")
+    gone = await catalog.speak(voice.model_copy(update={"id": "gone"}), Language.EN, "Hi")
+
+    assert gone is None and hinglish is not None
+    with pytest.raises(UnavailableError, match="429"):
+        await catalog.speak(voice.model_copy(update={"id": "busy"}), Language.EN, "Hi")
+    with wave.open(io.BytesIO(hinglish)) as audio:
+        assert (audio.getframerate(), audio.getsampwidth(), audio.getnframes()) == (8000, 2, 800)
+    assert seen[0] == {
+        "speak": "v1",
+        "query": {"output_format": "pcm_8000"},
+        "text": "नमस्ते",
+        "model_id": "eleven_flash_v2_5",
+        "voice_settings": {"speed": 0.8, "stability": 0.3},
+        "language_code": "hi",
+    }
+    assert seen[1]["language_code"] == "en"

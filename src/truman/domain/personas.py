@@ -12,9 +12,7 @@ from pydantic import (
 
 class Language(StrEnum):
     EN = "en"
-    HI = "hi"
     HINGLISH = "hinglish"
-    EN_HI = "en_hi"
 
 
 class VoiceProvider(StrEnum):

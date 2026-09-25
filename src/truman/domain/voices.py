@@ -2,7 +2,7 @@ from typing import Protocol
 
 from pydantic import BaseModel, ConfigDict
 
-from truman.domain.personas import Language
+from truman.domain.personas import Language, Voice
 
 
 class VoiceInfo(BaseModel):
@@ -20,7 +20,19 @@ class VoiceInfo(BaseModel):
     languages: frozenset[str] = frozenset()
 
 
+class VoicePreview(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    voice: Voice
+    language: Language
+
+
 class VoiceCatalog(Protocol):
     async def list_voices(self, language: Language | None = None) -> list[VoiceInfo]: ...
 
     async def get_voice(self, voice_id: str) -> VoiceInfo | None: ...
+
+    async def speak(self, voice: Voice, language: Language, text: str) -> bytes | None:
+        """The text spoken with the model, settings and 8 kHz audio a call uses, as WAV; None
+        when the voice is unknown."""
+        ...

@@ -33,10 +33,9 @@ export function authHeaders(): HeadersInit {
   return { Authorization: `Bearer ${getToken()}` };
 }
 
-export async function api<T>(
-  path: string,
-  init: { method?: string; json?: unknown; signal?: AbortSignal } = {},
-): Promise<T> {
+type ApiInit = { method?: string; json?: unknown; signal?: AbortSignal };
+
+async function request(path: string, init: ApiInit): Promise<Response> {
   const headers: Record<string, string> = { ...(authHeaders() as Record<string, string>) };
   if (init.json !== undefined) headers["Content-Type"] = "application/json";
   const response = await fetch(`/api/v1${path}`, {
@@ -57,6 +56,15 @@ export async function api<T>(
       error.message ?? `${response.status} ${response.statusText}`,
     );
   }
+  return response;
+}
+
+export async function api<T>(path: string, init: ApiInit = {}): Promise<T> {
+  const response = await request(path, init);
   if (response.status === 204) return undefined as T;
   return (await response.json()) as T;
+}
+
+export async function apiBlob(path: string, init: ApiInit = {}): Promise<Blob> {
+  return (await request(path, init)).blob();
 }

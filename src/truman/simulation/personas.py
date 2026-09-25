@@ -24,6 +24,7 @@ from truman.domain.personas import (
     VoiceProvider,
 )
 from truman.domain.voices import VoiceCatalog, VoiceInfo
+from truman.simulation.languages import LANGUAGES
 
 NAME_INDEX = "ix_personas_name_live"
 
@@ -82,6 +83,16 @@ async def check_voice(catalogs: VoiceCatalogs, voice: Voice) -> VoiceGender | No
         raise ValidationError(f"voice {voice.id} was not found on the {voice.provider} account")
     label = (info.gender or "").lower()
     return VoiceGender(label) if label in VoiceGender else None
+
+
+async def preview_voice(catalogs: VoiceCatalogs, voice: Voice, language: Language) -> bytes:
+    """The language's sample sentence, spoken with the voice, settings and audio a call uses."""
+    audio = await catalog_for(catalogs, voice.provider).speak(
+        voice, language, LANGUAGES[language].sample
+    )
+    if audio is None:
+        raise ValidationError(f"voice {voice.id} was not found on the {voice.provider} account")
+    return audio
 
 
 async def list_voices(

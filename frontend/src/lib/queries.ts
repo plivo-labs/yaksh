@@ -1,6 +1,6 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { api } from "@/lib/api";
+import { api, apiBlob } from "@/lib/api";
 import {
   ACTIVE_STATUSES,
   type Agent,
@@ -8,8 +8,12 @@ import {
   type Conversation,
   type ConversationInput,
   type ConversationSummary,
+  type Language,
   type Page,
   type Persona,
+  type PersonaInput,
+  type Voice,
+  type VoiceInfo,
 } from "@/lib/types";
 
 export const keys = {
@@ -18,14 +22,20 @@ export const keys = {
   conversations: (filters: Record<string, string>) => ["conversations", filters] as const,
   conversation: (id: string) => ["conversations", "one", id] as const,
   personas: ["personas"] as const,
+  voices: (language: Language) => ["voices", language] as const,
 };
 
 const PAGE_SIZE = 100;
 
-async function all<T>(path: string): Promise<T[]> {
+async function all<T>(path: string, params: Record<string, string> = {}): Promise<T[]> {
   const items: T[] = [];
   for (let page = 1; ; page++) {
-    const result = await api<Page<T>>(`${path}?page=${page}&page_size=${PAGE_SIZE}`);
+    const search = new URLSearchParams({
+      ...params,
+      page: String(page),
+      page_size: String(PAGE_SIZE),
+    });
+    const result = await api<Page<T>>(`${path}?${search}`);
     items.push(...result.items);
     if (items.length >= result.total || result.items.length === 0) return items;
   }
@@ -37,6 +47,41 @@ export function useAgents() {
 
 export function usePersonas() {
   return useQuery({ queryKey: keys.personas, queryFn: () => all<Persona>("/personas") });
+}
+
+export function useSavePersona(id?: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (input: PersonaInput) =>
+      id
+        ? api<Persona>(`/personas/${id}`, { method: "PATCH", json: input })
+        : api<Persona>("/personas", { method: "POST", json: input }),
+    onSuccess: () => client.invalidateQueries({ queryKey: keys.personas }),
+  });
+}
+
+export function useDeletePersona() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api<void>(`/personas/${id}`, { method: "DELETE" }),
+    onSuccess: () => client.invalidateQueries({ queryKey: keys.personas }),
+  });
+}
+
+export function usePreviewVoice() {
+  return useMutation({
+    mutationFn: (input: { voice: Voice; language: Language }) =>
+      apiBlob("/voices/preview", { method: "POST", json: input }),
+  });
+}
+
+export function useVoices(language: Language) {
+  return useQuery({
+    queryKey: keys.voices(language),
+    queryFn: () => all<VoiceInfo>("/voices", { provider: "elevenlabs", language }),
+    staleTime: 5 * 60_000,
+    placeholderData: keepPreviousData,
+  });
 }
 
 export function useAgent(id: string | undefined) {
@@ -62,7 +107,10 @@ export function useDeleteAgent() {
   const client = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => api<void>(`/agents/${id}`, { method: "DELETE" }),
-    onSuccess: () => client.invalidateQueries({ queryKey: keys.agents }),
+    onSuccess: (_, id) => {
+      client.removeQueries({ queryKey: keys.agent(id) });
+      return client.invalidateQueries({ queryKey: keys.agents });
+    },
   });
 }
 

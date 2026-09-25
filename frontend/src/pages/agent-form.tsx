@@ -145,9 +145,7 @@ function AgentForm({ agent }: { agent?: Agent }) {
           {draft.agent_number !== "" && !numberOk ? (
             <FieldError>Use the international format, like +14155550100.</FieldError>
           ) : (
-            <FieldDescription>
-              The number Truman dials, with the country code. Calls come from your Plivo numbers.
-            </FieldDescription>
+            <FieldDescription>Include the country code, like +14155550100.</FieldDescription>
           )}
         </Field>
 

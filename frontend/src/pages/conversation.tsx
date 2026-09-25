@@ -40,7 +40,7 @@ import { subscribe } from "@/lib/sse";
 import {
   ACTIVE_STATUSES,
   type Conversation,
-  type Language,
+  LANGUAGE_NAMES,
   type Turn,
   type WireEvent,
 } from "@/lib/types";
@@ -118,12 +118,7 @@ export function ConversationPage() {
             <Recording url={data.recording_url} />
             <Card>
               <CardHeader>
-                <CardTitle>
-                  {data.persona_name}
-                  <span className="ml-1.5 font-mono text-xs text-muted-foreground">
-                    v{data.persona_version}
-                  </span>
-                </CardTitle>
+                <CardTitle>{data.persona_name}</CardTitle>
                 <CardDescription>
                   {LANGUAGE_NAMES[data.language]}, from{" "}
                   {data.caller_number ?? "a number assigned at call time"}, up to{" "}
@@ -148,13 +143,6 @@ export function ConversationPage() {
     </div>
   );
 }
-
-const LANGUAGE_NAMES: Record<Language, string> = {
-  en: "English",
-  hi: "Hindi",
-  hinglish: "Hinglish",
-  en_hi: "English and Hindi",
-};
 
 function CallerPrompt({ instructions }: { instructions: string }) {
   const [shown, setShown] = useState(false);

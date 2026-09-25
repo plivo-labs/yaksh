@@ -725,7 +725,7 @@ async def test_a_conversation_freezes_its_persona_goal_and_prompt(
     client: AsyncClient, settings: Settings
 ) -> None:
     agent_id = await create_agent_id(client)
-    persona = await create_persona(client, language="hi")
+    persona = await create_persona(client, language="hinglish")
     started = await start(client, agent_id, persona_id=persona["id"], goal="Book a table for two.")
     await client.patch(
         f"/api/v1/personas/{persona['id']}",
@@ -740,11 +740,11 @@ async def test_a_conversation_freezes_its_persona_goal_and_prompt(
     await engine.dispose()
 
     assert (detail["persona_name"], detail["persona_version"]) == (persona["name"], 1)
-    assert (detail["goal"], detail["language"]) == ("Book a table for two.", "hi")
+    assert (detail["goal"], detail["language"]) == ("Book a table for two.", "hinglish")
     assert (
         PERSONA["prompt"] in detail["instructions"] and "Someone else." not in request.instructions
     )
-    assert "Book a table for two." in request.instructions and "Hindi" in request.instructions
+    assert "Book a table for two." in request.instructions and "Hinglish" in request.instructions
     assert request.voice.speed == 1.0 and request.nudge == "हेलो? आप वहाँ हैं?"
 
 
