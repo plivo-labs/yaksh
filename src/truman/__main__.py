@@ -9,13 +9,11 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from truman.caller.plivo_api import PlivoApi, PlivoError
 from truman.caller.plivo_server import PlivoServer, StreamRegistry, create_app
-from truman.caller.stub import STUB_NUMBER, StubCaller
 from truman.caller.unavailable import UnavailableCaller
 from truman.config import Settings
 from truman.db.migrate import upgrade_to_head
 from truman.db.session import create_engine, create_sessionmaker
 from truman.domain.conversations import Caller
-from truman.domain.numbers import AccountNumber
 from truman.simulation import conversations
 from truman.worker.worker import Worker
 
@@ -51,7 +49,7 @@ def worker() -> None:
     upgrade_to_head(str(settings.database_url))
     registry = StreamRegistry()
     api = plivo_api(settings)
-    caller: Caller = StubCaller() if settings.caller == "stub" else callers(settings, registry, api)
+    caller = callers(settings, registry, api)
     try:
         asyncio.run(run_worker(settings, caller, registry, api))
     except conversations.UnknownNumbersError as error:
@@ -108,10 +106,7 @@ async def run_worker(
 ) -> None:
     engine = create_engine(str(settings.database_url))
     sessionmaker = create_sessionmaker(engine)
-    if settings.caller == "stub":
-        async with sessionmaker() as session:
-            await conversations.sync_numbers(session, [AccountNumber(number=STUB_NUMBER)], [])
-    elif api is not None:
+    if api is not None:
         await sync_pool(sessionmaker, api, settings.plivo_numbers)
     worker = Worker(sessionmaker, caller, settings)
     server = None

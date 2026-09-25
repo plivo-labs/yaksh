@@ -267,7 +267,7 @@ async def test_conversations_cannot_start_while_phone_calls_are_off(
 ) -> None:
     from truman.api import create_app
 
-    app = create_app(settings.model_copy(update={"caller": "phone"}))
+    app = create_app(settings.model_copy(update={"public_url": None}))
     headers = {"Authorization": f"Bearer {TOKEN}"}
     async with AsyncClient(
         transport=ASGITransport(app=app), base_url="http://test", headers=headers

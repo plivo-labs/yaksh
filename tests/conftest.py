@@ -83,7 +83,9 @@ def make_settings(tmp_path: Path, **overrides: Any) -> Settings:
         "worker_heartbeat_s": 0.05,
         "worker_lease_s": 2,
         "end_timeout_s": 0.5,
-        "caller": "stub",
+        "plivo_auth_id": "MAXXXX",
+        "plivo_auth_token": "token",
+        "public_url": "http://truman.test",
     }
     return Settings.model_validate({**values, **overrides})
 

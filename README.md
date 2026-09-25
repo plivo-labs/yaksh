@@ -21,8 +21,6 @@ The worker phones agents with a [Pipecat](https://github.com/pipecat-ai/pipecat)
 | `ELEVENLABS_API_KEY` | Text to speech. `TRUMAN_ELEVENLABS_VOICE_ID` picks the voice. |
 | `OPENAI_API_KEY`, or `AZURE_OPENAI_ENDPOINT` with `AZURE_OPENAI_API_KEY` (and `AZURE_OPENAI_API_VERSION`) | The persona model. `TRUMAN_PERSONA_MODEL` names the model or the Azure deployment, default `gpt-4.1`. |
 
-`TRUMAN_CALLER=stub` runs the worker with a canned caller and no providers or Plivo account, which is enough to develop the API and the UI.
-
 ## Phone
 
 Agents are called on the real phone network through [Plivo](https://www.plivo.com): the worker dials the agent's number from one of your Plivo numbers, receives the call audio over a Plivo stream and hangs up through the API. Plivo has to reach the worker, so it needs a public HTTPS address; until these settings are in place, conversations cannot be started.

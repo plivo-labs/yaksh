@@ -41,7 +41,7 @@ class UnknownNumbersError(Exception):
 async def create_conversation(
     session: AsyncSession, settings: Settings, command: ConversationCreate
 ) -> Conversation:
-    if settings.caller != "stub" and not settings.phone_enabled:
+    if not settings.phone_enabled:
         raise ValidationError(
             "phone calls are off: set PLIVO_AUTH_ID, PLIVO_AUTH_TOKEN and TRUMAN_PUBLIC_URL"
         )

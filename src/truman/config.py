@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any
 
 from pydantic import Field, PostgresDsn, SecretStr, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
@@ -26,7 +26,6 @@ class Settings(BaseSettings):
     worker_heartbeat_s: float = 1.0
     worker_lease_s: int = 30
     end_timeout_s: float = 5.0
-    caller: Literal["phone", "stub"] = "phone"
     deepgram_api_key: SecretStr | None = Field(default=None, validation_alias="DEEPGRAM_API_KEY")
     deepgram_url: str = ""
     deepgram_model: str = "nova-3"

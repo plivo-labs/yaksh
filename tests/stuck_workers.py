@@ -12,7 +12,6 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 
 from truman.__main__ import run_worker
 from truman.caller.plivo_server import StreamRegistry
-from truman.caller.stub import StubCaller
 from truman.config import Settings
 from truman.domain.conversations import (
     Caller,
@@ -62,7 +61,7 @@ def stuck_write() -> Caller:
 
 def stuck_disposal() -> Caller:
     AsyncEngine.dispose = stuck
-    return StubCaller()
+    return HoldsUntilStop()
 
 
 KINDS = {"immortal": immortal, "stuck_write": stuck_write, "stuck_disposal": stuck_disposal}
