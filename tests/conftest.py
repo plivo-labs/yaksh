@@ -172,7 +172,7 @@ class FakeCaller:
 
 @pytest.fixture(scope="session")
 def database_url() -> Iterator[str]:
-    with PostgresContainer("postgres:17-alpine", driver="asyncpg") as postgres:
+    with PostgresContainer("postgres:18-alpine", driver="asyncpg") as postgres:
         url = postgres.get_connection_url()
         upgrade_to_head(url)
         yield url

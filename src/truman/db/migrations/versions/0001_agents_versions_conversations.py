@@ -56,7 +56,7 @@ def upgrade() -> None:
         sa.Column(
             "id",
             postgresql.UUID(as_uuid=True),
-            server_default=sa.text("gen_random_uuid()"),
+            server_default=sa.text("uuidv7()"),
             nullable=False,
         ),
         sa.Column("name", sa.Text(), nullable=False),
@@ -96,7 +96,7 @@ def upgrade() -> None:
         sa.Column(
             "id",
             postgresql.UUID(as_uuid=True),
-            server_default=sa.text("gen_random_uuid()"),
+            server_default=sa.text("uuidv7()"),
             nullable=False,
         ),
         sa.Column("agent_id", postgresql.UUID(as_uuid=True), nullable=False),
@@ -120,7 +120,7 @@ def upgrade() -> None:
         sa.Column(
             "id",
             postgresql.UUID(as_uuid=True),
-            server_default=sa.text("gen_random_uuid()"),
+            server_default=sa.text("uuidv7()"),
             nullable=False,
         ),
         sa.Column("agent_id", postgresql.UUID(as_uuid=True), nullable=False),

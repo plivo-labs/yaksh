@@ -54,7 +54,6 @@ async def create_conversation(
         )
     )
     conversation = Conversation(
-        id=uuid.uuid4(),
         agent_id=agent.id,
         agent_version_id=version_id,
         persona_prompt=command.persona_prompt,

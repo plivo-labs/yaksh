@@ -18,7 +18,7 @@ from sqlalchemy import (
     true,
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, MappedColumn, mapped_column
 
 from truman.db.base import Base
 from truman.domain.agents import AgentChange, Direction, Transport
@@ -29,15 +29,14 @@ def pg_enum[E: StrEnum](enum: type[E], name: str) -> Enum:
     return Enum(enum, name=name, values_callable=lambda e: [member.value for member in e])
 
 
+def uuid_primary_key() -> MappedColumn[uuid.UUID]:
+    return mapped_column(UUID(as_uuid=True), primary_key=True, server_default=text("uuidv7()"))
+
+
 class Agent(Base):
     __tablename__ = "agents"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
-        primary_key=True,
-        default=uuid.uuid4,
-        server_default=text("gen_random_uuid()"),
-    )
+    id: Mapped[uuid.UUID] = uuid_primary_key()
     name: Mapped[str] = mapped_column(Text)
     external_id: Mapped[str | None] = mapped_column(Text)
     direction: Mapped[Direction] = mapped_column(pg_enum(Direction, "agent_direction"))
@@ -65,12 +64,7 @@ class Agent(Base):
 class AgentVersion(Base):
     __tablename__ = "agent_versions"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
-        primary_key=True,
-        default=uuid.uuid4,
-        server_default=text("gen_random_uuid()"),
-    )
+    id: Mapped[uuid.UUID] = uuid_primary_key()
     agent_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("agents.id"))
     version: Mapped[int] = mapped_column(Integer)
     change: Mapped[AgentChange] = mapped_column(pg_enum(AgentChange, "agent_change"))
@@ -86,12 +80,7 @@ class AgentVersion(Base):
 class Conversation(Base):
     __tablename__ = "conversations"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
-        primary_key=True,
-        default=uuid.uuid4,
-        server_default=text("gen_random_uuid()"),
-    )
+    id: Mapped[uuid.UUID] = uuid_primary_key()
     agent_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("agents.id"))
     agent_version_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
     channel: Mapped[Channel] = mapped_column(pg_enum(Channel, "channel"), default=Channel.VOICE)

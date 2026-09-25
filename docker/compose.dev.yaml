@@ -62,7 +62,7 @@ services:
       - http://worker:8770
 
   postgres:
-    image: postgres:17-alpine
+    image: postgres:18-alpine
     environment:
       POSTGRES_USER: truman
       POSTGRES_PASSWORD: truman
@@ -70,7 +70,7 @@ services:
     ports:
       - "127.0.0.1:5433:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - pgdata:/var/lib/postgresql
     healthcheck:
       test:
         - CMD-SHELL
@@ -80,6 +80,6 @@ services:
       retries: 10
 
 volumes:
-  postgres_data:
+  pgdata:
   truman_data:
   web_node_modules:

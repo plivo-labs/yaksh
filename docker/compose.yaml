@@ -40,13 +40,13 @@ services:
       disable: true
 
   postgres:
-    image: postgres:17-alpine
+    image: postgres:18-alpine
     environment:
       POSTGRES_USER: truman
       POSTGRES_PASSWORD: truman
       POSTGRES_DB: truman
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - pgdata:/var/lib/postgresql
     healthcheck:
       test:
         - CMD-SHELL
@@ -57,5 +57,5 @@ services:
     restart: unless-stopped
 
 volumes:
-  postgres_data:
+  pgdata:
   truman_data:

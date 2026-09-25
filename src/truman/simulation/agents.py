@@ -68,11 +68,10 @@ async def get_agent(session: AsyncSession, agent_id: uuid.UUID, *, lock: bool = 
 
 async def create_agent(session: AsyncSession, command: AgentCreate) -> Agent:
     config = command.config()
-    agent = Agent(
-        id=uuid.uuid4(), name=command.name, external_id=command.external_id, current_version=1
-    )
+    agent = Agent(name=command.name, external_id=command.external_id, current_version=1)
     apply_config(agent, config)
     session.add(agent)
+    await flush(session)
     session.add(
         AgentVersion(
             agent_id=agent.id,
@@ -81,7 +80,6 @@ async def create_agent(session: AsyncSession, command: AgentCreate) -> Agent:
             config=config.model_dump(mode="json"),
         )
     )
-    await flush(session)
     await session.commit()
     return agent
 

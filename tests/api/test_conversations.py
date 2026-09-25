@@ -180,12 +180,11 @@ async def test_an_expired_lease_is_marked_failed_while_a_live_one_is_not(
     agent_id = await create_agent_id(client)
     live = await start(client, agent_id)
     await wait_for(client, live["id"], {"running"})
-    orphan_id = uuid.uuid4()
     engine = create_async_engine(settings.database_url.encoded_string())
     async with engine.begin() as connection:
-        await connection.execute(
-            insert(Conversation).values(
-                id=orphan_id,
+        orphan_id = await connection.scalar(
+            insert(Conversation)
+            .values(
                 agent_id=uuid.UUID(agent_id),
                 agent_version_id=uuid.UUID(live["agent_version_id"]),
                 persona_prompt="orphaned by a dead worker",
@@ -195,6 +194,7 @@ async def test_an_expired_lease_is_marked_failed_while_a_live_one_is_not(
                 claimed_by="dead-worker",
                 lease_expires_at=datetime.now(UTC) - timedelta(seconds=1),
             )
+            .returning(Conversation.id)
         )
     await engine.dispose()
 

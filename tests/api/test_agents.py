@@ -1,4 +1,5 @@
 import asyncio
+import uuid
 
 import pytest
 from httpx import AsyncClient
@@ -30,6 +31,16 @@ async def test_changing_config_creates_a_version_but_renaming_does_not(
         (1, "created"),
     ]
     assert versions["items"][0]["config"]["brief"] == "Books rooms"
+
+
+async def test_new_records_get_time_ordered_ids(client: AsyncClient) -> None:
+    first = await create_agent(client)
+    second = await create_agent(client)
+    versions = (await client.get(f"/api/v1/agents/{second['id']}/versions")).json()
+    ids = [uuid.UUID(first["id"]), uuid.UUID(second["id"]), uuid.UUID(versions["items"][0]["id"])]
+
+    assert [i.version for i in ids] == [7, 7, 7]
+    assert ids[0] < ids[1]
 
 
 async def test_invalid_updates_are_rejected_before_the_database(client: AsyncClient) -> None:
