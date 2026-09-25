@@ -32,7 +32,6 @@ from pipecat.transports.websocket.fastapi import FastAPIWebsocketParams, FastAPI
 
 from truman.caller.audio import GAP_BYTES, SAMPLE_RATE, SPEECH_PEAK, Clock, Playout, Stamper
 from truman.caller.pipeline import CallState, Persona, converse, provider_keys
-from truman.caller.plivo_api import OutboundCall, PlivoApi, PlivoError
 from truman.caller.plivo_server import CALLBACK_RETRIES, PendingStream, StreamRegistry
 from truman.caller.transcript import TranscriptBuilder, WireTap
 from truman.config import Settings
@@ -44,6 +43,7 @@ from truman.domain.conversations import (
     WireEvent,
     WireEventKind,
 )
+from truman.integrations.plivo import OutboundCall, PlivoApi, PlivoError
 
 log = logging.getLogger(__name__)
 

@@ -8,13 +8,13 @@ import uvicorn
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 from uvicorn.config import LOGGING_CONFIG
 
-from truman.caller.plivo_api import PlivoApi, PlivoError
 from truman.caller.plivo_server import PlivoServer, StreamRegistry, create_app
 from truman.caller.unavailable import UnavailableCaller
 from truman.config import Settings
 from truman.db.migrate import upgrade_to_head
 from truman.db.session import create_engine, create_sessionmaker
 from truman.domain.conversations import Caller
+from truman.integrations.plivo import PlivoApi, PlivoError
 from truman.simulation import conversations
 from truman.worker.worker import Worker
 

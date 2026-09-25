@@ -84,6 +84,20 @@ forbidden_modules = [
 ]
 
 [[tool.importlinter.contracts]]
+name = "integrations import only the domain"
+type = "forbidden"
+source_modules = ["truman.integrations"]
+forbidden_modules = [
+    "truman.api",
+    "truman.caller",
+    "truman.config",
+    "truman.db",
+    "truman.evaluation",
+    "truman.simulation",
+    "truman.worker",
+]
+
+[[tool.importlinter.contracts]]
 name = "simulation and evaluation never import the caller"
 type = "forbidden"
 source_modules = ["truman.simulation", "truman.evaluation"]

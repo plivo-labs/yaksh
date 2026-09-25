@@ -1,7 +1,7 @@
 """What the clients for outside services share about failed requests."""
 
 
-def describe(error: BaseException) -> str:
+def safe_error_text(error: BaseException) -> str:
     """The error type and text, never its repr: aiohttp's repr carries the request headers,
     and with them the provider credentials."""
     text = str(error)

@@ -6,8 +6,8 @@ from fastapi import FastAPI, Request, Response
 from fastapi.responses import JSONResponse, RedirectResponse
 
 from truman.caller.plivo_server import PlivoServer
-from truman.caller.voices import LIST_TTL_S, ElevenLabsCatalog
 from truman.domain.errors import UnavailableError
+from truman.integrations.elevenlabs import LIST_TTL_S, ElevenLabsCatalog
 
 API_KEY = "el-key"
 VOICE = {

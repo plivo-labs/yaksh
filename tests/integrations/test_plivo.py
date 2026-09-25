@@ -6,8 +6,8 @@ import pytest
 from fastapi import FastAPI, Request, Response
 from fastapi.responses import RedirectResponse
 
-from truman.caller.plivo_api import OutboundCall, PlivoApi, PlivoError
 from truman.caller.plivo_server import PlivoServer
+from truman.integrations.plivo import OutboundCall, PlivoApi, PlivoError
 
 AUTH_ID = "MAXXXXXXXXXXXXXXXXXX"
 AUTH_TOKEN = "secret-token"
@@ -153,7 +153,7 @@ async def test_a_listing_that_never_ends_is_an_error(
     plivo: tuple[PlivoApi, list[dict[str, Any]]], monkeypatch: pytest.MonkeyPatch
 ) -> None:
     api, _ = plivo
-    monkeypatch.setattr("truman.caller.plivo_api.MAX_PAGES", 3)
+    monkeypatch.setattr("truman.integrations.plivo.MAX_PAGES", 3)
     looping = PlivoApi("LOOPING", "token", base_url=api.base_url)
 
     with pytest.raises(PlivoError, match="3 pages"):

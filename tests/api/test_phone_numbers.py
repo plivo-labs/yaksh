@@ -9,12 +9,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from tests.conftest import FakeCaller, create_agent_id, start, wait_for, wait_until
 from truman.__main__ import sync_pool
-from truman.caller.plivo_api import PlivoApi, PlivoError
 from truman.config import Settings
 from truman.db.models import Conversation, PhoneNumber
 from truman.db.session import create_engine, create_sessionmaker
 from truman.domain.conversations import CallOutcome, ConversationStatus, EndReason, Transcript
 from truman.domain.numbers import AccountNumber
+from truman.integrations.plivo import PlivoApi, PlivoError
 from truman.simulation import conversations
 from truman.worker.worker import Worker
 

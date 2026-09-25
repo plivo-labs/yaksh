@@ -9,6 +9,7 @@ src/truman/
   config.py     process settings from environment variables
   domain/       shared data models and interfaces
   caller/       runs the simulated caller and connects to the customer's agent
+  integrations/ clients for outside services: Plivo, ElevenLabs
   simulation/   defines scenarios and personas and orchestrates test conversations
   evaluation/   runs judges and computes scores (planned, empty today)
   api/          HTTP endpoints for the UI and integrations

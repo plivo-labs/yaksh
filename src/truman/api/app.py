@@ -9,11 +9,11 @@ from fastapi import APIRouter, FastAPI, HTTPException, status
 from truman import __version__
 from truman.api.errors import register_error_handlers
 from truman.api.routes import agents, conversations, health, personas, voices
-from truman.caller.voices import ElevenLabsCatalog
 from truman.config import Settings
 from truman.db.migrate import upgrade_to_head
 from truman.db.session import create_engine, create_sessionmaker
 from truman.domain.personas import VoiceProvider
+from truman.integrations.elevenlabs import ElevenLabsCatalog
 from truman.simulation.personas import VoiceCatalogs, seed_builtin_personas
 
 log = logging.getLogger(__name__)

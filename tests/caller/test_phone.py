@@ -13,10 +13,10 @@ from httpx import AsyncClient
 from tests.conftest import Observer, make_settings
 from truman.caller import phone
 from truman.caller.phone import Connected, Dialer, PhoneCaller
-from truman.caller.plivo_api import PlivoApi
 from truman.caller.plivo_server import PlivoServer, StreamRegistry, create_app
 from truman.domain.agents import AgentConfig
 from truman.domain.conversations import CallOutcome, CallRequest, EndReason, WireEventKind
+from truman.integrations.plivo import PlivoApi
 
 PROVIDERS = ("deepgram_api_key", "elevenlabs_api_key", "openai_api_key")
 
