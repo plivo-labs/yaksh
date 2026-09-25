@@ -86,6 +86,6 @@ class VoiceClient(Protocol):
     async def get_voice(self, voice_id: str) -> ProviderVoice | None: ...
 
     async def speak(self, voice: VoiceSettings, language: Language, text: str) -> bytes | None:
-        """The text spoken with the model, settings and 8 kHz audio a call uses, as WAV; None
+        """The text spoken with the call's model, voice settings and 8 kHz format, as WAV; None
         when the voice is unknown."""
         ...

@@ -112,7 +112,7 @@ async def list_conversations(
 async def pinned_agents(
     session: AsyncSession, conversations: Sequence[Conversation]
 ) -> dict[uuid.UUID, tuple[int, str]]:
-    """The version number and agent name each conversation was started against, by version id."""
+    """The version number each conversation pinned and the agent's current name, by version id."""
     rows = await session.execute(
         select(AgentVersion.id, AgentVersion.version, Agent.name)
         .join(Agent, Agent.id == AgentVersion.agent_id)

@@ -84,7 +84,7 @@ export function ConversationPage() {
           <p className="text-sm text-muted-foreground">
             Version {data.agent_version}
             {data.started_at && ` · started ${when(data.started_at)}`}
-            {data.talk_ms !== null && ` · ${duration(data.talk_ms)} of talk`}
+            {data.talk_ms !== null && ` · ${duration(data.talk_ms)} connected`}
             {data.end_reason && ` · ${END_REASON_LABELS[data.end_reason]}`}
           </p>
           {data.failure_reason && (
@@ -258,7 +258,7 @@ function Transcript({ turns, active }: { turns: Turn[]; active: boolean }) {
       <CardContent className="lg:min-h-0 lg:flex-1">
         {turns.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            {active ? "Waiting for the first words." : "Nothing was said."}
+            {active ? "Waiting for the first words." : "Nothing was transcribed."}
           </p>
         ) : (
           <MessageScrollerProvider autoScroll>
@@ -279,7 +279,7 @@ function Transcript({ turns, active }: { turns: Turn[]; active: boolean }) {
                             {turn.scripted && <Badge variant="secondary">fixed nudge</Badge>}
                             {turn.provenance === "cut" && <Badge variant="outline">cut off</Badge>}
                             {turn.provenance === "unconfirmed" && (
-                              <Badge variant="outline">not confirmed heard</Badge>
+                              <Badge variant="outline">not confirmed played</Badge>
                             )}
                           </MessageHeader>
                           <Bubble variant={turn.role === "caller" ? "default" : "outline"}>
@@ -342,7 +342,9 @@ function Recording({ url }: { url: string | null }) {
     <Card>
       <CardHeader>
         <CardTitle>Recording</CardTitle>
-        <CardDescription>Agent on the left channel, caller on the right.</CardDescription>
+        <CardDescription>
+          Left: the agent as Truman received it. Right: the caller as Truman sent it.
+        </CardDescription>
       </CardHeader>
       <CardContent>
         {blob ? (

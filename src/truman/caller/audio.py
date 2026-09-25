@@ -14,7 +14,7 @@ from pipecat.frames.frames import (
 
 SAMPLE_RATE = 8000
 FRAME_BYTES = 320
-SPEECH_PEAK = 500
+LOUD_PEAK = 500
 GAP_BYTES = SAMPLE_RATE * 2 // 5
 PLAYOUT = "truman.playout"
 OFFSET = "truman.offset"

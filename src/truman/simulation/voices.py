@@ -54,7 +54,9 @@ async def lookup_voice(
 
 
 async def preview_voice(clients: VoiceClients, voice: VoiceSettings, language: Language) -> bytes:
-    """The language's sample sentence, spoken with the voice, settings and audio a call uses."""
+    """The language's sample sentence, spoken with the same model, voice settings and 8 kHz
+    format as a call. A call streams through a websocket and this is one request, so the
+    delivery can differ a little."""
     audio = await client_for(clients, voice.provider).speak(
         voice, language, LANGUAGES[language].sample
     )

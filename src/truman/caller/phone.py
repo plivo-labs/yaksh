@@ -30,7 +30,7 @@ from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
 from pipecat.serializers.base_serializer import FrameSerializer
 from pipecat.transports.websocket.fastapi import FastAPIWebsocketParams, FastAPIWebsocketTransport
 
-from truman.caller.audio import GAP_BYTES, SAMPLE_RATE, SPEECH_PEAK, Clock, Playout, Stamper
+from truman.caller.audio import GAP_BYTES, LOUD_PEAK, SAMPLE_RATE, Clock, Playout, Stamper
 from truman.caller.pipeline import CallState, Persona, converse, provider_keys
 from truman.caller.plivo_server import CALLBACK_RETRIES, PendingStream, StreamRegistry
 from truman.caller.transcript import TranscriptBuilder, WireTap
@@ -399,8 +399,9 @@ class StreamSerializer(FrameSerializer):
         return None
 
     def _heard(self, pcm: bytes) -> None:
-        """The first packet with speech after a quiet stretch is the agent starting to talk."""
-        if audioop.max(pcm, 2) > SPEECH_PEAK:
+        """The first packet louder than LOUD_PEAK after a quiet stretch: sound from the agent's
+        side started, which may be speech, music, a beep or line noise."""
+        if audioop.max(pcm, 2) > LOUD_PEAK:
             if self._quiet >= GAP_BYTES:
                 self._event(WireEventKind.AGENT_AUDIO)
             self._quiet = 0
@@ -411,7 +412,7 @@ class StreamSerializer(FrameSerializer):
         self._observer.wire_event(WireEvent(kind=kind, at_ms=self._clock.ms()))
 
 
-class SpeechMarks(FrameProcessor):
+class AudioMarks(FrameProcessor):
     """After the transport output: when the persona's audio starts and stops going out."""
 
     def __init__(self, clock: Clock, observer: CallObserver) -> None:
@@ -423,9 +424,9 @@ class SpeechMarks(FrameProcessor):
         await super().process_frame(frame, direction)
         if direction is FrameDirection.DOWNSTREAM:
             if isinstance(frame, BotStartedSpeakingFrame):
-                self._mark(WireEventKind.CALLER_SPEECH_START)
+                self._mark(WireEventKind.CALLER_AUDIO_START)
             elif isinstance(frame, BotStoppedSpeakingFrame):
-                self._mark(WireEventKind.CALLER_SPEECH_END)
+                self._mark(WireEventKind.CALLER_AUDIO_END)
         await self.push_frame(frame, direction)
 
     def _mark(self, kind: WireEventKind) -> None:
@@ -433,7 +434,10 @@ class SpeechMarks(FrameProcessor):
 
 
 class Recorder(AudioBufferProcessor):
-    """Both sides of the call as a stereo 8 kHz WAV: the agent left, the caller right."""
+    """A stereo 8 kHz WAV built by Truman: left, the agent as Truman received it; right, the
+    caller as Truman sent it. Pipecat pads silence by elapsed wall-clock time to line the two
+    up, so it is not Plivo's recording, and after a barge-in it can hold caller audio the
+    agent never heard."""
 
     def __init__(self, path: Path) -> None:
         super().__init__(sample_rate=SAMPLE_RATE, num_channels=2, auto_start_recording=True)
@@ -555,7 +559,7 @@ class PhoneCaller:
             transport_input=transport.input(),
             transport_output=transport.output(),
             before_output=[checkpoints],
-            after_output=[SpeechMarks(clock, observer), WireTap(transcript, settled), recorder],
+            after_output=[AudioMarks(clock, observer), WireTap(transcript, settled), recorder],
             state=state,
         )
 

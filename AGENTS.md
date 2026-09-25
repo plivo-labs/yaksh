@@ -17,7 +17,7 @@ src/truman/
   db/           database models and migrations
 frontend/       React UI
 docker/         container builds and self-hosted deployment
-docs/           Markdown now, Fumadocs site later
+docs/           empty for now; Markdown docs go here, Fumadocs site later
 tests/          automated tests and fixtures
 ```
 

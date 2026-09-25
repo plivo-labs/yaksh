@@ -28,7 +28,7 @@ LANGUAGE_PINS: dict[Language, str] = {
 
 class ElevenLabsClient:
     """Looks up one voice through v1, which has the only single-voice endpoint, and makes
-    speech in the audio a call uses."""
+    speech in the 8 kHz format a call uses."""
 
     def __init__(self, api_key: str, *, base_url: str = ELEVENLABS_API) -> None:
         self.base_url = base_url.rstrip("/")
