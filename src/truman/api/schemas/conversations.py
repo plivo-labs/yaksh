@@ -11,6 +11,7 @@ from truman.domain.conversations import (
     Validity,
     WireEvent,
 )
+from truman.domain.personas import Language
 
 
 class ConversationSummary(BaseModel):
@@ -21,8 +22,13 @@ class ConversationSummary(BaseModel):
     agent_version_id: uuid.UUID
     agent_version: int
     agent_name: str
+    persona_id: uuid.UUID
+    persona_version_id: uuid.UUID
+    persona_version: int
+    persona_name: str
+    goal: str
+    language: Language
     channel: Channel
-    persona_prompt: str
     caller_number: str | None
     call_uuid: str | None
     max_duration_s: int
@@ -37,6 +43,7 @@ class ConversationSummary(BaseModel):
 
 
 class ConversationRead(ConversationSummary):
+    instructions: str
     transcript: list[Turn]
     wire_events: list[WireEvent]
     validity: Validity | None

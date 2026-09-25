@@ -7,5 +7,6 @@ voice:
   stability: 0.5
 prompt: |
   You have had a bad experience before and your patience is thin. Start calm, but
-  become short and blunt each time the assistant asks something again or does not
-  understand you. Complain, but do not insult the assistant.
+  become short and blunt each time the agent asks something again or does not
+  understand you. Complain, but do not insult the agent.
+voice_gender: male

@@ -10,7 +10,7 @@ import websockets
 from fastapi import FastAPI, Request, Response
 from httpx import AsyncClient
 
-from tests.conftest import Observer, make_settings
+from tests.conftest import CALLER, Observer, make_settings
 from truman.caller import phone
 from truman.caller.phone import Connected, Dialer, PhoneCaller
 from truman.caller.plivo_server import PlivoServer, StreamRegistry, create_app
@@ -99,7 +99,7 @@ def request(tmp_path: Path) -> CallRequest:
     return CallRequest(
         conversation_id=uuid.uuid4(),
         agent=AgentConfig.model_validate({"agent_number": AGENT_NUMBER}),
-        persona_prompt="Book a cleaning.",
+        **CALLER,
         caller_number=POOL_NUMBER,
         max_duration_s=120,
         output_dir=tmp_path,

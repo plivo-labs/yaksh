@@ -14,10 +14,17 @@ class Language(StrEnum):
     EN = "en"
     HI = "hi"
     HINGLISH = "hinglish"
+    EN_HI = "en_hi"
 
 
 class VoiceProvider(StrEnum):
     ELEVENLABS = "elevenlabs"
+
+
+class VoiceGender(StrEnum):
+    MALE = "male"
+    FEMALE = "female"
+    NEUTRAL = "neutral"
 
 
 class Voice(BaseModel):
@@ -32,8 +39,8 @@ class Voice(BaseModel):
     stability: float = Field(default=0.5, ge=0.0, le=1.0)
 
 
-class PersonaConfig(BaseModel):
-    """What a persona version pins: how the caller talks and sounds."""
+class PersonaSettings(BaseModel):
+    """How the caller talks and sounds, as a client sets it."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -42,11 +49,18 @@ class PersonaConfig(BaseModel):
     voice: Voice
 
 
-class PersonaCreate(PersonaConfig):
+class PersonaConfig(PersonaSettings):
+    """What a persona version pins: the settings plus what the server learned about the
+    voice from its provider."""
+
+    voice_gender: VoiceGender | None = None
+
+
+class PersonaCreate(PersonaSettings):
     name: str = Field(min_length=1, max_length=80)
 
-    def config(self) -> PersonaConfig:
-        return PersonaConfig.model_validate(self.model_dump(exclude={"name"}))
+    def settings(self) -> PersonaSettings:
+        return PersonaSettings.model_validate(self.model_dump(exclude={"name"}))
 
 
 class PersonaUpdate(BaseModel):

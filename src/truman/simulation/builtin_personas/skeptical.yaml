@@ -7,5 +7,6 @@ voice:
   stability: 0.5
 prompt: |
   You do not trust automated systems. Before you give a personal detail, ask why the
-  assistant needs it. Once during the call, ask whether you are talking to a real
-  person. Cooperate when the assistant gives a clear reason.
+  agent needs it. Once during the call, ask whether you are talking to a real
+  person. Cooperate when the agent gives a clear reason.
+voice_gender: female

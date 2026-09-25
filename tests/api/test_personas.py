@@ -4,7 +4,7 @@ from typing import Any
 from httpx import AsyncClient
 
 from tests.conftest import ENGLISH_VOICE, HINDI_VOICE, PERSONA, FakeCatalog, create_persona
-from truman.domain.personas import VoiceProvider
+from truman.domain.personas import Language, VoiceProvider
 
 
 async def test_changing_config_creates_a_version_but_renaming_does_not(
@@ -140,14 +140,35 @@ async def test_a_deleted_persona_is_gone_but_its_versions_remain(client: AsyncCl
     assert (await client.get(f"{url}/versions")).json()["total"] == 1
 
 
-async def test_voices_are_listed_a_page_at_a_time_for_a_language(client: AsyncClient) -> None:
+async def test_voices_are_listed_a_page_at_a_time_for_a_language(
+    client: AsyncClient, catalog: FakeCatalog
+) -> None:
     async def voices(**params: str | int) -> dict[str, Any]:
         response = await client.get("/api/v1/voices", params={"provider": "elevenlabs", **params})
         return response.json()
 
     first, second = await voices(page_size=1), await voices(page_size=1, page=2)
-    hinglish = await voices(language="hinglish")
+    await voices(language="hinglish")
 
     assert first["total"] == second["total"] == 2
+    assert catalog.listed_for == [None, None, Language.HINGLISH]
     assert {v["id"] for v in first["items"] + second["items"]} == {ENGLISH_VOICE.id, HINDI_VOICE.id}
-    assert [v["id"] for v in hinglish["items"]] == [HINDI_VOICE.id] and hinglish["total"] == 1
+
+
+async def test_the_voice_gender_comes_from_the_provider_and_follows_the_voice(
+    client: AsyncClient,
+) -> None:
+    persona = await create_persona(client)
+    url = f"/api/v1/personas/{persona['id']}"
+    assert persona["voice_gender"] == "male"
+
+    faster = await client.patch(url, json={"voice": {**persona["voice"], "speed": 1.1}})
+    assert faster.json()["voice_gender"] == "male"
+
+    moved = await client.patch(
+        url, json={"voice": {"provider": "elevenlabs", "id": HINDI_VOICE.id}}
+    )
+    assert moved.json()["voice_gender"] == "female"
+
+    claimed = await client.post("/api/v1/personas", json={**PERSONA, "voice_gender": "female"})
+    assert claimed.status_code == 422

@@ -9,6 +9,7 @@ import {
   type ConversationInput,
   type ConversationSummary,
   type Page,
+  type Persona,
 } from "@/lib/types";
 
 export const keys = {
@@ -16,21 +17,26 @@ export const keys = {
   agent: (id: string) => ["agents", id] as const,
   conversations: (filters: Record<string, string>) => ["conversations", filters] as const,
   conversation: (id: string) => ["conversations", "one", id] as const,
+  personas: ["personas"] as const,
 };
 
-const AGENTS_PAGE = 100;
+const PAGE_SIZE = 100;
 
-async function allAgents(): Promise<Agent[]> {
-  const agents: Agent[] = [];
+async function all<T>(path: string): Promise<T[]> {
+  const items: T[] = [];
   for (let page = 1; ; page++) {
-    const result = await api<Page<Agent>>(`/agents?page=${page}&page_size=${AGENTS_PAGE}`);
-    agents.push(...result.items);
-    if (agents.length >= result.total || result.items.length === 0) return agents;
+    const result = await api<Page<T>>(`${path}?page=${page}&page_size=${PAGE_SIZE}`);
+    items.push(...result.items);
+    if (items.length >= result.total || result.items.length === 0) return items;
   }
 }
 
 export function useAgents() {
-  return useQuery({ queryKey: keys.agents, queryFn: allAgents });
+  return useQuery({ queryKey: keys.agents, queryFn: () => all<Agent>("/agents") });
+}
+
+export function usePersonas() {
+  return useQuery({ queryKey: keys.personas, queryFn: () => all<Persona>("/personas") });
 }
 
 export function useAgent(id: string | undefined) {

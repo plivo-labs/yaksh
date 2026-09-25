@@ -11,6 +11,7 @@ import pydantic
 
 from truman.diagnostics import describe_exception
 from truman.domain.errors import UnavailableError
+from truman.domain.personas import Language
 from truman.domain.voices import VoiceInfo
 
 ELEVENLABS_API = "https://api.elevenlabs.io"
@@ -18,6 +19,13 @@ TIMEOUT = aiohttp.ClientTimeout(total=10)
 PAGE_SIZE = 100
 MAX_PAGES = 50
 LIST_TTL_S = 300.0
+
+VERIFIED_LANGUAGES: dict[Language, str] = {
+    Language.EN: "en",
+    Language.HI: "hi",
+    Language.HINGLISH: "hi",
+    Language.EN_HI: "hi",
+}
 
 
 class ElevenLabsCatalog:
@@ -36,12 +44,16 @@ class ElevenLabsCatalog:
         self._clock = clock
         self._listed: tuple[float, list[VoiceInfo]] | None = None
 
-    async def list_voices(self) -> list[VoiceInfo]:
-        if self._listed is not None and self._clock() - self._listed[0] < LIST_TTL_S:
-            return self._listed[1]
-        voices = await self._list_all()
-        self._listed = (self._clock(), voices)
-        return voices
+    async def list_voices(self, language: Language | None = None) -> list[VoiceInfo]:
+        """The account's voices; with a language, only those ElevenLabs verified for it.
+        English and Hindi together count as Hindi, the harder of the two."""
+        if self._listed is None or self._clock() - self._listed[0] >= LIST_TTL_S:
+            self._listed = (self._clock(), await self._list_all())
+        voices = self._listed[1]
+        if language is None:
+            return voices
+        code = VERIFIED_LANGUAGES[language]
+        return [voice for voice in voices if code in voice.languages]
 
     async def get_voice(self, voice_id: str) -> VoiceInfo | None:
         url = f"{self.base_url}/v1/voices/{quote(voice_id, safe='')}"

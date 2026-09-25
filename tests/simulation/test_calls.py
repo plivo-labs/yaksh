@@ -2,6 +2,7 @@ import asyncio
 import uuid
 from pathlib import Path
 
+from tests.conftest import CALLER
 from truman.domain.agents import AgentConfig
 from truman.domain.conversations import (
     CallObserver,
@@ -14,7 +15,7 @@ from truman.simulation.calls import STOP_IGNORED, LiveCall, run_call
 REQUEST = CallRequest(
     conversation_id=uuid.uuid4(),
     agent=AgentConfig.model_validate({"agent_number": "+14155550100"}),
-    persona_prompt="hello",
+    **CALLER,
     caller_number="+15550100000",
     max_duration_s=10,
     output_dir=Path("/tmp/unused"),

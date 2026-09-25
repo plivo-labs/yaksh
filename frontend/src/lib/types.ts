@@ -19,6 +19,8 @@ type EndReason =
   | "error"
   | "process_restart";
 type Role = "agent" | "caller";
+export type Language = "en" | "hi" | "hinglish" | "en_hi";
+type VoiceGender = "male" | "female" | "neutral";
 type Provenance = "transmitted" | "cut";
 type WireEventKind =
   | "connect_started"
@@ -65,6 +67,26 @@ export interface AgentInput {
   brief: string | null;
 }
 
+export interface Voice {
+  provider: "elevenlabs";
+  id: string;
+  speed: number;
+  stability: number;
+}
+
+export interface Persona {
+  id: string;
+  name: string;
+  builtin_key: string | null;
+  prompt: string;
+  language: Language;
+  voice: Voice;
+  voice_gender: VoiceGender | null;
+  current_version: number;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Turn {
   role: Role;
   text: string;
@@ -89,8 +111,13 @@ export interface ConversationSummary {
   agent_version_id: string;
   agent_version: number;
   agent_name: string;
+  persona_id: string;
+  persona_version_id: string;
+  persona_version: number;
+  persona_name: string;
+  goal: string;
+  language: Language;
   channel: "voice";
-  persona_prompt: string;
   caller_number: string | null;
   call_uuid: string | null;
   max_duration_s: number;
@@ -105,6 +132,7 @@ export interface ConversationSummary {
 }
 
 export interface Conversation extends ConversationSummary {
+  instructions: string;
   transcript: Turn[];
   wire_events: WireEvent[];
   validity: Validity | null;
@@ -112,6 +140,7 @@ export interface Conversation extends ConversationSummary {
 
 export interface ConversationInput {
   agent_id: string;
-  persona_prompt: string;
+  persona_id: string;
+  goal: string;
   max_duration_s?: number;
 }

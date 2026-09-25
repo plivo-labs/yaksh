@@ -2,6 +2,8 @@ from typing import Protocol
 
 from pydantic import BaseModel, ConfigDict
 
+from truman.domain.personas import Language
+
 
 class VoiceInfo(BaseModel):
     """A voice as its provider describes it. `languages` holds the provider's language codes
@@ -19,6 +21,6 @@ class VoiceInfo(BaseModel):
 
 
 class VoiceCatalog(Protocol):
-    async def list_voices(self) -> list[VoiceInfo]: ...
+    async def list_voices(self, language: Language | None = None) -> list[VoiceInfo]: ...
 
     async def get_voice(self, voice_id: str) -> VoiceInfo | None: ...

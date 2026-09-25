@@ -41,9 +41,10 @@ end_reason = postgresql.ENUM(
     create_type=False,
 )
 persona_language = postgresql.ENUM(
-    "en", "hi", "hinglish", name="persona_language", create_type=False
+    "en", "hi", "hinglish", "en_hi", name="persona_language", create_type=False
 )
 voice_provider = postgresql.ENUM("elevenlabs", name="voice_provider", create_type=False)
+voice_gender = postgresql.ENUM("male", "female", "neutral", name="voice_gender", create_type=False)
 ENUMS = (
     agent_direction,
     agent_transport,
@@ -52,6 +53,7 @@ ENUMS = (
     end_reason,
     persona_language,
     voice_provider,
+    voice_gender,
 )
 
 
@@ -139,6 +141,7 @@ def upgrade() -> None:
         sa.Column("voice_id", sa.Text(), nullable=False),
         sa.Column("voice_speed", sa.Float(), nullable=False),
         sa.Column("voice_stability", sa.Float(), nullable=False),
+        sa.Column("voice_gender", voice_gender, nullable=True),
         sa.Column("current_version", sa.Integer(), nullable=False),
         sa.Column(
             "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
@@ -177,6 +180,7 @@ def upgrade() -> None:
         ),
         sa.PrimaryKeyConstraint("id", name="pk_persona_versions"),
         sa.UniqueConstraint("persona_id", "version", name="uq_persona_versions_persona_id_version"),
+        sa.UniqueConstraint("id", "persona_id", name="uq_persona_versions_id_persona_id"),
     )
 
     op.create_table(
@@ -190,7 +194,12 @@ def upgrade() -> None:
         sa.Column("agent_id", postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column("agent_version_id", postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column("channel", channel, nullable=False),
-        sa.Column("persona_prompt", sa.Text(), nullable=False),
+        sa.Column("persona_id", postgresql.UUID(as_uuid=True), nullable=False),
+        sa.Column("persona_version_id", postgresql.UUID(as_uuid=True), nullable=False),
+        sa.Column("goal", sa.Text(), nullable=False),
+        sa.Column("language", persona_language, nullable=False),
+        sa.Column("instructions", sa.Text(), nullable=False),
+        sa.Column("nudge", sa.Text(), nullable=False),
         sa.Column("caller_number", sa.Text(), nullable=False),
         sa.Column("max_duration_s", sa.Integer(), nullable=False),
         sa.Column("status", conversation_status, nullable=False),
@@ -211,6 +220,14 @@ def upgrade() -> None:
             ["agent_version_id", "agent_id"],
             ["agent_versions.id", "agent_versions.agent_id"],
             name="fk_conversations_agent_version_id_agent_id_agent_versions",
+        ),
+        sa.ForeignKeyConstraint(
+            ["persona_id"], ["personas.id"], name="fk_conversations_persona_id_personas"
+        ),
+        sa.ForeignKeyConstraint(
+            ["persona_version_id", "persona_id"],
+            ["persona_versions.id", "persona_versions.persona_id"],
+            name="fk_conversations_persona_version_id_persona_id_persona_versions",
         ),
         sa.PrimaryKeyConstraint("id", name="pk_conversations"),
     )

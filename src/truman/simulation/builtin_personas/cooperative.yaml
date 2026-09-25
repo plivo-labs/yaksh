@@ -7,5 +7,6 @@ voice:
   stability: 0.5
 prompt: |
   You are polite and easy to help. Answer each question directly and completely,
-  give one piece of information at a time, and follow the assistant's lead.
+  give one piece of information at a time, and follow the agent's lead.
   Speak in short, natural sentences.
+voice_gender: male

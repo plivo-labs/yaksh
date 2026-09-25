@@ -49,6 +49,7 @@ from truman.domain.conversations import (
     WireEvent,
     WireEventKind,
 )
+from truman.domain.personas import Language
 
 log = logging.getLogger(__name__)
 
@@ -57,25 +58,23 @@ DRAINED = frozenset({EndReason.GOAL_REACHED, EndReason.GOAL_ABANDONED})
 VAD = VADParams(confidence=0.5, start_secs=0.1, stop_secs=0.6)
 IDLE_S = 15.0
 IDLE_NUDGES = 2
-NUDGE = "Hello? Are you still there?"
+ELEVENLABS_MODEL = "eleven_flash_v2_5"
 
-PERSONA_INSTRUCTIONS = (
-    "You are a person on a phone call with a voice assistant. Stay in character throughout; "
-    "never mention being simulated, a test, or an AI.\n\n"
-    "{persona}\n\n"
-    "The assistant's words arrive as the user's messages. Reply with only what you would say "
-    "next: one short spoken turn, in the first person, in plain sentences, with no lists, "
-    "markdown or stage directions. Ask for or give one thing at a time, as a real caller "
-    "would, and do not repeat what the assistant has already understood. When your goal is "
-    "achieved, or it is clear the assistant cannot help, say nothing more and call end_call "
-    "with whether you succeeded and why."
-)
+# Deepgram language and ElevenLabs language pin per persona language. Hinglish transcribes
+# best as "hi". English and Hindi together need Deepgram's "multi" and no pin, so ElevenLabs
+# detects the language from the text.
+SPEECH_LANGUAGES: dict[Language, tuple[str, str | None]] = {
+    Language.EN: ("en", "en"),
+    Language.HI: ("hi", "hi"),
+    Language.HINGLISH: ("hi", "hi"),
+    Language.EN_HI: ("multi", None),
+}
 
 END_CALL = FunctionSchema(
     name="end_call",
     description=(
         "End the call. Call this instead of speaking once your goal is achieved "
-        "or it is clear the assistant cannot help."
+        "or it is clear the agent cannot help."
     ),
     properties={
         "success": {"type": "boolean", "description": "Whether you achieved your goal."},
@@ -199,18 +198,26 @@ class Persona:
         state: CallState,
         before_output: Sequence[FrameProcessor] = (),
     ) -> None:
-        instructions = PERSONA_INSTRUCTIONS.format(persona=request.persona_prompt)
-        self.llm = llm_service(settings, keys, instructions)
+        self.llm = llm_service(settings, keys, request.instructions)
+        stt_language, tts_language = SPEECH_LANGUAGES[request.language]
         self.stt = DeepgramSTTService(
             api_key=keys["DEEPGRAM_API_KEY"],
             base_url=settings.deepgram_url,
             sample_rate=SAMPLE_RATE,
-            settings=DeepgramSTTService.Settings(model=settings.deepgram_model),
+            settings=DeepgramSTTService.Settings(
+                model=settings.deepgram_model, language=stt_language
+            ),
         )
         self.tts = ElevenLabsTTSService(
             api_key=keys["ELEVENLABS_API_KEY"],
             sample_rate=SAMPLE_RATE,
-            settings=ElevenLabsTTSService.Settings(voice=settings.elevenlabs_voice_id),
+            settings=ElevenLabsTTSService.Settings(
+                model=ELEVENLABS_MODEL,
+                voice=request.voice.id,
+                speed=request.voice.speed,
+                stability=request.voice.stability,
+                language=tts_language,
+            ),
         )
         aggregators = LLMContextAggregatorPair(
             LLMContext(tools=ToolsSchema(standard_tools=[END_CALL])),
@@ -266,7 +273,7 @@ class Persona:
         self._transcript = transcript
 
         async def nudge() -> None:
-            await self.worker.queue_frame(TTSSpeakFrame(NUDGE))
+            await self.worker.queue_frame(TTSSpeakFrame(request.nudge))
 
         watch_silence(aggregators.user(), state, nudge)
 

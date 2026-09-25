@@ -6,6 +6,7 @@ from typing import Any
 
 import pydantic
 import yaml
+from pydantic import Field
 from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import IntegrityError
@@ -19,15 +20,12 @@ from truman.domain.personas import (
     PersonaCreate,
     PersonaUpdate,
     Voice,
+    VoiceGender,
     VoiceProvider,
 )
 from truman.domain.voices import VoiceCatalog, VoiceInfo
 
 NAME_INDEX = "ix_personas_name_live"
-
-VOICE_LANGUAGES: dict[VoiceProvider, dict[Language, str]] = {
-    VoiceProvider.ELEVENLABS: {Language.EN: "en", Language.HI: "hi", Language.HINGLISH: "hi"},
-}
 
 type VoiceCatalogs = Mapping[VoiceProvider, VoiceCatalog]
 
@@ -42,6 +40,7 @@ def config_of(persona: Persona) -> PersonaConfig:
             speed=persona.voice_speed,
             stability=persona.voice_stability,
         ),
+        voice_gender=persona.voice_gender,
     )
 
 
@@ -53,6 +52,7 @@ def config_columns(config: PersonaConfig) -> dict[str, Any]:
         "voice_id": config.voice.id,
         "voice_speed": config.voice.speed,
         "voice_stability": config.voice.stability,
+        "voice_gender": config.voice_gender,
     }
 
 
@@ -75,9 +75,13 @@ def catalog_for(catalogs: VoiceCatalogs, provider: VoiceProvider) -> VoiceCatalo
     return catalog
 
 
-async def check_voice(catalogs: VoiceCatalogs, voice: Voice) -> None:
-    if await catalog_for(catalogs, voice.provider).get_voice(voice.id) is None:
+async def check_voice(catalogs: VoiceCatalogs, voice: Voice) -> VoiceGender | None:
+    """Confirm the voice exists and return its gender as the provider labels it."""
+    info = await catalog_for(catalogs, voice.provider).get_voice(voice.id)
+    if info is None:
         raise ValidationError(f"voice {voice.id} was not found on the {voice.provider} account")
+    label = (info.gender or "").lower()
+    return VoiceGender(label) if label in VoiceGender else None
 
 
 async def list_voices(
@@ -89,10 +93,7 @@ async def list_voices(
     language: Language | None = None,
 ) -> tuple[list[VoiceInfo], int]:
     """A page of the provider's voices; with a language, only those verified for it."""
-    voices = await catalog_for(catalogs, provider).list_voices()
-    if language is not None:
-        code = VOICE_LANGUAGES[provider][language]
-        voices = [voice for voice in voices if code in voice.languages]
+    voices = await catalog_for(catalogs, provider).list_voices(language)
     return voices[offset : offset + limit], len(voices)
 
 
@@ -127,8 +128,9 @@ async def get_persona(
 async def create_persona(
     session: AsyncSession, catalogs: VoiceCatalogs, command: PersonaCreate
 ) -> Persona:
-    config = command.config()
-    await check_voice(catalogs, config.voice)
+    settings = command.settings()
+    gender = await check_voice(catalogs, settings.voice)
+    config = PersonaConfig.model_validate({**settings.model_dump(), "voice_gender": gender})
     persona = Persona(name=command.name, current_version=1)
     apply_config(persona, config)
     session.add(persona)
@@ -159,19 +161,26 @@ async def update_persona(
 ) -> Persona:
     """Rename in place; a changed config writes the next version. A new voice is checked
     after the read transaction ends and before the row is locked, so neither a connection
-    nor a lock is held across a call to the provider."""
+    nor a lock is held across a call to the provider. The voice gender always comes from
+    data about the voice being saved: the provider's answer for a new voice, or the gender
+    read together with the same voice id, never the locked row a concurrent change may have
+    moved to another voice."""
     persona = await get_persona(session, persona_id)
     current_voice = (persona.voice_provider, persona.voice_id)
+    gender = persona.voice_gender
     await session.rollback()
     if update.voice is not None and (update.voice.provider, update.voice.id) != current_voice:
-        await check_voice(catalogs, update.voice)
+        gender = await check_voice(catalogs, update.voice)
     changes = update.changes()
     persona = await get_persona(session, persona_id, lock=True)
     if "name" in changes:
         persona.name = changes.pop("name")
     if changes:
         current = config_of(persona)
-        new = validate_config({**current.model_dump(), **changes})
+        merged = {**current.model_dump(), **changes}
+        if update.voice is not None:
+            merged["voice_gender"] = gender
+        new = validate_config(merged)
         if new != current:
             apply_config(persona, new)
             persona.current_version += 1
@@ -218,13 +227,21 @@ async def get_version(session: AsyncSession, persona_id: uuid.UUID, version: int
     return row
 
 
-def builtin_personas() -> list[tuple[str, PersonaCreate]]:
+class BuiltinPersona(PersonaConfig):
+    """A persona file in the package. It states the voice gender itself, because the seed
+    does not ask the provider."""
+
+    name: str = Field(min_length=1, max_length=80)
+    voice_gender: VoiceGender | None
+
+
+def builtin_personas() -> list[tuple[str, BuiltinPersona]]:
     """The personas that ship in the package, keyed by file name."""
     folder = files("truman.simulation") / "builtin_personas"
     return [
         (
             entry.name.removesuffix(".yaml"),
-            PersonaCreate.model_validate(yaml.safe_load(entry.read_text(encoding="utf-8"))),
+            BuiltinPersona.model_validate(yaml.safe_load(entry.read_text(encoding="utf-8"))),
         )
         for entry in sorted(folder.iterdir(), key=lambda entry: entry.name)
         if entry.name.endswith(".yaml")
@@ -236,11 +253,11 @@ async def seed_builtin_personas(session: AsyncSession) -> list[str]:
     deleted built-in keeps its row, and a user persona with the same name is kept, so nothing
     a user changed comes back. Premade voices exist on every account, so no voice check runs."""
     seeded: list[str] = []
-    for key, command in builtin_personas():
-        config = command.config()
+    for key, builtin in builtin_personas():
+        config = PersonaConfig.model_validate(builtin.model_dump(exclude={"name"}))
         persona_id = await session.scalar(
             insert(Persona)
-            .values(name=command.name, builtin_key=key, current_version=1, **config_columns(config))
+            .values(name=builtin.name, builtin_key=key, current_version=1, **config_columns(config))
             .on_conflict_do_nothing()
             .returning(Persona.id)
         )

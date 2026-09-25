@@ -9,7 +9,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from truman.config import Settings
-from truman.db.models import Agent, AgentVersion, Conversation, PhoneNumber
+from truman.db.models import Agent, AgentVersion, Conversation, Persona, PersonaVersion, PhoneNumber
 from truman.domain.agents import AgentConfig, Direction
 from truman.domain.conversations import (
     ACTIVE_STATUSES,
@@ -23,7 +23,11 @@ from truman.domain.conversations import (
 )
 from truman.domain.errors import NotFoundError, ValidationError
 from truman.domain.numbers import AccountNumber
+from truman.domain.personas import PersonaConfig
 from truman.simulation.agents import get_agent
+from truman.simulation.languages import LANGUAGES
+from truman.simulation.personas import config_of, get_persona
+from truman.simulation.prompts import caller_instructions
 
 LIVE_STATUSES = frozenset({ConversationStatus.RUNNING, ConversationStatus.ENDING})
 LEASE_LOST = "worker lease expired; outcome unknown, not retried"
@@ -53,10 +57,23 @@ async def create_conversation(
             AgentVersion.agent_id == agent.id, AgentVersion.version == agent.current_version
         )
     )
+    persona = await get_persona(session, command.persona_id, lock=True)
+    persona_version_id = await session.scalar(
+        select(PersonaVersion.id).where(
+            PersonaVersion.persona_id == persona.id,
+            PersonaVersion.version == persona.current_version,
+        )
+    )
+    config = config_of(persona)
     conversation = Conversation(
         agent_id=agent.id,
         agent_version_id=version_id,
-        persona_prompt=command.persona_prompt,
+        persona_id=persona.id,
+        persona_version_id=persona_version_id,
+        goal=command.goal,
+        language=config.language,
+        instructions=caller_instructions(config, command.goal),
+        nudge=LANGUAGES[config.language].nudge,
         max_duration_s=command.max_duration_s or settings.default_max_duration_s,
     )
     session.add(conversation)
@@ -99,6 +116,19 @@ async def pinned_agents(
         select(AgentVersion.id, AgentVersion.version, Agent.name)
         .join(Agent, Agent.id == AgentVersion.agent_id)
         .where(AgentVersion.id.in_({row.agent_version_id for row in conversations}))
+    )
+    return {row.id: (row.version, row.name) for row in rows}
+
+
+async def pinned_personas(
+    session: AsyncSession, conversations: Sequence[Conversation]
+) -> dict[uuid.UUID, tuple[int, str]]:
+    """The version number each conversation pinned and the persona's current name, by version
+    id."""
+    rows = await session.execute(
+        select(PersonaVersion.id, PersonaVersion.version, Persona.name)
+        .join(Persona, Persona.id == PersonaVersion.persona_id)
+        .where(PersonaVersion.id.in_({row.persona_version_id for row in conversations}))
     )
     return {row.id: (row.version, row.name) for row in rows}
 
@@ -174,11 +204,15 @@ async def caller_number(session: AsyncSession, conversation: Conversation) -> st
 async def call_request(
     session: AsyncSession, settings: Settings, conversation: Conversation, number: str
 ) -> CallRequest:
-    version = await session.get_one(AgentVersion, conversation.agent_version_id)
+    agent_version = await session.get_one(AgentVersion, conversation.agent_version_id)
+    persona_version = await session.get_one(PersonaVersion, conversation.persona_version_id)
     return CallRequest(
         conversation_id=conversation.id,
-        agent=AgentConfig.model_validate(version.config),
-        persona_prompt=conversation.persona_prompt,
+        agent=AgentConfig.model_validate(agent_version.config),
+        instructions=conversation.instructions,
+        nudge=conversation.nudge,
+        language=conversation.language,
+        voice=PersonaConfig.model_validate(persona_version.config).voice,
         caller_number=number,
         max_duration_s=conversation.max_duration_s,
         output_dir=settings.data_dir / str(conversation.id),

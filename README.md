@@ -18,7 +18,7 @@ The worker phones agents with a [Pipecat](https://github.com/pipecat-ai/pipecat)
 | Variable | Purpose |
 | --- | --- |
 | `DEEPGRAM_API_KEY` | Speech to text. `TRUMAN_DEEPGRAM_URL` points at a self-hosted Deepgram; empty means Deepgram cloud. |
-| `ELEVENLABS_API_KEY` | Text to speech. `TRUMAN_ELEVENLABS_VOICE_ID` picks the voice. |
+| `ELEVENLABS_API_KEY` | Text to speech, and the voice list and check for personas. The API needs it too. Each persona picks its own voice. |
 | `OPENAI_API_KEY`, or `AZURE_OPENAI_ENDPOINT` with `AZURE_OPENAI_API_KEY` (and `AZURE_OPENAI_API_VERSION`) | The persona model. `TRUMAN_PERSONA_MODEL` names the model or the Azure deployment, default `gpt-4.1`. |
 
 ## Phone
@@ -39,13 +39,13 @@ docker compose -f docker/compose.dev.yaml create --force-recreate worker
 docker compose -f docker/compose.dev.yaml start worker
 ```
 
-Create the agent with its number, then start a conversation; the wire events show `ringing`, `answered` and `connected` as the call progresses:
+Create the agent with its number, then start a conversation with a persona and a goal. `GET /api/v1/personas` lists the built-in personas. The wire events show `ringing`, `answered` and `connected` as the call progresses:
 
 ```sh
 curl -X POST localhost:8000/api/v1/agents -H "Authorization: Bearer $TRUMAN_API_TOKEN" -H 'Content-Type: application/json' \
   -d '{"name": "Support line", "agent_number": "+14155550100"}'
 curl -X POST localhost:8000/api/v1/conversations -H "Authorization: Bearer $TRUMAN_API_TOKEN" -H 'Content-Type: application/json' \
-  -d '{"agent_id": "<id from the previous call>", "persona_prompt": "You want to book a table for two tonight."}'
+  -d '{"agent_id": "<agent id>", "persona_id": "<persona id>", "goal": "You want to book a table for two tonight."}'
 ```
 
 ## Develop

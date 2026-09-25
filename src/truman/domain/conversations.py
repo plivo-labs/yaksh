@@ -7,6 +7,7 @@ from typing import Protocol
 from pydantic import BaseModel, ConfigDict, Field
 
 from truman.domain.agents import AgentConfig
+from truman.domain.personas import Language, Voice
 
 
 class Channel(StrEnum):
@@ -97,7 +98,8 @@ class ConversationCreate(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     agent_id: uuid.UUID
-    persona_prompt: str = Field(min_length=1)
+    persona_id: uuid.UUID
+    goal: str = Field(min_length=1, max_length=2000)
     max_duration_s: int | None = Field(default=None, ge=10, le=1800)
 
 
@@ -106,7 +108,10 @@ class CallRequest(BaseModel):
 
     conversation_id: uuid.UUID
     agent: AgentConfig
-    persona_prompt: str
+    instructions: str
+    nudge: str
+    language: Language
+    voice: Voice
     caller_number: str
     max_duration_s: int
     output_dir: Path

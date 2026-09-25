@@ -7,6 +7,7 @@ from fastapi.responses import JSONResponse, RedirectResponse
 
 from truman.caller.plivo_server import PlivoServer
 from truman.domain.errors import UnavailableError
+from truman.domain.personas import Language
 from truman.integrations.elevenlabs import LIST_TTL_S, ElevenLabsCatalog
 
 API_KEY = "el-key"
@@ -45,7 +46,9 @@ async def elevenlabs() -> AsyncIterator[tuple[str, list[dict[str, Any]]]]:
             return {"voices": [VOICE], "has_more": True}
         if token is None:
             return {"voices": [VOICE], "has_more": True, "next_page_token": "p2"}
-        return {"voices": [{**VOICE, "voice_id": "v2", "labels": None}], "has_more": False}
+        english_only = {**VOICE, "voice_id": "v2", "labels": None}
+        english_only["verified_languages"] = [{"language": "en", "model_id": "eleven_turbo_v2_5"}]
+        return {"voices": [english_only], "has_more": False}
 
     @app.get("/v1/voices/{voice_id}")
     async def voice(voice_id: str) -> Response:
@@ -129,3 +132,17 @@ async def test_a_broken_answer_is_unavailable_with_its_status_and_never_the_key(
     assert API_KEY not in str(looped.value)
     with pytest.raises(UnavailableError, match="no page token"):
         await ElevenLabsCatalog("tokenless", base_url=base_url).list_voices()
+
+
+async def test_a_language_filters_the_cached_list_to_voices_verified_for_it(
+    elevenlabs: tuple[str, list[dict[str, Any]]],
+) -> None:
+    base_url, seen = elevenlabs
+    catalog = ElevenLabsCatalog(API_KEY, base_url=base_url)
+
+    everyone = await catalog.list_voices()
+    for language in (Language.HI, Language.HINGLISH, Language.EN_HI):
+        assert [voice.id for voice in await catalog.list_voices(language)] == ["v1"]
+    assert [voice.id for voice in await catalog.list_voices(Language.EN)] == ["v1", "v2"]
+
+    assert len(everyone) == 2 and len(seen) == 2

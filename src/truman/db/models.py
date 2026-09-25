@@ -24,7 +24,7 @@ from sqlalchemy.orm import Mapped, MappedColumn, mapped_column
 from truman.db.base import Base
 from truman.domain.agents import Direction, Transport
 from truman.domain.conversations import Channel, ConversationStatus, EndReason
-from truman.domain.personas import Language, VoiceProvider
+from truman.domain.personas import Language, VoiceGender, VoiceProvider
 
 
 def pg_enum[E: StrEnum](enum: type[E], name: str) -> Enum:
@@ -85,7 +85,12 @@ class Conversation(Base):
     agent_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("agents.id"))
     agent_version_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
     channel: Mapped[Channel] = mapped_column(pg_enum(Channel, "channel"), default=Channel.VOICE)
-    persona_prompt: Mapped[str] = mapped_column(Text)
+    persona_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("personas.id"))
+    persona_version_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
+    goal: Mapped[str] = mapped_column(Text)
+    language: Mapped[Language] = mapped_column(pg_enum(Language, "persona_language"))
+    instructions: Mapped[str] = mapped_column(Text)
+    nudge: Mapped[str] = mapped_column(Text)
     caller_number: Mapped[str | None] = mapped_column(Text)
     call_uuid: Mapped[str | None] = mapped_column(Text)
     max_duration_s: Mapped[int] = mapped_column(Integer)
@@ -107,6 +112,10 @@ class Conversation(Base):
         ForeignKeyConstraint(
             ["agent_version_id", "agent_id"], ["agent_versions.id", "agent_versions.agent_id"]
         ),
+        ForeignKeyConstraint(
+            ["persona_version_id", "persona_id"],
+            ["persona_versions.id", "persona_versions.persona_id"],
+        ),
         Index("ix_conversations_agent_created", "agent_id", text("created_at DESC")),
         Index("ix_conversations_status_created", "status", "created_at"),
     )
@@ -124,6 +133,7 @@ class Persona(Base):
     voice_id: Mapped[str] = mapped_column(Text)
     voice_speed: Mapped[float] = mapped_column(Float)
     voice_stability: Mapped[float] = mapped_column(Float)
+    voice_gender: Mapped[VoiceGender | None] = mapped_column(pg_enum(VoiceGender, "voice_gender"))
     current_version: Mapped[int] = mapped_column(Integer, default=1)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
@@ -150,7 +160,10 @@ class PersonaVersion(Base):
     config: Mapped[dict[str, Any]] = mapped_column(JSONB)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
-    __table_args__ = (UniqueConstraint("persona_id", "version"),)
+    __table_args__ = (
+        UniqueConstraint("persona_id", "version"),
+        UniqueConstraint("id", "persona_id"),
+    )
 
 
 class PhoneNumber(Base):

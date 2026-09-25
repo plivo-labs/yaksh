@@ -37,7 +37,13 @@ import { UNAUTHORIZED_EVENT, authHeaders } from "@/lib/api";
 import { clock, duration, when, words } from "@/lib/format";
 import { keys, useAgent, useConversation, useEndConversation } from "@/lib/queries";
 import { subscribe } from "@/lib/sse";
-import { ACTIVE_STATUSES, type Conversation, type Turn, type WireEvent } from "@/lib/types";
+import {
+  ACTIVE_STATUSES,
+  type Conversation,
+  type Language,
+  type Turn,
+  type WireEvent,
+} from "@/lib/types";
 
 export function ConversationPage() {
   const { id = "" } = useParams();
@@ -112,9 +118,15 @@ export function ConversationPage() {
             <Recording url={data.recording_url} />
             <Card>
               <CardHeader>
-                <CardTitle>Persona</CardTitle>
+                <CardTitle>
+                  {data.persona_name}
+                  <span className="ml-1.5 font-mono text-xs text-muted-foreground">
+                    v{data.persona_version}
+                  </span>
+                </CardTitle>
                 <CardDescription>
-                  From {data.caller_number ?? "a number assigned at call time"}, up to{" "}
+                  {LANGUAGE_NAMES[data.language]}, from{" "}
+                  {data.caller_number ?? "a number assigned at call time"}, up to{" "}
                   {data.max_duration_s}s
                   {data.call_uuid && (
                     <>
@@ -124,14 +136,44 @@ export function ConversationPage() {
                   )}
                 </CardDescription>
               </CardHeader>
-              <CardContent className="whitespace-pre-wrap text-sm">
-                {data.persona_prompt}
+              <CardContent className="grid gap-3 text-sm">
+                <p className="whitespace-pre-wrap">{data.goal}</p>
+                <CallerPrompt instructions={data.instructions} />
               </CardContent>
             </Card>
             <WireEvents events={data.wire_events} validity={data.validity} />
           </div>
         </ScrollArea>
       </div>
+    </div>
+  );
+}
+
+const LANGUAGE_NAMES: Record<Language, string> = {
+  en: "English",
+  hi: "Hindi",
+  hinglish: "Hinglish",
+  en_hi: "English and Hindi",
+};
+
+function CallerPrompt({ instructions }: { instructions: string }) {
+  const [shown, setShown] = useState(false);
+  return (
+    <div className="grid gap-2">
+      <Button
+        variant="link"
+        size="sm"
+        className="h-auto justify-self-start p-0"
+        aria-expanded={shown}
+        onClick={() => setShown(!shown)}
+      >
+        {shown ? "Hide prompt" : "Show prompt"}
+      </Button>
+      {shown && (
+        <pre className="whitespace-pre-wrap rounded-md bg-muted p-3 font-mono text-xs">
+          {instructions}
+        </pre>
+      )}
     </div>
   );
 }

@@ -10,16 +10,31 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy import insert, update
 from sqlalchemy.ext.asyncio import create_async_engine
 
-from tests.conftest import TOKEN, FakeCaller, create_agent_id, start, wait_for, wait_until
+from tests.conftest import (
+    PERSONA,
+    TOKEN,
+    FakeCaller,
+    create_agent_id,
+    create_persona,
+    start,
+    wait_for,
+    wait_until,
+)
 from truman.config import Settings
 from truman.db.models import Conversation
 from truman.db.session import create_engine, create_sessionmaker
 from truman.domain.conversations import ConversationStatus
+from truman.domain.personas import Language
 from truman.simulation import conversations
 from truman.simulation.calls import STOP_IGNORED
 from truman.worker.worker import FINALIZE_ATTEMPTS, Worker
 
 FINAL = {"completed", "failed", "invalid", "cancelled"}
+
+
+def unchecked(agent_id: str) -> dict[str, str]:
+    """A start body for requests refused before the persona is read."""
+    return {"agent_id": agent_id, "persona_id": str(uuid.uuid4()), "goal": "hello"}
 
 
 async def stuck_worker(kind: str, settings: Settings, data_dir: Path) -> asyncio.subprocess.Process:
@@ -109,7 +124,8 @@ async def test_ending_a_running_conversation_hangs_up_and_is_idempotent(
 
 async def test_starting_and_deleting_an_agent_cannot_both_succeed(client: AsyncClient) -> None:
     agent_id = await create_agent_id(client)
-    body = {"agent_id": agent_id, "persona_prompt": "race"}
+    persona = await create_persona(client)
+    body = {"agent_id": agent_id, "persona_id": persona["id"], "goal": "race"}
 
     started, deleted = await asyncio.gather(
         client.post("/api/v1/conversations", json=body),
@@ -187,7 +203,12 @@ async def test_an_expired_lease_is_marked_failed_while_a_live_one_is_not(
             .values(
                 agent_id=uuid.UUID(agent_id),
                 agent_version_id=uuid.UUID(live["agent_version_id"]),
-                persona_prompt="orphaned by a dead worker",
+                persona_id=uuid.UUID(live["persona_id"]),
+                persona_version_id=uuid.UUID(live["persona_version_id"]),
+                goal="orphaned by a dead worker",
+                language=Language.EN,
+                instructions="orphaned by a dead worker",
+                nudge="Hello?",
                 caller_number="+15550100000",
                 max_duration_s=60,
                 status=ConversationStatus.RUNNING,
@@ -250,11 +271,9 @@ async def test_a_conversation_gets_its_number_from_the_pool_and_outbound_agents_
     queued = await start(client, agent)
     chosen = await client.post(
         "/api/v1/conversations",
-        json={"agent_id": agent, "persona_prompt": "hello", "caller_number": "+15550100000"},
+        json={**unchecked(agent), "caller_number": "+15550100000"},
     )
-    refused = await client.post(
-        "/api/v1/conversations", json={"agent_id": outbound, "persona_prompt": "hello"}
-    )
+    refused = await client.post("/api/v1/conversations", json=unchecked(outbound))
 
     assert queued["status"] == "queued" and queued["caller_number"] is None
     assert chosen.status_code == 422
@@ -273,9 +292,7 @@ async def test_conversations_cannot_start_while_phone_calls_are_off(
         transport=ASGITransport(app=app), base_url="http://test", headers=headers
     ) as client:
         agent = await create_agent_id(client)
-        response = await client.post(
-            "/api/v1/conversations", json={"agent_id": agent, "persona_prompt": "hello"}
-        )
+        response = await client.post("/api/v1/conversations", json=unchecked(agent))
     await app.state.engine.dispose()
 
     assert response.status_code == 422
@@ -702,3 +719,62 @@ async def test_shutdown_with_stuck_engine_disposal_still_exits(
             await process.wait()
 
     assert exit_code == 1
+
+
+async def test_a_conversation_freezes_its_persona_goal_and_prompt(
+    client: AsyncClient, settings: Settings
+) -> None:
+    agent_id = await create_agent_id(client)
+    persona = await create_persona(client, language="hi")
+    started = await start(client, agent_id, persona_id=persona["id"], goal="Book a table for two.")
+    await client.patch(
+        f"/api/v1/personas/{persona['id']}",
+        json={"prompt": "Someone else.", "voice": {**persona["voice"], "speed": 1.2}},
+    )
+
+    detail = (await client.get(f"/api/v1/conversations/{started['id']}")).json()
+    engine = create_engine(settings.database_url.encoded_string())
+    async with create_sessionmaker(engine)() as session:
+        row = await conversations.get_conversation(session, uuid.UUID(started["id"]))
+        request = await conversations.call_request(session, settings, row, "+15550100000")
+    await engine.dispose()
+
+    assert (detail["persona_name"], detail["persona_version"]) == (persona["name"], 1)
+    assert (detail["goal"], detail["language"]) == ("Book a table for two.", "hi")
+    assert (
+        PERSONA["prompt"] in detail["instructions"] and "Someone else." not in request.instructions
+    )
+    assert "Book a table for two." in request.instructions and "Hindi" in request.instructions
+    assert request.voice.speed == 1.0 and request.nudge == "हेलो? आप वहाँ हैं?"
+
+
+async def test_a_conversation_needs_a_live_persona(client: AsyncClient) -> None:
+    agent_id = await create_agent_id(client)
+    persona = await create_persona(client)
+    await client.delete(f"/api/v1/personas/{persona['id']}")
+
+    for persona_id in (persona["id"], str(uuid.uuid4())):
+        body = {"agent_id": agent_id, "persona_id": persona_id, "goal": "hello"}
+        response = await client.post("/api/v1/conversations", json=body)
+        assert response.status_code == 404 and "persona" in response.json()["error"]["message"]
+
+
+async def test_a_queued_conversation_still_runs_after_its_persona_is_deleted(
+    client: AsyncClient, settings: Settings, caller: FakeCaller
+) -> None:
+    agent_id = await create_agent_id(client)
+    started = await start(client, agent_id)
+    await client.delete(f"/api/v1/personas/{started['persona_id']}")
+
+    engine = create_engine(settings.database_url.encoded_string())
+    worker = Worker(create_sessionmaker(engine), caller, settings, worker_id="late-worker")
+    stop = asyncio.Event()
+    task = asyncio.create_task(worker.run(stop))
+    try:
+        done = await wait_for(client, started["id"], FINAL)
+    finally:
+        stop.set()
+        await task
+        await engine.dispose()
+
+    assert done["status"] == "completed"

@@ -32,7 +32,6 @@ class Settings(BaseSettings):
     elevenlabs_api_key: SecretStr | None = Field(
         default=None, validation_alias="ELEVENLABS_API_KEY"
     )
-    elevenlabs_voice_id: str = "EXAVITQu4vr4xnSDxMaL"
     azure_openai_endpoint: str | None = Field(
         default=None, validation_alias="AZURE_OPENAI_ENDPOINT"
     )

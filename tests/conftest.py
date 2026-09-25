@@ -1,5 +1,6 @@
 import asyncio
 import contextlib
+import uuid
 from collections.abc import AsyncIterator, Callable, Iterator
 from pathlib import Path
 from typing import Any
@@ -27,7 +28,7 @@ from truman.domain.conversations import (
 )
 from truman.domain.errors import UnavailableError
 from truman.domain.numbers import AccountNumber
-from truman.domain.personas import VoiceProvider
+from truman.domain.personas import Language, Voice, VoiceProvider
 from truman.domain.voices import VoiceInfo
 from truman.simulation import conversations
 from truman.worker.worker import Worker
@@ -39,11 +40,21 @@ OFFLINE_DATABASE_URL = "postgresql+asyncpg://truman:truman@localhost:5432/truman
 
 AGENT = {"name": "Front desk", "agent_number": "+14155550100"}
 ENGLISH_VOICE = VoiceInfo(
-    id="voice-en", name="Chris", category="premade", languages=frozenset({"en"})
+    id="voice-en", name="Chris", category="premade", gender="male", languages=frozenset({"en"})
 )
 HINDI_VOICE = VoiceInfo(
-    id="voice-hi", name="Ananya", category="professional", languages=frozenset({"en", "hi"})
+    id="voice-hi",
+    name="Ananya",
+    category="professional",
+    gender="female",
+    languages=frozenset({"en", "hi"}),
 )
+CALLER = {
+    "instructions": "You want to book a room.",
+    "nudge": "Hello? Are you still there?",
+    "language": Language.EN,
+    "voice": Voice(provider=VoiceProvider.ELEVENLABS, id=ENGLISH_VOICE.id),
+}
 PERSONA = {
     "name": "Rushed caller",
     "prompt": "You are in a hurry.",
@@ -68,7 +79,11 @@ async def create_persona(client: AsyncClient, **overrides: Any) -> dict[str, Any
 
 
 async def start(client: AsyncClient, agent_id: str, **overrides: Any) -> dict[str, Any]:
-    body = {"agent_id": agent_id, "persona_prompt": "I want to book a room", **overrides}
+    if "persona_id" not in overrides:
+        overrides["persona_id"] = (await create_persona(client, name=f"Caller {uuid.uuid4()}"))[
+            "id"
+        ]
+    body = {"agent_id": agent_id, "goal": "I want to book a room", **overrides}
     response = await client.post("/api/v1/conversations", json=body)
     assert response.status_code == 202, response.text
     return response.json()
@@ -177,7 +192,7 @@ class FakeCaller:
         observer.turn(
             Turn(
                 role=Role.CALLER,
-                text=request.persona_prompt,
+                text="I want to book a room",
                 started_at_ms=4,
                 ended_at_ms=5,
                 provenance=Provenance.TRANSMITTED,
@@ -199,10 +214,12 @@ class FakeCatalog:
     def __init__(self) -> None:
         self.voices = {voice.id: voice for voice in (ENGLISH_VOICE, HINDI_VOICE)}
         self.lookups: list[str] = []
+        self.listed_for: list[Language | None] = []
         self.down = False
 
-    async def list_voices(self) -> list[VoiceInfo]:
+    async def list_voices(self, language: Language | None = None) -> list[VoiceInfo]:
         self._answer()
+        self.listed_for.append(language)
         return list(self.voices.values())
 
     async def get_voice(self, voice_id: str) -> VoiceInfo | None:

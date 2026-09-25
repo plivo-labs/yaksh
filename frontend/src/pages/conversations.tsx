@@ -20,7 +20,7 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty";
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import {
   Pagination,
@@ -53,6 +53,7 @@ import {
   CONVERSATIONS_PAGE,
   useAgents,
   useConversations,
+  usePersonas,
   useStartConversation,
 } from "@/lib/queries";
 import type { Agent, ConversationStatus } from "@/lib/types";
@@ -172,7 +173,7 @@ export function ConversationsPage() {
             </EmptyMedia>
             <EmptyTitle>No conversations yet</EmptyTitle>
             <EmptyDescription>
-              Start one: pick an agent and tell the caller who to be.
+              Start one: pick an agent, a persona and what the caller wants.
             </EmptyDescription>
           </EmptyHeader>
         </Empty>
@@ -207,8 +208,12 @@ export function ConversationsPage() {
                     v{conversation.agent_version}
                   </span>
                 </TableCell>
-                <TableCell className="max-w-96 truncate text-muted-foreground">
-                  {conversation.persona_prompt}
+                <TableCell className="max-w-96 truncate">
+                  {conversation.persona_name}
+                  <span className="ml-1.5 font-mono text-xs text-muted-foreground">
+                    v{conversation.persona_version}
+                  </span>
+                  <span className="ml-2 text-muted-foreground">{conversation.goal}</span>
                 </TableCell>
                 <TableCell>
                   <StatusBadge status={conversation.status} />
@@ -260,26 +265,40 @@ export function ConversationsPage() {
 function StartDialog({ agents }: { agents: Agent[] }) {
   const [open, setOpen] = useState(false);
   const [agentId, setAgentId] = useState("");
-  const [persona, setPersona] = useState("");
+  const [personaId, setPersonaId] = useState("");
+  const [goal, setGoal] = useState("");
   const [maxDuration, setMaxDuration] = useState("300");
+  const personas = usePersonas();
   const start = useStartConversation();
   const navigate = useNavigate();
   const chosen = agentId || agents[0]?.id || "";
+  const chosenPersona = personaId || personas.data?.[0]?.id || "";
   const agentItems = agents.map((agent) => ({ value: agent.id, label: agent.name }));
+  const personaItems = (personas.data ?? []).map((persona) => ({
+    value: persona.id,
+    label: persona.name,
+  }));
   const duration = Number(maxDuration);
   const durationOk = Number.isInteger(duration) && duration >= 10 && duration <= 1800;
 
   const submit = (event: SubmitEvent) => {
     event.preventDefault();
     start.mutate(
-      { agent_id: chosen, persona_prompt: persona.trim(), max_duration_s: duration },
+      {
+        agent_id: chosen,
+        persona_id: chosenPersona,
+        goal: goal.trim(),
+        max_duration_s: duration,
+      },
       { onSuccess: (conversation) => navigate(`/conversations/${conversation.id}`) },
     );
   };
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button disabled={agents.length === 0} />}>
+      <DialogTrigger
+        render={<Button disabled={agents.length === 0 || personas.data?.length === 0} />}
+      >
         <Plus />
         Start conversation
       </DialogTrigger>
@@ -312,14 +331,40 @@ function StartDialog({ agents }: { agents: Agent[] }) {
             </Field>
             <Field>
               <FieldLabel htmlFor="persona">Persona</FieldLabel>
+              <Select
+                items={personaItems}
+                value={chosenPersona}
+                onValueChange={(value) => setPersonaId(value ?? "")}
+              >
+                <SelectTrigger id="persona" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    {personaItems.map((item) => (
+                      <SelectItem key={item.value} value={item.value}>
+                        {item.label}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+              <FieldDescription>
+                Who calls: how they talk, their language and voice.
+              </FieldDescription>
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="goal">Goal</FieldLabel>
               <Textarea
-                id="persona"
-                rows={6}
+                id="goal"
+                rows={4}
                 required
-                placeholder="You are Priya Raman calling to book a teeth cleaning next Tuesday morning. Answer briefly, one thing at a time. End the call once the booking is confirmed."
-                value={persona}
-                onChange={(event) => setPersona(event.target.value)}
+                maxLength={2000}
+                placeholder="Book a teeth cleaning for next Tuesday morning. Your name is Priya Raman."
+                value={goal}
+                onChange={(event) => setGoal(event.target.value)}
               />
+              <FieldDescription>What the caller wants from this call.</FieldDescription>
             </Field>
             <Field>
               <FieldLabel htmlFor="max_duration">Hang up after (seconds)</FieldLabel>
@@ -338,7 +383,7 @@ function StartDialog({ agents }: { agents: Agent[] }) {
           <DialogFooter>
             <Button
               type="submit"
-              disabled={start.isPending || !persona.trim() || !chosen || !durationOk}
+              disabled={start.isPending || !goal.trim() || !chosen || !chosenPersona || !durationOk}
             >
               {start.isPending && <Spinner />}
               Call

@@ -8,4 +8,5 @@ voice:
 prompt: |
   You are in a hurry and want this call over fast. Give short answers, try to skip
   steps you think are unnecessary, and sometimes leave out a detail until the
-  assistant asks for it again. Show impatience when the assistant repeats itself.
+  agent asks for it again. Show impatience when the agent repeats itself.
+voice_gender: male
