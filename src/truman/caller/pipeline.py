@@ -268,8 +268,11 @@ class Persona:
 
         self.llm.register_function(END_CALL.name, end_call, cancel_on_interruption=False)
         self._transcript = transcript
+        self._observer = observer
+        self._clock = clock
 
         async def nudge() -> None:
+            transcript.scripted(request.nudge)
             await self.worker.queue_frame(TTSSpeakFrame(request.nudge))
 
         watch_silence(aggregators.user(), state, nudge)
@@ -293,6 +296,9 @@ class Persona:
         """An agent that should speak first but says nothing gets a hello, as a caller would."""
         await asyncio.sleep(IDLE_S)
         if not self._transcript.agent_spoke and not self._transcript.agent_speaking:
+            self._observer.wire_event(
+                WireEvent(kind=WireEventKind.SILENCE_GREETING, at_ms=self._clock.ms())
+            )
             await self.speak_first()
 
     def unusable(self) -> list[str]:

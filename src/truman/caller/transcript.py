@@ -20,6 +20,8 @@ from pipecat.frames.frames import (
     TTSTextFrame,
     UserStartedSpeakingFrame,
     UserStoppedSpeakingFrame,
+    VADUserStartedSpeakingFrame,
+    VADUserStoppedSpeakingFrame,
 )
 from pipecat.processors.aggregators.llm_context import LLMContext
 from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
@@ -63,12 +65,34 @@ class Reply:
         return heard
 
 
+def remainder(generated: str, heard: str) -> str | None:
+    """What follows `heard` in `generated`, matched on visible characters; None when the two
+    differ, for example when the TTS dropped a character."""
+    wanted = [char for char in heard if not char.isspace()]
+    matched = index = 0
+    while matched < len(wanted):
+        if index == len(generated):
+            return None
+        char = generated[index]
+        if not char.isspace():
+            if char != wanted[matched]:
+                return None
+            matched += 1
+        index += 1
+    return generated[index:].strip()
+
+
 class TranscriptBuilder:
     """Assembles turns from pipeline events.
 
-    A caller turn holds the words whose audio the wire had sent in full by the time the reply
-    ended or was cut off; the rest of the generated reply is kept apart as cut, so a judge
-    never reads what the agent did not hear. A reply with no audio evidence is all cut.
+    A caller turn holds the words whose audio Plivo reported as played by the time the reply
+    ended or was cut off. The rest of the generated reply is kept apart, so a judge never
+    reads what the agent may not have heard: as cut after a barge-in, as unconfirmed
+    otherwise.
+
+    Caller times are Truman's: a turn starts when its first word left Truman's output and ends
+    when the reply closed. Agent turns run from the first voice activity to the last, each
+    moved back by the delay the voice detector needed to decide.
     """
 
     def __init__(self, clock: Clock, observer: CallObserver) -> None:
@@ -76,8 +100,10 @@ class TranscriptBuilder:
         self._observer = observer
         self._agent_started: int | None = None
         self._agent_stopped: int | None = None
+        self._voice_started: int | None = None
+        self._voice_stopped: int | None = None
         self._generating: list[str] | None = None
-        self._generated: deque[str] = deque()
+        self._generated: deque[tuple[str, bool]] = deque()
         self._reply: Reply | None = None
         self._closed: Playout | None = None
         self.agent_speaking = False
@@ -93,17 +119,34 @@ class TranscriptBuilder:
         self.agent_speaking = False
         self._agent_stopped = self._clock.ms()
 
+    def agent_voice_started(self, start_secs: float) -> None:
+        if self._voice_stopped is not None and not self.agent_speaking:
+            self._voice_started = self._voice_stopped = None
+            self._agent_started = self._agent_stopped = None
+        if self._voice_started is None:
+            self._voice_started = self._clock.ms() - round(start_secs * 1000)
+
+    def agent_voice_stopped(self, stop_secs: float) -> None:
+        self._voice_stopped = self._clock.ms() - round(stop_secs * 1000)
+
     def agent_said(self, text: str) -> None:
         self.agent_spoke = True
         now = self._clock.ms()
-        started = now if self._agent_started is None else self._agent_started
-        stopped = now if self._agent_stopped is None else self._agent_stopped
+        started = self._voice_started if self._voice_started is not None else self._agent_started
+        stopped = self._voice_stopped if self._voice_stopped is not None else self._agent_stopped
+        started = now if started is None else started
+        stopped = now if stopped is None else stopped
         self._observer.turn(
             Turn(
                 role=Role.AGENT, text=text, started_at_ms=started, ended_at_ms=max(started, stopped)
             )
         )
         self._agent_started = self._agent_stopped = None
+        self._voice_started = self._voice_stopped = None
+
+    def scripted(self, text: str) -> None:
+        """Fixed text about to be spoken for the caller; it takes the place of a generation."""
+        self._generated.append((text, True))
 
     def generation_started(self) -> None:
         self._generating = []
@@ -117,7 +160,7 @@ class TranscriptBuilder:
             return
         text = "".join(self._generating).strip()
         if text:
-            self._generated.append(text)
+            self._generated.append((text, False))
         self._generating = None
 
     def caller_started(self, playout: Playout | None) -> None:
@@ -156,8 +199,13 @@ class TranscriptBuilder:
             self._close(cut=False)
 
     def call_ended(self) -> None:
+        """Close the open reply; text generated but never started is kept as unconfirmed."""
         if self._reply is not None:
             self._close(cut=False)
+        now = self._clock.ms()
+        while self._generated:
+            text, scripted = self._generated.popleft()
+            self._caller_turn(text, now, now, Provenance.UNCONFIRMED, scripted)
 
     def caller_interrupted(self) -> None:
         self.generation_ended()
@@ -172,21 +220,26 @@ class TranscriptBuilder:
         if reply.playout is not None:
             self._closed = reply.playout
         now = self._clock.ms()
-        generated = self._generated.popleft() if self._generated else None
+        generated, scripted = self._generated.popleft() if self._generated else (None, False)
         heard = reply.heard()
         text = ("" if reply.self_spaced else " ").join(heard).strip()
         if text:
-            self._caller_turn(text, reply.started_ms, now, Provenance.TRANSMITTED)
+            self._caller_turn(text, reply.started_ms, now, Provenance.TRANSMITTED, scripted)
         if cut or len(heard) < len(reply.words) or not text:
-            rest = (
-                generated.split()[len(heard) :]
-                if generated
-                else [word for word, _, _ in reply.words[len(heard) :]]
-            )
+            rest = remainder(generated, text) if generated else None
+            if rest is None:
+                rest = " ".join(word for word, _, _ in reply.words[len(heard) :]).strip()
             if rest:
-                self._caller_turn(" ".join(rest), now, now, Provenance.CUT)
+                provenance = Provenance.CUT if cut else Provenance.UNCONFIRMED
+                self._caller_turn(rest, now, now, provenance, scripted)
+        if cut:
+            while self._generated:
+                waiting, waiting_scripted = self._generated.popleft()
+                self._caller_turn(waiting, now, now, Provenance.CUT, waiting_scripted)
 
-    def _caller_turn(self, text: str, started: int, ended: int, provenance: Provenance) -> None:
+    def _caller_turn(
+        self, text: str, started: int, ended: int, provenance: Provenance, scripted: bool
+    ) -> None:
         self._observer.turn(
             Turn(
                 role=Role.CALLER,
@@ -194,6 +247,7 @@ class TranscriptBuilder:
                 started_at_ms=started,
                 ended_at_ms=ended,
                 provenance=provenance,
+                scripted=scripted,
             )
         )
 
@@ -208,7 +262,8 @@ def last_user_message(context: LLMContext) -> str | None:
 
 
 class AgentTurnTap(FrameProcessor):
-    """After the user aggregator: the agent's turns, timed by VAD, worded by the aggregator."""
+    """After the user aggregator: the agent's turns, timed by voice activity when it is known
+    and by the turn detector otherwise, worded by the aggregator."""
 
     def __init__(self, transcript: TranscriptBuilder) -> None:
         super().__init__(enable_direct_mode=True)
@@ -217,7 +272,11 @@ class AgentTurnTap(FrameProcessor):
     async def process_frame(self, frame: Frame, direction: FrameDirection) -> None:
         await super().process_frame(frame, direction)
         if direction is FrameDirection.DOWNSTREAM:
-            if isinstance(frame, UserStartedSpeakingFrame):
+            if isinstance(frame, VADUserStartedSpeakingFrame):
+                self._transcript.agent_voice_started(frame.start_secs)
+            elif isinstance(frame, VADUserStoppedSpeakingFrame):
+                self._transcript.agent_voice_stopped(frame.stop_secs)
+            elif isinstance(frame, UserStartedSpeakingFrame):
                 self._transcript.agent_started()
             elif isinstance(frame, UserStoppedSpeakingFrame):
                 self._transcript.agent_stopped()
@@ -282,7 +341,10 @@ class WireTap(FrameProcessor):
                 self._transcript.reply_ended(frame.metadata.get(PLAYOUT))
             elif isinstance(frame, EndFrame):
                 self._transcript.call_ended()
-            elif isinstance(frame, InterruptionFrame | CancelFrame):
+            elif isinstance(frame, CancelFrame):
+                await self._settle()
+                self._transcript.call_ended()
+            elif isinstance(frame, InterruptionFrame):
                 await self._settle()
                 self._transcript.caller_interrupted()
         await self.push_frame(frame, direction)

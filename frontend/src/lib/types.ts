@@ -40,7 +40,7 @@ export interface CallerClaim {
 type Role = "agent" | "caller";
 export type Language = "en" | "hinglish";
 export type VoiceGender = "male" | "female" | "neutral";
-type Provenance = "transmitted" | "cut";
+type Provenance = "transmitted" | "cut" | "unconfirmed";
 type WireEventKind =
   | "connect_started"
   | "ringing"
@@ -50,6 +50,7 @@ type WireEventKind =
   | "caller_speech_end"
   | "agent_audio"
   | "clear_audio"
+  | "silence_greeting"
   | "stop"
   | "caller_error";
 
@@ -160,6 +161,7 @@ export interface Turn {
   started_at_ms: number;
   ended_at_ms: number;
   provenance: Provenance | null;
+  scripted: boolean;
 }
 
 export interface WireEvent {

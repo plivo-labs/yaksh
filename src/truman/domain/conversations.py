@@ -55,7 +55,12 @@ class Role(StrEnum):
 
 class Provenance(StrEnum):
     TRANSMITTED = "transmitted"
+    """Plivo reported the audio of these words as played."""
     CUT = "cut"
+    """Agent-side voice started a turn while these words were due, and Plivo did not report
+    them played in full."""
+    UNCONFIRMED = "unconfirmed"
+    """No play report covers these words, and no barge-in stopped them."""
 
 
 class WireEventKind(StrEnum):
@@ -67,6 +72,7 @@ class WireEventKind(StrEnum):
     CALLER_SPEECH_END = "caller_speech_end"
     AGENT_AUDIO = "agent_audio"
     CLEAR_AUDIO = "clear_audio"
+    SILENCE_GREETING = "silence_greeting"
     STOP = "stop"
     CALLER_ERROR = "caller_error"
 
@@ -79,6 +85,8 @@ class Turn(BaseModel):
     started_at_ms: int
     ended_at_ms: int
     provenance: Provenance | None = None
+    scripted: bool = False
+    """Fixed text Truman spoke for the caller, such as the idle nudge, not model output."""
 
 
 class WireEvent(BaseModel):

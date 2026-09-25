@@ -276,11 +276,18 @@ function Transcript({ turns, active }: { turns: Turn[]; active: boolean }) {
                           <MessageHeader className="gap-2 font-mono">
                             <span>{turn.role === "agent" ? "Agent" : "Caller"}</span>
                             <span>{clock(turn.started_at_ms)}</span>
+                            {turn.scripted && <Badge variant="secondary">fixed nudge</Badge>}
                             {turn.provenance === "cut" && <Badge variant="outline">cut off</Badge>}
+                            {turn.provenance === "unconfirmed" && (
+                              <Badge variant="outline">not confirmed heard</Badge>
+                            )}
                           </MessageHeader>
                           <Bubble variant={turn.role === "caller" ? "default" : "outline"}>
                             <BubbleContent
-                              className={cn(turn.provenance === "cut" && "line-through opacity-60")}
+                              className={cn(
+                                turn.provenance === "cut" && "line-through opacity-60",
+                                turn.provenance === "unconfirmed" && "opacity-60",
+                              )}
                             >
                               {turn.text}
                             </BubbleContent>
