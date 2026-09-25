@@ -32,11 +32,11 @@ class ReturnsOnStop:
 
 async def test_a_requested_stop_reason_wins_even_when_the_caller_returns_at_once() -> None:
     live = LiveCall()
-    live.request_stop(EndReason.PROCESS_RESTART)
+    live.request_stop(EndReason.WORKER_STOPPED)
 
     outcome = await run_call(ReturnsOnStop(), REQUEST, live, end_timeout_s=0.2)
 
-    assert outcome.end_reason is EndReason.PROCESS_RESTART and outcome.connected is True
+    assert outcome.end_reason is EndReason.WORKER_STOPPED and outcome.connected is True
 
 
 class ReturnsOnlyWhenCancelled:
@@ -63,3 +63,20 @@ async def test_a_caller_that_needed_cancelling_keeps_its_recording_but_is_marked
     assert outcome.recording_path == Path("/data/saved.wav")
     assert outcome.end_reason is EndReason.USER_REQUEST
     assert outcome.caller_error == STOP_IGNORED
+
+
+class EndsOnItsOwnDuringStop:
+    async def run(
+        self, request: CallRequest, observer: CallObserver, stop: asyncio.Event
+    ) -> CallOutcome:
+        await stop.wait()
+        return CallOutcome(connected=True, end_reason=EndReason.AGENT_HANGUP)
+
+
+async def test_a_stop_that_comes_after_the_call_ended_does_not_rename_its_end() -> None:
+    live = LiveCall()
+    live.request_stop(EndReason.USER_REQUEST)
+
+    outcome = await run_call(EndsOnItsOwnDuringStop(), REQUEST, live, end_timeout_s=0.2)
+
+    assert outcome.end_reason is EndReason.AGENT_HANGUP

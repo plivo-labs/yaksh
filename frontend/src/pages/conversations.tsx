@@ -42,7 +42,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
-import { duration, when, words } from "@/lib/format";
+import { duration, when } from "@/lib/format";
 import {
   CONVERSATIONS_PAGE,
   useAgents,
@@ -50,7 +50,7 @@ import {
   usePersonas,
   useStartConversation,
 } from "@/lib/queries";
-import type { Agent, ConversationStatus } from "@/lib/types";
+import { END_REASON_LABELS, type Agent, type ConversationStatus } from "@/lib/types";
 
 const STATUSES: ConversationStatus[] = [
   "queued",
@@ -206,8 +206,8 @@ export function ConversationsPage() {
                 <TableCell>
                   <StatusBadge status={conversation.status} />
                 </TableCell>
-                <TableCell className="capitalize">
-                  {conversation.end_reason ? words(conversation.end_reason) : ""}
+                <TableCell>
+                  {conversation.end_reason ? END_REASON_LABELS[conversation.end_reason] : ""}
                 </TableCell>
                 <TableCell className="text-right font-mono text-xs">
                   {duration(conversation.duration_ms)}

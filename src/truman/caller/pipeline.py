@@ -43,6 +43,7 @@ from truman.caller.transcript import AgentTurnTap, GeneratedTap, TranscriptBuild
 from truman.config import Settings
 from truman.diagnostics import describe_exception
 from truman.domain.conversations import (
+    CallerClaim,
     CallObserver,
     CallRequest,
     EndReason,
@@ -55,7 +56,7 @@ from truman.integrations import elevenlabs
 log = logging.getLogger(__name__)
 
 END_GRACE_S = 3.0
-DRAINED = frozenset({EndReason.GOAL_REACHED, EndReason.GOAL_ABANDONED})
+DRAINED = frozenset({EndReason.CALLER_HANGUP})
 VAD = VADParams(confidence=0.5, start_secs=0.1, stop_secs=0.6)
 IDLE_S = 15.0
 IDLE_NUDGES = 2
@@ -120,6 +121,7 @@ class CallState:
     connected: bool = False
     end_reason: EndReason | None = None
     error: str | None = None
+    claim: CallerClaim | None = None
     ended: asyncio.Event = field(default_factory=asyncio.Event)
 
     def end(self, reason: EndReason) -> None:
@@ -252,17 +254,17 @@ class Persona:
         )
 
         async def end_call(params: FunctionCallParams) -> None:
-            success = bool(params.arguments.get("success"))
-            log.info(
-                "persona ended conversation %s: success=%s, %s",
-                request.conversation_id,
-                success,
-                params.arguments.get("reason"),
+            claim = CallerClaim(
+                success=bool(params.arguments.get("success")),
+                reason=str(params.arguments.get("reason") or ""),
             )
+            log.info("caller ended conversation %s: %s", request.conversation_id, claim)
             await params.result_callback(
                 {"status": "call ended"}, properties=FunctionCallResultProperties(run_llm=False)
             )
-            state.end(EndReason.GOAL_REACHED if success else EndReason.GOAL_ABANDONED)
+            if state.end_reason is None:
+                state.claim = claim
+            state.end(EndReason.CALLER_HANGUP)
 
         self.llm.register_function(END_CALL.name, end_call, cancel_on_interruption=False)
         self._transcript = transcript
@@ -322,7 +324,7 @@ async def converse(
             state.blame("the pipeline stopped on its own")
             state.end(EndReason.ERROR)
     except asyncio.CancelledError:
-        state.end(EndReason.PROCESS_RESTART)
+        state.end(EndReason.WORKER_STOPPED)
     finally:
         for waiter in waiters:
             waiter.cancel()

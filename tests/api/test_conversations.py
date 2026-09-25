@@ -73,6 +73,8 @@ async def test_a_conversation_runs_to_completion_with_its_transcript(
     assert done["call_uuid"] == "call-42"
     assert [turn["role"] for turn in done["transcript"]] == ["agent", "caller"]
     assert done["transcript"][1]["provenance"] == "transmitted"
+    assert done["caller_claim"] is None
+
     assert [event["kind"] for event in done["wire_events"]] == [
         "connect_started",
         "connected",
@@ -83,6 +85,18 @@ async def test_a_conversation_runs_to_completion_with_its_transcript(
     listed = (await client.get("/api/v1/conversations", params={"agent_id": agent_id})).json()
     assert [item["status"] for item in listed["items"]] == ["completed"]
     assert caller.calls == 1
+
+
+async def test_the_caller_hanging_up_keeps_its_claim_apart_from_the_end_reason(
+    client: AsyncClient, worker: Worker, caller: FakeCaller
+) -> None:
+    caller.mode = "caller_hangs_up"
+    started = await start(client, await create_agent_id(client))
+
+    done = await wait_for(client, started["id"], {"completed"})
+
+    assert done["end_reason"] == "caller_hangup"
+    assert done["caller_claim"] == {"success": True, "reason": "the room is booked"}
 
 
 async def test_ending_a_queued_conversation_cancels_it_without_a_call(
@@ -221,7 +235,7 @@ async def test_an_expired_lease_is_marked_failed_while_a_live_one_is_not(
 
     reaped = await wait_for(client, str(orphan_id), FINAL)
 
-    assert reaped["status"] == "failed" and reaped["end_reason"] == "process_restart"
+    assert reaped["status"] == "failed" and reaped["end_reason"] == "lease_lost"
     assert "not retried" in reaped["failure_reason"]
     assert (await client.get(f"/api/v1/conversations/{live['id']}")).json()["status"] == "running"
     caller.release.set()
@@ -393,7 +407,7 @@ async def test_worker_shutdown_stops_the_caller_and_keeps_the_evidence(
     await engine.dispose()
 
     done = (await client.get(f"/api/v1/conversations/{started['id']}")).json()
-    assert done["status"] == "failed" and done["end_reason"] == "process_restart"
+    assert done["status"] == "failed" and done["end_reason"] == "worker_stopped"
     assert "worker stopped" in done["failure_reason"]
     assert "connected" in [event["kind"] for event in done["wire_events"]]
     assert done["transcript"][0]["role"] == "agent"
@@ -457,7 +471,7 @@ async def test_a_worker_that_cannot_renew_its_lease_stops_the_call(
     monkeypatch.setattr("truman.simulation.conversations.renew_lease", broken)
     done = await wait_for(client, started["id"], FINAL, timeout=10)
 
-    assert done["status"] == "failed" and done["end_reason"] == "process_restart"
+    assert done["status"] == "failed" and done["end_reason"] == "lease_lost"
     assert caller.calls == 1
 
 
@@ -507,7 +521,7 @@ async def test_a_renewal_that_hangs_stops_the_call_within_the_lease(
     monkeypatch.setattr("truman.simulation.conversations.renew_lease", hanging)
     done = await wait_for(client, started["id"], FINAL, timeout=10)
 
-    assert done["status"] == "failed" and done["end_reason"] == "process_restart"
+    assert done["status"] == "failed" and done["end_reason"] == "lease_lost"
 
 
 async def test_an_expired_owner_can_neither_renew_nor_record(
@@ -635,7 +649,7 @@ async def test_a_call_whose_preparation_outlives_the_lease_is_not_started(
     done = await wait_for(client, started["id"], FINAL, timeout=10)
     await asyncio.sleep(0.5)
 
-    assert done["status"] == "failed" and done["end_reason"] == "process_restart"
+    assert done["status"] == "failed" and done["end_reason"] == "lease_lost"
     assert caller.calls == 0
 
 

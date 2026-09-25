@@ -74,7 +74,7 @@ async def run_call(
         live.request_stop(EndReason.DURATION_LIMIT)
         return await outcome_after_stop(run, live, end_timeout_s)
     except asyncio.CancelledError:
-        live.request_stop(EndReason.PROCESS_RESTART)
+        live.request_stop(EndReason.WORKER_STOPPED)
         live.outcome = await outcome_after_stop(run, live, end_timeout_s)
         raise
     finally:
@@ -84,8 +84,9 @@ async def run_call(
 
 
 def settle(outcome: CallOutcome, live: LiveCall) -> CallOutcome:
-    """A requested stop owns the end reason; the caller keeps everything else it reported."""
-    if not live.stop.is_set():
+    """A requested stop owns the end reason when the stop is what ended the call; a call that
+    ended on its own keeps the reason the caller observed."""
+    if not live.stop.is_set() or outcome.end_reason is not EndReason.USER_REQUEST:
         return outcome
     return outcome.model_copy(update={"end_reason": live.end_reason})
 

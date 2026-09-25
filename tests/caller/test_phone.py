@@ -13,6 +13,7 @@ from httpx import AsyncClient
 from tests.conftest import CALLER, Observer, make_settings
 from truman.caller import phone
 from truman.caller.phone import Connected, Dialer, PhoneCaller
+from truman.caller.pipeline import CallState
 from truman.caller.plivo_server import PlivoServer, StreamRegistry, create_app
 from truman.domain.agents import AgentConfig
 from truman.domain.conversations import CallOutcome, CallRequest, EndReason, WireEventKind
@@ -213,6 +214,78 @@ async def test_silence_from_plivo_and_a_missing_stream_time_out(rig: Rig, tmp_pa
         {"cancel": "req-1"},
         {"hang_up": "call-2"},
     ]
+
+
+async def test_a_call_that_only_rang_is_not_reported_as_answered(rig: Rig, tmp_path: Path) -> None:
+    call = request(tmp_path)
+    dialing = dial(rig, call, Observer(), asyncio.Event())
+    await rig.report(call.conversation_id, CallStatus="ringing", CallUUID="call-4")
+
+    outcome = await asyncio.wait_for(dialing, 5)
+
+    assert outcome.end_reason is EndReason.ERROR and outcome.caller_error
+    assert "rang" in outcome.caller_error and "answered" not in outcome.caller_error
+
+
+async def test_a_hangup_before_the_stream_names_the_side_plivo_reports(
+    rig: Rig, tmp_path: Path
+) -> None:
+    async def hung_up(**report: str) -> CallOutcome:
+        call = request(tmp_path)
+        dialing = dial(rig, call, Observer(), asyncio.Event())
+        await rig.report(call.conversation_id, CallStatus="completed", Event="Hangup", **report)
+        return await asyncio.wait_for(dialing, 2)
+
+    agent = await hung_up(HangupSource="Callee", HangupCause="NORMAL_CLEARING")
+    carrier = await hung_up(HangupSource="Plivo", HangupCauseName="Network Error")
+    unknown = await hung_up(HangupCause="NORMAL_CLEARING")
+
+    assert agent.end_reason is EndReason.AGENT_HANGUP
+    assert carrier.end_reason is EndReason.ERROR
+    assert carrier.caller_error == "Plivo reports hangup source Plivo: Network Error"
+    assert unknown.end_reason is EndReason.ERROR
+    assert unknown.caller_error == (
+        "the call ended before its stream started: completed (NORMAL_CLEARING)"
+    )
+
+
+async def test_the_end_of_a_stream_is_named_by_the_hangup_report_that_follows(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(phone, "HANGUP_REPORT_WAIT_S", 0.05)
+    reports: asyncio.Queue[dict[str, str]] = asyncio.Queue()
+    reports.put_nowait({"Event": "StartStream", "Status": "streaming"})
+    reports.put_nowait({"CallStatus": "completed", "Event": "Hangup", "HangupSource": "Callee"})
+    agent, unknown, observed = CallState(), CallState(), CallState()
+    agent.end(EndReason.STREAM_ENDED)
+    unknown.end(EndReason.STREAM_ENDED)
+    observed.end(EndReason.CALLER_HANGUP)
+
+    await phone.resolve_stream_end(agent, reports)
+    await phone.resolve_stream_end(unknown, reports)
+    await phone.resolve_stream_end(observed, reports)
+
+    assert (agent.end_reason, agent.error) == (EndReason.AGENT_HANGUP, None)
+    assert unknown.end_reason is EndReason.STREAM_ENDED
+    assert unknown.error == "the stream ended and Plivo did not say which side ended the call"
+    assert (observed.end_reason, observed.error) == (EndReason.CALLER_HANGUP, None)
+
+
+async def test_a_stream_report_before_the_socket_does_not_end_the_dial(
+    rig: Rig, tmp_path: Path
+) -> None:
+    call = request(tmp_path)
+    dialing = dial(rig, call, Observer(), asyncio.Event())
+    await rig.answer(call.conversation_id, "call-5")
+    await rig.report(call.conversation_id, Event="StartStream", Status="streaming")
+    async with websockets.connect(
+        f"ws://127.0.0.1:{rig.worker.port}/stream/{call.conversation_id}"
+    ) as plivo:
+        await plivo.send(json.dumps({"event": "start", "start": START}))
+        connected = await asyncio.wait_for(dialing, 2)
+        rig.registry.forget(call.conversation_id)
+
+    assert isinstance(connected, Connected)
 
 
 async def test_the_phone_caller_reports_an_unanswered_call_and_frees_its_stream_entry(

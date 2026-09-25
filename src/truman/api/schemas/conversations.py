@@ -4,6 +4,7 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict
 
 from truman.domain.conversations import (
+    CallerClaim,
     Channel,
     ConversationStatus,
     EndReason,
@@ -47,3 +48,4 @@ class ConversationRead(ConversationSummary):
     transcript: list[Turn]
     wire_events: list[WireEvent]
     validity: Validity | None
+    caller_claim: CallerClaim | None

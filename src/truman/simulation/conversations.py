@@ -30,8 +30,9 @@ from truman.simulation.personas import config_of, get_persona
 from truman.simulation.prompts import caller_instructions
 
 LIVE_STATUSES = frozenset({ConversationStatus.RUNNING, ConversationStatus.ENDING})
-LEASE_LOST = "worker lease expired; outcome unknown, not retried"
+LEASE_LOST = "worker lost its lease on the conversation; outcome unknown, not retried"
 WORKER_STOPPED = "worker stopped during the call; outcome unknown, not retried"
+FAILURE_TEXT = {EndReason.WORKER_STOPPED: WORKER_STOPPED, EndReason.LEASE_LOST: LEASE_LOST}
 
 
 class PoolExhaustedError(Exception):
@@ -278,7 +279,7 @@ async def reap_expired(session: AsyncSession) -> int:
         )
         .values(
             status=ConversationStatus.FAILED,
-            end_reason=EndReason.PROCESS_RESTART,
+            end_reason=EndReason.LEASE_LOST,
             failure_reason=LEASE_LOST,
             ended_at=func.now(),
             claimed_by=None,
@@ -294,7 +295,7 @@ async def reap_expired(session: AsyncSession) -> int:
 
 
 def resolve_status(outcome: CallOutcome) -> ConversationStatus:
-    if outcome.end_reason is EndReason.PROCESS_RESTART:
+    if outcome.end_reason in FAILURE_TEXT:
         return ConversationStatus.FAILED
     if not outcome.connected:
         if outcome.end_reason is EndReason.USER_REQUEST:
@@ -306,9 +307,7 @@ def resolve_status(outcome: CallOutcome) -> ConversationStatus:
 
 
 def failure_reason(outcome: CallOutcome) -> str | None:
-    if outcome.end_reason is EndReason.PROCESS_RESTART:
-        return WORKER_STOPPED
-    return outcome.caller_error
+    return FAILURE_TEXT.get(outcome.end_reason, outcome.caller_error)
 
 
 async def finalize(
@@ -320,6 +319,7 @@ async def finalize(
     duration_ms: int,
 ) -> bool:
     """Record the terminal state. Returns False when the row was no longer ours to finish."""
+    transcript.caller_claim = outcome.caller_claim
     if outcome.connected:
         transcript.validity = Validity(
             ok=outcome.caller_error is None,

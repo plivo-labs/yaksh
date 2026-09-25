@@ -26,7 +26,7 @@ STREAM_XML = (
     'statusCallbackUrl="{status_url}" statusCallbackMethod="POST">'
     "{stream_url}</Stream></Response>"
 )
-REPORT_KEYS = ("Event", "Status", "Cause", "Reason", "Error")
+REPORT_KEYS = ("Event", "Status", "Cause", "Source", "Reason", "Error")
 CALLBACK_RETRIES = "rc=5&ct=2000&rd=1000&rp=5xx,ct"
 HANGUP_XML = '<?xml version="1.0" encoding="UTF-8"?><Response><Hangup/></Response>'
 NO_CALL = "no call expects this stream"

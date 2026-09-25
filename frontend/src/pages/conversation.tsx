@@ -38,6 +38,7 @@ import { clock, duration, when, words } from "@/lib/format";
 import { keys, useAgent, useConversation, useEndConversation } from "@/lib/queries";
 import { subscribe } from "@/lib/sse";
 import {
+  END_REASON_LABELS,
   ACTIVE_STATUSES,
   type Conversation,
   LANGUAGE_NAMES,
@@ -84,10 +85,16 @@ export function ConversationPage() {
             Version {data.agent_version}
             {data.started_at && ` · started ${when(data.started_at)}`}
             {data.duration_ms !== null && ` · ${duration(data.duration_ms)}`}
-            {data.end_reason && ` · ended by ${words(data.end_reason)}`}
+            {data.end_reason && ` · ${END_REASON_LABELS[data.end_reason]}`}
           </p>
           {data.failure_reason && (
             <p className="text-sm text-status-danger">{data.failure_reason}</p>
+          )}
+          {data.caller_claim && (
+            <p className="text-sm text-muted-foreground">
+              The caller says it {data.caller_claim.success ? "reached" : "did not reach"} its goal
+              {data.caller_claim.reason && `: ${data.caller_claim.reason}`}
+            </p>
           )}
         </div>
         {active && (

@@ -10,14 +10,33 @@ export type ConversationStatus =
   | "cancelled";
 type EndReason =
   | "user_request"
-  | "goal_reached"
-  | "goal_abandoned"
+  | "caller_hangup"
   | "agent_hangup"
   | "agent_silent"
   | "no_answer"
+  | "stream_ended"
   | "duration_limit"
   | "error"
-  | "process_restart";
+  | "worker_stopped"
+  | "lease_lost";
+
+export const END_REASON_LABELS: Record<EndReason, string> = {
+  user_request: "Stopped on request",
+  caller_hangup: "Caller hung up",
+  agent_hangup: "Agent hung up",
+  agent_silent: "Agent stayed silent",
+  no_answer: "No answer",
+  stream_ended: "Stream ended",
+  duration_limit: "Time limit reached",
+  error: "Error",
+  worker_stopped: "Worker stopped",
+  lease_lost: "Worker lease lost",
+};
+
+export interface CallerClaim {
+  success: boolean;
+  reason: string;
+}
 type Role = "agent" | "caller";
 export type Language = "en" | "hinglish";
 export type VoiceGender = "male" | "female" | "neutral";
@@ -184,6 +203,7 @@ export interface Conversation extends ConversationSummary {
   transcript: Turn[];
   wire_events: WireEvent[];
   validity: Validity | null;
+  caller_claim: CallerClaim | null;
 }
 
 export interface ConversationInput {

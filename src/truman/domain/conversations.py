@@ -26,15 +26,21 @@ class ConversationStatus(StrEnum):
 
 
 class EndReason(StrEnum):
+    """Who or what ended the conversation, as Truman observed it."""
+
     USER_REQUEST = "user_request"
-    GOAL_REACHED = "goal_reached"
-    GOAL_ABANDONED = "goal_abandoned"
+    CALLER_HANGUP = "caller_hangup"
     AGENT_HANGUP = "agent_hangup"
+    """Plivo reported that the called side, the agent, hung up."""
     AGENT_SILENT = "agent_silent"
     NO_ANSWER = "no_answer"
+    STREAM_ENDED = "stream_ended"
+    """The audio stream stopped and Plivo did not say which side ended the call."""
     DURATION_LIMIT = "duration_limit"
     ERROR = "error"
-    PROCESS_RESTART = "process_restart"
+    WORKER_STOPPED = "worker_stopped"
+    LEASE_LOST = "lease_lost"
+    """The worker could not keep its claim on the conversation, so it stopped the call."""
 
 
 ACTIVE_STATUSES = frozenset(
@@ -89,10 +95,20 @@ class Validity(BaseModel):
     reasons: list[str] = Field(default_factory=list)
 
 
+class CallerClaim(BaseModel):
+    """What the caller model said when it hung up. A claim, not a verdict on the agent."""
+
+    model_config = ConfigDict(frozen=True)
+
+    success: bool
+    reason: str
+
+
 class Transcript(BaseModel):
     turns: list[Turn] = Field(default_factory=list)
     wire_events: list[WireEvent] = Field(default_factory=list)
     validity: Validity | None = None
+    caller_claim: CallerClaim | None = None
 
 
 class ConversationCreate(BaseModel):
@@ -124,6 +140,7 @@ class CallOutcome(BaseModel):
     connected: bool
     end_reason: EndReason
     caller_error: str | None = None
+    caller_claim: CallerClaim | None = None
     recording_path: Path | None = None
     call_uuid: str | None = None
 

@@ -156,7 +156,7 @@ class Worker:
     async def drain(self) -> None:
         """Ask every active call to stop, then wait for each task to finish recording its result."""
         for live in self._live.values():
-            live.request_stop(EndReason.PROCESS_RESTART)
+            live.request_stop(EndReason.WORKER_STOPPED)
         tasks = list(self._tasks.values())
         if not tasks:
             return
@@ -221,7 +221,7 @@ class Worker:
         except asyncio.CancelledError:
             return (
                 live.outcome or CallOutcome(connected=live.connected, end_reason=live.end_reason)
-            ).model_copy(update={"end_reason": EndReason.PROCESS_RESTART})
+            ).model_copy(update={"end_reason": EndReason.WORKER_STOPPED})
         except Exception as exc:
             log.exception("caller failed for conversation %s", request.conversation_id)
             return CallOutcome(
@@ -288,7 +288,7 @@ class Worker:
             remaining = lease_s - (time.monotonic() - last_confirmed)
             if remaining <= 0:
                 log.warning("lease on conversation %s ran out; stopping the call", conversation_id)
-                live.request_stop(EndReason.PROCESS_RESTART)
+                live.request_stop(EndReason.LEASE_LOST)
                 return
             progress = live.snapshot() if live.dirty else None
             sent = time.monotonic()
@@ -297,7 +297,7 @@ class Worker:
             )
             if renewal is None:
                 log.warning("lease on conversation %s ran out mid-renewal", conversation_id)
-                live.request_stop(EndReason.PROCESS_RESTART)
+                live.request_stop(EndReason.LEASE_LOST)
                 return
             if renewal.exception() is not None:
                 log.error("%s failed: %r", what, renewal.exception())
@@ -308,7 +308,7 @@ class Worker:
             status = renewal.result()
             if status is None:
                 log.warning("lost the lease on conversation %s", conversation_id)
-                live.request_stop(EndReason.PROCESS_RESTART)
+                live.request_stop(EndReason.LEASE_LOST)
                 return
             if status is ConversationStatus.ENDING:
                 live.request_stop(EndReason.USER_REQUEST)

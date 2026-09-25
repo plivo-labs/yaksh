@@ -58,6 +58,7 @@ async def detail(session: AsyncSession, conversation: Conversation) -> Conversat
         transcript=transcript.turns,
         wire_events=transcript.wire_events,
         validity=transcript.validity,
+        caller_claim=transcript.caller_claim,
     )
 
 

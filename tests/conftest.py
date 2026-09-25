@@ -17,6 +17,7 @@ from truman.db.migrate import upgrade_to_head
 from truman.db.models import Voice
 from truman.db.session import create_engine, create_sessionmaker
 from truman.domain.conversations import (
+    CallerClaim,
     CallObserver,
     CallOutcome,
     CallRequest,
@@ -213,6 +214,12 @@ class FakeCaller:
             )
         )
         observer.wire_event(WireEvent(kind=WireEventKind.STOP, at_ms=6))
+        if self.mode == "caller_hangs_up":
+            return CallOutcome(
+                connected=True,
+                end_reason=EndReason.CALLER_HANGUP,
+                caller_claim=CallerClaim(success=True, reason="the room is booked"),
+            )
         return CallOutcome(
             connected=True,
             end_reason=EndReason.AGENT_HANGUP,

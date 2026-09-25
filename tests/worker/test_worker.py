@@ -92,7 +92,7 @@ async def test_a_renewal_that_survives_cancellation_stops_the_call_and_marks_fat
 
     await asyncio.wait_for(worker._maintain(uuid.uuid4(), live, time.monotonic()), timeout=2)
 
-    assert live.stop.is_set() and live.end_reason is EndReason.PROCESS_RESTART
+    assert live.stop.is_set() and live.end_reason is EndReason.LEASE_LOST
     assert worker.fatal.is_set()
 
 
@@ -150,7 +150,7 @@ async def test_the_lease_is_measured_from_when_a_renewal_was_sent(
 
     await asyncio.wait_for(worker._maintain(uuid.uuid4(), live, started), timeout=3)
 
-    assert live.stop.is_set() and live.end_reason is EndReason.PROCESS_RESTART
+    assert live.stop.is_set() and live.end_reason is EndReason.LEASE_LOST
     assert time.monotonic() - started < 1.4
 
 
