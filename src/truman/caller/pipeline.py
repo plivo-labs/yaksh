@@ -41,6 +41,7 @@ from pipecat.workers.runner import WorkerRunner
 from truman.caller.audio import SAMPLE_RATE, Clock
 from truman.caller.transcript import AgentTurnTap, GeneratedTap, TranscriptBuilder
 from truman.config import Settings
+from truman.diagnostics import describe_exception
 from truman.domain.conversations import (
     CallObserver,
     CallRequest,
@@ -48,7 +49,6 @@ from truman.domain.conversations import (
     WireEvent,
     WireEventKind,
 )
-from truman.integrations.http import safe_error_text
 
 log = logging.getLogger(__name__)
 
@@ -364,6 +364,6 @@ def note_failure(running: asyncio.Task[None], state: CallState) -> None:
     error = None if running.cancelled() else running.exception()
     if error is None:
         return
-    failure = safe_error_text(error)
+    failure = describe_exception(error)
     log.error("pipeline failed: %s", failure)
     state.blame(failure)

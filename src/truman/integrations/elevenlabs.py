@@ -9,9 +9,9 @@ from urllib.parse import quote
 import aiohttp
 import pydantic
 
+from truman.diagnostics import describe_exception
 from truman.domain.errors import UnavailableError
 from truman.domain.voices import VoiceInfo
-from truman.integrations.http import safe_error_text
 
 ELEVENLABS_API = "https://api.elevenlabs.io"
 TIMEOUT = aiohttp.ClientTimeout(total=10)
@@ -53,7 +53,7 @@ class ElevenLabsCatalog:
                 status, text = response.status, await response.text()
         except (aiohttp.ClientError, TimeoutError, UnicodeDecodeError) as error:
             raise UnavailableError(
-                f"the ElevenLabs voice lookup failed: {safe_error_text(error)}"
+                f"the ElevenLabs voice lookup failed: {describe_exception(error)}"
             ) from error
         if status >= 400:
             if voice_not_found(text):
@@ -93,7 +93,7 @@ class ElevenLabsCatalog:
                     params = {"page_size": PAGE_SIZE, "next_page_token": token}
         except (aiohttp.ClientError, TimeoutError, UnicodeDecodeError) as error:
             raise UnavailableError(
-                f"the ElevenLabs voice list failed: {safe_error_text(error)}"
+                f"the ElevenLabs voice list failed: {describe_exception(error)}"
             ) from error
         raise UnavailableError(f"the ElevenLabs voice list did not end after {MAX_PAGES} pages")
 

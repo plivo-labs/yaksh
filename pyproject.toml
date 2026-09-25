@@ -74,20 +74,41 @@ name = "domain imports nothing from truman"
 type = "forbidden"
 source_modules = ["truman.domain"]
 forbidden_modules = [
+    "truman.__main__",
     "truman.api",
     "truman.caller",
     "truman.config",
     "truman.db",
+    "truman.diagnostics",
     "truman.evaluation",
+    "truman.integrations",
     "truman.simulation",
     "truman.worker",
 ]
 
 [[tool.importlinter.contracts]]
-name = "integrations import only the domain"
+name = "diagnostics imports nothing from truman"
+type = "forbidden"
+source_modules = ["truman.diagnostics"]
+forbidden_modules = [
+    "truman.__main__",
+    "truman.api",
+    "truman.caller",
+    "truman.config",
+    "truman.db",
+    "truman.domain",
+    "truman.evaluation",
+    "truman.integrations",
+    "truman.simulation",
+    "truman.worker",
+]
+
+[[tool.importlinter.contracts]]
+name = "integrations import only the domain and diagnostics"
 type = "forbidden"
 source_modules = ["truman.integrations"]
 forbidden_modules = [
+    "truman.__main__",
     "truman.api",
     "truman.caller",
     "truman.config",
@@ -98,10 +119,10 @@ forbidden_modules = [
 ]
 
 [[tool.importlinter.contracts]]
-name = "simulation and evaluation never import the caller"
+name = "simulation and evaluation never import the caller or integrations"
 type = "forbidden"
 source_modules = ["truman.simulation", "truman.evaluation"]
-forbidden_modules = ["truman.caller"]
+forbidden_modules = ["truman.caller", "truman.integrations"]
 
 [[tool.importlinter.contracts]]
 name = "evaluation never imports simulation"
@@ -125,7 +146,7 @@ forbidden_modules = ["truman.api", "truman.worker"]
 name = "db holds no business logic"
 type = "forbidden"
 source_modules = ["truman.db"]
-forbidden_modules = ["truman.simulation", "truman.evaluation", "truman.caller"]
+forbidden_modules = ["truman.simulation", "truman.evaluation", "truman.caller", "truman.integrations"]
 
 [tool.commitizen]
 name = "cz_conventional_commits"

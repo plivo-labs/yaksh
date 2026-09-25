@@ -8,8 +8,8 @@ from typing import Any
 import aiohttp
 from pydantic import ValidationError
 
+from truman.diagnostics import describe_exception
 from truman.domain.numbers import AccountNumber
-from truman.integrations.http import safe_error_text
 
 log = logging.getLogger(__name__)
 
@@ -67,7 +67,7 @@ class PlivoApi:
                     raise PlivoError(f"create call failed with {response.status}: {body}")
         except (aiohttp.ClientError, TimeoutError) as error:
             raise PlivoError(
-                f"create call did not reach Plivo: {safe_error_text(error)}"
+                f"create call did not reach Plivo: {describe_exception(error)}"
             ) from error
         try:
             return str(json.loads(body)["request_uuid"])
@@ -96,7 +96,7 @@ class PlivoApi:
                     url = f"{self.base_url}{next_path}" if next_path else None
         except (aiohttp.ClientError, TimeoutError, ValueError) as error:
             raise PlivoError(
-                f"listing numbers did not reach Plivo: {safe_error_text(error)}"
+                f"listing numbers did not reach Plivo: {describe_exception(error)}"
             ) from error
         if url is not None:
             raise PlivoError(f"listing numbers did not end after {MAX_PAGES} pages")
@@ -120,7 +120,7 @@ class PlivoApi:
                     raise PlivoError(f"delete {url} failed with {response.status}: {body}")
         except (aiohttp.ClientError, TimeoutError) as error:
             raise PlivoError(
-                f"delete {url} did not reach Plivo: {safe_error_text(error)}"
+                f"delete {url} did not reach Plivo: {describe_exception(error)}"
             ) from error
 
 
