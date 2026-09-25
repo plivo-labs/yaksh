@@ -70,7 +70,6 @@ async def test_concurrent_leases_get_distinct_numbers_and_a_finished_call_frees_
             "w1",
             CallOutcome(connected=True, end_reason=EndReason.AGENT_HANGUP),
             Transcript(),
-            1000,
         )
         assert recorded
         assert (await session.get_one(Conversation, winner)).caller_number == NUMBER

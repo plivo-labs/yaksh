@@ -316,7 +316,6 @@ async def finalize(
     worker_id: str,
     outcome: CallOutcome,
     transcript: Transcript,
-    duration_ms: int,
 ) -> bool:
     """Record the terminal state. Returns False when the row was no longer ours to finish."""
     transcript.caller_claim = outcome.caller_claim
@@ -333,7 +332,7 @@ async def finalize(
             end_reason=outcome.end_reason,
             failure_reason=failure_reason(outcome),
             ended_at=func.now(),
-            duration_ms=duration_ms,
+            talk_ms=outcome.talk_ms,
             transcript=transcript.model_dump(mode="json"),
             recording_path=str(outcome.recording_path) if outcome.recording_path else None,
             call_uuid=outcome.call_uuid,

@@ -38,7 +38,7 @@ class ConversationSummary(BaseModel):
     failure_reason: str | None
     started_at: datetime | None
     ended_at: datetime | None
-    duration_ms: int | None
+    talk_ms: int | None
     recording_url: str | None
     created_at: datetime
 

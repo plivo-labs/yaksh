@@ -224,7 +224,7 @@ def upgrade() -> None:
         sa.Column("failure_reason", sa.Text(), nullable=True),
         sa.Column("started_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("ended_at", sa.DateTime(timezone=True), nullable=True),
-        sa.Column("duration_ms", sa.Integer(), nullable=True),
+        sa.Column("talk_ms", sa.Integer(), nullable=True),
         sa.Column("recording_path", sa.Text(), nullable=True),
         sa.Column("transcript", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
         sa.Column("claimed_by", sa.Text(), nullable=True),

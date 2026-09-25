@@ -84,7 +84,7 @@ export function ConversationPage() {
           <p className="text-sm text-muted-foreground">
             Version {data.agent_version}
             {data.started_at && ` · started ${when(data.started_at)}`}
-            {data.duration_ms !== null && ` · ${duration(data.duration_ms)}`}
+            {data.talk_ms !== null && ` · ${duration(data.talk_ms)} of talk`}
             {data.end_reason && ` · ${END_REASON_LABELS[data.end_reason]}`}
           </p>
           {data.failure_reason && (
@@ -129,7 +129,7 @@ export function ConversationPage() {
                 <CardDescription>
                   {LANGUAGE_NAMES[data.language]}, from{" "}
                   {data.caller_number ?? "a number assigned at call time"}, up to{" "}
-                  {data.max_duration_s}s
+                  {data.max_duration_s}s once connected
                   {data.call_uuid && (
                     <>
                       {" · Plivo call "}

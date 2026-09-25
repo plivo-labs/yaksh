@@ -176,7 +176,7 @@ export function ConversationsPage() {
               <TableHead>Persona</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>End</TableHead>
-              <TableHead className="text-right">Length</TableHead>
+              <TableHead className="text-right">Talk time</TableHead>
               <TableHead>Started</TableHead>
             </TableRow>
           </TableHeader>
@@ -210,7 +210,7 @@ export function ConversationsPage() {
                   {conversation.end_reason ? END_REASON_LABELS[conversation.end_reason] : ""}
                 </TableCell>
                 <TableCell className="text-right font-mono text-xs">
-                  {duration(conversation.duration_ms)}
+                  {duration(conversation.talk_ms)}
                 </TableCell>
                 <TableCell className="font-mono text-xs">
                   {when(conversation.started_at ?? conversation.created_at)}
@@ -351,7 +351,7 @@ function StartDialog({ agents }: { agents: Agent[] }) {
               />
             </Field>
             <Field>
-              <FieldLabel htmlFor="max_duration">Hang up after (seconds)</FieldLabel>
+              <FieldLabel htmlFor="max_duration">Hang up after (seconds once connected)</FieldLabel>
               <Input
                 id="max_duration"
                 type="number"

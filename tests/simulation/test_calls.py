@@ -9,6 +9,8 @@ from truman.domain.conversations import (
     CallOutcome,
     CallRequest,
     EndReason,
+    WireEvent,
+    WireEventKind,
 )
 from truman.simulation.calls import STOP_IGNORED, LiveCall, run_call
 
@@ -34,7 +36,7 @@ async def test_a_requested_stop_reason_wins_even_when_the_caller_returns_at_once
     live = LiveCall()
     live.request_stop(EndReason.WORKER_STOPPED)
 
-    outcome = await run_call(ReturnsOnStop(), REQUEST, live, end_timeout_s=0.2)
+    outcome = await run_call(ReturnsOnStop(), REQUEST, live, end_timeout_s=0.2, dial_timeout_s=5)
 
     assert outcome.end_reason is EndReason.WORKER_STOPPED and outcome.connected is True
 
@@ -58,7 +60,9 @@ async def test_a_caller_that_needed_cancelling_keeps_its_recording_but_is_marked
     live = LiveCall()
     live.request_stop(EndReason.USER_REQUEST)
 
-    outcome = await run_call(ReturnsOnlyWhenCancelled(), REQUEST, live, end_timeout_s=0.1)
+    outcome = await run_call(
+        ReturnsOnlyWhenCancelled(), REQUEST, live, end_timeout_s=0.1, dial_timeout_s=5
+    )
 
     assert outcome.recording_path == Path("/data/saved.wav")
     assert outcome.end_reason is EndReason.USER_REQUEST
@@ -77,6 +81,46 @@ async def test_a_stop_that_comes_after_the_call_ended_does_not_rename_its_end() 
     live = LiveCall()
     live.request_stop(EndReason.USER_REQUEST)
 
-    outcome = await run_call(EndsOnItsOwnDuringStop(), REQUEST, live, end_timeout_s=0.2)
+    outcome = await run_call(
+        EndsOnItsOwnDuringStop(), REQUEST, live, end_timeout_s=0.2, dial_timeout_s=5
+    )
 
     assert outcome.end_reason is EndReason.AGENT_HANGUP
+
+
+class AnswersLate:
+    """Rings for a while, connects, then talks until it is stopped."""
+
+    def __init__(self, ring_s: float) -> None:
+        self.ring_s = ring_s
+
+    async def run(
+        self, request: CallRequest, observer: CallObserver, stop: asyncio.Event
+    ) -> CallOutcome:
+        await asyncio.sleep(self.ring_s)
+        observer.wire_event(WireEvent(kind=WireEventKind.CONNECTED, at_ms=0))
+        await stop.wait()
+        return CallOutcome(connected=True, end_reason=EndReason.USER_REQUEST)
+
+
+async def test_the_time_limit_counts_from_connect_not_from_dialing() -> None:
+    live = LiveCall()
+    request = REQUEST.model_copy(update={"max_duration_s": 0.3})
+    loop = asyncio.get_running_loop()
+    started = loop.time()
+
+    outcome = await run_call(
+        AnswersLate(ring_s=0.5), request, live, end_timeout_s=0.2, dial_timeout_s=5
+    )
+
+    assert outcome.end_reason is EndReason.DURATION_LIMIT
+    assert loop.time() - started >= 0.8
+
+
+async def test_a_caller_that_never_connects_is_stopped_at_the_dial_deadline_with_a_reason() -> None:
+    live = LiveCall()
+
+    outcome = await run_call(ReturnsOnStop(), REQUEST, live, end_timeout_s=0.2, dial_timeout_s=0.1)
+
+    assert outcome.end_reason is EndReason.ERROR
+    assert outcome.caller_error == "the call did not connect within 0.1s"

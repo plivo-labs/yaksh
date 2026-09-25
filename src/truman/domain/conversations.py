@@ -149,6 +149,8 @@ class CallOutcome(BaseModel):
     end_reason: EndReason
     caller_error: str | None = None
     caller_claim: CallerClaim | None = None
+    talk_ms: int | None = None
+    """From the moment the call connected until the conversation ended, on the caller's clock."""
     recording_path: Path | None = None
     call_uuid: str | None = None
 

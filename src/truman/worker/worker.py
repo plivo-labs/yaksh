@@ -28,6 +28,7 @@ FINALIZE_ATTEMPTS = 5
 FINALIZE_RETRY_S = 1.0
 FINALIZE_TIMEOUT_S = 10.0
 MAX_BACKOFF_S = 30.0
+DIAL_MARGIN_S = 60.0
 
 
 async def wait_any(
@@ -151,7 +152,7 @@ class Worker:
 
     async def _record_cancelled(self, conversation_id: uuid.UUID) -> None:
         outcome = CallOutcome(connected=False, end_reason=EndReason.USER_REQUEST)
-        await self._record(conversation_id, outcome, Transcript(), 0)
+        await self._record(conversation_id, outcome, Transcript())
 
     async def drain(self) -> None:
         """Ask every active call to stop, then wait for each task to finish recording its result."""
@@ -194,11 +195,9 @@ class Worker:
         maintenance = asyncio.create_task(
             self._maintain(request.conversation_id, live, confirmed_at)
         )
-        started = time.monotonic()
         try:
             outcome = await self._call(request, live)
-            duration_ms = int((time.monotonic() - started) * 1000)
-            await self._record(request.conversation_id, outcome, live.snapshot(), duration_ms)
+            await self._record(request.conversation_id, outcome, live.snapshot())
         finally:
             await self._abandon(
                 maintenance,
@@ -209,7 +208,11 @@ class Worker:
     async def _call(self, request: CallRequest, live: LiveCall) -> CallOutcome:
         try:
             return await run_call(
-                self._caller, request, live, end_timeout_s=self._settings.end_timeout_s
+                self._caller,
+                request,
+                live,
+                end_timeout_s=self._settings.end_timeout_s,
+                dial_timeout_s=self._settings.ring_timeout_s + DIAL_MARGIN_S,
             )
         except CallerUnresponsiveError:
             log.critical(
@@ -230,19 +233,18 @@ class Worker:
 
     async def _record_failure(self, conversation_id: uuid.UUID, exc: Exception) -> None:
         outcome = CallOutcome(connected=False, end_reason=EndReason.ERROR, caller_error=str(exc))
-        await self._record(conversation_id, outcome, Transcript(), 0)
+        await self._record(conversation_id, outcome, Transcript())
 
     async def _record(
         self,
         conversation_id: uuid.UUID,
         outcome: CallOutcome,
         transcript: Transcript,
-        duration_ms: int,
     ) -> None:
         what = f"recording conversation {conversation_id}"
         for attempt in range(1, FINALIZE_ATTEMPTS + 1):
             write = await self._run_bounded(
-                self._write_result(conversation_id, outcome, transcript, duration_ms),
+                self._write_result(conversation_id, outcome, transcript),
                 FINALIZE_TIMEOUT_S,
                 what,
             )
@@ -265,11 +267,10 @@ class Worker:
         conversation_id: uuid.UUID,
         outcome: CallOutcome,
         transcript: Transcript,
-        duration_ms: int,
     ) -> bool:
         async with self._sessionmaker() as session:
             return await conversations.finalize(
-                session, conversation_id, self.worker_id, outcome, transcript, duration_ms
+                session, conversation_id, self.worker_id, outcome, transcript
             )
 
     async def _maintain(

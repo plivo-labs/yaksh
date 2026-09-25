@@ -103,7 +103,7 @@ class Conversation(Base):
     failure_reason: Mapped[str | None] = mapped_column(Text)
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    duration_ms: Mapped[int | None] = mapped_column(Integer)
+    talk_ms: Mapped[int | None] = mapped_column(Integer)
     recording_path: Mapped[str | None] = mapped_column(Text)
     transcript: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     claimed_by: Mapped[str | None] = mapped_column(Text)

@@ -49,7 +49,7 @@ log = logging.getLogger(__name__)
 
 CALLBACK_GRACE_S = 15.0
 STREAM_GRACE_S = 10.0
-TIME_LIMIT_MARGIN_S = 10
+TIME_LIMIT_MARGIN_S = 30
 RINGING = "ringing"
 IN_PROGRESS = "in-progress"
 UNANSWERED = frozenset({"no-answer", "timeout", "busy"})
@@ -555,7 +555,7 @@ class PhoneCaller:
 
         @transport.event_handler("on_client_connected")
         async def on_connected(_transport: Any, _socket: Any) -> None:
-            state.connected = True
+            state.connected_ms = clock.ms()
             observer.wire_event(WireEvent(kind=WireEventKind.CONNECTED, at_ms=clock.ms()))
             if not request.agent.agent_speaks_first:
                 await persona.speak_first()
@@ -577,6 +577,7 @@ class PhoneCaller:
         finally:
             if greeting is not None:
                 greeting.cancel()
+        talk_ms = None if state.connected_ms is None else clock.ms() - state.connected_ms
         await resolve_stream_end(state, entry.callbacks)
         state.blame(serializer.failure)
         return CallOutcome(
@@ -584,6 +585,7 @@ class PhoneCaller:
             end_reason=state.end_reason or EndReason.ERROR,
             caller_error=state.error,
             caller_claim=state.claim,
+            talk_ms=talk_ms,
             recording_path=recorder.path,
             call_uuid=dialed.call_uuid,
         )

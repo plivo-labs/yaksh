@@ -195,7 +195,7 @@ export interface ConversationSummary {
   failure_reason: string | null;
   started_at: string | null;
   ended_at: string | null;
-  duration_ms: number | null;
+  talk_ms: number | null;
   recording_url: string | null;
   created_at: string;
 }
