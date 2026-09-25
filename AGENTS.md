@@ -43,7 +43,7 @@ Imported call:    api -> worker -> evaluation -> saved results
 
 ## Conventions
 
-- Modern, battle-tested tooling and libraries, current stable versions: Python 3.13 with uv, ruff, pyrefly, pytest; FastAPI, SQLAlchemy 2, Alembic, Pydantic 2. No legacy tools kept for familiarity.
+- Modern, battle-tested tooling and libraries, current stable versions: Python 3.14 with uv, ruff, pyrefly, pytest; FastAPI, SQLAlchemy 2, Alembic, Pydantic 2. No legacy tools kept for familiarity.
 - The import rules above are enforced by import-linter (`lint-imports`, contracts in `pyproject.toml`).
 - Records that a conversation depends on are versioned: every change to an agent's configuration writes an `agent_versions` row, and a conversation pins the version it ran against.
 - Work on `dev`; `main` is for releases.

@@ -7,7 +7,7 @@ RUN --mount=type=cache,target=/root/.bun/install/cache bun install --frozen-lock
 COPY frontend/ ./
 RUN bun run build
 
-FROM python:3.13-slim-trixie AS backend
+FROM python:3.14-slim-trixie AS backend
 COPY --from=ghcr.io/astral-sh/uv:0.12.15 /uv /uvx /bin/
 ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy UV_PYTHON_DOWNLOADS=0
 WORKDIR /app
@@ -24,7 +24,7 @@ RUN --mount=type=cache,target=/root/.cache/uv uv sync --locked
 ENV PATH="/app/.venv/bin:$PATH" TRUMAN_API_HOST=0.0.0.0
 CMD ["truman", "api", "--reload"]
 
-FROM python:3.13-slim-trixie
+FROM python:3.14-slim-trixie
 RUN groupadd --system truman && useradd --system --gid truman --home-dir /app truman \
     && mkdir -p /app/data && chown truman:truman /app/data
 WORKDIR /app

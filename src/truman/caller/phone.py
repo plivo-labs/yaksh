@@ -309,7 +309,7 @@ class StreamSerializer(FrameSerializer):
     async def deserialize(self, data: str | bytes) -> Frame | None:
         try:
             message = json.loads(data)
-        except (json.JSONDecodeError, TypeError):
+        except json.JSONDecodeError, TypeError:
             return None
         if not isinstance(message, dict):
             return None

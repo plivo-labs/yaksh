@@ -32,5 +32,5 @@ class Page[T](BaseModel):
     page_size: int
 
     @classmethod
-    def of(cls, items: list[T], total: int, params: PageParams) -> "Page[T]":
+    def of(cls, items: list[T], total: int, params: PageParams) -> Page[T]:
         return cls(items=items, total=total, page=params.page, page_size=params.page_size)

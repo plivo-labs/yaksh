@@ -5,7 +5,7 @@ description = "Simulate, evaluate and improve AI agents"
 readme = "README.md"
 license = "BSD-2-Clause"
 license-files = ["LICENSE"]
-requires-python = ">=3.13"
+requires-python = ">=3.14"
 dependencies = [
     "aiohttp>=3.14",
     "alembic>=1.20.0",
@@ -46,7 +46,7 @@ dev = [
 
 [tool.ruff]
 line-length = 100
-target-version = "py313"
+target-version = "py314"
 src = ["src", "tests"]
 
 [tool.ruff.lint]
@@ -58,7 +58,7 @@ known-first-party = ["truman", "tests"]
 [tool.pyrefly]
 project-includes = ["src", "tests"]
 search-path = ["src", "."]
-python-version = "3.13"
+python-version = "3.14"
 python-interpreter-path = ".venv/bin/python"
 
 [tool.pyrefly.errors]
