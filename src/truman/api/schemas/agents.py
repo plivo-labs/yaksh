@@ -3,7 +3,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict
 
-from truman.domain.agents import AgentChange, AgentConfig, Direction, Transport
+from truman.domain.agents import AgentConfig, Direction, Transport
 
 
 class AgentRead(BaseModel):
@@ -28,6 +28,5 @@ class AgentVersionRead(BaseModel):
     id: uuid.UUID
     agent_id: uuid.UUID
     version: int
-    change: AgentChange
     config: AgentConfig
     created_at: datetime

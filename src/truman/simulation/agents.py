@@ -9,7 +9,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from truman.db.models import Agent, AgentVersion, Conversation
 from truman.domain.agents import (
-    AgentChange,
     AgentConfig,
     AgentCreate,
     AgentUpdate,
@@ -76,7 +75,6 @@ async def create_agent(session: AsyncSession, command: AgentCreate) -> Agent:
         AgentVersion(
             agent_id=agent.id,
             version=1,
-            change=AgentChange.CREATED,
             config=config.model_dump(mode="json"),
         )
     )
@@ -121,7 +119,6 @@ async def update_agent(session: AsyncSession, agent_id: uuid.UUID, update: Agent
                 AgentVersion(
                     agent_id=agent.id,
                     version=agent.current_version,
-                    change=AgentChange.CHANGED,
                     config=new.model_dump(mode="json"),
                 )
             )

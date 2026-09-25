@@ -26,10 +26,7 @@ async def test_changing_config_creates_a_version_but_renaming_does_not(
     assert unchanged.json()["current_version"] == 2
 
     versions = (await client.get(f"{url}/versions")).json()
-    assert [(v["version"], v["change"]) for v in versions["items"]] == [
-        (2, "changed"),
-        (1, "created"),
-    ]
+    assert [v["version"] for v in versions["items"]] == [2, 1]
     assert versions["items"][0]["config"]["brief"] == "Books rooms"
 
 

@@ -18,9 +18,6 @@ agent_direction = postgresql.ENUM("inbound", "outbound", name="agent_direction",
 agent_transport = postgresql.ENUM(
     "plivo_websocket", "phone", name="agent_transport", create_type=False
 )
-agent_change = postgresql.ENUM(
-    "created", "changed", "restored", name="agent_change", create_type=False
-)
 channel = postgresql.ENUM("voice", name="channel", create_type=False)
 conversation_status = postgresql.ENUM(
     "queued",
@@ -43,7 +40,7 @@ end_reason = postgresql.ENUM(
     name="end_reason",
     create_type=False,
 )
-ENUMS = (agent_direction, agent_transport, agent_change, channel, conversation_status, end_reason)
+ENUMS = (agent_direction, agent_transport, channel, conversation_status, end_reason)
 
 
 def upgrade() -> None:
@@ -101,7 +98,6 @@ def upgrade() -> None:
         ),
         sa.Column("agent_id", postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column("version", sa.Integer(), nullable=False),
-        sa.Column("change", agent_change, nullable=False),
         sa.Column("label", sa.Text(), nullable=True),
         sa.Column("config", postgresql.JSONB(), nullable=False),
         sa.Column(

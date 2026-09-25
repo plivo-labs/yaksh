@@ -21,7 +21,7 @@ from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, MappedColumn, mapped_column
 
 from truman.db.base import Base
-from truman.domain.agents import AgentChange, Direction, Transport
+from truman.domain.agents import Direction, Transport
 from truman.domain.conversations import Channel, ConversationStatus, EndReason
 
 
@@ -67,7 +67,6 @@ class AgentVersion(Base):
     id: Mapped[uuid.UUID] = uuid_primary_key()
     agent_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("agents.id"))
     version: Mapped[int] = mapped_column(Integer)
-    change: Mapped[AgentChange] = mapped_column(pg_enum(AgentChange, "agent_change"))
     config: Mapped[dict[str, Any]] = mapped_column(JSONB)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 

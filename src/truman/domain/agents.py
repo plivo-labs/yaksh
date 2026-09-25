@@ -22,11 +22,6 @@ class Transport(StrEnum):
     PHONE = "phone"
 
 
-class AgentChange(StrEnum):
-    CREATED = "created"
-    CHANGED = "changed"
-
-
 E164 = Annotated[str, StringConstraints(pattern=r"^\+[1-9]\d{6,14}$")]
 
 
