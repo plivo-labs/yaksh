@@ -1,6 +1,7 @@
 import { Play, Plus, Square, UserRound } from "lucide-react";
 import { useState } from "react";
 
+import { GenderBadge } from "@/components/gender-badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -17,16 +18,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { useVoicePreview } from "@/hooks/use-voice-preview";
 import { usePersonas } from "@/lib/queries";
-import { LANGUAGE_NAMES, type Persona, type VoiceGender } from "@/lib/types";
+import { LANGUAGE_NAMES, type Persona } from "@/lib/types";
 import { PersonaDialog } from "@/pages/persona-dialog";
-
-function GenderBadge({ gender }: { gender: VoiceGender }) {
-  return (
-    <Badge variant="outline" className="capitalize">
-      {gender}
-    </Badge>
-  );
-}
 
 export function PersonasPage() {
   const personas = usePersonas();

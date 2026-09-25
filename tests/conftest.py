@@ -14,6 +14,7 @@ from testcontainers.community.postgres import PostgresContainer
 from truman.api import create_app
 from truman.config import Settings
 from truman.db.migrate import upgrade_to_head
+from truman.db.models import Voice
 from truman.db.session import create_engine, create_sessionmaker
 from truman.domain.conversations import (
     CallObserver,
@@ -27,9 +28,9 @@ from truman.domain.conversations import (
     WireEventKind,
 )
 from truman.domain.errors import UnavailableError
+from truman.domain.languages import Language
 from truman.domain.numbers import AccountNumber
-from truman.domain.personas import Language, Voice, VoiceProvider
-from truman.domain.voices import VoiceInfo
+from truman.domain.voices import ProviderVoice, VoiceGender, VoiceProvider, VoiceSettings
 from truman.simulation import conversations
 from truman.worker.worker import Worker
 
@@ -39,21 +40,29 @@ OFFLINE_DATABASE_URL = "postgresql+asyncpg://truman:truman@localhost:5432/truman
 
 
 AGENT = {"name": "Front desk", "agent_number": "+14155550100"}
-ENGLISH_VOICE = VoiceInfo(
-    id="voice-en", name="Chris", category="premade", gender="male", languages=frozenset({"en"})
+ENGLISH_VOICE = ProviderVoice(
+    id="voice-en",
+    name="Chris",
+    gender=VoiceGender.MALE,
+    accent="american",
+    listed_languages=(Language.EN,),
 )
-HINDI_VOICE = VoiceInfo(
+HINDI_VOICE = ProviderVoice(
     id="voice-hi",
     name="Ananya",
-    category="professional",
-    gender="female",
-    languages=frozenset({"en", "hi"}),
+    gender=VoiceGender.FEMALE,
+    accent="indian",
+    listed_languages=(Language.EN, Language.HINGLISH),
 )
+UNLISTED_VOICE = ProviderVoice(
+    id="voice-new", name="Riya", gender=VoiceGender.FEMALE, accent="indian"
+)
+"""On the provider account but not in the voices list until a test adds it."""
 CALLER = {
     "instructions": "You want to book a room.",
     "nudge": "Hello? Are you still there?",
     "language": Language.EN,
-    "voice": Voice(provider=VoiceProvider.ELEVENLABS, id=ENGLISH_VOICE.id),
+    "voice": VoiceSettings(provider=VoiceProvider.ELEVENLABS, id=ENGLISH_VOICE.id),
 }
 PERSONA = {
     "name": "Rushed caller",
@@ -70,6 +79,11 @@ async def create_agent(client: AsyncClient, **overrides: Any) -> dict[str, Any]:
 
 async def create_agent_id(client: AsyncClient, **overrides: Any) -> str:
     return (await create_agent(client, **overrides))["id"]
+
+
+async def listed_voice_id(client: AsyncClient, provider_voice_id: str) -> str:
+    voices = (await client.get("/api/v1/voices")).json()["items"]
+    return next(v["id"] for v in voices if v["provider_voice_id"] == provider_voice_id)
 
 
 async def create_persona(client: AsyncClient, **overrides: Any) -> dict[str, Any]:
@@ -207,28 +221,22 @@ class FakeCaller:
         )
 
 
-class FakeCatalog:
+class FakeVoiceClient:
     """Voices of one provider account; `down` makes every call fail as if the provider
     were unreachable."""
 
     def __init__(self) -> None:
-        self.voices = {voice.id: voice for voice in (ENGLISH_VOICE, HINDI_VOICE)}
+        self.voices = {voice.id: voice for voice in (ENGLISH_VOICE, HINDI_VOICE, UNLISTED_VOICE)}
         self.lookups: list[str] = []
-        self.listed_for: list[Language | None] = []
-        self.spoken: list[tuple[Voice, Language, str]] = []
+        self.spoken: list[tuple[VoiceSettings, Language, str]] = []
         self.down = False
 
-    async def list_voices(self, language: Language | None = None) -> list[VoiceInfo]:
-        self._answer()
-        self.listed_for.append(language)
-        return list(self.voices.values())
-
-    async def get_voice(self, voice_id: str) -> VoiceInfo | None:
+    async def get_voice(self, voice_id: str) -> ProviderVoice | None:
         self._answer()
         self.lookups.append(voice_id)
         return self.voices.get(voice_id)
 
-    async def speak(self, voice: Voice, language: Language, text: str) -> bytes | None:
+    async def speak(self, voice: VoiceSettings, language: Language, text: str) -> bytes | None:
         self._answer()
         self.spoken.append((voice, language, text))
         return b"RIFF fake wav" if voice.id in self.voices else None
@@ -236,6 +244,19 @@ class FakeCatalog:
     def _answer(self) -> None:
         if self.down:
             raise UnavailableError("the voice provider did not answer")
+
+
+def listed_voice(voice: ProviderVoice, *languages: Language) -> Voice:
+    return Voice(
+        provider=VoiceProvider.ELEVENLABS,
+        provider_voice_id=voice.id,
+        name=voice.name,
+        gender=voice.gender,
+        accent=voice.accent,
+        languages=list(languages),
+        listed_languages=list(voice.listed_languages),
+        builtin=False,
+    )
 
 
 @pytest.fixture(scope="session")
@@ -262,23 +283,27 @@ def settings(database_url: str, tmp_path: Path) -> Settings:
 
 
 @pytest.fixture
-def catalog() -> FakeCatalog:
-    return FakeCatalog()
+def voice_client() -> FakeVoiceClient:
+    return FakeVoiceClient()
 
 
 @pytest.fixture
-def catalogs(catalog: FakeCatalog) -> dict[VoiceProvider, FakeCatalog]:
-    return {VoiceProvider.ELEVENLABS: catalog}
+def voice_clients(voice_client: FakeVoiceClient) -> dict[VoiceProvider, FakeVoiceClient]:
+    return {VoiceProvider.ELEVENLABS: voice_client}
 
 
 @pytest.fixture
 async def client(
-    settings: Settings, catalogs: dict[VoiceProvider, FakeCatalog]
+    settings: Settings, voice_clients: dict[VoiceProvider, FakeVoiceClient]
 ) -> AsyncIterator[AsyncClient]:
+    """An API client whose voices list holds the English and the Hindi test voice."""
     app = create_app(settings)
-    app.state.voice_catalogs = catalogs
+    app.state.voice_clients = voice_clients
     async with create_sessionmaker(app.state.engine)() as session:
         await conversations.sync_numbers(session, POOL, [])
+        session.add(listed_voice(ENGLISH_VOICE, Language.EN))
+        session.add(listed_voice(HINDI_VOICE, Language.EN, Language.HINGLISH))
+        await session.commit()
     transport = ASGITransport(app=app)
     headers = {"Authorization": f"Bearer {TOKEN}"}
     async with AsyncClient(transport=transport, base_url="http://test", headers=headers) as client:
@@ -289,7 +314,7 @@ async def client(
         await connection.execute(
             text(
                 "TRUNCATE phone_numbers, conversations, agent_versions, agents,"
-                " persona_versions, personas"
+                " persona_versions, personas, voices"
             )
         )
     await engine.dispose()

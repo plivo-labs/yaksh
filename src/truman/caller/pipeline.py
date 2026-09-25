@@ -49,7 +49,7 @@ from truman.domain.conversations import (
     WireEvent,
     WireEventKind,
 )
-from truman.domain.personas import Language
+from truman.domain.languages import Language
 from truman.integrations import elevenlabs
 
 log = logging.getLogger(__name__)

@@ -3,7 +3,8 @@ voice preview speaks. Provider codes belong to the caller and the integrations, 
 
 from dataclasses import dataclass
 
-from truman.domain.personas import Language, VoiceGender
+from truman.domain.languages import Language
+from truman.domain.voices import VoiceGender
 
 
 @dataclass(frozen=True)

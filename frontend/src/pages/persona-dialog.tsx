@@ -1,17 +1,7 @@
 import { Square, Play } from "lucide-react";
 import { type ReactNode, type SubmitEvent, useState } from "react";
 
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
+import { DeleteConfirm, DiscardConfirm } from "@/components/confirm-dialogs";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -33,6 +23,7 @@ import {
 import { Slider } from "@/components/ui/slider";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
+import { useCloseGuard } from "@/hooks/use-close-guard";
 import type { VoicePreview } from "@/hooks/use-voice-preview";
 import { useDeletePersona, useSavePersona, useVoices } from "@/lib/queries";
 import {
@@ -40,7 +31,7 @@ import {
   type Language,
   type Persona,
   type PersonaInput,
-  type VoiceInfo,
+  type Voice,
 } from "@/lib/types";
 
 interface Draft {
@@ -95,7 +86,7 @@ function toInput(draft: Draft): PersonaInput {
   };
 }
 
-function voiceLabel(voice: VoiceInfo): string {
+function voiceLabel(voice: Voice): string {
   const details = [voice.gender, voice.accent].filter(Boolean).join(", ");
   return details ? `${voice.name} (${details})` : voice.name;
 }
@@ -152,10 +143,7 @@ export function PersonaDialog({
   const remove = useDeletePersona();
   const [initial] = useState<Draft>(() => (persona ? toDraft(persona) : EMPTY));
   const [draft, setDraft] = useState<Draft>(initial);
-  const [open, setOpen] = useState(true);
-  const [confirmingDiscard, setConfirmingDiscard] = useState(false);
-  const [confirmingDelete, setConfirmingDelete] = useState(false);
-  const [missingVoice, setMissingVoice] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
   const voices = useVoices(draft.language);
 
   const set = <K extends keyof Draft>(key: K, value: Draft[K]) => {
@@ -164,25 +152,26 @@ export function PersonaDialog({
   };
 
   const listed = voices.data ?? [];
-  const chosen = listed.find((voice) => voice.id === draft.voice_id);
-  const voiceItems = listed.map((voice) => ({ value: voice.id, label: voiceLabel(voice) }));
+  const chosen = listed.find((voice) => voice.provider_voice_id === draft.voice_id);
+  const voiceItems = listed.map((voice) => ({
+    value: voice.provider_voice_id,
+    label: voiceLabel(voice),
+  }));
   const hasVoice = draft.voice_id !== "";
-  const dirty = JSON.stringify(draft) !== JSON.stringify(initial);
+  const guard = useCloseGuard(JSON.stringify(draft) !== JSON.stringify(initial));
   const input = toInput(draft);
-
-  const requestClose = () => (dirty ? setConfirmingDiscard(true) : setOpen(false));
 
   const submit = (event: SubmitEvent) => {
     event.preventDefault();
-    setMissingVoice(!hasVoice);
-    if (!hasVoice) return;
-    save.mutate(input, { onSuccess: () => setOpen(false) });
+    setSubmitted(true);
+    if (!hasVoice || !input.name || !input.prompt) return;
+    save.mutate(input, { onSuccess: guard.close });
   };
 
   return (
     <Dialog
-      open={open}
-      onOpenChange={(next) => !next && requestClose()}
+      open={guard.open}
+      onOpenChange={(next) => !next && guard.requestClose()}
       onOpenChangeComplete={(next) => {
         if (next) return;
         preview.reset(FORM);
@@ -196,6 +185,7 @@ export function PersonaDialog({
 
         <form
           id="persona-form"
+          noValidate
           onSubmit={submit}
           className="min-h-0 flex-1 overflow-y-auto px-6 py-1"
         >
@@ -210,6 +200,9 @@ export function PersonaDialog({
                   value={draft.name}
                   onChange={(e) => set("name", e.target.value)}
                 />
+                {submitted && !input.name && (
+                  <FieldError className={APPEAR}>Enter a name.</FieldError>
+                )}
               </Field>
               <Field>
                 <FieldLabel htmlFor="language">Language</FieldLabel>
@@ -245,6 +238,9 @@ export function PersonaDialog({
                 value={draft.prompt}
                 onChange={(e) => set("prompt", e.target.value)}
               />
+              {submitted && !input.prompt && (
+                <FieldError className={APPEAR}>Describe how this caller behaves.</FieldError>
+              )}
               <FieldDescription>
                 Do not put the goal or facts here; each conversation gives the goal.
               </FieldDescription>
@@ -300,7 +296,7 @@ export function PersonaDialog({
                   )}
                 </Button>
               </div>
-              {missingVoice && !hasVoice && (
+              {submitted && !hasVoice && (
                 <FieldError className={APPEAR}>Choose a voice.</FieldError>
               )}
               {voices.isError && (
@@ -346,40 +342,14 @@ export function PersonaDialog({
 
         <DialogFooter className="border-t px-6 py-4">
           {id && (
-            <AlertDialog open={confirmingDelete} onOpenChange={setConfirmingDelete}>
-              <AlertDialogTrigger
-                render={
-                  <Button type="button" variant="ghost" className="text-destructive sm:mr-auto" />
-                }
-              >
-                Delete
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Delete {initial.name}?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Past and queued conversations are not changed.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Keep</AlertDialogCancel>
-                  <AlertDialogAction
-                    disabled={remove.isPending}
-                    onClick={() =>
-                      remove.mutate(id, {
-                        onSuccess: () => setOpen(false),
-                        onSettled: () => setConfirmingDelete(false),
-                      })
-                    }
-                  >
-                    {remove.isPending && <Spinner />}
-                    Delete
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
+            <DeleteConfirm
+              name={initial.name}
+              description="Past and queued conversations are not changed."
+              pending={remove.isPending}
+              onDelete={(close) => remove.mutate(id, { onSuccess: guard.close, onSettled: close })}
+            />
           )}
-          <Button type="button" variant="ghost" onClick={requestClose}>
+          <Button type="button" variant="ghost" onClick={guard.requestClose}>
             Cancel
           </Button>
           <Button type="submit" form="persona-form" disabled={save.isPending}>
@@ -388,27 +358,7 @@ export function PersonaDialog({
           </Button>
         </DialogFooter>
 
-        <AlertDialog open={confirmingDiscard} onOpenChange={setConfirmingDiscard}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Discard changes?</AlertDialogTitle>
-              <AlertDialogDescription>
-                Your changes to this persona are not saved.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Keep editing</AlertDialogCancel>
-              <AlertDialogAction
-                onClick={() => {
-                  setConfirmingDiscard(false);
-                  setOpen(false);
-                }}
-              >
-                Discard
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+        <DiscardConfirm subject="persona" {...guard.discard} />
       </DialogContent>
     </Dialog>
   );

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { usePreviewVoice } from "@/lib/queries";
-import type { Language, Voice } from "@/lib/types";
+import type { Language, VoiceSettings } from "@/lib/types";
 
 /** Plays ElevenLabs speech generated with the settings a call uses, one clip at a time.
  * `key` names who asked (a persona card, the form) so each can show its own state. Clips are
@@ -53,7 +53,7 @@ export function useVoicePreview() {
     setPlaying(null);
   };
 
-  const toggle = (key: string, voice: Voice, language: Language) => {
+  const toggle = (key: string, voice: VoiceSettings, language: Language) => {
     if (loading === key) return;
     if (playing === key) {
       stop();

@@ -1,29 +1,64 @@
-from fastapi import APIRouter, Depends, Response
+import uuid
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, Query, Response, status
 
 from truman.api.auth import require_token
-from truman.api.deps import VoiceCatalogsDep
+from truman.api.deps import SessionDep, VoiceClientsDep
 from truman.api.pagination import Page, PageDep
-from truman.domain.personas import Language, VoiceProvider
-from truman.domain.voices import VoiceInfo, VoicePreview
-from truman.simulation import personas
+from truman.api.schemas.voices import VoiceRead
+from truman.domain.languages import Language
+from truman.domain.voices import (
+    PROVIDER_VOICE_ID,
+    ProviderVoice,
+    VoiceCreate,
+    VoicePreview,
+    VoiceProvider,
+    VoiceUpdate,
+)
+from truman.simulation import voices
 
 router = APIRouter(prefix="/voices", tags=["voices"], dependencies=[Depends(require_token)])
 
 
 @router.get("")
 async def list_voices(
-    provider: VoiceProvider,
-    catalogs: VoiceCatalogsDep,
-    page: PageDep,
-    language: Language | None = None,
-) -> Page[VoiceInfo]:
-    voices, total = await personas.list_voices(
-        catalogs, provider, offset=page.offset, limit=page.page_size, language=language
+    session: SessionDep, page: PageDep, language: Language | None = None
+) -> Page[VoiceRead]:
+    rows, total = await voices.list_voices(
+        session, offset=page.offset, limit=page.page_size, language=language
     )
-    return Page.of(voices, total, page)
+    return Page.of([VoiceRead.model_validate(row) for row in rows], total, page)
+
+
+@router.get("/lookup")
+async def lookup_voice(
+    provider: VoiceProvider,
+    provider_voice_id: Annotated[str, Query(pattern=PROVIDER_VOICE_ID)],
+    clients: VoiceClientsDep,
+) -> ProviderVoice:
+    """What the provider says about a voice on the account. Saves nothing."""
+    return await voices.lookup_voice(clients, provider, provider_voice_id)
+
+
+@router.post("", status_code=status.HTTP_201_CREATED)
+async def create_voice(
+    command: VoiceCreate, session: SessionDep, clients: VoiceClientsDep
+) -> VoiceRead:
+    return VoiceRead.model_validate(await voices.create_voice(session, clients, command))
+
+
+@router.patch("/{voice_id}")
+async def update_voice(voice_id: uuid.UUID, update: VoiceUpdate, session: SessionDep) -> VoiceRead:
+    return VoiceRead.model_validate(await voices.update_voice(session, voice_id, update))
+
+
+@router.delete("/{voice_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_voice(voice_id: uuid.UUID, session: SessionDep) -> None:
+    await voices.delete_voice(session, voice_id)
 
 
 @router.post("/preview", response_class=Response, responses={200: {"content": {"audio/wav": {}}}})
-async def preview_voice(command: VoicePreview, catalogs: VoiceCatalogsDep) -> Response:
-    audio = await personas.preview_voice(catalogs, command.voice, command.language)
+async def preview_voice(command: VoicePreview, clients: VoiceClientsDep) -> Response:
+    audio = await voices.preview_voice(clients, command.voice, command.language)
     return Response(content=audio, media_type="audio/wav")

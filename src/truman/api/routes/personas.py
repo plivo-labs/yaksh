@@ -3,7 +3,7 @@ import uuid
 from fastapi import APIRouter, Depends, status
 
 from truman.api.auth import require_token
-from truman.api.deps import SessionDep, VoiceCatalogsDep
+from truman.api.deps import SessionDep
 from truman.api.pagination import Page, PageDep
 from truman.api.schemas.personas import PersonaRead, PersonaVersionRead
 from truman.domain.personas import PersonaCreate, PersonaUpdate
@@ -13,10 +13,8 @@ router = APIRouter(prefix="/personas", tags=["personas"], dependencies=[Depends(
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)
-async def create_persona(
-    command: PersonaCreate, session: SessionDep, catalogs: VoiceCatalogsDep
-) -> PersonaRead:
-    return PersonaRead.of(await personas.create_persona(session, catalogs, command))
+async def create_persona(command: PersonaCreate, session: SessionDep) -> PersonaRead:
+    return PersonaRead.of(await personas.create_persona(session, command))
 
 
 @router.get("")
@@ -32,12 +30,9 @@ async def get_persona(persona_id: uuid.UUID, session: SessionDep) -> PersonaRead
 
 @router.patch("/{persona_id}")
 async def update_persona(
-    persona_id: uuid.UUID,
-    update: PersonaUpdate,
-    session: SessionDep,
-    catalogs: VoiceCatalogsDep,
+    persona_id: uuid.UUID, update: PersonaUpdate, session: SessionDep
 ) -> PersonaRead:
-    return PersonaRead.of(await personas.update_persona(session, catalogs, persona_id, update))
+    return PersonaRead.of(await personas.update_persona(session, persona_id, update))
 
 
 @router.delete("/{persona_id}", status_code=status.HTTP_204_NO_CONTENT)

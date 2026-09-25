@@ -4,7 +4,9 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict
 
 from truman.db.models import Persona
-from truman.domain.personas import Language, PersonaConfig, Voice, VoiceGender
+from truman.domain.languages import Language
+from truman.domain.personas import PersonaConfig
+from truman.domain.voices import VoiceGender, VoiceSettings
 from truman.simulation.personas import config_of
 
 
@@ -14,7 +16,7 @@ class PersonaRead(BaseModel):
     builtin_key: str | None
     prompt: str
     language: Language
-    voice: Voice
+    voice: VoiceSettings
     voice_gender: VoiceGender | None
     current_version: int
     created_at: datetime

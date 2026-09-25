@@ -24,7 +24,7 @@ from truman.config import Settings
 from truman.db.models import Conversation
 from truman.db.session import create_engine, create_sessionmaker
 from truman.domain.conversations import ConversationStatus
-from truman.domain.personas import Language
+from truman.domain.languages import Language
 from truman.simulation import conversations
 from truman.simulation.calls import STOP_IGNORED
 from truman.worker.worker import FINALIZE_ATTEMPTS, Worker

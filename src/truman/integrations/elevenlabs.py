@@ -1,10 +1,8 @@
-"""The ElevenLabs voices on the account, for picking and checking persona voices."""
+"""ElevenLabs voice lookup and speech, for adding voices and playing previews."""
 
 import io
 import json
-import time
 import wave
-from collections.abc import Callable
 from typing import Any
 from urllib.parse import quote
 
@@ -13,14 +11,11 @@ import pydantic
 
 from truman.diagnostics import describe_exception
 from truman.domain.errors import UnavailableError
-from truman.domain.personas import Language, Voice
-from truman.domain.voices import VoiceInfo
+from truman.domain.languages import Language
+from truman.domain.voices import ProviderVoice, VoiceGender, VoiceSettings
 
 ELEVENLABS_API = "https://api.elevenlabs.io"
 TIMEOUT = aiohttp.ClientTimeout(total=10)
-PAGE_SIZE = 100
-MAX_PAGES = 50
-LIST_TTL_S = 300.0
 SPEECH_TIMEOUT = aiohttp.ClientTimeout(total=20)
 MODEL = "eleven_flash_v2_5"
 CALL_AUDIO = "pcm_8000"
@@ -31,34 +26,17 @@ LANGUAGE_PINS: dict[Language, str] = {
 }
 
 
-class ElevenLabsCatalog:
-    """Lists the account's voices through the paged v2 endpoint, cached for five minutes, and
-    looks one up through v1, which has the only single-voice endpoint."""
+class ElevenLabsClient:
+    """Looks up one voice through v1, which has the only single-voice endpoint, and makes
+    speech in the audio a call uses."""
 
-    def __init__(
-        self,
-        api_key: str,
-        *,
-        base_url: str = ELEVENLABS_API,
-        clock: Callable[[], float] = time.monotonic,
-    ) -> None:
+    def __init__(self, api_key: str, *, base_url: str = ELEVENLABS_API) -> None:
         self.base_url = base_url.rstrip("/")
         self._headers = {"xi-api-key": api_key}
-        self._clock = clock
-        self._listed: tuple[float, list[VoiceInfo]] | None = None
 
-    async def list_voices(self, language: Language | None = None) -> list[VoiceInfo]:
-        """The account's voices; with a language, only those ElevenLabs verified for it.
-        Hinglish counts as Hindi."""
-        if self._listed is None or self._clock() - self._listed[0] >= LIST_TTL_S:
-            self._listed = (self._clock(), await self._list_all())
-        voices = self._listed[1]
-        if language is None:
-            return voices
-        code = LANGUAGE_PINS[language]
-        return [voice for voice in voices if code in voice.languages]
-
-    async def get_voice(self, voice_id: str) -> VoiceInfo | None:
+    async def get_voice(self, voice_id: str) -> ProviderVoice | None:
+        """None when the account does not have the voice. A Voice Library voice counts only
+        after it is added to the account."""
         url = f"{self.base_url}/v1/voices/{quote(voice_id, safe='')}"
         try:
             async with (
@@ -76,9 +54,9 @@ class ElevenLabsCatalog:
             raise UnavailableError(
                 f"ElevenLabs refused the voice lookup with {status}: {excerpt(text)}"
             )
-        return voice_info(parsed(text))
+        return provider_voice(parsed(text))
 
-    async def speak(self, voice: Voice, language: Language, text: str) -> bytes | None:
+    async def speak(self, voice: VoiceSettings, language: Language, text: str) -> bytes | None:
         body: dict[str, Any] = {
             "text": text,
             "model_id": MODEL,
@@ -103,40 +81,6 @@ class ElevenLabsCatalog:
         raise UnavailableError(
             f"ElevenLabs refused the speech request with {status}: {excerpt(text_body)}"
         )
-
-    async def _list_all(self) -> list[VoiceInfo]:
-        voices: list[VoiceInfo] = []
-        params: dict[str, Any] = {"page_size": PAGE_SIZE}
-        try:
-            async with aiohttp.ClientSession(headers=self._headers, timeout=TIMEOUT) as session:
-                for _ in range(MAX_PAGES):
-                    async with session.get(f"{self.base_url}/v2/voices", params=params) as response:
-                        status, text = response.status, await response.text()
-                    if status >= 400:
-                        raise UnavailableError(
-                            f"ElevenLabs refused the voice list with {status}: {excerpt(text)}"
-                        )
-                    page = parsed(text)
-                    entries = page.get("voices")
-                    if not isinstance(entries, list):
-                        raise UnavailableError(
-                            f"ElevenLabs sent a voice list without voices: {excerpt(text)}"
-                        )
-                    voices.extend(voice_info(entry) for entry in entries)
-                    if not page.get("has_more"):
-                        return voices
-                    token = page.get("next_page_token")
-                    if not isinstance(token, str) or not token:
-                        raise UnavailableError(
-                            f"ElevenLabs said more voices follow but sent no page token: "
-                            f"{excerpt(text)}"
-                        )
-                    params = {"page_size": PAGE_SIZE, "next_page_token": token}
-        except (aiohttp.ClientError, TimeoutError, UnicodeDecodeError) as error:
-            raise UnavailableError(
-                f"the ElevenLabs voice list failed: {describe_exception(error)}"
-            ) from error
-        raise UnavailableError(f"the ElevenLabs voice list did not end after {MAX_PAGES} pages")
 
 
 def excerpt(text: str) -> str:
@@ -174,18 +118,18 @@ def voice_not_found(text: str) -> bool:
     return isinstance(detail, dict) and detail.get("code") == "voice_not_found"
 
 
-def voice_info(entry: Any) -> VoiceInfo:
+def provider_voice(entry: Any) -> ProviderVoice:
     try:
         labels = entry.get("labels") or {}
-        return VoiceInfo(
+        gender = str(labels.get("gender") or "").lower()
+        codes = {verified["language"] for verified in entry.get("verified_languages") or []}
+        return ProviderVoice(
             id=entry["voice_id"],
             name=entry["name"],
-            category=entry.get("category"),
-            gender=labels.get("gender"),
+            gender=VoiceGender(gender) if gender in VoiceGender else None,
             accent=labels.get("accent"),
-            preview_url=entry.get("preview_url"),
-            languages=frozenset(
-                verified["language"] for verified in entry.get("verified_languages") or []
+            listed_languages=tuple(
+                language for language, code in LANGUAGE_PINS.items() if code in codes
             ),
         )
     except (AttributeError, KeyError, TypeError, pydantic.ValidationError) as error:

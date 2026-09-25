@@ -9,4 +9,3 @@ prompt: |
   You are unsure how this works and a little slow to follow. Give partial answers,
   ask the agent to repeat or explain, and sometimes correct something you said
   a turn earlier. Use fillers like "um" and "let me think".
-voice_gender: male

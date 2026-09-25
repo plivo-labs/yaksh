@@ -1,4 +1,4 @@
-"""initial schema: agents, personas, their versions, conversations
+"""initial schema: agents, voices, personas, their versions, conversations
 
 Revision ID: 0001
 Revises:
@@ -40,7 +40,7 @@ end_reason = postgresql.ENUM(
     name="end_reason",
     create_type=False,
 )
-persona_language = postgresql.ENUM("en", "hinglish", name="persona_language", create_type=False)
+language = postgresql.ENUM("en", "hinglish", name="language", create_type=False)
 voice_provider = postgresql.ENUM("elevenlabs", name="voice_provider", create_type=False)
 voice_gender = postgresql.ENUM("male", "female", "neutral", name="voice_gender", create_type=False)
 ENUMS = (
@@ -49,7 +49,7 @@ ENUMS = (
     channel,
     conversation_status,
     end_reason,
-    persona_language,
+    language,
     voice_provider,
     voice_gender,
 )
@@ -124,6 +124,40 @@ def upgrade() -> None:
     )
 
     op.create_table(
+        "voices",
+        sa.Column(
+            "id",
+            postgresql.UUID(as_uuid=True),
+            server_default=sa.text("uuidv7()"),
+            nullable=False,
+        ),
+        sa.Column("provider", voice_provider, nullable=False),
+        sa.Column("provider_voice_id", sa.Text(), nullable=False),
+        sa.Column("name", sa.Text(), nullable=False),
+        sa.Column("gender", voice_gender, nullable=True),
+        sa.Column("accent", sa.Text(), nullable=True),
+        sa.Column("languages", postgresql.ARRAY(language), nullable=False),
+        sa.Column("listed_languages", postgresql.ARRAY(language), nullable=False),
+        sa.Column("builtin", sa.Boolean(), nullable=False),
+        sa.Column(
+            "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
+        sa.Column(
+            "updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
+        sa.Column("deleted_at", sa.DateTime(timezone=True), nullable=True),
+        sa.CheckConstraint("cardinality(languages) > 0", name="ck_voices_languages_not_empty"),
+        sa.PrimaryKeyConstraint("id", name="pk_voices"),
+    )
+    op.create_index(
+        "ix_voices_provider_voice_live",
+        "voices",
+        ["provider", "provider_voice_id"],
+        unique=True,
+        postgresql_where=sa.text("deleted_at IS NULL"),
+    )
+
+    op.create_table(
         "personas",
         sa.Column(
             "id",
@@ -134,7 +168,7 @@ def upgrade() -> None:
         sa.Column("name", sa.Text(), nullable=False),
         sa.Column("builtin_key", sa.Text(), nullable=True),
         sa.Column("prompt", sa.Text(), nullable=False),
-        sa.Column("language", persona_language, nullable=False),
+        sa.Column("language", language, nullable=False),
         sa.Column("voice_provider", voice_provider, nullable=False),
         sa.Column("voice_id", sa.Text(), nullable=False),
         sa.Column("voice_speed", sa.Float(), nullable=False),
@@ -195,7 +229,7 @@ def upgrade() -> None:
         sa.Column("persona_id", postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column("persona_version_id", postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column("goal", sa.Text(), nullable=False),
-        sa.Column("language", persona_language, nullable=False),
+        sa.Column("language", language, nullable=False),
         sa.Column("instructions", sa.Text(), nullable=False),
         sa.Column("nudge", sa.Text(), nullable=False),
         sa.Column("caller_number", sa.Text(), nullable=False),
@@ -240,6 +274,7 @@ def downgrade() -> None:
     op.drop_table("conversations")
     op.drop_table("persona_versions")
     op.drop_table("personas")
+    op.drop_table("voices")
     op.drop_table("agent_versions")
     op.drop_table("agents")
     bind = op.get_bind()

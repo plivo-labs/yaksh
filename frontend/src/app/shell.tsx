@@ -1,4 +1,4 @@
-import { Bot, KeyRound, MoonStar, PhoneCall, SunMedium, UserRound } from "lucide-react";
+import { AudioLines, Bot, KeyRound, MoonStar, PhoneCall, SunMedium, UserRound } from "lucide-react";
 import { type CSSProperties, useLayoutEffect, useState } from "react";
 import { flushSync } from "react-dom";
 import { NavLink, Outlet, useLocation } from "react-router";
@@ -53,6 +53,7 @@ function useDarkMode(): [boolean, () => void] {
 const links = [
   { to: "/conversations", label: "Conversations", icon: PhoneCall },
   { to: "/personas", label: "Personas", icon: UserRound },
+  { to: "/voices", label: "Voices", icon: AudioLines },
   { to: "/agents", label: "Agents", icon: Bot },
 ];
 

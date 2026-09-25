@@ -1,4 +1,3 @@
-from enum import StrEnum
 from typing import Any
 
 from pydantic import (
@@ -9,32 +8,8 @@ from pydantic import (
     field_validator,
 )
 
-
-class Language(StrEnum):
-    EN = "en"
-    HINGLISH = "hinglish"
-
-
-class VoiceProvider(StrEnum):
-    ELEVENLABS = "elevenlabs"
-
-
-class VoiceGender(StrEnum):
-    MALE = "male"
-    FEMALE = "female"
-    NEUTRAL = "neutral"
-
-
-class Voice(BaseModel):
-    """A voice of one text-to-speech provider and how it speaks; the id means nothing
-    outside that provider. The id goes into provider URLs, so dots and slashes are refused."""
-
-    model_config = ConfigDict(extra="forbid", frozen=True)
-
-    provider: VoiceProvider
-    id: str = Field(pattern=r"^[A-Za-z0-9_-]+$")
-    speed: float = Field(default=1.0, ge=0.7, le=1.2)
-    stability: float = Field(default=0.5, ge=0.0, le=1.0)
+from truman.domain.languages import Language
+from truman.domain.voices import VoiceGender, VoiceSettings
 
 
 class PersonaSettings(BaseModel):
@@ -44,12 +19,11 @@ class PersonaSettings(BaseModel):
 
     prompt: str = Field(min_length=1, max_length=4000)
     language: Language = Language.EN
-    voice: Voice
+    voice: VoiceSettings
 
 
 class PersonaConfig(PersonaSettings):
-    """What a persona version pins: the settings plus what the server learned about the
-    voice from its provider."""
+    """What a persona version pins: the settings plus the voice gender from the voices list."""
 
     voice_gender: VoiceGender | None = None
 
@@ -67,7 +41,7 @@ class PersonaUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=80)
     prompt: str | None = Field(default=None, min_length=1, max_length=4000)
     language: Language | None = None
-    voice: Voice | None = None
+    voice: VoiceSettings | None = None
 
     @field_validator("name", "prompt", "language", "voice")
     @classmethod

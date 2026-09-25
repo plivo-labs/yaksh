@@ -11,7 +11,7 @@ from truman.domain.conversations import (
     Validity,
     WireEvent,
 )
-from truman.domain.personas import Language
+from truman.domain.languages import Language
 
 
 class ConversationSummary(BaseModel):

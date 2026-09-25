@@ -1,11 +1,16 @@
 import uuid
-from typing import Any
 
 from httpx import AsyncClient
 
-from tests.conftest import ENGLISH_VOICE, HINDI_VOICE, PERSONA, FakeCatalog, create_persona
-from truman.domain.personas import Language, VoiceProvider
-from truman.simulation.languages import LANGUAGES
+from tests.conftest import (
+    ENGLISH_VOICE,
+    HINDI_VOICE,
+    PERSONA,
+    UNLISTED_VOICE,
+    FakeVoiceClient,
+    create_persona,
+    listed_voice_id,
+)
 
 
 async def test_changing_config_creates_a_version_but_renaming_does_not(
@@ -56,72 +61,65 @@ async def test_names_are_unique_among_live_personas_ignoring_case(client: AsyncC
     await create_persona(client, name="RUSHED")
 
 
-async def test_a_voice_must_exist_on_the_provider_account(
-    client: AsyncClient, catalog: FakeCatalog
+async def test_a_persona_voice_must_be_in_the_voices_list(
+    client: AsyncClient, voice_client: FakeVoiceClient
 ) -> None:
     def voice(voice_id: str) -> dict[str, object]:
         return {**PERSONA, "voice": {"provider": "elevenlabs", "id": voice_id}}
 
-    unknown = await client.post("/api/v1/personas", json=voice("nope"))
+    on_account_only = await client.post("/api/v1/personas", json=voice(UNLISTED_VOICE.id))
     dotted = await client.post("/api/v1/personas", json=voice(".."))
 
-    assert unknown.status_code == 422
-    assert "voice nope was not found" in unknown.json()["error"]["message"]
-    assert dotted.status_code == 422 and catalog.lookups == ["nope"]
+    assert on_account_only.status_code == 422
+    assert "is not in the voices list" in on_account_only.json()["error"]["message"]
+    assert dotted.status_code == 422
     assert (await client.get("/api/v1/personas")).json()["total"] == 0
+    assert voice_client.lookups == []
 
 
-async def test_nothing_is_saved_while_the_voice_provider_is_down(
-    client: AsyncClient, catalog: FakeCatalog
+async def test_a_deleted_voice_cannot_be_picked_again(client: AsyncClient) -> None:
+    persona = await create_persona(client)
+    hindi = {"provider": "elevenlabs", "id": HINDI_VOICE.id}
+    await client.delete(f"/api/v1/voices/{await listed_voice_id(client, HINDI_VOICE.id)}")
+
+    created = await client.post("/api/v1/personas", json={**PERSONA, "name": "B", "voice": hindi})
+    moved = await client.patch(f"/api/v1/personas/{persona['id']}", json={"voice": hindi})
+
+    assert created.status_code == moved.status_code == 422
+
+
+async def test_a_persona_is_saved_while_the_voice_provider_is_down(
+    client: AsyncClient, voice_client: FakeVoiceClient
 ) -> None:
-    catalog.down = True
+    voice_client.down = True
 
-    response = await client.post("/api/v1/personas", json=PERSONA)
+    persona = await create_persona(client)
 
-    assert response.status_code == 503 and response.json()["error"]["code"] == "unavailable"
-    assert (await client.get("/api/v1/personas")).json()["total"] == 0
-
-
-async def test_a_voice_provider_without_a_key_is_unavailable(
-    client: AsyncClient, catalogs: dict[VoiceProvider, FakeCatalog]
-) -> None:
-    catalogs.clear()
-
-    created = await client.post("/api/v1/personas", json=PERSONA)
-    listed = await client.get("/api/v1/voices", params={"provider": "elevenlabs"})
-
-    for response in (created, listed):
-        assert response.status_code == 503
-        assert response.json()["error"]["message"] == "voice provider elevenlabs is not set up"
+    assert persona["voice_gender"] == "male"
 
 
-async def test_an_update_checks_the_voice_only_when_it_changes(
-    client: AsyncClient, catalog: FakeCatalog
-) -> None:
+async def test_an_update_checks_the_voice_only_when_it_changes(client: AsyncClient) -> None:
     persona = await create_persona(client)
     url = f"/api/v1/personas/{persona['id']}"
-    catalog.lookups.clear()
+    english = await listed_voice_id(client, ENGLISH_VOICE.id)
+    await client.delete(f"/api/v1/voices/{english}")
 
-    await client.patch(url, json={"prompt": "You are calm.", "language": "hinglish"})
-    slower = {**persona["voice"], "speed": 0.9}
-    assert (await client.patch(url, json={"voice": slower})).status_code == 200
-    assert catalog.lookups == []
+    kept = await client.patch(url, json={"voice": {**persona["voice"], "speed": 0.9}})
+    assert kept.status_code == 200 and kept.json()["current_version"] == 2
 
     unknown = await client.patch(url, json={"voice": {"provider": "elevenlabs", "id": "nope"}})
     assert unknown.status_code == 422
-    assert catalog.lookups == ["nope"]
 
     moved = await client.patch(
         url, json={"voice": {"provider": "elevenlabs", "id": HINDI_VOICE.id}}
     )
     assert moved.json()["voice"] == {**persona["voice"], "id": HINDI_VOICE.id}
-    assert moved.json()["current_version"] == 4
+    assert moved.json()["current_version"] == 3
 
 
 async def test_an_update_to_a_missing_persona_is_not_found_before_any_voice_check(
-    client: AsyncClient, catalog: FakeCatalog
+    client: AsyncClient,
 ) -> None:
-    catalog.down = True
     voice = {"provider": "elevenlabs", "id": "nope"}
 
     response = await client.patch(f"/api/v1/personas/{uuid.uuid4()}", json={"voice": voice})
@@ -141,22 +139,7 @@ async def test_a_deleted_persona_is_gone_but_its_versions_remain(client: AsyncCl
     assert (await client.get(f"{url}/versions")).json()["total"] == 1
 
 
-async def test_voices_are_listed_a_page_at_a_time_for_a_language(
-    client: AsyncClient, catalog: FakeCatalog
-) -> None:
-    async def voices(**params: str | int) -> dict[str, Any]:
-        response = await client.get("/api/v1/voices", params={"provider": "elevenlabs", **params})
-        return response.json()
-
-    first, second = await voices(page_size=1), await voices(page_size=1, page=2)
-    await voices(language="hinglish")
-
-    assert first["total"] == second["total"] == 2
-    assert catalog.listed_for == [None, None, Language.HINGLISH]
-    assert {v["id"] for v in first["items"] + second["items"]} == {ENGLISH_VOICE.id, HINDI_VOICE.id}
-
-
-async def test_the_voice_gender_comes_from_the_provider_and_follows_the_voice(
+async def test_the_voice_gender_comes_from_the_voices_list_and_follows_the_voice(
     client: AsyncClient,
 ) -> None:
     persona = await create_persona(client)
@@ -173,28 +156,3 @@ async def test_the_voice_gender_comes_from_the_provider_and_follows_the_voice(
 
     claimed = await client.post("/api/v1/personas", json={**PERSONA, "voice_gender": "female"})
     assert claimed.status_code == 422
-
-
-async def test_a_preview_speaks_the_language_sample_with_the_call_settings(
-    client: AsyncClient, catalog: FakeCatalog
-) -> None:
-    voice = {"provider": "elevenlabs", "id": HINDI_VOICE.id, "speed": 1.15, "stability": 0.3}
-
-    heard = await client.post(
-        "/api/v1/voices/preview", json={"voice": voice, "language": "hinglish"}
-    )
-    unknown = await client.post(
-        "/api/v1/voices/preview",
-        json={"voice": {**voice, "id": "nope"}, "language": "hinglish"},
-    )
-
-    assert heard.status_code == 200 and heard.headers["content-type"] == "audio/wav"
-    assert heard.content == b"RIFF fake wav"
-    spoken_voice, language, text = catalog.spoken[0]
-    assert (spoken_voice.speed, spoken_voice.stability, language) == (1.15, 0.3, Language.HINGLISH)
-    assert text == LANGUAGES[Language.HINGLISH].sample
-    assert unknown.status_code == 422
-
-    catalog.down = True
-    down = await client.post("/api/v1/voices/preview", json={"voice": voice, "language": "en"})
-    assert down.status_code == 503

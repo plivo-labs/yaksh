@@ -18,7 +18,7 @@ The worker phones agents with a [Pipecat](https://github.com/pipecat-ai/pipecat)
 | Variable | Purpose |
 | --- | --- |
 | `DEEPGRAM_API_KEY` | Speech to text. `TRUMAN_DEEPGRAM_URL` points at a self-hosted Deepgram; empty means Deepgram cloud. |
-| `ELEVENLABS_API_KEY` | Text to speech, and the voice list and check for personas. The API needs it too. Each persona picks its own voice. |
+| `ELEVENLABS_API_KEY` | Text to speech. The API needs it too, to look up a voice when you add it and to play previews. Each persona picks its own voice from the voices list. |
 | `OPENAI_API_KEY`, or `AZURE_OPENAI_ENDPOINT` with `AZURE_OPENAI_API_KEY` (and `AZURE_OPENAI_API_VERSION`) | The persona model. `TRUMAN_PERSONA_MODEL` names the model or the Azure deployment, default `gpt-4.1`. |
 
 ## Phone

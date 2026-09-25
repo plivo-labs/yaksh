@@ -12,8 +12,11 @@ import {
   type Page,
   type Persona,
   type PersonaInput,
+  type ProviderVoice,
   type Voice,
-  type VoiceInfo,
+  type VoiceEdit,
+  type VoiceInput,
+  type VoiceSettings,
 } from "@/lib/types";
 
 export const keys = {
@@ -22,7 +25,8 @@ export const keys = {
   conversations: (filters: Record<string, string>) => ["conversations", filters] as const,
   conversation: (id: string) => ["conversations", "one", id] as const,
   personas: ["personas"] as const,
-  voices: (language: Language) => ["voices", language] as const,
+  voices: ["voices"] as const,
+  voicesFor: (language: Language | "all") => ["voices", language] as const,
 };
 
 const PAGE_SIZE = 100;
@@ -70,17 +74,53 @@ export function useDeletePersona() {
 
 export function usePreviewVoice() {
   return useMutation({
-    mutationFn: (input: { voice: Voice; language: Language }) =>
+    mutationFn: (input: { voice: VoiceSettings; language: Language }) =>
       apiBlob("/voices/preview", { method: "POST", json: input }),
   });
 }
 
-export function useVoices(language: Language) {
+export function useVoices(language?: Language) {
   return useQuery({
-    queryKey: keys.voices(language),
-    queryFn: () => all<VoiceInfo>("/voices", { provider: "elevenlabs", language }),
-    staleTime: 5 * 60_000,
+    queryKey: keys.voicesFor(language ?? "all"),
+    queryFn: () => all<Voice>("/voices", language ? { language } : {}),
     placeholderData: keepPreviousData,
+  });
+}
+
+export function useLookupVoice() {
+  return useMutation({
+    mutationFn: (providerVoiceId: string) =>
+      api<ProviderVoice>(
+        `/voices/lookup?${new URLSearchParams({
+          provider: "elevenlabs",
+          provider_voice_id: providerVoiceId,
+        })}`,
+      ),
+  });
+}
+
+export function useAddVoice() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (input: VoiceInput) => api<Voice>("/voices", { method: "POST", json: input }),
+    onSuccess: () => client.invalidateQueries({ queryKey: keys.voices }),
+  });
+}
+
+export function useEditVoice() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...input }: VoiceEdit & { id: string }) =>
+      api<Voice>(`/voices/${id}`, { method: "PATCH", json: input }),
+    onSuccess: () => client.invalidateQueries({ queryKey: keys.voices }),
+  });
+}
+
+export function useDeleteVoice() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api<void>(`/voices/${id}`, { method: "DELETE" }),
+    onSuccess: () => client.invalidateQueries({ queryKey: keys.voices }),
   });
 }
 

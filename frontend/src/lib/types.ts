@@ -72,25 +72,54 @@ export interface AgentInput {
   brief: string | null;
 }
 
-export interface Voice {
-  provider: "elevenlabs";
+export type VoiceProvider = "elevenlabs";
+
+export interface VoiceSettings {
+  provider: VoiceProvider;
   id: string;
   speed: number;
   stability: number;
 }
 
-export interface VoiceInfo {
+export interface Voice {
+  id: string;
+  provider: VoiceProvider;
+  provider_voice_id: string;
+  name: string;
+  gender: VoiceGender | null;
+  accent: string | null;
+  languages: Language[];
+  listed_languages: Language[];
+  builtin: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProviderVoice {
   id: string;
   name: string;
-  gender: string | null;
+  gender: VoiceGender | null;
   accent: string | null;
+  listed_languages: Language[];
+}
+
+export interface VoiceInput {
+  provider: VoiceProvider;
+  provider_voice_id: string;
+  name: string;
+  languages: Language[];
+}
+
+export interface VoiceEdit {
+  name: string;
+  languages: Language[];
 }
 
 export interface PersonaInput {
   name: string;
   prompt: string;
   language: Language;
-  voice: Voice;
+  voice: VoiceSettings;
 }
 
 export interface Persona {
@@ -99,7 +128,7 @@ export interface Persona {
   builtin_key: string | null;
   prompt: string;
   language: Language;
-  voice: Voice;
+  voice: VoiceSettings;
   voice_gender: VoiceGender | null;
   current_version: number;
   created_at: string;

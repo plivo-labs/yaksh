@@ -8,6 +8,7 @@ import { ConversationPage } from "@/pages/conversation";
 import { ConversationsPage } from "@/pages/conversations";
 import { NotFoundPage } from "@/pages/not-found";
 import { PersonasPage } from "@/pages/personas";
+import { VoicesPage } from "@/pages/voices";
 
 export const router = createBrowserRouter([
   {
@@ -19,6 +20,7 @@ export const router = createBrowserRouter([
       { path: "conversations", element: <ConversationsPage /> },
       { path: "conversations/:id", element: <ConversationPage /> },
       { path: "personas", element: <PersonasPage /> },
+      { path: "voices", element: <VoicesPage /> },
       { path: "agents", element: <AgentsPage /> },
       { path: "agents/new", element: <AgentFormPage /> },
       { path: "agents/:id", element: <AgentFormPage /> },

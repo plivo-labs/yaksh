@@ -7,7 +7,8 @@ from typing import Protocol
 from pydantic import BaseModel, ConfigDict, Field
 
 from truman.domain.agents import AgentConfig
-from truman.domain.personas import Language, Voice
+from truman.domain.languages import Language
+from truman.domain.voices import VoiceSettings
 
 
 class Channel(StrEnum):
@@ -111,7 +112,7 @@ class CallRequest(BaseModel):
     instructions: str
     nudge: str
     language: Language
-    voice: Voice
+    voice: VoiceSettings
     caller_number: str
     max_duration_s: int
     output_dir: Path

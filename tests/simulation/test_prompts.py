@@ -1,7 +1,9 @@
-from truman.domain.personas import Language, PersonaConfig, Voice, VoiceGender, VoiceProvider
+from truman.domain.languages import Language
+from truman.domain.personas import PersonaConfig
+from truman.domain.voices import VoiceGender, VoiceProvider, VoiceSettings
 from truman.simulation.prompts import caller_instructions
 
-VOICE = Voice(provider=VoiceProvider.ELEVENLABS, id="v1")
+VOICE = VoiceSettings(provider=VoiceProvider.ELEVENLABS, id="v1")
 
 
 def persona(language: Language, gender: VoiceGender | None) -> PersonaConfig:

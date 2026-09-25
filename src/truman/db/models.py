@@ -5,6 +5,7 @@ from typing import Any
 
 from sqlalchemy import (
     Boolean,
+    CheckConstraint,
     DateTime,
     Enum,
     Float,
@@ -18,13 +19,14 @@ from sqlalchemy import (
     text,
     true,
 )
-from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB, UUID
 from sqlalchemy.orm import Mapped, MappedColumn, mapped_column
 
 from truman.db.base import Base
 from truman.domain.agents import Direction, Transport
 from truman.domain.conversations import Channel, ConversationStatus, EndReason
-from truman.domain.personas import Language, VoiceGender, VoiceProvider
+from truman.domain.languages import Language
+from truman.domain.voices import VoiceGender, VoiceProvider
 
 
 def pg_enum[E: StrEnum](enum: type[E], name: str) -> Enum:
@@ -88,7 +90,7 @@ class Conversation(Base):
     persona_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("personas.id"))
     persona_version_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
     goal: Mapped[str] = mapped_column(Text)
-    language: Mapped[Language] = mapped_column(pg_enum(Language, "persona_language"))
+    language: Mapped[Language] = mapped_column(pg_enum(Language, "language"))
     instructions: Mapped[str] = mapped_column(Text)
     nudge: Mapped[str] = mapped_column(Text)
     caller_number: Mapped[str | None] = mapped_column(Text)
@@ -128,7 +130,7 @@ class Persona(Base):
     name: Mapped[str] = mapped_column(Text)
     builtin_key: Mapped[str | None] = mapped_column(Text, unique=True)
     prompt: Mapped[str] = mapped_column(Text)
-    language: Mapped[Language] = mapped_column(pg_enum(Language, "persona_language"))
+    language: Mapped[Language] = mapped_column(pg_enum(Language, "language"))
     voice_provider: Mapped[VoiceProvider] = mapped_column(pg_enum(VoiceProvider, "voice_provider"))
     voice_id: Mapped[str] = mapped_column(Text)
     voice_speed: Mapped[float] = mapped_column(Float)
@@ -163,6 +165,39 @@ class PersonaVersion(Base):
     __table_args__ = (
         UniqueConstraint("persona_id", "version"),
         UniqueConstraint("id", "persona_id"),
+    )
+
+
+class Voice(Base):
+    """A voice personas can use. Personas keep their own copy of the voice settings, so no
+    change here reaches a persona version or a call."""
+
+    __tablename__ = "voices"
+
+    id: Mapped[uuid.UUID] = uuid_primary_key()
+    provider: Mapped[VoiceProvider] = mapped_column(pg_enum(VoiceProvider, "voice_provider"))
+    provider_voice_id: Mapped[str] = mapped_column(Text)
+    name: Mapped[str] = mapped_column(Text)
+    gender: Mapped[VoiceGender | None] = mapped_column(pg_enum(VoiceGender, "voice_gender"))
+    accent: Mapped[str | None] = mapped_column(Text)
+    languages: Mapped[list[Language]] = mapped_column(ARRAY(pg_enum(Language, "language")))
+    listed_languages: Mapped[list[Language]] = mapped_column(ARRAY(pg_enum(Language, "language")))
+    builtin: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    __table_args__ = (
+        Index(
+            "ix_voices_provider_voice_live",
+            "provider",
+            "provider_voice_id",
+            unique=True,
+            postgresql_where=text("deleted_at IS NULL"),
+        ),
+        CheckConstraint("cardinality(languages) > 0", name="languages_not_empty"),
     )
 
 

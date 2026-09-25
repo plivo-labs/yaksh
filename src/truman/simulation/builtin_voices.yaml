@@ -1,0 +1,42 @@
+- provider: elevenlabs
+  provider_voice_id: iP95p4xoKVk53GoZ742B
+  name: Chris - Charming, Down-to-Earth
+  gender: male
+  accent: american
+  languages: [en]
+  listed_languages: [en, hinglish]
+- provider: elevenlabs
+  provider_voice_id: cjVigY5qzO86Huf0OWal
+  name: Eric - Smooth, Trustworthy
+  gender: male
+  accent: american
+  languages: [en]
+  listed_languages: [en]
+- provider: elevenlabs
+  provider_voice_id: pqHfZKP75CvOlQylNhV4
+  name: Bill - Wise, Mature, Balanced
+  gender: male
+  accent: american
+  languages: [en]
+  listed_languages: [en]
+- provider: elevenlabs
+  provider_voice_id: cgSgspJ2msm6clMCkdW9
+  name: Jessica - Playful, Bright, Warm
+  gender: female
+  accent: american
+  languages: [en]
+  listed_languages: [en, hinglish]
+- provider: elevenlabs
+  provider_voice_id: TX3LPaxmHKxFdv7VOQHJ
+  name: Liam - Energetic, Social Media Creator
+  gender: male
+  accent: american
+  languages: [en]
+  listed_languages: [en, hinglish]
+- provider: elevenlabs
+  provider_voice_id: Xb7hH8MSUJpSbSDYk0k2
+  name: Alice - Clear, Engaging Educator
+  gender: female
+  accent: british
+  languages: [en, hinglish]
+  listed_languages: [en, hinglish]

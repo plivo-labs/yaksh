@@ -12,9 +12,10 @@ from truman.api.routes import agents, conversations, health, personas, voices
 from truman.config import Settings
 from truman.db.migrate import upgrade_to_head
 from truman.db.session import create_engine, create_sessionmaker
-from truman.domain.personas import VoiceProvider
-from truman.integrations.elevenlabs import ElevenLabsCatalog
-from truman.simulation.personas import VoiceCatalogs, seed_builtin_personas
+from truman.domain.voices import VoiceProvider
+from truman.integrations.elevenlabs import ElevenLabsClient
+from truman.simulation.personas import seed_builtin_personas
+from truman.simulation.voices import VoiceClients, seed_builtin_voices
 
 log = logging.getLogger(__name__)
 
@@ -27,18 +28,21 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     if not os.access(settings.data_dir, os.W_OK):
         raise RuntimeError(f"data directory is not writable: {settings.data_dir}")
     async with app.state.sessionmaker() as session:
-        seeded = await seed_builtin_personas(session)
-    if seeded:
-        log.info("seeded built-in personas: %s", ", ".join(seeded))
+        voices = await seed_builtin_voices(session)
+        personas = await seed_builtin_personas(session)
+    if voices:
+        log.info("seeded built-in voices: %s", ", ".join(voices))
+    if personas:
+        log.info("seeded built-in personas: %s", ", ".join(personas))
     yield
     await app.state.engine.dispose()
 
 
-def voice_catalogs(settings: Settings) -> VoiceCatalogs:
+def voice_clients(settings: Settings) -> VoiceClients:
     if settings.elevenlabs_api_key is None:
         return {}
     return {
-        VoiceProvider.ELEVENLABS: ElevenLabsCatalog(settings.elevenlabs_api_key.get_secret_value())
+        VoiceProvider.ELEVENLABS: ElevenLabsClient(settings.elevenlabs_api_key.get_secret_value())
     }
 
 
@@ -48,7 +52,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.settings = settings
     app.state.engine = create_engine(str(settings.database_url))
     app.state.sessionmaker = create_sessionmaker(app.state.engine)
-    app.state.voice_catalogs = voice_catalogs(settings)
+    app.state.voice_clients = voice_clients(settings)
     register_error_handlers(app)
 
     api = APIRouter(prefix="/api/v1")
