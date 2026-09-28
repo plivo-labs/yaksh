@@ -70,15 +70,17 @@ async def test_facts_and_criteria_must_be_distinct_after_normalization(
             f"/api/v1/agents/{agent}/scenarios", json={**SCENARIO, **overrides}
         )
         assert response.status_code == 422, response.text
-        return response.text
+        return response.json()["error"]["message"]
 
     both = await rejected(unknown_facts=["  name "])
     await rejected(known_facts=[{"name": "Name", "value": "A"}, {"name": "NAME", "value": "B"}])
     await rejected(criteria=["Greets the caller.", "greets  the caller."])
-    await rejected(criteria=[])
     await rejected(goal="   ")
 
-    assert "both known and unknown" in both
+    assert both == "a fact cannot be both known and unknown: name"
+    assert (await rejected(criteria=[])).startswith("criteria: ")
+    missing = await client.post(f"/api/v1/agents/{agent}/scenarios", json={"name": "Only a name"})
+    assert missing.json()["error"]["message"] == "goal: Field required (and 1 more errors)"
     assert (await client.get(f"/api/v1/agents/{agent}/scenarios")).json()["total"] == 0
 
 
