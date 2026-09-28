@@ -29,6 +29,7 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useAgent, useDeleteAgent, useSaveAgent } from "@/lib/queries";
 import type { Agent, AgentInput } from "@/lib/types";
+import { AgentScenarios } from "@/pages/agent-scenarios";
 
 interface Draft {
   name: string;
@@ -87,7 +88,12 @@ export function AgentFormPage() {
       </Alert>
     );
   }
-  return <AgentForm key={agent.data.id} agent={agent.data} />;
+  return (
+    <div className="grid gap-12">
+      <AgentForm key={agent.data.id} agent={agent.data} />
+      <AgentScenarios agentId={agent.data.id} />
+    </div>
+  );
 }
 
 function AgentForm({ agent }: { agent?: Agent }) {

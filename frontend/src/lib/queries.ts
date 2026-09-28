@@ -13,6 +13,8 @@ import {
   type Persona,
   type PersonaInput,
   type ProviderVoice,
+  type Scenario,
+  type ScenarioInput,
   type Voice,
   type VoiceEdit,
   type VoiceInput,
@@ -25,6 +27,7 @@ export const keys = {
   conversations: (filters: Record<string, string>) => ["conversations", filters] as const,
   conversation: (id: string) => ["conversations", "one", id] as const,
   personas: ["personas"] as const,
+  scenarios: (agentId: string) => ["agents", agentId, "scenarios"] as const,
   voices: ["voices"] as const,
   voicesFor: (language: Language | "all") => ["voices", language] as const,
 };
@@ -69,6 +72,32 @@ export function useDeletePersona() {
   return useMutation({
     mutationFn: (id: string) => api<void>(`/personas/${id}`, { method: "DELETE" }),
     onSuccess: () => client.invalidateQueries({ queryKey: keys.personas }),
+  });
+}
+
+export function useScenarios(agentId: string) {
+  return useQuery({
+    queryKey: keys.scenarios(agentId),
+    queryFn: () => all<Scenario>(`/agents/${agentId}/scenarios`),
+  });
+}
+
+export function useSaveScenario(agentId: string, id?: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (input: ScenarioInput) =>
+      id
+        ? api<Scenario>(`/scenarios/${id}`, { method: "PATCH", json: input })
+        : api<Scenario>(`/agents/${agentId}/scenarios`, { method: "POST", json: input }),
+    onSuccess: () => client.invalidateQueries({ queryKey: keys.scenarios(agentId) }),
+  });
+}
+
+export function useDeleteScenario(agentId: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api<void>(`/scenarios/${id}`, { method: "DELETE" }),
+    onSuccess: () => client.invalidateQueries({ queryKey: keys.scenarios(agentId) }),
   });
 }
 

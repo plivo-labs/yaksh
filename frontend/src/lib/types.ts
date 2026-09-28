@@ -155,6 +155,27 @@ export interface Persona {
   updated_at: string;
 }
 
+export interface Fact {
+  name: string;
+  value: string;
+}
+
+export interface ScenarioInput {
+  name: string;
+  goal: string;
+  known_facts: Fact[];
+  unknown_facts: string[];
+  criteria: string[];
+}
+
+export interface Scenario extends ScenarioInput {
+  id: string;
+  agent_id: string;
+  current_version: number;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Turn {
   role: Role;
   text: string;
