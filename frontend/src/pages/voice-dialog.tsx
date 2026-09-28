@@ -94,17 +94,17 @@ export function VoiceDialog({
   const dirty = voice ? JSON.stringify(draft) !== JSON.stringify(initial) : typedId.trim() !== "";
   const guard = useCloseGuard(dirty);
 
-  const change = (next: Partial<Draft>) => {
+  const change = (next: (current: Draft) => Partial<Draft>) => {
     save.reset();
-    setDraft((current) => ({ ...current, ...next }));
+    setDraft((current) => ({ ...current, ...next(current) }));
   };
 
   const toggleLanguage = (language: Language, on: boolean) =>
-    change({
+    change((current) => ({
       languages: LANGUAGES.filter((item) =>
-        item === language ? on : draft.languages.includes(item),
+        item === language ? on : current.languages.includes(item),
       ),
-    });
+    }));
 
   const stopPreviews = () => {
     for (const language of LANGUAGES) preview.reset(previewKey(language));
@@ -128,7 +128,7 @@ export function VoiceDialog({
           accent: answer.accent,
           listed: answer.listed_languages,
         });
-        change({ name: answer.name, languages: answer.listed_languages });
+        change(() => ({ name: answer.name, languages: answer.listed_languages }));
       },
     });
   };
@@ -235,7 +235,7 @@ export function VoiceDialog({
                     required
                     maxLength={80}
                     value={draft.name}
-                    onChange={(e) => change({ name: e.target.value })}
+                    onChange={(e) => change(() => ({ name: e.target.value }))}
                   />
                   {submitted && !draft.name.trim() && (
                     <FieldError className={APPEAR}>Enter a name.</FieldError>
