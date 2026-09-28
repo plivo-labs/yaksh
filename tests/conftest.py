@@ -321,7 +321,7 @@ async def client(
         await connection.execute(
             text(
                 "TRUNCATE phone_numbers, conversations, agent_versions, agents,"
-                " persona_versions, personas, voices"
+                " persona_versions, personas, voices, scenario_versions, scenarios"
             )
         )
     await engine.dispose()

@@ -201,6 +201,47 @@ class Voice(Base):
     )
 
 
+class Scenario(Base):
+    __tablename__ = "scenarios"
+
+    id: Mapped[uuid.UUID] = uuid_primary_key()
+    agent_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("agents.id"))
+    name: Mapped[str] = mapped_column(Text)
+    config: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    current_version: Mapped[int] = mapped_column(Integer, default=1)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    __table_args__ = (
+        Index(
+            "ix_scenarios_agent_name_live",
+            "agent_id",
+            func.lower(text("name")),
+            unique=True,
+            postgresql_where=text("deleted_at IS NULL"),
+        ),
+        UniqueConstraint("id", "agent_id"),
+    )
+
+
+class ScenarioVersion(Base):
+    __tablename__ = "scenario_versions"
+
+    id: Mapped[uuid.UUID] = uuid_primary_key()
+    scenario_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("scenarios.id"))
+    version: Mapped[int] = mapped_column(Integer)
+    config: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        UniqueConstraint("scenario_id", "version"),
+        UniqueConstraint("id", "scenario_id"),
+    )
+
+
 class PhoneNumber(Base):
     """A number on the Plivo account; when enabled, leased to one conversation at a time and
     rotated by last use."""

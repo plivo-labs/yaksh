@@ -176,6 +176,62 @@ def upgrade() -> None:
         ),
     )
     op.create_table(
+        "scenarios",
+        sa.Column("id", sa.UUID(), server_default=sa.text("uuidv7()"), nullable=False),
+        sa.Column("agent_id", sa.UUID(), nullable=False),
+        sa.Column("name", sa.Text(), nullable=False),
+        sa.Column("config", postgresql.JSONB(astext_type=sa.Text()), nullable=False),
+        sa.Column("current_version", sa.Integer(), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.Column("deleted_at", sa.DateTime(timezone=True), nullable=True),
+        sa.ForeignKeyConstraint(
+            ["agent_id"], ["agents.id"], name=op.f("fk_scenarios_agent_id_agents")
+        ),
+        sa.PrimaryKeyConstraint("id", name=op.f("pk_scenarios")),
+        sa.UniqueConstraint("id", "agent_id", name=op.f("uq_scenarios_id_agent_id")),
+    )
+    op.create_index(
+        "ix_scenarios_agent_name_live",
+        "scenarios",
+        ["agent_id", sa.literal_column("lower(name)")],
+        unique=True,
+        postgresql_where=sa.text("deleted_at IS NULL"),
+    )
+    op.create_table(
+        "scenario_versions",
+        sa.Column("id", sa.UUID(), server_default=sa.text("uuidv7()"), nullable=False),
+        sa.Column("scenario_id", sa.UUID(), nullable=False),
+        sa.Column("version", sa.Integer(), nullable=False),
+        sa.Column("config", postgresql.JSONB(astext_type=sa.Text()), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.ForeignKeyConstraint(
+            ["scenario_id"],
+            ["scenarios.id"],
+            name=op.f("fk_scenario_versions_scenario_id_scenarios"),
+        ),
+        sa.PrimaryKeyConstraint("id", name=op.f("pk_scenario_versions")),
+        sa.UniqueConstraint("id", "scenario_id", name=op.f("uq_scenario_versions_id_scenario_id")),
+        sa.UniqueConstraint(
+            "scenario_id", "version", name=op.f("uq_scenario_versions_scenario_id_version")
+        ),
+    )
+    op.create_table(
         "conversations",
         sa.Column("id", sa.UUID(), server_default=sa.text("uuidv7()"), nullable=False),
         sa.Column("agent_id", sa.UUID(), nullable=False),
@@ -282,6 +338,8 @@ def upgrade() -> None:
 def downgrade() -> None:
     op.drop_table("phone_numbers")
     op.drop_table("conversations")
+    op.drop_table("scenario_versions")
+    op.drop_table("scenarios")
     op.drop_table("persona_versions")
     op.drop_table("agent_versions")
     op.drop_table("voices")

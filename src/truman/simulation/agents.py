@@ -4,10 +4,11 @@ from typing import Any
 
 import pydantic
 from sqlalchemy import func, select
+from sqlalchemy import update as update_rows
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from truman.db.models import Agent, AgentVersion, Conversation
+from truman.db.models import Agent, AgentVersion, Conversation, Scenario
 from truman.domain.agents import (
     AgentConfig,
     AgentCreate,
@@ -137,7 +138,13 @@ async def delete_agent(session: AsyncSession, agent_id: uuid.UUID) -> None:
     )
     if active:
         raise ConflictError("agent has an active conversation")
-    agent.deleted_at = datetime.now(UTC)
+    now = datetime.now(UTC)
+    agent.deleted_at = now
+    await session.execute(
+        update_rows(Scenario)
+        .where(Scenario.agent_id == agent.id, Scenario.deleted_at.is_(None))
+        .values(deleted_at=now)
+    )
     await session.commit()
 
 
