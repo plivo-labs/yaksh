@@ -1,20 +1,12 @@
-import {
-  ArrowDown,
-  ArrowUp,
-  ArrowUpDown,
-  Copy,
-  CopyPlus,
-  Ellipsis,
-  Plus,
-  Search,
-  Trash2,
-} from "lucide-react";
-import { type MouseEvent, useRef, useState } from "react";
+import { Copy, CopyPlus, Ellipsis, Plus, Trash2 } from "lucide-react";
+import { type MouseEvent, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
 
 import { toast } from "sonner";
 
 import { DeleteDialog } from "@/components/confirm-dialogs";
+import { SearchInput } from "@/components/search-input";
+import { SortHeader } from "@/components/sort-header";
 import { RelativeTime } from "@/components/relative-time";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -25,7 +17,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
 import {
   Pagination,
   PaginationContent,
@@ -49,65 +40,18 @@ import { type Agent, LANGUAGE_NAMES } from "@/lib/types";
 const ROW =
   "grid grid-cols-[minmax(0,1fr)_2rem] items-center gap-x-4 gap-y-2 px-3 md:grid-cols-[minmax(12rem,1.4fr)_7rem_6rem_minmax(12rem,1fr)_8rem_2rem]";
 
-const SEARCH_DELAY_MS = 250;
-
-type SortKey = "name" | "language" | "updated_at";
-
-/** A column heading that sorts the list; text sorts A to Z first, dates newest first. */
-function SortHeader({
-  label,
-  field,
-  sort,
-  onSort,
-}: {
-  label: string;
-  field: SortKey;
-  sort: string;
-  onSort: (sort: string) => void;
-}) {
-  const descending = sort === `-${field}`;
-  const active = descending || sort === field;
-  const next = active
-    ? descending
-      ? field
-      : `-${field}`
-    : field === "updated_at"
-      ? `-${field}`
-      : field;
-  const Icon = active ? (descending ? ArrowDown : ArrowUp) : ArrowUpDown;
-  return (
-    <button
-      type="button"
-      onClick={() => onSort(next)}
-      aria-label={`Sort by ${label.toLowerCase()}`}
-      aria-pressed={active}
-      className={`-mx-1 inline-flex w-fit items-center gap-1 rounded-sm px-1 outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 ${active ? "text-foreground" : ""}`}
-    >
-      {label}
-      <Icon className={`size-3.5 ${active ? "" : "opacity-50"}`} />
-    </button>
-  );
-}
-
 export function AgentsPage() {
   const [params, setParams] = useSearchParams();
   const search = params.get("q") ?? "";
   const sort = params.get("sort") ?? "";
   const page = Math.max(1, Number(params.get("page") ?? "1") || 1);
   const agents = useAgentPage(search, sort, page);
-  const [typed, setTyped] = useState(search);
-  const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
-
-  const type = (value: string) => {
-    setTyped(value);
-    clearTimeout(timer.current);
-    timer.current = setTimeout(() => {
-      const next = new URLSearchParams(params);
-      if (value.trim()) next.set("q", value.trim());
-      else next.delete("q");
-      next.delete("page");
-      setParams(next, { replace: true });
-    }, SEARCH_DELAY_MS);
+  const searchFor = (text: string) => {
+    const next = new URLSearchParams(params);
+    if (text) next.set("q", text);
+    else next.delete("q");
+    next.delete("page");
+    setParams(next, { replace: true });
   };
   const sortBy = (next: string) => {
     const target = new URLSearchParams(params);
@@ -132,17 +76,13 @@ export function AgentsPage() {
     <div className="mx-auto grid max-w-6xl gap-6">
       <div className="flex flex-wrap items-center gap-x-2 gap-y-4">
         <h1 className="mr-auto text-2xl font-semibold tracking-[-0.015em]">Agents</h1>
-        <div className="relative order-last basis-full sm:order-none sm:basis-64">
-          <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            type="search"
-            aria-label="Search agents"
-            placeholder="Search by name, number or id"
-            className="pl-8"
-            value={typed}
-            onChange={(event) => type(event.target.value)}
-          />
-        </div>
+        <SearchInput
+          value={search}
+          onSearch={searchFor}
+          label="Search agents"
+          placeholder="Search by name, number or id"
+          className="order-last basis-full sm:order-none sm:basis-64"
+        />
         <Button nativeButton={false} render={<Link to="/agents/new" />}>
           <Plus />
           New agent
@@ -178,7 +118,13 @@ export function AgentsPage() {
             <SortHeader label="Language" field="language" sort={sort} onSort={sortBy} />
             <span>Scenarios</span>
             <span>Last call</span>
-            <SortHeader label="Last updated" field="updated_at" sort={sort} onSort={sortBy} />
+            <SortHeader
+              label="Last updated"
+              field="updated_at"
+              sort={sort}
+              descendingFirst
+              onSort={sortBy}
+            />
             <span />
           </div>
           <ul className="divide-y border-b">

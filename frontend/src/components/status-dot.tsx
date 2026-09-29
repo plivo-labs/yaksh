@@ -1,5 +1,6 @@
 import { cn } from "cn";
 
+import { Badge } from "@/components/ui/badge";
 import { words } from "@/lib/format";
 import type { ConversationStatus } from "@/lib/types";
 
@@ -62,11 +63,11 @@ export function StatusDot({
   return <Dot tone={TONE[status]} live={status === "running"} size={size} className={className} />;
 }
 
-export function StatusLabel({ status }: { status: ConversationStatus }) {
+export function StatusBadge({ status }: { status: ConversationStatus }) {
   return (
-    <span className="inline-flex items-center gap-2 capitalize">
+    <Badge variant="outline" className="gap-1.5 capitalize">
       <StatusDot status={status} size="sm" />
       {words(status)}
-    </span>
+    </Badge>
   );
 }

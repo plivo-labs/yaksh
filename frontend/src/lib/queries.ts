@@ -217,7 +217,8 @@ export function useConversations(filters: Record<string, string>, page: number) 
   }).toString();
   return useQuery({
     queryKey: keys.conversations({ ...filters, page: String(page) }),
-    queryFn: () => api<Page<ConversationSummary>>(`/conversations?${search}`),
+    queryFn: ({ signal }) => api<Page<ConversationSummary>>(`/conversations?${search}`, { signal }),
+    placeholderData: keepPreviousData,
     refetchInterval: (query) =>
       query.state.data?.items.some((item) => ACTIVE_STATUSES.includes(item.status))
         ? 3_000
@@ -271,4 +272,52 @@ export function useScenarioCount(agentId: string) {
     queryFn: async () =>
       (await api<Page<Scenario>>(`/agents/${agentId}/scenarios?page_size=1`)).total,
   });
+}
+
+export interface Recording {
+  src: string;
+  duration: number;
+  /** Peak level of each 10 ms of the call for each channel, 0 to 1 against the loudest moment. */
+  lanes: Float32Array[];
+}
+
+const BUCKET_S = 0.01;
+
+/** Loads a recording with the API token and measures its waveform. The object URL lives as
+ * long as the page. */
+// ponytail: object URLs are not revoked; revoke on cache removal if pages stay open for hours.
+export function useRecording(url: string | null) {
+  return useQuery({
+    queryKey: ["recording", url],
+    enabled: url !== null,
+    staleTime: Infinity,
+    queryFn: async ({ signal }): Promise<Recording> => {
+      const blob = await apiBlob(url!.replace(/^\/api\/v1/, ""), { signal });
+      const decoded = await new OfflineAudioContext(1, 1, 8000).decodeAudioData(
+        await blob.arrayBuffer(),
+      );
+      const size = Math.max(1, Math.round(decoded.sampleRate * BUCKET_S));
+      const lanes = Array.from({ length: decoded.numberOfChannels }, (_, index) =>
+        peaks(decoded.getChannelData(index), size),
+      );
+      const loudest = Math.max(
+        1e-6,
+        ...lanes.map((lane) => lane.reduce((a, b) => Math.max(a, b), 0)),
+      );
+      for (const lane of lanes) {
+        for (let i = 0; i < lane.length; i++) lane[i] /= loudest;
+      }
+      return { src: URL.createObjectURL(blob), duration: decoded.duration, lanes };
+    },
+  });
+}
+
+function peaks(samples: Float32Array, size: number): Float32Array {
+  const out = new Float32Array(Math.ceil(samples.length / size));
+  for (let i = 0; i < samples.length; i++) {
+    const slot = Math.floor(i / size);
+    const level = Math.abs(samples[i]);
+    if (level > out[slot]) out[slot] = level;
+  }
+  return out;
 }

@@ -56,3 +56,9 @@ const EXACT = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyl
 export function exact(iso: string): string {
   return EXACT.format(new Date(iso));
 }
+
+/** Whole seconds as m:ss, for time rulers. */
+export function stamp(seconds: number): string {
+  const whole = Math.round(seconds);
+  return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, "0")}`;
+}

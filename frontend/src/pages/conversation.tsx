@@ -1,8 +1,9 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { Fragment, useEffect, useState } from "react";
-import { Link, useParams } from "react-router";
+import { Link, useParams, useSearchParams } from "react-router";
 
-import { StatusLabel } from "@/components/status-dot";
+import { RecordingPlayer } from "@/components/recording-player";
+import { StatusBadge } from "@/components/status-dot";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -33,7 +34,6 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
-import { UNAUTHORIZED_EVENT, authHeaders } from "@/lib/api";
 import { clock, duration, when, words } from "@/lib/format";
 import { keys, useAgent, useConversation, useEndConversation } from "@/lib/queries";
 import { subscribe } from "@/lib/sse";
@@ -49,6 +49,7 @@ import {
 
 export function ConversationPage() {
   const { id = "" } = useParams();
+  const [params] = useSearchParams();
   const conversation = useConversation(id);
   const agent = useAgent(conversation.data?.agent_id);
   const end = useEndConversation(id);
@@ -80,7 +81,7 @@ export function ConversationPage() {
                 "Conversation"
               )}
             </h1>
-            <StatusLabel status={data.status} />
+            <StatusBadge status={data.status} />
           </div>
           <p className="text-sm text-muted-foreground">
             Version {data.agent_version}
@@ -120,10 +121,23 @@ export function ConversationPage() {
       </div>
 
       <div className="grid gap-6 lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(0,1fr)_20rem] lg:grid-rows-[minmax(0,1fr)]">
-        <Transcript turns={data.transcript} active={active} />
+        <div className="flex flex-col gap-6 lg:min-h-0">
+          <Card className="shrink-0">
+            <CardHeader>
+              <CardTitle>Recording</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <RecordingPlayer
+                url={data.recording_url}
+                name={`truman-${data.id}`}
+                start={Number(params.get("t")) || 0}
+              />
+            </CardContent>
+          </Card>
+          <Transcript turns={data.transcript} active={active} />
+        </div>
         <ScrollArea className="lg:min-h-0">
           <div className="flex flex-col gap-6 p-px lg:pr-4">
-            <Recording url={data.recording_url} />
             <ScenarioCard name={data.scenario_name} scenario={data.scenario} />
             <Card>
               <CardHeader>
@@ -361,56 +375,6 @@ function Transcript({ turns, active }: { turns: Turn[]; active: boolean }) {
               <MessageScrollerButton />
             </MessageScroller>
           </MessageScrollerProvider>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-function Recording({ url }: { url: string | null }) {
-  const [blob, setBlob] = useState<string | null>(null);
-  const [failed, setFailed] = useState(false);
-  useEffect(() => {
-    if (!url) return;
-    const controller = new AbortController();
-    let objectUrl: string | null = null;
-    fetch(url, { headers: authHeaders(), signal: controller.signal })
-      .then((response) => {
-        if (response.status === 401) window.dispatchEvent(new Event(UNAUTHORIZED_EVENT));
-        if (!response.ok) throw new Error(response.statusText);
-        return response.blob();
-      })
-      .then((audio) => {
-        objectUrl = URL.createObjectURL(audio);
-        setBlob(objectUrl);
-      })
-      .catch(() => {
-        if (!controller.signal.aborted) setFailed(true);
-      });
-    return () => {
-      controller.abort();
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
-    };
-  }, [url]);
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Recording</CardTitle>
-        <CardDescription>
-          Left: the agent as Truman received it. Right: the caller as Truman sent it.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        {blob ? (
-          <audio controls src={blob} className="w-full" />
-        ) : (
-          <p className="text-sm text-muted-foreground">
-            {failed
-              ? "The recording did not load. Reload the page to try again."
-              : url
-                ? "Loading."
-                : "Available once the call has ended."}
-          </p>
         )}
       </CardContent>
     </Card>

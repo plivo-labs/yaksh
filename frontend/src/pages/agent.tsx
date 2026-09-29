@@ -6,8 +6,9 @@ import { toast } from "sonner";
 import { CopyId } from "@/components/copy-id";
 import { Fact, Panel, PanelHeader } from "@/components/panel";
 import { RelativeTime } from "@/components/relative-time";
-import { Dot, StatusLabel, StatusDot } from "@/components/status-dot";
+import { Dot, StatusBadge, StatusDot } from "@/components/status-dot";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { duration, phone, since, when } from "@/lib/format";
@@ -98,15 +99,15 @@ function LineState({
   call: ConversationSummary | null | undefined;
   pending: boolean;
 }) {
-  if (pending) return <Skeleton className="h-10 w-44" />;
+  if (pending) return <Skeleton className="h-6 w-56" />;
   if (!call) {
     return (
-      <div className="flex items-center gap-3">
-        <Dot tone="off" size="lg" />
-        <div className="grid text-sm">
-          <span className="font-medium">Idle</span>
-          <span className="text-muted-foreground">Never called</span>
-        </div>
+      <div className="flex items-center gap-2 text-sm">
+        <Badge variant="outline" className="gap-1.5">
+          <Dot tone="off" size="sm" />
+          Idle
+        </Badge>
+        <span className="text-muted-foreground">Never called</span>
       </div>
     );
   }
@@ -120,17 +121,17 @@ function LineState({
   return (
     <Link
       to={`/conversations/${call.id}`}
-      className="-mx-2 flex items-center gap-3 rounded-md px-2 py-1 outline-none transition-colors hover:bg-foreground/[0.04] focus-visible:ring-2 focus-visible:ring-ring/50"
+      className="-mx-2 flex items-center gap-2 rounded-md px-2 py-1 text-sm outline-none transition-colors hover:bg-foreground/[0.04] focus-visible:ring-2 focus-visible:ring-ring/50"
     >
-      {active ? <StatusDot status={call.status} size="lg" /> : <Dot tone="off" size="lg" />}
-      <div className="grid text-sm">
-        <span className="font-medium">{active ? state : "Idle"}</span>
-        <span className="text-muted-foreground">
-          {active
-            ? call.scenario_name
-            : `Last call ${call.status} ${since(call.started_at ?? call.created_at)}`}
-        </span>
-      </div>
+      <Badge variant="outline" className="gap-1.5">
+        {active ? <StatusDot status={call.status} size="sm" /> : <Dot tone="off" size="sm" />}
+        {active ? state : "Idle"}
+      </Badge>
+      <span className="text-muted-foreground">
+        {active
+          ? call.scenario_name
+          : `Last call ${call.status} ${since(call.started_at ?? call.created_at)}`}
+      </span>
     </Link>
   );
 }
@@ -177,7 +178,7 @@ function Calls({ agent }: { agent: Agent }) {
                 className="group grid grid-cols-[6.5rem_minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 px-5 py-3 outline-none transition-colors duration-150 hover:bg-foreground/[0.025] focus-visible:bg-foreground/[0.04] focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-inset md:grid-cols-[6.5rem_minmax(0,1.4fr)_minmax(0,1fr)_4.5rem_8rem]"
               >
                 <span className="text-sm">
-                  <StatusLabel status={call.status} />
+                  <StatusBadge status={call.status} />
                 </span>
                 <span className="grid min-w-0 gap-0.5 text-sm">
                   <span className="truncate font-medium">{call.scenario_name}</span>
