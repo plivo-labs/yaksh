@@ -23,8 +23,10 @@ from truman.config import Settings
 from truman.db.migrate import upgrade_to_head
 from truman.db.session import create_engine, create_sessionmaker
 from truman.domain.documents import MAX_FILE_BYTES, FileStore
+from truman.domain.language_models import JsonModel
 from truman.domain.voices import VoiceProvider
 from truman.integrations.elevenlabs import ElevenLabsClient
+from truman.integrations.openai_models import OpenAIJsonModel
 from truman.integrations.s3 import S3FileStore
 from truman.simulation.personas import seed_builtin_personas
 from truman.simulation.voices import VoiceClients, seed_builtin_voices
@@ -50,6 +52,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     if personas:
         log.info("seeded built-in personas: %s", ", ".join(personas))
     yield
+    if app.state.generation_model is not None:
+        await app.state.generation_model.close()
     await app.state.engine.dispose()
 
 
@@ -77,6 +81,23 @@ def file_store(settings: Settings) -> FileStore | None:
     )
 
 
+def generation_model(settings: Settings) -> JsonModel | None:
+    """OpenAI, or Azure OpenAI when its endpoint is set, as for the caller."""
+    model = settings.generation_model or settings.persona_model
+    if settings.azure_openai_endpoint:
+        if settings.azure_openai_api_key is None:
+            return None
+        return OpenAIJsonModel.azure(
+            settings.azure_openai_endpoint,
+            settings.azure_openai_api_key.get_secret_value(),
+            model,
+            api_version=settings.azure_openai_api_version,
+        )
+    if settings.openai_api_key is None:
+        return None
+    return OpenAIJsonModel.openai(settings.openai_api_key.get_secret_value(), model)
+
+
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or Settings()
     app = FastAPI(title="Truman", version=__version__, lifespan=lifespan)
@@ -85,6 +106,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.sessionmaker = create_sessionmaker(app.state.engine)
     app.state.voice_clients = voice_clients(settings)
     app.state.file_store = file_store(settings)
+    app.state.generation_model = generation_model(settings)
     register_error_handlers(app)
     app.add_middleware(BodySizeLimit, max_bytes=MAX_REQUEST_BYTES)
 

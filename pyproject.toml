@@ -13,6 +13,7 @@ dependencies = [
     "asyncpg>=0.31.0",
     "audioop-lts>=0.2.2",
     "fastapi>=0.141.1",
+    "openai>=3.14.1",
     "pipecat-ai[deepgram,elevenlabs,silero]>=1.11.0",
     "pydantic>=2.12",
     "pydantic-settings>=2.15.0",

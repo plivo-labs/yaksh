@@ -44,6 +44,8 @@ class Settings(BaseSettings):
     )
     openai_api_key: SecretStr | None = Field(default=None, validation_alias="OPENAI_API_KEY")
     persona_model: str = "gpt-4.1"
+    generation_model: str | None = None
+    """The model (or Azure deployment) that writes test scenarios; the persona model when unset."""
     plivo_auth_id: SecretStr | None = Field(default=None, validation_alias="PLIVO_AUTH_ID")
     plivo_auth_token: SecretStr | None = Field(default=None, validation_alias="PLIVO_AUTH_TOKEN")
     plivo_numbers: Annotated[list[E164], NoDecode] = []
