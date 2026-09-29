@@ -26,6 +26,7 @@ from truman.db.base import Base
 from truman.domain.agents import Direction, Transport
 from truman.domain.conversations import Channel, ConversationStatus, EndReason
 from truman.domain.languages import Language
+from truman.domain.scenarios import Category
 from truman.domain.voices import VoiceGender, VoiceProvider
 
 
@@ -226,6 +227,12 @@ class Scenario(Base):
     id: Mapped[uuid.UUID] = uuid_primary_key()
     agent_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("agents.id"))
     name: Mapped[str] = mapped_column(Text)
+    category: Mapped[Category] = mapped_column(
+        pg_enum(Category, "scenario_category"),
+        default=Category.HAPPY_PATH,
+        server_default=Category.HAPPY_PATH.value,
+    )
+    description: Mapped[str | None] = mapped_column(Text)
     config: Mapped[dict[str, Any]] = mapped_column(JSONB)
     current_version: Mapped[int] = mapped_column(Integer, default=1)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

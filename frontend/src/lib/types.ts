@@ -251,8 +251,27 @@ export interface ScenarioConfig {
   agent_data: Fact[];
 }
 
+export type Category = "happy_path" | "recovery" | "boundary";
+
+export const CATEGORY_ITEMS: { value: Category; label: string; hint: string }[] = [
+  { value: "happy_path", label: "Happy path", hint: "A normal request with correct information" },
+  {
+    value: "recovery",
+    label: "Recovery",
+    hint: "The caller gives wrong, partial, spelled-out or corrected information",
+  },
+  { value: "boundary", label: "Boundary", hint: "Out of scope, a refusal or a hand-off" },
+];
+
+export const CATEGORY_LABELS = Object.fromEntries(
+  CATEGORY_ITEMS.map((item) => [item.value, item.label]),
+) as Record<Category, string>;
+
 export interface ScenarioInput extends ScenarioConfig {
   name: string;
+  category: Category;
+  /** Why the scenario exists. The caller and the judge never see it. */
+  description: string | null;
 }
 
 export interface Scenario extends ScenarioInput {

@@ -1,3 +1,4 @@
+from enum import StrEnum
 from typing import Annotated, Any
 
 from pydantic import (
@@ -15,6 +16,18 @@ FactName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1,
 FactValue = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=500)]
 Criterion = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=500)]
 Name = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=80)]
+Description = Annotated[str, StringConstraints(strip_whitespace=True, max_length=500)]
+
+
+class Category(StrEnum):
+    """What kind of situation a scenario tests. How the caller talks comes from the persona."""
+
+    HAPPY_PATH = "happy_path"
+    """A normal request with correct information."""
+    RECOVERY = "recovery"
+    """The caller gives wrong, partial, spelled-out or corrected information."""
+    BOUNDARY = "boundary"
+    """A request outside the agent's job, or one that pushes a rule: refusal or hand-off."""
 
 
 def normalized(text: str) -> str:
@@ -62,11 +75,18 @@ class ScenarioConfig(BaseModel):
         return self
 
 
+SCENARIO_LABELS = frozenset({"name", "category", "description"})
+"""Fields that describe a scenario without changing what a call uses, so not versioned."""
+
+
 class ScenarioCreate(ScenarioConfig):
     name: Name
+    category: Category = Category.HAPPY_PATH
+    description: Description | None = None
+    """Why the scenario exists; for people, never shown to the caller or the judge."""
 
     def to_config(self) -> ScenarioConfig:
-        return ScenarioConfig.model_validate(self.model_dump(exclude={"name"}))
+        return ScenarioConfig.model_validate(self.model_dump(exclude=set(SCENARIO_LABELS)))
 
 
 class ScenarioUpdate(BaseModel):
@@ -75,13 +95,17 @@ class ScenarioUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     name: Name | None = None
+    category: Category | None = None
+    description: Description | None = None
     goal: Goal | None = None
     known_facts: list[Fact] | None = Field(default=None, max_length=30)
     unknown_facts: list[FactName] | None = Field(default=None, max_length=20)
     criteria: list[Criterion] | None = Field(default=None, min_length=1, max_length=10)
     agent_data: list[Fact] | None = Field(default=None, max_length=30)
 
-    @field_validator("name", "goal", "known_facts", "unknown_facts", "criteria", "agent_data")
+    @field_validator(
+        "name", "category", "goal", "known_facts", "unknown_facts", "criteria", "agent_data"
+    )
     @classmethod
     def cannot_be_cleared(cls, value: Any, info: ValidationInfo) -> Any:
         if value is None:

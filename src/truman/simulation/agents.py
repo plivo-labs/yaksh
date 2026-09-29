@@ -145,7 +145,12 @@ async def duplicate_agent(session: AsyncSession, agent_id: uuid.UUID) -> Agent:
     )
     for scenario in scenarios.all():
         copy = Scenario(
-            agent_id=agent.id, name=scenario.name, config=scenario.config, current_version=1
+            agent_id=agent.id,
+            name=scenario.name,
+            category=scenario.category,
+            description=scenario.description,
+            config=scenario.config,
+            current_version=1,
         )
         session.add(copy)
         await session.flush()

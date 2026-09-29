@@ -9,7 +9,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from truman.db.models import Scenario, ScenarioVersion
 from truman.domain.errors import ConflictError, NotFoundError, ValidationError
-from truman.domain.scenarios import ScenarioConfig, ScenarioCreate, ScenarioUpdate
+from truman.domain.scenarios import (
+    SCENARIO_LABELS,
+    ScenarioConfig,
+    ScenarioCreate,
+    ScenarioUpdate,
+)
 from truman.simulation.agents import get_agent
 
 NAME_INDEX = "ix_scenarios_agent_name_live"
@@ -65,6 +70,8 @@ async def create_scenario(
     scenario = Scenario(
         agent_id=agent.id,
         name=command.name,
+        category=command.category,
+        description=command.description or None,
         config=config.model_dump(mode="json"),
         current_version=1,
     )
@@ -92,12 +99,14 @@ async def list_scenarios(
 async def update_scenario(
     session: AsyncSession, scenario_id: uuid.UUID, update: ScenarioUpdate
 ) -> Scenario:
-    """Rename in place; a changed config writes the next version. The merge reads the config
-    under the row lock, so two concurrent changes cannot drop each other."""
+    """Labels change in place; a changed config writes the next version. The merge reads the
+    config under the row lock, so two concurrent changes cannot drop each other."""
     scenario = await get_scenario(session, scenario_id, lock=True)
     changes = update.changes()
-    if "name" in changes:
-        scenario.name = changes.pop("name")
+    if "description" in changes:
+        changes["description"] = changes["description"] or None
+    for field in SCENARIO_LABELS & changes.keys():
+        setattr(scenario, field, changes.pop(field))
     if changes:
         current = config_of(scenario)
         new = validate_config({**current.model_dump(), **changes})

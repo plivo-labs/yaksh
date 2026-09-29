@@ -21,16 +21,33 @@ import {
   FieldSet,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { useCloseGuard } from "@/hooks/use-close-guard";
 import { useDeleteScenario, useSaveScenario } from "@/lib/queries";
-import type { AgentSummary, Fact, Scenario, ScenarioInput } from "@/lib/types";
+import {
+  type AgentSummary,
+  CATEGORY_ITEMS,
+  type Category,
+  type Fact,
+  type Scenario,
+  type ScenarioInput,
+} from "@/lib/types";
 
 const APPEAR = "transition-opacity duration-150 ease-out starting:opacity-0";
 
 const EMPTY: ScenarioInput = {
   name: "",
+  category: "happy_path",
+  description: null,
   goal: "",
   known_facts: [],
   unknown_facts: [],
@@ -41,6 +58,8 @@ const EMPTY: ScenarioInput = {
 function toDraft(scenario: Scenario): ScenarioInput {
   return {
     name: scenario.name,
+    category: scenario.category,
+    description: scenario.description,
     goal: scenario.goal,
     known_facts: scenario.known_facts,
     unknown_facts: scenario.unknown_facts,
@@ -59,6 +78,8 @@ function trimFacts(facts: Fact[]): Fact[] {
 function toInput(draft: ScenarioInput): ScenarioInput {
   return {
     name: draft.name.trim(),
+    category: draft.category,
+    description: draft.description?.trim() || null,
     goal: draft.goal.trim(),
     known_facts: trimFacts(draft.known_facts),
     unknown_facts: draft.unknown_facts.map((name) => name.trim()).filter(Boolean),
@@ -238,6 +259,44 @@ export function ScenarioDialog({
               {submitted && !input.name && (
                 <FieldError className={APPEAR}>Enter a name.</FieldError>
               )}
+            </Field>
+
+            <Field>
+              <FieldLabel htmlFor="scenario-category">Category</FieldLabel>
+              <Select
+                items={CATEGORY_ITEMS}
+                value={draft.category}
+                onValueChange={(value) => value && change(() => ({ category: value as Category }))}
+              >
+                <SelectTrigger id="scenario-category" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    {CATEGORY_ITEMS.map((item) => (
+                      <SelectItem key={item.value} value={item.value}>
+                        {item.label}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+              <FieldDescription>
+                {CATEGORY_ITEMS.find((item) => item.value === draft.category)?.hint}.
+              </FieldDescription>
+            </Field>
+
+            <Field>
+              <FieldLabel htmlFor="scenario-description">Description</FieldLabel>
+              <Textarea
+                id="scenario-description"
+                rows={2}
+                maxLength={500}
+                placeholder="What this scenario tests and why."
+                value={draft.description ?? ""}
+                onChange={(e) => change(() => ({ description: e.target.value }))}
+              />
+              <FieldDescription>Optional. The caller never sees it.</FieldDescription>
             </Field>
 
             <Field>

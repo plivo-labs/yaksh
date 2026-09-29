@@ -189,6 +189,13 @@ def upgrade() -> None:
         sa.Column("id", sa.UUID(), server_default=sa.text("uuidv7()"), nullable=False),
         sa.Column("agent_id", sa.UUID(), nullable=False),
         sa.Column("name", sa.Text(), nullable=False),
+        sa.Column(
+            "category",
+            sa.Enum("happy_path", "recovery", "boundary", name="scenario_category"),
+            server_default="happy_path",
+            nullable=False,
+        ),
+        sa.Column("description", sa.Text(), nullable=True),
         sa.Column("config", postgresql.JSONB(astext_type=sa.Text()), nullable=False),
         sa.Column("current_version", sa.Integer(), nullable=False),
         sa.Column(
@@ -420,5 +427,6 @@ def downgrade() -> None:
         "language",
         "agent_transport",
         "agent_direction",
+        "scenario_category",
     ):
         op.execute(f"DROP TYPE {enum}")

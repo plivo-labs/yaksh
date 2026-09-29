@@ -4,7 +4,7 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict
 
 from truman.db.models import Scenario
-from truman.domain.scenarios import Fact, ScenarioConfig
+from truman.domain.scenarios import Category, Fact, ScenarioConfig
 from truman.simulation.scenarios import config_of
 
 
@@ -12,6 +12,8 @@ class ScenarioRead(BaseModel):
     id: uuid.UUID
     agent_id: uuid.UUID
     name: str
+    category: Category
+    description: str | None
     goal: str
     known_facts: list[Fact]
     unknown_facts: list[str]
@@ -27,6 +29,8 @@ class ScenarioRead(BaseModel):
             id=scenario.id,
             agent_id=scenario.agent_id,
             name=scenario.name,
+            category=scenario.category,
+            description=scenario.description,
             **config_of(scenario).model_dump(),
             current_version=scenario.current_version,
             created_at=scenario.created_at,

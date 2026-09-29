@@ -113,8 +113,12 @@ def test_an_empty_token_is_refused_at_startup() -> None:
 async def test_a_duplicate_copies_the_config_and_live_scenarios_but_not_the_external_id(
     client: AsyncClient,
 ) -> None:
-    original = await create_agent(client, external_id="flow-7", brief="Books rooms")
-    kept = await create_scenario(client, original["id"])
+    original = await create_agent(
+        client, external_id="flow-7", brief="Books rooms", config="Greet, then book."
+    )
+    kept = await create_scenario(
+        client, original["id"], category="recovery", description="Checks a corrected date."
+    )
     gone = await create_scenario(client, original["id"], name="Gone")
     await client.delete(f"/api/v1/scenarios/{gone['id']}")
     await client.patch(f"/api/v1/scenarios/{kept['id']}", json={"criteria": ["Books it."]})
@@ -125,10 +129,12 @@ async def test_a_duplicate_copies_the_config_and_live_scenarios_but_not_the_exte
     copy = response.json()
     assert copy["id"] != original["id"] and copy["name"] == f"{AGENT['name']} (copy)"
     assert (copy["external_id"], copy["brief"], copy["current_version"]) == (None, "Books rooms", 1)
+    assert copy["config"] == "Greet, then book."
     copied = (await client.get(f"/api/v1/agents/{copy['id']}/scenarios")).json()["items"]
-    assert [(s["name"], s["criteria"], s["current_version"]) for s in copied] == [
-        (SCENARIO["name"], ["Books it."], 1)
-    ]
+    assert [
+        (s["name"], s["criteria"], s["current_version"], s["category"], s["description"])
+        for s in copied
+    ] == [(SCENARIO["name"], ["Books it."], 1, "recovery", "Checks a corrected date.")]
     assert (await client.get(f"/api/v1/agents/{original['id']}/scenarios")).json()["total"] == 1
     missing = await client.post(f"/api/v1/agents/{uuid.uuid4()}/duplicate")
     assert missing.status_code == 404

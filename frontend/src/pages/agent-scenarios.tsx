@@ -2,10 +2,11 @@ import { PhoneIncoming, PhoneOutgoing, Plus } from "lucide-react";
 import { useState } from "react";
 
 import { Panel, PanelHeader } from "@/components/panel";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAgents, useScenarios } from "@/lib/queries";
-import type { Agent, Scenario } from "@/lib/types";
+import { type Agent, CATEGORY_LABELS, type Scenario } from "@/lib/types";
 import { ScenarioDialog } from "@/pages/scenario-dialog";
 import { StartCallDialog } from "@/pages/start-call-dialog";
 
@@ -59,8 +60,15 @@ export function AgentScenarios({ agent }: { agent: Agent }) {
                 className="flex min-w-0 flex-1 items-center gap-4 py-3 pl-5 text-left outline-none transition-colors duration-150 hover:bg-foreground/[0.025] focus-visible:bg-foreground/[0.04] focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-inset"
               >
                 <span className="grid min-w-0 flex-1 gap-0.5">
-                  <span className="truncate text-sm font-medium">{item.name}</span>
-                  <span className="truncate text-sm text-muted-foreground">{item.goal}</span>
+                  <span className="flex min-w-0 items-center gap-2">
+                    <span className="truncate text-sm font-medium">{item.name}</span>
+                    <Badge variant="outline" className="shrink-0">
+                      {CATEGORY_LABELS[item.category]}
+                    </Badge>
+                  </span>
+                  <span className="truncate text-sm text-muted-foreground">
+                    {item.description ?? item.goal}
+                  </span>
                 </span>
                 <span className="hidden shrink-0 text-xs text-muted-foreground sm:block">
                   {counted(item.known_facts.length, "fact", "facts")},{" "}
