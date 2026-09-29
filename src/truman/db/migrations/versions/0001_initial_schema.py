@@ -357,6 +357,32 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("number", name=op.f("pk_phone_numbers")),
     )
     op.create_table(
+        "documents",
+        sa.Column("id", sa.UUID(), server_default=sa.text("uuidv7()"), nullable=False),
+        sa.Column("name", sa.Text(), nullable=False),
+        sa.Column("media_type", sa.Text(), nullable=True),
+        sa.Column("size_bytes", sa.Integer(), nullable=True),
+        sa.Column("sha256", sa.Text(), nullable=True),
+        sa.Column("storage_key", sa.Text(), nullable=True),
+        sa.Column("text", sa.Text(), nullable=False),
+        sa.Column("characters", sa.Integer(), nullable=False),
+        sa.Column("pages", sa.Integer(), nullable=True),
+        sa.Column("empty_pages", sa.Integer(), nullable=True),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.CheckConstraint(
+            "(storage_key IS NULL) = (media_type IS NULL)"
+            " AND (storage_key IS NULL) = (size_bytes IS NULL)"
+            " AND (storage_key IS NULL) = (sha256 IS NULL)",
+            name=op.f("ck_documents_file_fields_together"),
+        ),
+        sa.PrimaryKeyConstraint("id", name=op.f("pk_documents")),
+    )
+    op.create_table(
         "workers",
         sa.Column("id", sa.Text(), nullable=False),
         sa.Column("receiving_app_id", sa.Text(), nullable=True),
@@ -368,6 +394,7 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     op.drop_table("workers")
+    op.drop_table("documents")
     op.drop_table("phone_numbers")
     op.drop_table("conversations")
     op.drop_table("scenario_versions")

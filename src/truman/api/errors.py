@@ -15,6 +15,7 @@ CODES = {
     status.HTTP_401_UNAUTHORIZED: "unauthorized",
     status.HTTP_404_NOT_FOUND: "not_found",
     status.HTTP_409_CONFLICT: "conflict",
+    status.HTTP_413_CONTENT_TOO_LARGE: "too_large",
     status.HTTP_422_UNPROCESSABLE_CONTENT: "validation_error",
     status.HTTP_503_SERVICE_UNAVAILABLE: "unavailable",
 }

@@ -51,6 +51,17 @@ curl -X POST localhost:8000/api/v1/conversations -H "Authorization: Bearer $TRUM
   -d '{"agent_id": "<agent id>", "scenario_id": "<scenario id>", "persona_id": "<persona id>"}'
 ```
 
+## Files
+
+Uploaded files (PDF, TXT and MD documents about an agent) are kept in S3-compatible storage. The compose files run [SeaweedFS](https://github.com/seaweedfs/seaweedfs) for this, with its data in the `storage` volume. To use S3, R2 or another S3-compatible service instead, set:
+
+| Variable | Purpose |
+| --- | --- |
+| `TRUMAN_S3_ENDPOINT` | The storage URL. File uploads are off without it; pasted text still works. |
+| `TRUMAN_S3_BUCKET` | The bucket, default `truman`. It must exist. |
+| `TRUMAN_S3_ACCESS_KEY`, `TRUMAN_S3_SECRET_KEY` | The credentials. |
+| `TRUMAN_S3_REGION` | Default `us-east-1`. |
+
 ## Outbound agents
 
 An outbound agent calls Truman. Truman sends the agent's trigger, a POST request that makes the agent call one of Truman's numbers, and answers that call.

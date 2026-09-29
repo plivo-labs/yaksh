@@ -7,10 +7,12 @@ from contextlib import asynccontextmanager
 from fastapi import APIRouter, FastAPI, HTTPException, status
 
 from truman import __version__
+from truman.api.body_limit import BodySizeLimit
 from truman.api.errors import register_error_handlers
 from truman.api.routes import (
     agents,
     conversations,
+    documents,
     health,
     personas,
     phone_numbers,
@@ -20,12 +22,17 @@ from truman.api.routes import (
 from truman.config import Settings
 from truman.db.migrate import upgrade_to_head
 from truman.db.session import create_engine, create_sessionmaker
+from truman.domain.documents import MAX_FILE_BYTES, FileStore
 from truman.domain.voices import VoiceProvider
 from truman.integrations.elevenlabs import ElevenLabsClient
+from truman.integrations.s3 import S3FileStore
 from truman.simulation.personas import seed_builtin_personas
 from truman.simulation.voices import VoiceClients, seed_builtin_voices
 
 log = logging.getLogger(__name__)
+
+MAX_REQUEST_BYTES = MAX_FILE_BYTES + 1024 * 1024
+"""The largest upload plus room for the multipart framing."""
 
 
 @asynccontextmanager
@@ -54,6 +61,22 @@ def voice_clients(settings: Settings) -> VoiceClients:
     }
 
 
+def file_store(settings: Settings) -> FileStore | None:
+    if (
+        settings.s3_endpoint is None
+        or settings.s3_access_key is None
+        or settings.s3_secret_key is None
+    ):
+        return None
+    return S3FileStore(
+        settings.s3_endpoint,
+        settings.s3_bucket,
+        settings.s3_access_key.get_secret_value(),
+        settings.s3_secret_key.get_secret_value(),
+        region=settings.s3_region,
+    )
+
+
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or Settings()
     app = FastAPI(title="Truman", version=__version__, lifespan=lifespan)
@@ -61,12 +84,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.engine = create_engine(str(settings.database_url))
     app.state.sessionmaker = create_sessionmaker(app.state.engine)
     app.state.voice_clients = voice_clients(settings)
+    app.state.file_store = file_store(settings)
     register_error_handlers(app)
+    app.add_middleware(BodySizeLimit, max_bytes=MAX_REQUEST_BYTES)
 
     api = APIRouter(prefix="/api/v1")
     api.include_router(health.router)
     api.include_router(agents.router)
     api.include_router(conversations.router)
+    api.include_router(documents.router)
     api.include_router(personas.router)
     api.include_router(phone_numbers.router)
     api.include_router(scenarios.router)

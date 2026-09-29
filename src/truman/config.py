@@ -59,6 +59,12 @@ class Settings(BaseSettings):
     public_url: str | None = None
     stream_port: int = 8770
     ring_timeout_s: int = 30
+    s3_endpoint: str | None = None
+    """Where uploaded files are kept: any S3-compatible service. Uploads are off without it."""
+    s3_bucket: str = "truman"
+    s3_access_key: SecretStr | None = None
+    s3_secret_key: SecretStr | None = None
+    s3_region: str = "us-east-1"
     timezone: str = "UTC"
     """The zone of the date the caller is told is today."""
 

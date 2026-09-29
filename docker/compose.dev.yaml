@@ -16,9 +16,15 @@ x-truman: &truman
     TRUMAN_API_PORT: 8000
     TRUMAN_DATABASE_URL: postgresql+asyncpg://truman:truman@postgres:5432/truman
     TRUMAN_DATA_DIR: /app/data
+    TRUMAN_S3_ENDPOINT: ${TRUMAN_S3_ENDPOINT:-http://storage:8333}
+    TRUMAN_S3_BUCKET: ${TRUMAN_S3_BUCKET:-truman}
+    TRUMAN_S3_ACCESS_KEY: ${TRUMAN_S3_ACCESS_KEY:-truman}
+    TRUMAN_S3_SECRET_KEY: ${TRUMAN_S3_SECRET_KEY:-truman-storage}
   depends_on:
     postgres:
       condition: service_healthy
+    storage:
+      condition: service_started
 
 services:
   api:
@@ -61,6 +67,19 @@ services:
       - --url
       - http://worker:8770
 
+  storage:
+    image: chrislusf/seaweedfs:4.48
+    command:
+      - mini
+      - -dir=/data
+      - -bucket=truman
+      - -admin.ui=false
+    environment:
+      AWS_ACCESS_KEY_ID: truman
+      AWS_SECRET_ACCESS_KEY: truman-storage
+    volumes:
+      - storage:/data
+
   postgres:
     image: postgres:18-alpine
     environment:
@@ -81,5 +100,6 @@ services:
 
 volumes:
   pgdata:
+  storage:
   truman_data:
   web_node_modules:

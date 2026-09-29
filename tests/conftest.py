@@ -1,6 +1,6 @@
 import asyncio
 import uuid
-from collections.abc import AsyncIterator, Callable, Iterator
+from collections.abc import AsyncGenerator, AsyncIterator, Callable, Iterator
 from pathlib import Path
 from typing import Any
 
@@ -282,6 +282,26 @@ class FakeCaller:
         )
 
 
+class FakeFileStore:
+    def __init__(self) -> None:
+        self.files: dict[str, tuple[bytes, str]] = {}
+        self.puts = 0
+        self.down = False
+
+    async def put(self, key: str, data: bytes, media_type: str) -> None:
+        if self.down:
+            raise UnavailableError("file storage refused the upload")
+        self.puts += 1
+        self.files[key] = (data, media_type)
+
+    async def stream(self, key: str) -> AsyncGenerator[bytes]:
+        if self.down or key not in self.files:
+            raise UnavailableError("file storage could not return the file")
+        data = self.files[key][0]
+        for start in range(0, len(data), 1000):
+            yield data[start : start + 1000]
+
+
 class FakeVoiceClient:
     """Voices of one provider account; `down` makes every call fail as if the provider
     were unreachable."""
@@ -354,12 +374,20 @@ def voice_clients(voice_client: FakeVoiceClient) -> dict[VoiceProvider, FakeVoic
 
 
 @pytest.fixture
+def file_store() -> FakeFileStore:
+    return FakeFileStore()
+
+
+@pytest.fixture
 async def client(
-    settings: Settings, voice_clients: dict[VoiceProvider, FakeVoiceClient]
+    settings: Settings,
+    voice_clients: dict[VoiceProvider, FakeVoiceClient],
+    file_store: FakeFileStore,
 ) -> AsyncIterator[AsyncClient]:
     """An API client whose voices list holds the English and the Hindi test voice."""
     app = create_app(settings)
     app.state.voice_clients = voice_clients
+    app.state.file_store = file_store
     async with create_sessionmaker(app.state.engine)() as session:
         await conversations.sync_numbers(session, POOL, [], {})
         session.add(listed_voice(ENGLISH_VOICE, Language.EN))
@@ -375,7 +403,8 @@ async def client(
         await connection.execute(
             text(
                 "TRUNCATE phone_numbers, conversations, agent_versions, agents,"
-                " persona_versions, personas, voices, scenario_versions, scenarios, workers"
+                " persona_versions, personas, voices, scenario_versions, scenarios, workers,"
+                " documents"
             )
         )
     await engine.dispose()

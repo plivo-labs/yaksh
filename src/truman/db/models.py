@@ -274,6 +274,34 @@ class PhoneNumber(Base):
     available_after: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
+class Document(Base):
+    """Text about an agent, from an uploaded file or pasted. Never changed after creation;
+    the original file, when there is one, is in the file store under storage_key."""
+
+    __tablename__ = "documents"
+
+    id: Mapped[uuid.UUID] = uuid_primary_key()
+    name: Mapped[str] = mapped_column(Text)
+    media_type: Mapped[str | None] = mapped_column(Text)
+    size_bytes: Mapped[int | None] = mapped_column(Integer)
+    sha256: Mapped[str | None] = mapped_column(Text)
+    storage_key: Mapped[str | None] = mapped_column(Text)
+    text: Mapped[str] = mapped_column(Text)
+    characters: Mapped[int] = mapped_column(Integer)
+    pages: Mapped[int | None] = mapped_column(Integer)
+    empty_pages: Mapped[int | None] = mapped_column(Integer)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        CheckConstraint(
+            "(storage_key IS NULL) = (media_type IS NULL)"
+            " AND (storage_key IS NULL) = (size_bytes IS NULL)"
+            " AND (storage_key IS NULL) = (sha256 IS NULL)",
+            name="file_fields_together",
+        ),
+    )
+
+
 class RunningWorker(Base):
     """A running worker as it last reported itself; one not seen for a lease has stopped."""
 

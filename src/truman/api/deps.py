@@ -5,6 +5,7 @@ from fastapi import Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from truman.config import Settings
+from truman.domain.documents import FileStore
 from truman.simulation.voices import VoiceClients
 
 
@@ -21,6 +22,11 @@ def get_voice_clients(request: Request) -> VoiceClients:
     return request.app.state.voice_clients
 
 
+def get_file_store(request: Request) -> FileStore | None:
+    return request.app.state.file_store
+
+
 SettingsDep = Annotated[Settings, Depends(get_settings)]
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
 VoiceClientsDep = Annotated[VoiceClients, Depends(get_voice_clients)]
+FileStoreDep = Annotated[FileStore | None, Depends(get_file_store)]
