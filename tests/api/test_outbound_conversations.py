@@ -143,3 +143,17 @@ async def test_a_waiting_outbound_conversation_does_not_hold_up_inbound_ones(
     claimed = await claim(settings, None)
 
     assert claimed is not None and str(claimed.id) == queued.json()["id"]
+
+
+async def test_the_numbers_page_shows_the_outbound_numbers_and_their_rest(
+    client: AsyncClient, settings: Settings
+) -> None:
+    await link_number(settings, available_after=datetime.now(UTC) + timedelta(minutes=5))
+
+    listed = (await client.get("/api/v1/phone-numbers")).json()
+
+    receiving = next(n for n in listed["items"] if n["number"] == RECEIVING)
+    others = [n for n in listed["items"] if n["number"] != RECEIVING]
+    assert listed["outbound_application_id"] == APP_ID
+    assert receiving["on_outbound_application"] and receiving["state"] == "resting"
+    assert others and not any(n["on_outbound_application"] for n in others)

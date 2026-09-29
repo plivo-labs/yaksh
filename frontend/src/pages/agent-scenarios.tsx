@@ -13,15 +13,15 @@ import {
 } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useScenarios } from "@/lib/queries";
-import type { Scenario } from "@/lib/types";
+import type { Agent, Scenario } from "@/lib/types";
 import { ScenarioDialog } from "@/pages/scenario-dialog";
 
 function counted(count: number, one: string, many: string): string {
   return `${count} ${count === 1 ? one : many}`;
 }
 
-export function AgentScenarios({ agentId }: { agentId: string }) {
-  const scenarios = useScenarios(agentId);
+export function AgentScenarios({ agent }: { agent: Agent }) {
+  const scenarios = useScenarios(agent.id);
   const [editing, setEditing] = useState<Scenario | "new" | null>(null);
   const scenario = editing === "new" ? undefined : (editing ?? undefined);
 
@@ -91,7 +91,7 @@ export function AgentScenarios({ agentId }: { agentId: string }) {
       {editing !== null && (
         <ScenarioDialog
           key={scenario?.id ?? "new"}
-          agentId={agentId}
+          agent={agent}
           scenario={scenario}
           onClosed={() => setEditing(null)}
         />

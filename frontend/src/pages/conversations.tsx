@@ -262,7 +262,8 @@ function StartDialog({ agents }: { agents: Agent[] }) {
   const personas = usePersonas();
   const start = useStartConversation();
   const navigate = useNavigate();
-  const chosen = agentId || agents[0]?.id || "";
+  const chosenAgent = agents.find((agent) => agent.id === agentId) ?? agents[0];
+  const chosen = chosenAgent?.id ?? "";
   const chosenPersona = personaId || personas.data?.[0]?.id || "";
   const scenarios = useScenarios(chosen, open);
   const selectedScenario =
@@ -438,9 +439,9 @@ function StartDialog({ agents }: { agents: Agent[] }) {
             Start call
           </Button>
         </DialogFooter>
-        {creating && (
+        {creating && chosenAgent && (
           <ScenarioDialog
-            agentId={chosen}
+            agent={chosenAgent}
             onSaved={(scenario) => setScenarioId(scenario.id)}
             onClosed={() => setCreating(false)}
           />

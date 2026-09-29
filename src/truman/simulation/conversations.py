@@ -521,6 +521,13 @@ async def finalize(
     return recorded is not None
 
 
+async def enabled_pool(session: AsyncSession) -> list[PhoneNumber]:
+    rows = await session.scalars(
+        select(PhoneNumber).where(PhoneNumber.enabled.is_(True)).order_by(PhoneNumber.number)
+    )
+    return list(rows)
+
+
 def enabled_numbers(numbers: list[AccountNumber], allowlist: list[str]) -> list[str]:
     """The allowlisted numbers, or every voice number when there is no allowlist."""
     return [

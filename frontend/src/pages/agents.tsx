@@ -76,7 +76,11 @@ export function AgentsPage() {
                     {agent.name}
                   </Link>
                 </TableCell>
-                <TableCell className="font-mono text-xs">{agent.agent_number}</TableCell>
+                <TableCell className="font-mono text-xs">
+                  {agent.agent_number ?? (
+                    <span className="font-sans text-muted-foreground">Calls Truman</span>
+                  )}
+                </TableCell>
                 <TableCell>{agent.agent_speaks_first ? "Yes" : "No"}</TableCell>
                 <TableCell className="text-right font-mono text-xs">
                   {agent.current_version}

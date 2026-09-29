@@ -37,6 +37,7 @@ class ConversationSummary(BaseModel):
     language: Language
     channel: Channel
     caller_number: str | None
+    agent_caller_id: str | None
     call_uuid: str | None
     max_duration_s: int
     status: ConversationStatus
