@@ -5,6 +5,7 @@ import { toast } from "sonner";
 
 import { CopyId } from "@/components/copy-id";
 import { Fact, Panel, PanelHeader } from "@/components/panel";
+import { Settle } from "@/components/settle";
 import { RelativeTime } from "@/components/relative-time";
 import { Dot, StatusBadge, StatusDot } from "@/components/status-dot";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -125,10 +126,12 @@ function LineState({
       to={`/conversations/${call.id}`}
       className="-mx-2 flex items-center gap-2 rounded-md px-2 py-1 text-sm outline-none transition-colors hover:bg-foreground/[0.04] focus-visible:ring-2 focus-visible:ring-ring/50"
     >
-      <Badge variant="outline" className="gap-1.5">
-        {active ? <StatusDot status={call.status} size="sm" /> : <Dot tone="off" size="sm" />}
-        {active ? state : "Idle"}
-      </Badge>
+      <Settle value={active ? state : "Idle"}>
+        <Badge variant="outline" className="gap-1.5">
+          {active ? <StatusDot status={call.status} size="sm" /> : <Dot tone="off" size="sm" />}
+          {active ? state : "Idle"}
+        </Badge>
+      </Settle>
       <span className="text-muted-foreground">
         {active
           ? call.scenario_name

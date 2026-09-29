@@ -77,7 +77,7 @@ export function Shell() {
   if (!token) return <TokenGate onToken={setToken} />;
   const theme = dark ? "Light theme" : "Dark theme";
   return (
-    <TooltipProvider>
+    <TooltipProvider delay={500}>
       <SidebarProvider
         defaultOpen={sidebarOpen()}
         style={{ "--sidebar-width": "12rem" } as CSSProperties}

@@ -250,7 +250,7 @@ function CallerPrompt({ instructions }: { instructions: string }) {
         {shown ? "Hide prompt" : "Show prompt"}
       </Button>
       {shown && (
-        <pre className="whitespace-pre-wrap rounded-md bg-muted p-3 font-mono text-xs">
+        <pre className="whitespace-pre-wrap rounded-md bg-muted p-3 font-mono text-xs transition-[opacity,translate] duration-200 ease-out starting:-translate-y-1 starting:opacity-0 motion-reduce:starting:translate-y-0">
           {instructions}
         </pre>
       )}

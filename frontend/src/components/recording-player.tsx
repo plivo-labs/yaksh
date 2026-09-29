@@ -369,7 +369,7 @@ function Player({ recording, name, start }: { recording: Recording; name: string
   }
 
   return (
-    <div className="grid gap-3">
+    <div className="grid gap-3 transition-opacity duration-200 ease-out starting:opacity-0">
       <audio
         ref={attachAudio}
         src={src}

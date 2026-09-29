@@ -1,5 +1,6 @@
 import { cn } from "cn";
 
+import { Settle } from "@/components/settle";
 import { Badge } from "@/components/ui/badge";
 import { words } from "@/lib/format";
 import type { ConversationStatus } from "@/lib/types";
@@ -65,9 +66,11 @@ export function StatusDot({
 
 export function StatusBadge({ status }: { status: ConversationStatus }) {
   return (
-    <Badge variant="outline" className="gap-1.5 capitalize">
-      <StatusDot status={status} size="sm" />
-      {words(status)}
-    </Badge>
+    <Settle value={status}>
+      <Badge variant="outline" className="gap-1.5 capitalize">
+        <StatusDot status={status} size="sm" />
+        {words(status)}
+      </Badge>
+    </Settle>
   );
 }
