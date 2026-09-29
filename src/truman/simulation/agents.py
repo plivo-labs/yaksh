@@ -142,21 +142,16 @@ async def list_agents(
     return list(rows), total or 0
 
 
-def contains(text: str) -> str:
-    escaped = text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
-    return f"%{escaped}%"
-
-
 def matching(search: str) -> ColumnElement[bool]:
     """Name, external id or id containing the text, ignoring case; and, when the text is written
     like a phone number, a number containing its digits, so "+1 (415) 555" finds +14155550100."""
-    text = contains(search.strip())
+    text = search.strip()
     digits = "".join(ch for ch in search if ch.isdigit())
     dialed = PHONE_LIKE.fullmatch(search.strip()) is not None and len(digits) >= 3
     return or_(
-        Agent.name.ilike(text, escape="\\"),
-        Agent.external_id.ilike(text, escape="\\"),
-        cast(Agent.id, String).ilike(text, escape="\\"),
+        Agent.name.icontains(text, autoescape=True),
+        Agent.external_id.icontains(text, autoescape=True),
+        cast(Agent.id, String).icontains(text, autoescape=True),
         Agent.agent_number.contains(digits, autoescape=True) if dialed else false(),
     )
 
