@@ -1,14 +1,16 @@
+import re
 import uuid
 from datetime import UTC, datetime
 from typing import Any
 
 import pydantic
-from sqlalchemy import func, select
+from sqlalchemy import String, cast, false, func, or_, select
 from sqlalchemy import update as update_rows
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.sql.elements import ColumnElement
 
-from truman.db.models import Agent, AgentVersion, Conversation, Scenario
+from truman.db.models import Agent, AgentVersion, Conversation, Scenario, ScenarioVersion
 from truman.domain.agents import (
     AgentConfig,
     AgentCreate,
@@ -20,6 +22,14 @@ from truman.domain.errors import ConflictError, NotFoundError, ValidationError
 
 IDENTITY_FIELDS = frozenset({"name", "external_id"})
 EXTERNAL_ID_INDEX = "ix_agents_external_id_live"
+SORT_KEYS = {
+    "name": func.lower(Agent.name),
+    "language": Agent.language,
+    "created_at": Agent.created_at,
+    "updated_at": Agent.updated_at,
+}
+"""Columns an agent list sorts on; `-` before a key sorts descending."""
+PHONE_LIKE = re.compile(r"[\d\s+().-]+")
 
 
 def config_of(agent: Agent) -> AgentConfig:
@@ -66,19 +76,41 @@ async def get_agent(session: AsyncSession, agent_id: uuid.UUID, *, lock: bool = 
     return agent
 
 
-async def create_agent(session: AsyncSession, command: AgentCreate) -> Agent:
-    config = command.config()
-    agent = Agent(name=command.name, external_id=command.external_id, current_version=1)
+async def add_agent(
+    session: AsyncSession, name: str, external_id: str | None, config: AgentConfig
+) -> Agent:
+    agent = Agent(name=name, external_id=external_id, current_version=1)
     apply_config(agent, config)
     session.add(agent)
     await flush(session)
-    session.add(
-        AgentVersion(
-            agent_id=agent.id,
-            version=1,
-            config=config.model_dump(mode="json"),
-        )
+    session.add(AgentVersion(agent_id=agent.id, version=1, config=config.model_dump(mode="json")))
+    return agent
+
+
+async def create_agent(session: AsyncSession, command: AgentCreate) -> Agent:
+    agent = await add_agent(session, command.name, command.external_id, command.config())
+    await session.commit()
+    return agent
+
+
+async def duplicate_agent(session: AsyncSession, agent_id: uuid.UUID) -> Agent:
+    """A new agent with the same configuration and a copy of every live scenario, all at
+    version 1. The external id stays with the original, since it names that agent."""
+    source = await get_agent(session, agent_id, lock=True)
+    agent = await add_agent(session, f"{source.name} (copy)", None, config_of(source))
+    # Copies share one creation time, so ids order them: copying newest first keeps the listing.
+    scenarios = await session.scalars(
+        select(Scenario)
+        .where(Scenario.agent_id == source.id, Scenario.deleted_at.is_(None))
+        .order_by(Scenario.created_at.desc(), Scenario.id)
     )
+    for scenario in scenarios.all():
+        copy = Scenario(
+            agent_id=agent.id, name=scenario.name, config=scenario.config, current_version=1
+        )
+        session.add(copy)
+        await session.flush()
+        session.add(ScenarioVersion(scenario_id=copy.id, version=1, config=scenario.config))
     await session.commit()
     return agent
 
@@ -90,17 +122,43 @@ async def list_agents(
     limit: int,
     external_id: str | None = None,
     direction: Direction | None = None,
+    search: str | None = None,
+    sort: str = "-created_at",
 ) -> tuple[list[Agent], int]:
     query = select(Agent).where(Agent.deleted_at.is_(None))
+    if search:
+        query = query.where(matching(search))
     if external_id is not None:
         query = query.where(Agent.external_id == external_id)
     if direction is not None:
         query = query.where(Agent.direction == direction)
     total = await session.scalar(select(func.count()).select_from(query.subquery()))
+    key = SORT_KEYS[sort.removeprefix("-")]
     rows = await session.scalars(
-        query.order_by(Agent.created_at.desc(), Agent.id).offset(offset).limit(limit)
+        query.order_by(key.desc() if sort.startswith("-") else key.asc(), Agent.id)
+        .offset(offset)
+        .limit(limit)
     )
     return list(rows), total or 0
+
+
+def contains(text: str) -> str:
+    escaped = text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    return f"%{escaped}%"
+
+
+def matching(search: str) -> ColumnElement[bool]:
+    """Name, external id or id containing the text, ignoring case; and, when the text is written
+    like a phone number, a number containing its digits, so "+1 (415) 555" finds +14155550100."""
+    text = contains(search.strip())
+    digits = "".join(ch for ch in search if ch.isdigit())
+    dialed = PHONE_LIKE.fullmatch(search.strip()) is not None and len(digits) >= 3
+    return or_(
+        Agent.name.ilike(text, escape="\\"),
+        Agent.external_id.ilike(text, escape="\\"),
+        cast(Agent.id, String).ilike(text, escape="\\"),
+        Agent.agent_number.contains(digits, autoescape=True) if dialed else false(),
+    )
 
 
 async def update_agent(session: AsyncSession, agent_id: uuid.UUID, update: AgentUpdate) -> Agent:

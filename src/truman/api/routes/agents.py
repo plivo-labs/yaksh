@@ -1,6 +1,7 @@
 import uuid
+from typing import Annotated
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
 
 from truman.api.auth import require_token
 from truman.api.deps import SessionDep
@@ -8,6 +9,8 @@ from truman.api.pagination import Page, PageDep
 from truman.api.schemas.agents import AgentRead, AgentVersionRead
 from truman.domain.agents import AgentCreate, AgentUpdate, Direction
 from truman.simulation import agents
+
+SORT_PATTERN = f"^-?({'|'.join(agents.SORT_KEYS)})$"
 
 router = APIRouter(prefix="/agents", tags=["agents"], dependencies=[Depends(require_token)])
 
@@ -23,6 +26,8 @@ async def list_agents(
     page: PageDep,
     external_id: str | None = None,
     direction: Direction | None = None,
+    q: Annotated[str | None, Query(max_length=200)] = None,
+    sort: Annotated[str, Query(pattern=SORT_PATTERN)] = "-created_at",
 ) -> Page[AgentRead]:
     rows, total = await agents.list_agents(
         session,
@@ -30,6 +35,8 @@ async def list_agents(
         limit=page.page_size,
         external_id=external_id,
         direction=direction,
+        search=q,
+        sort=sort,
     )
     return Page.of([AgentRead.model_validate(row) for row in rows], total, page)
 
@@ -42,6 +49,11 @@ async def get_agent(agent_id: uuid.UUID, session: SessionDep) -> AgentRead:
 @router.patch("/{agent_id}")
 async def update_agent(agent_id: uuid.UUID, update: AgentUpdate, session: SessionDep) -> AgentRead:
     return AgentRead.model_validate(await agents.update_agent(session, agent_id, update))
+
+
+@router.post("/{agent_id}/duplicate", status_code=status.HTTP_201_CREATED)
+async def duplicate_agent(agent_id: uuid.UUID, session: SessionDep) -> AgentRead:
+    return AgentRead.model_validate(await agents.duplicate_agent(session, agent_id))
 
 
 @router.delete("/{agent_id}", status_code=status.HTTP_204_NO_CONTENT)
