@@ -337,8 +337,11 @@ def upgrade() -> None:
         sa.Column("alias", sa.Text(), nullable=True),
         sa.Column("region", sa.Text(), nullable=True),
         sa.Column("enabled", sa.Boolean(), server_default=sa.text("true"), nullable=False),
+        sa.Column("application_id", sa.Text(), nullable=True),
+        sa.Column("application_name", sa.Text(), nullable=True),
         sa.Column("conversation_id", sa.UUID(), nullable=True),
         sa.Column("leased_at", sa.DateTime(timezone=True), nullable=True),
+        sa.Column("available_after", sa.DateTime(timezone=True), nullable=True),
         sa.ForeignKeyConstraint(
             ["conversation_id"],
             ["conversations.id"],

@@ -260,5 +260,8 @@ class PhoneNumber(Base):
     alias: Mapped[str | None] = mapped_column(Text)
     region: Mapped[str | None] = mapped_column(Text)
     enabled: Mapped[bool] = mapped_column(Boolean, default=True, server_default=true())
+    application_id: Mapped[str | None] = mapped_column(Text)
+    application_name: Mapped[str | None] = mapped_column(Text)
     conversation_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("conversations.id"))
     leased_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    available_after: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

@@ -97,7 +97,7 @@ class Worker:
 
     async def poll(self) -> int:
         async with self._sessionmaker() as session:
-            reaped = await conversations.reap_expired(session)
+            reaped = await conversations.reap_expired(session, self._settings.number_rest_s)
         if reaped:
             log.warning("marked %d conversations failed after their lease expired", reaped)
         claimed = 0
@@ -275,7 +275,12 @@ class Worker:
     ) -> bool:
         async with self._sessionmaker() as session:
             return await conversations.finalize(
-                session, conversation_id, self.worker_id, outcome, transcript
+                session,
+                conversation_id,
+                self.worker_id,
+                outcome,
+                transcript,
+                self._settings.number_rest_s,
             )
 
     async def _maintain(

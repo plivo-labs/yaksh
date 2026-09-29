@@ -13,7 +13,7 @@ from truman.config import Settings
 from truman.db.models import Conversation, PhoneNumber
 from truman.db.session import create_engine, create_sessionmaker
 from truman.domain.conversations import CallOutcome, ConversationStatus, EndReason, Transcript
-from truman.domain.numbers import AccountNumber
+from truman.domain.numbers import AccountNumber, PlivoApplication
 from truman.integrations.plivo import PlivoApi, PlivoError
 from truman.simulation import conversations
 from truman.worker.worker import Worker
@@ -70,11 +70,16 @@ async def test_concurrent_leases_get_distinct_numbers_and_a_finished_call_frees_
             "w1",
             CallOutcome(connected=True, end_reason=EndReason.AGENT_HANGUP),
             Transcript(),
+            60,
         )
         assert recorded
         assert (await session.get_one(Conversation, winner)).caller_number == NUMBER
+        rests_until = await session.scalar(
+            select(PhoneNumber.available_after).where(PhoneNumber.number == NUMBER)
+        )
+        assert rests_until is not None and rests_until > datetime.now(UTC) + timedelta(seconds=50)
 
-    assert await lease(third) == NUMBER
+    assert await lease(third) == NUMBER, "an inbound test uses a resting number as caller id"
     await engine.dispose()
 
 
@@ -101,13 +106,17 @@ async def test_reaping_a_lost_lease_frees_its_number_and_syncing_keeps_leased_on
         pool = set(await session.scalars(select(PhoneNumber.number)))
         assert pool == {NUMBER, "+18005550101"}
 
-        assert await conversations.reap_expired(session) == 1
+        assert await conversations.reap_expired(session, 60) == 1
         free = set(
             await session.scalars(
                 select(PhoneNumber.number).where(PhoneNumber.conversation_id.is_(None))
             )
         )
+        rests_until = await session.scalar(
+            select(PhoneNumber.available_after).where(PhoneNumber.number == NUMBER)
+        )
         assert free == {NUMBER, "+18005550101"}
+        assert rests_until is not None and rests_until > datetime.now(UTC) + timedelta(seconds=50)
     await engine.dispose()
 
 
@@ -161,16 +170,27 @@ async def test_the_allowlist_and_voice_capability_decide_which_numbers_are_lease
 
 
 class Listing(PlivoApi):
-    """A Plivo client whose account lists exactly these numbers, or cannot be reached."""
+    """A Plivo client whose account lists exactly these numbers and applications, or cannot be
+    reached."""
 
-    def __init__(self, numbers: list[AccountNumber] | PlivoError) -> None:
+    def __init__(
+        self,
+        numbers: list[AccountNumber] | PlivoError,
+        applications: dict[str, PlivoApplication] | None = None,
+    ) -> None:
         super().__init__("MAXXXX", "token")
         self.numbers = numbers
+        self.applications = applications or {}
 
     async def list_numbers(self) -> list[AccountNumber]:
         if isinstance(self.numbers, PlivoError):
             raise self.numbers
         return self.numbers
+
+    async def get_application(self, app_id: str) -> PlivoApplication:
+        if app_id not in self.applications:
+            raise PlivoError(f"reading application {app_id} failed with 404")
+        return self.applications[app_id]
 
 
 async def test_an_empty_listing_or_an_unreachable_plivo_keeps_the_last_synced_pool(
@@ -184,3 +204,30 @@ async def test_an_empty_listing_or_an_unreachable_plivo_keeps_the_last_synced_po
     async with sessions() as session:
         assert await enabled_numbers(session) == {NUMBER: True}
     await engine.dispose()
+
+
+async def test_the_pool_records_which_application_each_usable_number_is_linked_to(
+    client: AsyncClient, settings: Settings
+) -> None:
+    truman = PlivoApplication(
+        app_id="11",
+        name="truman",
+        answer_url="https://truman.example/incoming",
+        answer_method="POST",
+        hangup_url="https://truman.example/incoming/hangup",
+        hangup_method="POST",
+    )
+    listed = [
+        AccountNumber(number=NUMBER, application_id="11"),
+        AccountNumber(number=OTHER, application_id="99"),
+    ]
+    engine = create_engine(settings.database_url.encoded_string())
+    await sync_pool(create_sessionmaker(engine), Listing(listed, {"11": truman}), [])
+    async with create_sessionmaker(engine)() as session:
+        rows = await session.execute(
+            select(PhoneNumber.number, PhoneNumber.application_id, PhoneNumber.application_name)
+        )
+        links = {number: (app_id, name) for number, app_id, name in rows.tuples()}
+    await engine.dispose()
+
+    assert links == {NUMBER: ("11", "truman"), OTHER: ("99", None)}

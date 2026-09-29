@@ -14,6 +14,7 @@ from truman.config import Settings
 from truman.db.migrate import upgrade_to_head
 from truman.db.session import create_engine, create_sessionmaker
 from truman.domain.conversations import Caller
+from truman.domain.numbers import AccountNumber
 from truman.integrations.plivo import PlivoApi, PlivoError
 from truman.simulation import conversations
 from truman.worker.worker import Worker
@@ -88,6 +89,38 @@ def callers(settings: Settings, registry: StreamRegistry, api: PlivoApi | None) 
     return UnavailableCaller(reason)
 
 
+async def application_names(
+    api: PlivoApi, numbers: list[AccountNumber], allowlist: list[str]
+) -> dict[str, str]:
+    """The names of the Applications linked to the numbers Truman may use, for the Numbers
+    page; a name that cannot be read is left out."""
+    enabled = set(conversations.enabled_numbers(numbers, allowlist))
+    linked = {n.application_id for n in numbers if n.number in enabled and n.application_id}
+    names: dict[str, str] = {}
+    for app_id in sorted(linked):
+        try:
+            names[app_id] = (await api.get_application(app_id)).name
+        except PlivoError as error:
+            logging.warning("could not read the name of application %s: %s", app_id, error)
+    return names
+
+
+async def check_application(api: PlivoApi, settings: Settings) -> None:
+    """Log whether the Plivo Application set for outbound tests sends its calls here."""
+    if settings.plivo_app_id is None or settings.public_url is None:
+        return
+    try:
+        application = await api.get_application(settings.plivo_app_id)
+    except PlivoError as error:
+        logging.error("outbound tests are off: %s", error)
+        return
+    problems = application.problems(settings.public_url)
+    for problem in problems:
+        logging.error("outbound tests are off: %s", problem)
+    if not problems:
+        logging.info("outbound tests: application %s sends calls here", application.name)
+
+
 async def sync_pool(
     sessionmaker: async_sessionmaker[AsyncSession], api: PlivoApi, allowlist: list[str]
 ) -> None:
@@ -101,8 +134,9 @@ async def sync_pool(
     if not numbers:
         logging.warning("keeping the last synced number pool: the account listed no numbers")
         return
+    names = await application_names(api, numbers, allowlist)
     async with sessionmaker() as session:
-        enabled = await conversations.sync_numbers(session, numbers, allowlist)
+        enabled = await conversations.sync_numbers(session, numbers, allowlist, names)
     logging.info(
         "number pool: %d of %d account numbers enabled: %s",
         len(enabled),
@@ -118,6 +152,7 @@ async def run_worker(
     sessionmaker = create_sessionmaker(engine)
     if api is not None:
         await sync_pool(sessionmaker, api, settings.plivo_numbers)
+        await check_application(api, settings)
     worker = Worker(sessionmaker, caller, settings)
     server = None
     if settings.public_url and api is not None:

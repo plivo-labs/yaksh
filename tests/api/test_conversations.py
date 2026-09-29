@@ -538,7 +538,7 @@ async def test_an_expired_owner_can_neither_renew_nor_record(
         connected=True, end_reason=conversations.EndReason.AGENT_HANGUP
     )
     recorded = await conversations.finalize(
-        session, conversation_id, "slow-worker", outcome, conversations.Transcript()
+        session, conversation_id, "slow-worker", outcome, conversations.Transcript(), 0
     )
     await session.close()
     await engine.dispose()

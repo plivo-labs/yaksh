@@ -320,7 +320,7 @@ def owned_by(conversation_id: uuid.UUID, worker_id: str) -> ColumnElement[bool]:
     )
 
 
-async def reap_expired(session: AsyncSession) -> int:
+async def reap_expired(session: AsyncSession, number_rest_s: int) -> int:
     reaped = await session.scalars(
         update(Conversation)
         .where(
@@ -339,7 +339,7 @@ async def reap_expired(session: AsyncSession) -> int:
     )
     ids = list(reaped.all())
     if ids:
-        await release_numbers(session, ids)
+        await release_numbers(session, ids, number_rest_s)
     await session.commit()
     return len(ids)
 
@@ -366,6 +366,7 @@ async def finalize(
     worker_id: str,
     outcome: CallOutcome,
     transcript: Transcript,
+    number_rest_s: int,
 ) -> bool:
     """Record the terminal state. Returns False when the row was no longer ours to finish."""
     transcript.caller_claim = outcome.caller_claim
@@ -392,13 +393,25 @@ async def finalize(
         .returning(Conversation.id)
     )
     if recorded is not None:
-        await release_numbers(session, [conversation_id])
+        await release_numbers(session, [conversation_id], number_rest_s)
     await session.commit()
     return recorded is not None
 
 
+def enabled_numbers(numbers: list[AccountNumber], allowlist: list[str]) -> list[str]:
+    """The allowlisted numbers, or every voice number when there is no allowlist."""
+    return [
+        entry.number
+        for entry in numbers
+        if (entry.number in allowlist if allowlist else entry.voice)
+    ]
+
+
 async def sync_numbers(
-    session: AsyncSession, numbers: list[AccountNumber], allowlist: list[str]
+    session: AsyncSession,
+    numbers: list[AccountNumber],
+    allowlist: list[str],
+    application_names: dict[str, str] | None = None,
 ) -> list[str]:
     """Make the pool match the Plivo account: every voice number is enabled, or only the
     allowlisted ones when there is an allowlist; numbers gone from the account are dropped once
@@ -407,11 +420,7 @@ async def sync_numbers(
     missing = [number for number in allowlist if number not in listed]
     if missing:
         raise UnknownNumbersError(f"the Plivo account does not have {', '.join(missing)}")
-    enabled = [
-        entry.number
-        for entry in numbers
-        if (entry.number in allowlist if allowlist else entry.voice)
-    ]
+    enabled = enabled_numbers(numbers, allowlist)
     if numbers:
         rows = insert(PhoneNumber).values(
             [
@@ -420,6 +429,8 @@ async def sync_numbers(
                     "alias": entry.alias,
                     "region": entry.region,
                     "enabled": entry.number in enabled,
+                    "application_id": entry.application_id,
+                    "application_name": (application_names or {}).get(entry.application_id or ""),
                 }
                 for entry in numbers
             ]
@@ -431,6 +442,8 @@ async def sync_numbers(
                     "alias": rows.excluded.alias,
                     "region": rows.excluded.region,
                     "enabled": rows.excluded.enabled,
+                    "application_id": rows.excluded.application_id,
+                    "application_name": rows.excluded.application_name,
                 },
             )
         )
@@ -469,11 +482,18 @@ async def lease_number(session: AsyncSession, conversation_id: uuid.UUID) -> str
     return number
 
 
-async def release_numbers(session: AsyncSession, conversation_ids: list[uuid.UUID]) -> None:
+async def release_numbers(
+    session: AsyncSession, conversation_ids: list[uuid.UUID], number_rest_s: int
+) -> None:
+    """Free the numbers. A number rests before a new test may receive calls on it, so a late
+    call from the finished test does not reach the next one."""
     await session.execute(
         update(PhoneNumber)
         .where(PhoneNumber.conversation_id.in_(conversation_ids))
-        .values(conversation_id=None)
+        .values(
+            conversation_id=None,
+            available_after=func.now() + timedelta(seconds=number_rest_s),
+        )
     )
 
 
