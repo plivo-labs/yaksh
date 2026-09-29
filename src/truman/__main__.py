@@ -120,8 +120,10 @@ async def run_worker(
         await sync_pool(sessionmaker, api, settings.plivo_numbers)
     worker = Worker(sessionmaker, caller, settings)
     server = None
-    if settings.public_url:
-        server = PlivoServer(create_app(registry, settings.public_url), settings.stream_port)
+    if settings.public_url and api is not None:
+        server = PlivoServer(
+            create_app(registry, settings.public_url, api.auth_token), settings.stream_port
+        )
         await server.start()
     stop = asyncio.Event()
     loop = asyncio.get_running_loop()

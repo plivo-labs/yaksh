@@ -10,7 +10,7 @@ import websockets
 from fastapi import FastAPI, Request, Response
 from httpx import AsyncClient
 
-from tests.conftest import CALLER, Observer, make_settings
+from tests.conftest import CALLER, PLIVO_TOKEN, Observer, make_settings, plivo_signed
 from truman.caller import phone
 from truman.caller.phone import Connected, Dialer, PhoneCaller
 from truman.caller.pipeline import CallState
@@ -23,6 +23,7 @@ PROVIDERS = ("deepgram_api_key", "elevenlabs_api_key", "openai_api_key")
 
 AGENT_NUMBER = "+14155550100"
 POOL_NUMBER = "+17862242321"
+SIGNED_URL = "http://placeholder"
 RETRIES = "rc=5&ct=2000&rd=1000&rp=5xx,ct"
 START = {"streamId": "stream-1", "callId": "call-1", "mediaFormat": {"encoding": "audio/x-l16"}}
 
@@ -50,18 +51,29 @@ class Rig:
         return PhoneCaller(settings, self.registry, self.api)
 
     async def report(self, conversation_id: uuid.UUID, **fields: str) -> None:
+        path = f"/callbacks/{conversation_id}"
         async with AsyncClient(base_url=self.public_url) as client:
-            response = await client.post(f"/callbacks/{conversation_id}", data=fields)
+            response = await client.post(
+                path, data=fields, headers=plivo_signed(SIGNED_URL + path, fields)
+            )
         assert response.status_code == 200
 
     async def answer(self, conversation_id: uuid.UUID, call_uuid: str) -> str:
+        path = f"/answer/{conversation_id}"
+        fields = {"CallStatus": "in-progress", "CallUUID": call_uuid}
         async with AsyncClient(base_url=self.public_url) as client:
             response = await client.post(
-                f"/answer/{conversation_id}",
-                data={"CallStatus": "in-progress", "CallUUID": call_uuid},
+                path, data=fields, headers=plivo_signed(SIGNED_URL + path, fields)
             )
         assert response.status_code == 200
         return response.text
+
+    def stream(self, conversation_id: uuid.UUID) -> websockets.connect:
+        path = f"/stream/{conversation_id}"
+        return websockets.connect(
+            f"ws://127.0.0.1:{self.worker.port}{path}",
+            additional_headers=plivo_signed(f"http://placeholder{path}", method="GET"),
+        )
 
 
 @pytest.fixture
@@ -70,7 +82,7 @@ async def rig(monkeypatch: pytest.MonkeyPatch) -> AsyncIterator[Rig]:
     monkeypatch.setattr(phone, "STREAM_GRACE_S", 0.5)
     fake = FastAPI()
     registry = StreamRegistry()
-    worker = PlivoServer(create_app(registry, "http://placeholder"), port=0)
+    worker = PlivoServer(create_app(registry, SIGNED_URL, PLIVO_TOKEN), port=0)
     plivo = PlivoServer(fake, port=0)
     await worker.start()
     await plivo.start()
@@ -127,9 +139,7 @@ async def test_the_stream_arrives_after_the_agent_rings_and_answers(
     await rig.report(call.conversation_id, CallStatus="ringing", CallUUID="call-1")
     await rig.report(call.conversation_id, CallStatus="ringing", CallUUID="call-1")
     xml = await rig.answer(call.conversation_id, "call-1")
-    async with websockets.connect(
-        f"ws://127.0.0.1:{rig.worker.port}/stream/{call.conversation_id}"
-    ) as plivo:
+    async with rig.stream(call.conversation_id) as plivo:
         await plivo.send(json.dumps({"event": "start", "start": START}))
         connected = await asyncio.wait_for(dialing, 2)
         assert isinstance(connected, Connected)
@@ -278,9 +288,7 @@ async def test_a_stream_report_before_the_socket_does_not_end_the_dial(
     dialing = dial(rig, call, Observer(), asyncio.Event())
     await rig.answer(call.conversation_id, "call-5")
     await rig.report(call.conversation_id, Event="StartStream", Status="streaming")
-    async with websockets.connect(
-        f"ws://127.0.0.1:{rig.worker.port}/stream/{call.conversation_id}"
-    ) as plivo:
+    async with rig.stream(call.conversation_id) as plivo:
         await plivo.send(json.dumps({"event": "start", "start": START}))
         connected = await asyncio.wait_for(dialing, 2)
         rig.registry.forget(call.conversation_id)
@@ -313,9 +321,7 @@ async def test_a_stream_that_is_not_plivo_ends_the_call_before_any_provider_is_t
     running = asyncio.create_task(rig.caller(tmp_path).run(call, observer, asyncio.Event()))
     await asyncio.wait_for(seen(observer, WireEventKind.CONNECT_STARTED), 2)
     await rig.answer(call.conversation_id, "call-9")
-    async with websockets.connect(
-        f"ws://127.0.0.1:{rig.worker.port}/stream/{call.conversation_id}"
-    ) as stranger:
+    async with rig.stream(call.conversation_id) as stranger:
         await stranger.send('{"event": "connected", "protocol": "Call"}')
         await stranger.send('{"event": "start", "start": {"streamSid": "MZ1", "callSid": "CA1"}}')
         outcome = await asyncio.wait_for(running, 2)
