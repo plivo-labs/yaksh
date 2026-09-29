@@ -16,9 +16,9 @@ from aiohttp.abc import AbstractResolver, ResolveResult
 from aiohttp.resolver import DefaultResolver
 
 from truman.diagnostics import describe_exception
-from truman.domain.triggers import RenderedTrigger
+from truman.domain.triggers import SEND_TIMEOUT_S, RenderedTrigger
 
-TIMEOUT = aiohttp.ClientTimeout(total=15, sock_connect=5)
+TIMEOUT = aiohttp.ClientTimeout(total=SEND_TIMEOUT_S, sock_connect=5)
 EXCERPT_CHARS = 500
 READ_LIMIT = 64 * 1024
 

@@ -16,6 +16,8 @@ from pydantic import BaseModel, ConfigDict, Field, HttpUrl, StringConstraints, f
 from truman.domain.numbers import E164
 from truman.domain.scenarios import Fact, normalized
 
+SEND_TIMEOUT_S = 15
+"""How long Truman waits for the trigger's response; the call may arrive before it ends."""
 PLACEHOLDER = re.compile(r"\{\{([^{}]*)\}\}")
 TRUMAN_VALUES = frozenset({"truman.number", "truman.conversation_id"})
 ENV_NAME = re.compile(r"TRUMAN_TRIGGER_[A-Z0-9_]+")

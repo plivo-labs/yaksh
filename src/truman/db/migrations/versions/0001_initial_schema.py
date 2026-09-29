@@ -239,6 +239,9 @@ def upgrade() -> None:
         sa.Column("agent_id", sa.UUID(), nullable=False),
         sa.Column("agent_version_id", sa.UUID(), nullable=False),
         sa.Column("channel", sa.Enum("voice", name="channel"), nullable=False),
+        sa.Column(
+            "direction", sa.Enum("inbound", "outbound", name="agent_direction"), nullable=False
+        ),
         sa.Column("persona_id", sa.UUID(), nullable=False),
         sa.Column("persona_version_id", sa.UUID(), nullable=False),
         sa.Column("scenario_id", sa.UUID(), nullable=False),

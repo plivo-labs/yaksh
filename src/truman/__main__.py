@@ -105,20 +105,23 @@ async def application_names(
     return names
 
 
-async def check_application(api: PlivoApi, settings: Settings) -> None:
-    """Log whether the Plivo Application set for outbound tests sends its calls here."""
+async def receiving_app_id(api: PlivoApi, settings: Settings) -> str | None:
+    """The Plivo application whose calls this worker receives, when it sends them here; the
+    worker then runs outbound conversations. Every reason it does not is logged."""
     if settings.plivo_app_id is None or settings.public_url is None:
-        return
+        return None
     try:
         application = await api.get_application(settings.plivo_app_id)
     except PlivoError as error:
         logging.error("outbound tests are off: %s", error)
-        return
+        return None
     problems = application.problems(settings.public_url)
     for problem in problems:
         logging.error("outbound tests are off: %s", problem)
-    if not problems:
-        logging.info("outbound tests: application %s sends calls here", application.name)
+    if problems:
+        return None
+    logging.info("outbound tests: application %s sends calls here", application.name)
+    return application.app_id
 
 
 async def sync_pool(
@@ -152,8 +155,8 @@ async def run_worker(
     sessionmaker = create_sessionmaker(engine)
     if api is not None:
         await sync_pool(sessionmaker, api, settings.plivo_numbers)
-        await check_application(api, settings)
-    worker = Worker(sessionmaker, caller, settings)
+    app_id = None if api is None else await receiving_app_id(api, settings)
+    worker = Worker(sessionmaker, caller, settings, receiving_app_id=app_id)
     server = None
     if settings.public_url and api is not None:
         server = PlivoServer(

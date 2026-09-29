@@ -267,7 +267,7 @@ async def test_a_refused_connection_is_failed_and_still_readable(
     assert [event["kind"] for event in done["wire_events"]] == ["connect_started"]
 
 
-async def test_a_conversation_gets_its_number_from_the_pool_and_outbound_agents_are_refused(
+async def test_a_conversation_gets_its_number_from_the_pool_and_outbound_tests_need_an_application(
     client: AsyncClient,
 ) -> None:
     agent = await create_agent_id(client)
@@ -283,7 +283,8 @@ async def test_a_conversation_gets_its_number_from_the_pool_and_outbound_agents_
     assert queued["status"] == "queued" and queued["caller_number"] is None
     assert chosen.status_code == 422
     assert chosen.json()["error"]["details"][0]["loc"][-1] == "caller_number"
-    assert refused.status_code == 422 and "not supported yet" in refused.json()["error"]["message"]
+    assert refused.status_code == 422
+    assert refused.json()["error"]["message"] == "outbound tests are off: set TRUMAN_PLIVO_APP_ID"
 
 
 async def test_conversations_cannot_start_while_phone_calls_are_off(

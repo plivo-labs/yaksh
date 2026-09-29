@@ -36,7 +36,9 @@ from truman.domain.conversations import (
 from truman.domain.errors import NotFoundError, ValidationError
 from truman.domain.numbers import AccountNumber
 from truman.domain.personas import PersonaConfig
-from truman.domain.scenarios import ScenarioConfig
+from truman.domain.scenarios import ScenarioConfig, normalized
+from truman.domain.triggers import SEND_TIMEOUT_S, agent_data_names
+from truman.simulation.agents import config_of as agents_config_of
 from truman.simulation.agents import get_agent
 from truman.simulation.languages import LANGUAGES
 from truman.simulation.personas import config_of, get_persona
@@ -66,8 +68,8 @@ async def create_conversation(
             "phone calls are off: set PLIVO_AUTH_ID, PLIVO_AUTH_TOKEN and TRUMAN_PUBLIC_URL"
         )
     agent = await get_agent(session, command.agent_id, lock=True)
-    if agent.direction is not Direction.INBOUND:
-        raise ValidationError("not supported yet: only inbound agents")
+    if agent.direction is Direction.OUTBOUND and settings.plivo_app_id is None:
+        raise ValidationError("outbound tests are off: set TRUMAN_PLIVO_APP_ID")
     version_id = await session.scalar(
         select(AgentVersion.id).where(
             AgentVersion.agent_id == agent.id, AgentVersion.version == agent.current_version
@@ -91,7 +93,10 @@ async def create_conversation(
     )
     config = config_of(persona)
     wants = scenario_config_of(scenario)
+    if agent.direction is Direction.OUTBOUND:
+        await check_outbound_start(session, settings, agents_config_of(agent), wants)
     conversation = Conversation(
+        direction=agent.direction,
         agent_id=agent.id,
         agent_version_id=version_id,
         persona_id=persona.id,
@@ -112,6 +117,27 @@ async def create_conversation(
     session.add(conversation)
     await session.commit()
     return conversation
+
+
+async def check_outbound_start(
+    session: AsyncSession, settings: Settings, agent: AgentConfig, scenario: ScenarioConfig
+) -> None:
+    """Refuse a start that could never get a call: nowhere to receive it, or a trigger that
+    needs agent data the scenario does not have."""
+    linked = await session.scalar(
+        select(PhoneNumber.number)
+        .where(PhoneNumber.enabled.is_(True), PhoneNumber.application_id == settings.plivo_app_id)
+        .limit(1)
+    )
+    if linked is None:
+        raise ValidationError(
+            f"no enabled number is linked to Plivo application {settings.plivo_app_id}"
+        )
+    assert agent.outbound is not None
+    have = {normalized(fact.name) for fact in scenario.agent_data}
+    missing = sorted(agent_data_names(agent.outbound.trigger) - have)
+    if missing:
+        raise ValidationError(f"the scenario has no agent data named {', '.join(missing)}")
 
 
 async def get_conversation(session: AsyncSession, conversation_id: uuid.UUID) -> Conversation:
@@ -209,22 +235,42 @@ async def end_conversation(session: AsyncSession, conversation_id: uuid.UUID) ->
     return conversation
 
 
-async def claim_next(session: AsyncSession, worker_id: str, lease_s: int) -> Conversation | None:
-    """Claim the oldest queued conversation that can run now.
-
-    A conversation without a caller number takes one from the pool, so it waits while none is free.
-    """
-    free_number = (
-        select(PhoneNumber.number)
-        .where(PhoneNumber.enabled.is_(True), PhoneNumber.conversation_id.is_(None))
-        .exists()
+def free_numbers(receiving_app_id: str | None = None) -> ColumnElement[bool]:
+    """Numbers a conversation may lease: enabled and free; to receive an outbound call, also
+    linked to Truman's Plivo application and rested since their last test."""
+    free = and_(PhoneNumber.enabled.is_(True), PhoneNumber.conversation_id.is_(None))
+    if receiving_app_id is None:
+        return free
+    return and_(
+        free,
+        PhoneNumber.application_id == receiving_app_id,
+        or_(PhoneNumber.available_after.is_(None), PhoneNumber.available_after <= func.now()),
     )
+
+
+async def claim_next(
+    session: AsyncSession, worker_id: str, lease_s: int, receiving_app_id: str | None
+) -> Conversation | None:
+    """Claim the oldest queued conversation that can run now: one that needs a number waits
+    while none it may use is free. Outbound conversations run only on a worker that receives
+    calls for receiving_app_id."""
+    inbound = and_(
+        Conversation.direction == Direction.INBOUND,
+        or_(
+            Conversation.caller_number.is_not(None),
+            select(PhoneNumber).where(free_numbers()).exists(),
+        ),
+    )
+    runnable = inbound
+    if receiving_app_id is not None:
+        outbound = and_(
+            Conversation.direction == Direction.OUTBOUND,
+            select(PhoneNumber).where(free_numbers(receiving_app_id)).exists(),
+        )
+        runnable = or_(inbound, outbound)
     candidate = (
         select(Conversation.id)
-        .where(
-            Conversation.status == ConversationStatus.QUEUED,
-            or_(Conversation.caller_number.is_not(None), free_number),
-        )
+        .where(Conversation.status == ConversationStatus.QUEUED, runnable)
         .order_by(Conversation.created_at, Conversation.id)
         .limit(1)
         .with_for_update(skip_locked=True)
@@ -246,28 +292,55 @@ async def claim_next(session: AsyncSession, worker_id: str, lease_s: int) -> Con
     return conversation
 
 
-async def caller_number(session: AsyncSession, conversation: Conversation) -> str:
-    """The number the conversation calls from, leased from the pool when it has none yet."""
-    number = conversation.caller_number or await lease_number(session, conversation.id)
+async def prepare_call(
+    session: AsyncSession,
+    settings: Settings,
+    conversation: Conversation,
+    receiving_app_id: str | None,
+) -> CallRequest:
+    """Lease the conversation's Truman number when it has none yet (the caller ID of an inbound
+    test, or the number an outbound agent must call) and build the call from the pinned
+    versions."""
+    agent_version = await session.get_one(AgentVersion, conversation.agent_version_id)
+    agent = AgentConfig.model_validate(agent_version.config)
+    number = conversation.caller_number
+    if number is None and agent.outbound is not None:
+        assert receiving_app_id is not None
+        number = await lease_number(
+            session,
+            conversation.id,
+            receiving_app_id=receiving_app_id,
+            accept_calls_for_s=SEND_TIMEOUT_S + agent.outbound.dial_window_s,
+        )
+    elif number is None:
+        number = await lease_number(session, conversation.id)
     if number is None:
         raise PoolExhaustedError("no pool number is free")
-    return number
+    return await call_request(session, settings, conversation, number, agent)
 
 
 async def call_request(
-    session: AsyncSession, settings: Settings, conversation: Conversation, number: str
+    session: AsyncSession,
+    settings: Settings,
+    conversation: Conversation,
+    number: str,
+    agent: AgentConfig | None = None,
 ) -> CallRequest:
-    agent_version = await session.get_one(AgentVersion, conversation.agent_version_id)
+    if agent is None:
+        agent_version = await session.get_one(AgentVersion, conversation.agent_version_id)
+        agent = AgentConfig.model_validate(agent_version.config)
     persona_version = await session.get_one(PersonaVersion, conversation.persona_version_id)
+    scenario_version = await session.get_one(ScenarioVersion, conversation.scenario_version_id)
     return CallRequest(
         conversation_id=conversation.id,
-        agent=AgentConfig.model_validate(agent_version.config),
+        agent=agent,
         instructions=conversation.instructions,
         nudge=conversation.nudge,
         caller_language=conversation.language,
         voice=PersonaConfig.model_validate(persona_version.config).voice,
         caller_number=number,
         max_duration_s=conversation.max_duration_s,
+        agent_data=ScenarioConfig.model_validate(scenario_version.config).agent_data,
         output_dir=settings.data_dir / str(conversation.id),
     )
 
@@ -502,11 +575,18 @@ async def sync_numbers(
     return enabled
 
 
-async def lease_number(session: AsyncSession, conversation_id: uuid.UUID) -> str | None:
-    """Lease the least recently used free number to the conversation, or None when all are taken."""
+async def lease_number(
+    session: AsyncSession,
+    conversation_id: uuid.UUID,
+    *,
+    receiving_app_id: str | None = None,
+    accept_calls_for_s: int | None = None,
+) -> str | None:
+    """Lease the least recently used number the conversation may use, or None when all are
+    taken. An outbound lease opens the window for the agent's call to arrive."""
     candidate = (
         select(PhoneNumber.number)
-        .where(PhoneNumber.enabled.is_(True), PhoneNumber.conversation_id.is_(None))
+        .where(free_numbers(receiving_app_id))
         .order_by(PhoneNumber.leased_at.nulls_first(), PhoneNumber.number)
         .limit(1)
         .with_for_update(skip_locked=True)
@@ -519,10 +599,15 @@ async def lease_number(session: AsyncSession, conversation_id: uuid.UUID) -> str
         .returning(PhoneNumber.number)
     )
     if number is not None:
+        deadline = (
+            None
+            if accept_calls_for_s is None
+            else func.now() + timedelta(seconds=accept_calls_for_s)
+        )
         await session.execute(
             update(Conversation)
             .where(Conversation.id == conversation_id)
-            .values(caller_number=number)
+            .values(caller_number=number, dial_deadline_at=deadline)
         )
     await session.commit()
     return number

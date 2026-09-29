@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from truman.domain.agents import AgentConfig
 from truman.domain.languages import Language
+from truman.domain.scenarios import Fact
 from truman.domain.voices import VoiceSettings
 
 
@@ -159,6 +160,7 @@ class CallRequest(BaseModel):
     voice: VoiceSettings
     caller_number: str
     max_duration_s: int
+    agent_data: list[Fact] = []
     output_dir: Path
 
 

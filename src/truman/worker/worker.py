@@ -22,6 +22,7 @@ from truman.domain.conversations import (
     IncomingCall,
     Transcript,
 )
+from truman.domain.triggers import SEND_TIMEOUT_S
 from truman.simulation import conversations
 from truman.simulation.calls import CallerUnresponsiveError, LiveCall, run_call
 
@@ -55,13 +56,17 @@ class Worker:
         settings: Settings,
         *,
         worker_id: str | None = None,
+        receiving_app_id: str | None = None,
     ) -> None:
+        """receiving_app_id is the Plivo application that sends outbound agents' calls to this
+        worker; without it the worker runs only inbound conversations."""
         self.worker_id = worker_id or f"{socket.gethostname()}:{os.getpid()}:{uuid.uuid4().hex[:8]}"
         self.fatal = asyncio.Event()
         self._stop = asyncio.Event()
         self._sessionmaker = sessionmaker
         self._caller = caller
         self._settings = settings
+        self._receiving_app_id = receiving_app_id
         self._tasks: dict[uuid.UUID, asyncio.Task[None]] = {}
         self._live: dict[uuid.UUID, LiveCall] = {}
 
@@ -106,7 +111,9 @@ class Worker:
         lease_s = self._settings.worker_lease_s
         while self.active < self._settings.max_active_conversations and not self.stopping:
             async with self._sessionmaker() as session:
-                conversation = await conversations.claim_next(session, self.worker_id, lease_s)
+                conversation = await conversations.claim_next(
+                    session, self.worker_id, lease_s, self._receiving_app_id
+                )
             if conversation is None:
                 break
             sent = time.monotonic()
@@ -144,8 +151,9 @@ class Worker:
 
     async def _prepare(self, conversation: Conversation) -> CallRequest:
         async with self._sessionmaker() as session:
-            number = await conversations.caller_number(session, conversation)
-            return await conversations.call_request(session, self._settings, conversation, number)
+            return await conversations.prepare_call(
+                session, self._settings, conversation, self._receiving_app_id
+            )
 
     async def _requeue(self, conversation_id: uuid.UUID) -> None:
         async with self._sessionmaker() as session:
@@ -219,7 +227,7 @@ class Worker:
                 request,
                 live,
                 end_timeout_s=self._settings.end_timeout_s,
-                dial_timeout_s=self._settings.ring_timeout_s + DIAL_MARGIN_S,
+                dial_timeout_s=self._connect_timeout_s(request),
             )
         except CallerUnresponsiveError:
             log.critical(
@@ -239,6 +247,14 @@ class Worker:
                 end_reason=EndReason.ERROR,
                 caller_error=describe_exception(exc),
             )
+
+    def _connect_timeout_s(self, request: CallRequest) -> float:
+        """How long a call may take to connect: ringing the agent, or for an outbound agent,
+        its trigger and dial window."""
+        outbound = request.agent.outbound
+        if outbound is None:
+            return self._settings.ring_timeout_s + DIAL_MARGIN_S
+        return SEND_TIMEOUT_S + outbound.dial_window_s + DIAL_MARGIN_S
 
     async def _record_failure(self, conversation_id: uuid.UUID, exc: Exception) -> None:
         outcome = CallOutcome(

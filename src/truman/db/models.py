@@ -89,6 +89,9 @@ class Conversation(Base):
     agent_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("agents.id"))
     agent_version_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
     channel: Mapped[Channel] = mapped_column(pg_enum(Channel, "channel"), default=Channel.VOICE)
+    direction: Mapped[Direction] = mapped_column(
+        pg_enum(Direction, "agent_direction"), default=Direction.INBOUND
+    )
     persona_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("personas.id"))
     persona_version_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
     scenario_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
