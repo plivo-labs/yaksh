@@ -5,6 +5,7 @@ from pydantic import BaseModel, ConfigDict
 
 from truman.domain.agents import AgentConfig, Direction, Transport
 from truman.domain.languages import Language
+from truman.domain.triggers import OutboundConfig
 
 
 class AgentRead(BaseModel):
@@ -15,7 +16,8 @@ class AgentRead(BaseModel):
     external_id: str | None
     direction: Direction
     transport: Transport
-    agent_number: str
+    agent_number: str | None
+    outbound: OutboundConfig | None
     agent_speaks_first: bool
     language: Language
     brief: str | None

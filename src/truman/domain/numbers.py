@@ -1,6 +1,8 @@
-from pydantic import BaseModel, ConfigDict
+from typing import Annotated
 
-from truman.domain.agents import E164
+from pydantic import BaseModel, ConfigDict, StringConstraints
+
+E164 = Annotated[str, StringConstraints(pattern=r"^\+[1-9]\d{6,14}$")]
 
 
 class AccountNumber(BaseModel):

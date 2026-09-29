@@ -40,6 +40,23 @@ OFFLINE_DATABASE_URL = "postgresql+asyncpg://truman:truman@localhost:5432/truman
 
 
 AGENT = {"name": "Front desk", "agent_number": "+14155550100"}
+OUTBOUND_AGENT: dict[str, Any] = {
+    "name": "Payment reminders",
+    "direction": "outbound",
+    "agent_number": None,
+    "outbound": {
+        "trigger": {
+            "url": "https://agents.example.com/calls",
+            "headers": [{"name": "Authorization", "value": "Bearer {{env.TRUMAN_TRIGGER_KEY}}"}],
+            "body": {
+                "to": "{{truman.number}}",
+                "customer": {"name": "{{agent_data.Customer name}}"},
+                "tags": ["truman", "{{truman.conversation_id}}"],
+            },
+        },
+        "calling_numbers": ["+14155550100"],
+    },
+}
 ENGLISH_VOICE = ProviderVoice(
     id="voice-en",
     name="Chris",

@@ -25,7 +25,8 @@ def upgrade() -> None:
             "direction", sa.Enum("inbound", "outbound", name="agent_direction"), nullable=False
         ),
         sa.Column("transport", sa.Enum("phone", name="agent_transport"), nullable=False),
-        sa.Column("agent_number", sa.Text(), nullable=False),
+        sa.Column("agent_number", sa.Text(), nullable=True),
+        sa.Column("outbound", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
         sa.Column("agent_speaks_first", sa.Boolean(), nullable=False),
         sa.Column("language", sa.Enum("en", "hinglish", name="language"), nullable=False),
         sa.Column("brief", sa.Text(), nullable=True),

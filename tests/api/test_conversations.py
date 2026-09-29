@@ -13,6 +13,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from tests.conftest import (
+    OUTBOUND_AGENT,
     PERSONA,
     SCENARIO,
     TOKEN,
@@ -270,7 +271,7 @@ async def test_a_conversation_gets_its_number_from_the_pool_and_outbound_agents_
     client: AsyncClient,
 ) -> None:
     agent = await create_agent_id(client)
-    outbound = await create_agent_id(client, direction="outbound")
+    outbound = await create_agent_id(client, **OUTBOUND_AGENT)
 
     queued = await start(client, agent)
     chosen = await client.post(

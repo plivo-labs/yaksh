@@ -5,7 +5,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from pydantic import Field, PostgresDsn, SecretStr, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
-from truman.domain.agents import E164
+from truman.domain.numbers import E164
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 

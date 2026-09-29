@@ -3,6 +3,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 import pydantic
+from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy import update as update_rows
 from sqlalchemy.exc import IntegrityError
@@ -30,7 +31,10 @@ def config_of(agent: Agent) -> AgentConfig:
 
 def apply_config(agent: Agent, config: AgentConfig) -> None:
     for field in AgentConfig.model_fields:
-        setattr(agent, field, getattr(config, field))
+        value = getattr(config, field)
+        setattr(
+            agent, field, value.model_dump(mode="json") if isinstance(value, BaseModel) else value
+        )
 
 
 def validate_config(data: dict[str, Any]) -> AgentConfig:
