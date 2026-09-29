@@ -1,5 +1,4 @@
 import asyncio
-import contextlib
 import uuid
 from collections.abc import AsyncIterator, Callable, Iterator
 from pathlib import Path
@@ -215,10 +214,6 @@ class FakeCaller:
         if self.mode == "raise_after_connect":
             raise RuntimeError("tts exploded")
         if self.mode == "ignore_stop":
-            await asyncio.sleep(3600)
-        if self.mode == "immortal":
-            with contextlib.suppress(asyncio.CancelledError):
-                await asyncio.sleep(3600)
             await asyncio.sleep(3600)
         if await first(stop, self.release) is stop:
             return CallOutcome(

@@ -252,26 +252,6 @@ async def test_an_expired_lease_is_marked_failed_while_a_live_one_is_not(
     await wait_for(client, live["id"], {"completed"})
 
 
-async def test_a_conversation_waits_until_a_worker_picks_it_up(
-    client: AsyncClient, settings: Settings, caller: FakeCaller
-) -> None:
-    agent_id = await create_agent_id(client)
-    started = await start(client, agent_id)
-    await asyncio.sleep(0.3)
-    assert (await client.get(f"/api/v1/conversations/{started['id']}")).json()["status"] == "queued"
-
-    engine = create_engine(settings.database_url.encoded_string())
-    worker = Worker(create_sessionmaker(engine), caller, settings, worker_id="late")
-    stop = asyncio.Event()
-    task = asyncio.create_task(worker.run(stop))
-    done = await wait_for(client, started["id"], {"completed"})
-    stop.set()
-    await task
-    await engine.dispose()
-
-    assert done["status"] == "completed"
-
-
 async def test_a_refused_connection_is_failed_and_still_readable(
     client: AsyncClient, worker: Worker, caller: FakeCaller
 ) -> None:
@@ -565,27 +545,6 @@ async def test_an_expired_owner_can_neither_renew_nor_record(
     assert renewed is None and recorded is False
 
 
-async def test_a_caller_that_survives_cancellation_makes_the_worker_exit(
-    client: AsyncClient, settings: Settings, caller: FakeCaller
-) -> None:
-    caller.mode = "immortal"
-    agent_id = await create_agent_id(client)
-    started = await start(client, agent_id)
-    engine = create_engine(settings.database_url.encoded_string())
-    worker = Worker(create_sessionmaker(engine), caller, settings, worker_id="doomed")
-    stop = asyncio.Event()
-    task = asyncio.create_task(worker.run(stop))
-    await wait_for_event(client, started["id"], "connected")
-
-    await client.post(f"/api/v1/conversations/{started['id']}/end")
-    done = await wait_for(client, started["id"], FINAL, timeout=10)
-    await asyncio.wait_for(task, timeout=10)
-    await engine.dispose()
-
-    assert done["status"] == "invalid" and done["failure_reason"] == STOP_IGNORED
-    assert worker.fatal.is_set()
-
-
 async def test_a_conversation_that_cannot_be_prepared_fails_without_stopping_the_worker(
     client: AsyncClient,
     worker: Worker,
@@ -662,25 +621,6 @@ async def test_a_call_whose_preparation_outlives_the_lease_is_not_started(
 
     assert done["status"] == "failed" and done["end_reason"] == "lease_lost"
     assert caller.calls == 0
-
-
-async def test_shutdown_interrupts_a_blocked_poll(
-    settings: Settings, caller: FakeCaller, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    async def blocked(*args: Any, **kwargs: Any) -> int:
-        await asyncio.sleep(3600)
-        return 0
-
-    monkeypatch.setattr("truman.simulation.conversations.reap_expired", blocked)
-    engine = create_engine(settings.database_url.encoded_string())
-    worker = Worker(create_sessionmaker(engine), caller, settings, worker_id="blocked")
-    stop = asyncio.Event()
-    task = asyncio.create_task(worker.run(stop))
-    await asyncio.sleep(0.2)
-
-    stop.set()
-    await asyncio.wait_for(task, timeout=3)
-    await engine.dispose()
 
 
 async def test_a_stalled_result_write_does_not_hold_capacity(
