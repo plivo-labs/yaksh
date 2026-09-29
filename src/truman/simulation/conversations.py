@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from typing import Any
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import ColumnElement, and_, delete, func, or_, select, update
+from sqlalchemy import ColumnElement, String, and_, cast, delete, func, or_, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -112,6 +112,11 @@ async def create_conversation(
     return conversation
 
 
+SORT_KEYS = {"created_at": Conversation.created_at, "talk_ms": Conversation.talk_ms}
+"""Columns a conversation list sorts on; `-` before a key sorts descending. Calls that never
+connected have no talk time and sort last either way."""
+
+
 async def get_conversation(session: AsyncSession, conversation_id: uuid.UUID) -> Conversation:
     conversation = await session.get(Conversation, conversation_id)
     if conversation is None:
@@ -126,15 +131,34 @@ async def list_conversations(
     limit: int,
     agent_id: uuid.UUID | None = None,
     status: ConversationStatus | None = None,
+    search: str | None = None,
+    sort: str = "-created_at",
 ) -> tuple[list[Conversation], int]:
     query = select(Conversation)
+    if search:
+        text = search.strip()
+        query = (
+            query.join(Agent, Agent.id == Conversation.agent_id)
+            .join(Scenario, Scenario.id == Conversation.scenario_id)
+            .join(Persona, Persona.id == Conversation.persona_id)
+            .where(
+                or_(
+                    Agent.name.icontains(text, autoescape=True),
+                    Scenario.name.icontains(text, autoescape=True),
+                    Persona.name.icontains(text, autoescape=True),
+                    cast(Conversation.id, String).icontains(text, autoescape=True),
+                )
+            )
+        )
     if agent_id is not None:
         query = query.where(Conversation.agent_id == agent_id)
     if status is not None:
         query = query.where(Conversation.status == status)
     total = await session.scalar(select(func.count()).select_from(query.subquery()))
+    key = SORT_KEYS[sort.removeprefix("-")]
+    order = key.desc() if sort.startswith("-") else key.asc()
     rows = await session.scalars(
-        query.order_by(Conversation.created_at.desc(), Conversation.id).offset(offset).limit(limit)
+        query.order_by(order.nulls_last(), Conversation.id).offset(offset).limit(limit)
     )
     return list(rows), total or 0
 

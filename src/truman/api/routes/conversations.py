@@ -1,8 +1,9 @@
 import uuid
 from collections.abc import AsyncIterable
 from pathlib import Path
+from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from fastapi.responses import FileResponse
 from fastapi.sse import EventSourceResponse, ServerSentEvent
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,6 +15,8 @@ from truman.api.schemas.conversations import ConversationRead, ConversationSumma
 from truman.db.models import Conversation
 from truman.domain.conversations import ACTIVE_STATUSES, ConversationCreate, ConversationStatus
 from truman.simulation import conversations
+
+SORT_PATTERN = f"^-?({'|'.join(conversations.SORT_KEYS)})$"
 
 router = APIRouter(
     prefix="/conversations", tags=["conversations"], dependencies=[Depends(require_token)]
@@ -79,9 +82,17 @@ async def list_conversations(
     page: PageDep,
     agent_id: uuid.UUID | None = None,
     status: ConversationStatus | None = None,
+    q: Annotated[str | None, Query(max_length=200)] = None,
+    sort: Annotated[str, Query(pattern=SORT_PATTERN)] = "-created_at",
 ) -> Page[ConversationSummary]:
     rows, total = await conversations.list_conversations(
-        session, offset=page.offset, limit=page.page_size, agent_id=agent_id, status=status
+        session,
+        offset=page.offset,
+        limit=page.page_size,
+        agent_id=agent_id,
+        status=status,
+        search=q,
+        sort=sort,
     )
     return Page.of(await summaries(session, rows), total, page)
 

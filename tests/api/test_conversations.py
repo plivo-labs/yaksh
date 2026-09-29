@@ -819,3 +819,37 @@ async def test_a_queued_conversation_still_runs_after_its_persona_is_deleted(
         await engine.dispose()
 
     assert done["status"] == "completed"
+
+
+async def test_the_list_searches_names_and_sorts_by_talk_time(
+    client: AsyncClient, settings: Settings
+) -> None:
+    desk = await create_agent_id(client, name="Front desk")
+    pizza = await create_agent_id(client, name="Pizza_orders")
+    persona = await create_persona(client, name="Grumpy caller")
+    short = await start(client, desk)
+    long = await start(client, desk, persona_id=persona["id"])
+    silent = await start(client, pizza)
+    engine = create_async_engine(settings.database_url.encoded_string())
+    async with engine.begin() as connection:
+        for conversation, talk_ms in ((short, 9_000), (long, 60_000)):
+            await connection.execute(
+                update(Conversation)
+                .where(Conversation.id == uuid.UUID(conversation["id"]))
+                .values(talk_ms=talk_ms)
+            )
+    await engine.dispose()
+
+    async def found(**params: str) -> list[str]:
+        response = await client.get("/api/v1/conversations", params=params)
+        assert response.status_code == 200, response.text
+        return [item["id"] for item in response.json()["items"]]
+
+    assert await found(q="grumpy") == [long["id"]]
+    assert await found(q="pizza_") == [silent["id"]]
+    assert await found(q="_") == [silent["id"]]
+    assert sorted(await found(q="front")) == sorted([short["id"], long["id"]])
+    assert await found(sort="-talk_ms") == [long["id"], short["id"], silent["id"]]
+    assert await found(sort="talk_ms") == [short["id"], long["id"], silent["id"]]
+    invalid = await client.get("/api/v1/conversations", params={"sort": "status"})
+    assert invalid.status_code == 422
