@@ -1,0 +1,19 @@
+# 0003 Private trigger hosts are blocked by default
+
+Date: 2026-09-29
+Status: accepted
+
+## Decision
+
+Truman resolves the trigger host and refuses the request if any address is loopback, private, link-local, a cloud metadata address, IPv6 unique-local or IPv4-mapped. It then connects to the address it checked, keeps the TLS host name check, and does not follow redirects. `TRUMAN_ALLOW_PRIVATE_TRIGGERS=true` turns the check off.
+
+## Why
+
+- The trigger URL is user input, and Truman's server sends the request. Without the check, anyone with the API token can reach internal services, such as `http://169.254.169.254/` (cloud credentials) or `http://localhost:5432`.
+- Checking the resolved address, not only the host name, stops DNS names that point to private addresses.
+- Local development needs private hosts, for example a test agent on `http://localhost:9000`, so the setting exists.
+
+## Other options
+
+- No check. Rejected: server-side request forgery.
+- An allowlist of trigger hosts. Rejected: every new provider or webhook needs a config change.
