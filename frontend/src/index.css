@@ -71,6 +71,17 @@
     }
   }
 
+  --animate-shimmer: shimmer 1.8s linear infinite;
+
+  @keyframes shimmer {
+    from {
+      background-position: 100% 0;
+    }
+    to {
+      background-position: -100% 0;
+    }
+  }
+
   @keyframes glint {
     from {
       background-position: 200% 0;
@@ -178,6 +189,25 @@
   --sidebar-border: hsl(240 4% 15%);
   --sidebar-ring: hsl(240 5% 64.9%);
   --status-idle: hsl(220 9% 30%);
+}
+
+/* Text that marks live work: a light band sweeps across it. Still under reduced motion. */
+@utility text-shimmer {
+  color: transparent;
+  background-image: linear-gradient(
+    90deg,
+    var(--muted-foreground) 35%,
+    var(--foreground) 50%,
+    var(--muted-foreground) 65%
+  );
+  background-size: 200% 100%;
+  background-clip: text;
+  animation: var(--animate-shimmer);
+
+  @media (prefers-reduced-motion: reduce) {
+    color: var(--muted-foreground);
+    animation: none;
+  }
 }
 
 @layer base {
