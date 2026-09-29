@@ -62,7 +62,7 @@ UNLISTED_VOICE = ProviderVoice(
 CALLER = {
     "instructions": "You want to book a room.",
     "nudge": "Hello? Are you still there?",
-    "language": Language.EN,
+    "caller_language": Language.EN,
     "voice": VoiceSettings(provider=VoiceProvider.ELEVENLABS, id=ENGLISH_VOICE.id),
 }
 PERSONA = {

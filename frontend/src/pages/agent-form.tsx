@@ -14,21 +14,22 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import {
-  Field,
-  FieldContent,
-  FieldDescription,
-  FieldError,
-  FieldGroup,
-  FieldLabel,
-} from "@/components/ui/field";
+import { Field, FieldContent, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useAgent, useDeleteAgent, useSaveAgent } from "@/lib/queries";
-import type { Agent, AgentInput } from "@/lib/types";
+import { type Agent, type AgentInput, LANGUAGE_ITEMS, type Language } from "@/lib/types";
 import { AgentScenarios } from "@/pages/agent-scenarios";
 
 interface Draft {
@@ -36,6 +37,7 @@ interface Draft {
   external_id: string;
   agent_number: string;
   agent_speaks_first: boolean;
+  language: Language;
   brief: string;
 }
 
@@ -44,6 +46,7 @@ const EMPTY: Draft = {
   external_id: "",
   agent_number: "",
   agent_speaks_first: true,
+  language: "en",
   brief: "",
 };
 
@@ -53,6 +56,7 @@ function toDraft(agent: Agent): Draft {
     external_id: agent.external_id ?? "",
     agent_number: agent.agent_number,
     agent_speaks_first: agent.agent_speaks_first,
+    language: agent.language,
     brief: agent.brief ?? "",
   };
 }
@@ -71,6 +75,7 @@ function toInput(draft: Draft, agent?: Agent): AgentInput {
     transport: "phone",
     agent_number: normalizeNumber(draft.agent_number),
     agent_speaks_first: draft.agent_speaks_first,
+    language: draft.language,
     brief: draft.brief.trim() || null,
   };
 }
@@ -148,11 +153,31 @@ function AgentForm({ agent }: { agent?: Agent }) {
             value={draft.agent_number}
             onChange={(e) => set("agent_number", e.target.value)}
           />
-          {draft.agent_number !== "" && !numberOk ? (
+          {draft.agent_number !== "" && !numberOk && (
             <FieldError>Use the international format, like +14155550100.</FieldError>
-          ) : (
-            <FieldDescription>Include the country code, like +14155550100.</FieldDescription>
           )}
+        </Field>
+
+        <Field>
+          <FieldLabel htmlFor="language">Language</FieldLabel>
+          <Select
+            items={LANGUAGE_ITEMS}
+            value={draft.language}
+            onValueChange={(value) => value && set("language", value as Language)}
+          >
+            <SelectTrigger id="language" className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                {LANGUAGE_ITEMS.map((item) => (
+                  <SelectItem key={item.value} value={item.value}>
+                    {item.label}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
         </Field>
 
         <Field orientation="horizontal" className="rounded-md border px-4 py-3">

@@ -47,6 +47,7 @@ class Agent(Base):
     transport: Mapped[Transport] = mapped_column(pg_enum(Transport, "agent_transport"))
     agent_number: Mapped[str] = mapped_column(Text)
     agent_speaks_first: Mapped[bool] = mapped_column(Boolean, default=True)
+    language: Mapped[Language] = mapped_column(pg_enum(Language, "language"))
     brief: Mapped[str | None] = mapped_column(Text)
     current_version: Mapped[int] = mapped_column(Integer, default=1)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

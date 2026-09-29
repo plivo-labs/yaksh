@@ -27,7 +27,7 @@ import { useCloseGuard } from "@/hooks/use-close-guard";
 import type { VoicePreview } from "@/hooks/use-voice-preview";
 import { useDeletePersona, useSavePersona, useVoices } from "@/lib/queries";
 import {
-  LANGUAGE_NAMES,
+  LANGUAGE_ITEMS,
   type Language,
   type Persona,
   type PersonaInput,
@@ -55,11 +55,6 @@ const EMPTY: Draft = {
 const APPEAR = "transition-opacity duration-150 ease-out starting:opacity-0";
 
 const FORM = "form";
-
-const languageItems = (Object.keys(LANGUAGE_NAMES) as Language[]).map((language) => ({
-  value: language,
-  label: LANGUAGE_NAMES[language],
-}));
 
 function toDraft(persona: Persona): Draft {
   return {
@@ -207,7 +202,7 @@ export function PersonaDialog({
               <Field>
                 <FieldLabel htmlFor="language">Language</FieldLabel>
                 <Select
-                  items={languageItems}
+                  items={LANGUAGE_ITEMS}
                   value={draft.language}
                   onValueChange={(value) => value && set("language", value as Language)}
                 >
@@ -216,7 +211,7 @@ export function PersonaDialog({
                   </SelectTrigger>
                   <SelectContent>
                     <SelectGroup>
-                      {languageItems.map((item) => (
+                      {LANGUAGE_ITEMS.map((item) => (
                         <SelectItem key={item.value} value={item.value}>
                           {item.label}
                         </SelectItem>

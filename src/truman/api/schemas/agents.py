@@ -4,6 +4,7 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict
 
 from truman.domain.agents import AgentConfig, Direction, Transport
+from truman.domain.languages import Language
 
 
 class AgentRead(BaseModel):
@@ -16,6 +17,7 @@ class AgentRead(BaseModel):
     transport: Transport
     agent_number: str
     agent_speaks_first: bool
+    language: Language
     brief: str | None
     current_version: int
     created_at: datetime

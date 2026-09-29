@@ -27,6 +27,7 @@ def upgrade() -> None:
         sa.Column("transport", sa.Enum("phone", name="agent_transport"), nullable=False),
         sa.Column("agent_number", sa.Text(), nullable=False),
         sa.Column("agent_speaks_first", sa.Boolean(), nullable=False),
+        sa.Column("language", sa.Enum("en", "hinglish", name="language"), nullable=False),
         sa.Column("brief", sa.Text(), nullable=True),
         sa.Column("current_version", sa.Integer(), nullable=False),
         sa.Column(

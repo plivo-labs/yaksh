@@ -60,8 +60,8 @@ DRAINED = frozenset({EndReason.CALLER_HANGUP})
 VAD = VADParams(confidence=0.5, start_secs=0.1, stop_secs=0.6)
 IDLE_S = 15.0
 IDLE_NUDGES = 2
-# Deepgram language per persona language. Hinglish uses the Hindi model, which also
-# transcribes the English words in it.
+# Deepgram language per agent language: Truman hears the agent in the language the agent
+# speaks. Hinglish uses the Hindi model, which also transcribes the English words in it.
 DEEPGRAM_LANGUAGES: dict[Language, str] = {
     Language.EN: "en",
     Language.HINGLISH: "hi",
@@ -206,7 +206,7 @@ class Persona:
             base_url=settings.deepgram_url,
             sample_rate=SAMPLE_RATE,
             settings=DeepgramSTTService.Settings(
-                model=settings.deepgram_model, language=DEEPGRAM_LANGUAGES[request.language]
+                model=settings.deepgram_model, language=DEEPGRAM_LANGUAGES[request.agent.language]
             ),
         )
         self.tts = ElevenLabsTTSService(
@@ -217,7 +217,7 @@ class Persona:
                 voice=request.voice.id,
                 speed=request.voice.speed,
                 stability=request.voice.stability,
-                language=elevenlabs.LANGUAGE_PINS[request.language],
+                language=elevenlabs.LANGUAGE_PINS[request.caller_language],
             ),
         )
         aggregators = LLMContextAggregatorPair(

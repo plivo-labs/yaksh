@@ -136,7 +136,7 @@ class CallRequest(BaseModel):
     agent: AgentConfig
     instructions: str
     nudge: str
-    language: Language
+    caller_language: Language
     voice: VoiceSettings
     caller_number: str
     max_duration_s: int

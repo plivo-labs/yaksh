@@ -61,6 +61,11 @@ export const LANGUAGE_NAMES: Record<Language, string> = {
   hinglish: "Hinglish",
 };
 
+export const LANGUAGE_ITEMS = (Object.keys(LANGUAGE_NAMES) as Language[]).map((language) => ({
+  value: language,
+  label: LANGUAGE_NAMES[language],
+}));
+
 export interface Page<T> {
   items: T[];
   total: number;
@@ -76,6 +81,7 @@ export interface Agent {
   transport: Transport;
   agent_number: string;
   agent_speaks_first: boolean;
+  language: Language;
   brief: string | null;
   current_version: number;
   created_at: string;
@@ -89,6 +95,7 @@ export interface AgentInput {
   transport: Transport;
   agent_number: string;
   agent_speaks_first: boolean;
+  language: Language;
   brief: string | null;
 }
 

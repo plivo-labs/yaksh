@@ -10,6 +10,8 @@ from pydantic import (
     field_validator,
 )
 
+from truman.domain.languages import Language
+
 
 class Direction(StrEnum):
     INBOUND = "inbound"
@@ -32,6 +34,7 @@ class AgentConfig(BaseModel):
     transport: Transport = Transport.PHONE
     agent_number: E164
     agent_speaks_first: bool = True
+    language: Language = Language.EN
     brief: str | None = None
 
 
@@ -52,9 +55,10 @@ class AgentUpdate(BaseModel):
     transport: Transport | None = None
     agent_number: E164 | None = None
     agent_speaks_first: bool | None = None
+    language: Language | None = None
     brief: str | None = None
 
-    @field_validator("name", "agent_number")
+    @field_validator("name", "agent_number", "language")
     @classmethod
     def cannot_be_cleared(cls, value: str | None, info: ValidationInfo) -> str | None:
         if value is None:

@@ -262,7 +262,7 @@ async def call_request(
         agent=AgentConfig.model_validate(agent_version.config),
         instructions=conversation.instructions,
         nudge=conversation.nudge,
-        language=conversation.language,
+        caller_language=conversation.language,
         voice=PersonaConfig.model_validate(persona_version.config).voice,
         caller_number=number,
         max_duration_s=conversation.max_duration_s,
