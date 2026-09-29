@@ -116,8 +116,8 @@ function SliderField({
         min={min}
         max={max}
         step={0.05}
-        value={[value]}
-        onValueChange={(next) => onChange((next as number[])[0])}
+        value={value}
+        onValueChange={(next) => onChange(next as number)}
       />
       {children}
     </Field>
