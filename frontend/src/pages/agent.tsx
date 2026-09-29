@@ -10,8 +10,9 @@ import { Dot, StatusBadge, StatusDot } from "@/components/status-dot";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
-import { duration, phone, since, when } from "@/lib/format";
+import { duration, phone, reach, since, when } from "@/lib/format";
 import { useAgent, useAgents, useConversations, useLastCall } from "@/lib/queries";
 import {
   ACTIVE_STATUSES,
@@ -19,6 +20,7 @@ import {
   type ConversationSummary,
   END_REASON_LABELS,
   LANGUAGE_NAMES,
+  type OutboundSettings,
 } from "@/lib/types";
 import { AgentForm } from "@/pages/agent-form";
 import { AgentScenarios } from "@/pages/agent-scenarios";
@@ -76,7 +78,7 @@ function Designation({ agent }: { agent: Agent }) {
       <div className="flex flex-wrap items-center gap-x-6 gap-y-4 px-5 pt-5 pb-4">
         <div className="grid min-w-0 flex-1 basis-72 gap-0.5 sm:flex-none">
           <h1 className="truncate text-2xl font-semibold tracking-[-0.015em]">{agent.name}</h1>
-          <p className="text-sm text-muted-foreground">{phone(agent.agent_number)}</p>
+          <p className="text-sm text-muted-foreground">{reach(agent)}</p>
         </div>
         <LineState call={last.data} pending={last.isPending} />
         <StartCallDialog
@@ -219,52 +221,91 @@ function Settings({ agent }: { agent: Agent }) {
       <PanelHeader
         title="Settings"
         action={
-          !editing && (
-            <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
-              Edit
-            </Button>
-          )
+          <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
+            Edit
+          </Button>
         }
       />
-      <div
-        key={String(editing)}
-        className="px-5 py-4 transition-opacity duration-150 ease-out starting:opacity-0"
-      >
-        {editing ? (
-          <AgentForm
-            agent={agent}
-            onSaved={() => {
-              setEditing(false);
-              toast.success("Settings saved");
-            }}
-            cancel={
-              <Button type="button" variant="ghost" onClick={() => setEditing(false)}>
-                Cancel
-              </Button>
-            }
-          />
-        ) : (
-          <dl className="grid gap-4">
-            <Fact label="Language">{LANGUAGE_NAMES[agent.language]}</Fact>
-            <Fact label="Opens with">
-              {agent.agent_speaks_first ? "Agent speaks first" : "Caller speaks first"}
-            </Fact>
-            <div className="grid gap-0.5">
-              <dt className="text-xs text-muted-foreground">Brief</dt>
-              <dd className="text-sm whitespace-pre-wrap">
-                {agent.brief ?? <span className="text-muted-foreground">None</span>}
-              </dd>
-            </div>
-            <Fact label="External id">
-              {agent.external_id ?? <span className="font-normal text-muted-foreground">None</span>}
-            </Fact>
-            <Fact label="Agent id">
-              <CopyId id={agent.id} label="agent id" />
-            </Fact>
-            <Fact label="Added">{when(agent.created_at)}</Fact>
-          </dl>
-        )}
-      </div>
+      <dl className="grid grid-cols-[minmax(0,1fr)] gap-4 px-5 py-4">
+        <Fact label="Language">{LANGUAGE_NAMES[agent.language]}</Fact>
+        <Fact label="Opens with">
+          {agent.agent_speaks_first ? "Agent speaks first" : "Caller speaks first"}
+        </Fact>
+        {agent.outbound && <OutboundFacts outbound={agent.outbound} />}
+        <div className="grid gap-0.5">
+          <dt className="text-xs text-muted-foreground">Brief</dt>
+          <dd className="text-sm whitespace-pre-wrap">
+            {agent.brief ?? <span className="text-muted-foreground">None</span>}
+          </dd>
+        </div>
+        <Fact label="External id">
+          {agent.external_id ?? <span className="font-normal text-muted-foreground">None</span>}
+        </Fact>
+        <Fact label="Agent id">
+          <CopyId id={agent.id} label="agent id" />
+        </Fact>
+        <Fact label="Added">{when(agent.created_at)}</Fact>
+      </dl>
+      <Sheet open={editing} onOpenChange={setEditing}>
+        <SheetContent size="lg" className="overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>Edit {agent.name}</SheetTitle>
+          </SheetHeader>
+          <div className="px-6 pb-6">
+            <AgentForm
+              agent={agent}
+              onSaved={() => {
+                setEditing(false);
+                toast.success("Settings saved");
+              }}
+              cancel={
+                <Button type="button" variant="ghost" onClick={() => setEditing(false)}>
+                  Cancel
+                </Button>
+              }
+            />
+          </div>
+        </SheetContent>
+      </Sheet>
     </Panel>
+  );
+}
+
+/** What Truman sends to start an outbound agent's call, and how it takes the call. */
+function OutboundFacts({ outbound }: { outbound: OutboundSettings }) {
+  const { trigger } = outbound;
+  return (
+    <>
+      <div className="grid gap-0.5">
+        <dt className="text-xs text-muted-foreground">Start request</dt>
+        <dd className="text-sm break-all">
+          <span className="text-muted-foreground">POST </span>
+          {trigger.url}
+        </dd>
+      </div>
+      <Fact label="Headers">
+        {trigger.headers.length > 0 ? (
+          trigger.headers.map((header) => header.name).join(", ")
+        ) : (
+          <span className="font-normal text-muted-foreground">None</span>
+        )}
+      </Fact>
+      <div className="grid min-w-0 gap-1">
+        <dt className="text-xs text-muted-foreground">Request body</dt>
+        <dd className="min-w-0">
+          <pre className="max-h-48 overflow-auto rounded-md bg-muted p-3 font-mono text-xs leading-relaxed">
+            {JSON.stringify(trigger.body, null, 2)}
+          </pre>
+        </dd>
+      </div>
+      <Fact label="Calling numbers">
+        {outbound.calling_numbers.length > 0 ? (
+          outbound.calling_numbers.map(phone).join(", ")
+        ) : (
+          <span className="font-normal text-muted-foreground">Any number</span>
+        )}
+      </Fact>
+      <Fact label="Dial window">{outbound.dial_window_s} seconds</Fact>
+    </>
   );
 }

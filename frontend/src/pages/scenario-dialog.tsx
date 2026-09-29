@@ -25,7 +25,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { useCloseGuard } from "@/hooks/use-close-guard";
 import { useDeleteScenario, useSaveScenario } from "@/lib/queries";
-import type { Fact, Scenario, ScenarioInput } from "@/lib/types";
+import type { Agent, Fact, Scenario, ScenarioInput } from "@/lib/types";
 
 const APPEAR = "transition-opacity duration-150 ease-out starting:opacity-0";
 
@@ -35,6 +35,7 @@ const EMPTY: ScenarioInput = {
   known_facts: [],
   unknown_facts: [],
   criteria: [""],
+  agent_data: [],
 };
 
 function toDraft(scenario: Scenario): ScenarioInput {
@@ -44,7 +45,14 @@ function toDraft(scenario: Scenario): ScenarioInput {
     known_facts: scenario.known_facts,
     unknown_facts: scenario.unknown_facts,
     criteria: scenario.criteria,
+    agent_data: scenario.agent_data,
   };
+}
+
+function trimFacts(facts: Fact[]): Fact[] {
+  return facts
+    .map((fact) => ({ name: fact.name.trim(), value: fact.value.trim() }))
+    .filter((fact) => fact.name || fact.value);
 }
 
 /** The draft as the API takes it: text trimmed, rows left fully empty dropped. */
@@ -52,11 +60,10 @@ function toInput(draft: ScenarioInput): ScenarioInput {
   return {
     name: draft.name.trim(),
     goal: draft.goal.trim(),
-    known_facts: draft.known_facts
-      .map((fact) => ({ name: fact.name.trim(), value: fact.value.trim() }))
-      .filter((fact) => fact.name || fact.value),
+    known_facts: trimFacts(draft.known_facts),
     unknown_facts: draft.unknown_facts.map((name) => name.trim()).filter(Boolean),
     criteria: draft.criteria.map((text) => text.trim()).filter(Boolean),
+    agent_data: trimFacts(draft.agent_data),
   };
 }
 
@@ -84,20 +91,84 @@ function AddRow({
   );
 }
 
+type FactKey = "known_facts" | "agent_data";
+
+function FactRows({
+  label,
+  facts,
+  submitted,
+  onChange,
+}: {
+  label: string;
+  facts: Fact[];
+  submitted: boolean;
+  onChange: (facts: Fact[]) => void;
+}) {
+  const set = (index: number, next: Partial<Fact>) =>
+    onChange(facts.map((fact, at) => (at === index ? { ...fact, ...next } : fact)));
+
+  return (
+    <>
+      <div className="grid gap-2">
+        {facts.map((fact, index) => (
+          <div key={index} className="flex items-start gap-2">
+            <div className="flex flex-1 flex-col gap-2 sm:flex-row">
+              <Input
+                aria-label={`${label} ${index + 1} name`}
+                aria-invalid={submitted && !fact.name.trim() && Boolean(fact.value.trim())}
+                placeholder="Name"
+                maxLength={80}
+                className="sm:w-2/5"
+                value={fact.name}
+                onChange={(e) => set(index, { name: e.target.value })}
+              />
+              <Input
+                aria-label={`${label} ${index + 1} value`}
+                aria-invalid={submitted && !fact.value.trim() && Boolean(fact.name.trim())}
+                placeholder="Value"
+                maxLength={500}
+                className="sm:flex-1"
+                value={fact.value}
+                onChange={(e) => set(index, { value: e.target.value })}
+              />
+            </div>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              aria-label={`Remove ${label.toLowerCase()} ${index + 1}`}
+              onClick={() => onChange(facts.filter((_, at) => at !== index))}
+            >
+              <X />
+            </Button>
+          </div>
+        ))}
+      </div>
+      <AddRow
+        count={facts.length}
+        limit={30}
+        onAdd={() => onChange([...facts, { name: "", value: "" }])}
+      >
+        {`Add ${label.toLowerCase()}`}
+      </AddRow>
+    </>
+  );
+}
+
 export function ScenarioDialog({
-  agentId,
+  agent,
   scenario,
   onSaved,
   onClosed,
 }: {
-  agentId: string;
+  agent: Agent;
   scenario?: Scenario;
   onSaved?: (scenario: Scenario) => void;
   onClosed: () => void;
 }) {
   const id = scenario?.id;
-  const save = useSaveScenario(agentId, id);
-  const remove = useDeleteScenario(agentId);
+  const save = useSaveScenario(agent.id, id);
+  const remove = useDeleteScenario(agent.id);
   const [initial] = useState<ScenarioInput>(() => (scenario ? toDraft(scenario) : EMPTY));
   const [draft, setDraft] = useState<ScenarioInput>(initial);
   const [submitted, setSubmitted] = useState(false);
@@ -107,16 +178,7 @@ export function ScenarioDialog({
     save.reset();
     setDraft((current) => ({ ...current, ...next(current) }));
   };
-  const setFact = (index: number, next: Partial<Fact>) =>
-    change((current) => ({
-      known_facts: current.known_facts.map((fact, at) =>
-        at === index ? { ...fact, ...next } : fact,
-      ),
-    }));
-  const addFact = () =>
-    change((current) => ({ known_facts: [...current.known_facts, { name: "", value: "" }] }));
-  const removeFact = (index: number) =>
-    change((current) => ({ known_facts: current.known_facts.filter((_, at) => at !== index) }));
+  const setFacts = (key: FactKey, facts: Fact[]) => change(() => ({ [key]: facts }));
   const addListItem = (key: "unknown_facts" | "criteria") =>
     change((current) => ({ [key]: [...current[key], ""] }));
   const setListItem = (key: "unknown_facts" | "criteria", index: number, value: string) =>
@@ -125,12 +187,17 @@ export function ScenarioDialog({
     change((current) => ({ [key]: current[key].filter((_, at) => at !== index) }));
 
   const input = toInput(draft);
-  const halfFact = input.known_facts.some((fact) => !fact.name || !fact.value);
+  const outbound = agent.direction === "outbound";
+  const halfFact = (facts: Fact[]) => facts.some((fact) => !fact.name || !fact.value);
+  const halfKnown = halfFact(input.known_facts);
+  const halfAgentData = outbound && halfFact(input.agent_data);
 
   const submit = (event: SubmitEvent) => {
     event.preventDefault();
     setSubmitted(true);
-    if (!input.name || !input.goal || input.criteria.length === 0 || halfFact) return;
+    if (!input.name || !input.goal || input.criteria.length === 0 || halfKnown || halfAgentData) {
+      return;
+    }
     save.mutate(input, {
       onSuccess: (saved) => {
         toast.success(id ? "Scenario saved" : `Added ${saved.name}`);
@@ -196,48 +263,35 @@ export function ScenarioDialog({
               <FieldDescription>
                 Write dates relative to today, for example next Thursday.
               </FieldDescription>
-              <div className="grid gap-2">
-                {draft.known_facts.map((fact, index) => (
-                  <div key={index} className="flex items-start gap-2">
-                    <div className="flex flex-1 flex-col gap-2 sm:flex-row">
-                      <Input
-                        aria-label={`Fact ${index + 1} name`}
-                        aria-invalid={submitted && !fact.name.trim() && Boolean(fact.value.trim())}
-                        placeholder="Name"
-                        maxLength={80}
-                        className="sm:w-2/5"
-                        value={fact.name}
-                        onChange={(e) => setFact(index, { name: e.target.value })}
-                      />
-                      <Input
-                        aria-label={`Fact ${index + 1} value`}
-                        aria-invalid={submitted && !fact.value.trim() && Boolean(fact.name.trim())}
-                        placeholder="Value"
-                        maxLength={500}
-                        className="sm:flex-1"
-                        value={fact.value}
-                        onChange={(e) => setFact(index, { value: e.target.value })}
-                      />
-                    </div>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      aria-label={`Remove fact ${index + 1}`}
-                      onClick={() => removeFact(index)}
-                    >
-                      <X />
-                    </Button>
-                  </div>
-                ))}
-              </div>
-              {submitted && halfFact && (
+              <FactRows
+                label="Fact"
+                facts={draft.known_facts}
+                submitted={submitted}
+                onChange={(facts) => setFacts("known_facts", facts)}
+              />
+              {submitted && halfKnown && (
                 <FieldError className={APPEAR}>Give each fact a name and a value.</FieldError>
               )}
-              <AddRow count={draft.known_facts.length} limit={30} onAdd={addFact}>
-                Add fact
-              </AddRow>
             </FieldSet>
+
+            {outbound && (
+              <FieldSet>
+                <FieldLegend variant="label">Data sent to the agent</FieldLegend>
+                <FieldDescription>
+                  Truman puts these in the request that starts the call, as{" "}
+                  <code>{"{{agent_data.<name>}}"}</code>. The caller does not see them.
+                </FieldDescription>
+                <FactRows
+                  label="Agent data"
+                  facts={draft.agent_data}
+                  submitted={submitted}
+                  onChange={(facts) => setFacts("agent_data", facts)}
+                />
+                {submitted && halfAgentData && (
+                  <FieldError className={APPEAR}>Give each item a name and a value.</FieldError>
+                )}
+              </FieldSet>
+            )}
 
             <FieldSet>
               <FieldLegend variant="label">What the caller does not have</FieldLegend>

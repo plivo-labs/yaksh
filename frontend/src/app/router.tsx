@@ -8,6 +8,7 @@ import { AgentsPage } from "@/pages/agents";
 import { ConversationPage } from "@/pages/conversation";
 import { ConversationsPage } from "@/pages/conversations";
 import { NotFoundPage } from "@/pages/not-found";
+import { NumbersPage } from "@/pages/numbers";
 import { PersonasPage } from "@/pages/personas";
 import { VoicesPage } from "@/pages/voices";
 
@@ -25,6 +26,7 @@ export const router = createBrowserRouter([
       { path: "agents", element: <AgentsPage /> },
       { path: "agents/new", element: <NewAgentPage /> },
       { path: "agents/:id", element: <AgentPage /> },
+      { path: "numbers", element: <NumbersPage /> },
       { path: "*", element: <NotFoundPage /> },
     ],
   },

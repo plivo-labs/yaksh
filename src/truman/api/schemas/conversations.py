@@ -3,6 +3,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict
 
+from truman.domain.agents import Direction
 from truman.domain.conversations import (
     CallerClaim,
     Channel,
@@ -32,9 +33,11 @@ class ConversationSummary(BaseModel):
     scenario_version_id: uuid.UUID
     scenario_version: int
     scenario_name: str
+    direction: Direction
     language: Language
     channel: Channel
     caller_number: str | None
+    agent_caller_id: str | None
     call_uuid: str | None
     max_duration_s: int
     status: ConversationStatus

@@ -25,7 +25,8 @@ def upgrade() -> None:
             "direction", sa.Enum("inbound", "outbound", name="agent_direction"), nullable=False
         ),
         sa.Column("transport", sa.Enum("phone", name="agent_transport"), nullable=False),
-        sa.Column("agent_number", sa.Text(), nullable=False),
+        sa.Column("agent_number", sa.Text(), nullable=True),
+        sa.Column("outbound", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
         sa.Column("agent_speaks_first", sa.Boolean(), nullable=False),
         sa.Column("language", sa.Enum("en", "hinglish", name="language"), nullable=False),
         sa.Column("brief", sa.Text(), nullable=True),
@@ -238,6 +239,9 @@ def upgrade() -> None:
         sa.Column("agent_id", sa.UUID(), nullable=False),
         sa.Column("agent_version_id", sa.UUID(), nullable=False),
         sa.Column("channel", sa.Enum("voice", name="channel"), nullable=False),
+        sa.Column(
+            "direction", sa.Enum("inbound", "outbound", name="agent_direction"), nullable=False
+        ),
         sa.Column("persona_id", sa.UUID(), nullable=False),
         sa.Column("persona_version_id", sa.UUID(), nullable=False),
         sa.Column("scenario_id", sa.UUID(), nullable=False),
@@ -247,6 +251,8 @@ def upgrade() -> None:
         sa.Column("nudge", sa.Text(), nullable=False),
         sa.Column("caller_number", sa.Text(), nullable=True),
         sa.Column("call_uuid", sa.Text(), nullable=True),
+        sa.Column("dial_deadline_at", sa.DateTime(timezone=True), nullable=True),
+        sa.Column("agent_caller_id", sa.Text(), nullable=True),
         sa.Column("max_duration_s", sa.Integer(), nullable=False),
         sa.Column(
             "status",
@@ -275,6 +281,8 @@ def upgrade() -> None:
                 "error",
                 "worker_stopped",
                 "lease_lost",
+                "trigger_failed",
+                "no_call",
                 name="end_reason",
             ),
             nullable=True,
@@ -336,8 +344,11 @@ def upgrade() -> None:
         sa.Column("alias", sa.Text(), nullable=True),
         sa.Column("region", sa.Text(), nullable=True),
         sa.Column("enabled", sa.Boolean(), server_default=sa.text("true"), nullable=False),
+        sa.Column("application_id", sa.Text(), nullable=True),
+        sa.Column("application_name", sa.Text(), nullable=True),
         sa.Column("conversation_id", sa.UUID(), nullable=True),
         sa.Column("leased_at", sa.DateTime(timezone=True), nullable=True),
+        sa.Column("available_after", sa.DateTime(timezone=True), nullable=True),
         sa.ForeignKeyConstraint(
             ["conversation_id"],
             ["conversations.id"],

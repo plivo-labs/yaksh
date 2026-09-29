@@ -11,6 +11,7 @@ import {
   type Language,
   type Page,
   type Persona,
+  type PhoneNumbers,
   type PersonaInput,
   type ProviderVoice,
   type Scenario,
@@ -30,6 +31,7 @@ export const keys = {
   scenarios: (agentId: string) => ["agents", agentId, "scenarios"] as const,
   voices: ["voices"] as const,
   voicesFor: (language: Language | "all") => ["voices", language] as const,
+  phoneNumbers: ["phone-numbers"] as const,
 };
 
 const PAGE_SIZE = 100;
@@ -320,4 +322,11 @@ function peaks(samples: Float32Array, size: number): Float32Array {
     if (level > out[slot]) out[slot] = level;
   }
   return out;
+}
+
+export function usePhoneNumbers() {
+  return useQuery({
+    queryKey: keys.phoneNumbers,
+    queryFn: () => api<PhoneNumbers>("/phone-numbers"),
+  });
 }

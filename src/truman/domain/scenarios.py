@@ -32,8 +32,9 @@ class Fact(BaseModel):
 
 
 class ScenarioConfig(BaseModel):
-    """What a scenario version pins. The goal and the facts go to the caller; the criteria never
-    do, they are what the agent must say or do on the call."""
+    """What a scenario version pins. The goal and the facts go to the caller. The criteria never
+    do: they are what the agent must say or do on the call. Agent data goes only to the agent,
+    in an outbound agent's trigger."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -41,6 +42,7 @@ class ScenarioConfig(BaseModel):
     known_facts: list[Fact] = Field(default_factory=list, max_length=30)
     unknown_facts: list[FactName] = Field(default_factory=list, max_length=20)
     criteria: list[Criterion] = Field(min_length=1, max_length=10)
+    agent_data: list[Fact] = Field(default_factory=list, max_length=30)
 
     @model_validator(mode="after")
     def names_and_criteria_are_distinct(self) -> ScenarioConfig:
@@ -50,6 +52,7 @@ class ScenarioConfig(BaseModel):
             ("known fact names", known),
             ("unknown facts", unknown),
             ("criteria", [normalized(text) for text in self.criteria]),
+            ("agent data names", [normalized(fact.name) for fact in self.agent_data]),
         ):
             if len(set(values)) != len(values):
                 raise ValueError(f"{label} must be unique")
@@ -76,8 +79,9 @@ class ScenarioUpdate(BaseModel):
     known_facts: list[Fact] | None = Field(default=None, max_length=30)
     unknown_facts: list[FactName] | None = Field(default=None, max_length=20)
     criteria: list[Criterion] | None = Field(default=None, min_length=1, max_length=10)
+    agent_data: list[Fact] | None = Field(default=None, max_length=30)
 
-    @field_validator("name", "goal", "known_facts", "unknown_facts", "criteria")
+    @field_validator("name", "goal", "known_facts", "unknown_facts", "criteria", "agent_data")
     @classmethod
     def cannot_be_cleared(cls, value: Any, info: ValidationInfo) -> Any:
         if value is None:

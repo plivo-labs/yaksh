@@ -5,7 +5,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from pydantic import Field, PostgresDsn, SecretStr, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
-from truman.domain.agents import E164
+from truman.domain.numbers import E164
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -47,6 +47,15 @@ class Settings(BaseSettings):
     plivo_auth_id: SecretStr | None = Field(default=None, validation_alias="PLIVO_AUTH_ID")
     plivo_auth_token: SecretStr | None = Field(default=None, validation_alias="PLIVO_AUTH_TOKEN")
     plivo_numbers: Annotated[list[E164], NoDecode] = []
+    plivo_app_id: str | None = None
+    """The Plivo Application that sends outbound test calls to this worker."""
+    webhook_signing_key: SecretStr | None = None
+    """Signs every outbound agent trigger so its receiver can check it came from Truman."""
+    allow_private_triggers: bool = False
+    """Allow trigger URLs on private or local addresses, for development."""
+    number_rest_s: int = Field(default=300, ge=0)
+    """How long a released number waits before a new test may use it, so a late call from an
+    earlier test does not reach the next one."""
     public_url: str | None = None
     stream_port: int = 8770
     ring_timeout_s: int = 30

@@ -41,6 +41,7 @@ import {
   END_REASON_LABELS,
   ACTIVE_STATUSES,
   type Conversation,
+  type Fact,
   LANGUAGE_NAMES,
   type ScenarioConfig,
   type Turn,
@@ -143,8 +144,7 @@ export function ConversationPage() {
               <CardHeader>
                 <RailTitle role="Caller" name={data.persona_name} />
                 <CardDescription>
-                  {LANGUAGE_NAMES[data.language]}, from{" "}
-                  {data.caller_number ?? "a number assigned at call time"}, up to{" "}
+                  {LANGUAGE_NAMES[data.language]}, <CallerLine conversation={data} />, up to{" "}
                   {data.max_duration_s}s once connected
                   {data.call_uuid && (
                     <>
@@ -166,6 +166,17 @@ export function ConversationPage() {
   );
 }
 
+function CallerLine({ conversation }: { conversation: Conversation }) {
+  const number = conversation.caller_number ?? "a number assigned at call time";
+  if (conversation.direction === "inbound") return <>from {number}</>;
+  return (
+    <>
+      answers on {number}
+      {conversation.agent_caller_id && `, called from ${conversation.agent_caller_id}`}
+    </>
+  );
+}
+
 function RailTitle({ role, name }: { role: string; name: string }) {
   return (
     <div className="grid gap-0.5">
@@ -184,19 +195,8 @@ function ScenarioCard({ name, scenario }: { name: string; scenario: ScenarioConf
       </CardHeader>
       <CardContent>
         <dl className="grid gap-3 text-sm">
-          {scenario.known_facts.length > 0 && (
-            <div className="grid gap-1">
-              <dt className="text-xs text-muted-foreground">Knows</dt>
-              <dd className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1">
-                {scenario.known_facts.map((fact) => (
-                  <Fragment key={fact.name}>
-                    <span className="text-muted-foreground">{fact.name}</span>
-                    <span className="font-medium break-words">{fact.value}</span>
-                  </Fragment>
-                ))}
-              </dd>
-            </div>
-          )}
+          <Facts label="Knows" facts={scenario.known_facts} />
+          <Facts label="Sent to the agent" facts={scenario.agent_data} />
           {scenario.unknown_facts.length > 0 && (
             <div className="grid gap-1">
               <dt className="text-xs text-muted-foreground">Does not have</dt>
@@ -216,6 +216,23 @@ function ScenarioCard({ name, scenario }: { name: string; scenario: ScenarioConf
         </dl>
       </CardContent>
     </Card>
+  );
+}
+
+function Facts({ label, facts }: { label: string; facts: Fact[] }) {
+  if (facts.length === 0) return null;
+  return (
+    <div className="grid gap-1">
+      <dt className="text-xs text-muted-foreground">{label}</dt>
+      <dd className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1">
+        {facts.map((fact) => (
+          <Fragment key={fact.name}>
+            <span className="text-muted-foreground">{fact.name}</span>
+            <span className="font-medium break-words">{fact.value}</span>
+          </Fragment>
+        ))}
+      </dd>
+    </div>
   );
 }
 
@@ -404,11 +421,14 @@ function WireEvents({
         ) : (
           <ol className="grid gap-1 font-mono text-xs">
             {events.map((event, index) => (
-              <li key={index} className="flex justify-between gap-4">
-                <span className={event.kind === "caller_error" ? "text-status-danger" : ""}>
-                  {words(event.kind)}
-                </span>
-                <span className="text-muted-foreground">{clock(event.at_ms)}</span>
+              <li key={index} className="grid gap-0.5">
+                <div className="flex justify-between gap-4">
+                  <span className={event.kind === "caller_error" ? "text-status-danger" : ""}>
+                    {words(event.kind)}
+                  </span>
+                  <span className="text-muted-foreground">{clock(event.at_ms)}</span>
+                </div>
+                {event.detail && <p className="break-all text-muted-foreground">{event.detail}</p>}
               </li>
             ))}
           </ol>

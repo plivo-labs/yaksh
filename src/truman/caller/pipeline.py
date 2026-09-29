@@ -276,8 +276,7 @@ class Persona:
         self._clock = clock
 
         async def nudge() -> None:
-            transcript.scripted(request.nudge)
-            await self.worker.queue_frame(TTSSpeakFrame(request.nudge))
+            await self.say(request.nudge)
 
         watch_silence(aggregators.user(), state, nudge)
 
@@ -295,6 +294,11 @@ class Persona:
 
     async def speak_first(self) -> None:
         await self.worker.queue_frame(LLMRunFrame())
+
+    async def say(self, text: str) -> None:
+        """Speak fixed text for the caller, such as the idle nudge, without the model."""
+        self._transcript.scripted(text)
+        await self.worker.queue_frame(TTSSpeakFrame(text))
 
     async def greet_if_silent(self) -> None:
         """An agent that should speak first but says nothing gets a hello, as a caller would."""

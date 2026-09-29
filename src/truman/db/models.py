@@ -45,7 +45,8 @@ class Agent(Base):
     external_id: Mapped[str | None] = mapped_column(Text)
     direction: Mapped[Direction] = mapped_column(pg_enum(Direction, "agent_direction"))
     transport: Mapped[Transport] = mapped_column(pg_enum(Transport, "agent_transport"))
-    agent_number: Mapped[str] = mapped_column(Text)
+    agent_number: Mapped[str | None] = mapped_column(Text)
+    outbound: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     agent_speaks_first: Mapped[bool] = mapped_column(Boolean, default=True)
     language: Mapped[Language] = mapped_column(pg_enum(Language, "language"))
     brief: Mapped[str | None] = mapped_column(Text)
@@ -88,6 +89,9 @@ class Conversation(Base):
     agent_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("agents.id"))
     agent_version_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
     channel: Mapped[Channel] = mapped_column(pg_enum(Channel, "channel"), default=Channel.VOICE)
+    direction: Mapped[Direction] = mapped_column(
+        pg_enum(Direction, "agent_direction"), default=Direction.INBOUND
+    )
     persona_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("personas.id"))
     persona_version_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
     scenario_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
@@ -97,6 +101,10 @@ class Conversation(Base):
     nudge: Mapped[str] = mapped_column(Text)
     caller_number: Mapped[str | None] = mapped_column(Text)
     call_uuid: Mapped[str | None] = mapped_column(Text)
+    dial_deadline_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    """Outbound only: the time until which a call from the agent is accepted."""
+    agent_caller_id: Mapped[str | None] = mapped_column(Text)
+    """Outbound only: the number the agent called from."""
     max_duration_s: Mapped[int] = mapped_column(Integer)
     status: Mapped[ConversationStatus] = mapped_column(
         pg_enum(ConversationStatus, "conversation_status"), default=ConversationStatus.QUEUED
@@ -259,5 +267,8 @@ class PhoneNumber(Base):
     alias: Mapped[str | None] = mapped_column(Text)
     region: Mapped[str | None] = mapped_column(Text)
     enabled: Mapped[bool] = mapped_column(Boolean, default=True, server_default=true())
+    application_id: Mapped[str | None] = mapped_column(Text)
+    application_name: Mapped[str | None] = mapped_column(Text)
     conversation_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("conversations.id"))
     leased_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    available_after: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

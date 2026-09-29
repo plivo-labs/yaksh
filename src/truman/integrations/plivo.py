@@ -1,4 +1,5 @@
-"""The Plivo REST calls Truman makes: place a call, cancel one still ringing, hang one up."""
+"""The Plivo REST calls Truman makes: list numbers, read an application, place a call, cancel
+one still ringing, hang one up."""
 
 import json
 import logging
@@ -9,7 +10,7 @@ import aiohttp
 from pydantic import ValidationError
 
 from truman.diagnostics import describe_exception
-from truman.domain.numbers import AccountNumber
+from truman.domain.numbers import AccountNumber, PlivoApplication
 
 log = logging.getLogger(__name__)
 
@@ -102,6 +103,32 @@ class PlivoApi:
             raise PlivoError(f"listing numbers did not end after {MAX_PAGES} pages")
         return numbers
 
+    async def get_application(self, app_id: str) -> PlivoApplication:
+        url = f"{self._account}/Application/{app_id}/"
+        try:
+            async with (
+                aiohttp.ClientSession(headers=self._headers, timeout=TIMEOUT) as session,
+                session.get(url) as response,
+            ):
+                body = await response.text()
+                if response.status >= 400:
+                    raise PlivoError(
+                        f"reading application {app_id} failed with {response.status}: {body}"
+                    )
+            entry = json.loads(body)
+            return PlivoApplication(
+                app_id=str(entry["app_id"]),
+                name=str(entry.get("app_name") or app_id),
+                answer_url=str(entry.get("answer_url") or ""),
+                answer_method=str(entry.get("answer_method") or ""),
+                hangup_url=str(entry.get("hangup_url") or ""),
+                hangup_method=str(entry.get("hangup_method") or ""),
+            )
+        except (aiohttp.ClientError, TimeoutError, ValueError, KeyError, TypeError) as error:
+            raise PlivoError(
+                f"reading application {app_id} did not work: {describe_exception(error)}"
+            ) from error
+
     async def cancel_request(self, request_uuid: str) -> None:
         """Stop a call that has not been answered; gone already is fine."""
         await self._delete(f"{self._account}/Request/{request_uuid}/")
@@ -124,6 +151,13 @@ class PlivoApi:
             ) from error
 
 
+def application_id(uri: object) -> str | None:
+    """The id at the end of an application URI such as /v1/Account/MA../Application/123/."""
+    if not isinstance(uri, str) or "/Application/" not in uri:
+        return None
+    return uri.rstrip("/").rsplit("/", 1)[-1] or None
+
+
 def account_numbers(entries: list[dict[str, Any]]) -> list[AccountNumber]:
     numbers: list[AccountNumber] = []
     for entry in entries:
@@ -135,6 +169,7 @@ def account_numbers(entries: list[dict[str, Any]]) -> list[AccountNumber]:
                     alias=entry.get("alias") or None,
                     region=entry.get("region") or None,
                     voice=bool(entry.get("voice_enabled")) and bool(entry.get("active", True)),
+                    application_id=application_id(entry.get("application")),
                 )
             )
         except ValidationError:

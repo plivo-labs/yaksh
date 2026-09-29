@@ -5,7 +5,14 @@ import { toast } from "sonner";
 import { DeleteConfirm } from "@/components/confirm-dialogs";
 import { Panel, PanelHeader } from "@/components/panel";
 import { Button } from "@/components/ui/button";
-import { Field, FieldContent, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
+import {
+  Field,
+  FieldContent,
+  FieldDescription,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+} from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -19,12 +26,30 @@ import { Spinner } from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useDeleteAgent, useSaveAgent } from "@/lib/queries";
-import { type Agent, type AgentInput, LANGUAGE_ITEMS, type Language } from "@/lib/types";
+import {
+  EMPTY_OUTBOUND,
+  isPhoneNumber,
+  normalizeNumber,
+  type OutboundDraft,
+  outboundProblems,
+  toOutbound,
+  toOutboundDraft,
+} from "@/lib/outbound";
+import {
+  type Agent,
+  type AgentInput,
+  type Direction,
+  LANGUAGE_ITEMS,
+  type Language,
+} from "@/lib/types";
+import { OutboundFields } from "@/pages/agent-outbound-fields";
 
 interface Draft {
   name: string;
   external_id: string;
+  direction: Direction;
   agent_number: string;
+  outbound: OutboundDraft;
   agent_speaks_first: boolean;
   language: Language;
   brief: string;
@@ -33,7 +58,9 @@ interface Draft {
 const EMPTY: Draft = {
   name: "",
   external_id: "",
+  direction: "inbound",
   agent_number: "",
+  outbound: EMPTY_OUTBOUND,
   agent_speaks_first: true,
   language: "en",
   brief: "",
@@ -43,26 +70,29 @@ function toDraft(agent: Agent): Draft {
   return {
     name: agent.name,
     external_id: agent.external_id ?? "",
-    agent_number: agent.agent_number,
+    direction: agent.direction,
+    agent_number: agent.agent_number ?? "",
+    outbound: agent.outbound ? toOutboundDraft(agent.outbound) : EMPTY_OUTBOUND,
     agent_speaks_first: agent.agent_speaks_first,
     language: agent.language,
     brief: agent.brief ?? "",
   };
 }
 
-const E164 = /^\+[1-9]\d{6,14}$/;
+const DIRECTION_ITEMS: { value: Direction; label: string }[] = [
+  { value: "inbound", label: "Inbound: Truman calls the agent" },
+  { value: "outbound", label: "Outbound: the agent calls Truman" },
+];
 
-function normalizeNumber(typed: string): string {
-  return typed.replaceAll(/[\s-]/g, "");
-}
-
-function toInput(draft: Draft, agent?: Agent): AgentInput {
+function toInput(draft: Draft): AgentInput {
+  const outbound = draft.direction === "outbound";
   return {
     name: draft.name.trim(),
     external_id: draft.external_id.trim() || null,
-    direction: agent?.direction ?? "inbound",
+    direction: draft.direction,
     transport: "phone",
-    agent_number: normalizeNumber(draft.agent_number),
+    agent_number: outbound ? null : normalizeNumber(draft.agent_number),
+    outbound: outbound ? toOutbound(draft.outbound) : null,
     agent_speaks_first: draft.agent_speaks_first,
     language: draft.language,
     brief: draft.brief.trim() || null,
@@ -106,14 +136,20 @@ export function AgentForm({
   const save = useSaveAgent(id);
   const remove = useDeleteAgent();
   const [draft, setDraft] = useState<Draft>(() => (agent ? toDraft(agent) : EMPTY));
+  const [submitted, setSubmitted] = useState(false);
+
   const set = <K extends keyof Draft>(key: K, value: Draft[K]) =>
     setDraft((current) => ({ ...current, [key]: value }));
-  const numberOk = E164.test(normalizeNumber(draft.agent_number));
+
+  const outbound = draft.direction === "outbound";
+  const numberOk = isPhoneNumber(draft.agent_number);
+  const ready = outbound ? Object.keys(outboundProblems(draft.outbound)).length === 0 : numberOk;
 
   const submit = (event: SubmitEvent) => {
     event.preventDefault();
-    if (!numberOk) return;
-    save.mutate(toInput(draft, agent), { onSuccess: onSaved });
+    setSubmitted(true);
+    if (!ready) return;
+    save.mutate(toInput(draft), { onSuccess: onSaved });
   };
 
   return (
@@ -130,21 +166,50 @@ export function AgentForm({
         </Field>
 
         <Field>
-          <FieldLabel htmlFor="agent_number">Phone number</FieldLabel>
-          <Input
-            id="agent_number"
-            required
-            type="tel"
-            inputMode="tel"
-            placeholder="+1 415 555 0100"
-            aria-invalid={draft.agent_number !== "" && !numberOk}
-            value={draft.agent_number}
-            onChange={(e) => set("agent_number", e.target.value)}
-          />
-          {draft.agent_number !== "" && !numberOk && (
-            <FieldError>Use the international format, like +14155550100.</FieldError>
-          )}
+          <FieldLabel htmlFor="direction">Direction</FieldLabel>
+          <Select
+            items={DIRECTION_ITEMS}
+            value={draft.direction}
+            onValueChange={(value) => value && set("direction", value as Direction)}
+          >
+            <SelectTrigger id="direction" className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                {DIRECTION_ITEMS.map((item) => (
+                  <SelectItem key={item.value} value={item.value}>
+                    {item.label}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
         </Field>
+
+        {outbound ? (
+          <OutboundFields
+            draft={draft.outbound}
+            onChange={(next) => set("outbound", next)}
+            submitted={submitted}
+          />
+        ) : (
+          <Field>
+            <FieldLabel htmlFor="agent_number">Phone number</FieldLabel>
+            <Input
+              id="agent_number"
+              type="tel"
+              inputMode="tel"
+              placeholder="+1 415 555 0100"
+              aria-invalid={draft.agent_number !== "" && !numberOk}
+              value={draft.agent_number}
+              onChange={(e) => set("agent_number", e.target.value)}
+            />
+            {(submitted || draft.agent_number !== "") && !numberOk && (
+              <FieldError>Use the international format, like +14155550100.</FieldError>
+            )}
+          </Field>
+        )}
 
         <Field>
           <FieldLabel htmlFor="language">Language</FieldLabel>
@@ -171,6 +236,11 @@ export function AgentForm({
         <Field orientation="horizontal" className="rounded-md border bg-muted/40 px-3.5 py-3">
           <FieldContent>
             <FieldLabel htmlFor="agent_speaks_first">Agent speaks first</FieldLabel>
+            {outbound && (
+              <FieldDescription>
+                When off, the caller says a short hello on pickup.
+              </FieldDescription>
+            )}
           </FieldContent>
           <Switch
             id="agent_speaks_first"

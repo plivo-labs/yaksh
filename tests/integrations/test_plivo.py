@@ -4,7 +4,7 @@ from typing import Any
 
 import pytest
 from fastapi import FastAPI, Request, Response
-from fastapi.responses import RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 
 from truman.caller.plivo_server import PlivoServer
 from truman.integrations.plivo import OutboundCall, PlivoApi, PlivoError
@@ -46,6 +46,7 @@ async def plivo() -> AsyncIterator[tuple[PlivoApi, list[dict[str, Any]]]]:
                         "region": "Florida, UNITED STATES",
                         "voice_enabled": True,
                         "active": True,
+                        "application": f"/v1/Account/{auth_id}/Application/24330520250244652/",
                     },
                     {
                         "number": "18005550100",
@@ -64,6 +65,23 @@ async def plivo() -> AsyncIterator[tuple[PlivoApi, list[dict[str, Any]]]]:
             },
         }
         return pages[offset]
+
+    @app.get("/v1/Account/{auth_id}/Application/{app_id}/")
+    async def application(auth_id: str, app_id: str) -> Response:
+        if app_id == "2":
+            return Response(content="null", media_type="application/json")
+        if app_id != "24330520250244652":
+            return Response(status_code=404, content='{"error": "not found"}')
+        return JSONResponse(
+            {
+                "app_id": app_id,
+                "app_name": "truman",
+                "answer_url": "https://truman.example/incoming",
+                "answer_method": "POST",
+                "hangup_url": "https://truman.example/incoming/hangup",
+                "hangup_method": "POST",
+            }
+        )
 
     @app.delete("/v1/Account/{auth_id}/Request/{request_uuid}/")
     async def cancel(auth_id: str, request_uuid: str) -> Response:
@@ -142,11 +160,31 @@ async def test_account_numbers_are_listed_across_pages_in_e164(
 
     numbers = await api.list_numbers()
 
-    assert [(n.number, n.alias, n.region, n.voice) for n in numbers] == [
-        ("+17862242321", None, "Florida, UNITED STATES", True),
-        ("+18005550100", "SMS only", None, False),
-        ("+919999999999", None, None, True),
+    assert [(n.number, n.alias, n.region, n.voice, n.application_id) for n in numbers] == [
+        ("+17862242321", None, "Florida, UNITED STATES", True, "24330520250244652"),
+        ("+18005550100", "SMS only", None, False, None),
+        ("+919999999999", None, None, True, None),
     ]
+
+
+async def test_an_application_is_read_and_a_missing_one_is_an_error(
+    plivo: tuple[PlivoApi, list[dict[str, Any]]],
+) -> None:
+    api, _ = plivo
+
+    application = await api.get_application("24330520250244652")
+
+    assert application.problems("https://truman.example") == []
+    assert application.problems("https://elsewhere.example") == [
+        "Plivo application truman has answer URL 'https://truman.example/incoming'; "
+        "set it to 'https://elsewhere.example/incoming'",
+        "Plivo application truman has hangup URL 'https://truman.example/incoming/hangup'; "
+        "set it to 'https://elsewhere.example/incoming/hangup'",
+    ]
+    with pytest.raises(PlivoError, match="404"):
+        await api.get_application("1")
+    with pytest.raises(PlivoError, match="did not work"):
+        await api.get_application("2")
 
 
 async def test_a_listing_that_never_ends_is_an_error(

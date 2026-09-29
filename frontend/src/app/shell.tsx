@@ -1,4 +1,13 @@
-import { AudioLines, Bot, KeyRound, MoonStar, PhoneCall, SunMedium, UserRound } from "lucide-react";
+import {
+  AudioLines,
+  Bot,
+  Hash,
+  KeyRound,
+  MoonStar,
+  PhoneCall,
+  SunMedium,
+  UserRound,
+} from "lucide-react";
 import { type CSSProperties, useLayoutEffect, useState } from "react";
 import { flushSync } from "react-dom";
 import { NavLink, Outlet, useLocation } from "react-router";
@@ -56,6 +65,7 @@ const links = [
   { to: "/conversations", label: "Conversations", icon: PhoneCall },
   { to: "/personas", label: "Personas", icon: UserRound },
   { to: "/voices", label: "Voices", icon: AudioLines },
+  { to: "/numbers", label: "Numbers", icon: Hash },
 ];
 
 const sidebarOpen = () => !document.cookie.split("; ").includes("sidebar_state=false");

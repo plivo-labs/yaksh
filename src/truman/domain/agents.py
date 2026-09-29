@@ -1,16 +1,18 @@
 from enum import StrEnum
-from typing import Annotated, Any
+from typing import Any
 
 from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
-    StringConstraints,
     ValidationInfo,
     field_validator,
+    model_validator,
 )
 
 from truman.domain.languages import Language
+from truman.domain.numbers import E164
+from truman.domain.triggers import OutboundConfig
 
 
 class Direction(StrEnum):
@@ -24,18 +26,34 @@ class Transport(StrEnum):
     PHONE = "phone"
 
 
-E164 = Annotated[str, StringConstraints(pattern=r"^\+[1-9]\d{6,14}$")]
-
-
 class AgentConfig(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     direction: Direction = Direction.INBOUND
     transport: Transport = Transport.PHONE
-    agent_number: E164
+    agent_number: E164 | None = None
+    """The number Truman dials; inbound agents only."""
+    outbound: OutboundConfig | None = None
     agent_speaks_first: bool = True
     language: Language = Language.EN
     brief: str | None = None
+
+    @model_validator(mode="after")
+    def fits_direction(self) -> AgentConfig:
+        if self.direction is Direction.INBOUND:
+            if self.agent_number is None:
+                raise ValueError("an inbound agent needs agent_number")
+            if self.outbound is not None:
+                raise ValueError("outbound settings are only for outbound agents")
+        else:
+            if self.outbound is None:
+                raise ValueError("an outbound agent needs outbound settings with a trigger")
+            if self.agent_number is not None:
+                raise ValueError(
+                    "an outbound agent has no agent_number; list the numbers it calls from "
+                    "in outbound.calling_numbers"
+                )
+        return self
 
 
 class AgentCreate(AgentConfig):
@@ -54,11 +72,12 @@ class AgentUpdate(BaseModel):
     direction: Direction | None = None
     transport: Transport | None = None
     agent_number: E164 | None = None
+    outbound: OutboundConfig | None = None
     agent_speaks_first: bool | None = None
     language: Language | None = None
     brief: str | None = None
 
-    @field_validator("name", "agent_number", "language")
+    @field_validator("name", "language")
     @classmethod
     def cannot_be_cleared(cls, value: str | None, info: ValidationInfo) -> str | None:
         if value is None:

@@ -1,4 +1,4 @@
-import { PhoneOutgoing, Plus } from "lucide-react";
+import { PhoneIncoming, PhoneOutgoing, Plus } from "lucide-react";
 import { useState } from "react";
 
 import { Panel, PanelHeader } from "@/components/panel";
@@ -16,6 +16,7 @@ function counted(count: number, one: string, many: string): string {
 export function AgentScenarios({ agent }: { agent: Agent }) {
   const scenarios = useScenarios(agent.id);
   const agents = useAgents();
+  const outbound = agent.direction === "outbound";
   const [editing, setEditing] = useState<Scenario | "new" | null>(null);
   const scenario = editing === "new" ? undefined : (editing ?? undefined);
 
@@ -70,10 +71,16 @@ export function AgentScenarios({ agent }: { agent: Agent }) {
                 agents={agents.data ?? [agent]}
                 agentId={agent.id}
                 scenarioId={item.id}
-                render={<Button variant="outline" size="sm" aria-label={`Ring ${item.name}`} />}
+                render={
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    aria-label={`${outbound ? "Trigger" : "Ring"} ${item.name}`}
+                  />
+                }
               >
-                <PhoneOutgoing />
-                Ring
+                {outbound ? <PhoneIncoming /> : <PhoneOutgoing />}
+                {outbound ? "Trigger" : "Ring"}
               </StartCallDialog>
             </li>
           ))}
@@ -83,7 +90,7 @@ export function AgentScenarios({ agent }: { agent: Agent }) {
       {editing !== null && (
         <ScenarioDialog
           key={scenario?.id ?? "new"}
-          agentId={agent.id}
+          agent={agent}
           scenario={scenario}
           onClosed={() => setEditing(null)}
         />

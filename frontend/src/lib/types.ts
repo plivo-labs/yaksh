@@ -1,4 +1,4 @@
-type Direction = "inbound" | "outbound";
+export type Direction = "inbound" | "outbound";
 type Transport = "phone";
 export type ConversationStatus =
   | "queued"
@@ -18,7 +18,9 @@ type EndReason =
   | "duration_limit"
   | "error"
   | "worker_stopped"
-  | "lease_lost";
+  | "lease_lost"
+  | "trigger_failed"
+  | "no_call";
 
 export const END_REASON_LABELS: Record<EndReason, string> = {
   user_request: "Stopped on request",
@@ -31,6 +33,8 @@ export const END_REASON_LABELS: Record<EndReason, string> = {
   error: "Error",
   worker_stopped: "Worker stopped",
   lease_lost: "Worker lease lost",
+  trigger_failed: "Trigger failed",
+  no_call: "Agent did not call",
 };
 
 export interface CallerClaim {
@@ -52,7 +56,9 @@ type WireEventKind =
   | "clear_audio"
   | "silence_greeting"
   | "stop"
-  | "caller_error";
+  | "caller_error"
+  | "trigger_sent"
+  | "waiting_for_call";
 
 export const ACTIVE_STATUSES: ConversationStatus[] = ["queued", "running", "ending"];
 
@@ -73,13 +79,31 @@ export interface Page<T> {
   page_size: number;
 }
 
+export interface Header {
+  name: string;
+  value: string;
+}
+
+export interface Trigger {
+  url: string;
+  headers: Header[];
+  body: Record<string, unknown>;
+}
+
+export interface OutboundSettings {
+  trigger: Trigger;
+  calling_numbers: string[];
+  dial_window_s: number;
+}
+
 export interface Agent {
   id: string;
   name: string;
   external_id: string | null;
   direction: Direction;
   transport: Transport;
-  agent_number: string;
+  agent_number: string | null;
+  outbound: OutboundSettings | null;
   agent_speaks_first: boolean;
   language: Language;
   brief: string | null;
@@ -93,10 +117,26 @@ export interface AgentInput {
   external_id: string | null;
   direction: Direction;
   transport: Transport;
-  agent_number: string;
+  agent_number: string | null;
+  outbound: OutboundSettings | null;
   agent_speaks_first: boolean;
   language: Language;
   brief: string | null;
+}
+
+export interface PhoneNumber {
+  number: string;
+  alias: string | null;
+  region: string | null;
+  application_id: string | null;
+  application_name: string | null;
+  on_outbound_application: boolean;
+  state: "in_use" | "resting" | "free";
+}
+
+export interface PhoneNumbers {
+  items: PhoneNumber[];
+  outbound_application_id: string | null;
 }
 
 export type VoiceProvider = "elevenlabs";
@@ -172,6 +212,7 @@ export interface ScenarioConfig {
   known_facts: Fact[];
   unknown_facts: string[];
   criteria: string[];
+  agent_data: Fact[];
 }
 
 export interface ScenarioInput extends ScenarioConfig {
@@ -198,6 +239,7 @@ export interface Turn {
 export interface WireEvent {
   kind: WireEventKind;
   at_ms: number;
+  detail: string | null;
 }
 
 interface Validity {
@@ -222,6 +264,8 @@ export interface ConversationSummary {
   language: Language;
   channel: "voice";
   caller_number: string | null;
+  agent_caller_id: string | null;
+  direction: Direction;
   call_uuid: string | null;
   max_duration_s: number;
   status: ConversationStatus;

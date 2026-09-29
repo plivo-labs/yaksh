@@ -50,7 +50,8 @@ export function StartCallDialog({
   const personas = usePersonas();
   const start = useStartConversation();
   const navigate = useNavigate();
-  const chosen = agentId || agents[0]?.id || "";
+  const chosenAgent = agents.find((agent) => agent.id === agentId) ?? agents[0];
+  const chosen = chosenAgent?.id ?? "";
   const chosenPersona = personaId || personas.data?.[0]?.id || "";
   const scenarios = useScenarios(chosen, open);
   const selectedScenario =
@@ -88,7 +89,9 @@ export function StartCallDialog({
         <DialogHeader className="px-6 pt-6 pb-4">
           <DialogTitle>Start a conversation</DialogTitle>
           <DialogDescription>
-            Truman calls the agent as the persona and follows the scenario.
+            {chosenAgent?.direction === "outbound"
+              ? "Truman asks the agent to call, then answers as the persona and follows the scenario."
+              : "Truman calls the agent as the persona and follows the scenario."}
           </DialogDescription>
         </DialogHeader>
         <form id="start-form" onSubmit={submit} className="px-6 pb-6">
@@ -221,9 +224,9 @@ export function StartCallDialog({
             Start call
           </Button>
         </DialogFooter>
-        {creating && (
+        {creating && chosenAgent && (
           <ScenarioDialog
-            agentId={chosen}
+            agent={chosenAgent}
             onSaved={(scenario) => setScenarioId(scenario.id)}
             onClosed={() => setCreating(false)}
           />

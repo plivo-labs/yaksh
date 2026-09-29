@@ -5,15 +5,14 @@ Status: accepted
 
 ## Decision
 
-When `TRUMAN_WEBHOOK_SIGNING_KEY` is set, every trigger request carries:
+Every trigger carries `X-Truman-Delivery: <conversation id>`, so the receiver can drop duplicates. When `TRUMAN_WEBHOOK_SIGNING_KEY` is set, every trigger also carries:
 
 ```
-X-Truman-Delivery: <conversation id>
 X-Truman-Timestamp: <unix seconds>
 X-Truman-Signature: v1=<hex HMAC-SHA256(key, delivery_id + "." + timestamp + "." + raw body)>
 ```
 
-The receiving endpoint rejects a timestamp more than 5 minutes in the past or the future, recomputes the HMAC and compares in constant time, and only then records the delivery ID atomically, rejecting one it has seen. Without the key, no signature headers are sent.
+The receiving endpoint rejects a timestamp more than 5 minutes in the past or the future, recomputes the HMAC and compares in constant time, and only then records the delivery ID atomically, rejecting one it has seen. Without the key, only `X-Truman-Delivery` is sent.
 
 ## Why
 

@@ -31,15 +31,34 @@ from truman.domain.errors import UnavailableError
 from truman.domain.languages import Language
 from truman.domain.numbers import AccountNumber
 from truman.domain.voices import ProviderVoice, VoiceGender, VoiceProvider, VoiceSettings
+from truman.integrations.plivo_signature import signature, signed_text
 from truman.simulation import conversations
 from truman.worker.worker import Worker
 
 TOKEN = "test-token"
+PLIVO_TOKEN = "token"
 POOL = [AccountNumber(number=f"+1555010{n:04d}") for n in range(8)]
 OFFLINE_DATABASE_URL = "postgresql+asyncpg://truman:truman@localhost:5432/truman"
 
 
 AGENT = {"name": "Front desk", "agent_number": "+14155550100"}
+OUTBOUND_AGENT: dict[str, Any] = {
+    "name": "Payment reminders",
+    "direction": "outbound",
+    "agent_number": None,
+    "outbound": {
+        "trigger": {
+            "url": "https://agents.example.com/calls",
+            "headers": [{"name": "Authorization", "value": "Bearer {{env.TRUMAN_TRIGGER_KEY}}"}],
+            "body": {
+                "to": "{{truman.number}}",
+                "customer": {"name": "{{agent_data.Customer name}}"},
+                "tags": ["truman", "{{truman.conversation_id}}"],
+            },
+        },
+        "calling_numbers": ["+14155550100"],
+    },
+}
 ENGLISH_VOICE = ProviderVoice(
     id="voice-en",
     name="Chris",
@@ -142,6 +161,18 @@ async def wait_until(condition: Callable[[], bool], timeout: float = 5.0) -> Non
     while not condition():
         assert asyncio.get_running_loop().time() < deadline
         await asyncio.sleep(0.02)
+
+
+def plivo_signed(
+    url: str, fields: dict[str, str] | None = None, *, method: str = "POST"
+) -> dict[str, str]:
+    """Headers Plivo would send with a request to url, signed with the test account token."""
+    nonce = "nonce-1"
+    text = signed_text(method, url, {key: [value] for key, value in (fields or {}).items()})
+    return {
+        "X-Plivo-Signature-V3-Nonce": nonce,
+        "X-Plivo-Signature-V3": signature(PLIVO_TOKEN, text, nonce),
+    }
 
 
 def make_settings(tmp_path: Path, **overrides: Any) -> Settings:

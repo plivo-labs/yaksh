@@ -16,6 +16,7 @@ class ScenarioRead(BaseModel):
     known_facts: list[Fact]
     unknown_facts: list[str]
     criteria: list[str]
+    agent_data: list[Fact]
     current_version: int
     created_at: datetime
     updated_at: datetime

@@ -1,3 +1,5 @@
+import type { Agent } from "@/lib/types";
+
 export function clock(ms: number): string {
   const seconds = ms / 1000;
   const minutes = Math.floor(seconds / 60);
@@ -61,4 +63,9 @@ export function exact(iso: string): string {
 export function stamp(seconds: number): string {
   const whole = Math.round(seconds);
   return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, "0")}`;
+}
+
+/** How Truman reaches an agent: the number it dials, or that the agent calls Truman. */
+export function reach(agent: Agent): string {
+  return agent.agent_number ? phone(agent.agent_number) : "Calls Truman";
 }

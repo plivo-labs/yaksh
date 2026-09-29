@@ -26,7 +26,7 @@ import {
 } from "@/components/ui/pagination";
 import { Skeleton } from "@/components/ui/skeleton";
 import { copyText } from "@/lib/clipboard";
-import { duration, phone, words } from "@/lib/format";
+import { duration, reach, words } from "@/lib/format";
 import {
   AGENTS_PAGE,
   useAgentPage,
@@ -189,7 +189,7 @@ function AgentRow({ agent }: { agent: Agent }) {
           >
             {agent.name}
           </Link>
-          <span className="text-sm text-muted-foreground">{phone(agent.agent_number)}</span>
+          <span className="text-sm text-muted-foreground">{reach(agent)}</span>
         </div>
       </div>
       <div className="col-span-2 text-sm md:col-span-1">{LANGUAGE_NAMES[agent.language]}</div>
