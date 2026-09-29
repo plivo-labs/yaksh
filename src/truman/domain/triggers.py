@@ -5,13 +5,16 @@ A placeholder is `{{kind.name}}` inside a header value or a JSON string value of
 `{{env.TRUMAN_TRIGGER_<NAME>}}`. The URL and JSON keys take none.
 """
 
+import json
 import re
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
+from dataclasses import dataclass
 from typing import Annotated, Any
 
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl, StringConstraints, field_validator
 
 from truman.domain.numbers import E164
+from truman.domain.scenarios import Fact, normalized
 
 PLACEHOLDER = re.compile(r"\{\{([^{}]*)\}\}")
 TRUMAN_VALUES = frozenset({"truman.number", "truman.conversation_id"})
@@ -133,3 +136,72 @@ class OutboundConfig(BaseModel):
         if len(set(numbers)) != len(numbers):
             raise ValueError("calling numbers must be unique")
         return numbers
+
+
+class RenderError(ValueError):
+    """The trigger cannot be sent: a placeholder has no value, or a value breaks a header."""
+
+
+@dataclass(frozen=True)
+class RenderedTrigger:
+    url: str
+    headers: dict[str, str]
+    body: bytes
+    secrets: tuple[str, ...]
+    """The environment values the request carries, to mask wherever it is stored."""
+
+
+def render(
+    trigger: Trigger,
+    *,
+    number: str,
+    conversation_id: str,
+    agent_data: list[Fact],
+    env: Mapping[str, str],
+) -> RenderedTrigger:
+    """The request with every placeholder replaced. Values go inside JSON strings of the parsed
+    body, so no value can change the JSON's shape."""
+    facts = {normalized(fact.name): fact.value for fact in agent_data}
+    secrets: list[str] = []
+
+    def value_of(name: str) -> str:
+        kind, _, rest = name.partition(".")
+        if name == "truman.number":
+            return number
+        if name == "truman.conversation_id":
+            return conversation_id
+        if kind == "agent_data":
+            if normalized(rest) not in facts:
+                raise RenderError(f"the scenario has no agent data named {rest!r}")
+            return facts[normalized(rest)]
+        if rest not in env:
+            raise RenderError(f"the environment variable {rest} is not set")
+        secrets.append(env[rest])
+        return env[rest]
+
+    def fill(value: Any) -> Any:
+        if isinstance(value, str):
+            return PLACEHOLDER.sub(lambda match: value_of(match.group(1).strip()), value)
+        if isinstance(value, dict):
+            return {key: fill(item) for key, item in value.items()}
+        if isinstance(value, list):
+            return [fill(item) for item in value]
+        return value
+
+    headers = {header.name: fill(header.value) for header in trigger.headers}
+    for name, value in headers.items():
+        if "\r" in value or "\n" in value:
+            raise RenderError(f"a placeholder puts a line break into the {name} header")
+    body = json.dumps(fill(trigger.body)).encode()
+    return RenderedTrigger(str(trigger.url), headers, body, tuple(secrets))
+
+
+def agent_data_names(trigger: Trigger) -> set[str]:
+    """The agent data a scenario must provide for this trigger, by normalized fact name."""
+    texts = [header.value for header in trigger.headers] + list(template_strings(trigger.body))
+    return {
+        normalized(name.partition(".")[2])
+        for text in texts
+        for name in placeholders(text)
+        if name.startswith("agent_data.")
+    }
