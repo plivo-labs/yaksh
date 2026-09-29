@@ -41,10 +41,19 @@ class TriggerOutcome:
     """The status and the start of the response body, secrets masked; or what went wrong."""
 
 
+EMBEDS_IPV4 = (
+    ipaddress.IPv6Network("::ffff:0:0/96"),
+    ipaddress.IPv6Network("64:ff9b::/96"),
+    ipaddress.IPv6Network("::/96"),
+)
+"""IPv4-mapped, NAT64 and IPv4-compatible addresses: each reaches the IPv4 address in its last
+32 bits, so that address decides."""
+
+
 def is_public(address: str) -> bool:
     ip = ipaddress.ip_address(address)
-    if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped is not None:
-        ip = ip.ipv4_mapped
+    if isinstance(ip, ipaddress.IPv6Address) and any(ip in net for net in EMBEDS_IPV4):
+        return ipaddress.IPv4Address(int(ip) & 0xFFFFFFFF).is_global
     return ip.is_global
 
 
@@ -126,6 +135,7 @@ async def send_trigger(
     if signing_key:
         headers |= signed_headers(signing_key, delivery_id, request.body)
     resolver = None if allow_private else PublicOnlyResolver()
+    status: int | None = None
     try:
         async with (
             aiohttp.ClientSession(
@@ -135,18 +145,24 @@ async def send_trigger(
                 request.url, data=request.body, headers=headers, allow_redirects=False
             ) as response,
         ):
+            status = response.status
             text = await read_bounded(response)
     except (aiohttp.ClientConnectorError, aiohttp.ConnectionTimeoutError) as error:
         return TriggerOutcome(
             TriggerResult.NOT_SENT, mask(describe_exception(error), request.secrets)
         )
     except (aiohttp.ClientError, TimeoutError) as error:
-        return TriggerOutcome(
-            TriggerResult.UNKNOWN, mask(describe_exception(error), request.secrets)
-        )
-    detail = f"HTTP {response.status}: {mask(text, request.secrets)[:EXCERPT_CHARS]}"
-    if 200 <= response.status < 300:
-        return TriggerOutcome(TriggerResult.DELIVERED, detail)
-    if 400 <= response.status < 500:
-        return TriggerOutcome(TriggerResult.REJECTED, detail)
-    return TriggerOutcome(TriggerResult.UNKNOWN, detail)
+        failure = mask(describe_exception(error), request.secrets)
+        if status is None:
+            return TriggerOutcome(TriggerResult.UNKNOWN, failure)
+        return TriggerOutcome(result_of(status), f"HTTP {status}, body not read: {failure}")
+    detail = f"HTTP {status}: {mask(text, request.secrets)[:EXCERPT_CHARS]}"
+    return TriggerOutcome(result_of(status), detail)
+
+
+def result_of(status: int) -> TriggerResult:
+    if 200 <= status < 300:
+        return TriggerResult.DELIVERED
+    if 400 <= status < 500:
+        return TriggerResult.REJECTED
+    return TriggerResult.UNKNOWN

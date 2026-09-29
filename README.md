@@ -51,6 +51,22 @@ curl -X POST localhost:8000/api/v1/conversations -H "Authorization: Bearer $TRUM
   -d '{"agent_id": "<agent id>", "scenario_id": "<scenario id>", "persona_id": "<persona id>"}'
 ```
 
+## Outbound agents
+
+An outbound agent calls Truman. Truman sends the agent's trigger, a POST request that makes the agent call one of Truman's numbers, and answers that call.
+
+1. In the Plivo console, create an Application with answer URL `<TRUMAN_PUBLIC_URL>/incoming` and hangup URL `<TRUMAN_PUBLIC_URL>/incoming/hangup`, both `POST`, and link the numbers that receive test calls to it.
+2. Set the variables below and restart the worker. It reads the Application and its numbers at startup. The Numbers page says why outbound tests are off, if they are.
+3. Create an agent with direction outbound, its trigger URL, headers and JSON body. In the trigger, `{{truman.number}}` is the number to call, `{{truman.conversation_id}}` the conversation, `{{agent_data.<name>}}` a value from the scenario and `{{env.TRUMAN_TRIGGER_<NAME>}}` a secret from the environment.
+
+| Variable | Purpose |
+| --- | --- |
+| `TRUMAN_PLIVO_APP_ID` | The Application from step 1. Outbound tests are off without it. |
+| `TRUMAN_TRIGGER_<NAME>` | Secrets for triggers, such as API keys. |
+| `TRUMAN_WEBHOOK_SIGNING_KEY` | Optional. Signs each trigger with `X-Truman-Signature` (HMAC-SHA256 over `<X-Truman-Delivery>.<X-Truman-Timestamp>.<body>`). See `docs/decisions/0004-signed-triggers.md`. |
+| `TRUMAN_ALLOW_PRIVATE_TRIGGERS` | Optional. Allows `http` and private addresses as trigger URLs, for agents on your own network. Default off. |
+| `TRUMAN_NUMBER_REST_S` | How long a number rests after a test before it receives another outbound call, default 300. |
+
 ## Develop
 
 ```sh

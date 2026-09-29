@@ -5,7 +5,7 @@ Status: accepted
 
 ## Decision
 
-Truman resolves the trigger host and refuses the request if any address is loopback, private, link-local, a cloud metadata address, IPv6 unique-local or IPv4-mapped. It then connects to the address it checked, keeps the TLS host name check, and does not follow redirects. `TRUMAN_ALLOW_PRIVATE_TRIGGERS=true` turns the check off.
+Truman resolves the trigger host and refuses the request if any address is loopback, private, link-local, a cloud metadata address, IPv6 unique-local, or an IPv6 address that carries a private IPv4 address (IPv4-mapped, NAT64 or IPv4-compatible). It then connects to the address it checked, keeps the TLS host name check, and does not follow redirects. `TRUMAN_ALLOW_PRIVATE_TRIGGERS=true` turns the check off.
 
 ## Why
 

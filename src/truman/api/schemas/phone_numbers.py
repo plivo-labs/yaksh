@@ -24,5 +24,5 @@ class PhoneNumberRead(BaseModel):
 
 class PhoneNumbers(BaseModel):
     items: list[PhoneNumberRead]
-    outbound_application_id: str | None
-    """TRUMAN_PLIVO_APP_ID; outbound tests are off without it."""
+    outbound_problem: str | None
+    """Why an outbound test could not get its call now; None when it could."""

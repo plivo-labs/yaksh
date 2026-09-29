@@ -10,7 +10,7 @@ const ROW =
   "grid grid-cols-[minmax(10rem,1fr)_minmax(8rem,1fr)_minmax(8rem,1fr)_minmax(12rem,1.4fr)_9rem] items-center gap-x-4 px-3";
 
 const STATES: Record<PhoneNumber["state"], { label: string; tone: "green" | "amber" | "off" }> = {
-  in_use: { label: "In a call", tone: "green" },
+  in_use: { label: "In use by a test", tone: "green" },
   resting: { label: "Resting", tone: "amber" },
   free: { label: "Free", tone: "off" },
 };
@@ -27,12 +27,15 @@ export function NumbersPage() {
         </Alert>
       ) : (
         <>
-          {numbers.data?.outbound_application_id === null && (
+          {numbers.data?.outbound_problem && (
             <Alert>
               <AlertTitle>Outbound tests are off</AlertTitle>
               <AlertDescription>
-                Set TRUMAN_PLIVO_APP_ID to the Plivo application that sends calls to Truman, then
-                link numbers to it in the Plivo console.
+                <p className="break-words">{numbers.data.outbound_problem}</p>
+                <p>
+                  The worker reads the Plivo application and its numbers when it starts, so restart
+                  it after a change in the Plivo console.
+                </p>
               </AlertDescription>
             </Alert>
           )}

@@ -5,6 +5,7 @@ import signal
 
 import typer
 import uvicorn
+from dotenv import load_dotenv
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 from uvicorn.config import LOGGING_CONFIG
 
@@ -32,7 +33,9 @@ API_LOGGING = {
 
 @cli.callback()
 def main_callback() -> None:
-    pass
+    """Load .env into the environment, where triggers read their TRUMAN_TRIGGER_* secrets;
+    variables already set win."""
+    load_dotenv(".env")
 
 
 @cli.command()
@@ -105,23 +108,25 @@ async def application_names(
     return names
 
 
-async def receiving_app_id(api: PlivoApi, settings: Settings) -> str | None:
-    """The Plivo application whose calls this worker receives, when it sends them here; the
-    worker then runs outbound conversations. Every reason it does not is logged."""
+def outbound_off(problem: str) -> tuple[None, str]:
+    logging.error("outbound tests are off: %s", problem)
+    return None, problem
+
+
+async def check_receiving(api: PlivoApi, settings: Settings) -> tuple[str | None, str | None]:
+    """The Plivo application whose calls this worker receives, so it runs outbound
+    conversations; or, when outbound tests are set up, why it does not."""
     if settings.plivo_app_id is None or settings.public_url is None:
-        return None
+        return None, None
     try:
         application = await api.get_application(settings.plivo_app_id)
     except PlivoError as error:
-        logging.error("outbound tests are off: %s", error)
-        return None
+        return outbound_off(str(error))
     problems = application.problems(settings.public_url)
-    for problem in problems:
-        logging.error("outbound tests are off: %s", problem)
     if problems:
-        return None
+        return outbound_off("; ".join(problems))
     logging.info("outbound tests: application %s sends calls here", application.name)
-    return application.app_id
+    return application.app_id, None
 
 
 async def sync_pool(
@@ -155,8 +160,10 @@ async def run_worker(
     sessionmaker = create_sessionmaker(engine)
     if api is not None:
         await sync_pool(sessionmaker, api, settings.plivo_numbers)
-    app_id = None if api is None else await receiving_app_id(api, settings)
-    worker = Worker(sessionmaker, caller, settings, receiving_app_id=app_id)
+    app_id, problem = (None, None) if api is None else await check_receiving(api, settings)
+    worker = Worker(
+        sessionmaker, caller, settings, receiving_app_id=app_id, outbound_problem=problem
+    )
     server = None
     if settings.public_url and api is not None:
         server = PlivoServer(

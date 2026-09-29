@@ -18,6 +18,7 @@ from tests.conftest import (
     Observer,
     make_settings,
     plivo_signed,
+    refuse_calls,
 )
 from truman.caller import phone
 from truman.caller.audio import Clock
@@ -92,7 +93,7 @@ async def rig(monkeypatch: pytest.MonkeyPatch) -> AsyncIterator[Rig]:
     monkeypatch.setattr(phone, "STREAM_GRACE_S", 0.5)
     fake = FastAPI()
     registry = StreamRegistry()
-    worker = PlivoServer(create_app(registry, SIGNED_URL, PLIVO_TOKEN), port=0)
+    worker = PlivoServer(create_app(registry, SIGNED_URL, PLIVO_TOKEN, refuse_calls), port=0)
     plivo = PlivoServer(fake, port=0)
     await worker.start()
     await plivo.start()
@@ -274,7 +275,7 @@ async def test_the_end_of_a_stream_is_named_by_the_hangup_report_that_follows(
 ) -> None:
     monkeypatch.setattr(phone, "HANGUP_REPORT_WAIT_S", 0.05)
     reports: asyncio.Queue[dict[str, str]] = asyncio.Queue()
-    reports.put_nowait({"Event": "StartStream", "Status": "streaming"})
+    reports.put_nowait({"CallStatus": "in-progress"})
     reports.put_nowait({"CallStatus": "completed", "Event": "Hangup", "HangupSource": "Callee"})
     agent, unknown, observed = CallState(), CallState(), CallState()
     agent.end(EndReason.STREAM_ENDED)
@@ -297,21 +298,6 @@ async def test_the_end_of_a_stream_is_named_by_the_hangup_report_that_follows(
     assert unknown.end_reason is EndReason.STREAM_ENDED
     assert unknown.error == "the stream ended and Plivo did not say which side ended the call"
     assert (observed.end_reason, observed.error) == (EndReason.CALLER_HANGUP, None)
-
-
-async def test_a_stream_report_before_the_socket_does_not_end_the_dial(
-    rig: Rig, tmp_path: Path
-) -> None:
-    call = request(tmp_path)
-    dialing = dial(rig, call, Observer(), asyncio.Event())
-    await rig.answer(call.conversation_id, "call-5")
-    await rig.report(call.conversation_id, Event="StartStream", Status="streaming")
-    async with rig.stream(call.conversation_id) as plivo:
-        await plivo.send(json.dumps({"event": "start", "start": START}))
-        connected = await asyncio.wait_for(dialing, 2)
-        rig.registry.forget(call.conversation_id)
-
-    assert isinstance(connected, Connected)
 
 
 async def test_the_phone_caller_reports_an_unanswered_call_and_frees_its_stream_entry(

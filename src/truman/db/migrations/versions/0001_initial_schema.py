@@ -356,9 +356,18 @@ def upgrade() -> None:
         ),
         sa.PrimaryKeyConstraint("number", name=op.f("pk_phone_numbers")),
     )
+    op.create_table(
+        "workers",
+        sa.Column("id", sa.Text(), nullable=False),
+        sa.Column("receiving_app_id", sa.Text(), nullable=True),
+        sa.Column("outbound_problem", sa.Text(), nullable=True),
+        sa.Column("seen_at", sa.DateTime(timezone=True), nullable=False),
+        sa.PrimaryKeyConstraint("id", name=op.f("pk_workers")),
+    )
 
 
 def downgrade() -> None:
+    op.drop_table("workers")
     op.drop_table("phone_numbers")
     op.drop_table("conversations")
     op.drop_table("scenario_versions")
