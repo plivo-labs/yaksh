@@ -2,7 +2,8 @@ import { Navigate, createBrowserRouter } from "react-router";
 
 import { RouteError } from "@/app/route-error";
 import { Shell } from "@/app/shell";
-import { AgentFormPage } from "@/pages/agent-form";
+import { AgentPage } from "@/pages/agent";
+import { NewAgentPage } from "@/pages/agent-form";
 import { AgentsPage } from "@/pages/agents";
 import { ConversationPage } from "@/pages/conversation";
 import { ConversationsPage } from "@/pages/conversations";
@@ -16,14 +17,14 @@ export const router = createBrowserRouter([
     element: <Shell />,
     errorElement: <RouteError />,
     children: [
-      { index: true, element: <Navigate to="/conversations" replace /> },
+      { index: true, element: <Navigate to="/agents" replace /> },
       { path: "conversations", element: <ConversationsPage /> },
       { path: "conversations/:id", element: <ConversationPage /> },
       { path: "personas", element: <PersonasPage /> },
       { path: "voices", element: <VoicesPage /> },
       { path: "agents", element: <AgentsPage /> },
-      { path: "agents/new", element: <AgentFormPage /> },
-      { path: "agents/:id", element: <AgentFormPage /> },
+      { path: "agents/new", element: <NewAgentPage /> },
+      { path: "agents/:id", element: <AgentPage /> },
       { path: "*", element: <NotFoundPage /> },
     ],
   },

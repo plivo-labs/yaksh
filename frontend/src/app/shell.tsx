@@ -2,6 +2,7 @@ import { AudioLines, Bot, KeyRound, MoonStar, PhoneCall, SunMedium, UserRound } 
 import { type CSSProperties, useLayoutEffect, useState } from "react";
 import { flushSync } from "react-dom";
 import { NavLink, Outlet, useLocation } from "react-router";
+import { Toaster } from "sonner";
 
 import { TokenGate } from "@/app/token";
 import { useToken } from "@/app/use-token";
@@ -51,10 +52,10 @@ function useDarkMode(): [boolean, () => void] {
 }
 
 const links = [
+  { to: "/agents", label: "Agents", icon: Bot },
   { to: "/conversations", label: "Conversations", icon: PhoneCall },
   { to: "/personas", label: "Personas", icon: UserRound },
   { to: "/voices", label: "Voices", icon: AudioLines },
-  { to: "/agents", label: "Agents", icon: Bot },
 ];
 
 const sidebarOpen = () => !document.cookie.split("; ").includes("sidebar_state=false");
@@ -75,13 +76,11 @@ export function Shell() {
           <SidebarHeader>
             <SidebarMenu>
               <SidebarMenuItem>
-                <SidebarMenuButton size="lg" render={<NavLink to="/conversations" />}>
-                  <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-primary font-heading text-base font-semibold text-primary-foreground">
+                <SidebarMenuButton size="lg" render={<NavLink to="/agents" />}>
+                  <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-primary text-base font-semibold text-primary-foreground">
                     T
                   </span>
-                  <span className="font-heading text-base font-semibold tracking-tight">
-                    Truman
-                  </span>
+                  <span className="text-base font-semibold tracking-tight">Truman</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>
@@ -128,11 +127,21 @@ export function Shell() {
           <header className="flex h-12 shrink-0 items-center gap-2 border-b px-4">
             <SidebarTrigger />
           </header>
-          <div className="min-h-0 flex-1 overflow-y-auto px-8 py-6">
+          <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 md:px-8 md:py-6">
             <Outlet />
           </div>
         </SidebarInset>
       </SidebarProvider>
+      <Toaster
+        theme={dark ? "dark" : "light"}
+        position="bottom-right"
+        toastOptions={{
+          classNames: {
+            toast: "!rounded-lg !border-border !bg-popover !text-popover-foreground !font-sans",
+            description: "!text-muted-foreground",
+          },
+        }}
+      />
     </TooltipProvider>
   );
 }

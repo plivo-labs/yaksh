@@ -1,5 +1,6 @@
 import { Plus, X } from "lucide-react";
 import { type SubmitEvent, useState } from "react";
+import { toast } from "sonner";
 
 import { DeleteConfirm, DiscardConfirm } from "@/components/confirm-dialogs";
 import { Button } from "@/components/ui/button";
@@ -132,6 +133,7 @@ export function ScenarioDialog({
     if (!input.name || !input.goal || input.criteria.length === 0 || halfFact) return;
     save.mutate(input, {
       onSuccess: (saved) => {
+        toast.success(id ? "Scenario saved" : `Added ${saved.name}`);
         onSaved?.(saved);
         guard.close();
       },
@@ -326,7 +328,15 @@ export function ScenarioDialog({
               name={initial.name}
               description="Past and queued conversations are not changed."
               pending={remove.isPending}
-              onDelete={(close) => remove.mutate(id, { onSuccess: guard.close, onSettled: close })}
+              onDelete={(close) =>
+                remove.mutate(id, {
+                  onSuccess: () => {
+                    toast.success(`Deleted ${initial.name}`);
+                    guard.close();
+                  },
+                  onSettled: close,
+                })
+              }
             />
           )}
           <Button type="button" variant="ghost" onClick={guard.requestClose}>

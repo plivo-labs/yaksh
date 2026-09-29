@@ -1,92 +1,356 @@
-import { Bot, Plus } from "lucide-react";
-import { Link, useNavigate } from "react-router";
+import {
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
+  Copy,
+  CopyPlus,
+  Ellipsis,
+  Plus,
+  Search,
+  Trash2,
+} from "lucide-react";
+import { type MouseEvent, useRef, useState } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router";
 
+import { toast } from "sonner";
+
+import { DeleteDialog } from "@/components/confirm-dialogs";
+import { RelativeTime } from "@/components/relative-time";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Empty, EmptyContent, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
-import { Skeleton } from "@/components/ui/skeleton";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { when } from "@/lib/format";
-import { useAgents } from "@/lib/queries";
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
+import { Skeleton } from "@/components/ui/skeleton";
+import { copyText } from "@/lib/clipboard";
+import { duration, phone, words } from "@/lib/format";
+import {
+  AGENTS_PAGE,
+  useAgentPage,
+  useDeleteAgent,
+  useDuplicateAgent,
+  useLastCall,
+  useScenarioCount,
+} from "@/lib/queries";
+import { type Agent, LANGUAGE_NAMES } from "@/lib/types";
+
+const ROW =
+  "grid grid-cols-[minmax(0,1fr)_2rem] items-center gap-x-4 gap-y-2 px-3 md:grid-cols-[minmax(12rem,1.4fr)_7rem_6rem_minmax(12rem,1fr)_8rem_2rem]";
+
+const SEARCH_DELAY_MS = 250;
+
+type SortKey = "name" | "language" | "updated_at";
+
+/** A column heading that sorts the list; text sorts A to Z first, dates newest first. */
+function SortHeader({
+  label,
+  field,
+  sort,
+  onSort,
+}: {
+  label: string;
+  field: SortKey;
+  sort: string;
+  onSort: (sort: string) => void;
+}) {
+  const descending = sort === `-${field}`;
+  const active = descending || sort === field;
+  const next = active
+    ? descending
+      ? field
+      : `-${field}`
+    : field === "updated_at"
+      ? `-${field}`
+      : field;
+  const Icon = active ? (descending ? ArrowDown : ArrowUp) : ArrowUpDown;
+  return (
+    <button
+      type="button"
+      onClick={() => onSort(next)}
+      aria-label={`Sort by ${label.toLowerCase()}`}
+      aria-pressed={active}
+      className={`-mx-1 inline-flex w-fit items-center gap-1 rounded-sm px-1 outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 ${active ? "text-foreground" : ""}`}
+    >
+      {label}
+      <Icon className={`size-3.5 ${active ? "" : "opacity-50"}`} />
+    </button>
+  );
+}
 
 export function AgentsPage() {
-  const agents = useAgents();
-  const navigate = useNavigate();
+  const [params, setParams] = useSearchParams();
+  const search = params.get("q") ?? "";
+  const sort = params.get("sort") ?? "";
+  const page = Math.max(1, Number(params.get("page") ?? "1") || 1);
+  const agents = useAgentPage(search, sort, page);
+  const [typed, setTyped] = useState(search);
+  const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+  const type = (value: string) => {
+    setTyped(value);
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => {
+      const next = new URLSearchParams(params);
+      if (value.trim()) next.set("q", value.trim());
+      else next.delete("q");
+      next.delete("page");
+      setParams(next, { replace: true });
+    }, SEARCH_DELAY_MS);
+  };
+  const sortBy = (next: string) => {
+    const target = new URLSearchParams(params);
+    target.set("sort", next);
+    target.delete("page");
+    setParams(target, { replace: true });
+  };
+  const pageParams = (target: number) => {
+    const next = new URLSearchParams(params);
+    if (target <= 1) next.delete("page");
+    else next.set("page", String(target));
+    return next;
+  };
+  const goTo = (target: number) => (event: MouseEvent) => {
+    event.preventDefault();
+    setParams(pageParams(target));
+  };
+  const total = agents.data?.total ?? 0;
+  const last = Math.max(1, Math.ceil(total / AGENTS_PAGE));
+
   return (
-    <div className="grid gap-6">
-      <div className="flex items-start justify-between gap-4">
-        <h1 className="font-heading text-2xl font-semibold tracking-tight">Agents</h1>
+    <div className="mx-auto grid max-w-6xl gap-6">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-4">
+        <h1 className="mr-auto text-2xl font-semibold tracking-[-0.015em]">Agents</h1>
+        <div className="relative order-last basis-full sm:order-none sm:basis-64">
+          <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            type="search"
+            aria-label="Search agents"
+            placeholder="Search by name, number or id"
+            className="pl-8"
+            value={typed}
+            onChange={(event) => type(event.target.value)}
+          />
+        </div>
         <Button nativeButton={false} render={<Link to="/agents/new" />}>
           <Plus />
           New agent
         </Button>
       </div>
-      {agents.isPending ? (
-        <Skeleton className="h-40 w-full" />
-      ) : agents.isError ? (
+
+      {agents.isError ? (
         <Alert variant="destructive">
           <AlertTitle>Could not load agents</AlertTitle>
           <AlertDescription>{agents.error.message}</AlertDescription>
         </Alert>
-      ) : agents.data.length === 0 ? (
-        <Empty>
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <Bot />
-            </EmptyMedia>
-            <EmptyTitle>No agents yet</EmptyTitle>
-          </EmptyHeader>
-          <EmptyContent>
-            <Button nativeButton={false} render={<Link to="/agents/new" />} variant="outline">
-              Register an agent
-            </Button>
-          </EmptyContent>
-        </Empty>
+      ) : agents.data?.total === 0 && !search ? (
+        <div className="grid justify-items-start gap-4 border-y py-10">
+          <div className="grid max-w-md gap-1.5">
+            <h2 className="text-lg font-semibold">No agents yet</h2>
+            <p className="text-sm text-muted-foreground">
+              An agent is the phone number Truman calls. Add one, give it a scenario, and Truman
+              phones it with a simulated caller.
+            </p>
+          </div>
+          <Button nativeButton={false} render={<Link to="/agents/new" />}>
+            <Plus />
+            Add your first agent
+          </Button>
+        </div>
       ) : (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Number</TableHead>
-              <TableHead>Speaks first</TableHead>
-              <TableHead className="text-right">Version</TableHead>
-              <TableHead>Updated</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {agents.data.map((agent) => (
-              <TableRow
-                key={agent.id}
-                className="cursor-pointer"
-                onClick={() => navigate(`/agents/${agent.id}`)}
-              >
-                <TableCell className="font-medium">
-                  <Link
-                    to={`/agents/${agent.id}`}
-                    className="rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
-                    onClick={(event) => event.stopPropagation()}
-                  >
-                    {agent.name}
-                  </Link>
-                </TableCell>
-                <TableCell className="font-mono text-xs">{agent.agent_number}</TableCell>
-                <TableCell>{agent.agent_speaks_first ? "Yes" : "No"}</TableCell>
-                <TableCell className="text-right font-mono text-xs">
-                  {agent.current_version}
-                </TableCell>
-                <TableCell className="font-mono text-xs">{when(agent.updated_at)}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+        <div
+          aria-busy={agents.isFetching}
+          className={`transition-opacity duration-150 ${agents.isPlaceholderData ? "opacity-60" : ""}`}
+        >
+          <div className={`${ROW} hidden border-b pb-2.5 text-xs text-muted-foreground md:grid`}>
+            <SortHeader label="Agent" field="name" sort={sort} onSort={sortBy} />
+            <SortHeader label="Language" field="language" sort={sort} onSort={sortBy} />
+            <span>Scenarios</span>
+            <span>Last call</span>
+            <SortHeader label="Last updated" field="updated_at" sort={sort} onSort={sortBy} />
+            <span />
+          </div>
+          <ul className="divide-y border-b">
+            {agents.data === undefined ? (
+              [0, 1, 2].map((index) => (
+                <li key={index} className={`${ROW} py-4`}>
+                  <Skeleton className="h-10" />
+                </li>
+              ))
+            ) : agents.data.items.length === 0 ? (
+              <li className="px-3 py-8 text-sm text-muted-foreground">
+                No agents match “{search}”.
+              </li>
+            ) : (
+              agents.data.items.map((agent) => <AgentRow key={agent.id} agent={agent} />)
+            )}
+          </ul>
+          {total > AGENTS_PAGE && (
+            <Pagination className="mt-4 justify-between">
+              <span className="text-sm text-muted-foreground">
+                {(page - 1) * AGENTS_PAGE + 1}–{Math.min(page * AGENTS_PAGE, total)} of {total}
+              </span>
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious
+                    href={`?${pageParams(page - 1)}`}
+                    onClick={goTo(page - 1)}
+                    aria-disabled={page <= 1}
+                    className={page <= 1 ? "pointer-events-none opacity-50" : ""}
+                  />
+                </PaginationItem>
+                <PaginationItem>
+                  <PaginationNext
+                    href={`?${pageParams(page + 1)}`}
+                    onClick={goTo(page + 1)}
+                    aria-disabled={page >= last}
+                    className={page >= last ? "pointer-events-none opacity-50" : ""}
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+          )}
+        </div>
       )}
+    </div>
+  );
+}
+
+function AgentRow({ agent }: { agent: Agent }) {
+  const last = useLastCall(agent.id);
+  const scenarios = useScenarioCount(agent.id);
+  const call = last.data;
+  return (
+    <li
+      className={`${ROW} group relative py-3.5 transition-colors duration-150 hover:bg-foreground/[0.02] has-[a:focus-visible]:bg-foreground/[0.04]`}
+    >
+      <div className="min-w-0">
+        <div className="grid min-w-0 gap-0.5">
+          <Link
+            to={`/agents/${agent.id}`}
+            className="truncate text-[15px] font-semibold outline-none after:absolute after:inset-0"
+          >
+            {agent.name}
+          </Link>
+          <span className="text-sm text-muted-foreground">{phone(agent.agent_number)}</span>
+        </div>
+      </div>
+      <div className="col-span-2 text-sm md:col-span-1">{LANGUAGE_NAMES[agent.language]}</div>
+      <div className="col-span-2 text-sm md:col-span-1">
+        {scenarios.data === undefined ? (
+          <Skeleton className="h-4 w-12" />
+        ) : (
+          <>
+            <span className="font-semibold">{scenarios.data}</span>{" "}
+            <span className="text-muted-foreground">
+              {scenarios.data === 1 ? "scenario" : "scenarios"}
+            </span>
+          </>
+        )}
+      </div>
+      <div className="col-span-2 grid min-w-0 gap-0.5 text-sm md:col-span-1">
+        {last.isPending ? (
+          <Skeleton className="h-9 w-40" />
+        ) : call ? (
+          <>
+            <Link
+              to={`/conversations/${call.id}`}
+              className="relative z-10 w-fit max-w-full truncate rounded-sm underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring/50"
+            >
+              {call.scenario_name}
+            </Link>
+            <span className="truncate text-muted-foreground">
+              <span className="capitalize">{words(call.status)}</span>
+              {call.talk_ms !== null && `, ${duration(call.talk_ms)}`},{" "}
+              <RelativeTime iso={call.started_at ?? call.created_at} />
+            </span>
+          </>
+        ) : (
+          <span className="text-muted-foreground">Never called</span>
+        )}
+      </div>
+      <div className="col-span-2 text-sm text-muted-foreground md:col-span-1">
+        <span className="md:hidden">Updated </span>
+        <RelativeTime iso={agent.updated_at} />
+      </div>
+      <AgentMenu agent={agent} />
+    </li>
+  );
+}
+
+function AgentMenu({ agent }: { agent: Agent }) {
+  const navigate = useNavigate();
+  const duplicate = useDuplicateAgent();
+  const remove = useDeleteAgent();
+  const [deleting, setDeleting] = useState(false);
+  return (
+    <div className="relative z-10 col-start-2 row-start-1 md:col-start-auto md:row-start-auto">
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          render={
+            <Button variant="ghost" size="icon-sm" aria-label={`More actions for ${agent.name}`} />
+          }
+        >
+          <Ellipsis />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem onClick={() => void copyText(agent.id, "Agent id copied")}>
+            <Copy />
+            Copy agent id
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            disabled={duplicate.isPending}
+            onClick={() =>
+              duplicate.mutate(agent.id, {
+                onSuccess: (copy) => {
+                  toast.success(`Duplicated as ${copy.name}`);
+                  navigate(`/agents/${copy.id}`);
+                },
+                onError: (error) =>
+                  toast.error(`Could not duplicate ${agent.name}`, { description: error.message }),
+              })
+            }
+          >
+            <CopyPlus />
+            Duplicate
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem variant="destructive" onClick={() => setDeleting(true)}>
+            <Trash2 />
+            Delete
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <DeleteDialog
+        name={agent.name}
+        description="Its scenarios are deleted too. Past conversations keep their copy of its configuration."
+        pending={remove.isPending}
+        error={remove.error?.message}
+        open={deleting}
+        onOpenChange={(open) => {
+          setDeleting(open);
+          if (!open) remove.reset();
+        }}
+        onDelete={(close) =>
+          remove.mutate(agent.id, {
+            onSuccess: () => {
+              close();
+              toast.success(`Deleted ${agent.name}`);
+            },
+          })
+        }
+      />
     </div>
   );
 }

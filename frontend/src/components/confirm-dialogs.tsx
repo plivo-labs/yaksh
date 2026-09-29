@@ -9,10 +9,48 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
+
+/** Asks before a delete. `onDelete` gets `close`, to call when the request ends; a failure
+ * shows `error` in the dialog so the reason is not lost. */
+export function DeleteDialog({
+  name,
+  description,
+  pending,
+  error,
+  open,
+  onOpenChange,
+  onDelete,
+}: {
+  name: string;
+  description: string;
+  pending: boolean;
+  error?: string;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onDelete: (close: () => void) => void;
+}) {
+  return (
+    <AlertDialog open={open} onOpenChange={onOpenChange}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Delete {name}?</AlertDialogTitle>
+          <AlertDialogDescription>{description}</AlertDialogDescription>
+        </AlertDialogHeader>
+        {error && <p className="text-sm text-destructive">{error}</p>}
+        <AlertDialogFooter>
+          <AlertDialogCancel>Keep</AlertDialogCancel>
+          <AlertDialogAction disabled={pending} onClick={() => onDelete(() => onOpenChange(false))}>
+            {pending && <Spinner />}
+            Delete
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
 
 /** A Delete button that asks first. `onDelete` gets `close`, to call when the request ends,
  * so a failure closes the question and its message shows in the dialog behind it. */
@@ -29,26 +67,24 @@ export function DeleteConfirm({
 }) {
   const [open, setOpen] = useState(false);
   return (
-    <AlertDialog open={open} onOpenChange={setOpen}>
-      <AlertDialogTrigger
-        render={<Button type="button" variant="ghost" className="text-destructive sm:mr-auto" />}
+    <>
+      <Button
+        type="button"
+        variant="ghost"
+        className="text-destructive sm:mr-auto"
+        onClick={() => setOpen(true)}
       >
         Delete
-      </AlertDialogTrigger>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>Delete {name}?</AlertDialogTitle>
-          <AlertDialogDescription>{description}</AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel>Keep</AlertDialogCancel>
-          <AlertDialogAction disabled={pending} onClick={() => onDelete(() => setOpen(false))}>
-            {pending && <Spinner />}
-            Delete
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+      </Button>
+      <DeleteDialog
+        name={name}
+        description={description}
+        pending={pending}
+        open={open}
+        onOpenChange={setOpen}
+        onDelete={onDelete}
+      />
+    </>
   );
 }
 

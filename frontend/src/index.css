@@ -1,16 +1,15 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
-@import "@fontsource-variable/inter";
+@import "@fontsource-variable/archivo/wdth.css";
 @import "@fontsource-variable/jetbrains-mono";
-@import "@fontsource-variable/sora";
 
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
-  --font-sans: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Archivo Variable", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono Variable", ui-monospace, SFMono-Regular, Menlo, monospace;
-  --font-heading: "Sora Variable", "Inter Variable", ui-sans-serif, sans-serif;
+  --font-heading: "Archivo Variable", ui-sans-serif, system-ui, sans-serif;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -50,16 +49,27 @@
   --color-status-danger: var(--status-danger);
   --color-status-progress: var(--status-progress);
   --color-status-neutral: var(--status-neutral);
-  --radius-sm: var(--radius);
-  --radius-md: var(--radius);
-  --radius-lg: var(--radius);
-  --radius-xl: var(--radius);
-  --radius-2xl: var(--radius);
-  --radius-3xl: var(--radius);
-  --radius-4xl: var(--radius);
+  --color-status-idle: var(--status-idle);
+  --radius-sm: 3px;
+  --radius-md: 4px;
+  --radius-lg: 6px;
+  --radius-xl: 8px;
+  --radius-2xl: 10px;
+  --radius-3xl: 12px;
+  --radius-4xl: 16px;
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
   --animate-glint: glint 1.4s ease-in-out;
+
+  @keyframes breathe {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.55;
+    }
+  }
 
   @keyframes glint {
     from {
@@ -71,7 +81,7 @@
   }
 }
 
-/* The console's button hover: a light band sweeping across the surface. */
+/* A light band that sweeps across a button on hover. */
 @utility bg-glint-subtle {
   background-image: linear-gradient(
     105deg,
@@ -83,7 +93,6 @@
   );
 }
 
-/* Colors, fonts and the single 2px corner follow the Plivo console theme. */
 :root {
   --background: hsl(0 0% 100%);
   --foreground: hsl(222 47% 11%);
@@ -116,7 +125,7 @@
   --chart-3: hsl(36 96% 42%);
   --chart-4: hsl(0 74% 48%);
   --chart-5: hsl(215 16% 60%);
-  --radius: 2px;
+  --radius: 4px;
   --sidebar: hsl(0 0% 100%);
   --sidebar-foreground: hsl(240 5.3% 26.1%);
   --sidebar-primary: hsl(240 5.9% 10%);
@@ -125,6 +134,7 @@
   --sidebar-accent-foreground: hsl(240 5.9% 10%);
   --sidebar-border: hsl(240 6% 91%);
   --sidebar-ring: hsl(217.2 91.2% 59.8%);
+  --status-idle: hsl(215 16% 78%);
 }
 
 .dark {
@@ -167,6 +177,7 @@
   --sidebar-accent-foreground: hsl(0 0% 98%);
   --sidebar-border: hsl(240 4% 15%);
   --sidebar-ring: hsl(240 5% 64.9%);
+  --status-idle: hsl(220 9% 30%);
 }
 
 @layer base {
@@ -182,5 +193,14 @@
   }
   html {
     @apply font-sans;
+    font-variant-numeric: tabular-nums;
+  }
+  ::selection {
+    background: color-mix(in oklab, var(--status-warning) 35%, transparent);
+    color: var(--foreground);
+  }
+  :root {
+    caret-color: var(--foreground);
+    scrollbar-color: var(--input) transparent;
   }
 }

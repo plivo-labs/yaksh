@@ -52,6 +52,21 @@ export function useAgents() {
   return useQuery({ queryKey: keys.agents, queryFn: () => all<Agent>("/agents") });
 }
 
+export const AGENTS_PAGE = 25;
+
+/** One page of agents, filtered on the server by `search`. The previous page stays on screen
+ * while the next one loads, so typing does not flash the table. */
+export function useAgentPage(search: string, sort: string, page: number) {
+  const params = new URLSearchParams({ page: String(page), page_size: String(AGENTS_PAGE) });
+  if (search) params.set("q", search);
+  if (sort) params.set("sort", sort);
+  return useQuery({
+    queryKey: [...keys.agents, "page", { search, sort, page }],
+    queryFn: ({ signal }) => api<Page<Agent>>(`/agents?${params}`, { signal }),
+    placeholderData: keepPreviousData,
+  });
+}
+
 export function usePersonas() {
   return useQuery({ queryKey: keys.personas, queryFn: () => all<Persona>("/personas") });
 }
@@ -173,6 +188,14 @@ export function useSaveAgent(id?: string) {
   });
 }
 
+export function useDuplicateAgent() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api<Agent>(`/agents/${id}/duplicate`, { method: "POST" }),
+    onSuccess: () => client.invalidateQueries({ queryKey: keys.agents }),
+  });
+}
+
 export function useDeleteAgent() {
   const client = useQueryClient();
   return useMutation({
@@ -227,5 +250,25 @@ export function useEndConversation(id: string) {
       client.setQueryData(keys.conversation(id), conversation);
       void client.invalidateQueries({ queryKey: ["conversations"] });
     },
+  });
+}
+
+/** The agent's most recent conversation, or null when it has never been called. */
+export function useLastCall(agentId: string) {
+  const search = new URLSearchParams({ agent_id: agentId, page_size: "1" });
+  return useQuery({
+    queryKey: keys.conversations({ agent_id: agentId, last: "1" }),
+    queryFn: async () =>
+      (await api<Page<ConversationSummary>>(`/conversations?${search}`)).items[0] ?? null,
+    refetchInterval: (query) =>
+      query.state.data && ACTIVE_STATUSES.includes(query.state.data.status) ? 3_000 : 15_000,
+  });
+}
+
+export function useScenarioCount(agentId: string) {
+  return useQuery({
+    queryKey: [...keys.scenarios(agentId), "count"],
+    queryFn: async () =>
+      (await api<Page<Scenario>>(`/agents/${agentId}/scenarios?page_size=1`)).total,
   });
 }

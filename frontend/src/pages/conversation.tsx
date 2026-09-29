@@ -2,7 +2,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Fragment, useEffect, useState } from "react";
 import { Link, useParams } from "react-router";
 
-import { StatusBadge } from "@/components/status-badge";
+import { StatusLabel } from "@/components/status-dot";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -80,7 +80,7 @@ export function ConversationPage() {
                 "Conversation"
               )}
             </h1>
-            <StatusBadge status={data.status} />
+            <StatusLabel status={data.status} />
           </div>
           <p className="text-sm text-muted-foreground">
             Version {data.agent_version}

@@ -1,18 +1,9 @@
-import { type SubmitEvent, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router";
+import { type ReactNode, type SubmitEvent, useState } from "react";
+import { Link, useNavigate } from "react-router";
+import { toast } from "sonner";
 
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { DeleteConfirm } from "@/components/confirm-dialogs";
+import { Panel, PanelHeader } from "@/components/panel";
 import { Button } from "@/components/ui/button";
 import { Field, FieldContent, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -24,13 +15,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { useAgent, useDeleteAgent, useSaveAgent } from "@/lib/queries";
+import { useDeleteAgent, useSaveAgent } from "@/lib/queries";
 import { type Agent, type AgentInput, LANGUAGE_ITEMS, type Language } from "@/lib/types";
-import { AgentScenarios } from "@/pages/agent-scenarios";
 
 interface Draft {
   name: string;
@@ -80,57 +69,56 @@ function toInput(draft: Draft, agent?: Agent): AgentInput {
   };
 }
 
-export function AgentFormPage() {
-  const { id } = useParams();
-  const agent = useAgent(id);
-  if (!id) return <AgentForm />;
-  if (agent.isPending) return <Skeleton className="h-96 w-full max-w-2xl" />;
-  if (agent.isError) {
-    return (
-      <Alert variant="destructive">
-        <AlertTitle>Could not load the agent</AlertTitle>
-        <AlertDescription>{agent.error.message}</AlertDescription>
-      </Alert>
-    );
-  }
+export function NewAgentPage() {
+  const navigate = useNavigate();
   return (
-    <div className="grid gap-12">
-      <AgentForm key={agent.data.id} agent={agent.data} />
-      <AgentScenarios agentId={agent.data.id} />
+    <div className="mx-auto grid max-w-2xl gap-6">
+      <h1 className="text-2xl font-semibold tracking-[-0.015em]">New agent</h1>
+      <Panel>
+        <PanelHeader title="Settings" />
+        <div className="px-5 py-5">
+          <AgentForm
+            onSaved={(agent) => navigate(`/agents/${agent.id}`)}
+            cancel={
+              <Button variant="ghost" nativeButton={false} render={<Link to="/agents" />}>
+                Cancel
+              </Button>
+            }
+          />
+        </div>
+      </Panel>
     </div>
   );
 }
 
-function AgentForm({ agent }: { agent?: Agent }) {
+/** Creates an agent, or edits one when `agent` is given. */
+export function AgentForm({
+  agent,
+  onSaved,
+  cancel,
+}: {
+  agent?: Agent;
+  onSaved: (agent: Agent) => void;
+  cancel: ReactNode;
+}) {
   const id = agent?.id;
   const navigate = useNavigate();
   const save = useSaveAgent(id);
   const remove = useDeleteAgent();
   const [draft, setDraft] = useState<Draft>(() => (agent ? toDraft(agent) : EMPTY));
-
   const set = <K extends keyof Draft>(key: K, value: Draft[K]) =>
     setDraft((current) => ({ ...current, [key]: value }));
-
   const numberOk = E164.test(normalizeNumber(draft.agent_number));
 
   const submit = (event: SubmitEvent) => {
     event.preventDefault();
     if (!numberOk) return;
-    save.mutate(toInput(draft, agent), { onSuccess: () => navigate("/agents") });
+    save.mutate(toInput(draft, agent), { onSuccess: onSaved });
   };
 
   return (
-    <form onSubmit={submit} className="max-w-2xl">
+    <form onSubmit={submit}>
       <FieldGroup>
-        <div>
-          <h1 className="font-heading text-2xl font-semibold tracking-tight">
-            {id ? draft.name || "Agent" : "New agent"}
-          </h1>
-          {agent && (
-            <p className="text-sm text-muted-foreground">Version {agent.current_version}</p>
-          )}
-        </div>
-
         <Field>
           <FieldLabel htmlFor="name">Name</FieldLabel>
           <Input
@@ -180,7 +168,7 @@ function AgentForm({ agent }: { agent?: Agent }) {
           </Select>
         </Field>
 
-        <Field orientation="horizontal" className="rounded-md border px-4 py-3">
+        <Field orientation="horizontal" className="rounded-md border bg-muted/40 px-3.5 py-3">
           <FieldContent>
             <FieldLabel htmlFor="agent_speaks_first">Agent speaks first</FieldLabel>
           </FieldContent>
@@ -216,41 +204,29 @@ function AgentForm({ agent }: { agent?: Agent }) {
           <FieldError>{(save.error ?? remove.error)?.message}</FieldError>
         )}
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2">
           <Button type="submit" disabled={save.isPending}>
             {save.isPending && <Spinner />}
-            {id ? "Save changes" : "Register agent"}
+            {id ? "Save changes" : "Add agent"}
           </Button>
-          <Button variant="ghost" nativeButton={false} render={<Link to="/agents" />}>
-            Cancel
-          </Button>
+          {cancel}
           {id && (
-            <AlertDialog>
-              <AlertDialogTrigger
-                render={
-                  <Button type="button" variant="ghost" className="ml-auto text-destructive" />
+            <div className="ml-auto">
+              <DeleteConfirm
+                name={draft.name}
+                description="Past conversations keep their copy of its configuration. An agent with an active conversation cannot be deleted."
+                pending={remove.isPending}
+                onDelete={(close) =>
+                  remove.mutate(id, {
+                    onSuccess: () => {
+                      toast.success(`Deleted ${draft.name}`);
+                      navigate("/agents");
+                    },
+                    onSettled: close,
+                  })
                 }
-              >
-                Delete
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Delete {draft.name}?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Past conversations keep their copy of its configuration. An agent with an active
-                    conversation cannot be deleted.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Keep</AlertDialogCancel>
-                  <AlertDialogAction
-                    onClick={() => remove.mutate(id, { onSuccess: () => navigate("/agents") })}
-                  >
-                    Delete
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
+              />
+            </div>
           )}
         </div>
       </FieldGroup>
