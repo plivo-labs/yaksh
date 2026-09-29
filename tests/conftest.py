@@ -282,6 +282,54 @@ class FakeCaller:
         )
 
 
+class FakeJsonModel:
+    """Answers the scenario generator: the plan it is given, and for each scenario what
+    `write` makes of the writer's prompt."""
+
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, str]] = []
+        self.capabilities: list[dict[str, Any]] = []
+        self.questions: dict[str, Any] = {"answered": [], "unanswered": []}
+        self.write: Callable[[str], dict[str, Any]] = written_scenario
+        self.down = False
+
+    async def complete_json(
+        self, *, system: str, user: str, name: str, schema: dict[str, Any]
+    ) -> dict[str, Any]:
+        self.calls.append((name, user))
+        if self.down:
+            raise UnavailableError("the model call failed: timed out")
+        if name == "capabilities":
+            return {"capabilities": self.capabilities}
+        if name == "questions":
+            return self.questions
+        return self.write(user)
+
+    async def close(self) -> None:
+        pass
+
+
+def written_scenario(prompt: str) -> dict[str, Any]:
+    """A valid scenario named after what the writer was asked to test."""
+    subject = next(
+        (
+            line.split(":", 1)[1].split(":")[0].strip().strip('"')
+            for line in prompt.splitlines()
+            if line.startswith(("Area:", "The caller asks:"))
+        ),
+        "Out of scope",
+    )
+    return {
+        "name": subject[:60],
+        "description": f"Tests {subject}.",
+        "goal": "Get the request done, then end the call.",
+        "known_facts": [{"name": "Name", "value": "Priya Raman"}],
+        "unknown_facts": [],
+        "criteria": ["The agent confirms the name Priya Raman."],
+        "agent_data": [],
+    }
+
+
 class FakeFileStore:
     def __init__(self) -> None:
         self.files: dict[str, tuple[bytes, str]] = {}
@@ -379,15 +427,22 @@ def file_store() -> FakeFileStore:
 
 
 @pytest.fixture
+def generation_model() -> FakeJsonModel:
+    return FakeJsonModel()
+
+
+@pytest.fixture
 async def client(
     settings: Settings,
     voice_clients: dict[VoiceProvider, FakeVoiceClient],
     file_store: FakeFileStore,
+    generation_model: FakeJsonModel,
 ) -> AsyncIterator[AsyncClient]:
     """An API client whose voices list holds the English and the Hindi test voice."""
     app = create_app(settings)
     app.state.voice_clients = voice_clients
     app.state.file_store = file_store
+    app.state.generation_model = generation_model
     async with create_sessionmaker(app.state.engine)() as session:
         await conversations.sync_numbers(session, POOL, [], {})
         session.add(listed_voice(ENGLISH_VOICE, Language.EN))
@@ -404,7 +459,7 @@ async def client(
             text(
                 "TRUNCATE phone_numbers, conversations, agent_versions, agents,"
                 " persona_versions, personas, voices, scenario_versions, scenarios, workers,"
-                " documents"
+                " documents, scenario_generations"
             )
         )
     await engine.dispose()

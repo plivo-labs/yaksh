@@ -25,6 +25,7 @@ from sqlalchemy.orm import Mapped, MappedColumn, mapped_column
 from truman.db.base import Base
 from truman.domain.agents import Direction, Transport
 from truman.domain.conversations import Channel, ConversationStatus, EndReason
+from truman.domain.generation import GenerationMode, GenerationStatus
 from truman.domain.languages import Language
 from truman.domain.scenarios import Category
 from truman.domain.voices import VoiceGender, VoiceProvider
@@ -221,6 +222,28 @@ class Voice(Base):
     )
 
 
+class ScenarioGeneration(Base):
+    """One request to write scenarios, and the agent version whose context it read."""
+
+    __tablename__ = "scenario_generations"
+
+    id: Mapped[uuid.UUID] = uuid_primary_key()
+    agent_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("agents.id"))
+    agent_version_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("agent_versions.id"))
+    mode: Mapped[GenerationMode] = mapped_column(pg_enum(GenerationMode, "generation_mode"))
+    count: Mapped[int] = mapped_column(Integer)
+    instructions: Mapped[str] = mapped_column(Text)
+    document_ids: Mapped[list[str]] = mapped_column(JSONB)
+    status: Mapped[GenerationStatus] = mapped_column(
+        pg_enum(GenerationStatus, "generation_status"), default=GenerationStatus.RUNNING
+    )
+    saved: Mapped[int] = mapped_column(Integer, default=0)
+    dropped: Mapped[int] = mapped_column(Integer, default=0)
+    error: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
 class Scenario(Base):
     __tablename__ = "scenarios"
 
@@ -233,6 +256,8 @@ class Scenario(Base):
         server_default=Category.HAPPY_PATH.value,
     )
     description: Mapped[str | None] = mapped_column(Text)
+    generation_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("scenario_generations.id"))
+    """The generation that wrote the scenario; None for one written by hand."""
     config: Mapped[dict[str, Any]] = mapped_column(JSONB)
     current_version: Mapped[int] = mapped_column(Integer, default=1)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

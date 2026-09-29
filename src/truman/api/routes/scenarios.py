@@ -1,13 +1,18 @@
 import uuid
+from collections.abc import AsyncGenerator, AsyncIterable, AsyncIterator
+from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, status
+import anyio
+from fastapi import APIRouter, Depends, Request, status
+from fastapi.sse import EventSourceResponse, ServerSentEvent
 
 from truman.api.auth import require_token
 from truman.api.deps import SessionDep
 from truman.api.pagination import Page, PageDep
 from truman.api.schemas.scenarios import ScenarioRead, ScenarioVersionRead
+from truman.domain.generation import GenerateScenarios
 from truman.domain.scenarios import ScenarioCreate, ScenarioUpdate
-from truman.simulation import scenarios
+from truman.simulation import generation, scenarios
 
 router = APIRouter(tags=["scenarios"], dependencies=[Depends(require_token)])
 
@@ -17,6 +22,63 @@ async def create_scenario(
     agent_id: uuid.UUID, command: ScenarioCreate, session: SessionDep
 ) -> ScenarioRead:
     return ScenarioRead.of(await scenarios.create_scenario(session, agent_id, command))
+
+
+async def prepared_generation(
+    agent_id: uuid.UUID, command: GenerateScenarios, request: Request
+) -> generation.Prepared:
+    """Checks the request before the stream opens, so a refusal is an ordinary error."""
+    async with request.app.state.sessionmaker() as session:
+        return await generation.prepare(
+            session, request.app.state.generation_model, agent_id, command
+        )
+
+
+def event_data(event: generation.Event) -> tuple[str, dict[str, Any]]:
+    match event:
+        case generation.Started(generation_id):
+            return "started", {"generation_id": str(generation_id)}
+        case generation.Planned(count):
+            return "planned", {"count": count}
+        case generation.Saved(scenario):
+            return "scenario", ScenarioRead.of(scenario).model_dump(mode="json")
+        case generation.Dropped(reason):
+            return "dropped", {"reason": reason}
+        case generation.Finished(status_, saved, dropped, error):
+            return "finished", {
+                "status": status_.value,
+                "saved": saved,
+                "dropped": dropped,
+                "error": error,
+            }
+
+
+async def generation_events(
+    prepared: Annotated[generation.Prepared, Depends(prepared_generation)], request: Request
+) -> AsyncIterator[AsyncGenerator[generation.Event]]:
+    """Closes the generation after the stream ends. FastAPI does not close the endpoint when
+    the console disconnects while an event waits to be sent, so the endpoint cannot."""
+    events = generation.generate(
+        request.app.state.sessionmaker, request.app.state.generation_model, prepared
+    )
+    try:
+        yield events
+    finally:
+        with anyio.CancelScope(shield=True):
+            await events.aclose()
+
+
+@router.post("/agents/{agent_id}/scenarios/generate", response_class=EventSourceResponse)
+async def generate_scenarios(
+    events: Annotated[
+        AsyncGenerator[generation.Event], Depends(generation_events, scope="request")
+    ],
+) -> AsyncIterable[ServerSentEvent]:
+    """Writes scenarios and streams each one as it is saved. Closing the stream stops the
+    generation; what is saved stays."""
+    async for event in events:
+        name, data = event_data(event)
+        yield ServerSentEvent(data=data, event=name)
 
 
 @router.get("/agents/{agent_id}/scenarios")

@@ -185,6 +185,42 @@ def upgrade() -> None:
         ),
     )
     op.create_table(
+        "scenario_generations",
+        sa.Column("id", sa.UUID(), server_default=sa.text("uuidv7()"), nullable=False),
+        sa.Column("agent_id", sa.UUID(), nullable=False),
+        sa.Column("agent_version_id", sa.UUID(), nullable=False),
+        sa.Column(
+            "mode", sa.Enum("agent", "knowledge_base", name="generation_mode"), nullable=False
+        ),
+        sa.Column("count", sa.Integer(), nullable=False),
+        sa.Column("instructions", sa.Text(), nullable=False),
+        sa.Column("document_ids", postgresql.JSONB(astext_type=sa.Text()), nullable=False),
+        sa.Column(
+            "status",
+            sa.Enum("running", "done", "failed", "stopped", name="generation_status"),
+            nullable=False,
+        ),
+        sa.Column("saved", sa.Integer(), nullable=False),
+        sa.Column("dropped", sa.Integer(), nullable=False),
+        sa.Column("error", sa.Text(), nullable=True),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.Column("ended_at", sa.DateTime(timezone=True), nullable=True),
+        sa.ForeignKeyConstraint(
+            ["agent_id"], ["agents.id"], name=op.f("fk_scenario_generations_agent_id_agents")
+        ),
+        sa.ForeignKeyConstraint(
+            ["agent_version_id"],
+            ["agent_versions.id"],
+            name=op.f("fk_scenario_generations_agent_version_id_agent_versions"),
+        ),
+        sa.PrimaryKeyConstraint("id", name=op.f("pk_scenario_generations")),
+    )
+    op.create_table(
         "scenarios",
         sa.Column("id", sa.UUID(), server_default=sa.text("uuidv7()"), nullable=False),
         sa.Column("agent_id", sa.UUID(), nullable=False),
@@ -196,6 +232,7 @@ def upgrade() -> None:
             nullable=False,
         ),
         sa.Column("description", sa.Text(), nullable=True),
+        sa.Column("generation_id", sa.UUID(), nullable=True),
         sa.Column("config", postgresql.JSONB(astext_type=sa.Text()), nullable=False),
         sa.Column("current_version", sa.Integer(), nullable=False),
         sa.Column(
@@ -213,6 +250,11 @@ def upgrade() -> None:
         sa.Column("deleted_at", sa.DateTime(timezone=True), nullable=True),
         sa.ForeignKeyConstraint(
             ["agent_id"], ["agents.id"], name=op.f("fk_scenarios_agent_id_agents")
+        ),
+        sa.ForeignKeyConstraint(
+            ["generation_id"],
+            ["scenario_generations.id"],
+            name=op.f("fk_scenarios_generation_id_scenario_generations"),
         ),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_scenarios")),
         sa.UniqueConstraint("id", "agent_id", name=op.f("uq_scenarios_id_agent_id")),
@@ -413,6 +455,7 @@ def downgrade() -> None:
     op.drop_table("conversations")
     op.drop_table("scenario_versions")
     op.drop_table("scenarios")
+    op.drop_table("scenario_generations")
     op.drop_table("persona_versions")
     op.drop_table("agent_versions")
     op.drop_table("voices")
@@ -428,5 +471,7 @@ def downgrade() -> None:
         "agent_transport",
         "agent_direction",
         "scenario_category",
+        "generation_mode",
+        "generation_status",
     ):
         op.execute(f"DROP TYPE {enum}")

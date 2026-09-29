@@ -62,7 +62,11 @@ async def get_scenario(
 
 
 async def create_scenario(
-    session: AsyncSession, agent_id: uuid.UUID, command: ScenarioCreate
+    session: AsyncSession,
+    agent_id: uuid.UUID,
+    command: ScenarioCreate,
+    *,
+    generation_id: uuid.UUID | None = None,
 ) -> Scenario:
     """The agent row is locked first, so a scenario cannot be added to an agent being deleted."""
     agent = await get_agent(session, agent_id, lock=True)
@@ -72,6 +76,7 @@ async def create_scenario(
         name=command.name,
         category=command.category,
         description=command.description or None,
+        generation_id=generation_id,
         config=config.model_dump(mode="json"),
         current_version=1,
     )
