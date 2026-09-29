@@ -61,7 +61,7 @@ async def create_scenario(
 ) -> Scenario:
     """The agent row is locked first, so a scenario cannot be added to an agent being deleted."""
     agent = await get_agent(session, agent_id, lock=True)
-    config = command.config()
+    config = command.to_config()
     scenario = Scenario(
         agent_id=agent.id,
         name=command.name,

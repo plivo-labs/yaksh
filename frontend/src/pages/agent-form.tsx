@@ -43,6 +43,7 @@ import {
   type Language,
 } from "@/lib/types";
 import { OutboundFields } from "@/pages/agent-outbound-fields";
+import { ConfigField, MAX_CONFIG_CHARS } from "@/pages/agent-config-field";
 
 interface Draft {
   name: string;
@@ -53,6 +54,7 @@ interface Draft {
   agent_speaks_first: boolean;
   language: Language;
   brief: string;
+  config: string;
 }
 
 const EMPTY: Draft = {
@@ -64,6 +66,7 @@ const EMPTY: Draft = {
   agent_speaks_first: true,
   language: "en",
   brief: "",
+  config: "",
 };
 
 function toDraft(agent: Agent): Draft {
@@ -76,6 +79,7 @@ function toDraft(agent: Agent): Draft {
     agent_speaks_first: agent.agent_speaks_first,
     language: agent.language,
     brief: agent.brief ?? "",
+    config: agent.config ?? "",
   };
 }
 
@@ -96,6 +100,7 @@ function toInput(draft: Draft): AgentInput {
     agent_speaks_first: draft.agent_speaks_first,
     language: draft.language,
     brief: draft.brief.trim() || null,
+    config: draft.config.trim() ? draft.config : null,
   };
 }
 
@@ -143,7 +148,9 @@ export function AgentForm({
 
   const outbound = draft.direction === "outbound";
   const numberOk = isPhoneNumber(draft.agent_number);
-  const ready = outbound ? Object.keys(outboundProblems(draft.outbound)).length === 0 : numberOk;
+  const ready =
+    (outbound ? Object.keys(outboundProblems(draft.outbound)).length === 0 : numberOk) &&
+    draft.config.length <= MAX_CONFIG_CHARS;
 
   const submit = (event: SubmitEvent) => {
     event.preventDefault();
@@ -264,11 +271,14 @@ export function AgentForm({
           <Textarea
             id="brief"
             rows={4}
+            maxLength={10_000}
             placeholder="What this agent is supposed to do, in your words."
             value={draft.brief}
             onChange={(e) => set("brief", e.target.value)}
           />
         </Field>
+
+        <ConfigField value={draft.config} onChange={(value) => set("config", value)} />
 
         {(save.error || remove.error) && (
           <FieldError>{(save.error ?? remove.error)?.message}</FieldError>

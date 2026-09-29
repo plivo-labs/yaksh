@@ -30,6 +30,13 @@ def upgrade() -> None:
         sa.Column("agent_speaks_first", sa.Boolean(), nullable=False),
         sa.Column("language", sa.Enum("en", "hinglish", name="language"), nullable=False),
         sa.Column("brief", sa.Text(), nullable=True),
+        sa.Column("config", sa.Text(), nullable=True),
+        sa.Column(
+            "knowledge_base",
+            postgresql.JSONB(astext_type=sa.Text()),
+            server_default=sa.text("'[]'::jsonb"),
+            nullable=False,
+        ),
         sa.Column("current_version", sa.Integer(), nullable=False),
         sa.Column(
             "created_at",

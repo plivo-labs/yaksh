@@ -1,4 +1,4 @@
-import type { Agent } from "@/lib/types";
+import type { AgentSummary } from "@/lib/types";
 
 export function clock(ms: number): string {
   const seconds = ms / 1000;
@@ -66,6 +66,12 @@ export function stamp(seconds: number): string {
 }
 
 /** How Truman reaches an agent: the number it dials, or that the agent calls Truman. */
-export function reach(agent: Agent): string {
+export function reach(agent: AgentSummary): string {
   return agent.agent_number ? phone(agent.agent_number) : "Calls Truman";
+}
+
+/** A text's length as the model sees it: about four characters per token in English. */
+export function textSize(characters: number): string {
+  const tokens = Math.round(characters / 4);
+  return `${characters.toLocaleString()} characters, about ${tokens.toLocaleString()} tokens`;
 }

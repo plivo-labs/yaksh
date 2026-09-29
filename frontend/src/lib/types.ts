@@ -96,7 +96,7 @@ export interface OutboundSettings {
   dial_window_s: number;
 }
 
-export interface Agent {
+export interface AgentSummary {
   id: string;
   name: string;
   external_id: string | null;
@@ -112,6 +112,41 @@ export interface Agent {
   updated_at: string;
 }
 
+export interface KnowledgeBaseEntry {
+  document_id: string;
+  name: string;
+}
+
+export interface KnowledgeBaseDocument extends KnowledgeBaseEntry {
+  /** Null for pasted text, which has no file. */
+  media_type: string | null;
+  size_bytes: number | null;
+  characters: number;
+  pages: number | null;
+  /** PDF pages with no text, such as scanned pages. */
+  empty_pages: number | null;
+}
+
+export interface Agent extends AgentSummary {
+  config: string | null;
+  knowledge_base: KnowledgeBaseDocument[];
+}
+
+export interface DocumentSummary {
+  id: string;
+  name: string;
+  media_type: string | null;
+  size_bytes: number | null;
+  characters: number;
+  pages: number | null;
+  empty_pages: number | null;
+  created_at: string;
+}
+
+export interface DocumentRead extends DocumentSummary {
+  text: string;
+}
+
 export interface AgentInput {
   name: string;
   external_id: string | null;
@@ -122,6 +157,7 @@ export interface AgentInput {
   agent_speaks_first: boolean;
   language: Language;
   brief: string | null;
+  config: string | null;
 }
 
 export interface PhoneNumber {

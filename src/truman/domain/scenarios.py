@@ -65,7 +65,7 @@ class ScenarioConfig(BaseModel):
 class ScenarioCreate(ScenarioConfig):
     name: Name
 
-    def config(self) -> ScenarioConfig:
+    def to_config(self) -> ScenarioConfig:
         return ScenarioConfig.model_validate(self.model_dump(exclude={"name"}))
 
 

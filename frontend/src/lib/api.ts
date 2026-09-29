@@ -33,7 +33,7 @@ export function authHeaders(): HeadersInit {
   return { Authorization: `Bearer ${getToken()}` };
 }
 
-type ApiInit = { method?: string; json?: unknown; signal?: AbortSignal };
+type ApiInit = { method?: string; json?: unknown; form?: FormData; signal?: AbortSignal };
 
 async function request(path: string, init: ApiInit): Promise<Response> {
   const headers: Record<string, string> = { ...(authHeaders() as Record<string, string>) };
@@ -41,7 +41,7 @@ async function request(path: string, init: ApiInit): Promise<Response> {
   const response = await fetch(`/api/v1${path}`, {
     method: init.method ?? "GET",
     headers,
-    body: init.json === undefined ? undefined : JSON.stringify(init.json),
+    body: init.json === undefined ? init.form : JSON.stringify(init.json),
     signal: init.signal,
   });
   if (response.status === 401) {

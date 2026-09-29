@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
-import { duration, phone, reach, since, when } from "@/lib/format";
+import { duration, phone, reach, since, textSize, when } from "@/lib/format";
 import { useAgent, useAgents, useConversations, useLastCall } from "@/lib/queries";
 import {
   ACTIVE_STATUSES,
@@ -24,6 +24,7 @@ import {
   type OutboundSettings,
 } from "@/lib/types";
 import { AgentForm } from "@/pages/agent-form";
+import { AgentKnowledgeBase } from "@/pages/agent-knowledge-base";
 import { AgentScenarios } from "@/pages/agent-scenarios";
 import { StartCallDialog } from "@/pages/start-call-dialog";
 
@@ -59,6 +60,7 @@ export function AgentPage() {
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_21rem]">
         <div className="grid gap-6">
           {agent.data && <AgentScenarios agent={agent.data} />}
+          {agent.data && <AgentKnowledgeBase agent={agent.data} />}
           {agent.data && <Calls agent={agent.data} />}
         </div>
         {agent.data ? (
@@ -241,6 +243,13 @@ function Settings({ agent }: { agent: Agent }) {
             {agent.brief ?? <span className="text-muted-foreground">None</span>}
           </dd>
         </div>
+        <Fact label="Config">
+          {agent.config ? (
+            textSize(agent.config.length)
+          ) : (
+            <span className="font-normal text-muted-foreground">None</span>
+          )}
+        </Fact>
         <Fact label="External id">
           {agent.external_id ?? <span className="font-normal text-muted-foreground">None</span>}
         </Fact>

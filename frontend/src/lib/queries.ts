@@ -5,6 +5,10 @@ import {
   ACTIVE_STATUSES,
   type Agent,
   type AgentInput,
+  type AgentSummary,
+  type DocumentRead,
+  type DocumentSummary,
+  type KnowledgeBaseEntry,
   type Conversation,
   type ConversationInput,
   type ConversationSummary,
@@ -32,6 +36,7 @@ export const keys = {
   voices: ["voices"] as const,
   voicesFor: (language: Language | "all") => ["voices", language] as const,
   phoneNumbers: ["phone-numbers"] as const,
+  document: (id: string) => ["documents", id] as const,
 };
 
 const PAGE_SIZE = 100;
@@ -51,7 +56,7 @@ async function all<T>(path: string, params: Record<string, string> = {}): Promis
 }
 
 export function useAgents() {
-  return useQuery({ queryKey: keys.agents, queryFn: () => all<Agent>("/agents") });
+  return useQuery({ queryKey: keys.agents, queryFn: () => all<AgentSummary>("/agents") });
 }
 
 export const AGENTS_PAGE = 25;
@@ -64,7 +69,7 @@ export function useAgentPage(search: string, sort: string, page: number) {
   if (sort) params.set("sort", sort);
   return useQuery({
     queryKey: [...keys.agents, "page", { search, sort, page }],
-    queryFn: ({ signal }) => api<Page<Agent>>(`/agents?${params}`, { signal }),
+    queryFn: ({ signal }) => api<Page<AgentSummary>>(`/agents?${params}`, { signal }),
     placeholderData: keepPreviousData,
   });
 }
@@ -329,4 +334,53 @@ export function usePhoneNumbers() {
     queryKey: keys.phoneNumbers,
     queryFn: () => api<PhoneNumbers>("/phone-numbers"),
   });
+}
+
+/** Saves a change to an agent's knowledge base, applied to the list as it is when the save
+ * starts, so an upload that took a while does not undo a change made meanwhile. */
+export function useSaveKnowledgeBase(agentId: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (change: (current: KnowledgeBaseEntry[]) => KnowledgeBaseEntry[]) => {
+      const agent = client.getQueryData<Agent>(keys.agent(agentId));
+      const current = (agent?.knowledge_base ?? []).map(({ document_id, name }) => ({
+        document_id,
+        name,
+      }));
+      return api<Agent>(`/agents/${agentId}`, {
+        method: "PATCH",
+        json: { knowledge_base: change(current) },
+      });
+    },
+    onSuccess: (agent) => {
+      client.setQueryData(keys.agent(agentId), agent);
+      return client.invalidateQueries({ queryKey: keys.agents });
+    },
+  });
+}
+
+export function uploadDocument(file: File): Promise<DocumentSummary> {
+  const form = new FormData();
+  form.append("file", file);
+  return api<DocumentSummary>("/documents/upload", { method: "POST", form });
+}
+
+export function createTextDocument(name: string, text: string): Promise<DocumentSummary> {
+  return api<DocumentSummary>("/documents", { method: "POST", json: { name, text } });
+}
+
+export function useDocument(id: string | undefined) {
+  return useQuery({
+    queryKey: keys.document(id ?? ""),
+    queryFn: () => api<DocumentRead>(`/documents/${id}`),
+    enabled: Boolean(id),
+    staleTime: Infinity,
+  });
+}
+
+export async function downloadDocument(id: string, name: string): Promise<void> {
+  const url = URL.createObjectURL(await apiBlob(`/documents/${id}/file`));
+  const link = Object.assign(document.createElement("a"), { href: url, download: name });
+  link.click();
+  URL.revokeObjectURL(url);
 }

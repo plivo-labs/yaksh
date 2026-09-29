@@ -35,7 +35,7 @@ import {
   useLastCall,
   useScenarioCount,
 } from "@/lib/queries";
-import { type Agent, LANGUAGE_NAMES } from "@/lib/types";
+import { type AgentSummary, LANGUAGE_NAMES } from "@/lib/types";
 
 const ROW =
   "grid grid-cols-[minmax(0,1fr)_2rem] items-center gap-x-4 gap-y-2 px-3 md:grid-cols-[minmax(12rem,1.4fr)_7rem_6rem_minmax(12rem,1fr)_8rem_2rem]";
@@ -173,7 +173,7 @@ export function AgentsPage() {
   );
 }
 
-function AgentRow({ agent }: { agent: Agent }) {
+function AgentRow({ agent }: { agent: AgentSummary }) {
   const last = useLastCall(agent.id);
   const scenarios = useScenarioCount(agent.id);
   const call = last.data;
@@ -235,7 +235,7 @@ function AgentRow({ agent }: { agent: Agent }) {
   );
 }
 
-function AgentMenu({ agent }: { agent: Agent }) {
+function AgentMenu({ agent }: { agent: AgentSummary }) {
   const navigate = useNavigate();
   const duplicate = useDuplicateAgent();
   const remove = useDeleteAgent();

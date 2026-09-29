@@ -25,7 +25,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { useCloseGuard } from "@/hooks/use-close-guard";
 import { useDeleteScenario, useSaveScenario } from "@/lib/queries";
-import type { Agent, Fact, Scenario, ScenarioInput } from "@/lib/types";
+import type { AgentSummary, Fact, Scenario, ScenarioInput } from "@/lib/types";
 
 const APPEAR = "transition-opacity duration-150 ease-out starting:opacity-0";
 
@@ -161,7 +161,7 @@ export function ScenarioDialog({
   onSaved,
   onClosed,
 }: {
-  agent: Agent;
+  agent: AgentSummary;
   scenario?: Scenario;
   onSaved?: (scenario: Scenario) => void;
   onClosed: () => void;

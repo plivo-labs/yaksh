@@ -50,6 +50,10 @@ class Agent(Base):
     agent_speaks_first: Mapped[bool] = mapped_column(Boolean, default=True)
     language: Mapped[Language] = mapped_column(pg_enum(Language, "language"))
     brief: Mapped[str | None] = mapped_column(Text)
+    config: Mapped[str | None] = mapped_column(Text)
+    knowledge_base: Mapped[list[dict[str, Any]]] = mapped_column(
+        JSONB, default=list, server_default=text("'[]'::jsonb")
+    )
     current_version: Mapped[int] = mapped_column(Integer, default=1)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(

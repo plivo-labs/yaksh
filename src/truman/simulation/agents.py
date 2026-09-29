@@ -9,9 +9,17 @@ from sqlalchemy import String, cast, false, func, or_, select
 from sqlalchemy import update as update_rows
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import defer
 from sqlalchemy.sql.elements import ColumnElement
 
-from truman.db.models import Agent, AgentVersion, Conversation, Scenario, ScenarioVersion
+from truman.db.models import (
+    Agent,
+    AgentVersion,
+    Conversation,
+    Document,
+    Scenario,
+    ScenarioVersion,
+)
 from truman.domain.agents import (
     AgentConfig,
     AgentCreate,
@@ -39,12 +47,18 @@ def config_of(agent: Agent) -> AgentConfig:
     )
 
 
+def column_value(value: Any) -> Any:
+    """Nested settings are stored as JSON."""
+    if isinstance(value, BaseModel):
+        return value.model_dump(mode="json")
+    if isinstance(value, list):
+        return [column_value(item) for item in value]
+    return value
+
+
 def apply_config(agent: Agent, config: AgentConfig) -> None:
     for field in AgentConfig.model_fields:
-        value = getattr(config, field)
-        setattr(
-            agent, field, value.model_dump(mode="json") if isinstance(value, BaseModel) else value
-        )
+        setattr(agent, field, column_value(getattr(config, field)))
 
 
 def validate_config(data: dict[str, Any]) -> AgentConfig:
@@ -52,6 +66,25 @@ def validate_config(data: dict[str, Any]) -> AgentConfig:
         return AgentConfig.model_validate(data)
     except pydantic.ValidationError as exc:
         raise ValidationError(exc.errors()[0]["msg"]) from exc
+
+
+async def check_documents(session: AsyncSession, config: AgentConfig) -> None:
+    wanted = {entry.document_id for entry in config.knowledge_base}
+    found = set(await session.scalars(select(Document.id).where(Document.id.in_(wanted))))
+    missing = sorted(str(document_id) for document_id in wanted - found)
+    if missing:
+        raise ValidationError(f"knowledge_base: no document {', '.join(missing)}")
+
+
+async def knowledge_base_documents(
+    session: AsyncSession, agent: Agent
+) -> dict[uuid.UUID, Document]:
+    """The agent's knowledge base documents by id, without their text."""
+    ids = [uuid.UUID(entry["document_id"]) for entry in agent.knowledge_base]
+    rows = await session.scalars(
+        select(Document).where(Document.id.in_(ids)).options(defer(Document.text))
+    )
+    return {row.id: row for row in rows}
 
 
 async def flush(session: AsyncSession) -> None:
@@ -92,7 +125,9 @@ async def add_agent(
 
 
 async def create_agent(session: AsyncSession, command: AgentCreate) -> Agent:
-    agent = await add_agent(session, command.name, command.external_id, command.config())
+    config = command.to_config()
+    await check_documents(session, config)
+    agent = await add_agent(session, command.name, command.external_id, config)
     await session.commit()
     return agent
 
@@ -129,7 +164,11 @@ async def list_agents(
     search: str | None = None,
     sort: str = "-created_at",
 ) -> tuple[list[Agent], int]:
-    query = select(Agent).where(Agent.deleted_at.is_(None))
+    query = (
+        select(Agent)
+        .where(Agent.deleted_at.is_(None))
+        .options(defer(Agent.config), defer(Agent.knowledge_base))
+    )
     if search:
         query = query.where(matching(search))
     if external_id is not None:
@@ -163,23 +202,25 @@ def matching(search: str) -> ColumnElement[bool]:
 async def update_agent(session: AsyncSession, agent_id: uuid.UUID, update: AgentUpdate) -> Agent:
     changes = update.changes()
     agent = await get_agent(session, agent_id, lock=True)
+    current = config_of(agent)
+    config_changes = {k: v for k, v in changes.items() if k not in IDENTITY_FIELDS}
+    new = validate_config({**current.model_dump(), **config_changes})
+    # Before the agent changes: this query would flush a pending external_id clash, which
+    # must reach flush() below to become a 409.
+    if new.knowledge_base != current.knowledge_base:
+        await check_documents(session, new)
     for field in IDENTITY_FIELDS & changes.keys():
         setattr(agent, field, changes[field])
-
-    config_changes = {k: v for k, v in changes.items() if k not in IDENTITY_FIELDS}
-    if config_changes:
-        current = config_of(agent)
-        new = validate_config({**current.model_dump(), **config_changes})
-        if new != current:
-            apply_config(agent, new)
-            agent.current_version += 1
-            session.add(
-                AgentVersion(
-                    agent_id=agent.id,
-                    version=agent.current_version,
-                    config=new.model_dump(mode="json"),
-                )
+    if new != current:
+        apply_config(agent, new)
+        agent.current_version += 1
+        session.add(
+            AgentVersion(
+                agent_id=agent.id,
+                version=agent.current_version,
+                config=new.model_dump(mode="json"),
             )
+        )
     await flush(session)
     await session.refresh(agent)
     await session.commit()

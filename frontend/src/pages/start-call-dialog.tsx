@@ -25,7 +25,7 @@ import {
 } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 import { usePersonas, useScenarios, useStartConversation } from "@/lib/queries";
-import type { Agent } from "@/lib/types";
+import type { AgentSummary } from "@/lib/types";
 import { ScenarioDialog } from "@/pages/scenario-dialog";
 
 export function StartCallDialog({
@@ -35,7 +35,7 @@ export function StartCallDialog({
   render,
   children,
 }: {
-  agents: Agent[];
+  agents: AgentSummary[];
   agentId?: string;
   scenarioId?: string;
   render: ReactElement;
