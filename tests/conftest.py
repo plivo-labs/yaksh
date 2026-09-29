@@ -16,11 +16,13 @@ from truman.db.migrate import upgrade_to_head
 from truman.db.models import Voice
 from truman.db.session import create_engine, create_sessionmaker
 from truman.domain.conversations import (
+    Admission,
     CallerClaim,
     CallObserver,
     CallOutcome,
     CallRequest,
     EndReason,
+    IncomingCall,
     Provenance,
     Role,
     Turn,
@@ -161,6 +163,10 @@ async def wait_until(condition: Callable[[], bool], timeout: float = 5.0) -> Non
     while not condition():
         assert asyncio.get_running_loop().time() < deadline
         await asyncio.sleep(0.02)
+
+
+async def refuse_calls(call: IncomingCall) -> Admission | str:
+    return "no conversation expects a call"
 
 
 def plivo_signed(
@@ -355,7 +361,7 @@ async def client(
     app = create_app(settings)
     app.state.voice_clients = voice_clients
     async with create_sessionmaker(app.state.engine)() as session:
-        await conversations.sync_numbers(session, POOL, [])
+        await conversations.sync_numbers(session, POOL, [], {})
         session.add(listed_voice(ENGLISH_VOICE, Language.EN))
         session.add(listed_voice(HINDI_VOICE, Language.EN, Language.HINGLISH))
         await session.commit()
@@ -369,7 +375,7 @@ async def client(
         await connection.execute(
             text(
                 "TRUNCATE phone_numbers, conversations, agent_versions, agents,"
-                " persona_versions, personas, voices, scenario_versions, scenarios"
+                " persona_versions, personas, voices, scenario_versions, scenarios, workers"
             )
         )
     await engine.dispose()

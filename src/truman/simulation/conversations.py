@@ -45,11 +45,13 @@ from truman.simulation.personas import config_of, get_persona
 from truman.simulation.prompts import caller_instructions
 from truman.simulation.scenarios import config_of as scenario_config_of
 from truman.simulation.scenarios import get_scenario
+from truman.simulation.workers import receiving_problem
 
 LIVE_STATUSES = frozenset({ConversationStatus.RUNNING, ConversationStatus.ENDING})
 LEASE_LOST = "worker lost its lease on the conversation; outcome unknown, not retried"
 WORKER_STOPPED = "worker stopped during the call; outcome unknown, not retried"
 FAILURE_TEXT = {EndReason.WORKER_STOPPED: WORKER_STOPPED, EndReason.LEASE_LOST: LEASE_LOST}
+PHONE_SETTINGS = "set PLIVO_AUTH_ID, PLIVO_AUTH_TOKEN and TRUMAN_PUBLIC_URL"
 
 
 class PoolExhaustedError(Exception):
@@ -64,12 +66,12 @@ async def create_conversation(
     session: AsyncSession, settings: Settings, command: ConversationCreate
 ) -> Conversation:
     if not settings.phone_enabled:
-        raise ValidationError(
-            "phone calls are off: set PLIVO_AUTH_ID, PLIVO_AUTH_TOKEN and TRUMAN_PUBLIC_URL"
-        )
+        raise ValidationError(f"phone calls are off: {PHONE_SETTINGS}")
     agent = await get_agent(session, command.agent_id, lock=True)
-    if agent.direction is Direction.OUTBOUND and settings.plivo_app_id is None:
-        raise ValidationError("outbound tests are off: set TRUMAN_PLIVO_APP_ID")
+    if agent.direction is Direction.OUTBOUND:
+        problem = await outbound_problem(session, settings)
+        if problem is not None:
+            raise ValidationError(f"outbound tests are off: {problem}")
     version_id = await session.scalar(
         select(AgentVersion.id).where(
             AgentVersion.agent_id == agent.id, AgentVersion.version == agent.current_version
@@ -94,7 +96,7 @@ async def create_conversation(
     config = config_of(persona)
     wants = scenario_config_of(scenario)
     if agent.direction is Direction.OUTBOUND:
-        await check_outbound_start(session, settings, agents_config_of(agent), wants)
+        check_agent_data(agents_config_of(agent), wants)
     conversation = Conversation(
         direction=agent.direction,
         agent_id=agent.id,
@@ -120,20 +122,28 @@ async def create_conversation(
     return conversation
 
 
-async def check_outbound_start(
-    session: AsyncSession, settings: Settings, agent: AgentConfig, scenario: ScenarioConfig
-) -> None:
-    """Refuse a start that could never get a call: nowhere to receive it, or a trigger that
-    needs agent data the scenario does not have."""
+async def outbound_problem(session: AsyncSession, settings: Settings) -> str | None:
+    """Why an outbound test could not get its call now, or None when it could."""
+    if not settings.phone_enabled:
+        return PHONE_SETTINGS
+    app_id = settings.plivo_app_id
+    if app_id is None:
+        return "set TRUMAN_PLIVO_APP_ID"
+    problem = await receiving_problem(session, app_id, settings.worker_lease_s)
+    if problem is not None:
+        return problem
     linked = await session.scalar(
         select(PhoneNumber.number)
-        .where(PhoneNumber.enabled.is_(True), PhoneNumber.application_id == settings.plivo_app_id)
+        .where(PhoneNumber.enabled.is_(True), PhoneNumber.application_id == app_id)
         .limit(1)
     )
     if linked is None:
-        raise ValidationError(
-            f"no enabled number is linked to Plivo application {settings.plivo_app_id}"
-        )
+        return f"no enabled number is linked to Plivo application {app_id}"
+    return None
+
+
+def check_agent_data(agent: AgentConfig, scenario: ScenarioConfig) -> None:
+    """Refuse a scenario that lacks agent data the trigger needs."""
     assert agent.outbound is not None
     have = {normalized(fact.name) for fact in scenario.agent_data}
     missing = sorted(agent_data_names(agent.outbound.trigger) - have)
@@ -326,11 +336,8 @@ async def call_request(
     settings: Settings,
     conversation: Conversation,
     number: str,
-    agent: AgentConfig | None = None,
+    agent: AgentConfig,
 ) -> CallRequest:
-    if agent is None:
-        agent_version = await session.get_one(AgentVersion, conversation.agent_version_id)
-        agent = AgentConfig.model_validate(agent_version.config)
     persona_version = await session.get_one(PersonaVersion, conversation.persona_version_id)
     scenario_version = await session.get_one(ScenarioVersion, conversation.scenario_version_id)
     return CallRequest(
@@ -510,6 +517,7 @@ async def finalize(
             transcript=transcript.model_dump(mode="json"),
             recording_path=str(outcome.recording_path) if outcome.recording_path else None,
             call_uuid=outcome.call_uuid,
+            agent_caller_id=Conversation.agent_caller_id if outcome.call_uuid else None,
             claimed_by=None,
             lease_expires_at=None,
         )
@@ -541,7 +549,7 @@ async def sync_numbers(
     session: AsyncSession,
     numbers: list[AccountNumber],
     allowlist: list[str],
-    application_names: dict[str, str] | None = None,
+    application_names: dict[str, str],
 ) -> list[str]:
     """Make the pool match the Plivo account: every voice number is enabled, or only the
     allowlisted ones when there is an allowlist; numbers gone from the account are dropped once
@@ -560,7 +568,7 @@ async def sync_numbers(
                     "region": entry.region,
                     "enabled": entry.number in enabled,
                     "application_id": entry.application_id,
-                    "application_name": (application_names or {}).get(entry.application_id or ""),
+                    "application_name": application_names.get(entry.application_id or ""),
                 }
                 for entry in numbers
             ]

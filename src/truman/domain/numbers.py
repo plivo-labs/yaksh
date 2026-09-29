@@ -42,5 +42,5 @@ class PlivoApplication(BaseModel):
         return [
             f"Plivo application {self.name} has {label} {actual!r}; set it to {wanted!r}"
             for label, (actual, wanted) in expected.items()
-            if actual.rstrip("/") != wanted
+            if actual != wanted
         ]

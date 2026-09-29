@@ -272,3 +272,16 @@ class PhoneNumber(Base):
     conversation_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("conversations.id"))
     leased_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     available_after: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class RunningWorker(Base):
+    """A running worker as it last reported itself; one not seen for a lease has stopped."""
+
+    __tablename__ = "workers"
+
+    id: Mapped[str] = mapped_column(Text, primary_key=True)
+    receiving_app_id: Mapped[str | None] = mapped_column(Text)
+    """The Plivo application whose calls the worker receives, so it runs outbound tests."""
+    outbound_problem: Mapped[str | None] = mapped_column(Text)
+    """Why the worker runs no outbound tests, when it was set up for them."""
+    seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))

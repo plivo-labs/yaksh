@@ -9,15 +9,18 @@ from sqlalchemy import func, insert, select, update
 
 from tests.conftest import (
     OUTBOUND_AGENT,
+    FakeCaller,
     create_agent,
     create_persona,
     create_scenario,
     make_settings,
 )
 from truman.config import Settings
-from truman.db.models import Conversation, PhoneNumber
+from truman.db.models import Conversation, PhoneNumber, RunningWorker
 from truman.db.session import create_engine, create_sessionmaker
 from truman.simulation import conversations
+from truman.simulation.workers import report_worker
+from truman.worker.worker import Worker
 
 APP_ID = "31216907353261579"
 RECEIVING = "+15716535187"
@@ -38,6 +41,25 @@ async def link_number(settings: Settings, **columns: Any) -> None:
     await engine.dispose()
 
 
+async def report(
+    settings: Settings,
+    worker_id: str = "w1",
+    *,
+    receiving_app_id: str | None = APP_ID,
+    outbound_problem: str | None = None,
+) -> None:
+    engine = create_engine(settings.database_url.encoded_string())
+    async with create_sessionmaker(engine)() as session:
+        await report_worker(
+            session,
+            worker_id,
+            receiving_app_id=receiving_app_id,
+            outbound_problem=outbound_problem,
+            lease_s=settings.worker_lease_s,
+        )
+    await engine.dispose()
+
+
 async def start_outbound(client: AsyncClient, **scenario: Any) -> Any:
     agent = await create_agent(client, **OUTBOUND_AGENT)
     created = await create_scenario(client, agent["id"], **scenario)
@@ -51,6 +73,7 @@ async def start_outbound(client: AsyncClient, **scenario: Any) -> Any:
 async def test_an_outbound_start_needs_a_linked_number_and_the_triggers_agent_data(
     client: AsyncClient, settings: Settings
 ) -> None:
+    await report(settings)
     unlinked = await start_outbound(client, agent_data=AGENT_DATA)
     await link_number(settings)
     lacking = await start_outbound(client, name="No data")
@@ -58,7 +81,7 @@ async def test_an_outbound_start_needs_a_linked_number_and_the_triggers_agent_da
 
     assert unlinked.status_code == 422
     assert unlinked.json()["error"]["message"] == (
-        f"no enabled number is linked to Plivo application {APP_ID}"
+        f"outbound tests are off: no enabled number is linked to Plivo application {APP_ID}"
     )
     assert lacking.status_code == 422
     assert (
@@ -78,6 +101,7 @@ async def claim(settings: Settings, receiving_app_id: str | None) -> Conversatio
 async def test_an_outbound_conversation_runs_only_where_its_call_can_be_received(
     client: AsyncClient, settings: Settings
 ) -> None:
+    await report(settings)
     await link_number(settings, available_after=datetime.now(UTC) + timedelta(minutes=5))
     started = (await start_outbound(client, agent_data=AGENT_DATA)).json()
 
@@ -96,6 +120,7 @@ async def test_an_outbound_conversation_runs_only_where_its_call_can_be_received
 async def test_preparing_the_call_opens_the_dial_window_and_keeps_the_pinned_data(
     client: AsyncClient, settings: Settings
 ) -> None:
+    await report(settings)
     await link_number(settings)
     outbound = {**OUTBOUND_AGENT["outbound"], "dial_window_s": 30}
     agent = await create_agent(client, **{**OUTBOUND_AGENT, "outbound": outbound})
@@ -126,8 +151,10 @@ async def test_preparing_the_call_opens_the_dial_window_and_keeps_the_pinned_dat
 async def test_a_waiting_outbound_conversation_does_not_hold_up_inbound_ones(
     client: AsyncClient, settings: Settings
 ) -> None:
+    await report(settings)
     await link_number(settings)
-    await start_outbound(client, agent_data=AGENT_DATA)
+    waiting = await start_outbound(client, agent_data=AGENT_DATA)
+    assert waiting.status_code == 202
     inbound = await create_agent(client)
     scenario = await create_scenario(client, inbound["id"])
     persona = await create_persona(client, name=f"Caller {uuid.uuid4()}")
@@ -148,12 +175,48 @@ async def test_a_waiting_outbound_conversation_does_not_hold_up_inbound_ones(
 async def test_the_numbers_page_shows_the_outbound_numbers_and_their_rest(
     client: AsyncClient, settings: Settings
 ) -> None:
+    await report(settings)
     await link_number(settings, available_after=datetime.now(UTC) + timedelta(minutes=5))
 
     listed = (await client.get("/api/v1/phone-numbers")).json()
 
     receiving = next(n for n in listed["items"] if n["number"] == RECEIVING)
     others = [n for n in listed["items"] if n["number"] != RECEIVING]
-    assert listed["outbound_application_id"] == APP_ID
+    assert listed["outbound_problem"] is None
     assert receiving["on_outbound_application"] and receiving["state"] == "resting"
     assert others and not any(n["on_outbound_application"] for n in others)
+
+
+async def test_an_outbound_start_needs_a_running_worker_that_receives_its_calls(
+    client: AsyncClient, settings: Settings
+) -> None:
+    await link_number(settings)
+    nobody = await start_outbound(client, agent_data=AGENT_DATA)
+    await report(settings, "w1", receiving_app_id=None, outbound_problem="answer URL is wrong")
+    await report(settings, "w2", receiving_app_id=None, outbound_problem="Plivo returned 401")
+    misconfigured = await start_outbound(client, agent_data=AGENT_DATA)
+    engine = create_engine(settings.database_url.encoded_string())
+    async with engine.begin() as connection:
+        await connection.execute(
+            insert(RunningWorker).values(
+                id="gone",
+                receiving_app_id=APP_ID,
+                seen_at=func.now() - timedelta(seconds=settings.worker_lease_s + 1),
+            )
+        )
+    await engine.dispose()
+    stopped = await start_outbound(client, agent_data=AGENT_DATA)
+    engine = create_engine(settings.database_url.encoded_string())
+    worker = Worker(create_sessionmaker(engine), FakeCaller(), settings, receiving_app_id=APP_ID)
+    await worker.poll()
+    await engine.dispose()
+    running = await start_outbound(client, agent_data=AGENT_DATA)
+
+    assert nobody.json()["error"]["message"] == (
+        f"outbound tests are off: no running worker receives calls for application {APP_ID}"
+    )
+    assert misconfigured.json()["error"]["message"] == (
+        "outbound tests are off: Plivo returned 401; answer URL is wrong"
+    )
+    assert stopped.status_code == 422, "a worker not seen for a lease has stopped"
+    assert running.status_code == 202

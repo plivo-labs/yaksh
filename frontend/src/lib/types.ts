@@ -136,7 +136,7 @@ export interface PhoneNumber {
 
 export interface PhoneNumbers {
   items: PhoneNumber[];
-  outbound_application_id: string | null;
+  outbound_problem: string | null;
 }
 
 export type VoiceProvider = "elevenlabs";

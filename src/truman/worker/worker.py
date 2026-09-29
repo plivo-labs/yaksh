@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import math
 import os
 import socket
 import time
@@ -25,6 +26,7 @@ from truman.domain.conversations import (
 from truman.domain.triggers import SEND_TIMEOUT_S
 from truman.simulation import conversations
 from truman.simulation.calls import CallerUnresponsiveError, LiveCall, run_call
+from truman.simulation.workers import report_worker
 
 log = logging.getLogger(__name__)
 
@@ -57,9 +59,11 @@ class Worker:
         *,
         worker_id: str | None = None,
         receiving_app_id: str | None = None,
+        outbound_problem: str | None = None,
     ) -> None:
         """receiving_app_id is the Plivo application that sends outbound agents' calls to this
-        worker; without it the worker runs only inbound conversations."""
+        worker; without it the worker runs only inbound conversations, and outbound_problem
+        says why."""
         self.worker_id = worker_id or f"{socket.gethostname()}:{os.getpid()}:{uuid.uuid4().hex[:8]}"
         self.fatal = asyncio.Event()
         self._stop = asyncio.Event()
@@ -67,6 +71,8 @@ class Worker:
         self._caller = caller
         self._settings = settings
         self._receiving_app_id = receiving_app_id
+        self._outbound_problem = outbound_problem
+        self._reported_at = -math.inf
         self._tasks: dict[uuid.UUID, asyncio.Task[None]] = {}
         self._live: dict[uuid.UUID, LiveCall] = {}
 
@@ -107,9 +113,11 @@ class Worker:
             reaped = await conversations.reap_expired(session, self._settings.number_rest_s)
         if reaped:
             log.warning("marked %d conversations failed after their lease expired", reaped)
+        await self._report_if_due()
         claimed = 0
         lease_s = self._settings.worker_lease_s
         while self.active < self._settings.max_active_conversations and not self.stopping:
+            await self._report_if_due()
             async with self._sessionmaker() as session:
                 conversation = await conversations.claim_next(
                     session, self.worker_id, lease_s, self._receiving_app_id
@@ -148,6 +156,19 @@ class Worker:
             self._start(request, confirmed_at=sent)
             claimed += 1
         return claimed
+
+    async def _report_if_due(self) -> None:
+        if time.monotonic() - self._reported_at < self._settings.worker_heartbeat_s:
+            return
+        async with self._sessionmaker() as session:
+            await report_worker(
+                session,
+                self.worker_id,
+                receiving_app_id=self._receiving_app_id,
+                outbound_problem=self._outbound_problem,
+                lease_s=self._settings.worker_lease_s,
+            )
+        self._reported_at = time.monotonic()
 
     async def _prepare(self, conversation: Conversation) -> CallRequest:
         async with self._sessionmaker() as session:

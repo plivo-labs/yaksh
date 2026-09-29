@@ -126,7 +126,7 @@ def stream_xml(
         conversation_id=conversation_id,
         stream_url=f"{stream_base(public_url)}/stream/{conversation_id}",
         status_url=escape(
-            f"{public_url.rstrip('/')}/callbacks/{conversation_id}#{CALLBACK_RETRIES}"
+            f"{public_url.rstrip('/')}/stream-status/{conversation_id}#{CALLBACK_RETRIES}"
         ),
     )
     hangup = "" if hangup_after_s is None else f'<Hangup schedule="{hangup_after_s}"/>'
@@ -139,9 +139,9 @@ def plus_e164(number: str) -> str:
 
 
 def create_app(
-    registry: StreamRegistry, public_url: str, auth_token: str, accept: Accept | None = None
+    registry: StreamRegistry, public_url: str, auth_token: str, accept: Accept
 ) -> FastAPI:
-    """accept admits calls to Truman's numbers; without it, every incoming call is refused."""
+    """accept admits calls to Truman's numbers, or says why it refuses them."""
     app = FastAPI(title="Truman worker", docs_url=None, redoc_url=None, openapi_url=None)
 
     def expected(conversation_id: str) -> PendingStream | None:
@@ -178,7 +178,7 @@ def create_app(
             from_number=plus_e164(report.get("From", "")),
             call_uuid=report.get("CallUUID", ""),
         )
-        verdict = "incoming calls are off" if accept is None else await accept(call)
+        verdict = await accept(call)
         entry = registry.get(verdict.conversation_id) if isinstance(verdict, Admission) else None
         if not isinstance(verdict, Admission) or entry is None:
             reason = verdict if isinstance(verdict, str) else "no call on this worker waits for it"
@@ -217,6 +217,16 @@ def create_app(
         entry = expected(conversation_id)
         if entry is not None:
             entry.callbacks.put_nowait(report)
+        return Response(status_code=200)
+
+    @app.post("/stream-status/{conversation_id}")
+    async def stream_status(conversation_id: str, request: Request) -> Response:
+        """Stream events (started, audio cleared, stopped) are only logged: the socket and the
+        hangup report already tell a call what happened."""
+        report = await signed_fields(request, public_url, auth_token)
+        if report is None:
+            return Response(status_code=403)
+        log.info("plivo reported %s for the stream of %s", summary(report), conversation_id)
         return Response(status_code=200)
 
     @app.websocket("/stream/{conversation_id}")

@@ -11,7 +11,14 @@ from tests.conftest import OUTBOUND_AGENT, create_agent, create_persona, create_
 from truman.config import Settings
 from truman.db.models import Conversation, PhoneNumber
 from truman.db.session import create_engine, create_sessionmaker
-from truman.domain.conversations import Admission, ConversationStatus, IncomingCall
+from truman.domain.conversations import (
+    Admission,
+    CallOutcome,
+    ConversationStatus,
+    EndReason,
+    IncomingCall,
+    Transcript,
+)
 from truman.domain.languages import Language
 from truman.simulation import conversations
 
@@ -179,3 +186,24 @@ async def test_calls_that_no_waiting_conversation_owns_are_refused(
         await accept(settings, call(elsewhere), worker_id="w2")
         == "the conversation is not running on this worker"
     )
+
+
+async def test_a_call_the_worker_never_took_leaves_no_caller_on_the_conversation(
+    client: AsyncClient, settings: Settings
+) -> None:
+    conversation_id, number = await waiting_conversation(client, settings)
+    assert isinstance(await accept(settings, call(number)), Admission)
+    engine = create_engine(settings.database_url.encoded_string())
+    async with create_sessionmaker(engine)() as session:
+        await conversations.finalize(
+            session,
+            conversation_id,
+            "w1",
+            CallOutcome(connected=False, end_reason=EndReason.NO_CALL),
+            Transcript(),
+            number_rest_s=0,
+        )
+        finished = await session.get_one(Conversation, conversation_id)
+    await engine.dispose()
+
+    assert (finished.call_uuid, finished.agent_caller_id) == (None, None)

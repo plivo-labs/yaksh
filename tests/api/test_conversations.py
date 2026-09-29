@@ -26,8 +26,9 @@ from tests.conftest import (
     wait_until,
 )
 from truman.config import Settings
-from truman.db.models import Conversation, ScenarioVersion
+from truman.db.models import AgentVersion, Conversation, ScenarioVersion
 from truman.db.session import create_engine, create_sessionmaker
+from truman.domain.agents import AgentConfig
 from truman.domain.conversations import ConversationCreate, ConversationStatus
 from truman.domain.languages import Language
 from truman.simulation import conversations
@@ -708,7 +709,10 @@ async def test_a_conversation_freezes_its_persona_scenario_and_prompt(
     engine = create_engine(settings.database_url.encoded_string())
     async with create_sessionmaker(engine)() as session:
         row = await conversations.get_conversation(session, uuid.UUID(started["id"]))
-        request = await conversations.call_request(session, settings, row, "+15550100000")
+        agent = await session.get_one(AgentVersion, row.agent_version_id)
+        request = await conversations.call_request(
+            session, settings, row, "+15550100000", AgentConfig.model_validate(agent.config)
+        )
     await engine.dispose()
 
     assert (detail["persona_name"], detail["persona_version"]) == (persona["name"], 1)

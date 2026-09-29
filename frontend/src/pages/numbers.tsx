@@ -22,8 +22,8 @@ import { usePhoneNumbers } from "@/lib/queries";
 import type { PhoneNumber } from "@/lib/types";
 
 const STATE_LABELS: Record<PhoneNumber["state"], string> = {
-  in_use: "In a call",
-  resting: "Resting after a call",
+  in_use: "In use by a test",
+  resting: "Resting after a test",
   free: "Free",
 };
 
@@ -46,12 +46,15 @@ export function NumbersPage() {
         </Alert>
       ) : (
         <>
-          {numbers.data.outbound_application_id === null && (
+          {numbers.data.outbound_problem !== null && (
             <Alert>
               <AlertTitle>Outbound tests are off</AlertTitle>
               <AlertDescription>
-                Set TRUMAN_PLIVO_APP_ID to the Plivo application that sends calls to Truman, then
-                link numbers to it in the Plivo console.
+                <p className="break-words">{numbers.data.outbound_problem}</p>
+                <p>
+                  The worker reads the Plivo application and its numbers when it starts, so restart
+                  it after a change in the Plivo console.
+                </p>
               </AlertDescription>
             </Alert>
           )}

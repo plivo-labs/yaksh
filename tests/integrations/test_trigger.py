@@ -60,6 +60,15 @@ async def agent_system() -> AsyncIterator[tuple[str, list[Request]]]:
         await asyncio.sleep(2)
         return Response("late")
 
+    @app.post("/slow-refusal")
+    async def slow_refusal() -> StreamingResponse:
+        async def parts() -> AsyncIterator[bytes]:
+            yield b'{"error": '
+            await asyncio.sleep(2)
+            yield b'"phone is required"}'
+
+        return StreamingResponse(parts(), status_code=422)
+
     server = PlivoServer(app, port=0)
     await server.start()
     yield f"http://127.0.0.1:{server.port}", seen
@@ -110,7 +119,7 @@ async def test_the_status_decides_whether_a_call_may_still_come(
     assert seen == [], "a redirect is never followed"
 
 
-async def test_a_timeout_leaves_the_call_possible_and_a_refused_connection_does_not(
+async def test_a_timeout_leaves_the_call_possible_unless_the_status_refused_it(
     agent_system: tuple[str, list[Request]],
 ) -> None:
     base, _ = agent_system
@@ -125,6 +134,13 @@ async def test_a_timeout_leaves_the_call_possible_and_a_refused_connection_does_
         allow_private=True,
         timeout=aiohttp.ClientTimeout(total=0.5),
     )
+    slow_refusal = await send_trigger(
+        request(f"{base}/slow-refusal"),
+        "conv-3",
+        signing_key=None,
+        allow_private=True,
+        timeout=aiohttp.ClientTimeout(total=0.5),
+    )
     refused = await send_trigger(
         request(f"http://127.0.0.1:{closed_port}/calls"),
         "conv-3",
@@ -133,6 +149,8 @@ async def test_a_timeout_leaves_the_call_possible_and_a_refused_connection_does_
     )
 
     assert slow.result is TriggerResult.UNKNOWN
+    assert slow_refusal.result is TriggerResult.REJECTED
+    assert slow_refusal.detail.startswith("HTTP 422, body not read: ")
     assert refused.result is TriggerResult.NOT_SENT
 
 
@@ -194,5 +212,16 @@ def test_only_global_addresses_count_as_public() -> None:
     assert is_public("8.8.8.8")
     assert not any(
         is_public(address)
-        for address in ("10.1.2.3", "127.0.0.1", "169.254.169.254", "100.64.0.1", "::1", "fd00::1")
+        for address in (
+            "10.1.2.3",
+            "127.0.0.1",
+            "169.254.169.254",
+            "100.64.0.1",
+            "::1",
+            "fd00::1",
+            "::ffff:10.0.0.1",
+            "64:ff9b::a9fe:a9fe",
+            "::7f00:1",
+        )
     )
+    assert is_public("64:ff9b::808:808")
