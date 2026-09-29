@@ -248,6 +248,8 @@ def upgrade() -> None:
         sa.Column("nudge", sa.Text(), nullable=False),
         sa.Column("caller_number", sa.Text(), nullable=True),
         sa.Column("call_uuid", sa.Text(), nullable=True),
+        sa.Column("dial_deadline_at", sa.DateTime(timezone=True), nullable=True),
+        sa.Column("agent_caller_id", sa.Text(), nullable=True),
         sa.Column("max_duration_s", sa.Integer(), nullable=False),
         sa.Column(
             "status",

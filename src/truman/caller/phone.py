@@ -32,7 +32,12 @@ from pipecat.transports.websocket.fastapi import FastAPIWebsocketParams, FastAPI
 
 from truman.caller.audio import GAP_BYTES, LOUD_PEAK, SAMPLE_RATE, Clock, Playout, Stamper
 from truman.caller.pipeline import CallState, Persona, converse, provider_keys
-from truman.caller.plivo_server import CALLBACK_RETRIES, PendingStream, StreamRegistry
+from truman.caller.plivo_server import (
+    CALLBACK_RETRIES,
+    TIME_LIMIT_MARGIN_S,
+    PendingStream,
+    StreamRegistry,
+)
 from truman.caller.transcript import TranscriptBuilder, WireTap
 from truman.config import Settings
 from truman.domain.conversations import (
@@ -49,7 +54,6 @@ log = logging.getLogger(__name__)
 
 CALLBACK_GRACE_S = 15.0
 STREAM_GRACE_S = 10.0
-TIME_LIMIT_MARGIN_S = 30
 RINGING = "ringing"
 IN_PROGRESS = "in-progress"
 UNANSWERED = frozenset({"no-answer", "timeout", "busy"})

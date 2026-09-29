@@ -13,11 +13,13 @@ from truman.config import Settings
 from truman.db.models import Conversation
 from truman.diagnostics import describe_exception
 from truman.domain.conversations import (
+    Admission,
     Caller,
     CallOutcome,
     CallRequest,
     ConversationStatus,
     EndReason,
+    IncomingCall,
     Transcript,
 )
 from truman.simulation import conversations
@@ -154,6 +156,10 @@ class Worker:
     async def _record_cancelled(self, conversation_id: uuid.UUID) -> None:
         outcome = CallOutcome(connected=False, end_reason=EndReason.USER_REQUEST)
         await self._record(conversation_id, outcome, Transcript())
+
+    async def accept_incoming(self, call: IncomingCall) -> Admission | str:
+        async with self._sessionmaker() as session:
+            return await conversations.accept_incoming_call(session, self.worker_id, call)
 
     async def drain(self) -> None:
         """Ask every active call to stop, then wait for each task to finish recording its result."""

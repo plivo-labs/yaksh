@@ -129,6 +129,25 @@ class ConversationCreate(BaseModel):
     max_duration_s: int | None = Field(default=None, ge=10, le=1800)
 
 
+class IncomingCall(BaseModel):
+    """A call Plivo delivers to one of Truman's numbers, as its answer webhook describes it."""
+
+    model_config = ConfigDict(frozen=True)
+
+    to_number: str
+    from_number: str
+    call_uuid: str
+
+
+class Admission(BaseModel):
+    """An incoming call accepted for the outbound conversation waiting on its number."""
+
+    model_config = ConfigDict(frozen=True)
+
+    conversation_id: uuid.UUID
+    max_duration_s: int
+
+
 class CallRequest(BaseModel):
     model_config = ConfigDict(frozen=True)
 

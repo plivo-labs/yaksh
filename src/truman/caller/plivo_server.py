@@ -1,4 +1,5 @@
-"""The worker's Plivo-facing surface: the answer XML, the stream websocket, and the callbacks.
+"""The worker's Plivo-facing surface: the answer XML for calls Truman places, the answer XML
+for calls an outbound agent places to Truman, the stream websocket, and the callbacks.
 
 Plivo reaches the worker directly, at one public URL, because the pipeline that owns a call
 lives in the worker. A stream is matched to its conversation by the id Truman put in the
@@ -9,7 +10,7 @@ import asyncio
 import contextlib
 import logging
 import uuid
-from collections.abc import Generator
+from collections.abc import Awaitable, Callable, Generator
 from dataclasses import dataclass, field
 from html import escape
 
@@ -17,21 +18,27 @@ import uvicorn
 from fastapi import FastAPI, Request, WebSocket
 from fastapi.responses import Response
 
+from truman.domain.conversations import Admission, IncomingCall
 from truman.integrations.plivo_signature import is_signed
 
 log = logging.getLogger(__name__)
 
-STREAM_XML = (
-    '<?xml version="1.0" encoding="UTF-8"?><Response>'
+STREAM_ELEMENT = (
     '<Stream bidirectional="true" keepCallAlive="true" contentType="audio/x-l16;rate=8000" '
     'extraHeaders="conversation_id={conversation_id}" '
     'statusCallbackUrl="{status_url}" statusCallbackMethod="POST">'
-    "{stream_url}</Stream></Response>"
+    "{stream_url}</Stream>"
 )
+XML_HEAD = '<?xml version="1.0" encoding="UTF-8"?><Response>'
 REPORT_KEYS = ("Event", "Status", "Cause", "Source", "Reason", "Error")
 CALLBACK_RETRIES = "rc=5&ct=2000&rd=1000&rp=5xx,ct"
-HANGUP_XML = '<?xml version="1.0" encoding="UTF-8"?><Response><Hangup/></Response>'
+HANGUP_XML = f"{XML_HEAD}<Hangup/></Response>"
+REJECT_XML = f'{XML_HEAD}<Hangup reason="rejected"/></Response>'
 NO_CALL = "no call expects this stream"
+TIME_LIMIT_MARGIN_S = 30
+"""Past the talk-time limit, Plivo itself ends the call, in case the worker cannot."""
+
+type Accept = Callable[[IncomingCall], Awaitable[Admission | str]]
 
 
 @dataclass
@@ -46,6 +53,7 @@ class PendingStream:
 class StreamRegistry:
     def __init__(self) -> None:
         self._pending: dict[uuid.UUID, PendingStream] = {}
+        self._calls: dict[str, uuid.UUID] = {}
 
     def expect(self, conversation_id: uuid.UUID) -> PendingStream:
         if conversation_id in self._pending:
@@ -56,11 +64,20 @@ class StreamRegistry:
     def get(self, conversation_id: uuid.UUID) -> PendingStream | None:
         return self._pending.get(conversation_id)
 
+    def bind(self, call_uuid: str, conversation_id: uuid.UUID) -> None:
+        """Route a call's hangup report, which names only its CallUUID, to its conversation."""
+        self._calls[call_uuid] = conversation_id
+
+    def for_call(self, call_uuid: str) -> PendingStream | None:
+        conversation_id = self._calls.get(call_uuid)
+        return None if conversation_id is None else self._pending.get(conversation_id)
+
     def forget(self, conversation_id: uuid.UUID) -> None:
         """Release the entry; a socket handler still waiting on it returns and closes."""
         entry = self._pending.pop(conversation_id, None)
         if entry is not None:
             entry.finished.set()
+        self._calls = {call: cid for call, cid in self._calls.items() if cid != conversation_id}
 
 
 def public_request_url(base: str, path: str, query: str) -> str:
@@ -100,7 +117,31 @@ def stream_base(public_url: str) -> str:
     return "ws://" + public_url.removeprefix("http://").rstrip("/")
 
 
-def create_app(registry: StreamRegistry, public_url: str, auth_token: str) -> FastAPI:
+def stream_xml(
+    public_url: str, conversation_id: uuid.UUID | str, hangup_after_s: int | None
+) -> str:
+    """Answer XML that connects the call to the conversation's stream. With hangup_after_s,
+    Plivo hangs up after that many seconds even if the worker is gone."""
+    stream = STREAM_ELEMENT.format(
+        conversation_id=conversation_id,
+        stream_url=f"{stream_base(public_url)}/stream/{conversation_id}",
+        status_url=escape(
+            f"{public_url.rstrip('/')}/callbacks/{conversation_id}#{CALLBACK_RETRIES}"
+        ),
+    )
+    hangup = "" if hangup_after_s is None else f'<Hangup schedule="{hangup_after_s}"/>'
+    return f"{XML_HEAD}{hangup}{stream}</Response>"
+
+
+def plus_e164(number: str) -> str:
+    """Plivo sends numbers with or without the leading +."""
+    return "+" + number.strip().lstrip("+")
+
+
+def create_app(
+    registry: StreamRegistry, public_url: str, auth_token: str, accept: Accept | None = None
+) -> FastAPI:
+    """accept admits calls to Truman's numbers; without it, every incoming call is refused."""
     app = FastAPI(title="Truman worker", docs_url=None, redoc_url=None, openapi_url=None)
 
     def expected(conversation_id: str) -> PendingStream | None:
@@ -120,14 +161,52 @@ def create_app(registry: StreamRegistry, public_url: str, auth_token: str) -> Fa
         if entry is None:
             return Response(HANGUP_XML, media_type="application/xml")
         entry.callbacks.put_nowait(report)
-        xml = STREAM_XML.format(
-            conversation_id=conversation_id,
-            stream_url=f"{stream_base(public_url)}/stream/{conversation_id}",
-            status_url=escape(
-                f"{public_url.rstrip('/')}/callbacks/{conversation_id}#{CALLBACK_RETRIES}"
-            ),
+        return Response(
+            stream_xml(public_url, conversation_id, hangup_after_s=None),
+            media_type="application/xml",
         )
-        return Response(xml, media_type="application/xml")
+
+    @app.post("/incoming")
+    async def incoming(request: Request) -> Response:
+        """An outbound agent calls one of Truman's numbers; answer it for the conversation
+        waiting on that number, or refuse it."""
+        report = await signed_fields(request, public_url, auth_token)
+        if report is None:
+            return Response(status_code=403)
+        call = IncomingCall(
+            to_number=plus_e164(report.get("To", "")),
+            from_number=plus_e164(report.get("From", "")),
+            call_uuid=report.get("CallUUID", ""),
+        )
+        verdict = "incoming calls are off" if accept is None else await accept(call)
+        entry = registry.get(verdict.conversation_id) if isinstance(verdict, Admission) else None
+        if not isinstance(verdict, Admission) or entry is None:
+            reason = verdict if isinstance(verdict, str) else "no call on this worker waits for it"
+            log.warning(
+                "refused a call from %s to %s: %s", call.from_number, call.to_number, reason
+            )
+            return Response(REJECT_XML, media_type="application/xml")
+        registry.bind(call.call_uuid, verdict.conversation_id)
+        entry.callbacks.put_nowait(report)
+        return Response(
+            stream_xml(
+                public_url,
+                verdict.conversation_id,
+                hangup_after_s=verdict.max_duration_s + TIME_LIMIT_MARGIN_S,
+            ),
+            media_type="application/xml",
+        )
+
+    @app.post("/incoming/hangup")
+    async def incoming_hangup(request: Request) -> Response:
+        report = await signed_fields(request, public_url, auth_token)
+        if report is None:
+            return Response(status_code=403)
+        log.info("plivo reported %s for incoming call %s", summary(report), report.get("CallUUID"))
+        entry = registry.for_call(report.get("CallUUID", ""))
+        if entry is not None:
+            entry.callbacks.put_nowait(report)
+        return Response(status_code=200)
 
     @app.post("/callbacks/{conversation_id}")
     async def callback(conversation_id: str, request: Request) -> Response:

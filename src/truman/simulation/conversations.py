@@ -23,11 +23,13 @@ from truman.db.models import (
 from truman.domain.agents import AgentConfig, Direction
 from truman.domain.conversations import (
     ACTIVE_STATUSES,
+    Admission,
     CallOutcome,
     CallRequest,
     ConversationCreate,
     ConversationStatus,
     EndReason,
+    IncomingCall,
     Transcript,
     Validity,
 )
@@ -318,6 +320,50 @@ def owned_by(conversation_id: uuid.UUID, worker_id: str) -> ColumnElement[bool]:
         Conversation.status.in_(LIVE_STATUSES),
         Conversation.lease_expires_at > func.now(),
     )
+
+
+async def accept_incoming_call(
+    session: AsyncSession, worker_id: str, call: IncomingCall
+) -> Admission | str:
+    """Accept a call on a leased number for the outbound conversation waiting on it, or say
+    why not. The conversation row stays locked from check to write, so cancellation, the
+    reaper and a second call cannot interleave. Plivo retries its answer webhook, so the
+    same CallUUID is accepted again even after the dial window closed."""
+    conversation = await session.scalar(
+        select(Conversation)
+        .join(PhoneNumber, PhoneNumber.conversation_id == Conversation.id)
+        .where(PhoneNumber.number == call.to_number)
+        .with_for_update(of=Conversation)
+    )
+    if conversation is None:
+        return "no conversation holds this number"
+    now = (await session.execute(select(func.clock_timestamp()))).scalar_one()
+    if conversation.dial_deadline_at is None:
+        return "the number is on an inbound test"
+    if not (
+        conversation.claimed_by == worker_id
+        and conversation.status is ConversationStatus.RUNNING
+        and conversation.lease_expires_at is not None
+        and conversation.lease_expires_at > now
+    ):
+        return "the conversation is not running on this worker"
+    admission = Admission(
+        conversation_id=conversation.id, max_duration_s=conversation.max_duration_s
+    )
+    if conversation.call_uuid == call.call_uuid:
+        return admission
+    if conversation.call_uuid is not None:
+        return "the conversation already has a call"
+    if now >= conversation.dial_deadline_at:
+        return "the dial window has closed"
+    agent_version = await session.get_one(AgentVersion, conversation.agent_version_id)
+    outbound = AgentConfig.model_validate(agent_version.config).outbound
+    if outbound and outbound.calling_numbers and call.from_number not in outbound.calling_numbers:
+        return f"{call.from_number} is not one of the agent's calling numbers"
+    conversation.call_uuid = call.call_uuid
+    conversation.agent_caller_id = call.from_number
+    await session.commit()
+    return admission
 
 
 async def reap_expired(session: AsyncSession, number_rest_s: int) -> int:

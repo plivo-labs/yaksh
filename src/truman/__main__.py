@@ -157,7 +157,8 @@ async def run_worker(
     server = None
     if settings.public_url and api is not None:
         server = PlivoServer(
-            create_app(registry, settings.public_url, api.auth_token), settings.stream_port
+            create_app(registry, settings.public_url, api.auth_token, worker.accept_incoming),
+            settings.stream_port,
         )
         await server.start()
     stop = asyncio.Event()

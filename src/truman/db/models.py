@@ -98,6 +98,10 @@ class Conversation(Base):
     nudge: Mapped[str] = mapped_column(Text)
     caller_number: Mapped[str | None] = mapped_column(Text)
     call_uuid: Mapped[str | None] = mapped_column(Text)
+    dial_deadline_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    """Outbound only: the time until which a call from the agent is accepted."""
+    agent_caller_id: Mapped[str | None] = mapped_column(Text)
+    """Outbound only: the number the agent called from."""
     max_duration_s: Mapped[int] = mapped_column(Integer)
     status: Mapped[ConversationStatus] = mapped_column(
         pg_enum(ConversationStatus, "conversation_status"), default=ConversationStatus.QUEUED
