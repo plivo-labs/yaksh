@@ -1,5 +1,6 @@
 import asyncio
 import uuid
+from datetime import datetime
 from enum import StrEnum
 from pathlib import Path
 from typing import Protocol
@@ -32,7 +33,7 @@ class EndReason(StrEnum):
     USER_REQUEST = "user_request"
     CALLER_HANGUP = "caller_hangup"
     AGENT_HANGUP = "agent_hangup"
-    """Plivo reported that the called side, the agent, hung up."""
+    """Plivo reported that the agent's side hung up."""
     AGENT_SILENT = "agent_silent"
     NO_ANSWER = "no_answer"
     STREAM_ENDED = "stream_ended"
@@ -42,6 +43,10 @@ class EndReason(StrEnum):
     WORKER_STOPPED = "worker_stopped"
     LEASE_LOST = "lease_lost"
     """The worker could not keep its claim on the conversation, so it stopped the call."""
+    TRIGGER_FAILED = "trigger_failed"
+    """The outbound agent's system refused the trigger, or it could not be sent."""
+    NO_CALL = "no_call"
+    """The outbound agent did not call within its dial window."""
 
 
 ACTIVE_STATUSES = frozenset(
@@ -77,6 +82,9 @@ class WireEventKind(StrEnum):
     SILENCE_GREETING = "silence_greeting"
     STOP = "stop"
     CALLER_ERROR = "caller_error"
+    TRIGGER_SENT = "trigger_sent"
+    """Truman sent the outbound agent's trigger; the detail holds the result."""
+    WAITING_FOR_CALL = "waiting_for_call"
 
 
 class Turn(BaseModel):
@@ -96,6 +104,7 @@ class WireEvent(BaseModel):
 
     kind: WireEventKind
     at_ms: int
+    detail: str | None = None
 
 
 class Validity(BaseModel):
@@ -161,6 +170,10 @@ class CallRequest(BaseModel):
     caller_number: str
     max_duration_s: int
     agent_data: list[Fact] = []
+    pickup: str = "Hello?"
+    """What the caller says on answering an outbound agent that waits for the callee."""
+    accept_calls_until: datetime | None = None
+    """Outbound: when the window for the agent's call closes."""
     output_dir: Path
 
 

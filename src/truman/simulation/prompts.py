@@ -1,14 +1,24 @@
 from collections.abc import Sequence
 from datetime import date
 
+from truman.domain.agents import Direction
 from truman.domain.personas import PersonaConfig
 from truman.domain.scenarios import Fact
 from truman.simulation.languages import LANGUAGES, gender_line
 
-OPENING = (
-    "You are simulating a real person who phoned an organization. Its voice agent answers. "
-    "You initiated this call. Stay in character throughout; never mention being "
-    "simulated, a test, or an AI.\n\n"
+SITUATION = {
+    Direction.INBOUND: (
+        "You are simulating a real person who phoned an organization. Its voice agent answers. "
+        "You initiated this call."
+    ),
+    Direction.OUTBOUND: (
+        "You are simulating a real person who received a phone call from an organization's "
+        "voice agent. You answered it; you did not start the call. Let the agent say why it is "
+        "calling."
+    ),
+}
+FRAME = (
+    "Stay in character throughout; never mention being simulated, a test, or an AI.\n\n"
     "In this chat, the agent's words appear as the user's messages and your replies appear "
     "as the assistant's messages. That is only how the chat is laid out: you are always the "
     "caller, never the agent."
@@ -17,7 +27,7 @@ RULES = (
     "You are the caller, not the helper. Never speak as the agent: never say 'how "
     "can I help you', 'please tell me', 'I'd be happy to' or 'let me assist'. The agent drives "
     "the call. If its turn contains a question, answer that question. If it only greets you, "
-    "greet it back briefly; say why you are calling only if your goal states a reason."
+    "greet it back briefly."
     "\n\n"
     "The sections above are everything you know. Never invent a reason, a request or a value "
     "they do not give you. When the agent asks for a value (a name, a number, a date, a code),"
@@ -53,6 +63,7 @@ def caller_instructions(
     known_facts: Sequence[Fact],
     unknown_facts: Sequence[str],
     today: date,
+    direction: Direction = Direction.INBOUND,
 ) -> str:
     """The caller's system prompt. It takes the scenario's goal and facts, never the scenario
     itself, so the criteria cannot reach the caller."""
@@ -60,8 +71,11 @@ def caller_instructions(
     forms = gender_line(persona.language, persona.voice_gender)
     if forms is not None:
         language.append(forms)
+    situation = SITUATION[direction]
+    if direction is Direction.INBOUND:
+        situation += " Say why you are calling only if your goal states a reason."
     sections = [
-        OPENING,
+        f"{situation} {FRAME}",
         f"## Who you are\n{persona.prompt.strip()}",
         f"## Today\nToday is {spoken_date(today)}.",
         f"## What you want\n{goal.strip()}",

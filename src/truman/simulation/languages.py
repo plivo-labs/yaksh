@@ -12,6 +12,8 @@ class LanguagePolicy:
     instruction: str
     nudge: str
     sample: str
+    pickup: str
+    """What a person says on answering the phone."""
 
 
 LANGUAGES: dict[Language, LanguagePolicy] = {
@@ -19,12 +21,14 @@ LANGUAGES: dict[Language, LanguagePolicy] = {
         "Speak English.",
         "Hello? Are you still there?",
         "Hi, I'm calling about my booking for next Tuesday. Can you check it for me?",
+        "Hello?",
     ),
     Language.HINGLISH: LanguagePolicy(
         "Speak Hinglish: Devanagari script, with common English words such as appointment or "
         "confirm kept in English.",
         "हेलो? आप वहाँ हैं?",
         "नमस्ते, मुझे next Tuesday की booking के बारे में बात करनी है। क्या आप check कर सकते हैं?",
+        "हेलो?",
     ),
 }
 

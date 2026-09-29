@@ -281,6 +281,8 @@ def upgrade() -> None:
                 "error",
                 "worker_stopped",
                 "lease_lost",
+                "trigger_failed",
+                "no_call",
                 name="end_reason",
             ),
             nullable=True,

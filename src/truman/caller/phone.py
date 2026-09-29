@@ -4,9 +4,11 @@ import asyncio
 import base64
 import json
 import logging
+import os
 import wave
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -48,21 +50,28 @@ from truman.domain.conversations import (
     WireEvent,
     WireEventKind,
 )
+from truman.domain.triggers import RenderError, render
 from truman.integrations.plivo import OutboundCall, PlivoApi, PlivoError
+from truman.integrations.trigger import TriggerOutcome, TriggerResult, send_trigger
 
 log = logging.getLogger(__name__)
 
 CALLBACK_GRACE_S = 15.0
 STREAM_GRACE_S = 10.0
+ACCEPT_GRACE_S = 2.0
+"""Past the dial deadline, Plivo's report of a call accepted just in time may still be on its
+way; no new call is accepted then."""
 RINGING = "ringing"
 IN_PROGRESS = "in-progress"
 UNANSWERED = frozenset({"no-answer", "timeout", "busy"})
 HANGUP_EVENT = "Hangup"
 CALLED_SIDE = "Callee"
+CALLING_SIDE = "Caller"
 HANGUP_REPORT_WAIT_S = 2.0
 ACK_GRACE_S = 0.2
 HANGUP_TIMEOUT_S = 2.0
 CHUNK_BYTES = SAMPLE_RATE * 2 // 2
+CALL_NEVER_COMES = frozenset({TriggerResult.REJECTED, TriggerResult.NOT_SENT})
 LINEAR = "audio/x-l16"
 MULAW = "audio/x-mulaw"
 
@@ -200,7 +209,7 @@ def ended_early(report: Mapping[str, str], call_uuid: str | None) -> CallOutcome
     detail = (f"{status} ({cause})" if cause else status) or "no status"
     if status in UNANSWERED:
         return unreached(EndReason.NO_ANSWER, f"the agent did not answer: {detail}", call_uuid)
-    reason, error = ended_by(report)
+    reason, error = ended_by(report, CALLED_SIDE)
     if reason is EndReason.AGENT_HANGUP:
         return unreached(reason, "the agent hung up before the stream started", call_uuid)
     return unreached(
@@ -210,13 +219,14 @@ def ended_early(report: Mapping[str, str], call_uuid: str | None) -> CallOutcome
     )
 
 
-def ended_by(report: Mapping[str, str] | None) -> tuple[EndReason, str | None]:
-    """Who ended the call, by Plivo's hangup report. Truman dials, so the called side is the
-    agent; without a hangup source nobody knows which side it was."""
+def ended_by(report: Mapping[str, str] | None, agent_side: str) -> tuple[EndReason, str | None]:
+    """Who ended the call, by Plivo's hangup report. The agent is the called side when Truman
+    dials and the calling side when an outbound agent calls Truman; without a hangup source
+    nobody knows which side it was."""
     source = (report or {}).get("HangupSource")
     if report is None or source is None:
         return EndReason.STREAM_ENDED, None
-    if source == CALLED_SIDE:
+    if source == agent_side:
         return EndReason.AGENT_HANGUP, None
     cause = report.get("HangupCauseName") or report.get("HangupCause") or "no cause given"
     return EndReason.ERROR, f"Plivo reports hangup source {source}: {cause}"
@@ -235,12 +245,14 @@ async def hangup_report(
     return report
 
 
-async def resolve_stream_end(state: CallState, callbacks: asyncio.Queue[dict[str, str]]) -> None:
+async def resolve_stream_end(
+    state: CallState, callbacks: asyncio.Queue[dict[str, str]], agent_side: str
+) -> None:
     """A stream that stopped on its own is named by Plivo's hangup report; without one the
     call cannot count as clean, since nobody knows which side ended it."""
     if state.end_reason is not EndReason.STREAM_ENDED:
         return
-    reason, error = ended_by(await hangup_report(callbacks, HANGUP_REPORT_WAIT_S))
+    reason, error = ended_by(await hangup_report(callbacks, HANGUP_REPORT_WAIT_S), agent_side)
     state.end_reason = reason
     if reason is EndReason.STREAM_ENDED:
         error = "the stream ended and Plivo did not say which side ended the call"
@@ -468,6 +480,101 @@ class Recorder(AudioBufferProcessor):
             recording.writeframes(bytes(self._audio))
 
 
+class Receiver:
+    """Waits for the call an outbound agent places to the leased number, and hands over its
+    stream. The trigger that makes the agent call runs beside the wait: the call may arrive
+    before the trigger's response, and a trigger that fails after the call arrived does not
+    end it.
+    """
+
+    async def receive(
+        self,
+        request: CallRequest,
+        entry: PendingStream,
+        observer: CallObserver,
+        at_ms: Callable[[], int],
+        stop: asyncio.Event,
+        trigger: asyncio.Future[TriggerOutcome],
+    ) -> Connected | CallOutcome:
+        if request.accept_calls_until is None:
+            return unreached(EndReason.ERROR, "the outbound conversation has no dial deadline")
+        observer.wire_event(WireEvent(kind=WireEventKind.WAITING_FOR_CALL, at_ms=at_ms()))
+        loop = asyncio.get_running_loop()
+        left_s = (request.accept_calls_until - datetime.now(UTC)).total_seconds()
+        deadline = loop.time() + left_s + ACCEPT_GRACE_S
+        accepted: str | None = None
+        triggered: TriggerOutcome | None = None
+        stopped = asyncio.ensure_future(stop.wait())
+        report = asyncio.ensure_future(entry.callbacks.get())
+        try:
+            while True:
+                waits: set[asyncio.Future[Any]] = {entry.socket, stopped, report}
+                if triggered is None:
+                    waits.add(trigger)
+                await asyncio.wait(
+                    waits,
+                    timeout=max(deadline - loop.time(), 0),
+                    return_when=asyncio.FIRST_COMPLETED,
+                )
+                if report.done():
+                    fields = report.result()
+                    report = asyncio.ensure_future(entry.callbacks.get())
+                    if fields.get("Event") == HANGUP_EVENT:
+                        return ended_early_incoming(fields, accepted)
+                    accepted = fields.get("CallUUID") or accepted
+                    observer.wire_event(WireEvent(kind=WireEventKind.ANSWERED, at_ms=at_ms()))
+                    deadline = loop.time() + STREAM_GRACE_S
+                    continue
+                if entry.socket.done():
+                    await give_back(report, entry.callbacks)
+                    return await accept_stream(entry.socket.result(), accepted)
+                if triggered is None and trigger.done():
+                    triggered = trigger.result()
+                    if accepted is None and triggered.result in CALL_NEVER_COMES:
+                        return unreached(EndReason.TRIGGER_FAILED, triggered.detail)
+                    continue
+                if stopped.done():
+                    return unreached(EndReason.USER_REQUEST, None, accepted)
+                if accepted is not None:
+                    return unreached(
+                        EndReason.ERROR,
+                        "the call was answered but its stream never opened",
+                        accepted,
+                    )
+                detail = f"no call reached {request.caller_number} within the dial window"
+                if triggered is not None:
+                    detail += f"; trigger result: {triggered.detail}"
+                return unreached(EndReason.NO_CALL, detail)
+        finally:
+            stopped.cancel()
+            report.cancel()
+            await asyncio.gather(stopped, report, return_exceptions=True)
+
+
+def ended_early_incoming(report: Mapping[str, str], call_uuid: str | None) -> CallOutcome:
+    reason, error = ended_by(report, CALLING_SIDE)
+    if reason is EndReason.AGENT_HANGUP:
+        return unreached(reason, "the agent hung up before the stream started", call_uuid)
+    return unreached(
+        EndReason.ERROR, error or "the call ended before its stream started", call_uuid
+    )
+
+
+async def accept_stream(socket: WebSocket, call_uuid: str | None) -> Connected | CallOutcome:
+    """Open the stream of the accepted call; a stream for any other call is refused."""
+    try:
+        stream_id, call_id, encoding = await handshake(socket)
+    except (WebSocketDisconnect, ValueError) as error:
+        return unreached(EndReason.ERROR, f"the stream ended before it started: {error}", call_uuid)
+    if call_id != call_uuid:
+        return unreached(
+            EndReason.ERROR,
+            f"the stream belongs to call {call_id}, not the accepted call",
+            call_uuid,
+        )
+    return Connected(socket, stream_id, call_id, encoding)
+
+
 async def settled() -> None:
     """Reports for audio that played just before a cut are still in flight; give them a moment."""
     await asyncio.sleep(ACK_GRACE_S)
@@ -475,7 +582,10 @@ async def settled() -> None:
 
 async def handshake(socket: WebSocket) -> tuple[str, str, str]:
     """Plivo opens a stream with its start event: the stream and call ids and the encoding."""
-    message = json.loads(await socket.receive_text())
+    try:
+        message = json.loads(await asyncio.wait_for(socket.receive_text(), STREAM_GRACE_S))
+    except TimeoutError as error:
+        raise ValueError(f"no Plivo start event within {STREAM_GRACE_S:g}s") from error
     if message.get("event") != "start":
         raise ValueError(
             f"the stream did not open with a Plivo start event: {message.get('event')}"
@@ -499,6 +609,7 @@ class PhoneCaller:
         self._registry = registry
         self._api = api
         self._dialer = Dialer(api, settings.public_url, settings.ring_timeout_s)
+        self._receiver = Receiver()
 
     async def run(
         self, request: CallRequest, observer: CallObserver, stop: asyncio.Event
@@ -506,8 +617,17 @@ class PhoneCaller:
         clock = Clock()
         observer.wire_event(WireEvent(kind=WireEventKind.CONNECT_STARTED, at_ms=clock.ms()))
         entry = self._registry.expect(request.conversation_id)
+        trigger: asyncio.Future[TriggerOutcome] | None = None
         try:
-            dialed = await self._dialer.dial(request, entry, observer, clock.ms, stop)
+            if request.agent.outbound is None:
+                dialed = await self._dialer.dial(request, entry, observer, clock.ms, stop)
+            else:
+                trigger = asyncio.ensure_future(self._send_trigger(request, observer, clock))
+                dialed = await self._receiver.receive(
+                    request, entry, observer, clock.ms, stop, trigger
+                )
+                if isinstance(dialed, CallOutcome) and dialed.call_uuid is not None:
+                    await self._hang_up(dialed.call_uuid)
             if isinstance(dialed, CallOutcome):
                 return dialed
             try:
@@ -516,6 +636,37 @@ class PhoneCaller:
                 await self._hang_up(dialed.call_uuid)
         finally:
             self._registry.forget(request.conversation_id)
+            if trigger is not None:
+                trigger.cancel()
+                await asyncio.gather(trigger, return_exceptions=True)
+
+    async def _send_trigger(
+        self, request: CallRequest, observer: CallObserver, clock: Clock
+    ) -> TriggerOutcome:
+        """Send the outbound agent's trigger once and record its result on the wire."""
+        assert request.agent.outbound is not None
+        try:
+            rendered = render(
+                request.agent.outbound.trigger,
+                number=request.caller_number,
+                conversation_id=str(request.conversation_id),
+                agent_data=request.agent_data,
+                env=os.environ,
+            )
+        except RenderError as error:
+            outcome = TriggerOutcome(TriggerResult.NOT_SENT, str(error))
+        else:
+            key = self._settings.webhook_signing_key
+            outcome = await send_trigger(
+                rendered,
+                str(request.conversation_id),
+                signing_key=key.get_secret_value() if key else None,
+                allow_private=self._settings.allow_private_triggers,
+            )
+        observer.wire_event(
+            WireEvent(kind=WireEventKind.TRIGGER_SENT, at_ms=clock.ms(), detail=outcome.detail)
+        )
+        return outcome
 
     async def _talk(
         self,
@@ -571,8 +722,12 @@ class PhoneCaller:
         async def on_connected(_transport: Any, _socket: Any) -> None:
             state.connected_ms = clock.ms()
             observer.wire_event(WireEvent(kind=WireEventKind.CONNECTED, at_ms=clock.ms()))
-            if not request.agent.agent_speaks_first:
+            if request.agent.agent_speaks_first:
+                return
+            if request.agent.outbound is None:
                 await persona.speak_first()
+            else:
+                await persona.say(request.pickup)
 
         @transport.event_handler("on_client_disconnected")
         async def on_disconnected(_transport: Any, _socket: Any) -> None:
@@ -592,7 +747,8 @@ class PhoneCaller:
             if greeting is not None:
                 greeting.cancel()
         talk_ms = None if state.connected_ms is None else clock.ms() - state.connected_ms
-        await resolve_stream_end(state, entry.callbacks)
+        agent_side = CALLED_SIDE if request.agent.outbound is None else CALLING_SIDE
+        await resolve_stream_end(state, entry.callbacks, agent_side)
         state.blame(serializer.failure)
         return CallOutcome(
             connected=state.connected,

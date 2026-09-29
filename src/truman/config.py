@@ -49,6 +49,10 @@ class Settings(BaseSettings):
     plivo_numbers: Annotated[list[E164], NoDecode] = []
     plivo_app_id: str | None = None
     """The Plivo Application that sends outbound test calls to this worker."""
+    webhook_signing_key: SecretStr | None = None
+    """Signs every outbound agent trigger so its receiver can check it came from Truman."""
+    allow_private_triggers: bool = False
+    """Allow trigger URLs on private or local addresses, for development."""
     number_rest_s: int = Field(default=300, ge=0)
     """How long a released number waits before a new test may use it, so a late call from an
     earlier test does not reach the next one."""

@@ -110,6 +110,7 @@ async def create_conversation(
             known_facts=wants.known_facts,
             unknown_facts=wants.unknown_facts,
             today=datetime.now(ZoneInfo(settings.timezone)).date(),
+            direction=agent.direction,
         ),
         nudge=LANGUAGES[config.language].nudge,
         max_duration_s=command.max_duration_s or settings.default_max_duration_s,
@@ -316,7 +317,8 @@ async def prepare_call(
         number = await lease_number(session, conversation.id)
     if number is None:
         raise PoolExhaustedError("no pool number is free")
-    return await call_request(session, settings, conversation, number, agent)
+    leased = await session.get_one(Conversation, conversation.id, populate_existing=True)
+    return await call_request(session, settings, leased, number, agent)
 
 
 async def call_request(
@@ -341,6 +343,8 @@ async def call_request(
         caller_number=number,
         max_duration_s=conversation.max_duration_s,
         agent_data=ScenarioConfig.model_validate(scenario_version.config).agent_data,
+        pickup=LANGUAGES[conversation.language].pickup,
+        accept_calls_until=conversation.dial_deadline_at,
         output_dir=settings.data_dir / str(conversation.id),
     )
 
