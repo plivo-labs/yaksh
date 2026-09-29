@@ -239,7 +239,8 @@ def upgrade() -> None:
         sa.Column("channel", sa.Enum("voice", name="channel"), nullable=False),
         sa.Column("persona_id", sa.UUID(), nullable=False),
         sa.Column("persona_version_id", sa.UUID(), nullable=False),
-        sa.Column("goal", sa.Text(), nullable=False),
+        sa.Column("scenario_id", sa.UUID(), nullable=False),
+        sa.Column("scenario_version_id", sa.UUID(), nullable=False),
         sa.Column("language", sa.Enum("en", "hinglish", name="language"), nullable=False),
         sa.Column("instructions", sa.Text(), nullable=False),
         sa.Column("nudge", sa.Text(), nullable=False),
@@ -306,6 +307,16 @@ def upgrade() -> None:
             ["persona_version_id", "persona_id"],
             ["persona_versions.id", "persona_versions.persona_id"],
             name=op.f("fk_conversations_persona_version_id_persona_id_persona_versions"),
+        ),
+        sa.ForeignKeyConstraint(
+            ["scenario_id", "agent_id"],
+            ["scenarios.id", "scenarios.agent_id"],
+            name=op.f("fk_conversations_scenario_id_agent_id_scenarios"),
+        ),
+        sa.ForeignKeyConstraint(
+            ["scenario_version_id", "scenario_id"],
+            ["scenario_versions.id", "scenario_versions.scenario_id"],
+            name=op.f("fk_conversations_scenario_version_id_scenario_id_scenario_versions"),
         ),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_conversations")),
     )

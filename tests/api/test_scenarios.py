@@ -3,26 +3,7 @@ from typing import Any
 
 from httpx import AsyncClient
 
-from tests.conftest import create_agent_id
-
-SCENARIO: dict[str, Any] = {
-    "name": "Reschedule a cleaning",
-    "goal": "Move your cleaning to an evening next week; if none is free, keep the current one.",
-    "known_facts": [
-        {"name": "Name", "value": "Priya Raman"},
-        {"name": "Current appointment", "value": "next Thursday, 10:30 am"},
-    ],
-    "unknown_facts": ["Patient ID"],
-    "criteria": ["Reads the new date and time back before it moves the appointment."],
-}
-
-
-async def create_scenario(client: AsyncClient, agent_id: str, **overrides: Any) -> dict[str, Any]:
-    response = await client.post(
-        f"/api/v1/agents/{agent_id}/scenarios", json={**SCENARIO, **overrides}
-    )
-    assert response.status_code == 201, response.text
-    return response.json()
+from tests.conftest import SCENARIO, create_agent_id, create_scenario
 
 
 async def test_a_config_change_writes_a_version_but_a_rename_does_not(

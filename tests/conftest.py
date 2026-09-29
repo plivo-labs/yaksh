@@ -70,6 +70,16 @@ PERSONA = {
     "prompt": "You are in a hurry.",
     "voice": {"provider": "elevenlabs", "id": ENGLISH_VOICE.id},
 }
+SCENARIO: dict[str, Any] = {
+    "name": "Reschedule a cleaning",
+    "goal": "Move your cleaning to an evening next week; if none is free, keep the current one.",
+    "known_facts": [
+        {"name": "Name", "value": "Priya Raman"},
+        {"name": "Current appointment", "value": "next Thursday, 10:30 am"},
+    ],
+    "unknown_facts": ["Patient ID"],
+    "criteria": ["Reads the new date and time back before it moves the appointment."],
+}
 
 
 async def create_agent(client: AsyncClient, **overrides: Any) -> dict[str, Any]:
@@ -93,12 +103,24 @@ async def create_persona(client: AsyncClient, **overrides: Any) -> dict[str, Any
     return response.json()
 
 
+async def create_scenario(client: AsyncClient, agent_id: str, **overrides: Any) -> dict[str, Any]:
+    response = await client.post(
+        f"/api/v1/agents/{agent_id}/scenarios", json={**SCENARIO, **overrides}
+    )
+    assert response.status_code == 201, response.text
+    return response.json()
+
+
 async def start(client: AsyncClient, agent_id: str, **overrides: Any) -> dict[str, Any]:
     if "persona_id" not in overrides:
         overrides["persona_id"] = (await create_persona(client, name=f"Caller {uuid.uuid4()}"))[
             "id"
         ]
-    body = {"agent_id": agent_id, "goal": "I want to book a room", **overrides}
+    if "scenario_id" not in overrides:
+        overrides["scenario_id"] = (
+            await create_scenario(client, agent_id, name=f"Scenario {uuid.uuid4()}")
+        )["id"]
+    body = {"agent_id": agent_id, **overrides}
     response = await client.post("/api/v1/conversations", json=body)
     assert response.status_code == 202, response.text
     return response.json()

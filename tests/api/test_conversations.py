@@ -4,26 +4,30 @@ import uuid
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo
 
 import pytest
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import insert, update
+from sqlalchemy import insert, select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from tests.conftest import (
     PERSONA,
+    SCENARIO,
     TOKEN,
     FakeCaller,
     create_agent_id,
     create_persona,
+    create_scenario,
     start,
     wait_for,
     wait_until,
 )
 from truman.config import Settings
-from truman.db.models import Conversation
+from truman.db.models import Conversation, ScenarioVersion
 from truman.db.session import create_engine, create_sessionmaker
-from truman.domain.conversations import ConversationStatus
+from truman.domain.conversations import ConversationCreate, ConversationStatus
 from truman.domain.languages import Language
 from truman.simulation import conversations
 from truman.simulation.calls import STOP_IGNORED
@@ -33,8 +37,12 @@ FINAL = {"completed", "failed", "invalid", "cancelled"}
 
 
 def unchecked(agent_id: str) -> dict[str, str]:
-    """A start body for requests refused before the persona is read."""
-    return {"agent_id": agent_id, "persona_id": str(uuid.uuid4()), "goal": "hello"}
+    """A start body for requests refused before the scenario and the persona are read."""
+    return {
+        "agent_id": agent_id,
+        "persona_id": str(uuid.uuid4()),
+        "scenario_id": str(uuid.uuid4()),
+    }
 
 
 async def stuck_worker(kind: str, settings: Settings, data_dir: Path) -> asyncio.subprocess.Process:
@@ -139,7 +147,8 @@ async def test_ending_a_running_conversation_hangs_up_and_is_idempotent(
 async def test_starting_and_deleting_an_agent_cannot_both_succeed(client: AsyncClient) -> None:
     agent_id = await create_agent_id(client)
     persona = await create_persona(client)
-    body = {"agent_id": agent_id, "persona_id": persona["id"], "goal": "race"}
+    scenario = await create_scenario(client, agent_id)
+    body = {"agent_id": agent_id, "persona_id": persona["id"], "scenario_id": scenario["id"]}
 
     started, deleted = await asyncio.gather(
         client.post("/api/v1/conversations", json=body),
@@ -219,7 +228,8 @@ async def test_an_expired_lease_is_marked_failed_while_a_live_one_is_not(
                 agent_version_id=uuid.UUID(live["agent_version_id"]),
                 persona_id=uuid.UUID(live["persona_id"]),
                 persona_version_id=uuid.UUID(live["persona_version_id"]),
-                goal="orphaned by a dead worker",
+                scenario_id=uuid.UUID(live["scenario_id"]),
+                scenario_version_id=uuid.UUID(live["scenario_version_id"]),
                 language=Language.EN,
                 instructions="orphaned by a dead worker",
                 nudge="Hello?",
@@ -736,15 +746,20 @@ async def test_shutdown_with_stuck_engine_disposal_still_exits(
     assert exit_code == 1
 
 
-async def test_a_conversation_freezes_its_persona_goal_and_prompt(
+async def test_a_conversation_freezes_its_persona_scenario_and_prompt(
     client: AsyncClient, settings: Settings
 ) -> None:
     agent_id = await create_agent_id(client)
     persona = await create_persona(client, language="hinglish")
-    started = await start(client, agent_id, persona_id=persona["id"], goal="Book a table for two.")
+    scenario = await create_scenario(client, agent_id)
+    started = await start(client, agent_id, persona_id=persona["id"], scenario_id=scenario["id"])
     await client.patch(
         f"/api/v1/personas/{persona['id']}",
         json={"prompt": "Someone else.", "voice": {**persona["voice"], "speed": 1.2}},
+    )
+    await client.patch(
+        f"/api/v1/scenarios/{scenario['id']}",
+        json={"name": "Renamed", "goal": "Cancel the cleaning.", "known_facts": []},
     )
 
     detail = (await client.get(f"/api/v1/conversations/{started['id']}")).json()
@@ -755,23 +770,94 @@ async def test_a_conversation_freezes_its_persona_goal_and_prompt(
     await engine.dispose()
 
     assert (detail["persona_name"], detail["persona_version"]) == (persona["name"], 1)
-    assert (detail["goal"], detail["language"]) == ("Book a table for two.", "hinglish")
+    assert (detail["scenario_name"], detail["scenario_version"]) == ("Renamed", 1)
+    assert detail["scenario"]["goal"] == SCENARIO["goal"] and detail["language"] == "hinglish"
     assert (
         PERSONA["prompt"] in detail["instructions"] and "Someone else." not in request.instructions
     )
-    assert "Book a table for two." in request.instructions and "Hinglish" in request.instructions
+    assert SCENARIO["goal"] in request.instructions and "Cancel" not in request.instructions
+    assert "- Name: Priya Raman" in request.instructions and "Hinglish" in request.instructions
     assert request.voice.speed == 1.0 and request.nudge == "हेलो? आप वहाँ हैं?"
+
+
+@pytest.mark.parametrize("timezone", ["Pacific/Kiritimati", "Pacific/Pago_Pago"])
+async def test_the_caller_knows_its_facts_and_today_but_never_the_criteria(
+    client: AsyncClient, settings: Settings, timezone: str
+) -> None:
+    agent_id = await create_agent_id(client)
+    persona = await create_persona(client)
+    scenario = await create_scenario(client, agent_id)
+    command = ConversationCreate.model_validate(
+        {"agent_id": agent_id, "persona_id": persona["id"], "scenario_id": scenario["id"]}
+    )
+    zoned = settings.model_copy(update={"timezone": timezone})
+
+    engine = create_engine(settings.database_url.encoded_string())
+    async with create_sessionmaker(engine)() as session:
+        instructions = (
+            await conversations.create_conversation(session, zoned, command)
+        ).instructions
+    await engine.dispose()
+
+    today = datetime.now(ZoneInfo(timezone)).date()
+    assert f"Today is {today:%A}, {today.day} {today:%B %Y}." in instructions
+    assert "- Current appointment: next Thursday, 10:30 am" in instructions
+    assert "## What you do not have\n- Patient ID" in instructions
+    assert SCENARIO["criteria"][0] not in instructions
 
 
 async def test_a_conversation_needs_a_live_persona(client: AsyncClient) -> None:
     agent_id = await create_agent_id(client)
     persona = await create_persona(client)
+    scenario = await create_scenario(client, agent_id)
     await client.delete(f"/api/v1/personas/{persona['id']}")
 
     for persona_id in (persona["id"], str(uuid.uuid4())):
-        body = {"agent_id": agent_id, "persona_id": persona_id, "goal": "hello"}
+        body = {"agent_id": agent_id, "persona_id": persona_id, "scenario_id": scenario["id"]}
         response = await client.post("/api/v1/conversations", json=body)
         assert response.status_code == 404 and "persona" in response.json()["error"]["message"]
+
+
+async def test_a_conversation_needs_a_live_scenario_of_its_agent(
+    client: AsyncClient, settings: Settings
+) -> None:
+    agent_id, other_id = await create_agent_id(client), await create_agent_id(client, name="Other")
+    persona = await create_persona(client)
+    deleted = await create_scenario(client, agent_id)
+    await client.delete(f"/api/v1/scenarios/{deleted['id']}")
+    foreign = await create_scenario(client, other_id)
+
+    def body(scenario_id: str) -> dict[str, str]:
+        return {"agent_id": agent_id, "persona_id": persona["id"], "scenario_id": scenario_id}
+
+    gone = await client.post("/api/v1/conversations", json=body(deleted["id"]))
+    missing = await client.post("/api/v1/conversations", json=body(str(uuid.uuid4())))
+    crossed = await client.post("/api/v1/conversations", json=body(foreign["id"]))
+    live = await start(client, agent_id)
+
+    assert gone.status_code == missing.status_code == 404
+    assert crossed.status_code == 422 and "another agent" in crossed.json()["error"]["message"]
+
+    def version_of(scenario_id: str) -> Any:
+        return (
+            select(ScenarioVersion.id)
+            .where(ScenarioVersion.scenario_id == uuid.UUID(scenario_id))
+            .scalar_subquery()
+        )
+
+    engine = create_async_engine(settings.database_url.encoded_string())
+    for values in (
+        {"scenario_id": uuid.UUID(foreign["id"]), "scenario_version_id": version_of(foreign["id"])},
+        {"scenario_version_id": version_of(deleted["id"])},
+    ):
+        with pytest.raises(IntegrityError):
+            async with engine.begin() as connection:
+                await connection.execute(
+                    update(Conversation)
+                    .where(Conversation.id == uuid.UUID(live["id"]))
+                    .values(**values)
+                )
+    await engine.dispose()
 
 
 async def test_a_queued_conversation_still_runs_after_its_persona_is_deleted(

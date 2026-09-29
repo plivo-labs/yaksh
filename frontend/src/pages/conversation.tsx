@@ -1,5 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { Link, useParams } from "react-router";
 
 import { StatusBadge } from "@/components/status-badge";
@@ -42,6 +42,7 @@ import {
   ACTIVE_STATUSES,
   type Conversation,
   LANGUAGE_NAMES,
+  type ScenarioConfig,
   type Turn,
   type WireEvent,
 } from "@/lib/types";
@@ -123,9 +124,10 @@ export function ConversationPage() {
         <ScrollArea className="lg:min-h-0">
           <div className="flex flex-col gap-6 p-px lg:pr-4">
             <Recording url={data.recording_url} />
+            <ScenarioCard name={data.scenario_name} scenario={data.scenario} />
             <Card>
               <CardHeader>
-                <CardTitle>{data.persona_name}</CardTitle>
+                <RailTitle role="Caller" name={data.persona_name} />
                 <CardDescription>
                   {LANGUAGE_NAMES[data.language]}, from{" "}
                   {data.caller_number ?? "a number assigned at call time"}, up to{" "}
@@ -139,7 +141,6 @@ export function ConversationPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="grid gap-3 text-sm">
-                <p className="whitespace-pre-wrap">{data.goal}</p>
                 <CallerPrompt instructions={data.instructions} />
               </CardContent>
             </Card>
@@ -148,6 +149,59 @@ export function ConversationPage() {
         </ScrollArea>
       </div>
     </div>
+  );
+}
+
+function RailTitle({ role, name }: { role: string; name: string }) {
+  return (
+    <div className="grid gap-0.5">
+      <span className="text-xs text-muted-foreground">{role}</span>
+      <CardTitle>{name}</CardTitle>
+    </div>
+  );
+}
+
+function ScenarioCard({ name, scenario }: { name: string; scenario: ScenarioConfig }) {
+  return (
+    <Card>
+      <CardHeader>
+        <RailTitle role="Scenario" name={name} />
+        <CardDescription className="whitespace-pre-wrap">{scenario.goal}</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <dl className="grid gap-3 text-sm">
+          {scenario.known_facts.length > 0 && (
+            <div className="grid gap-1">
+              <dt className="text-xs text-muted-foreground">Knows</dt>
+              <dd className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1">
+                {scenario.known_facts.map((fact) => (
+                  <Fragment key={fact.name}>
+                    <span className="text-muted-foreground">{fact.name}</span>
+                    <span className="font-medium break-words">{fact.value}</span>
+                  </Fragment>
+                ))}
+              </dd>
+            </div>
+          )}
+          {scenario.unknown_facts.length > 0 && (
+            <div className="grid gap-1">
+              <dt className="text-xs text-muted-foreground">Does not have</dt>
+              <dd>{scenario.unknown_facts.join(", ")}</dd>
+            </div>
+          )}
+          <div className="grid gap-1">
+            <dt className="text-xs text-muted-foreground">Criteria</dt>
+            <dd>
+              <ul className="grid list-disc gap-1 pl-4 marker:text-muted-foreground">
+                {scenario.criteria.map((text) => (
+                  <li key={text}>{text}</li>
+                ))}
+              </ul>
+            </dd>
+          </div>
+        </dl>
+      </CardContent>
+    </Card>
   );
 }
 

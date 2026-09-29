@@ -21,16 +21,22 @@ LANGUAGES: dict[Language, LanguagePolicy] = {
         "Hi, I'm calling about my booking for next Tuesday. Can you check it for me?",
     ),
     Language.HINGLISH: LanguagePolicy(
-        "Speak Hinglish: Devanagari script, with common English words kept in English. "
-        'Example: "मेरा appointment confirm हो गया है।"',
+        "Speak Hinglish: Devanagari script, with common English words such as appointment or "
+        "confirm kept in English.",
         "हेलो? आप वहाँ हैं?",
         "नमस्ते, मुझे next Tuesday की booking के बारे में बात करनी है। क्या आप check कर सकते हैं?",
     ),
 }
 
 HINDI_FORMS: dict[VoiceGender, str] = {
-    VoiceGender.MALE: "Refer to yourself with masculine Hindi forms, for example 'मैं जा रहा हूँ'.",
-    VoiceGender.FEMALE: "Refer to yourself with feminine Hindi forms, for example 'मैं जा रही हूँ'.",
+    VoiceGender.MALE: (
+        "When a verb is about yourself, use its masculine form (रहा, गया, था, सकता, चाहता); "
+        "other words still agree with their own noun."
+    ),
+    VoiceGender.FEMALE: (
+        "When a verb is about yourself, use its feminine form (रही, गई, थी, सकती, चाहती); "
+        "other words still agree with their own noun."
+    ),
 }
 
 

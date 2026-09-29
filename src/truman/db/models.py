@@ -89,7 +89,8 @@ class Conversation(Base):
     channel: Mapped[Channel] = mapped_column(pg_enum(Channel, "channel"), default=Channel.VOICE)
     persona_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("personas.id"))
     persona_version_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
-    goal: Mapped[str] = mapped_column(Text)
+    scenario_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
+    scenario_version_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
     language: Mapped[Language] = mapped_column(pg_enum(Language, "language"))
     instructions: Mapped[str] = mapped_column(Text)
     nudge: Mapped[str] = mapped_column(Text)
@@ -117,6 +118,11 @@ class Conversation(Base):
         ForeignKeyConstraint(
             ["persona_version_id", "persona_id"],
             ["persona_versions.id", "persona_versions.persona_id"],
+        ),
+        ForeignKeyConstraint(["scenario_id", "agent_id"], ["scenarios.id", "scenarios.agent_id"]),
+        ForeignKeyConstraint(
+            ["scenario_version_id", "scenario_id"],
+            ["scenario_versions.id", "scenario_versions.scenario_id"],
         ),
         Index("ix_conversations_agent_created", "agent_id", text("created_at DESC")),
         Index("ix_conversations_status_created", "status", "created_at"),

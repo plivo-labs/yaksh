@@ -160,12 +160,15 @@ export interface Fact {
   value: string;
 }
 
-export interface ScenarioInput {
-  name: string;
+export interface ScenarioConfig {
   goal: string;
   known_facts: Fact[];
   unknown_facts: string[];
   criteria: string[];
+}
+
+export interface ScenarioInput extends ScenarioConfig {
+  name: string;
 }
 
 export interface Scenario extends ScenarioInput {
@@ -205,7 +208,10 @@ export interface ConversationSummary {
   persona_version_id: string;
   persona_version: number;
   persona_name: string;
-  goal: string;
+  scenario_id: string;
+  scenario_version_id: string;
+  scenario_version: number;
+  scenario_name: string;
   language: Language;
   channel: "voice";
   caller_number: string | null;
@@ -223,6 +229,7 @@ export interface ConversationSummary {
 
 export interface Conversation extends ConversationSummary {
   instructions: string;
+  scenario: ScenarioConfig;
   transcript: Turn[];
   wire_events: WireEvent[];
   validity: Validity | null;
@@ -232,6 +239,6 @@ export interface Conversation extends ConversationSummary {
 export interface ConversationInput {
   agent_id: string;
   persona_id: string;
-  goal: string;
+  scenario_id: string;
   max_duration_s?: number;
 }

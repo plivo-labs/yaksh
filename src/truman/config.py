@@ -1,5 +1,6 @@
 from pathlib import Path
 from typing import Annotated, Any
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import Field, PostgresDsn, SecretStr, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
@@ -49,6 +50,8 @@ class Settings(BaseSettings):
     public_url: str | None = None
     stream_port: int = 8770
     ring_timeout_s: int = 30
+    timezone: str = "UTC"
+    """The zone of the date the caller is told is today."""
 
     @property
     def phone_enabled(self) -> bool:
@@ -57,6 +60,15 @@ class Settings(BaseSettings):
             and self.plivo_auth_token is not None
             and self.public_url is not None
         )
+
+    @field_validator("timezone")
+    @classmethod
+    def known_timezone(cls, value: str) -> str:
+        try:
+            ZoneInfo(value)
+        except (ZoneInfoNotFoundError, ValueError) as error:
+            raise ValueError(f"unknown time zone: {value}") from error
+        return value
 
     @field_validator("plivo_numbers", mode="before")
     @classmethod

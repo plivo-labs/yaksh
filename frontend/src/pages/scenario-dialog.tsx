@@ -86,10 +86,12 @@ function AddRow({
 export function ScenarioDialog({
   agentId,
   scenario,
+  onSaved,
   onClosed,
 }: {
   agentId: string;
   scenario?: Scenario;
+  onSaved?: (scenario: Scenario) => void;
   onClosed: () => void;
 }) {
   const id = scenario?.id;
@@ -128,7 +130,12 @@ export function ScenarioDialog({
     event.preventDefault();
     setSubmitted(true);
     if (!input.name || !input.goal || input.criteria.length === 0 || halfFact) return;
-    save.mutate(input, { onSuccess: guard.close });
+    save.mutate(input, {
+      onSuccess: (saved) => {
+        onSaved?.(saved);
+        guard.close();
+      },
+    });
   };
 
   return (

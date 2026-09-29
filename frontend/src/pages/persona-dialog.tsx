@@ -242,7 +242,7 @@ export function PersonaDialog({
                 <FieldError className={APPEAR}>Describe how this caller behaves.</FieldError>
               )}
               <FieldDescription>
-                Do not put the goal or facts here; each conversation gives the goal.
+                Do not put a goal or facts here; the scenario gives them.
               </FieldDescription>
             </Field>
 

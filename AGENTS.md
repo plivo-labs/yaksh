@@ -31,7 +31,7 @@ Simulated test:   api -> worker -> simulation -> caller -> saved conversation
 Imported call:    api -> worker -> evaluation -> saved results
 ```
 
-`simulation/` turns each scenario and persona into a prompt and a goal and calls the `Caller` interface once per repeat; `caller/` has one conversation at a time and returns transcript, recording and timing; the conversation is saved before anything is judged. `evaluation/` starts from a saved conversation, whoever produced it: one result per conversation per judge, then reliability (pass@k, pass^k) across repeats. `worker/` only sequences the stages. A conversation freezes its inputs when it is created: the pinned agent and persona versions, the goal, and the finished caller prompt; how the caller maps them to provider settings follows the running code. A run will also freeze its scenario, rubric and judge prompt versions.
+`simulation/` turns each scenario and persona into a prompt and a goal and calls the `Caller` interface once per repeat; `caller/` has one conversation at a time and returns transcript, recording and timing; the conversation is saved before anything is judged. `evaluation/` starts from a saved conversation, whoever produced it: one result per conversation per judge, then reliability (pass@k, pass^k) across repeats. `worker/` only sequences the stages. A conversation freezes its inputs when it is created: the pinned agent, scenario and persona versions and the finished caller prompt; how the caller maps them to provider settings follows the running code. A run will also freeze its scenario, rubric and judge prompt versions.
 
 ## Rules
 

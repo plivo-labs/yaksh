@@ -13,6 +13,7 @@ from truman.domain.conversations import (
     WireEvent,
 )
 from truman.domain.languages import Language
+from truman.domain.scenarios import ScenarioConfig
 
 
 class ConversationSummary(BaseModel):
@@ -27,7 +28,10 @@ class ConversationSummary(BaseModel):
     persona_version_id: uuid.UUID
     persona_version: int
     persona_name: str
-    goal: str
+    scenario_id: uuid.UUID
+    scenario_version_id: uuid.UUID
+    scenario_version: int
+    scenario_name: str
     language: Language
     channel: Channel
     caller_number: str | None
@@ -45,6 +49,7 @@ class ConversationSummary(BaseModel):
 
 class ConversationRead(ConversationSummary):
     instructions: str
+    scenario: ScenarioConfig
     transcript: list[Turn]
     wire_events: list[WireEvent]
     validity: Validity | None

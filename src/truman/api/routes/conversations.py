@@ -31,6 +31,7 @@ def recording_url(conversation: Conversation) -> str | None:
 async def summaries(session: AsyncSession, rows: list[Conversation]) -> list[ConversationSummary]:
     agents = await conversations.pinned_agents(session, rows)
     personas = await conversations.pinned_personas(session, rows)
+    scenarios = await conversations.pinned_scenarios(session, rows)
     items = []
     for row in rows:
         data = {
@@ -40,6 +41,7 @@ async def summaries(session: AsyncSession, rows: list[Conversation]) -> list[Con
         }
         data["agent_version"], data["agent_name"] = agents[row.agent_version_id]
         data["persona_version"], data["persona_name"] = personas[row.persona_version_id]
+        data["scenario_version"], data["scenario_name"] = scenarios[row.scenario_version_id]
         data["recording_url"] = recording_url(row)
         items.append(ConversationSummary.model_validate(data))
     return items
@@ -55,6 +57,7 @@ async def detail(session: AsyncSession, conversation: Conversation) -> Conversat
     return ConversationRead(
         **base.model_dump(),
         instructions=conversation.instructions,
+        scenario=await conversations.pinned_scenario_config(session, conversation),
         transcript=transcript.turns,
         wire_events=transcript.wire_events,
         validity=transcript.validity,

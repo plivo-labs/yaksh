@@ -125,7 +125,7 @@ class ConversationCreate(BaseModel):
 
     agent_id: uuid.UUID
     persona_id: uuid.UUID
-    goal: str = Field(min_length=1, max_length=2000)
+    scenario_id: uuid.UUID
     max_duration_s: int | None = Field(default=None, ge=10, le=1800)
 
 

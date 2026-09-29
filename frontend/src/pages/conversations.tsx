@@ -7,14 +7,16 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
+  DialogClose,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import {
   Pagination,
@@ -41,16 +43,17 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Textarea } from "@/components/ui/textarea";
 import { duration, when } from "@/lib/format";
 import {
   CONVERSATIONS_PAGE,
   useAgents,
   useConversations,
   usePersonas,
+  useScenarios,
   useStartConversation,
 } from "@/lib/queries";
 import { END_REASON_LABELS, type Agent, type ConversationStatus } from "@/lib/types";
+import { ScenarioDialog } from "@/pages/scenario-dialog";
 
 const STATUSES: ConversationStatus[] = [
   "queued",
@@ -173,6 +176,7 @@ export function ConversationsPage() {
           <TableHeader>
             <TableRow>
               <TableHead>Agent</TableHead>
+              <TableHead>Scenario</TableHead>
               <TableHead>Persona</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>End</TableHead>
@@ -199,10 +203,8 @@ export function ConversationsPage() {
                     v{conversation.agent_version}
                   </span>
                 </TableCell>
-                <TableCell className="max-w-96 truncate">
-                  {conversation.persona_name}
-                  <span className="ml-2 text-muted-foreground">{conversation.goal}</span>
-                </TableCell>
+                <TableCell className="max-w-72 truncate">{conversation.scenario_name}</TableCell>
+                <TableCell className="max-w-48 truncate">{conversation.persona_name}</TableCell>
                 <TableCell>
                   <StatusBadge status={conversation.status} />
                 </TableCell>
@@ -254,13 +256,22 @@ function StartDialog({ agents }: { agents: Agent[] }) {
   const [open, setOpen] = useState(false);
   const [agentId, setAgentId] = useState("");
   const [personaId, setPersonaId] = useState("");
-  const [goal, setGoal] = useState("");
+  const [scenarioId, setScenarioId] = useState("");
+  const [creating, setCreating] = useState(false);
   const [maxDuration, setMaxDuration] = useState("300");
   const personas = usePersonas();
   const start = useStartConversation();
   const navigate = useNavigate();
   const chosen = agentId || agents[0]?.id || "";
   const chosenPersona = personaId || personas.data?.[0]?.id || "";
+  const scenarios = useScenarios(chosen, open);
+  const selectedScenario =
+    scenarios.data?.find((scenario) => scenario.id === scenarioId) ?? scenarios.data?.[0];
+  const chosenScenario = selectedScenario?.id ?? "";
+  const scenarioItems = (scenarios.data ?? []).map((scenario) => ({
+    value: scenario.id,
+    label: scenario.name,
+  }));
   const agentItems = agents.map((agent) => ({ value: agent.id, label: agent.name }));
   const personaItems = (personas.data ?? []).map((persona) => ({
     value: persona.id,
@@ -275,7 +286,7 @@ function StartDialog({ agents }: { agents: Agent[] }) {
       {
         agent_id: chosen,
         persona_id: chosenPersona,
-        goal: goal.trim(),
+        scenario_id: chosenScenario,
         max_duration_s: duration,
       },
       { onSuccess: (conversation) => navigate(`/conversations/${conversation.id}`) },
@@ -290,11 +301,14 @@ function StartDialog({ agents }: { agents: Agent[] }) {
         <Plus />
         Start conversation
       </DialogTrigger>
-      <DialogContent className="sm:max-w-lg">
-        <form onSubmit={submit} className="grid gap-5">
-          <DialogHeader>
-            <DialogTitle>Start a conversation</DialogTitle>
-          </DialogHeader>
+      <DialogContent className="gap-0 p-0 sm:max-w-lg">
+        <DialogHeader className="px-6 pt-6 pb-4">
+          <DialogTitle>Start a conversation</DialogTitle>
+          <DialogDescription>
+            Truman calls the agent as the persona and follows the scenario.
+          </DialogDescription>
+        </DialogHeader>
+        <form id="start-form" onSubmit={submit} className="px-6 pb-6">
           <FieldGroup>
             <Field>
               <FieldLabel htmlFor="agent">Agent</FieldLabel>
@@ -318,6 +332,53 @@ function StartDialog({ agents }: { agents: Agent[] }) {
               </Select>
             </Field>
             <Field>
+              <FieldLabel htmlFor="scenario">Scenario</FieldLabel>
+              <div className="flex gap-2">
+                <Select
+                  items={scenarioItems}
+                  value={chosenScenario}
+                  onValueChange={(value) => setScenarioId(value ?? "")}
+                  disabled={scenarioItems.length === 0}
+                >
+                  <SelectTrigger id="scenario" className="min-w-0 flex-1">
+                    <SelectValue
+                      placeholder={
+                        scenarios.isError
+                          ? "Could not load scenarios"
+                          : scenarios.isPending
+                            ? "Loading scenarios"
+                            : "No scenarios yet"
+                      }
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      {scenarioItems.map((item) => (
+                        <SelectItem key={item.value} value={item.value}>
+                          {item.label}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={!chosen}
+                  onClick={() => setCreating(true)}
+                >
+                  <Plus />
+                  New scenario
+                </Button>
+              </div>
+              {selectedScenario && (
+                <FieldDescription className="line-clamp-2">
+                  {selectedScenario.goal}
+                </FieldDescription>
+              )}
+              {scenarios.isError && <FieldError>{scenarios.error.message}</FieldError>}
+            </Field>
+            <Field>
               <FieldLabel htmlFor="persona">Persona</FieldLabel>
               <Select
                 items={personaItems}
@@ -339,41 +400,51 @@ function StartDialog({ agents }: { agents: Agent[] }) {
               </Select>
             </Field>
             <Field>
-              <FieldLabel htmlFor="goal">Goal</FieldLabel>
-              <Textarea
-                id="goal"
-                rows={4}
-                required
-                maxLength={2000}
-                placeholder="Book a teeth cleaning for next Tuesday morning. Your name is Priya Raman."
-                value={goal}
-                onChange={(event) => setGoal(event.target.value)}
-              />
-            </Field>
-            <Field>
-              <FieldLabel htmlFor="max_duration">Hang up after (seconds once connected)</FieldLabel>
-              <Input
-                id="max_duration"
-                type="number"
-                min={10}
-                max={1800}
-                value={maxDuration}
-                onChange={(event) => setMaxDuration(event.target.value)}
-                className="w-40"
-              />
+              <FieldLabel htmlFor="max_duration">Time limit</FieldLabel>
+              <div className="flex items-center gap-2">
+                <Input
+                  id="max_duration"
+                  type="number"
+                  inputMode="numeric"
+                  min={10}
+                  max={1800}
+                  aria-invalid={!durationOk}
+                  aria-describedby="max_duration_hint"
+                  value={maxDuration}
+                  onChange={(event) => setMaxDuration(event.target.value)}
+                  className="w-24 tabular-nums"
+                />
+                <span className="text-sm text-muted-foreground">seconds</span>
+              </div>
+              <FieldDescription id="max_duration_hint">
+                {durationOk
+                  ? "Counts from when the call connects."
+                  : "Enter a whole number from 10 to 1800."}
+              </FieldDescription>
             </Field>
           </FieldGroup>
-          {start.error && <p className="text-sm text-destructive">{start.error.message}</p>}
-          <DialogFooter>
-            <Button
-              type="submit"
-              disabled={start.isPending || !goal.trim() || !chosen || !chosenPersona || !durationOk}
-            >
-              {start.isPending && <Spinner />}
-              Call
-            </Button>
-          </DialogFooter>
         </form>
+        {start.error && <FieldError className="px-6 pb-3">{start.error.message}</FieldError>}
+        <DialogFooter className="border-t px-6 py-4">
+          <DialogClose render={<Button type="button" variant="ghost" />}>Cancel</DialogClose>
+          <Button
+            type="submit"
+            form="start-form"
+            disabled={
+              start.isPending || !chosen || !chosenPersona || !chosenScenario || !durationOk
+            }
+          >
+            {start.isPending && <Spinner />}
+            Start call
+          </Button>
+        </DialogFooter>
+        {creating && (
+          <ScenarioDialog
+            agentId={chosen}
+            onSaved={(scenario) => setScenarioId(scenario.id)}
+            onClosed={() => setCreating(false)}
+          />
+        )}
       </DialogContent>
     </Dialog>
   );

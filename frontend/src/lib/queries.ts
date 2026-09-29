@@ -75,10 +75,11 @@ export function useDeletePersona() {
   });
 }
 
-export function useScenarios(agentId: string) {
+export function useScenarios(agentId: string, enabled = true) {
   return useQuery({
     queryKey: keys.scenarios(agentId),
     queryFn: () => all<Scenario>(`/agents/${agentId}/scenarios`),
+    enabled: enabled && Boolean(agentId),
   });
 }
 

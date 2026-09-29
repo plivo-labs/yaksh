@@ -1,15 +1,25 @@
 import asyncio
 import uuid
 from collections.abc import AsyncIterator, Sequence
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import ColumnElement, and_, delete, func, or_, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from truman.config import Settings
-from truman.db.models import Agent, AgentVersion, Conversation, Persona, PersonaVersion, PhoneNumber
+from truman.db.models import (
+    Agent,
+    AgentVersion,
+    Conversation,
+    Persona,
+    PersonaVersion,
+    PhoneNumber,
+    Scenario,
+    ScenarioVersion,
+)
 from truman.domain.agents import AgentConfig, Direction
 from truman.domain.conversations import (
     ACTIVE_STATUSES,
@@ -24,10 +34,13 @@ from truman.domain.conversations import (
 from truman.domain.errors import NotFoundError, ValidationError
 from truman.domain.numbers import AccountNumber
 from truman.domain.personas import PersonaConfig
+from truman.domain.scenarios import ScenarioConfig
 from truman.simulation.agents import get_agent
 from truman.simulation.languages import LANGUAGES
 from truman.simulation.personas import config_of, get_persona
 from truman.simulation.prompts import caller_instructions
+from truman.simulation.scenarios import config_of as scenario_config_of
+from truman.simulation.scenarios import get_scenario
 
 LIVE_STATUSES = frozenset({ConversationStatus.RUNNING, ConversationStatus.ENDING})
 LEASE_LOST = "worker lost its lease on the conversation; outcome unknown, not retried"
@@ -58,6 +71,15 @@ async def create_conversation(
             AgentVersion.agent_id == agent.id, AgentVersion.version == agent.current_version
         )
     )
+    scenario = await get_scenario(session, command.scenario_id, lock=True)
+    if scenario.agent_id != agent.id:
+        raise ValidationError("the scenario belongs to another agent")
+    scenario_version_id = await session.scalar(
+        select(ScenarioVersion.id).where(
+            ScenarioVersion.scenario_id == scenario.id,
+            ScenarioVersion.version == scenario.current_version,
+        )
+    )
     persona = await get_persona(session, command.persona_id, lock=True)
     persona_version_id = await session.scalar(
         select(PersonaVersion.id).where(
@@ -66,14 +88,22 @@ async def create_conversation(
         )
     )
     config = config_of(persona)
+    wants = scenario_config_of(scenario)
     conversation = Conversation(
         agent_id=agent.id,
         agent_version_id=version_id,
         persona_id=persona.id,
         persona_version_id=persona_version_id,
-        goal=command.goal,
+        scenario_id=scenario.id,
+        scenario_version_id=scenario_version_id,
         language=config.language,
-        instructions=caller_instructions(config, command.goal),
+        instructions=caller_instructions(
+            config,
+            goal=wants.goal,
+            known_facts=wants.known_facts,
+            unknown_facts=wants.unknown_facts,
+            today=datetime.now(ZoneInfo(settings.timezone)).date(),
+        ),
         nudge=LANGUAGES[config.language].nudge,
         max_duration_s=command.max_duration_s or settings.default_max_duration_s,
     )
@@ -119,6 +149,26 @@ async def pinned_agents(
         .where(AgentVersion.id.in_({row.agent_version_id for row in conversations}))
     )
     return {row.id: (row.version, row.name) for row in rows}
+
+
+async def pinned_scenarios(
+    session: AsyncSession, conversations: Sequence[Conversation]
+) -> dict[uuid.UUID, tuple[int, str]]:
+    """The version number each conversation pinned and the scenario's current name, by version
+    id."""
+    rows = await session.execute(
+        select(ScenarioVersion.id, ScenarioVersion.version, Scenario.name)
+        .join(Scenario, Scenario.id == ScenarioVersion.scenario_id)
+        .where(ScenarioVersion.id.in_({row.scenario_version_id for row in conversations}))
+    )
+    return {row.id: (row.version, row.name) for row in rows}
+
+
+async def pinned_scenario_config(
+    session: AsyncSession, conversation: Conversation
+) -> ScenarioConfig:
+    version = await session.get_one(ScenarioVersion, conversation.scenario_version_id)
+    return ScenarioConfig.model_validate(version.config)
 
 
 async def pinned_personas(
