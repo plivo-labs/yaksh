@@ -35,7 +35,7 @@ export function authHeaders(): HeadersInit {
 
 type ApiInit = { method?: string; json?: unknown; form?: FormData; signal?: AbortSignal };
 
-async function request(path: string, init: ApiInit): Promise<Response> {
+export async function request(path: string, init: ApiInit): Promise<Response> {
   const headers: Record<string, string> = { ...(authHeaders() as Record<string, string>) };
   if (init.json !== undefined) headers["Content-Type"] = "application/json";
   const response = await fetch(`/api/v1${path}`, {

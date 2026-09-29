@@ -433,3 +433,24 @@ class Writer:
             return await scenarios.create_scenario(
                 session, agent_id, named, generation_id=self._generation_id
             )
+
+
+async def list_generations(
+    session: AsyncSession, agent_id: uuid.UUID, *, offset: int, limit: int
+) -> tuple[list[tuple[ScenarioGeneration, int]], int]:
+    """The agent's generations that still have scenarios, newest first, each with how many."""
+    agent = await get_agent(session, agent_id)
+    live = func.count(Scenario.id).label("live")
+    query = (
+        select(ScenarioGeneration, live)
+        .join(Scenario, Scenario.generation_id == ScenarioGeneration.id)
+        .where(ScenarioGeneration.agent_id == agent.id, Scenario.deleted_at.is_(None))
+        .group_by(ScenarioGeneration.id)
+    )
+    total = await session.scalar(select(func.count()).select_from(query.subquery()))
+    rows = await session.execute(
+        query.order_by(ScenarioGeneration.created_at.desc(), ScenarioGeneration.id)
+        .offset(offset)
+        .limit(limit)
+    )
+    return [(row, count) for row, count in rows.tuples()], total or 0

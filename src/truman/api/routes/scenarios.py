@@ -9,9 +9,9 @@ from fastapi.sse import EventSourceResponse, ServerSentEvent
 from truman.api.auth import require_token
 from truman.api.deps import SessionDep
 from truman.api.pagination import Page, PageDep
-from truman.api.schemas.scenarios import ScenarioRead, ScenarioVersionRead
+from truman.api.schemas.scenarios import GenerationRead, ScenarioRead, ScenarioVersionRead
 from truman.domain.generation import GenerateScenarios
-from truman.domain.scenarios import ScenarioCreate, ScenarioUpdate
+from truman.domain.scenarios import ScenarioCreate, ScenarioDelete, ScenarioUpdate
 from truman.simulation import generation, scenarios
 
 router = APIRouter(tags=["scenarios"], dependencies=[Depends(require_token)])
@@ -83,12 +83,32 @@ async def generate_scenarios(
 
 @router.get("/agents/{agent_id}/scenarios")
 async def list_scenarios(
-    agent_id: uuid.UUID, session: SessionDep, page: PageDep
+    agent_id: uuid.UUID,
+    session: SessionDep,
+    page: PageDep,
+    generation_id: uuid.UUID | None = None,
 ) -> Page[ScenarioRead]:
     rows, total = await scenarios.list_scenarios(
-        session, agent_id, offset=page.offset, limit=page.page_size
+        session, agent_id, offset=page.offset, limit=page.page_size, generation_id=generation_id
     )
     return Page.of([ScenarioRead.of(row) for row in rows], total, page)
+
+
+@router.post("/agents/{agent_id}/scenarios/delete", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_scenarios(
+    agent_id: uuid.UUID, command: ScenarioDelete, session: SessionDep
+) -> None:
+    await scenarios.delete_scenarios(session, agent_id, command)
+
+
+@router.get("/agents/{agent_id}/scenario-generations")
+async def list_generations(
+    agent_id: uuid.UUID, session: SessionDep, page: PageDep
+) -> Page[GenerationRead]:
+    rows, total = await generation.list_generations(
+        session, agent_id, offset=page.offset, limit=page.page_size
+    )
+    return Page.of([GenerationRead.of(row, count) for row, count in rows], total, page)
 
 
 @router.get("/scenarios/{scenario_id}")

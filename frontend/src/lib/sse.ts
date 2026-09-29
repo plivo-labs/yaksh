@@ -1,19 +1,21 @@
-import { UNAUTHORIZED_EVENT, authHeaders } from "@/lib/api";
+import { request } from "@/lib/api";
 
 export interface ServerEvent {
   event: string;
   data: string;
 }
 
-/** Reads a server-sent event stream with the bearer token, which EventSource cannot send. */
-export async function subscribe(
-  path: string,
+/** Opens a server-sent event stream with the bearer token, which EventSource cannot send. A
+ * refusal before the stream starts throws with the API's message. */
+export function openStream(path: string, signal: AbortSignal, json?: unknown): Promise<Response> {
+  return request(path, { method: json === undefined ? "GET" : "POST", json, signal });
+}
+
+export async function readEvents(
+  response: Response,
   onEvent: (event: ServerEvent) => void,
-  signal: AbortSignal,
 ): Promise<void> {
-  const response = await fetch(`/api/v1${path}`, { headers: authHeaders(), signal });
-  if (response.status === 401) window.dispatchEvent(new Event(UNAUTHORIZED_EVENT));
-  if (!response.ok || !response.body) throw new Error(`${response.status} ${response.statusText}`);
+  if (!response.body) throw new Error("the stream has no body");
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
@@ -39,4 +41,12 @@ export async function subscribe(
       newline = buffer.indexOf("\n");
     }
   }
+}
+
+export async function subscribe(
+  path: string,
+  onEvent: (event: ServerEvent) => void,
+  signal: AbortSignal,
+): Promise<void> {
+  await readEvents(await openStream(path, signal), onEvent);
 }

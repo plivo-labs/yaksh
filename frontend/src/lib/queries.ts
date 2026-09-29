@@ -1,4 +1,10 @@
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  type QueryClient,
+  keepPreviousData,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 
 import { api, apiBlob } from "@/lib/api";
 import {
@@ -12,6 +18,7 @@ import {
   type Conversation,
   type ConversationInput,
   type ConversationSummary,
+  type Generation,
   type Language,
   type Page,
   type Persona,
@@ -33,6 +40,9 @@ export const keys = {
   conversation: (id: string) => ["conversations", "one", id] as const,
   personas: ["personas"] as const,
   scenarios: (agentId: string) => ["agents", agentId, "scenarios"] as const,
+  scenariosOf: (agentId: string, generationId: string | null) =>
+    ["agents", agentId, "scenarios", generationId ?? "all"] as const,
+  generations: (agentId: string) => ["agents", agentId, "generations"] as const,
   voices: ["voices"] as const,
   voicesFor: (language: Language | "all") => ["voices", language] as const,
   phoneNumbers: ["phone-numbers"] as const,
@@ -97,11 +107,42 @@ export function useDeletePersona() {
   });
 }
 
-export function useScenarios(agentId: string, enabled = true) {
+export function useScenarios(agentId: string, enabled = true, generationId: string | null = null) {
   return useQuery({
-    queryKey: keys.scenarios(agentId),
-    queryFn: () => all<Scenario>(`/agents/${agentId}/scenarios`),
+    queryKey: keys.scenariosOf(agentId, generationId),
+    queryFn: () =>
+      all<Scenario>(
+        `/agents/${agentId}/scenarios`,
+        generationId ? { generation_id: generationId } : {},
+      ),
     enabled: enabled && Boolean(agentId),
+  });
+}
+
+export function useGenerations(agentId: string) {
+  return useQuery({
+    queryKey: keys.generations(agentId),
+    queryFn: () => all<Generation>(`/agents/${agentId}/scenario-generations`),
+  });
+}
+
+/** Refreshes what a change to an agent's scenarios can change. */
+export function refreshScenarios(client: QueryClient, agentId: string) {
+  return Promise.all([
+    client.invalidateQueries({ queryKey: keys.scenarios(agentId) }),
+    client.invalidateQueries({ queryKey: keys.generations(agentId) }),
+  ]);
+}
+
+export function useDeleteScenarios(agentId: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (ids: string[]) =>
+      api<void>(`/agents/${agentId}/scenarios/delete`, {
+        method: "POST",
+        json: { scenario_ids: ids },
+      }),
+    onSettled: () => refreshScenarios(client, agentId),
   });
 }
 
@@ -112,7 +153,7 @@ export function useSaveScenario(agentId: string, id?: string) {
       id
         ? api<Scenario>(`/scenarios/${id}`, { method: "PATCH", json: input })
         : api<Scenario>(`/agents/${agentId}/scenarios`, { method: "POST", json: input }),
-    onSuccess: () => client.invalidateQueries({ queryKey: keys.scenarios(agentId) }),
+    onSuccess: () => refreshScenarios(client, agentId),
   });
 }
 
@@ -120,7 +161,7 @@ export function useDeleteScenario(agentId: string) {
   const client = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => api<void>(`/scenarios/${id}`, { method: "DELETE" }),
-    onSuccess: () => client.invalidateQueries({ queryKey: keys.scenarios(agentId) }),
+    onSuccess: () => refreshScenarios(client, agentId),
   });
 }
 

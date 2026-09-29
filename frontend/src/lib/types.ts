@@ -277,6 +277,8 @@ export interface ScenarioInput extends ScenarioConfig {
 export interface Scenario extends ScenarioInput {
   id: string;
   agent_id: string;
+  /** The generation that wrote it; null when written by hand. */
+  generation_id: string | null;
   current_version: number;
   created_at: string;
   updated_at: string;
@@ -347,4 +349,26 @@ export interface ConversationInput {
   persona_id: string;
   scenario_id: string;
   max_duration_s?: number;
+}
+
+export type GenerationMode = "agent" | "knowledge_base";
+export type GenerationStatus = "running" | "done" | "failed" | "stopped";
+
+export const MAX_GENERATED = 20;
+export const MAX_DELETED = 500;
+
+export interface GenerateInput {
+  mode: GenerationMode;
+  count: number;
+  instructions: string;
+  document_ids: string[];
+}
+
+export interface Generation {
+  id: string;
+  mode: GenerationMode;
+  status: GenerationStatus;
+  created_at: string;
+  /** Its scenarios that are not deleted. */
+  scenarios: number;
 }

@@ -58,11 +58,13 @@ export function DeleteConfirm({
   name,
   description,
   pending,
+  label = "Delete",
   onDelete,
 }: {
   name: string;
   description: string;
   pending: boolean;
+  label?: string;
   onDelete: (close: () => void) => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -74,7 +76,7 @@ export function DeleteConfirm({
         className="text-destructive sm:mr-auto"
         onClick={() => setOpen(true)}
       >
-        Delete
+        {label}
       </Button>
       <DeleteDialog
         name={name}

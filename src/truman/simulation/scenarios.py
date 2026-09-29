@@ -13,6 +13,7 @@ from truman.domain.scenarios import (
     SCENARIO_LABELS,
     ScenarioConfig,
     ScenarioCreate,
+    ScenarioDelete,
     ScenarioUpdate,
 )
 from truman.simulation.agents import get_agent
@@ -90,10 +91,17 @@ async def create_scenario(
 
 
 async def list_scenarios(
-    session: AsyncSession, agent_id: uuid.UUID, *, offset: int, limit: int
+    session: AsyncSession,
+    agent_id: uuid.UUID,
+    *,
+    offset: int,
+    limit: int,
+    generation_id: uuid.UUID | None = None,
 ) -> tuple[list[Scenario], int]:
     agent = await get_agent(session, agent_id)
     query = select(Scenario).where(Scenario.agent_id == agent.id, Scenario.deleted_at.is_(None))
+    if generation_id:
+        query = query.where(Scenario.generation_id == generation_id)
     total = await session.scalar(select(func.count()).select_from(query.subquery()))
     rows = await session.scalars(
         query.order_by(Scenario.created_at.desc(), Scenario.id).offset(offset).limit(limit)
@@ -134,6 +142,30 @@ async def update_scenario(
 async def delete_scenario(session: AsyncSession, scenario_id: uuid.UUID) -> None:
     scenario = await get_scenario(session, scenario_id, lock=True)
     scenario.deleted_at = datetime.now(UTC)
+    await session.commit()
+
+
+async def delete_scenarios(
+    session: AsyncSession, agent_id: uuid.UUID, command: ScenarioDelete
+) -> None:
+    agent = await get_agent(session, agent_id)
+    ids = set(command.scenario_ids)
+    rows = list(
+        await session.scalars(
+            select(Scenario)
+            .where(
+                Scenario.id.in_(ids),
+                Scenario.agent_id == agent.id,
+                Scenario.deleted_at.is_(None),
+            )
+            .with_for_update()
+        )
+    )
+    if len(rows) != len(ids):
+        raise NotFoundError("a scenario to delete was not found")
+    now = datetime.now(UTC)
+    for row in rows:
+        row.deleted_at = now
     await session.commit()
 
 

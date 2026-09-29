@@ -1,3 +1,4 @@
+import uuid
 from enum import StrEnum
 from typing import Annotated, Any
 
@@ -114,3 +115,11 @@ class ScenarioUpdate(BaseModel):
 
     def changes(self) -> dict[str, Any]:
         return self.model_dump(exclude_unset=True)
+
+
+class ScenarioDelete(BaseModel):
+    """Scenarios of one agent to delete together: all of them, or none if one is missing."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    scenario_ids: list[uuid.UUID] = Field(min_length=1, max_length=500)

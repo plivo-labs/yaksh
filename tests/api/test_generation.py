@@ -429,3 +429,47 @@ async def test_a_disconnect_while_an_event_waits_to_be_sent_still_records_the_st
     await app.state.engine.dispose()
 
     assert ended_with_the_request == [GenerationStatus.STOPPED]
+
+
+async def test_a_batch_is_listed_filtered_and_deleted_together(
+    client: AsyncClient, generation_model: FakeJsonModel
+) -> None:
+    agent = await create_agent(client, brief=BRIEF)
+    by_hand = await create_scenario(client, agent["id"])
+    generation_model.capabilities = [capability("Reschedule", "Reschedules missed clinic visits.")]
+    events = await generate(client, agent["id"], count=3)
+    generation_id = events[0][1]["generation_id"]
+    base = f"/api/v1/agents/{agent['id']}"
+
+    listed = (await client.get(f"{base}/scenario-generations")).json()["items"]
+    batch = (await client.get(f"{base}/scenarios", params={"generation_id": generation_id})).json()
+    ids = [item["id"] for item in batch["items"]]
+    refused = await client.post(
+        f"{base}/scenarios/delete", json={"scenario_ids": [*ids, str(uuid.uuid4())]}
+    )
+    kept_after_refusal = (await client.get(f"{base}/scenarios")).json()["total"]
+    deleted = await client.post(f"{base}/scenarios/delete", json={"scenario_ids": ids})
+    remaining = (await client.get(f"{base}/scenarios")).json()["items"]
+    listed_after = (await client.get(f"{base}/scenario-generations")).json()["items"]
+
+    assert [(item["id"], item["scenarios"]) for item in listed] == [(generation_id, 3)]
+    assert {item["generation_id"] for item in batch["items"]} == {generation_id}
+    assert refused.status_code == 404 and kept_after_refusal == 4
+    assert deleted.status_code == 204
+    assert [item["id"] for item in remaining] == [by_hand["id"]]
+    assert listed_after == []
+
+
+async def test_scenarios_of_another_agent_cannot_be_deleted_through_this_one(
+    client: AsyncClient,
+) -> None:
+    mine = await create_agent(client, name="Mine")
+    other = await create_agent(client, name="Other")
+    theirs = await create_scenario(client, other["id"])
+
+    response = await client.post(
+        f"/api/v1/agents/{mine['id']}/scenarios/delete", json={"scenario_ids": [theirs["id"]]}
+    )
+
+    assert response.status_code == 404
+    assert (await client.get(f"/api/v1/scenarios/{theirs['id']}")).status_code == 200

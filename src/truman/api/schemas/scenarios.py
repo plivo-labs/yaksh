@@ -3,7 +3,8 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict
 
-from truman.db.models import Scenario
+from truman.db.models import Scenario, ScenarioGeneration
+from truman.domain.generation import GenerationMode, GenerationStatus
 from truman.domain.scenarios import Category, Fact, ScenarioConfig
 from truman.simulation.scenarios import config_of
 
@@ -14,6 +15,7 @@ class ScenarioRead(BaseModel):
     name: str
     category: Category
     description: str | None
+    generation_id: uuid.UUID | None
     goal: str
     known_facts: list[Fact]
     unknown_facts: list[str]
@@ -31,6 +33,7 @@ class ScenarioRead(BaseModel):
             name=scenario.name,
             category=scenario.category,
             description=scenario.description,
+            generation_id=scenario.generation_id,
             **config_of(scenario).model_dump(),
             current_version=scenario.current_version,
             created_at=scenario.created_at,
@@ -46,3 +49,22 @@ class ScenarioVersionRead(BaseModel):
     version: int
     config: ScenarioConfig
     created_at: datetime
+
+
+class GenerationRead(BaseModel):
+    id: uuid.UUID
+    mode: GenerationMode
+    status: GenerationStatus
+    created_at: datetime
+    scenarios: int
+    """How many of its scenarios are not deleted."""
+
+    @classmethod
+    def of(cls, generation: ScenarioGeneration, scenarios: int) -> GenerationRead:
+        return cls(
+            id=generation.id,
+            mode=generation.mode,
+            status=generation.status,
+            created_at=generation.created_at,
+            scenarios=scenarios,
+        )

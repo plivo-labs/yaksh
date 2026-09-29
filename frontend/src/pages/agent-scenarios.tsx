@@ -1,40 +1,174 @@
-import { PhoneIncoming, PhoneOutgoing, Plus } from "lucide-react";
+import { PhoneIncoming, PhoneOutgoing, Plus, Sparkles, X } from "lucide-react";
 import { useState } from "react";
+import { toast } from "sonner";
 
+import { DeleteConfirm } from "@/components/confirm-dialogs";
 import { Panel, PanelHeader } from "@/components/panel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useAgents, useScenarios } from "@/lib/queries";
-import { type Agent, CATEGORY_LABELS, type Scenario } from "@/lib/types";
+import { Spinner } from "@/components/ui/spinner";
+import { type GenerationRun, useGeneration } from "@/hooks/use-generation";
+import { when } from "@/lib/format";
+import { useAgents, useDeleteScenarios, useGenerations, useScenarios } from "@/lib/queries";
+import {
+  type Agent,
+  CATEGORY_LABELS,
+  type Generation,
+  MAX_DELETED,
+  type Scenario,
+} from "@/lib/types";
+import { GenerateDialog } from "@/pages/generate-dialog";
 import { ScenarioDialog } from "@/pages/scenario-dialog";
 import { StartCallDialog } from "@/pages/start-call-dialog";
+
+const ALL = "all";
 
 function counted(count: number, one: string, many: string): string {
   return `${count} ${count === 1 ? one : many}`;
 }
 
+function batchLabel(generation: Generation): string {
+  const kind = generation.mode === "knowledge_base" ? "Knowledge base questions" : "Generated";
+  return `${kind}, ${when(generation.created_at)} (${generation.scenarios})`;
+}
+
+function runMessage(run: GenerationRun): string {
+  const saved = counted(run.saved, "scenario", "scenarios");
+  if (run.status === "running") {
+    return run.planned === null
+      ? "Reading the agent and planning what to test."
+      : `Writing scenarios: ${run.saved + run.dropped.length} of ${run.planned} done.`;
+  }
+  if (run.status === "stopped") return `Stopped. ${saved} saved.`;
+  if (run.status === "failed") {
+    const kept = run.saved > 0 ? ` ${saved} saved before it stopped.` : "";
+    return `The generation failed: ${run.error}${kept}`;
+  }
+  const dropped =
+    run.dropped.length > 0
+      ? ` ${counted(run.dropped.length, "scenario", "scenarios")} could not be written: ${run.dropped[0]}`
+      : "";
+  return `Wrote ${saved}.${dropped}`;
+}
+
+function RunStatus({
+  run,
+  onStop,
+  onDismiss,
+}: {
+  run: GenerationRun;
+  onStop: () => void;
+  onDismiss: () => void;
+}) {
+  const running = run.status === "running";
+  return (
+    <div role="status" className="flex items-center gap-3 border-b bg-muted/40 px-5 py-3 text-sm">
+      {running && <Spinner />}
+      <p className={`min-w-0 flex-1 ${run.status === "failed" ? "text-destructive" : ""}`}>
+        {runMessage(run)}
+      </p>
+      {running ? (
+        <Button type="button" variant="outline" size="sm" onClick={onStop}>
+          Stop
+        </Button>
+      ) : (
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          aria-label="Close this message"
+          onClick={onDismiss}
+        >
+          <X />
+        </Button>
+      )}
+    </div>
+  );
+}
+
 export function AgentScenarios({ agent }: { agent: Agent }) {
-  const scenarios = useScenarios(agent.id);
+  const [batch, setBatch] = useState<string | null>(null);
+  const generations = useGenerations(agent.id);
+  const shownBatch = generations.data?.some((item) => item.id === batch) ? batch : null;
+  const scenarios = useScenarios(agent.id, true, shownBatch);
   const agents = useAgents();
+  const remove = useDeleteScenarios(agent.id);
+  const generation = useGeneration(agent.id);
   const outbound = agent.direction === "outbound";
   const [editing, setEditing] = useState<Scenario | "new" | null>(null);
+  const [generating, setGenerating] = useState(false);
+  const [picked, setPicked] = useState<ReadonlySet<string>>(new Set());
   const scenario = editing === "new" ? undefined : (editing ?? undefined);
+
+  const items = scenarios.data ?? [];
+  const selected = items.filter((item) => picked.has(item.id)).map((item) => item.id);
+  const allPicked = items.length > 0 && selected.length === items.length;
+  const pick = (id: string, on: boolean) =>
+    setPicked((current) => {
+      const next = new Set(current);
+      if (on) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  const deleteScenarios = (ids: string[], close: () => void) =>
+    remove.mutate(ids, {
+      onSuccess: () => {
+        setPicked(new Set());
+        toast.success(`Deleted ${counted(ids.length, "scenario", "scenarios")}`);
+      },
+      onError: (error) =>
+        toast.error("Could not delete the scenarios", { description: error.message }),
+      onSettled: close,
+    });
+  const batches = generations.data ?? [];
+  const filterItems = [
+    { value: ALL, label: "All scenarios" },
+    ...batches.map((item) => ({ value: item.id, label: batchLabel(item) })),
+  ];
+  const generateButton = (variant: "default" | "outline") => (
+    <Button
+      variant={variant}
+      size="sm"
+      disabled={generation.running}
+      onClick={() => setGenerating(true)}
+    >
+      <Sparkles />
+      Generate
+    </Button>
+  );
+  const newButton = (
+    <Button variant="outline" size="sm" onClick={() => setEditing("new")}>
+      <Plus />
+      New scenario
+    </Button>
+  );
 
   return (
     <Panel className="overflow-hidden">
       <PanelHeader
         title="Scenarios"
         action={
-          scenarios.data &&
-          scenarios.data.length > 0 && (
-            <Button variant="outline" size="sm" onClick={() => setEditing("new")}>
-              <Plus />
-              New scenario
-            </Button>
+          items.length > 0 && (
+            <div className="flex gap-2">
+              {generateButton("outline")}
+              {newButton}
+            </div>
           )
         }
       />
+      {generation.run && (
+        <RunStatus run={generation.run} onStop={generation.stop} onDismiss={generation.dismiss} />
+      )}
       {scenarios.isPending ? (
         <div className="grid gap-3 p-5">
           <Skeleton className="h-11" />
@@ -42,57 +176,130 @@ export function AgentScenarios({ agent }: { agent: Agent }) {
         </div>
       ) : scenarios.isError ? (
         <p className="px-5 py-4 text-sm text-destructive">{scenarios.error.message}</p>
-      ) : scenarios.data.length === 0 ? (
+      ) : items.length === 0 ? (
         <div className="grid justify-items-start gap-3 px-5 py-6">
-          <p className="text-sm text-muted-foreground">No scenarios yet.</p>
-          <Button size="sm" onClick={() => setEditing("new")}>
-            <Plus />
-            New scenario
-          </Button>
+          <p className="text-sm text-muted-foreground">
+            No scenarios yet. Generate them from what Truman knows about the agent, or write one.
+          </p>
+          <div className="flex gap-2">
+            {generateButton("default")}
+            {newButton}
+          </div>
         </div>
       ) : (
-        <ul className="divide-y">
-          {scenarios.data.map((item) => (
-            <li key={item.id} className="flex items-center gap-2 pr-4">
-              <button
-                type="button"
-                onClick={() => setEditing(item)}
-                className="flex min-w-0 flex-1 items-center gap-4 py-3 pl-5 text-left outline-none transition-colors duration-150 hover:bg-foreground/[0.025] focus-visible:bg-foreground/[0.04] focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-inset"
+        <>
+          <div className="flex min-h-12 flex-wrap items-center gap-3 border-b px-5 py-2">
+            <Checkbox
+              aria-label="Select all scenarios"
+              checked={allPicked}
+              indeterminate={selected.length > 0 && !allPicked}
+              onCheckedChange={(on) =>
+                setPicked(on ? new Set(items.map((item) => item.id)) : new Set())
+              }
+            />
+            {batches.length > 0 && (
+              <Select
+                items={filterItems}
+                value={shownBatch ?? ALL}
+                onValueChange={(value) => {
+                  setBatch(value === ALL ? null : value);
+                  setPicked(new Set());
+                }}
               >
-                <span className="grid min-w-0 flex-1 gap-0.5">
-                  <span className="flex min-w-0 items-center gap-2">
-                    <span className="truncate text-sm font-medium">{item.name}</span>
-                    <Badge variant="outline" className="shrink-0">
-                      {CATEGORY_LABELS[item.category]}
-                    </Badge>
-                  </span>
-                  <span className="truncate text-sm text-muted-foreground">
-                    {item.description ?? item.goal}
-                  </span>
-                </span>
-                <span className="hidden shrink-0 text-xs text-muted-foreground sm:block">
-                  {counted(item.known_facts.length, "fact", "facts")},{" "}
-                  {counted(item.criteria.length, "criterion", "criteria")}
-                </span>
-              </button>
-              <StartCallDialog
-                agents={agents.data ?? [agent]}
-                agentId={agent.id}
-                scenarioId={item.id}
-                render={
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    aria-label={`${outbound ? "Trigger" : "Ring"} ${item.name}`}
+                <SelectTrigger aria-label="Show scenarios from" size="sm" className="min-w-0">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    {filterItems.map((item) => (
+                      <SelectItem key={item.value} value={item.value}>
+                        {item.label}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            )}
+            <div className="ml-auto flex gap-2">
+              {selected.length > MAX_DELETED ? (
+                <p className="text-sm text-muted-foreground">
+                  Select at most {MAX_DELETED} to delete at once.
+                </p>
+              ) : selected.length > 0 ? (
+                <DeleteConfirm
+                  name={counted(selected.length, "scenario", "scenarios")}
+                  label={`Delete ${selected.length} selected`}
+                  description="Past and queued conversations are not changed."
+                  pending={remove.isPending}
+                  onDelete={(close) => deleteScenarios(selected, close)}
+                />
+              ) : (
+                shownBatch && (
+                  <DeleteConfirm
+                    name={`this batch of ${counted(items.length, "scenario", "scenarios")}`}
+                    label="Delete this batch"
+                    description="Past and queued conversations are not changed."
+                    pending={remove.isPending}
+                    onDelete={(close) =>
+                      deleteScenarios(
+                        items.map((item) => item.id),
+                        close,
+                      )
+                    }
                   />
-                }
-              >
-                {outbound ? <PhoneIncoming /> : <PhoneOutgoing />}
-                {outbound ? "Trigger" : "Ring"}
-              </StartCallDialog>
-            </li>
-          ))}
-        </ul>
+                )
+              )}
+            </div>
+          </div>
+          <ul className="divide-y">
+            {items.map((item) => (
+              <li key={item.id} className="flex items-center gap-2 pr-4 pl-5">
+                <Checkbox
+                  aria-label={`Select ${item.name}`}
+                  checked={picked.has(item.id)}
+                  onCheckedChange={(on) => pick(item.id, on)}
+                />
+                <button
+                  type="button"
+                  onClick={() => setEditing(item)}
+                  className="flex min-w-0 flex-1 items-center gap-4 py-3 pl-3 text-left outline-none transition-colors duration-150 hover:bg-foreground/[0.025] focus-visible:bg-foreground/[0.04] focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-inset"
+                >
+                  <span className="grid min-w-0 flex-1 gap-0.5">
+                    <span className="flex min-w-0 items-center gap-2">
+                      <span className="truncate text-sm font-medium">{item.name}</span>
+                      <Badge variant="outline" className="shrink-0">
+                        {CATEGORY_LABELS[item.category]}
+                      </Badge>
+                      {generation.newIds.has(item.id) && <Badge className="shrink-0">New</Badge>}
+                    </span>
+                    <span className="truncate text-sm text-muted-foreground">
+                      {item.description ?? item.goal}
+                    </span>
+                  </span>
+                  <span className="hidden shrink-0 text-xs text-muted-foreground sm:block">
+                    {counted(item.known_facts.length, "fact", "facts")},{" "}
+                    {counted(item.criteria.length, "criterion", "criteria")}
+                  </span>
+                </button>
+                <StartCallDialog
+                  agents={agents.data ?? [agent]}
+                  agentId={agent.id}
+                  scenarioId={item.id}
+                  render={
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      aria-label={`${outbound ? "Trigger" : "Ring"} ${item.name}`}
+                    />
+                  }
+                >
+                  {outbound ? <PhoneIncoming /> : <PhoneOutgoing />}
+                  {outbound ? "Trigger" : "Ring"}
+                </StartCallDialog>
+              </li>
+            ))}
+          </ul>
+        </>
       )}
 
       {editing !== null && (
@@ -101,6 +308,13 @@ export function AgentScenarios({ agent }: { agent: Agent }) {
           agent={agent}
           scenario={scenario}
           onClosed={() => setEditing(null)}
+        />
+      )}
+      {generating && (
+        <GenerateDialog
+          agent={agent}
+          onStart={generation.start}
+          onClosed={() => setGenerating(false)}
         />
       )}
     </Panel>
