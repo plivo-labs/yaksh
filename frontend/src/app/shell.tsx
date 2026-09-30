@@ -87,9 +87,7 @@ export function Shell() {
             <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarMenuButton size="lg" render={<NavLink to="/agents" />}>
-                  <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-primary text-base font-semibold text-primary-foreground">
-                    T
-                  </span>
+                  <img src="/favicon.svg" alt="" className="size-8 shrink-0" />
                   <span className="text-base font-semibold tracking-tight">Truman</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
