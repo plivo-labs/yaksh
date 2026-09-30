@@ -14,6 +14,7 @@ from tests.conftest import (
     create_persona,
     create_scenario,
     make_settings,
+    reap,
 )
 from truman.config import Settings
 from truman.db.models import Conversation, PhoneNumber, RunningWorker
@@ -250,3 +251,30 @@ async def test_an_outbound_start_needs_a_running_worker_that_receives_its_calls(
     )
     assert stopped.status_code == 422, "a worker not seen for a lease has stopped"
     assert running.status_code == 202
+
+
+async def test_an_outbound_retry_runs_as_outbound(client: AsyncClient, settings: Settings) -> None:
+    await report(settings)
+    await link_number(settings)
+    agent = await create_agent(client, **OUTBOUND_AGENT)
+    scenario = await create_scenario(client, agent["id"], agent_data=AGENT_DATA)
+    run = await client.post(
+        "/api/v1/runs", json={"agent_id": agent["id"], "scenario_ids": [scenario["id"]]}
+    )
+    lost = await claim(settings, APP_ID)
+    assert run.status_code == 202 and lost is not None
+    engine = create_engine(settings.database_url.encoded_string())
+    async with engine.begin() as connection:
+        await connection.execute(
+            update(Conversation)
+            .where(Conversation.id == lost.id)
+            .values(lease_expires_at=func.now() - timedelta(seconds=1))
+        )
+    await engine.dispose()
+    await reap(settings)
+
+    inbound_only = await claim(settings, None)
+    retried = await claim(settings, APP_ID)
+
+    assert inbound_only is None
+    assert retried is not None and (retried.direction, retried.attempt) == ("outbound", 2)

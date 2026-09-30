@@ -10,11 +10,12 @@ from sqlalchemy.ext.asyncio import create_async_engine
 
 from tests.conftest import (
     FakeCaller,
+    claim,
     create_agent_id,
-    create_scenario,
+    new_run,
+    reap,
     run_conversations,
     start,
-    start_run,
     wait_for,
     wait_for_lock_waiters,
 )
@@ -28,28 +29,8 @@ from truman.worker.worker import Worker
 FINAL = {"completed", "failed", "invalid", "cancelled"}
 
 
-async def new_run(client: AsyncClient, *, scenarios: int = 1, **fields: Any) -> dict[str, Any]:
-    """A run of a new agent's new scenarios."""
-    agent = await create_agent_id(client, name=f"Agent {uuid.uuid4()}")
-    ids = [
-        (await create_scenario(client, agent, name=f"Scenario {n}"))["id"] for n in range(scenarios)
-    ]
-    response = await start_run(client, agent, ids, **fields)
-    assert response.status_code == 202, response.text
-    return response.json()
-
-
 async def queue_of(client: AsyncClient, run: dict[str, Any]) -> list[str]:
     return [c["id"] for c in await run_conversations(client, run["id"])]
-
-
-async def claim(settings: Settings, worker_id: str = "w1") -> str | None:
-    """The id of the conversation a worker claims next, if any."""
-    engine = create_engine(settings.database_url.encoded_string())
-    async with create_sessionmaker(engine)() as session:
-        claimed = await conversations.claim_next(session, worker_id, 30, None)
-    await engine.dispose()
-    return None if claimed is None else str(claimed.id)
 
 
 async def reason(client: AsyncClient, run: dict[str, Any]) -> str | None:
@@ -231,14 +212,6 @@ async def test_a_claim_and_a_cancel_at_the_same_moment_leave_nothing_queued(
         assert cancelled["status"] == "cancelled"
 
 
-async def reap(settings: Settings, rest_s: int = 0) -> int:
-    engine = create_engine(settings.database_url.encoded_string())
-    async with create_sessionmaker(engine)() as session:
-        reaped = await conversations.reap_expired(session, rest_s)
-    await engine.dispose()
-    return reaped
-
-
 async def test_a_reaper_that_waited_for_its_run_still_rests_the_number(
     client: AsyncClient, settings: Settings
 ) -> None:
@@ -275,7 +248,7 @@ async def test_a_reaper_that_waited_for_its_run_still_rests_the_number(
 async def test_the_reaper_and_a_cancel_of_the_same_run_take_turns(
     client: AsyncClient, settings: Settings, reap_first: bool
 ) -> None:
-    run = await new_run(client, repeats=2)
+    run = await new_run(client, repeats=2, retries=0)
     assert None not in [await claim(settings), await claim(settings)]
     engine = create_engine(settings.database_url.encoded_string())
     async with engine.begin() as connection:

@@ -248,7 +248,7 @@ async def test_an_expired_lease_is_marked_failed_while_a_live_one_is_not(
     reaped = await wait_for(client, str(orphan_id), FINAL)
 
     assert reaped["status"] == "failed" and reaped["end_reason"] == "lease_lost"
-    assert "not retried" in reaped["failure_reason"]
+    assert reaped["failure_reason"] == "worker lost its lease on the conversation; outcome unknown"
     assert (await client.get(f"/api/v1/conversations/{live['id']}")).json()["status"] == "running"
     caller.release.set()
     await wait_for(client, live["id"], {"completed"})

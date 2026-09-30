@@ -182,6 +182,46 @@ async def run_conversations(
     return response.json()["items"]
 
 
+async def new_run(client: AsyncClient, *, scenarios: int = 1, **fields: Any) -> dict[str, Any]:
+    """A run of a new agent's new scenarios."""
+    agent = await create_agent_id(client, name=f"Agent {uuid.uuid4()}")
+    ids = [
+        (await create_scenario(client, agent, name=f"Scenario {n}"))["id"] for n in range(scenarios)
+    ]
+    response = await start_run(client, agent, ids, **fields)
+    assert response.status_code == 202, response.text
+    return response.json()
+
+
+async def claim(settings: Settings, worker_id: str = "w1") -> str | None:
+    """The id of the conversation a worker claims next, if any."""
+    engine = create_engine(settings.database_url.encoded_string())
+    async with create_sessionmaker(engine)() as session:
+        claimed = await conversations.claim_next(session, worker_id, 30, None)
+    await engine.dispose()
+    return None if claimed is None else str(claimed.id)
+
+
+async def reap(settings: Settings, rest_s: int = 0) -> int:
+    engine = create_engine(settings.database_url.encoded_string())
+    async with create_sessionmaker(engine)() as session:
+        reaped = await conversations.reap_expired(session, rest_s)
+    await engine.dispose()
+    return reaped
+
+
+async def wait_for_run(
+    client: AsyncClient, run_id: str, status: str, timeout: float = 10.0
+) -> dict[str, Any]:
+    deadline = asyncio.get_running_loop().time() + timeout
+    while True:
+        run = (await client.get(f"/api/v1/runs/{run_id}")).json()
+        if run["status"] == status:
+            return run
+        assert asyncio.get_running_loop().time() < deadline, run
+        await asyncio.sleep(0.05)
+
+
 async def wait_for(
     client: AsyncClient, conversation_id: str, statuses: set[str], timeout: float = 5.0
 ) -> dict[str, Any]:
@@ -300,6 +340,8 @@ class FakeCaller:
         observer.wire_event(WireEvent(kind=WireEventKind.CONNECT_STARTED, at_ms=0))
         if await first(stop, self.connect_gate) is stop:
             return CallOutcome(connected=False, end_reason=EndReason.USER_REQUEST)
+        if self.mode == "no_answer":
+            return CallOutcome(connected=False, end_reason=EndReason.NO_ANSWER)
         if self.mode == "refuse":
             return CallOutcome(
                 connected=False, end_reason=EndReason.ERROR, caller_error="connection refused"

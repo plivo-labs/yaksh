@@ -19,6 +19,7 @@ from tests.conftest import (
     start,
     start_run,
     wait_for_lock_waiters,
+    wait_for_run,
 )
 from truman.config import Settings
 from truman.db.models import Conversation, Persona, Scenario
@@ -57,18 +58,6 @@ def settings(database_url: str, tmp_path: Path) -> Settings:
         max_run_retries=2,
         max_run_start_interval_s=60,
     )
-
-
-async def wait_for_run(
-    client: AsyncClient, run_id: str, status: str, timeout: float = 10.0
-) -> dict[str, Any]:
-    deadline = asyncio.get_running_loop().time() + timeout
-    while True:
-        run = (await client.get(f"/api/v1/runs/{run_id}")).json()
-        if run["status"] == status:
-            return run
-        assert asyncio.get_running_loop().time() < deadline, run
-        await asyncio.sleep(0.05)
 
 
 async def test_a_run_starts_each_repeat_of_every_scenario_in_order_with_its_persona(

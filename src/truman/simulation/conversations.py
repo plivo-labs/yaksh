@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from typing import Any
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import ColumnElement, String, and_, cast, delete, func, or_, select, update
+from sqlalchemy import ColumnElement, Row, String, and_, cast, delete, func, or_, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from sqlalchemy.orm import aliased
@@ -54,10 +54,40 @@ from truman.simulation.prompts import caller_instructions
 from truman.simulation.scenarios import config_of as scenario_config_of
 from truman.simulation.workers import receiving_problem
 
-LEASE_LOST = "worker lost its lease on the conversation; outcome unknown, not retried"
-WORKER_STOPPED = "worker stopped during the call; outcome unknown, not retried"
+LEASE_LOST = "worker lost its lease on the conversation; outcome unknown"
+WORKER_STOPPED = "worker stopped during the call; outcome unknown"
 FAILURE_TEXT = {EndReason.WORKER_STOPPED: WORKER_STOPPED, EndReason.LEASE_LOST: LEASE_LOST}
 PHONE_SETTINGS = "set PLIVO_AUTH_ID, PLIVO_AUTH_TOKEN and TRUMAN_PUBLIC_URL"
+
+
+INPUTS = (
+    Conversation.agent_id,
+    Conversation.agent_version_id,
+    Conversation.channel,
+    Conversation.direction,
+    Conversation.persona_id,
+    Conversation.persona_version_id,
+    Conversation.scenario_id,
+    Conversation.scenario_version_id,
+    Conversation.language,
+    Conversation.instructions,
+    Conversation.nudge,
+    Conversation.max_duration_s,
+    Conversation.run_id,
+    Conversation.repeat,
+)
+"""What a conversation starts from. A retry copies these and nothing the attempt got while
+running: no number, dial window, call or result."""
+ENDED = (
+    Conversation.id,
+    Conversation.status,
+    Conversation.end_reason,
+    Conversation.attempt,
+    Conversation.agent_id,
+    Conversation.scenario_id,
+    Conversation.persona_id,
+)
+"""What the retry step reads from a conversation that just ended."""
 
 
 class PoolExhaustedError(Exception):
@@ -682,11 +712,13 @@ async def requeue(session: AsyncSession, conversation_id: uuid.UUID, worker_id: 
 
 
 def owned_by(conversation_id: uuid.UUID, worker_id: str) -> ColumnElement[bool]:
+    """The worker still holds the lease when the statement runs, even after a wait for the
+    conversation's run lock in the same transaction."""
     return and_(
         Conversation.id == conversation_id,
         Conversation.claimed_by == worker_id,
         Conversation.status.in_(LIVE_STATUSES),
-        Conversation.lease_expires_at > func.now(),
+        Conversation.lease_expires_at > func.statement_timestamp(),
     )
 
 
@@ -757,17 +789,19 @@ async def reap_expired(session: AsyncSession, number_rest_s: int) -> int:
     )
     await session.commit()
     for run_id in run_ids:
-        await session.execute(select(Run.id).where(Run.id == run_id).with_for_update())
-        reaped += len(await end_expired(session, Conversation.run_id == run_id, number_rest_s))
+        run = await session.get_one(Run, run_id, with_for_update=True, populate_existing=True)
+        ended = await end_expired(session, Conversation.run_id == run_id, number_rest_s)
+        await retry(session, run, ended)
         await session.commit()
+        reaped += len(ended)
     return reaped
 
 
 async def end_expired(
     session: AsyncSession, which: ColumnElement[bool], number_rest_s: int
-) -> list[uuid.UUID]:
+) -> list[Row[Any]]:
     ended = list(
-        await session.scalars(
+        await session.execute(
             update(Conversation)
             .where(expired(), which)
             .values(
@@ -778,12 +812,56 @@ async def end_expired(
                 claimed_by=None,
                 lease_expires_at=None,
             )
-            .returning(Conversation.id)
+            .returning(*ENDED)
         )
     )
     if ended:
-        await release_numbers(session, ended, number_rest_s)
+        await release_numbers(session, [row.id for row in ended], number_rest_s)
     return ended
+
+
+async def retry(session: AsyncSession, run: Run, ended: Sequence[Row[Any]]) -> None:
+    """Queue the next attempt of each just-ended conversation of the run that is in the error
+    group, up to the run's retries, and none once the run is cancelled. The caller holds the
+    run's lock. An attempt that is already there is left alone, so this step never fails the
+    transaction that ended the conversations."""
+    due = [
+        row
+        for row in ended
+        if run.cancelled_at is None
+        and row.attempt <= run.retries
+        and outcome_group(row.status, row.end_reason) is OutcomeGroup.ERROR
+    ]
+    if not due:
+        return
+    await key_share_references(session, due)
+    copies = (
+        select(*INPUTS, (Conversation.attempt + 1).label("attempt"), Conversation.id)
+        .where(Conversation.id.in_([row.id for row in due]))
+        .order_by(Conversation.id)
+    )
+    await session.execute(
+        insert(Conversation)
+        .from_select([*(column.key for column in INPUTS), "attempt", "retry_of"], copies)
+        .on_conflict_do_nothing(index_elements=["run_id", "repeat", "scenario_id", "attempt"])
+    )
+
+
+async def key_share_references(session: AsyncSession, rows: Sequence[Row[Any]]) -> None:
+    """Key-share the agents, scenarios and personas that retries reference, in that order and
+    each set in id order, as the start step locks them, before the insert's foreign key checks
+    take the same locks in an order of their own."""
+    for model, ids in (
+        (Agent, {row.agent_id for row in rows}),
+        (Scenario, {row.scenario_id for row in rows}),
+        (Persona, {row.persona_id for row in rows}),
+    ):
+        await session.execute(
+            select(model.id)
+            .where(model.id.in_(ids))
+            .order_by(model.id)
+            .with_for_update(read=True, key_share=True)
+        )
 
 
 def resolve_status(outcome: CallOutcome) -> ConversationStatus:
@@ -810,35 +888,52 @@ async def finalize(
     transcript: Transcript,
     number_rest_s: int,
 ) -> bool:
-    """Record the terminal state. Returns False when the row was no longer ours to finish."""
+    """Record the terminal state; a run conversation in the error group is queued again, up to
+    its run's retries. Returns False when the row was no longer ours to finish."""
     transcript.caller_claim = outcome.caller_claim
     if outcome.connected:
         transcript.validity = Validity(
             ok=outcome.caller_error is None,
             reasons=[outcome.caller_error] if outcome.caller_error else [],
         )
-    recorded = await session.scalar(
-        update(Conversation)
-        .where(owned_by(conversation_id, worker_id))
-        .values(
-            status=resolve_status(outcome),
-            end_reason=outcome.end_reason,
-            failure_reason=failure_reason(outcome),
-            ended_at=func.now(),
-            talk_ms=outcome.talk_ms,
-            transcript=transcript.model_dump(mode="json"),
-            recording_path=str(outcome.recording_path) if outcome.recording_path else None,
-            call_uuid=outcome.call_uuid,
-            agent_caller_id=Conversation.agent_caller_id if outcome.call_uuid else None,
-            claimed_by=None,
-            lease_expires_at=None,
+    run = await locked_run(session, conversation_id)
+    ended = (
+        await session.execute(
+            update(Conversation)
+            .where(owned_by(conversation_id, worker_id))
+            .values(
+                status=resolve_status(outcome),
+                end_reason=outcome.end_reason,
+                failure_reason=failure_reason(outcome),
+                ended_at=func.statement_timestamp(),
+                talk_ms=outcome.talk_ms,
+                transcript=transcript.model_dump(mode="json"),
+                recording_path=str(outcome.recording_path) if outcome.recording_path else None,
+                call_uuid=outcome.call_uuid,
+                agent_caller_id=Conversation.agent_caller_id if outcome.call_uuid else None,
+                claimed_by=None,
+                lease_expires_at=None,
+            )
+            .returning(*ENDED)
         )
-        .returning(Conversation.id)
-    )
-    if recorded is not None:
+    ).one_or_none()
+    if ended is not None:
         await release_numbers(session, [conversation_id], number_rest_s)
+        if run is not None:
+            await retry(session, run, [ended])
     await session.commit()
-    return recorded is not None
+    return ended is not None
+
+
+async def locked_run(session: AsyncSession, conversation_id: uuid.UUID) -> Run | None:
+    """The conversation's run, read without a lock and then locked, before the conversation
+    is changed, as on every path that locks a run and its conversations."""
+    run_id = await session.scalar(
+        select(Conversation.run_id).where(Conversation.id == conversation_id)
+    )
+    if run_id is None:
+        return None
+    return await session.get_one(Run, run_id, with_for_update=True, populate_existing=True)
 
 
 async def enabled_pool(session: AsyncSession) -> list[PhoneNumber]:
