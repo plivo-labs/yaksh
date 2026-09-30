@@ -1,5 +1,5 @@
 import { Download, FileText, Plus, Upload } from "lucide-react";
-import { useRef, useState } from "react";
+import { type DragEvent, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { DeleteConfirm, DiscardConfirm } from "@/components/confirm-dialogs";
@@ -20,18 +20,39 @@ import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { useCloseGuard } from "@/hooks/use-close-guard";
 import { textSize } from "@/lib/format";
-import {
-  createTextDocument,
-  downloadDocument,
-  uploadDocument,
-  useDocument,
-  useSaveKnowledgeBase,
-} from "@/lib/queries";
-import type { Agent, KnowledgeBaseDocument, KnowledgeBaseEntry } from "@/lib/types";
+import { type KnowledgeBaseSource, useSavedKnowledgeBase } from "@/hooks/use-knowledge-base";
+import { createTextDocument, downloadDocument, uploadDocument, useDocument } from "@/lib/queries";
+import type {
+  Agent,
+  DocumentSummary,
+  KnowledgeBaseDocument,
+  KnowledgeBaseEntry,
+} from "@/lib/types";
 
 const MAX_DOCUMENTS = 20;
 const MAX_TEXT_CHARS = 1_000_000;
 const MAX_NAME_CHARS = 200;
+
+const EXTENSIONS = [".pdf", ".txt", ".md"];
+
+/** The extension as the server reads it: control characters dropped, the name trimmed, then
+ * Python's `PurePath.suffix`, where leading dots are part of the name. */
+function suffix(name: string): string {
+  const base = name
+    .replaceAll(/\p{Cc}/gu, "")
+    .trim()
+    .replace(/^\.+/, "");
+  const dot = base.lastIndexOf(".");
+  return dot === -1 ? "" : base.slice(dot).toLowerCase();
+}
+
+function supported(name: string): boolean {
+  return EXTENSIONS.includes(suffix(name));
+}
+
+function carriesFiles(event: DragEvent): boolean {
+  return event.dataTransfer.types.includes("Files");
+}
 
 const TYPE_LABELS: Record<string, string> = {
   "application/pdf": "PDF",
@@ -58,34 +79,66 @@ function details(document: KnowledgeBaseDocument): string {
 }
 
 export function AgentKnowledgeBase({ agent }: { agent: Agent }) {
-  const save = useSaveKnowledgeBase(agent.id);
+  return <KnowledgeBasePanel source={useSavedKnowledgeBase(agent)} />;
+}
+
+export function KnowledgeBasePanel({ source }: { source: KnowledgeBaseSource }) {
   const files = useRef<HTMLInputElement>(null);
-  const [adding, setAdding] = useState<string | null>(null);
   const [open, setOpen] = useState<KnowledgeBaseDocument | "new" | null>(null);
-  const documents = agent.knowledge_base;
-  const busy = adding !== null || save.isPending;
+  const { documents, progress, setProgress } = source;
+  const busy = progress !== null || source.saving;
   const room = MAX_DOCUMENTS - documents.length;
+  const depth = useRef(0);
+  const [dragging, setDragging] = useState(false);
+  const refusal = busy
+    ? "Wait for the current upload to finish."
+    : room <= 0
+      ? `The knowledge base holds at most ${MAX_DOCUMENTS} documents.`
+      : null;
+
+  // A file dropped next to the panel would make the browser open it and lose the page.
+  useEffect(() => {
+    const refuse = (event: globalThis.DragEvent) => {
+      if (event.defaultPrevented || !event.dataTransfer?.types.includes("Files")) return;
+      event.preventDefault();
+      event.dataTransfer.dropEffect = "none";
+    };
+    window.addEventListener("dragover", refuse);
+    window.addEventListener("drop", refuse);
+    return () => {
+      window.removeEventListener("dragover", refuse);
+      window.removeEventListener("drop", refuse);
+    };
+  }, []);
 
   const addFiles = async (picked: File[]) => {
-    const failed = picked
-      .slice(room)
-      .map((file) => `${file.name}: the knowledge base holds at most ${MAX_DOCUMENTS} documents`);
+    const readable = picked.filter((file) => supported(file.name));
+    const failed = [
+      ...picked
+        .filter((file) => !supported(file.name))
+        .map((file) => `${file.name}: add PDF, TXT or MD files`),
+      ...readable
+        .slice(room)
+        .map((file) => `${file.name}: the knowledge base holds at most ${MAX_DOCUMENTS} documents`),
+    ];
     const taken = new Set(documents.map((document) => document.name.toLowerCase()));
     const added: KnowledgeBaseEntry[] = [];
-    const accepted = picked.slice(0, room);
+    const uploaded: DocumentSummary[] = [];
+    const accepted = readable.slice(0, room);
     for (const [index, file] of accepted.entries()) {
-      setAdding(`Reading ${file.name} (${index + 1} of ${accepted.length})`);
+      setProgress(`Reading ${file.name} (${index + 1} of ${accepted.length})`);
       try {
         const document = await uploadDocument(file);
         added.push({ document_id: document.id, name: freeName(document.name, taken) });
+        uploaded.push(document);
       } catch (error) {
         failed.push(`${file.name}: ${(error as Error).message}`);
       }
     }
     if (added.length > 0) {
-      setAdding("Saving the knowledge base");
+      setProgress("Saving the knowledge base");
       try {
-        await save.mutateAsync((current) => [...current, ...added]);
+        await source.change((current) => [...current, ...added], uploaded);
       } catch (error) {
         failed.push((error as Error).message);
       }
@@ -93,7 +146,7 @@ export function AgentKnowledgeBase({ agent }: { agent: Agent }) {
     if (failed.length > 0) {
       toast.error("Some documents were not added", { description: failed.join("\n") });
     }
-    setAdding(null);
+    setProgress(null);
   };
 
   const download = async (document: KnowledgeBaseDocument) => {
@@ -106,14 +159,47 @@ export function AgentKnowledgeBase({ agent }: { agent: Agent }) {
     }
   };
 
-  const remove = (target: KnowledgeBaseDocument, close: () => void) =>
-    save.mutate((current) => current.filter((entry) => entry.document_id !== target.document_id), {
-      onSettled: close,
-    });
+  const remove = async (target: KnowledgeBaseDocument) => {
+    try {
+      await source.change(
+        (current) => current.filter((entry) => entry.document_id !== target.document_id),
+        [],
+      );
+    } catch (error) {
+      toast.error(`Could not delete ${target.name}`, { description: (error as Error).message });
+    }
+  };
+
+  const dropTarget = {
+    onDragEnter: (event: DragEvent<HTMLElement>) => {
+      if (!carriesFiles(event)) return;
+      event.preventDefault();
+      depth.current += 1;
+      setDragging(true);
+    },
+    onDragOver: (event: DragEvent<HTMLElement>) => {
+      if (!carriesFiles(event)) return;
+      event.preventDefault();
+      event.dataTransfer.dropEffect = refusal ? "none" : "copy";
+    },
+    onDragLeave: (event: DragEvent<HTMLElement>) => {
+      if (!carriesFiles(event)) return;
+      depth.current = Math.max(0, depth.current - 1);
+      if (depth.current === 0) setDragging(false);
+    },
+    onDrop: (event: DragEvent<HTMLElement>) => {
+      if (!carriesFiles(event)) return;
+      event.preventDefault();
+      depth.current = 0;
+      setDragging(false);
+      if (!refusal) void addFiles(Array.from(event.dataTransfer.files));
+    },
+  };
 
   const addButtons = (
     <div className="flex gap-2">
       <Button
+        type="button"
         variant="outline"
         size="sm"
         disabled={room <= 0 || busy}
@@ -123,6 +209,7 @@ export function AgentKnowledgeBase({ agent }: { agent: Agent }) {
         Add text
       </Button>
       <Button
+        type="button"
         variant={documents.length > 0 ? "outline" : "default"}
         size="sm"
         disabled={room <= 0 || busy}
@@ -135,88 +222,120 @@ export function AgentKnowledgeBase({ agent }: { agent: Agent }) {
   );
 
   return (
-    <Panel className="overflow-hidden">
-      <PanelHeader title="Knowledge base" action={documents.length > 0 && addButtons} />
-      <input
-        ref={files}
-        type="file"
-        accept=".pdf,.txt,.md"
-        multiple
-        hidden
-        onChange={(e) => {
-          void addFiles(Array.from(e.target.files ?? []));
-          e.target.value = "";
-        }}
-      />
+    <>
+      <Panel className="relative flex flex-col overflow-hidden" {...dropTarget}>
+        <PanelHeader title="Knowledge base" action={documents.length > 0 && addButtons} />
+        <input
+          ref={files}
+          type="file"
+          accept={EXTENSIONS.join(",")}
+          multiple
+          hidden
+          onChange={(e) => {
+            void addFiles(Array.from(e.target.files ?? []));
+            e.target.value = "";
+          }}
+        />
 
-      {adding && (
-        <p className="flex items-center gap-2 px-5 pt-4 text-sm text-muted-foreground">
-          <Spinner />
-          {adding}
-        </p>
-      )}
-
-      {documents.length === 0 ? (
-        <div className="grid justify-items-start gap-3 px-5 py-6">
-          <p className="text-sm text-muted-foreground">
-            No documents yet. Add the FAQ, policies or product facts the agent answers from, as PDF,
-            TXT or MD files or pasted text. Truman reads them to write scenarios.
+        {progress && (
+          <p className="flex items-center gap-2 px-5 pt-4 text-sm text-muted-foreground">
+            <Spinner />
+            {progress}
           </p>
-          {addButtons}
-        </div>
-      ) : (
-        <ul className="divide-y">
-          {documents.map((document) => (
-            <li key={document.document_id} className="flex items-center gap-3 px-5 py-3">
-              <FileText className="size-4 shrink-0 text-muted-foreground" />
-              <button
-                type="button"
-                onClick={() => setOpen(document)}
-                className="grid min-w-0 flex-1 gap-0.5 rounded-sm text-left outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
-              >
-                <span className="truncate text-sm font-medium">{document.name}</span>
-                <span className="truncate text-xs text-muted-foreground tabular-nums">
-                  {details(document)}
-                </span>
-                {Boolean(document.empty_pages) && (
-                  <span className="text-xs text-status-warning">
-                    {document.empty_pages} of {document.pages} pages had no text (scanned?)
-                  </span>
-                )}
-              </button>
-              {document.media_type && (
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label={`Download ${document.name}`}
-                  onClick={() => void download(document)}
-                >
-                  <Download />
-                </Button>
-              )}
-              <DeleteConfirm
-                name={document.name}
-                description="The agent stops using it. Earlier versions of the agent keep it."
-                pending={busy}
-                onDelete={(close) => remove(document, close)}
-              />
-            </li>
-          ))}
-        </ul>
-      )}
-      {save.error && !adding && <FieldError className="px-5 pb-4">{save.error.message}</FieldError>}
+        )}
 
+        {documents.length === 0 ? (
+          <div className="flex flex-1 flex-col p-5">
+            <div className="grid flex-1 content-center justify-items-center gap-4 rounded-lg border border-dashed px-6 py-8 text-center">
+              <span className="grid size-10 place-items-center rounded-full bg-muted text-muted-foreground">
+                <Upload className="size-4" />
+              </span>
+              <div className="grid gap-1">
+                <p className="text-sm font-medium">Drop PDF, TXT or MD files here</p>
+                <p className="text-sm text-muted-foreground">
+                  Add the FAQ, policies or product facts the agent answers from.
+                </p>
+              </div>
+              {addButtons}
+            </div>
+          </div>
+        ) : (
+          <ul className="divide-y">
+            {documents.map((document) => (
+              <li key={document.document_id} className="flex items-center gap-3 px-5 py-3">
+                <FileText className="size-4 shrink-0 text-muted-foreground" />
+                <button
+                  type="button"
+                  onClick={() => setOpen(document)}
+                  className="grid min-w-0 flex-1 gap-0.5 rounded-sm text-left outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+                >
+                  <span className="truncate text-sm font-medium">{document.name}</span>
+                  <span className="truncate text-xs text-muted-foreground tabular-nums">
+                    {details(document)}
+                  </span>
+                  {Boolean(document.empty_pages) && (
+                    <span className="text-xs text-status-warning">
+                      {document.empty_pages} of {document.pages} pages had no text (scanned?)
+                    </span>
+                  )}
+                </button>
+                {document.media_type && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label={`Download ${document.name}`}
+                    onClick={() => void download(document)}
+                  >
+                    <Download />
+                  </Button>
+                )}
+                {source.deleteNote ? (
+                  <DeleteConfirm
+                    name={document.name}
+                    description={source.deleteNote}
+                    pending={busy}
+                    onDelete={(close) => void remove(document).finally(close)}
+                  />
+                ) : (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="text-destructive"
+                    disabled={busy}
+                    onClick={() => void remove(document)}
+                  >
+                    Remove
+                  </Button>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {dragging && (
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-0 z-10 grid place-items-center rounded-lg border-2 border-dashed border-primary/40 bg-background/85 backdrop-blur-[2px] transition-opacity duration-150 ease-out starting:opacity-0"
+          >
+            <p className="flex items-center gap-2 px-6 text-sm font-medium">
+              <Upload className="size-4 shrink-0" />
+              {refusal ?? "Drop to add to the knowledge base"}
+            </p>
+          </div>
+        )}
+      </Panel>
       {open !== null && (
         <DocumentSheet
           key={open === "new" ? "new" : open.document_id}
           document={open === "new" ? undefined : open}
           documents={documents}
           saving={busy}
-          onSave={(change) => save.mutateAsync(change)}
+          onSave={source.change}
           onClosed={() => setOpen(null)}
         />
       )}
-    </Panel>
+    </>
   );
 }
 
@@ -232,7 +351,7 @@ function DocumentSheet({
   document?: KnowledgeBaseDocument;
   documents: KnowledgeBaseDocument[];
   saving: boolean;
-  onSave: (change: (current: KnowledgeBaseEntry[]) => KnowledgeBaseEntry[]) => Promise<unknown>;
+  onSave: KnowledgeBaseSource["change"];
   onClosed: () => void;
 }) {
   const loaded = useDocument(document?.document_id);
@@ -252,15 +371,20 @@ function DocumentSheet({
     setWorking(true);
     try {
       const trimmed = name.trim();
-      const id =
+      const saved =
         document && text === null
-          ? document.document_id
-          : (await createTextDocument(trimmed, shownText)).id;
-      const entry = { document_id: id, name: trimmed };
-      await onSave((current) =>
-        document
-          ? current.map((other) => (other.document_id === document.document_id ? entry : other))
-          : [...current, entry],
+          ? { id: document.document_id, added: [] }
+          : await createTextDocument(trimmed, shownText).then((created) => ({
+              id: created.id,
+              added: [created],
+            }));
+      const entry = { document_id: saved.id, name: trimmed };
+      await onSave(
+        (current) =>
+          document
+            ? current.map((other) => (other.document_id === document.document_id ? entry : other))
+            : [...current, entry],
+        saved.added,
       );
       guard.close();
     } catch (failure) {
@@ -329,10 +453,11 @@ function DocumentSheet({
           {(error || loaded.error) && <FieldError>{error ?? loaded.error?.message}</FieldError>}
         </div>
         <SheetFooter className="flex-row justify-end">
-          <Button variant="ghost" disabled={working} onClick={requestClose}>
+          <Button type="button" variant="ghost" disabled={working} onClick={requestClose}>
             Cancel
           </Button>
           <Button
+            type="button"
             disabled={working || saving || clash || tooLong || !name.trim() || !shownText.trim()}
             onClick={() => void submit()}
           >

@@ -63,9 +63,7 @@ export function ConfigField({
           {MAX_CONFIG_CHARS.toLocaleString()}.
         </FieldError>
       ) : (
-        <FieldDescription>
-          Truman reads it to write scenarios.{value && ` ${textSize(value.length)}.`}
-        </FieldDescription>
+        value && <FieldDescription>{textSize(value.length)}.</FieldDescription>
       )}
       {unreadable && <FieldError>{unreadable}</FieldError>}
     </Field>

@@ -1,9 +1,13 @@
+import { cn } from "cn";
+import { ChevronLeft } from "lucide-react";
 import { type ReactNode, type SubmitEvent, useState } from "react";
+import { flushSync } from "react-dom";
 import { Link, useNavigate } from "react-router";
 import { toast } from "sonner";
 
 import { DeleteConfirm } from "@/components/confirm-dialogs";
 import { Panel, PanelHeader } from "@/components/panel";
+import { Segmented } from "@/components/segmented";
 import { Button } from "@/components/ui/button";
 import {
   Field,
@@ -12,6 +16,8 @@ import {
   FieldError,
   FieldGroup,
   FieldLabel,
+  FieldLegend,
+  FieldSet,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import {
@@ -25,6 +31,7 @@ import {
 import { Spinner } from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { useDraftKnowledgeBase } from "@/hooks/use-knowledge-base";
 import { useDeleteAgent, useSaveAgent } from "@/lib/queries";
 import {
   EMPTY_OUTBOUND,
@@ -42,8 +49,11 @@ import {
   LANGUAGE_ITEMS,
   type Language,
 } from "@/lib/types";
-import { OutboundFields } from "@/pages/agent-outbound-fields";
 import { ConfigField, MAX_CONFIG_CHARS } from "@/pages/agent-config-field";
+import { KnowledgeBasePanel } from "@/pages/agent-knowledge-base";
+import { OutboundFields } from "@/pages/agent-outbound-fields";
+
+const APPEAR = "transition-opacity duration-150 ease-out starting:opacity-0";
 
 interface Draft {
   name: string;
@@ -83,10 +93,18 @@ function toDraft(agent: Agent): Draft {
   };
 }
 
-const DIRECTION_ITEMS: { value: Direction; label: string }[] = [
-  { value: "inbound", label: "Inbound: Truman calls the agent" },
-  { value: "outbound", label: "Outbound: the agent calls Truman" },
+const REACH_OPTIONS: { value: Direction; label: string }[] = [
+  { value: "inbound", label: "Truman" },
+  { value: "outbound", label: "The agent" },
 ];
+
+const REQUEST_NOTE =
+  "Truman sends this POST request to make the agent call one of Truman's numbers.";
+
+const REACH_HINTS: Record<Direction, string> = {
+  inbound: "Truman dials the agent's phone number and plays the caller.",
+  outbound: "Truman asks the agent to call, then answers as the caller.",
+};
 
 function toInput(draft: Draft): AgentInput {
   const outbound = draft.direction === "outbound";
@@ -104,120 +122,59 @@ function toInput(draft: Draft): AgentInput {
   };
 }
 
-export function NewAgentPage() {
-  const navigate = useNavigate();
-  return (
-    <div className="mx-auto grid max-w-2xl gap-6">
-      <h1 className="text-2xl font-semibold tracking-[-0.015em]">New agent</h1>
-      <Panel>
-        <PanelHeader title="Settings" />
-        <div className="px-5 py-5">
-          <AgentForm
-            onSaved={(agent) => navigate(`/agents/${agent.id}`)}
-            cancel={
-              <Button variant="ghost" nativeButton={false} render={<Link to="/agents" />}>
-                Cancel
-              </Button>
-            }
-          />
-        </div>
-      </Panel>
-    </div>
-  );
-}
-
-/** Creates an agent, or edits one when `agent` is given. */
-export function AgentForm({
-  agent,
-  onSaved,
-  cancel,
-}: {
-  agent?: Agent;
-  onSaved: (agent: Agent) => void;
-  cancel: ReactNode;
-}) {
-  const id = agent?.id;
-  const navigate = useNavigate();
-  const save = useSaveAgent(id);
-  const remove = useDeleteAgent();
+/** An agent being added or edited: the draft, what it still needs, and a check that shows the
+ * problems and moves focus to the first one. */
+function useAgentDraft(agent?: Agent) {
   const [draft, setDraft] = useState<Draft>(() => (agent ? toDraft(agent) : EMPTY));
   const [submitted, setSubmitted] = useState(false);
-
-  const set = <K extends keyof Draft>(key: K, value: Draft[K]) =>
+  const [switched, setSwitched] = useState(false);
+  const set = <K extends keyof Draft>(key: K, value: Draft[K]) => {
+    if (key === "direction") setSwitched(true);
     setDraft((current) => ({ ...current, [key]: value }));
-
-  const outbound = draft.direction === "outbound";
-  const numberOk = isPhoneNumber(draft.agent_number);
-  const ready =
-    (outbound ? Object.keys(outboundProblems(draft.outbound)).length === 0 : numberOk) &&
-    draft.config.length <= MAX_CONFIG_CHARS;
-
-  const submit = (event: SubmitEvent) => {
-    event.preventDefault();
-    setSubmitted(true);
-    if (!ready) return;
-    save.mutate(toInput(draft), { onSuccess: onSaved });
   };
+  const outbound = draft.direction === "outbound";
+  const needs = {
+    name: draft.name.trim() === "",
+    reach: outbound
+      ? Object.keys(outboundProblems(draft.outbound)).length > 0
+      : !isPhoneNumber(draft.agent_number),
+    config: draft.config.length > MAX_CONFIG_CHARS,
+  };
+  const ready = !needs.name && !needs.reach && !needs.config;
+  const check = (element: HTMLFormElement) => {
+    flushSync(() => setSubmitted(true));
+    if (!ready) element.querySelector<HTMLElement>("[aria-invalid=true]")?.focus();
+    return ready;
+  };
+  /** Who calls changed, so fields that swap with it may fade in; the first render stays still. */
+  const swap = switched ? APPEAR : undefined;
+  return { draft, set, submitted, outbound, needs, check, swap };
+}
 
+type AgentDraft = ReturnType<typeof useAgentDraft>;
+
+function BasicsFields({ form }: { form: AgentDraft }) {
+  const { draft, set, submitted, needs } = form;
   return (
-    <form onSubmit={submit}>
-      <FieldGroup>
-        <Field>
-          <FieldLabel htmlFor="name">Name</FieldLabel>
-          <Input
-            id="name"
-            required
-            value={draft.name}
-            onChange={(e) => set("name", e.target.value)}
-          />
-        </Field>
-
-        <Field>
-          <FieldLabel htmlFor="direction">Direction</FieldLabel>
-          <Select
-            items={DIRECTION_ITEMS}
-            value={draft.direction}
-            onValueChange={(value) => value && set("direction", value as Direction)}
-          >
-            <SelectTrigger id="direction" className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectGroup>
-                {DIRECTION_ITEMS.map((item) => (
-                  <SelectItem key={item.value} value={item.value}>
-                    {item.label}
-                  </SelectItem>
-                ))}
-              </SelectGroup>
-            </SelectContent>
-          </Select>
-        </Field>
-
-        {outbound ? (
-          <OutboundFields
-            draft={draft.outbound}
-            onChange={(next) => set("outbound", next)}
-            submitted={submitted}
-          />
-        ) : (
-          <Field>
-            <FieldLabel htmlFor="agent_number">Phone number</FieldLabel>
-            <Input
-              id="agent_number"
-              type="tel"
-              inputMode="tel"
-              placeholder="+1 415 555 0100"
-              aria-invalid={draft.agent_number !== "" && !numberOk}
-              value={draft.agent_number}
-              onChange={(e) => set("agent_number", e.target.value)}
-            />
-            {(submitted || draft.agent_number !== "") && !numberOk && (
-              <FieldError>Use the international format, like +14155550100.</FieldError>
-            )}
-          </Field>
+    <FieldGroup>
+      <Field>
+        <FieldLabel htmlFor="name">Name</FieldLabel>
+        <Input
+          id="name"
+          required
+          placeholder="Front desk"
+          aria-invalid={submitted && needs.name}
+          aria-describedby={submitted && needs.name ? "name-error" : undefined}
+          value={draft.name}
+          onChange={(e) => set("name", e.target.value)}
+        />
+        {submitted && needs.name && (
+          <FieldError id="name-error" className={APPEAR}>
+            Enter a name.
+          </FieldError>
         )}
-
+      </Field>
+      <div className="grid gap-7 @md/field-group:grid-cols-2">
         <Field>
           <FieldLabel htmlFor="language">Language</FieldLabel>
           <Select
@@ -239,77 +196,273 @@ export function AgentForm({
             </SelectContent>
           </Select>
         </Field>
-
-        <Field orientation="horizontal" className="rounded-md border bg-muted/40 px-3.5 py-3">
-          <FieldContent>
-            <FieldLabel htmlFor="agent_speaks_first">Agent speaks first</FieldLabel>
-            {outbound && (
-              <FieldDescription>
-                When off, the caller says a short hello on pickup.
-              </FieldDescription>
-            )}
-          </FieldContent>
-          <Switch
-            id="agent_speaks_first"
-            checked={draft.agent_speaks_first}
-            onCheckedChange={(checked) => set("agent_speaks_first", checked)}
-          />
-        </Field>
-
         <Field>
           <FieldLabel htmlFor="external_id">External id</FieldLabel>
           <Input
             id="external_id"
-            placeholder="Your own identifier for this agent"
+            placeholder="Optional"
             value={draft.external_id}
             onChange={(e) => set("external_id", e.target.value)}
           />
+          <FieldDescription>Your own id for this agent, for the API.</FieldDescription>
         </Field>
+      </div>
+    </FieldGroup>
+  );
+}
 
-        <Field>
-          <FieldLabel htmlFor="brief">Brief</FieldLabel>
-          <Textarea
-            id="brief"
-            rows={4}
-            maxLength={10_000}
-            placeholder="What this agent is supposed to do, in your words."
-            value={draft.brief}
-            onChange={(e) => set("brief", e.target.value)}
+function ReachFields({ form }: { form: AgentDraft }) {
+  const { draft, set, submitted, outbound, needs, swap } = form;
+  const numberProblem = (submitted || draft.agent_number !== "") && needs.reach;
+  return (
+    <FieldGroup>
+      <div className="grid gap-2">
+        <Segmented
+          label="Who calls"
+          value={draft.direction}
+          options={REACH_OPTIONS}
+          onChange={(value) => set("direction", value)}
+        />
+        <p className="text-sm text-muted-foreground">{REACH_HINTS[draft.direction]}</p>
+      </div>
+      {!outbound && (
+        <Field className={swap}>
+          <FieldLabel htmlFor="agent_number">Phone number</FieldLabel>
+          <Input
+            id="agent_number"
+            type="tel"
+            inputMode="tel"
+            required
+            placeholder="+1 415 555 0100"
+            aria-invalid={numberProblem}
+            aria-describedby={numberProblem ? "agent_number-error" : undefined}
+            value={draft.agent_number}
+            onChange={(e) => set("agent_number", e.target.value)}
           />
-        </Field>
-
-        <ConfigField value={draft.config} onChange={(value) => set("config", value)} />
-
-        {(save.error || remove.error) && (
-          <FieldError>{(save.error ?? remove.error)?.message}</FieldError>
-        )}
-
-        <div className="flex flex-wrap items-center gap-2">
-          <Button type="submit" disabled={save.isPending}>
-            {save.isPending && <Spinner />}
-            {id ? "Save changes" : "Add agent"}
-          </Button>
-          {cancel}
-          {id && (
-            <div className="ml-auto">
-              <DeleteConfirm
-                name={draft.name}
-                description="Past conversations keep their copy of its configuration. An agent with an active conversation cannot be deleted."
-                pending={remove.isPending}
-                onDelete={(close) =>
-                  remove.mutate(id, {
-                    onSuccess: () => {
-                      toast.success(`Deleted ${draft.name}`);
-                      navigate("/agents");
-                    },
-                    onSettled: close,
-                  })
-                }
-              />
-            </div>
+          {numberProblem && (
+            <FieldError id="agent_number-error" className={APPEAR}>
+              Use the international format, like +14155550100.
+            </FieldError>
           )}
+        </Field>
+      )}
+      <Field orientation="horizontal" className="rounded-md border bg-muted/40 px-3.5 py-3">
+        <FieldContent>
+          <FieldLabel htmlFor="agent_speaks_first">Agent speaks first</FieldLabel>
+          {outbound && (
+            <FieldDescription>When off, the caller says a short hello on pickup.</FieldDescription>
+          )}
+        </FieldContent>
+        <Switch
+          id="agent_speaks_first"
+          checked={draft.agent_speaks_first}
+          onCheckedChange={(checked) => set("agent_speaks_first", checked)}
+        />
+      </Field>
+    </FieldGroup>
+  );
+}
+
+function RequestFields({ form }: { form: AgentDraft }) {
+  const { draft, set, submitted } = form;
+  return (
+    <OutboundFields
+      draft={draft.outbound}
+      onChange={(next) => set("outbound", next)}
+      submitted={submitted}
+    />
+  );
+}
+
+function ContextFields({ form }: { form: AgentDraft }) {
+  const { draft, set } = form;
+  return (
+    <FieldGroup>
+      <Field>
+        <FieldLabel htmlFor="brief">Brief</FieldLabel>
+        <Textarea
+          id="brief"
+          rows={4}
+          maxLength={10_000}
+          placeholder="What this agent is supposed to do, in your words."
+          value={draft.brief}
+          onChange={(e) => set("brief", e.target.value)}
+        />
+      </Field>
+      <ConfigField value={draft.config} onChange={(value) => set("config", value)} />
+    </FieldGroup>
+  );
+}
+
+function Section({
+  title,
+  description,
+  className,
+  children,
+}: {
+  title: string;
+  description?: string;
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    <Panel className={className}>
+      <PanelHeader title={title} />
+      <div className="grid gap-5 px-5 py-5">
+        {description && <p className="text-sm text-muted-foreground">{description}</p>}
+        {children}
+      </div>
+    </Panel>
+  );
+}
+
+export function NewAgentPage() {
+  const navigate = useNavigate();
+  const form = useAgentDraft();
+  const save = useSaveAgent();
+  const knowledgeBase = useDraftKnowledgeBase(save.isPending);
+  const uploading = knowledgeBase.progress !== null;
+
+  const submit = (event: SubmitEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!form.check(event.currentTarget) || uploading || save.isPending) return;
+    const entries = knowledgeBase.documents.map(({ document_id, name }) => ({ document_id, name }));
+    save.mutate(
+      { ...toInput(form.draft), knowledge_base: entries },
+      { onSuccess: (agent) => navigate(`/agents/${agent.id}`) },
+    );
+  };
+
+  return (
+    <div className="mx-auto grid max-w-6xl gap-6">
+      <Link
+        to="/agents"
+        className="inline-flex w-fit items-center gap-1 rounded-sm text-sm text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
+      >
+        <ChevronLeft className="size-4" />
+        Agents
+      </Link>
+      <div className="grid gap-1">
+        <h1 className="text-2xl font-semibold tracking-[-0.015em]">New agent</h1>
+        <p className="text-sm text-muted-foreground">
+          Tell Truman how to reach the agent and what it does.
+        </p>
+      </div>
+      <form noValidate onSubmit={submit} className="grid gap-6">
+        <div className="grid gap-6 lg:grid-cols-2">
+          <Section title="Agent">
+            <BasicsFields form={form} />
+          </Section>
+          <Section title="Calls">
+            <ReachFields form={form} />
+          </Section>
+          {form.outbound && (
+            <Section
+              title="Start request"
+              description={REQUEST_NOTE}
+              className={cn("lg:col-span-2", form.swap)}
+            >
+              <RequestFields form={form} />
+            </Section>
+          )}
+          <Section
+            title="What it does"
+            description="Optional. Truman reads these and the knowledge base to write test scenarios."
+          >
+            <ContextFields form={form} />
+          </Section>
+          <KnowledgeBasePanel source={knowledgeBase} />
         </div>
-      </FieldGroup>
+        <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-2">
+          {save.error && (
+            <FieldError className={`mr-auto ${APPEAR}`}>{save.error.message}</FieldError>
+          )}
+          {uploading && (
+            <FieldDescription className={`mr-auto ${APPEAR}`}>
+              Wait for the documents to finish uploading.
+            </FieldDescription>
+          )}
+          <Button variant="ghost" nativeButton={false} render={<Link to="/agents" />}>
+            Cancel
+          </Button>
+          <Button type="submit" disabled={save.isPending || uploading}>
+            {save.isPending && <Spinner />}
+            Add agent
+          </Button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+/** Edits an agent. Its knowledge base is edited in its own panel, which saves at once. */
+export function AgentForm({
+  agent,
+  onSaved,
+  cancel,
+}: {
+  agent: Agent;
+  onSaved: (agent: Agent) => void;
+  cancel: ReactNode;
+}) {
+  const navigate = useNavigate();
+  const form = useAgentDraft(agent);
+  const save = useSaveAgent(agent.id);
+  const remove = useDeleteAgent();
+
+  const submit = (event: SubmitEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!form.check(event.currentTarget)) return;
+    save.mutate(toInput(form.draft), { onSuccess: onSaved });
+  };
+
+  return (
+    <form noValidate onSubmit={submit} className="grid gap-10">
+      <FieldSet>
+        <FieldLegend>Agent</FieldLegend>
+        <BasicsFields form={form} />
+      </FieldSet>
+      <FieldSet>
+        <FieldLegend>Calls</FieldLegend>
+        <ReachFields form={form} />
+      </FieldSet>
+      {form.outbound && (
+        <FieldSet className={form.swap}>
+          <FieldLegend>Start request</FieldLegend>
+          <FieldDescription>{REQUEST_NOTE}</FieldDescription>
+          <RequestFields form={form} />
+        </FieldSet>
+      )}
+      <FieldSet>
+        <FieldLegend>What it does</FieldLegend>
+        <ContextFields form={form} />
+      </FieldSet>
+
+      {(save.error || remove.error) && (
+        <FieldError className={APPEAR}>{(save.error ?? remove.error)?.message}</FieldError>
+      )}
+
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        <DeleteConfirm
+          name={form.draft.name}
+          description="Past conversations keep their copy of its configuration. An agent with an active conversation cannot be deleted."
+          pending={remove.isPending}
+          onDelete={(close) =>
+            remove.mutate(agent.id, {
+              onSuccess: () => {
+                toast.success(`Deleted ${form.draft.name}`);
+                navigate("/agents");
+              },
+              onSettled: close,
+            })
+          }
+        />
+        {cancel}
+        <Button type="submit" disabled={save.isPending}>
+          {save.isPending && <Spinner />}
+          Save changes
+        </Button>
+      </div>
     </form>
   );
 }

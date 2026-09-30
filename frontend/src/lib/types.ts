@@ -158,6 +158,8 @@ export interface AgentInput {
   language: Language;
   brief: string | null;
   config: string | null;
+  /** Sent only when the agent is added; later changes go through the knowledge base panel. */
+  knowledge_base?: KnowledgeBaseEntry[];
 }
 
 export interface PhoneNumber {

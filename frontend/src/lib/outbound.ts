@@ -47,14 +47,31 @@ function parseBody(text: string): Record<string, unknown> | null {
   }
 }
 
+/** Why the server would refuse the URL: it takes an absolute http or https URL with no
+ * placeholders. */
+function urlProblem(typed: string): string | null {
+  const url = typed.trim();
+  if (!url) return "Enter the URL Truman sends the request to.";
+  if (url.includes("{{") || url.includes("}}")) {
+    return "Put placeholders in the headers or the body, not in the URL.";
+  }
+  try {
+    const { protocol } = new URL(url);
+    return protocol === "http:" || protocol === "https:" ? null : "Use an http or https URL.";
+  } catch {
+    return "Enter a full URL, like https://api.example.com/calls.";
+  }
+}
+
 /** Problems that keep the settings from being saved, by field. */
 export function outboundProblems(
   draft: OutboundDraft,
 ): Partial<Record<keyof OutboundDraft, string>> {
   const window = Number(draft.dial_window);
   const numbers = draft.calling_numbers.map(normalizeNumber).filter(Boolean);
+  const url = urlProblem(draft.url);
   return {
-    ...(draft.url.trim() ? {} : { url: "Enter the URL Truman sends the request to." }),
+    ...(url ? { url } : {}),
     ...(parseBody(draft.body) ? {} : { body: "The body must be a JSON object." }),
     ...(numbers.every(isPhoneNumber)
       ? {}
