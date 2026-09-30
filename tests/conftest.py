@@ -34,7 +34,7 @@ from truman.domain.languages import Language
 from truman.domain.numbers import AccountNumber
 from truman.domain.voices import ProviderVoice, VoiceGender, VoiceProvider, VoiceSettings
 from truman.integrations.plivo_signature import signature, signed_text
-from truman.simulation import conversations
+from truman.simulation import conversations, numbers
 from truman.worker.worker import Worker
 
 TOKEN = "test-token"
@@ -546,7 +546,7 @@ async def client(
     app.state.file_store = file_store
     app.state.generation_model = generation_model
     async with create_sessionmaker(app.state.engine)() as session:
-        await conversations.sync_numbers(session, POOL, [], {})
+        await numbers.sync_numbers(session, POOL, [], {})
         session.add(listed_voice(ENGLISH_VOICE, Language.EN))
         session.add(listed_voice(HINDI_VOICE, Language.EN, Language.HINGLISH))
         await session.commit()

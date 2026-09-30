@@ -17,7 +17,7 @@ from truman.db.session import create_engine, create_sessionmaker
 from truman.domain.conversations import Caller
 from truman.domain.numbers import AccountNumber
 from truman.integrations.plivo import PlivoApi, PlivoError
-from truman.simulation import conversations
+from truman.simulation.numbers import UnknownNumbersError, enabled_numbers, sync_numbers
 from truman.worker.worker import Worker
 
 cli = typer.Typer(no_args_is_help=True, add_completion=False)
@@ -66,7 +66,7 @@ def worker() -> None:
     caller = callers(settings, registry, api)
     try:
         asyncio.run(run_worker(settings, caller, registry, api))
-    except conversations.UnknownNumbersError as error:
+    except UnknownNumbersError as error:
         logging.critical("TRUMAN_PLIVO_NUMBERS: %s", error)
         raise SystemExit(1) from None
 
@@ -97,7 +97,7 @@ async def application_names(
 ) -> dict[str, str]:
     """The names of the Applications linked to the numbers Truman may use, for the Numbers
     page; a name that cannot be read is left out."""
-    enabled = set(conversations.enabled_numbers(numbers, allowlist))
+    enabled = set(enabled_numbers(numbers, allowlist))
     linked = {n.application_id for n in numbers if n.number in enabled and n.application_id}
     names: dict[str, str] = {}
     for app_id in sorted(linked):
@@ -144,7 +144,7 @@ async def sync_pool(
         return
     names = await application_names(api, numbers, allowlist)
     async with sessionmaker() as session:
-        enabled = await conversations.sync_numbers(session, numbers, allowlist, names)
+        enabled = await sync_numbers(session, numbers, allowlist, names)
     logging.info(
         "number pool: %d of %d account numbers enabled: %s",
         len(enabled),

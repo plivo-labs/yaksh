@@ -15,7 +15,7 @@ from truman.db.session import create_engine, create_sessionmaker
 from truman.domain.conversations import CallOutcome, ConversationStatus, EndReason, Transcript
 from truman.domain.numbers import AccountNumber, PlivoApplication
 from truman.integrations.plivo import PlivoApi, PlivoError
-from truman.simulation import conversations
+from truman.simulation import conversations, numbers
 from truman.worker.worker import Worker
 
 NUMBER = "+17862242321"
@@ -42,11 +42,11 @@ async def test_concurrent_leases_get_distinct_numbers_and_a_finished_call_frees_
     sessions = create_sessionmaker(engine)
     first, second, third = [await queue_phone_conversation(client) for _ in range(3)]
     async with sessions() as session:
-        await conversations.sync_numbers(session, account(NUMBER, OTHER), [], {})
+        await numbers.sync_numbers(session, account(NUMBER, OTHER), [], {})
 
     async def lease(conversation_id: uuid.UUID) -> str | None:
         async with sessions() as session:
-            return await conversations.lease_number(session, conversation_id)
+            return await numbers.lease_number(session, conversation_id)
 
     leased = await asyncio.gather(lease(first), lease(second))
     assert sorted(leased, key=str) == [NUMBER, OTHER]
@@ -90,8 +90,8 @@ async def test_reaping_a_lost_lease_frees_its_number_and_syncing_keeps_leased_on
     sessions = create_sessionmaker(engine)
     conversation_id = await queue_phone_conversation(client)
     async with sessions() as session:
-        await conversations.sync_numbers(session, account(NUMBER, OTHER), [], {})
-        assert await conversations.lease_number(session, conversation_id) == NUMBER
+        await numbers.sync_numbers(session, account(NUMBER, OTHER), [], {})
+        assert await numbers.lease_number(session, conversation_id) == NUMBER
         await session.execute(
             update(Conversation)
             .where(Conversation.id == conversation_id)
@@ -102,7 +102,7 @@ async def test_reaping_a_lost_lease_frees_its_number_and_syncing_keeps_leased_on
             )
         )
         await session.commit()
-        await conversations.sync_numbers(session, account("+18005550101"), [], {})
+        await numbers.sync_numbers(session, account("+18005550101"), [], {})
         pool = set(await session.scalars(select(PhoneNumber.number)))
         assert pool == {NUMBER, "+18005550101"}
 
@@ -125,7 +125,7 @@ async def test_phone_conversations_run_from_a_leased_number_and_wait_for_a_free_
 ) -> None:
     engine = create_engine(settings.database_url.encoded_string())
     async with create_sessionmaker(engine)() as session:
-        await conversations.sync_numbers(session, account(NUMBER), [], {})
+        await numbers.sync_numbers(session, account(NUMBER), [], {})
     await engine.dispose()
     caller.release.clear()
     first = await queue_phone_conversation(client)
@@ -153,19 +153,19 @@ async def test_the_allowlist_and_voice_capability_decide_which_numbers_are_lease
     first, second = [await queue_phone_conversation(client) for _ in range(2)]
     async with sessions() as session:
         listed = account(NUMBER, OTHER) + account("+18005550102", voice=False)
-        await conversations.sync_numbers(session, listed, [OTHER], {})
+        await numbers.sync_numbers(session, listed, [OTHER], {})
         rows = await enabled_numbers(session)
         assert rows == {NUMBER: False, OTHER: True, "+18005550102": False}
-        assert await conversations.lease_number(session, first) == OTHER
-        assert await conversations.lease_number(session, second) is None
+        assert await numbers.lease_number(session, first) == OTHER
+        assert await numbers.lease_number(session, second) is None
 
-        await conversations.sync_numbers(session, listed, [], {})
+        await numbers.sync_numbers(session, listed, [], {})
         rows = await enabled_numbers(session)
         assert rows == {NUMBER: True, OTHER: True, "+18005550102": False}
-        assert await conversations.lease_number(session, second) == NUMBER
+        assert await numbers.lease_number(session, second) == NUMBER
 
-        with pytest.raises(conversations.UnknownNumbersError, match=r"\+15550009999"):
-            await conversations.sync_numbers(session, listed, ["+15550009999"], {})
+        with pytest.raises(numbers.UnknownNumbersError, match=r"\+15550009999"):
+            await numbers.sync_numbers(session, listed, ["+15550009999"], {})
     await engine.dispose()
 
 

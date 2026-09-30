@@ -23,7 +23,7 @@ from truman.config import Settings
 from truman.db.models import Conversation, PhoneNumber, Run
 from truman.db.session import create_engine, create_sessionmaker
 from truman.domain.conversations import ConversationStatus, EndReason
-from truman.simulation import conversations
+from truman.simulation import conversations, numbers
 from truman.worker.worker import Worker
 
 FINAL = {"completed", "failed", "invalid", "cancelled"}
@@ -220,7 +220,7 @@ async def test_a_reaper_that_waited_for_its_run_still_rests_the_number(
     assert lost is not None
     engine = create_engine(settings.database_url.encoded_string())
     async with create_sessionmaker(engine)() as session:
-        number = await conversations.lease_number(session, uuid.UUID(lost))
+        number = await numbers.lease_number(session, uuid.UUID(lost))
         await session.execute(
             update(Conversation)
             .where(Conversation.id == uuid.UUID(lost))

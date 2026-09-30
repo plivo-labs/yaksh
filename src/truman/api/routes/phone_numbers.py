@@ -6,7 +6,7 @@ from truman.api.auth import require_token
 from truman.api.deps import SessionDep, SettingsDep
 from truman.api.schemas.phone_numbers import NumberState, PhoneNumberRead, PhoneNumbers
 from truman.db.models import PhoneNumber
-from truman.simulation import conversations
+from truman.simulation import conversations, numbers
 
 
 def state(row: PhoneNumber, now: datetime) -> NumberState:
@@ -26,7 +26,7 @@ router = APIRouter(
 async def list_phone_numbers(session: SessionDep, settings: SettingsDep) -> PhoneNumbers:
     """The numbers Truman may use, as the worker last synced them from the Plivo account."""
     app_id = settings.plivo_app_id
-    rows = await conversations.enabled_pool(session)
+    rows = await numbers.enabled_pool(session)
     now = datetime.now(UTC)
     return PhoneNumbers(
         items=[
