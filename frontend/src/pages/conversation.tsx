@@ -34,7 +34,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
-import { clock, duration, when, words } from "@/lib/format";
+import { clock, duration, phone, when, words } from "@/lib/format";
 import { keys, useAgent, useConversation, useEndConversation } from "@/lib/queries";
 import { subscribe } from "@/lib/sse";
 import {
@@ -135,7 +135,7 @@ export function ConversationPage() {
               />
             </CardContent>
           </Card>
-          <Transcript turns={data.transcript} active={active} />
+          <Transcript turns={data.transcript} active={active} waiting={waitingText(data)} />
         </div>
         <ScrollArea className="lg:min-h-0">
           <div className="flex flex-col gap-6 p-px lg:pr-4">
@@ -175,6 +175,16 @@ function CallerLine({ conversation }: { conversation: Conversation }) {
       {conversation.agent_caller_id && `, called from ${conversation.agent_caller_id}`}
     </>
   );
+}
+
+function waitingText(conversation: Conversation): string {
+  const kinds = conversation.wire_events.map((event) => event.kind);
+  if (!kinds.includes("waiting_for_call") || kinds.includes("answered")) {
+    return "Waiting for the first words.";
+  }
+  return conversation.caller_number
+    ? `Waiting for the agent to call ${phone(conversation.caller_number)}.`
+    : "Waiting for the agent to call.";
 }
 
 function RailTitle({ role, name }: { role: string; name: string }) {
@@ -294,6 +304,14 @@ function useLiveUpdates(id: string, status: Conversation["status"] | undefined) 
                   ...current,
                   wire_events: place(current.wire_events, index, payload),
                 }));
+                // The number is leased after the status turns running, so the snapshot fetched
+                // on that status change can come back without it.
+                if (
+                  payload.kind === "waiting_for_call" &&
+                  !client.getQueryData<Conversation>(key)?.caller_number
+                ) {
+                  void client.invalidateQueries({ queryKey: key });
+                }
               } else if (event === "status") {
                 patch((current) => ({ ...current, status: payload.status }));
                 void client.invalidateQueries({ queryKey: ["conversations"], exact: false });
@@ -334,7 +352,15 @@ function pause(ms: number, signal: AbortSignal): Promise<void> {
   });
 }
 
-function Transcript({ turns, active }: { turns: Turn[]; active: boolean }) {
+function Transcript({
+  turns,
+  active,
+  waiting,
+}: {
+  turns: Turn[];
+  active: boolean;
+  waiting: string;
+}) {
   return (
     <Card className="lg:min-h-0">
       <CardHeader className="shrink-0">
@@ -343,7 +369,7 @@ function Transcript({ turns, active }: { turns: Turn[]; active: boolean }) {
       <CardContent className="lg:min-h-0 lg:flex-1">
         {turns.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            {active ? "Waiting for the first words." : "Nothing was transcribed."}
+            {active ? waiting : "Nothing was transcribed."}
           </p>
         ) : (
           <MessageScrollerProvider autoScroll>
