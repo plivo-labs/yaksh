@@ -5,7 +5,7 @@ import { refreshScenarios } from "@/lib/queries";
 import { openStream, readEvents } from "@/lib/sse";
 import type { GenerateInput, GenerationStatus, Scenario } from "@/lib/types";
 
-export interface GenerationRun {
+export interface GenerationProgress {
   status: GenerationStatus;
   /** Null until the plan is made. */
   planned: number | null;
@@ -18,14 +18,14 @@ export interface GenerationRun {
  * leaving the page, stops the writing, and what is saved stays. */
 export function useGeneration(agentId: string) {
   const client = useQueryClient();
-  const [run, setRun] = useState<GenerationRun | null>(null);
+  const [progress, setProgress] = useState<GenerationProgress | null>(null);
   const [newIds, setNewIds] = useState<ReadonlySet<string>>(new Set());
   const controller = useRef<AbortController | null>(null);
 
   useEffect(() => () => controller.current?.abort(), []);
 
-  const patch = (next: Partial<GenerationRun>) =>
-    setRun((current) => (current ? { ...current, ...next } : current));
+  const patch = (next: Partial<GenerationProgress>) =>
+    setProgress((current) => (current ? { ...current, ...next } : current));
 
   /** Resolves when the stream opens, and rejects with the API's reason if it is refused. */
   const start = async (input: GenerateInput): Promise<void> => {
@@ -39,7 +39,7 @@ export function useGeneration(agentId: string) {
       controller.current = null;
       throw failure;
     }
-    setRun({
+    setProgress({
       status: "running",
       planned: null,
       saved: 0,
@@ -54,10 +54,10 @@ export function useGeneration(agentId: string) {
       } else if (event === "scenario") {
         const scenario = payload as Scenario;
         setNewIds((current) => new Set(current).add(scenario.id));
-        setRun((current) => current && { ...current, saved: current.saved + 1 });
+        setProgress((current) => current && { ...current, saved: current.saved + 1 });
         void refreshScenarios(client, agentId);
       } else if (event === "dropped") {
-        setRun(
+        setProgress(
           (current) => current && { ...current, dropped: [...current.dropped, payload.reason] },
         );
       } else if (event === "finished") {
@@ -79,11 +79,11 @@ export function useGeneration(agentId: string) {
   };
 
   return {
-    run,
+    progress,
     newIds,
-    running: run?.status === "running",
+    running: progress?.status === "running",
     start,
     stop: () => controller.current?.abort(),
-    dismiss: () => setRun(null),
+    dismiss: () => setProgress(null),
   };
 }

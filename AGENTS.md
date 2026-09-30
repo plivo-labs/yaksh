@@ -21,7 +21,7 @@ docs/           empty for now; Markdown docs go here, Fumadocs site later
 tests/          automated tests and fixtures
 ```
 
-## How a run flows
+## How a test flows
 
 Two stages, each a separate job, each retryable on its own. Today the simulated test runs up to the saved conversation; the evaluation stage and imported calls are planned.
 

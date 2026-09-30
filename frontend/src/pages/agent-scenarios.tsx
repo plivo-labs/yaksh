@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
-import { type GenerationRun, useGeneration } from "@/hooks/use-generation";
+import { type GenerationProgress, useGeneration } from "@/hooks/use-generation";
 import { when } from "@/lib/format";
 import { useAgents, useDeleteScenarios, useGenerations, useScenarios } from "@/lib/queries";
 import {
@@ -42,40 +42,40 @@ function batchLabel(generation: Generation): string {
   return `${kind}, ${when(generation.created_at)} (${generation.scenarios})`;
 }
 
-function runMessage(run: GenerationRun): string {
-  const saved = counted(run.saved, "scenario", "scenarios");
-  if (run.status === "running") {
-    return run.planned === null
+function progressMessage(progress: GenerationProgress): string {
+  const saved = counted(progress.saved, "scenario", "scenarios");
+  if (progress.status === "running") {
+    return progress.planned === null
       ? "Reading the agent and planning what to test."
-      : `Writing scenarios: ${run.saved + run.dropped.length} of ${run.planned} done.`;
+      : `Writing scenarios: ${progress.saved + progress.dropped.length} of ${progress.planned} done.`;
   }
-  if (run.status === "stopped") return `Stopped. ${saved} saved.`;
-  if (run.status === "failed") {
-    const kept = run.saved > 0 ? ` ${saved} saved before it stopped.` : "";
-    return `The generation failed: ${run.error}${kept}`;
+  if (progress.status === "stopped") return `Stopped. ${saved} saved.`;
+  if (progress.status === "failed") {
+    const kept = progress.saved > 0 ? ` ${saved} saved before it stopped.` : "";
+    return `The generation failed: ${progress.error}${kept}`;
   }
   const dropped =
-    run.dropped.length > 0
-      ? ` ${counted(run.dropped.length, "scenario", "scenarios")} could not be written: ${run.dropped[0]}`
+    progress.dropped.length > 0
+      ? ` ${counted(progress.dropped.length, "scenario", "scenarios")} could not be written: ${progress.dropped[0]}`
       : "";
   return `Wrote ${saved}.${dropped}`;
 }
 
-function RunStatus({
-  run,
+function GenerationNotice({
+  progress,
   onStop,
   onDismiss,
 }: {
-  run: GenerationRun;
+  progress: GenerationProgress;
   onStop: () => void;
   onDismiss: () => void;
 }) {
-  const running = run.status === "running";
+  const running = progress.status === "running";
   return (
     <div role="status" className="flex items-center gap-3 border-b bg-muted/40 px-5 py-3 text-sm">
       {running && <Spinner />}
-      <p className={`min-w-0 flex-1 ${run.status === "failed" ? "text-destructive" : ""}`}>
-        {runMessage(run)}
+      <p className={`min-w-0 flex-1 ${progress.status === "failed" ? "text-destructive" : ""}`}>
+        {progressMessage(progress)}
       </p>
       {running ? (
         <Button type="button" variant="outline" size="sm" onClick={onStop}>
@@ -166,8 +166,12 @@ export function AgentScenarios({ agent }: { agent: Agent }) {
           )
         }
       />
-      {generation.run && (
-        <RunStatus run={generation.run} onStop={generation.stop} onDismiss={generation.dismiss} />
+      {generation.progress && (
+        <GenerationNotice
+          progress={generation.progress}
+          onStop={generation.stop}
+          onDismiss={generation.dismiss}
+        />
       )}
       {scenarios.isPending ? (
         <div className="grid gap-3 p-5">
