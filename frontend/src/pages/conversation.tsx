@@ -93,6 +93,29 @@ export function ConversationPage() {
           {data.failure_reason && (
             <p className="text-sm text-status-danger">{data.failure_reason}</p>
           )}
+          {data.run_id && (
+            <p className="flex flex-wrap gap-x-3 text-sm text-muted-foreground">
+              <Link to={`/runs/${data.run_id}`} className="underline-offset-4 hover:underline">
+                Repeat {data.repeat} of a run
+              </Link>
+              {data.retry_of && (
+                <Link
+                  to={`/conversations/${data.retry_of}`}
+                  className="underline-offset-4 hover:underline"
+                >
+                  Attempt {data.attempt}, retry of attempt {data.attempt - 1}
+                </Link>
+              )}
+              {data.retried_as && (
+                <Link
+                  to={`/conversations/${data.retried_as}`}
+                  className="underline-offset-4 hover:underline"
+                >
+                  Retried as attempt {data.attempt + 1}
+                </Link>
+              )}
+            </p>
+          )}
           {data.caller_claim && (
             <p className="text-sm text-muted-foreground">
               The caller says it {data.caller_claim.success ? "reached" : "did not reach"} its goal

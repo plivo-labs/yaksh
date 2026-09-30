@@ -8,6 +8,7 @@ import {
 
 import { api, apiBlob } from "@/lib/api";
 import {
+  ACTIVE_RUN_STATUSES,
   ACTIVE_STATUSES,
   type Agent,
   type AgentInput,
@@ -25,6 +26,9 @@ import {
   type PhoneNumbers,
   type PersonaInput,
   type ProviderVoice,
+  type Run,
+  type RunInput,
+  type RunSummary,
   type Scenario,
   type ScenarioInput,
   type Voice,
@@ -46,6 +50,8 @@ export const keys = {
   voices: ["voices"] as const,
   voicesFor: (language: Language | "all") => ["voices", language] as const,
   phoneNumbers: ["phone-numbers"] as const,
+  runs: (agentId: string) => ["runs", agentId] as const,
+  run: (id: string) => ["runs", "one", id] as const,
   document: (id: string) => ["documents", id] as const,
 };
 
@@ -306,6 +312,59 @@ export function useEndConversation(id: string) {
     mutationFn: () => api<Conversation>(`/conversations/${id}/end`, { method: "POST" }),
     onSuccess: (conversation) => {
       client.setQueryData(keys.conversation(id), conversation);
+      void client.invalidateQueries({ queryKey: ["conversations"] });
+    },
+  });
+}
+
+export const RUNS_SHOWN = 8;
+
+export function useRuns(agentId: string) {
+  const search = new URLSearchParams({ agent_id: agentId, page_size: String(RUNS_SHOWN) });
+  return useQuery({
+    queryKey: keys.runs(agentId),
+    queryFn: ({ signal }) => api<Page<RunSummary>>(`/runs?${search}`, { signal }),
+    refetchInterval: (query) =>
+      query.state.data?.items.some((run) => ACTIVE_RUN_STATUSES.includes(run.status))
+        ? 3_000
+        : 15_000,
+  });
+}
+
+export function useRun(id: string | undefined) {
+  return useQuery({
+    queryKey: keys.run(id ?? ""),
+    queryFn: ({ signal }) => api<Run>(`/runs/${id}`, { signal }),
+    enabled: Boolean(id),
+    refetchInterval: (query) =>
+      query.state.data && ACTIVE_RUN_STATUSES.includes(query.state.data.status) ? 3_000 : false,
+  });
+}
+
+/** The key makes a repeated request, such as a double click, return the run it started. */
+export function useStartRun(requestKey: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (input: RunInput) =>
+      api<RunSummary>("/runs", {
+        method: "POST",
+        json: input,
+        headers: { "Idempotency-Key": requestKey },
+      }),
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: ["runs"] });
+      void client.invalidateQueries({ queryKey: ["conversations"] });
+    },
+  });
+}
+
+export function useCancelRun(id: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: () => api<Run>(`/runs/${id}/cancel`, { method: "POST" }),
+    onSuccess: (run) => {
+      client.setQueryData(keys.run(id), run);
+      void client.invalidateQueries({ queryKey: ["runs"] });
       void client.invalidateQueries({ queryKey: ["conversations"] });
     },
   });

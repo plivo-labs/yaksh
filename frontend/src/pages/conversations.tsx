@@ -1,8 +1,9 @@
 import { Copy, Ellipsis, PhoneOff, Plus } from "lucide-react";
-import { type MouseEvent, useState } from "react";
+import { useState } from "react";
 import { Link, useSearchParams } from "react-router";
 import { toast } from "sonner";
 
+import { Pager } from "@/components/pager";
 import { RelativeTime } from "@/components/relative-time";
 import { SearchInput } from "@/components/search-input";
 import { SortHeader } from "@/components/sort-header";
@@ -27,13 +28,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
-  Pagination,
-  PaginationContent,
-  PaginationItem,
-  PaginationNext,
-  PaginationPrevious,
-} from "@/components/ui/pagination";
-import {
   Select,
   SelectContent,
   SelectGroup,
@@ -42,6 +36,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { usePageParam } from "@/hooks/use-page-param";
 import { copyText } from "@/lib/clipboard";
 import { duration } from "@/lib/format";
 import { CONVERSATIONS_PAGE, useAgents, useConversations, useEndConversation } from "@/lib/queries";
@@ -74,7 +69,7 @@ export function ConversationsPage() {
   const status = params.get("status") ?? ANY;
   const search = params.get("q") ?? "";
   const sort = params.get("sort") ?? "";
-  const page = Math.max(1, Number(params.get("page") ?? "1") || 1);
+  const page = usePageParam();
   const filters: Record<string, string> = {};
   if (agentId !== ANY) filters.agent_id = agentId;
   if (status !== ANY) filters.status = status;
@@ -100,18 +95,6 @@ export function ConversationsPage() {
     next.delete("page");
     setParams(next, { replace: true });
   };
-  const pageParams = (target: number) => {
-    const next = new URLSearchParams(params);
-    if (target <= 1) next.delete("page");
-    else next.set("page", String(target));
-    return next;
-  };
-  const goTo = (target: number) => (event: MouseEvent) => {
-    event.preventDefault();
-    setParams(pageParams(target));
-  };
-  const total = conversations.data?.total ?? 0;
-  const last = Math.max(1, Math.ceil(total / CONVERSATIONS_PAGE));
 
   return (
     <div className="grid gap-6">
@@ -226,32 +209,12 @@ export function ConversationsPage() {
               ))
             )}
           </ul>
-          {total > CONVERSATIONS_PAGE && (
-            <Pagination className="mt-4 justify-between">
-              <span className="text-sm text-muted-foreground">
-                {(page - 1) * CONVERSATIONS_PAGE + 1}–{Math.min(page * CONVERSATIONS_PAGE, total)}{" "}
-                of {total}
-              </span>
-              <PaginationContent>
-                <PaginationItem>
-                  <PaginationPrevious
-                    href={`?${pageParams(page - 1)}`}
-                    onClick={goTo(page - 1)}
-                    aria-disabled={page <= 1}
-                    className={page <= 1 ? "pointer-events-none opacity-50" : ""}
-                  />
-                </PaginationItem>
-                <PaginationItem>
-                  <PaginationNext
-                    href={`?${pageParams(page + 1)}`}
-                    onClick={goTo(page + 1)}
-                    aria-disabled={page >= last}
-                    className={page >= last ? "pointer-events-none opacity-50" : ""}
-                  />
-                </PaginationItem>
-              </PaginationContent>
-            </Pagination>
-          )}
+          <Pager
+            className="mt-4"
+            page={page}
+            total={conversations.isPlaceholderData ? undefined : conversations.data?.total}
+            pageSize={CONVERSATIONS_PAGE}
+          />
         </div>
       )}
     </div>

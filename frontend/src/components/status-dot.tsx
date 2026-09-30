@@ -3,7 +3,7 @@ import { cn } from "cn";
 import { Settle } from "@/components/settle";
 import { Badge } from "@/components/ui/badge";
 import { words } from "@/lib/format";
-import type { ConversationStatus } from "@/lib/types";
+import type { ConversationStatus, RunStatus } from "@/lib/types";
 
 type Tone = "amber" | "green" | "red" | "off";
 
@@ -70,6 +70,25 @@ export function StatusBadge({ status }: { status: ConversationStatus }) {
       <Badge variant="outline" className="gap-1.5 capitalize">
         <StatusDot status={status} size="sm" />
         {words(status)}
+      </Badge>
+    </Settle>
+  );
+}
+
+const RUN_TONE: Record<RunStatus, Tone> = {
+  queued: "amber",
+  running: "green",
+  cancelling: "amber",
+  done: "green",
+  cancelled: "off",
+};
+
+export function RunStatusBadge({ status }: { status: RunStatus }) {
+  return (
+    <Settle value={status}>
+      <Badge variant="outline" className="gap-1.5 capitalize">
+        <Dot tone={RUN_TONE[status]} live={status === "running"} size="sm" />
+        {status}
       </Badge>
     </Settle>
   );

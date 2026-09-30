@@ -26,3 +26,5 @@ class PhoneNumbers(BaseModel):
     items: list[PhoneNumberRead]
     outbound_problem: str | None
     """Why an outbound test could not get its call now; None when it could."""
+    rest_s: int
+    """How long a released number rests before an outbound test may use it."""

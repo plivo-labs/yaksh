@@ -8,7 +8,7 @@ export type ConversationStatus =
   | "failed"
   | "invalid"
   | "cancelled";
-type EndReason =
+export type EndReason =
   | "user_request"
   | "caller_hangup"
   | "agent_hangup"
@@ -61,6 +61,37 @@ type WireEventKind =
   | "waiting_for_call";
 
 export const ACTIVE_STATUSES: ConversationStatus[] = ["queued", "running", "ending"];
+
+/** How a conversation went, from its status and end reason only: what happened, not who is at
+ * fault. */
+export type OutcomeGroup =
+  | "waiting"
+  | "in_progress"
+  | "completed"
+  | "did_not_connect"
+  | "error"
+  | "cancelled";
+
+export const OUTCOME_GROUPS: { value: OutcomeGroup; label: string }[] = [
+  { value: "waiting", label: "Waiting" },
+  { value: "in_progress", label: "In progress" },
+  { value: "completed", label: "Completed" },
+  { value: "did_not_connect", label: "Did not connect" },
+  { value: "error", label: "Error" },
+  { value: "cancelled", label: "Cancelled" },
+];
+
+export type RunStatus = "queued" | "running" | "cancelling" | "done" | "cancelled";
+
+export const ACTIVE_RUN_STATUSES: RunStatus[] = ["queued", "running", "cancelling"];
+
+export type WaitingReason = "max_parallel" | "delay" | "worker_or_number";
+
+export const WAITING_REASON_TEXT: Record<WaitingReason, string> = {
+  max_parallel: "max parallel reached",
+  delay: "delay between calls",
+  worker_or_number: "a free worker or number",
+};
 
 export const LANGUAGE_NAMES: Record<Language, string> = {
   en: "English",
@@ -175,6 +206,8 @@ export interface PhoneNumber {
 export interface PhoneNumbers {
   items: PhoneNumber[];
   outbound_problem: string | null;
+  /** How long a released number rests before an outbound test may use it. */
+  rest_s: number;
 }
 
 export type VoiceProvider = "elevenlabs";
@@ -336,6 +369,13 @@ export interface ConversationSummary {
   ended_at: string | null;
   talk_ms: number | null;
   recording_url: string | null;
+  /** What the caller said when it hung up: a claim, not a verdict. */
+  caller_claim: CallerClaim | null;
+  run_id: string | null;
+  repeat: number | null;
+  attempt: number;
+  /** The conversation this one tries again. */
+  retry_of: string | null;
   created_at: string;
 }
 
@@ -345,7 +385,48 @@ export interface Conversation extends ConversationSummary {
   transcript: Turn[];
   wire_events: WireEvent[];
   validity: Validity | null;
-  caller_claim: CallerClaim | null;
+  /** The retry that replaced this conversation. */
+  retried_as: string | null;
+}
+
+export interface RunInput {
+  agent_id: string;
+  /** In the order the conversations of each repeat start. */
+  scenario_ids: string[];
+  repeats: number;
+  max_duration_s: number;
+  /** Calls of the run on the line at once; null is no run limit. */
+  max_parallel: number | null;
+  /** The least time between two call starts; null is no wait. */
+  start_interval_s: number | null;
+  /** How many times a conversation that ends with an error is tried again. */
+  retries: number;
+  name: string | null;
+}
+
+export interface RunSummary extends Omit<RunInput, "scenario_ids"> {
+  id: string;
+  agent_version_id: string;
+  agent_version: number;
+  agent_name: string;
+  status: RunStatus;
+  /** The latest attempt of each repeat of each scenario, by outcome group. */
+  counts: Record<OutcomeGroup, number>;
+  end_reasons: Partial<Record<EndReason, number>>;
+  /** How many of the run's conversations are retries. */
+  retried: number;
+  /** What the callers said when they hung up: claims, not verdicts. */
+  caller_claims: { reached: number; not_reached: number };
+  median_talk_ms: number | null;
+  waiting_reason: WaitingReason | null;
+  started_at: string | null;
+  ended_at: string | null;
+  created_at: string;
+  cancelled_at: string | null;
+}
+
+export interface Run extends RunSummary {
+  scenario_ids: string[];
 }
 
 export interface ConversationInput {

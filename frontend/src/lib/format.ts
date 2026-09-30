@@ -75,3 +75,8 @@ export function textSize(characters: number): string {
   const tokens = Math.round(characters / 4);
   return `${characters.toLocaleString()} characters, about ${tokens.toLocaleString()} tokens`;
 }
+
+/** A run's name, or its start time when it has none. */
+export function runTitle(run: { name: string | null; created_at: string }): string {
+  return run.name ?? `Run of ${when(run.created_at)}`;
+}

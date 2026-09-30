@@ -213,7 +213,7 @@ async def test_the_numbers_page_shows_the_outbound_numbers_and_their_rest(
 
     receiving = next(n for n in listed["items"] if n["number"] == RECEIVING)
     others = [n for n in listed["items"] if n["number"] != RECEIVING]
-    assert listed["outbound_problem"] is None
+    assert listed["outbound_problem"] is None and listed["rest_s"] == settings.number_rest_s
     assert receiving["on_outbound_application"] and receiving["state"] == "resting"
     assert others and not any(n["on_outbound_application"] for n in others)
 

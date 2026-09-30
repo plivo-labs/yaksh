@@ -1,4 +1,4 @@
-import { PhoneIncoming, PhoneOutgoing, Plus, Sparkles, X } from "lucide-react";
+import { PhoneIncoming, PhoneOutgoing, Play, Plus, Sparkles, X } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -29,6 +29,7 @@ import {
 } from "@/lib/queries";
 import { type Agent, CATEGORY_LABELS, type Generation, MAX_BULK, type Scenario } from "@/lib/types";
 import { GenerateDialog } from "@/pages/generate-dialog";
+import { RunDialog } from "@/pages/run-dialog";
 import { ScenarioDialog } from "@/pages/scenario-dialog";
 import { StartCallDialog } from "@/pages/start-call-dialog";
 
@@ -110,6 +111,7 @@ export function AgentScenarios({ agent }: { agent: Agent }) {
   const outbound = agent.direction === "outbound";
   const [editing, setEditing] = useState<Scenario | "new" | null>(null);
   const [generating, setGenerating] = useState(false);
+  const [running, setRunning] = useState(false);
   const [picked, setPicked] = useState<ReadonlySet<string>>(new Set());
   const scenario = editing === "new" ? undefined : (editing ?? undefined);
 
@@ -268,6 +270,10 @@ export function AgentScenarios({ agent }: { agent: Agent }) {
                       </SelectGroup>
                     </SelectContent>
                   </Select>
+                  <Button size="sm" onClick={() => setRunning(true)}>
+                    <Play />
+                    Run {selected.length}
+                  </Button>
                   <DeleteConfirm
                     name={counted(selected.length, "scenario", "scenarios")}
                     label={`Delete ${selected.length} selected`}
@@ -354,6 +360,13 @@ export function AgentScenarios({ agent }: { agent: Agent }) {
           agent={agent}
           scenario={scenario}
           onClosed={() => setEditing(null)}
+        />
+      )}
+      {running && (
+        <RunDialog
+          agent={agent}
+          choices={{ scenarios: items.filter((item) => picked.has(item.id)) }}
+          onClosed={() => setRunning(false)}
         />
       )}
       {generating && (

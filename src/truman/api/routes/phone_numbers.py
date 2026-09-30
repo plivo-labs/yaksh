@@ -42,4 +42,5 @@ async def list_phone_numbers(session: SessionDep, settings: SettingsDep) -> Phon
             for row in rows
         ],
         outbound_problem=await conversations.outbound_problem(session, settings),
+        rest_s=settings.number_rest_s,
     )

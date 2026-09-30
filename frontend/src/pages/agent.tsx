@@ -25,6 +25,7 @@ import {
 } from "@/lib/types";
 import { AgentForm } from "@/pages/agent-form";
 import { AgentKnowledgeBase } from "@/pages/agent-knowledge-base";
+import { AgentRuns } from "@/pages/agent-runs";
 import { AgentScenarios } from "@/pages/agent-scenarios";
 import { StartCallDialog } from "@/pages/start-call-dialog";
 
@@ -60,6 +61,7 @@ export function AgentPage() {
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_21rem]">
         <div className="grid gap-6">
           {agent.data && <AgentScenarios agent={agent.data} />}
+          {agent.data && <AgentRuns agent={agent.data} />}
           {agent.data && <AgentKnowledgeBase agent={agent.data} />}
           {agent.data && <Calls agent={agent.data} />}
         </div>
