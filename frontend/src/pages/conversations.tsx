@@ -114,7 +114,7 @@ export function ConversationsPage() {
   const last = Math.max(1, Math.ceil(total / CONVERSATIONS_PAGE));
 
   return (
-    <div className="mx-auto grid max-w-6xl gap-6">
+    <div className="grid gap-6">
       <div className="flex flex-wrap items-center gap-x-2 gap-y-4">
         <h1 className="mr-auto text-2xl font-semibold tracking-[-0.015em]">Conversations</h1>
         <StartCallDialog

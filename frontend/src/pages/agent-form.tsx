@@ -334,7 +334,7 @@ export function NewAgentPage() {
   };
 
   return (
-    <div className="mx-auto grid max-w-6xl gap-6">
+    <div className="grid gap-6">
       <Link
         to="/agents"
         className="inline-flex w-fit items-center gap-1 rounded-sm text-sm text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"

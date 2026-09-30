@@ -18,7 +18,7 @@ const STATES: Record<PhoneNumber["state"], { label: string; tone: "green" | "amb
 export function NumbersPage() {
   const numbers = usePhoneNumbers();
   return (
-    <div className="mx-auto grid max-w-6xl gap-6">
+    <div className="grid gap-6">
       <h1 className="text-2xl font-semibold tracking-[-0.015em]">Numbers</h1>
       {numbers.isError ? (
         <Alert variant="destructive">
