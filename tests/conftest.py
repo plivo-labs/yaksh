@@ -167,6 +167,30 @@ async def wait_for(
         await asyncio.sleep(0.05)
 
 
+async def wait_for_lock_waiters(settings: Settings, count: int, timeout: float = 5.0) -> None:
+    """Wait until `count` database sessions wait on a lock, so a test releases a lock it holds
+    only after every request it races has reached that lock."""
+    engine = create_async_engine(
+        settings.database_url.encoded_string(), isolation_level="AUTOCOMMIT"
+    )
+    deadline = asyncio.get_running_loop().time() + timeout
+    try:
+        async with engine.connect() as connection:
+            while True:
+                waiting = await connection.scalar(
+                    text(
+                        "SELECT count(*) FROM pg_stat_activity"
+                        " WHERE datname = current_database() AND wait_event_type = 'Lock'"
+                    )
+                )
+                if waiting is not None and waiting >= count:
+                    return
+                assert asyncio.get_running_loop().time() < deadline, f"{waiting} of {count} wait"
+                await asyncio.sleep(0.02)
+    finally:
+        await engine.dispose()
+
+
 async def wait_until(condition: Callable[[], bool], timeout: float = 5.0) -> None:
     deadline = asyncio.get_running_loop().time() + timeout
     while not condition():

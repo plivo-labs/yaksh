@@ -1,0 +1,59 @@
+import dataclasses
+import uuid
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, Header, status
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from truman.api.auth import require_token
+from truman.api.deps import SessionDep, SettingsDep
+from truman.api.pagination import Page, PageDep
+from truman.api.schemas.runs import RunRead, RunSummary
+from truman.db.models import Run
+from truman.domain.runs import RunCreate
+from truman.simulation import conversations, runs
+
+router = APIRouter(prefix="/runs", tags=["runs"], dependencies=[Depends(require_token)])
+
+
+async def summaries(session: AsyncSession, rows: list[Run]) -> list[RunSummary]:
+    agents = await conversations.pinned_agents(session, rows)
+    progress = await runs.progress(session, rows)
+    items = []
+    for row in rows:
+        data = {name: getattr(row, name) for name in RunSummary.model_fields if hasattr(row, name)}
+        data["agent_version"], data["agent_name"] = agents[row.agent_version_id]
+        data.update(dataclasses.asdict(progress[row.id]))
+        items.append(RunSummary.model_validate(data))
+    return items
+
+
+async def detail(session: AsyncSession, run: Run) -> RunRead:
+    base = (await summaries(session, [run]))[0]
+    return RunRead(**base.model_dump(), scenario_ids=await runs.scenario_ids(session, run))
+
+
+@router.post("", status_code=status.HTTP_202_ACCEPTED)
+async def create_run(
+    command: RunCreate,
+    session: SessionDep,
+    settings: SettingsDep,
+    idempotency_key: Annotated[str | None, Header(min_length=1, max_length=200)] = None,
+) -> RunSummary:
+    run = await runs.create_run(session, settings, command, idempotency_key)
+    return (await summaries(session, [run]))[0]
+
+
+@router.get("")
+async def list_runs(
+    session: SessionDep, page: PageDep, agent_id: uuid.UUID | None = None
+) -> Page[RunSummary]:
+    rows, total = await runs.list_runs(
+        session, offset=page.offset, limit=page.page_size, agent_id=agent_id
+    )
+    return Page.of(await summaries(session, rows), total, page)
+
+
+@router.get("/{run_id}")
+async def get_run(run_id: uuid.UUID, session: SessionDep) -> RunRead:
+    return await detail(session, await runs.get_run(session, run_id))

@@ -47,6 +47,11 @@ class ConversationSummary(BaseModel):
     ended_at: datetime | None
     talk_ms: int | None
     recording_url: str | None
+    caller_claim: CallerClaim | None
+    run_id: uuid.UUID | None
+    repeat: int | None
+    attempt: int
+    retry_of: uuid.UUID | None
     created_at: datetime
 
 
@@ -56,4 +61,4 @@ class ConversationRead(ConversationSummary):
     transcript: list[Turn]
     wire_events: list[WireEvent]
     validity: Validity | None
-    caller_claim: CallerClaim | None
+    retried_as: uuid.UUID | None

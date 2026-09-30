@@ -84,10 +84,40 @@ async def test_an_outbound_start_needs_a_linked_number_and_the_triggers_agent_da
         f"outbound tests are off: no enabled number is linked to Plivo application {APP_ID}"
     )
     assert lacking.status_code == 422
-    assert (
-        lacking.json()["error"]["message"] == "the scenario has no agent data named customer name"
+    assert lacking.json()["error"]["message"] == (
+        'the scenario "No data" has no agent data named customer name'
     )
     assert started.status_code == 202 and started.json()["direction"] == "outbound"
+
+
+async def test_an_outbound_run_needs_the_same_setup_and_names_a_scenario_without_agent_data(
+    client: AsyncClient, settings: Settings
+) -> None:
+    agent = await create_agent(client, **OUTBOUND_AGENT)
+    with_data = await create_scenario(client, agent["id"], agent_data=AGENT_DATA)
+    without = await create_scenario(client, agent["id"], name="No data")
+
+    async def start_run(*scenarios: dict[str, Any]) -> Any:
+        return await client.post(
+            "/api/v1/runs",
+            json={"agent_id": agent["id"], "scenario_ids": [s["id"] for s in scenarios]},
+        )
+
+    off = await start_run(with_data)
+    await report(settings)
+    await link_number(settings)
+    lacking = await start_run(with_data, without)
+    started = await start_run(with_data)
+
+    assert off.status_code == 422
+    assert off.json()["error"]["message"].startswith("outbound tests are off: ")
+    assert lacking.status_code == 422
+    assert lacking.json()["error"]["message"] == (
+        'the scenario "No data" has no agent data named customer name'
+    )
+    assert started.status_code == 202, started.text
+    queued = await client.get("/api/v1/conversations", params={"run_id": started.json()["id"]})
+    assert [c["direction"] for c in queued.json()["items"]] == ["outbound"]
 
 
 async def claim(settings: Settings, receiving_app_id: str | None) -> Conversation | None:

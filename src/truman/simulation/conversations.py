@@ -1,6 +1,7 @@
 import asyncio
 import uuid
 from collections.abc import AsyncIterator, Sequence
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any
 from zoneinfo import ZoneInfo
@@ -8,6 +9,7 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import ColumnElement, String, and_, cast, delete, func, or_, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+from sqlalchemy.orm import aliased
 
 from truman.config import Settings
 from truman.db.models import (
@@ -17,23 +19,29 @@ from truman.db.models import (
     Persona,
     PersonaVersion,
     PhoneNumber,
+    Run,
     Scenario,
     ScenarioVersion,
 )
 from truman.domain.agents import AgentConfig, Direction
 from truman.domain.conversations import (
     ACTIVE_STATUSES,
+    LIVE_STATUSES,
     Admission,
+    CallerClaim,
     CallOutcome,
     CallRequest,
     ConversationCreate,
     ConversationStatus,
     EndReason,
     IncomingCall,
+    OutcomeGroup,
     Transcript,
     Validity,
+    outcome_group,
 )
 from truman.domain.errors import NotFoundError, ValidationError
+from truman.domain.languages import Language
 from truman.domain.numbers import AccountNumber
 from truman.domain.personas import PersonaConfig
 from truman.domain.scenarios import ScenarioConfig, normalized
@@ -41,13 +49,11 @@ from truman.domain.triggers import SEND_TIMEOUT_S, agent_data_names
 from truman.simulation.agents import config_of as agents_config_of
 from truman.simulation.agents import get_agent
 from truman.simulation.languages import LANGUAGES
-from truman.simulation.personas import config_of, get_persona
+from truman.simulation.personas import config_of
 from truman.simulation.prompts import caller_instructions
 from truman.simulation.scenarios import config_of as scenario_config_of
-from truman.simulation.scenarios import get_scenario
 from truman.simulation.workers import receiving_problem
 
-LIVE_STATUSES = frozenset({ConversationStatus.RUNNING, ConversationStatus.ENDING})
 LEASE_LOST = "worker lost its lease on the conversation; outcome unknown, not retried"
 WORKER_STOPPED = "worker stopped during the call; outcome unknown, not retried"
 FAILURE_TEXT = {EndReason.WORKER_STOPPED: WORKER_STOPPED, EndReason.LEASE_LOST: LEASE_LOST}
@@ -62,64 +68,190 @@ class UnknownNumbersError(Exception):
     """The allowlist names numbers the Plivo account does not have."""
 
 
+@dataclass(frozen=True)
+class Pins:
+    """What the conversations of one scenario pin, read once for all of them."""
+
+    scenario_id: uuid.UUID
+    scenario_version_id: uuid.UUID
+    persona_id: uuid.UUID
+    persona_version_id: uuid.UUID
+    language: Language
+    instructions: str
+    nudge: str
+
+
+@dataclass(frozen=True)
+class Snapshot:
+    """What new conversations of one agent pin: the agent version, and the pins of each
+    scenario in the order asked."""
+
+    agent_id: uuid.UUID
+    agent_version_id: uuid.UUID
+    direction: Direction
+    pins: list[Pins]
+
+    def conversation(
+        self,
+        pins: Pins,
+        max_duration_s: int,
+        *,
+        run_id: uuid.UUID | None = None,
+        repeat: int | None = None,
+    ) -> Conversation:
+        return Conversation(
+            direction=self.direction,
+            agent_id=self.agent_id,
+            agent_version_id=self.agent_version_id,
+            persona_id=pins.persona_id,
+            persona_version_id=pins.persona_version_id,
+            scenario_id=pins.scenario_id,
+            scenario_version_id=pins.scenario_version_id,
+            language=pins.language,
+            instructions=pins.instructions,
+            nudge=pins.nudge,
+            max_duration_s=max_duration_s,
+            run_id=run_id,
+            repeat=repeat,
+        )
+
+
 async def create_conversation(
     session: AsyncSession, settings: Settings, command: ConversationCreate
 ) -> Conversation:
-    if not settings.phone_enabled:
-        raise ValidationError(f"phone calls are off: {PHONE_SETTINGS}")
     agent = await get_agent(session, command.agent_id, lock=True)
-    if agent.direction is Direction.OUTBOUND:
-        problem = await outbound_problem(session, settings)
-        if problem is not None:
-            raise ValidationError(f"outbound tests are off: {problem}")
-    version_id = await session.scalar(
-        select(AgentVersion.id).where(
-            AgentVersion.agent_id == agent.id, AgentVersion.version == agent.current_version
-        )
-    )
-    scenario = await get_scenario(session, command.scenario_id, lock=True)
-    if scenario.agent_id != agent.id:
-        raise ValidationError("the scenario belongs to another agent")
-    scenario_version_id = await session.scalar(
-        select(ScenarioVersion.id).where(
-            ScenarioVersion.scenario_id == scenario.id,
-            ScenarioVersion.version == scenario.current_version,
-        )
-    )
-    persona = await get_persona(session, command.persona_id, lock=True)
-    persona_version_id = await session.scalar(
-        select(PersonaVersion.id).where(
-            PersonaVersion.persona_id == persona.id,
-            PersonaVersion.version == persona.current_version,
-        )
-    )
-    config = config_of(persona)
-    wants = scenario_config_of(scenario)
-    if agent.direction is Direction.OUTBOUND:
-        check_agent_data(agents_config_of(agent), wants)
-    conversation = Conversation(
-        direction=agent.direction,
-        agent_id=agent.id,
-        agent_version_id=version_id,
-        persona_id=persona.id,
-        persona_version_id=persona_version_id,
-        scenario_id=scenario.id,
-        scenario_version_id=scenario_version_id,
-        language=config.language,
-        instructions=caller_instructions(
-            config,
-            goal=wants.goal,
-            known_facts=wants.known_facts,
-            unknown_facts=wants.unknown_facts,
-            today=datetime.now(ZoneInfo(settings.timezone)).date(),
-            direction=agent.direction,
-        ),
-        nudge=LANGUAGES[config.language].nudge,
-        max_duration_s=command.max_duration_s or settings.default_max_duration_s,
+    taken = await snapshot(session, settings, agent, [command.scenario_id], command.persona_id)
+    conversation = taken.conversation(
+        taken.pins[0], command.max_duration_s or settings.default_max_duration_s
     )
     session.add(conversation)
     await session.commit()
     return conversation
+
+
+async def snapshot(
+    session: AsyncSession,
+    settings: Settings,
+    agent: Agent,
+    scenario_ids: Sequence[uuid.UUID],
+    persona_id: uuid.UUID | None = None,
+) -> Snapshot:
+    """Check that conversations of the agent's scenarios can start now, and read what they pin,
+    once for all of them: the current agent, scenario and persona versions, and today. Each
+    scenario runs with its own persona, or with persona_id when one is given. The caller locks
+    the agent first. The scenarios, then the personas are share-locked here, each set in id
+    order: edits and deletes wait until the conversations are saved, while transactions that
+    only reference these rows, such as duplicating an agent, do not conflict. A refusal about a
+    scenario names it."""
+    if not settings.phone_enabled:
+        raise ValidationError(f"phone calls are off: {PHONE_SETTINGS}")
+    if agent.direction is Direction.OUTBOUND:
+        problem = await outbound_problem(session, settings)
+        if problem is not None:
+            raise ValidationError(f"outbound tests are off: {problem}")
+    scenarios = await scenarios_to_start(session, agent, scenario_ids)
+    chosen = [persona_id if persona_id is not None else s.persona_id for s in scenarios]
+    personas = await personas_to_start(session, chosen)
+    agent_version_id = (
+        await session.execute(
+            select(AgentVersion.id).where(
+                AgentVersion.agent_id == agent.id, AgentVersion.version == agent.current_version
+            )
+        )
+    ).scalar_one()
+    scenario_versions = dict(
+        (
+            await session.execute(
+                select(ScenarioVersion.scenario_id, ScenarioVersion.id)
+                .join(Scenario, Scenario.id == ScenarioVersion.scenario_id)
+                .where(
+                    Scenario.id.in_(scenario_ids),
+                    ScenarioVersion.version == Scenario.current_version,
+                )
+            )
+        )
+        .tuples()
+        .all()
+    )
+    persona_versions = dict(
+        (
+            await session.execute(
+                select(PersonaVersion.persona_id, PersonaVersion.id)
+                .join(Persona, Persona.id == PersonaVersion.persona_id)
+                .where(
+                    Persona.id.in_(personas.keys()),
+                    PersonaVersion.version == Persona.current_version,
+                )
+            )
+        )
+        .tuples()
+        .all()
+    )
+    today = datetime.now(ZoneInfo(settings.timezone)).date()
+    outbound = agents_config_of(agent) if agent.direction is Direction.OUTBOUND else None
+    pins = []
+    for scenario, persona_id_of_scenario in zip(scenarios, chosen, strict=True):
+        persona = personas[persona_id_of_scenario]
+        config = config_of(persona)
+        wants = scenario_config_of(scenario)
+        if outbound is not None:
+            check_agent_data(outbound, wants, scenario.name)
+        pins.append(
+            Pins(
+                scenario_id=scenario.id,
+                scenario_version_id=scenario_versions[scenario.id],
+                persona_id=persona.id,
+                persona_version_id=persona_versions[persona.id],
+                language=config.language,
+                instructions=caller_instructions(
+                    config,
+                    goal=wants.goal,
+                    known_facts=wants.known_facts,
+                    unknown_facts=wants.unknown_facts,
+                    today=today,
+                    direction=agent.direction,
+                ),
+                nudge=LANGUAGES[config.language].nudge,
+            )
+        )
+    return Snapshot(agent.id, agent_version_id, agent.direction, pins)
+
+
+async def scenarios_to_start(
+    session: AsyncSession, agent: Agent, scenario_ids: Sequence[uuid.UUID]
+) -> list[Scenario]:
+    """The agent's live scenarios in the order asked, share-locked in id order."""
+    rows = await session.scalars(
+        select(Scenario)
+        .where(Scenario.id.in_(scenario_ids))
+        .order_by(Scenario.id)
+        .with_for_update(read=True)
+    )
+    found = {row.id: row for row in rows}
+    for scenario_id in scenario_ids:
+        scenario = found.get(scenario_id)
+        if scenario is None or scenario.deleted_at is not None:
+            raise NotFoundError(f"scenario {scenario_id} not found")
+        if scenario.agent_id != agent.id:
+            raise ValidationError(f'the scenario "{scenario.name}" belongs to another agent')
+    return [found[scenario_id] for scenario_id in scenario_ids]
+
+
+async def personas_to_start(
+    session: AsyncSession, persona_ids: Sequence[uuid.UUID]
+) -> dict[uuid.UUID, Persona]:
+    """The live personas by id, share-locked in id order."""
+    rows = await session.scalars(
+        select(Persona)
+        .where(Persona.id.in_(persona_ids))
+        .order_by(Persona.id)
+        .with_for_update(read=True)
+    )
+    found = {row.id: row for row in rows if row.deleted_at is None}
+    for persona_id in persona_ids:
+        if persona_id not in found:
+            raise NotFoundError(f"persona {persona_id} not found")
+    return found
 
 
 async def outbound_problem(session: AsyncSession, settings: Settings) -> str | None:
@@ -142,13 +274,15 @@ async def outbound_problem(session: AsyncSession, settings: Settings) -> str | N
     return None
 
 
-def check_agent_data(agent: AgentConfig, scenario: ScenarioConfig) -> None:
-    """Refuse a scenario that lacks agent data the trigger needs."""
+def check_agent_data(agent: AgentConfig, scenario: ScenarioConfig, name: str | None = None) -> None:
+    """Refuse a scenario that lacks agent data the trigger needs; the refusal names the
+    scenario when its name is given."""
     assert agent.outbound is not None
     have = {normalized(fact.name) for fact in scenario.agent_data}
     missing = sorted(agent_data_names(agent.outbound.trigger) - have)
     if missing:
-        raise ValidationError(f"the scenario has no agent data named {', '.join(missing)}")
+        subject = "the scenario" if name is None else f'the scenario "{name}"'
+        raise ValidationError(f"{subject} has no agent data named {', '.join(missing)}")
 
 
 SORT_KEYS = {"created_at": Conversation.created_at, "talk_ms": Conversation.talk_ms}
@@ -163,13 +297,41 @@ async def get_conversation(session: AsyncSession, conversation_id: uuid.UUID) ->
     return conversation
 
 
+def retried() -> ColumnElement[bool]:
+    """A later attempt replaced the conversation."""
+    retry = aliased(Conversation)
+    return select(retry.id).where(retry.retry_of == Conversation.id).exists()
+
+
+def in_group(group: OutcomeGroup) -> ColumnElement[bool]:
+    """The conversations outcome_group puts in the group: for each status, the end reasons
+    that land there, so the filter cannot drift from the domain rule."""
+    clauses = []
+    for status in ConversationStatus:
+        reasons = [
+            reason for reason in (None, *EndReason) if outcome_group(status, reason) is group
+        ]
+        if len(reasons) == len(EndReason) + 1:
+            clauses.append(Conversation.status == status)
+        elif reasons:
+            named = [reason for reason in reasons if reason is not None]
+            matches = [Conversation.end_reason.in_(named)] if named else []
+            if None in reasons:
+                matches.append(Conversation.end_reason.is_(None))
+            clauses.append(and_(Conversation.status == status, or_(*matches)))
+    return or_(*clauses)
+
+
 async def list_conversations(
     session: AsyncSession,
     *,
     offset: int,
     limit: int,
     agent_id: uuid.UUID | None = None,
+    run_id: uuid.UUID | None = None,
     status: ConversationStatus | None = None,
+    group: OutcomeGroup | None = None,
+    was_retried: bool | None = None,
     search: str | None = None,
     sort: str = "-created_at",
 ) -> tuple[list[Conversation], int]:
@@ -191,8 +353,14 @@ async def list_conversations(
         )
     if agent_id is not None:
         query = query.where(Conversation.agent_id == agent_id)
+    if run_id is not None:
+        query = query.where(Conversation.run_id == run_id)
     if status is not None:
         query = query.where(Conversation.status == status)
+    if group is not None:
+        query = query.where(in_group(group))
+    if was_retried is not None:
+        query = query.where(retried() if was_retried else ~retried())
     total = await session.scalar(select(func.count()).select_from(query.subquery()))
     key = SORT_KEYS[sort.removeprefix("-")]
     order = key.desc() if sort.startswith("-") else key.asc()
@@ -203,13 +371,14 @@ async def list_conversations(
 
 
 async def pinned_agents(
-    session: AsyncSession, conversations: Sequence[Conversation]
+    session: AsyncSession, pinning: Sequence[Conversation | Run]
 ) -> dict[uuid.UUID, tuple[int, str]]:
-    """The version number each conversation pinned and the agent's current name, by version id."""
+    """The version number each conversation or run pinned and the agent's current name, by
+    version id."""
     rows = await session.execute(
         select(AgentVersion.id, AgentVersion.version, Agent.name)
         .join(Agent, Agent.id == AgentVersion.agent_id)
-        .where(AgentVersion.id.in_({row.agent_version_id for row in conversations}))
+        .where(AgentVersion.id.in_({row.agent_version_id for row in pinning}))
     )
     return {row.id: (row.version, row.name) for row in rows}
 
@@ -251,6 +420,18 @@ def transcript_of(conversation: Conversation) -> Transcript:
     if conversation.transcript is None:
         return Transcript()
     return Transcript.model_validate(conversation.transcript)
+
+
+def caller_claim_of(conversation: Conversation) -> CallerClaim | None:
+    """The claim alone, without reading the whole transcript."""
+    claim = (conversation.transcript or {}).get("caller_claim")
+    return None if claim is None else CallerClaim.model_validate(claim)
+
+
+async def retried_as(session: AsyncSession, conversation: Conversation) -> uuid.UUID | None:
+    return await session.scalar(
+        select(Conversation.id).where(Conversation.retry_of == conversation.id)
+    )
 
 
 async def end_conversation(session: AsyncSession, conversation_id: uuid.UUID) -> Conversation:

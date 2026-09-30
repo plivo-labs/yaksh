@@ -52,6 +52,41 @@ class EndReason(StrEnum):
 ACTIVE_STATUSES = frozenset(
     {ConversationStatus.QUEUED, ConversationStatus.RUNNING, ConversationStatus.ENDING}
 )
+LIVE_STATUSES = frozenset({ConversationStatus.RUNNING, ConversationStatus.ENDING})
+
+
+class OutcomeGroup(StrEnum):
+    """How a conversation went, from its status and end reason only. Before any judge, the
+    groups say what happened, not who is at fault."""
+
+    WAITING = "waiting"
+    IN_PROGRESS = "in_progress"
+    COMPLETED = "completed"
+    DID_NOT_CONNECT = "did_not_connect"
+    ERROR = "error"
+    """A failure on Truman's side or on the line; a run tries these again."""
+    CANCELLED = "cancelled"
+
+
+NOT_CONNECTED = frozenset(
+    {EndReason.NO_ANSWER, EndReason.NO_CALL, EndReason.TRIGGER_FAILED, EndReason.AGENT_HANGUP}
+)
+"""End reasons of a failed conversation whose call never connected. A failed conversation
+ends with agent_hangup only when the agent hung up before the audio started."""
+
+
+def outcome_group(status: ConversationStatus, end_reason: EndReason | None) -> OutcomeGroup:
+    if status is ConversationStatus.CANCELLED or end_reason is EndReason.USER_REQUEST:
+        return OutcomeGroup.CANCELLED
+    if status is ConversationStatus.QUEUED:
+        return OutcomeGroup.WAITING
+    if status in LIVE_STATUSES:
+        return OutcomeGroup.IN_PROGRESS
+    if status is ConversationStatus.COMPLETED:
+        return OutcomeGroup.COMPLETED
+    if status is ConversationStatus.FAILED and end_reason in NOT_CONNECTED:
+        return OutcomeGroup.DID_NOT_CONNECT
+    return OutcomeGroup.ERROR
 
 
 class Role(StrEnum):

@@ -13,7 +13,12 @@ from truman.api.deps import SessionDep, SettingsDep
 from truman.api.pagination import Page, PageDep
 from truman.api.schemas.conversations import ConversationRead, ConversationSummary
 from truman.db.models import Conversation
-from truman.domain.conversations import ACTIVE_STATUSES, ConversationCreate, ConversationStatus
+from truman.domain.conversations import (
+    ACTIVE_STATUSES,
+    ConversationCreate,
+    ConversationStatus,
+    OutcomeGroup,
+)
 from truman.simulation import conversations
 
 SORT_PATTERN = f"^-?({'|'.join(conversations.SORT_KEYS)})$"
@@ -46,6 +51,7 @@ async def summaries(session: AsyncSession, rows: list[Conversation]) -> list[Con
         data["persona_version"], data["persona_name"] = personas[row.persona_version_id]
         data["scenario_version"], data["scenario_name"] = scenarios[row.scenario_version_id]
         data["recording_url"] = recording_url(row)
+        data["caller_claim"] = conversations.caller_claim_of(row)
         items.append(ConversationSummary.model_validate(data))
     return items
 
@@ -64,7 +70,7 @@ async def detail(session: AsyncSession, conversation: Conversation) -> Conversat
         transcript=transcript.turns,
         wire_events=transcript.wire_events,
         validity=transcript.validity,
-        caller_claim=transcript.caller_claim,
+        retried_as=await conversations.retried_as(session, conversation),
     )
 
 
@@ -81,7 +87,12 @@ async def list_conversations(
     session: SessionDep,
     page: PageDep,
     agent_id: uuid.UUID | None = None,
+    run_id: uuid.UUID | None = None,
     status: ConversationStatus | None = None,
+    group: OutcomeGroup | None = None,
+    retried: Annotated[
+        bool | None, Query(description="false keeps the latest attempt of each retried one")
+    ] = None,
     q: Annotated[str | None, Query(max_length=200)] = None,
     sort: Annotated[str, Query(pattern=SORT_PATTERN)] = "-created_at",
 ) -> Page[ConversationSummary]:
@@ -90,7 +101,10 @@ async def list_conversations(
         offset=page.offset,
         limit=page.page_size,
         agent_id=agent_id,
+        run_id=run_id,
         status=status,
+        group=group,
+        was_retried=retried,
         search=q,
         sort=sort,
     )

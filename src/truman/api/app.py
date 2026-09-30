@@ -16,6 +16,7 @@ from truman.api.routes import (
     health,
     personas,
     phone_numbers,
+    runs,
     scenarios,
     voices,
 )
@@ -110,6 +111,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     api.include_router(documents.router)
     api.include_router(personas.router)
     api.include_router(phone_numbers.router)
+    api.include_router(runs.router)
     api.include_router(scenarios.router)
     api.include_router(voices.router)
     app.include_router(api)

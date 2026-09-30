@@ -22,6 +22,11 @@ class Settings(BaseSettings):
     data_dir: Path = REPO_ROOT / "data"
     frontend_dist: Path = REPO_ROOT / "frontend" / "dist"
     default_max_duration_s: int = 300
+    max_run_conversations: int = Field(default=200, ge=1)
+    """Conversations one run starts, the scenarios times the repeats. Retries are not counted."""
+    max_run_repeats: int = Field(default=10, ge=1)
+    max_run_retries: int = Field(default=3, ge=0)
+    max_run_start_interval_s: int = Field(default=600, ge=1)
     max_active_conversations: int = 4
     worker_poll_interval_s: float = 0.5
     worker_heartbeat_s: float = 1.0
