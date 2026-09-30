@@ -10,7 +10,7 @@ from truman.api.app import generation_model
 from truman.caller.plivo_server import PlivoServer
 from truman.config import Settings
 from truman.domain.errors import UnavailableError
-from truman.integrations.openai_models import AZURE_API_VERSION, OpenAIJsonModel
+from truman.integrations.openai_models import OpenAIJsonModel
 
 SCHEMA = {
     "type": "object",
@@ -100,7 +100,6 @@ async def test_scenario_generation_asks_the_configured_openai_base_url(
         update={
             "openai_api_key": SecretStr("sk-test"),
             "openai_base_url": f"{base}/gateway/v1",
-            "azure_openai_endpoint": None,
         }
     )
 
@@ -110,17 +109,6 @@ async def test_scenario_generation_asks_the_configured_openai_base_url(
 
     assert answer == {"answer": "yes"}
     assert fake.requests[0][0] == "/gateway/v1/chat/completions"
-
-
-async def test_azure_is_asked_through_its_deployment(provider: tuple[str, FakeProvider]) -> None:
-    base, fake = provider
-
-    answer = await ask(OpenAIJsonModel.azure(base, "azure-key", "scenario-writer"))
-
-    path, query, _ = fake.requests[0]
-    assert answer == {"answer": "yes"}
-    assert path == "/openai/deployments/scenario-writer/chat/completions"
-    assert query == {"api-version": AZURE_API_VERSION}
 
 
 @pytest.mark.parametrize(

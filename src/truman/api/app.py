@@ -82,17 +82,8 @@ def file_store(settings: Settings) -> FileStore | None:
 
 
 def generation_model(settings: Settings) -> JsonModel | None:
-    """OpenAI, or Azure OpenAI when its endpoint is set, as for the caller."""
+    """The OpenAI-compatible API at OPENAI_BASE_URL, as for the caller."""
     model = settings.generation_model or settings.persona_model
-    if settings.azure_openai_endpoint:
-        if settings.azure_openai_api_key is None:
-            return None
-        return OpenAIJsonModel.azure(
-            settings.azure_openai_endpoint,
-            settings.azure_openai_api_key.get_secret_value(),
-            model,
-            api_version=settings.azure_openai_api_version,
-        )
     if settings.openai_api_key is None:
         return None
     return OpenAIJsonModel.openai(

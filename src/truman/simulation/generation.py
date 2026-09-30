@@ -58,10 +58,7 @@ WRITERS = 4
 """Writer calls at once."""
 MAX_CRITERIA = 10
 MAX_NAME_CHARS = 80
-MODEL_OFF = (
-    "scenario generation is off: set OPENAI_API_KEY, or AZURE_OPENAI_ENDPOINT and "
-    "AZURE_OPENAI_API_KEY"
-)
+MODEL_OFF = "scenario generation is off: set OPENAI_API_KEY"
 
 
 @dataclass(frozen=True)

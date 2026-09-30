@@ -29,7 +29,6 @@ from pipecat.processors.aggregators.llm_response_universal import (
 )
 from pipecat.processors.audio.vad_processor import VADProcessor
 from pipecat.processors.frame_processor import FrameProcessor
-from pipecat.services.azure.llm import AzureLLMService
 from pipecat.services.deepgram.stt import DeepgramSTTService
 from pipecat.services.elevenlabs.tts import ElevenLabsTTSService
 from pipecat.services.llm_service import FunctionCallParams
@@ -85,11 +84,8 @@ def provider_keys(settings: Settings) -> dict[str, str]:
     keys = {
         "DEEPGRAM_API_KEY": settings.deepgram_api_key,
         "ELEVENLABS_API_KEY": settings.elevenlabs_api_key,
+        "OPENAI_API_KEY": settings.openai_api_key,
     }
-    if settings.azure_openai_endpoint:
-        keys["AZURE_OPENAI_API_KEY"] = settings.azure_openai_api_key
-    else:
-        keys["OPENAI_API_KEY"] = settings.openai_api_key
     missing = [name for name, value in keys.items() if value is None]
     if missing:
         raise ValueError(f"the caller needs {', '.join(missing)}")
@@ -97,15 +93,6 @@ def provider_keys(settings: Settings) -> dict[str, str]:
 
 
 def llm_service(settings: Settings, keys: dict[str, str], instructions: str) -> OpenAILLMService:
-    if settings.azure_openai_endpoint:
-        return AzureLLMService(
-            endpoint=settings.azure_openai_endpoint,
-            api_key=keys["AZURE_OPENAI_API_KEY"],
-            api_version=settings.azure_openai_api_version,
-            settings=AzureLLMService.Settings(
-                model=settings.persona_model, system_instruction=instructions
-            ),
-        )
     return OpenAILLMService(
         api_key=keys["OPENAI_API_KEY"],
         base_url=settings.openai_base_url,

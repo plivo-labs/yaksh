@@ -1,11 +1,11 @@
-"""Structured JSON answers from OpenAI or Azure OpenAI, for generating test scenarios."""
+"""Structured JSON answers from an OpenAI-compatible API, for generating test scenarios."""
 
 import json
 import logging
 from typing import Any
 
 import openai
-from openai import AsyncAzureOpenAI, AsyncOpenAI
+from openai import AsyncOpenAI
 
 from truman.domain.errors import UnavailableError
 
@@ -14,8 +14,6 @@ log = logging.getLogger(__name__)
 TIMEOUT_S = 90.0
 RETRIES = 1
 """One retry: someone is waiting for the answer in the console."""
-AZURE_API_VERSION = "2024-10-21"
-"""The first generally available Azure API version with strict structured outputs."""
 
 
 class OpenAIJsonModel:
@@ -29,19 +27,6 @@ class OpenAIJsonModel:
             api_key=api_key, base_url=base_url, timeout=TIMEOUT_S, max_retries=RETRIES
         )
         return cls(client, model)
-
-    @classmethod
-    def azure(
-        cls, endpoint: str, api_key: str, deployment: str, *, api_version: str | None = None
-    ) -> OpenAIJsonModel:
-        client = AsyncAzureOpenAI(
-            azure_endpoint=endpoint,
-            api_key=api_key,
-            api_version=api_version or AZURE_API_VERSION,
-            timeout=TIMEOUT_S,
-            max_retries=RETRIES,
-        )
-        return cls(client, deployment)
 
     async def complete_json(
         self, *, system: str, user: str, name: str, schema: dict[str, Any]

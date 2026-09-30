@@ -35,22 +35,13 @@ class Settings(BaseSettings):
     elevenlabs_api_key: SecretStr | None = Field(
         default=None, validation_alias="ELEVENLABS_API_KEY"
     )
-    azure_openai_endpoint: str | None = Field(
-        default=None, validation_alias="AZURE_OPENAI_ENDPOINT"
-    )
-    azure_openai_api_key: SecretStr | None = Field(
-        default=None, validation_alias="AZURE_OPENAI_API_KEY"
-    )
-    azure_openai_api_version: str | None = Field(
-        default=None, validation_alias="AZURE_OPENAI_API_VERSION"
-    )
     openai_api_key: SecretStr | None = Field(default=None, validation_alias="OPENAI_API_KEY")
     openai_base_url: str = Field(
         default="https://api.openai.com/v1", validation_alias="OPENAI_BASE_URL"
     )
     persona_model: str = "gpt-4.1"
     generation_model: str | None = None
-    """The model (or Azure deployment) that writes test scenarios; the persona model when unset."""
+    """The model that writes test scenarios; the persona model when unset."""
     plivo_auth_id: SecretStr | None = Field(default=None, validation_alias="PLIVO_AUTH_ID")
     plivo_auth_token: SecretStr | None = Field(default=None, validation_alias="PLIVO_AUTH_TOKEN")
     plivo_numbers: Annotated[list[E164], NoDecode] = []
