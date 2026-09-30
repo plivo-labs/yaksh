@@ -95,7 +95,9 @@ def generation_model(settings: Settings) -> JsonModel | None:
         )
     if settings.openai_api_key is None:
         return None
-    return OpenAIJsonModel.openai(settings.openai_api_key.get_secret_value(), model)
+    return OpenAIJsonModel.openai(
+        settings.openai_api_key.get_secret_value(), model, base_url=settings.openai_base_url
+    )
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:

@@ -108,6 +108,7 @@ def llm_service(settings: Settings, keys: dict[str, str], instructions: str) -> 
         )
     return OpenAILLMService(
         api_key=keys["OPENAI_API_KEY"],
+        base_url=settings.openai_base_url,
         settings=OpenAILLMService.Settings(
             model=settings.persona_model, system_instruction=instructions
         ),
@@ -203,7 +204,7 @@ class Persona:
         self.llm = llm_service(settings, keys, request.instructions)
         self.stt = DeepgramSTTService(
             api_key=keys["DEEPGRAM_API_KEY"],
-            base_url=settings.deepgram_url,
+            base_url=settings.deepgram_base_url,
             sample_rate=SAMPLE_RATE,
             settings=DeepgramSTTService.Settings(
                 model=settings.deepgram_model, language=DEEPGRAM_LANGUAGES[request.agent.language]

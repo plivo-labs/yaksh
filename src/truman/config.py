@@ -28,7 +28,9 @@ class Settings(BaseSettings):
     worker_lease_s: int = 30
     end_timeout_s: float = 5.0
     deepgram_api_key: SecretStr | None = Field(default=None, validation_alias="DEEPGRAM_API_KEY")
-    deepgram_url: str = ""
+    deepgram_base_url: str = Field(
+        default="https://api.deepgram.com", validation_alias="DEEPGRAM_BASE_URL"
+    )
     deepgram_model: str = "nova-3"
     elevenlabs_api_key: SecretStr | None = Field(
         default=None, validation_alias="ELEVENLABS_API_KEY"
@@ -43,6 +45,9 @@ class Settings(BaseSettings):
         default=None, validation_alias="AZURE_OPENAI_API_VERSION"
     )
     openai_api_key: SecretStr | None = Field(default=None, validation_alias="OPENAI_API_KEY")
+    openai_base_url: str = Field(
+        default="https://api.openai.com/v1", validation_alias="OPENAI_BASE_URL"
+    )
     persona_model: str = "gpt-4.1"
     generation_model: str | None = None
     """The model (or Azure deployment) that writes test scenarios; the persona model when unset."""

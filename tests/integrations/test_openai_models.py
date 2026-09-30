@@ -4,8 +4,11 @@ from typing import Any
 
 import pytest
 from fastapi import FastAPI, Request, Response
+from pydantic import SecretStr
 
+from truman.api.app import generation_model
 from truman.caller.plivo_server import PlivoServer
+from truman.config import Settings
 from truman.domain.errors import UnavailableError
 from truman.integrations.openai_models import AZURE_API_VERSION, OpenAIJsonModel
 
@@ -87,6 +90,26 @@ async def test_openai_is_asked_for_the_strict_schema(
         "type": "json_schema",
         "json_schema": {"name": "reply", "schema": SCHEMA, "strict": True},
     }
+
+
+async def test_scenario_generation_asks_the_configured_openai_base_url(
+    provider: tuple[str, FakeProvider], settings: Settings
+) -> None:
+    base, fake = provider
+    configured = settings.model_copy(
+        update={
+            "openai_api_key": SecretStr("sk-test"),
+            "openai_base_url": f"{base}/gateway/v1",
+            "azure_openai_endpoint": None,
+        }
+    )
+
+    model = generation_model(configured)
+    assert isinstance(model, OpenAIJsonModel)
+    answer = await ask(model)
+
+    assert answer == {"answer": "yes"}
+    assert fake.requests[0][0] == "/gateway/v1/chat/completions"
 
 
 async def test_azure_is_asked_through_its_deployment(provider: tuple[str, FakeProvider]) -> None:
