@@ -18,6 +18,7 @@ from truman.db.session import create_engine, create_sessionmaker
 from truman.domain.errors import UnavailableError
 from truman.domain.generation import MAX_PLANNER_CHARS, GenerateScenarios, GenerationStatus
 from truman.simulation import generation
+from truman.simulation.generation_prompts import OPEN_BOUNDARY_REQUESTS
 
 BRIEF = "Reschedules missed clinic visits. Never gives medical advice; transfers to a nurse."
 
@@ -292,7 +293,7 @@ async def test_nothing_is_written_when_the_plan_has_no_grounded_work(
     assert not [name for name, _ in generation_model.calls if name == "scenario"]
 
 
-async def test_repeats_of_one_area_are_asked_from_different_angles(
+async def test_repeats_of_one_area_and_open_refusals_are_each_asked_differently(
     client: AsyncClient, generation_model: FakeJsonModel
 ) -> None:
     agent = await create_agent(client, brief=BRIEF)
@@ -301,9 +302,14 @@ async def test_repeats_of_one_area_are_asked_from_different_angles(
     events = await generate(client, agent["id"], count=20)
 
     prompts = [user for name, user in generation_model.calls if name == "scenario"]
+    normal = [p for p in prompts if "## What to test\nA normal request" in p]
+    changes = [line for p in normal for line in p.splitlines() if line.startswith("Vary it:")]
+    refusals = [p for p in prompts if "must refuse, redirect or hand off." in p]
+    asks = {line for p in refusals for line in p.splitlines() if line in OPEN_BOUNDARY_REQUESTS}
     assert events[1] == ("planned", {"count": 14})
     assert len(prompts) == len(set(prompts)) == 14
-    assert "Angle: the usual request." in prompts[0] + prompts[1]
+    assert (len(normal), len(changes), len(set(changes))) == (5, 4, 4)
+    assert len(refusals) == len(asks) == 4
     assert all("## What the agent handles\n- Reschedule" in p for p in prompts)
 
 

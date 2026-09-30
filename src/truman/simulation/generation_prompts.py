@@ -53,15 +53,17 @@ QUESTIONS_SCHEMA = strict_object(
 
 SCENARIO_SCHEMA = strict_object(
     {
-        "name": TEXT,
-        "description": TEXT,
         "goal": TEXT,
         "known_facts": FACTS,
         "unknown_facts": TEXTS,
         "criteria": TEXTS,
         "agent_data": FACTS,
+        "description": TEXT,
+        "name": TEXT,
     }
 )
+"""The name and description come last, so the model names the scenario it wrote, not the
+instructions it was given."""
 
 CAPABILITIES_SYSTEM = """\
 You plan tests for a voice agent. Read everything about the agent below and list the \
@@ -101,14 +103,10 @@ SCENARIO_SYSTEM = """\
 You write one test scenario for a voice agent. A simulated caller phones the agent and \
 follows the scenario; a judge later checks the criteria against the call transcript.
 
-Fields:
-- name: names the situation in a few words, such as "Wrong date of birth, then corrected". \
-Never a number.
-- description: one sentence on what this scenario tests and which part of the agent it \
-rests on.
-- goal: what the caller wants and when the call is done, including the choices the caller \
-makes ("take an evening slot next week; if there is none, keep the current booking"). No \
-names, numbers or dates in the goal: those go in the facts.
+Fields, in this order:
+- goal: what the caller wants and when the call is done, including each choice the caller \
+makes and what the caller does when the first choice is not possible. No names, numbers or \
+dates in the goal: those go in the facts.
 - known_facts: every value the caller may be asked for, as name and value. The caller never \
 invents a value, so a missing fact makes the call stall. Use realistic values. Write dates \
 relative to today, such as "next Thursday".
@@ -119,11 +117,17 @@ conditional check as "If ..., then ...". Never a check of what the caller says o
 caller follows the goal. Never a check of anything the caller cannot hear, such as a \
 database write, a webhook, or the name of a route, intent, node or tool.
 - agent_data: see the agent section; otherwise an empty list.
+- description: one sentence on what this scenario tests and which part of the agent it \
+rests on.
+- name: names the situation you wrote, in at most eight words and under 60 characters: what \
+the caller wants, and the twist if there is one. Never a number.
 
 Rules:
 - The caller sees only the goal and the facts. In a recovery test, the goal must say exactly \
-how the caller gets it wrong first, for example "give only the month and day of your birth \
-date at first; give the year when asked".
+how the caller gets it wrong first (which value, and how it is wrong) and when the caller \
+corrects it.
+- The kind of test comes first; a variation only changes the situation inside it. A normal \
+request stays a normal request, with no mistake and no refusal.
 - The caller never sees the criteria; do not repeat them in the goal or the facts.
 - Make the scenario clearly different from the existing scenarios and from the others in \
 this batch.
@@ -133,21 +137,37 @@ this batch.
 its criteria are the refusal or the hand-off.
 - Write in English."""
 
-ANGLES = (
-    "the usual request",
-    "the same need with a different choice or option",
-    "the same need with an extra question along the way",
-    "a caller who is unsure and needs the options explained",
-    "a caller with a detail that changes the outcome",
+REPEAT_ANGLES = (
+    "the caller picks a different option than the first time",
+    "the caller asks an extra question along the way",
+    "the caller is unsure and needs the options explained",
+    "the caller has a detail that changes the outcome, still within the agent's job",
 )
-"""Different takes on one area, one for each of the MAX_REPEATS slots it can get."""
+"""How each repeat of one area differs from the first scenario on it, one for each of the
+MAX_REPEATS - 1 repeats. The first needs none."""
+
+OPEN_BOUNDARY_REQUESTS = (
+    "The caller asks for a service the business does not offer.",
+    "The caller asks about a topic unrelated to the agent's job.",
+    "The caller asks for advice the agent is not qualified to give.",
+    "The caller asks for something only a person can do, such as a complaint to a manager.",
+    "The caller asks the agent to act for someone other than the caller.",
+)
+"""What the caller asks in a boundary test with no known refusal, one per slot, so writers
+that run at the same time pick different requests."""
+
+KINDS = {
+    Category.HAPPY_PATH: "normal request",
+    Category.RECOVERY: "the caller gets information wrong first",
+    Category.BOUNDARY: "a request the agent must refuse or redirect",
+}
+"""The kinds of test in plain words; the category labels themselves end up in names."""
 
 CATEGORY_TASKS = {
     Category.HAPPY_PATH: "A normal request: the caller has the right information and cooperates.",
-    Category.RECOVERY: "A recovery test: the caller gets information wrong first, and the "
-    "agent must notice and recover.",
-    Category.BOUNDARY: "A boundary test: the caller asks for something the agent must refuse, "
-    "redirect or hand off.",
+    Category.RECOVERY: "The caller gets information wrong first, and the agent must notice and "
+    "recover.",
+    Category.BOUNDARY: "The caller asks for something the agent must refuse, redirect or hand off.",
 }
 
 
@@ -197,7 +217,8 @@ def instructions_section(instructions: str) -> str:
 def batch_section(slot: Slot, slots: list[Slot]) -> str:
     """The other scenarios being written at the same time, so this one differs from them."""
     others = [
-        f"- {other.category.value}: {subject(other)}, {angle(other)}"
+        f"- {KINDS[other.category]}: {subject(other)}"
+        + (f"; {change}" if (change := variation(other)) else "")
         + (f"; the caller {other.entity_format}" if other.entity_format else "")
         for other in slots
         if other is not slot
@@ -205,8 +226,15 @@ def batch_section(slot: Slot, slots: list[Slot]) -> str:
     return "## Others in this batch\n" + "\n".join(others) if others else ""
 
 
-def angle(slot: Slot) -> str:
-    return ANGLES[slot.variant]
+def open_boundary(slot: Slot) -> bool:
+    return slot.category is Category.BOUNDARY and not (slot.capability or slot.question)
+
+
+def variation(slot: Slot) -> str | None:
+    """How this slot differs from the others on the same subject; the first has none."""
+    if open_boundary(slot):
+        return OPEN_BOUNDARY_REQUESTS[slot.variant]
+    return f"Vary it: {REPEAT_ANGLES[slot.variant - 1]}." if slot.variant else None
 
 
 def areas_section(areas: list[str]) -> str:
@@ -239,11 +267,10 @@ def slot_section(slot: Slot) -> str:
             "criteria check that the agent does not invent an answer, and says it does not "
             "know or offers a way to find out."
         )
-    elif slot.category is Category.BOUNDARY:
-        lines.append(
-            "Pick a request a caller could plausibly make to this agent that is outside its job."
-        )
-    lines.append(f"Angle: {angle(slot)}.")
+    elif open_boundary(slot):
+        lines.append("Make it a request a caller could plausibly make to this agent.")
+    if change := variation(slot):
+        lines.append(change)
     if slot.entity_format:
         lines.append(f"How the caller gets it wrong first: the caller {slot.entity_format}.")
     return "\n".join(lines)

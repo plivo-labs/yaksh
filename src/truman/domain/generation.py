@@ -101,7 +101,8 @@ ENTITY_FORMATS = (
 
 MIN_QUOTE_CHARS = 12
 MAX_REPEATS = 5
-"""Slots for one subject in one category; the writer has one angle for each."""
+"""Slots for one subject in one category: the first, and a different variation for each
+repeat."""
 
 
 def category_quotas(count: int) -> dict[Category, int]:
