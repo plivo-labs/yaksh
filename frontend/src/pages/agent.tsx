@@ -79,11 +79,13 @@ function Designation({ agent }: { agent: Agent }) {
   return (
     <Panel>
       <div className="flex flex-wrap items-center gap-x-6 gap-y-4 px-5 pt-5 pb-4">
-        <div className="grid min-w-0 flex-1 basis-72 gap-0.5 sm:flex-none">
+        <div className="grid min-w-0 flex-1 basis-72 gap-1">
           <h1 className="truncate text-2xl font-semibold tracking-[-0.015em]">{agent.name}</h1>
-          <p className="text-sm text-muted-foreground">{reach(agent)}</p>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+            <span className="text-muted-foreground">{reach(agent)}</span>
+            <LineState call={last.data} pending={last.isPending} />
+          </div>
         </div>
-        <LineState call={last.data} pending={last.isPending} />
         <StartCallDialog
           agents={agents.data ?? [agent]}
           agentId={agent.id}

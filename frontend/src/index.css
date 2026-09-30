@@ -146,7 +146,7 @@
   --sidebar-accent-foreground: hsl(240 5.9% 10%);
   --sidebar-border: hsl(240 6% 91%);
   --sidebar-ring: hsl(217.2 91.2% 59.8%);
-  --status-idle: hsl(215 16% 78%);
+  --status-idle: hsl(215 16% 58%);
 }
 
 .dark {
@@ -189,7 +189,7 @@
   --sidebar-accent-foreground: hsl(0 0% 98%);
   --sidebar-border: hsl(240 4% 15%);
   --sidebar-ring: hsl(240 5% 64.9%);
-  --status-idle: hsl(220 9% 30%);
+  --status-idle: hsl(220 9% 40%);
 }
 
 /* Text that marks live work: a light band sweeps across it. Still under reduced motion. */
