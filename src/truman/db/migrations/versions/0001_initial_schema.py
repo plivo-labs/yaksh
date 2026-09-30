@@ -224,6 +224,7 @@ def upgrade() -> None:
         "scenarios",
         sa.Column("id", sa.UUID(), server_default=sa.text("uuidv7()"), nullable=False),
         sa.Column("agent_id", sa.UUID(), nullable=False),
+        sa.Column("persona_id", sa.UUID(), nullable=False),
         sa.Column("name", sa.Text(), nullable=False),
         sa.Column(
             "category",
@@ -255,6 +256,9 @@ def upgrade() -> None:
             ["generation_id"],
             ["scenario_generations.id"],
             name=op.f("fk_scenarios_generation_id_scenario_generations"),
+        ),
+        sa.ForeignKeyConstraint(
+            ["persona_id"], ["personas.id"], name=op.f("fk_scenarios_persona_id_personas")
         ),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_scenarios")),
         sa.UniqueConstraint("id", "agent_id", name=op.f("uq_scenarios_id_agent_id")),

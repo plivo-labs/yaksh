@@ -19,14 +19,15 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { type GenerationProgress, useGeneration } from "@/hooks/use-generation";
 import { when } from "@/lib/format";
-import { useAgents, useDeleteScenarios, useGenerations, useScenarios } from "@/lib/queries";
 import {
-  type Agent,
-  CATEGORY_LABELS,
-  type Generation,
-  MAX_DELETED,
-  type Scenario,
-} from "@/lib/types";
+  useAgents,
+  useAssignPersona,
+  useDeleteScenarios,
+  useGenerations,
+  usePersonas,
+  useScenarios,
+} from "@/lib/queries";
+import { type Agent, CATEGORY_LABELS, type Generation, MAX_BULK, type Scenario } from "@/lib/types";
 import { GenerateDialog } from "@/pages/generate-dialog";
 import { ScenarioDialog } from "@/pages/scenario-dialog";
 import { StartCallDialog } from "@/pages/start-call-dialog";
@@ -103,6 +104,8 @@ export function AgentScenarios({ agent }: { agent: Agent }) {
   const scenarios = useScenarios(agent.id, true, shownBatch);
   const agents = useAgents();
   const remove = useDeleteScenarios(agent.id);
+  const assign = useAssignPersona(agent.id);
+  const personas = usePersonas();
   const generation = useGeneration(agent.id);
   const outbound = agent.direction === "outbound";
   const [editing, setEditing] = useState<Scenario | "new" | null>(null);
@@ -130,6 +133,23 @@ export function AgentScenarios({ agent }: { agent: Agent }) {
         toast.error("Could not delete the scenarios", { description: error.message }),
       onSettled: close,
     });
+  const personaItems = (personas.data ?? []).map((persona) => ({
+    value: persona.id,
+    label: persona.name,
+  }));
+  const personaNames = new Map(personaItems.map((item) => [item.value, item.label]));
+  const assignPersona = (personaId: string) =>
+    assign.mutate(
+      { scenario_ids: selected, persona_id: personaId },
+      {
+        onSuccess: () =>
+          toast.success(
+            `${personaNames.get(personaId)} is now the persona of ${counted(selected.length, "scenario", "scenarios")}`,
+          ),
+        onError: (error) =>
+          toast.error("Could not change the persona", { description: error.message }),
+      },
+    );
   const batches = generations.data ?? [];
   const filterItems = [
     { value: ALL, label: "All scenarios" },
@@ -225,18 +245,37 @@ export function AgentScenarios({ agent }: { agent: Agent }) {
               </Select>
             )}
             <div className="ml-auto flex gap-2">
-              {selected.length > MAX_DELETED ? (
-                <p className="text-sm text-muted-foreground">
-                  Select at most {MAX_DELETED} to delete at once.
-                </p>
+              {selected.length > MAX_BULK ? (
+                <p className="text-sm text-muted-foreground">Select at most {MAX_BULK} at once.</p>
               ) : selected.length > 0 ? (
-                <DeleteConfirm
-                  name={counted(selected.length, "scenario", "scenarios")}
-                  label={`Delete ${selected.length} selected`}
-                  description="Past and queued conversations are not changed."
-                  pending={remove.isPending}
-                  onDelete={(close) => deleteScenarios(selected, close)}
-                />
+                <>
+                  <Select
+                    items={personaItems}
+                    value={null}
+                    onValueChange={(value) => value && assignPersona(value)}
+                    disabled={assign.isPending || personaItems.length === 0}
+                  >
+                    <SelectTrigger aria-label="Set the persona of the selected scenarios" size="sm">
+                      <SelectValue placeholder="Set persona" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        {personaItems.map((item) => (
+                          <SelectItem key={item.value} value={item.value}>
+                            {item.label}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                  <DeleteConfirm
+                    name={counted(selected.length, "scenario", "scenarios")}
+                    label={`Delete ${selected.length} selected`}
+                    description="Past and queued conversations are not changed."
+                    pending={remove.isPending}
+                    onDelete={(close) => deleteScenarios(selected, close)}
+                  />
+                </>
               ) : (
                 shownBatch && (
                   <DeleteConfirm
@@ -280,9 +319,12 @@ export function AgentScenarios({ agent }: { agent: Agent }) {
                       {item.description ?? item.goal}
                     </span>
                   </span>
-                  <span className="hidden shrink-0 text-xs text-muted-foreground sm:block">
-                    {counted(item.known_facts.length, "fact", "facts")},{" "}
-                    {counted(item.criteria.length, "criterion", "criteria")}
+                  <span className="hidden shrink-0 justify-items-end gap-0.5 text-xs text-muted-foreground sm:grid">
+                    <span>{personaNames.get(item.persona_id)}</span>
+                    <span>
+                      {counted(item.known_facts.length, "fact", "facts")},{" "}
+                      {counted(item.criteria.length, "criterion", "criteria")}
+                    </span>
                   </span>
                 </button>
                 <StartCallDialog

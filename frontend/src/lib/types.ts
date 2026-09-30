@@ -274,6 +274,8 @@ export interface ScenarioInput extends ScenarioConfig {
   category: Category;
   /** Why the scenario exists. The caller and the judge never see it. */
   description: string | null;
+  /** The persona the scenario runs with. */
+  persona_id: string;
 }
 
 export interface Scenario extends ScenarioInput {
@@ -357,13 +359,16 @@ export type GenerationMode = "agent" | "knowledge_base";
 export type GenerationStatus = "running" | "done" | "failed" | "stopped";
 
 export const MAX_GENERATED = 20;
-export const MAX_DELETED = 500;
+/** Scenarios one bulk change takes. */
+export const MAX_BULK = 500;
 
 export interface GenerateInput {
   mode: GenerationMode;
   count: number;
   instructions: string;
   document_ids: string[];
+  /** Given to the new scenarios in turn. */
+  persona_ids: string[];
 }
 
 export interface Generation {

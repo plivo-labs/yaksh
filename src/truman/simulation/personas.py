@@ -11,7 +11,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from truman.db.models import Persona, PersonaVersion, Voice
+from truman.db.models import Persona, PersonaVersion, Scenario, Voice
 from truman.domain.errors import ConflictError, NotFoundError, ValidationError
 from truman.domain.personas import PersonaConfig, PersonaCreate, PersonaSettings, PersonaUpdate
 from truman.domain.voices import VoiceSettings
@@ -149,7 +149,18 @@ async def update_persona(
 
 
 async def delete_persona(session: AsyncSession, persona_id: uuid.UUID) -> None:
+    """Refused while a live scenario runs with the persona. Saving a scenario locks the persona
+    row too, so the count cannot miss one being saved."""
     persona = await get_persona(session, persona_id, lock=True)
+    used = await session.scalar(
+        select(func.count()).where(Scenario.persona_id == persona.id, Scenario.deleted_at.is_(None))
+    )
+    if used:
+        raise ConflictError(
+            "1 scenario uses this persona; give it another persona first"
+            if used == 1
+            else f"{used} scenarios use this persona; give them another persona first"
+        )
     persona.deleted_at = datetime.now(UTC)
     await session.commit()
 

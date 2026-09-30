@@ -339,7 +339,7 @@ export function PersonaDialog({
           {id && (
             <DeleteConfirm
               name={initial.name}
-              description="Past and queued conversations are not changed."
+              description="Past and queued conversations are not changed. Scenarios that use it must get another persona first."
               pending={remove.isPending}
               onDelete={(close) => remove.mutate(id, { onSuccess: guard.close, onSettled: close })}
             />

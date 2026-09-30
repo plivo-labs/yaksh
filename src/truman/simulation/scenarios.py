@@ -11,12 +11,14 @@ from truman.db.models import Scenario, ScenarioVersion
 from truman.domain.errors import ConflictError, NotFoundError, ValidationError
 from truman.domain.scenarios import (
     SCENARIO_LABELS,
+    AssignPersona,
     ScenarioConfig,
     ScenarioCreate,
     ScenarioDelete,
     ScenarioUpdate,
 )
 from truman.simulation.agents import get_agent
+from truman.simulation.personas import get_persona
 
 NAME_INDEX = "ix_scenarios_agent_name_live"
 
@@ -69,11 +71,14 @@ async def create_scenario(
     *,
     generation_id: uuid.UUID | None = None,
 ) -> Scenario:
-    """The agent row is locked first, so a scenario cannot be added to an agent being deleted."""
+    """The agent row is locked first, so a scenario cannot be added to an agent being deleted,
+    then the persona row, so the persona cannot be deleted before the scenario uses it."""
     agent = await get_agent(session, agent_id, lock=True)
+    persona = await get_persona(session, command.persona_id, lock=True)
     config = command.to_config()
     scenario = Scenario(
         agent_id=agent.id,
+        persona_id=persona.id,
         name=command.name,
         category=command.category,
         description=command.description or None,
@@ -112,10 +117,13 @@ async def list_scenarios(
 async def update_scenario(
     session: AsyncSession, scenario_id: uuid.UUID, update: ScenarioUpdate
 ) -> Scenario:
-    """Labels change in place; a changed config writes the next version. The merge reads the
-    config under the row lock, so two concurrent changes cannot drop each other."""
+    """Labels and the persona change in place; a changed config writes the next version. The
+    merge reads the config under the row lock, so two concurrent changes cannot drop each
+    other."""
     scenario = await get_scenario(session, scenario_id, lock=True)
     changes = update.changes()
+    if "persona_id" in changes:
+        scenario.persona_id = (await get_persona(session, changes.pop("persona_id"), lock=True)).id
     if "description" in changes:
         changes["description"] = changes["description"] or None
     for field in SCENARIO_LABELS & changes.keys():
@@ -145,11 +153,14 @@ async def delete_scenario(session: AsyncSession, scenario_id: uuid.UUID) -> None
     await session.commit()
 
 
-async def delete_scenarios(
-    session: AsyncSession, agent_id: uuid.UUID, command: ScenarioDelete
-) -> None:
-    agent = await get_agent(session, agent_id)
-    ids = set(command.scenario_ids)
+async def locked_scenarios(
+    session: AsyncSession, agent_id: uuid.UUID, scenario_ids: list[uuid.UUID], action: str
+) -> list[Scenario]:
+    """The agent's live scenarios with these ids, locked in id order like every lock on several
+    scenarios; all of them, or NotFoundError. The agent row is locked first, as agent deletion
+    does before it changes the scenarios, so the two cannot deadlock."""
+    agent = await get_agent(session, agent_id, lock=True)
+    ids = set(scenario_ids)
     rows = list(
         await session.scalars(
             select(Scenario)
@@ -158,14 +169,32 @@ async def delete_scenarios(
                 Scenario.agent_id == agent.id,
                 Scenario.deleted_at.is_(None),
             )
+            .order_by(Scenario.id)
             .with_for_update()
         )
     )
     if len(rows) != len(ids):
-        raise NotFoundError("a scenario to delete was not found")
+        raise NotFoundError(f"a scenario to {action} was not found")
+    return rows
+
+
+async def delete_scenarios(
+    session: AsyncSession, agent_id: uuid.UUID, command: ScenarioDelete
+) -> None:
     now = datetime.now(UTC)
-    for row in rows:
+    for row in await locked_scenarios(session, agent_id, command.scenario_ids, "delete"):
         row.deleted_at = now
+    await session.commit()
+
+
+async def assign_persona(
+    session: AsyncSession, agent_id: uuid.UUID, command: AssignPersona
+) -> None:
+    """The scenarios are locked before the persona, the same order as a single update."""
+    rows = await locked_scenarios(session, agent_id, command.scenario_ids, "change")
+    persona = await get_persona(session, command.persona_id, lock=True)
+    for row in rows:
+        row.persona_id = persona.id
     await session.commit()
 
 

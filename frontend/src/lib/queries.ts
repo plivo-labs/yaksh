@@ -146,6 +146,15 @@ export function useDeleteScenarios(agentId: string) {
   });
 }
 
+export function useAssignPersona(agentId: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { scenario_ids: string[]; persona_id: string }) =>
+      api<void>(`/agents/${agentId}/scenarios/persona`, { method: "POST", json: input }),
+    onSettled: () => refreshScenarios(client, agentId),
+  });
+}
+
 export function useSaveScenario(agentId: string, id?: string) {
   const client = useQueryClient();
   return useMutation({

@@ -8,6 +8,7 @@ from collections.abc import AsyncGenerator, Sequence
 from contextlib import aclosing
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from itertools import cycle
 from typing import Any
 
 import anyio
@@ -17,7 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from truman.db.models import AgentVersion, Document, Scenario, ScenarioGeneration
 from truman.domain.agents import AgentConfig, Direction
-from truman.domain.errors import UnavailableError, ValidationError
+from truman.domain.errors import NotFoundError, UnavailableError, ValidationError
 from truman.domain.generation import (
     MAX_PLANNER_CHARS,
     Capability,
@@ -53,6 +54,7 @@ from truman.simulation.generation_prompts import (
     instructions_section,
     slot_section,
 )
+from truman.simulation.personas import get_persona
 
 WRITERS = 4
 """Writer calls at once."""
@@ -129,6 +131,8 @@ async def prepare(
     if model is None:
         raise UnavailableError(MODEL_OFF)
     agent = await get_agent(session, agent_id)
+    for persona_id in command.persona_ids:
+        await get_persona(session, persona_id)
     version = await session.scalar(
         select(AgentVersion).where(
             AgentVersion.agent_id == agent.id, AgentVersion.version == agent.current_version
@@ -209,7 +213,7 @@ async def generate(
             status = GenerationStatus.DONE
         else:
             status, error = GenerationStatus.FAILED, "the agent's context shows nothing to test"
-    except UnavailableError as failure:
+    except (UnavailableError, NotFoundError) as failure:
         status, error = GenerationStatus.FAILED, str(failure)
     except Exception:
         status, error = GenerationStatus.FAILED, "the generation failed"
@@ -353,7 +357,11 @@ class Writer:
         )
 
     async def write_all(self, plan: Plan) -> AsyncGenerator[Saved | Dropped]:
-        tasks = [asyncio.ensure_future(self.write(slot, plan)) for slot in plan.slots]
+        personas = cycle(self._prepared.command.persona_ids)
+        tasks = [
+            asyncio.ensure_future(self.write(slot, persona_id, plan))
+            for slot, persona_id in zip(plan.slots, personas, strict=False)
+        ]
         try:
             for next_done in asyncio.as_completed(tasks):
                 yield await next_done
@@ -363,12 +371,12 @@ class Writer:
             with anyio.CancelScope(shield=True):
                 await asyncio.gather(*tasks, return_exceptions=True)
 
-    async def write(self, slot: Slot, plan: Plan) -> Saved | Dropped:
+    async def write(self, slot: Slot, persona_id: uuid.UUID, plan: Plan) -> Saved | Dropped:
         reason = ""
         for _ in range(2):
             async with self._gate:
                 try:
-                    command = self.checked(await self.ask(slot, plan), slot)
+                    command = self.checked(await self.ask(slot, plan), slot, persona_id)
                 except (UnavailableError, ValidationError) as error:
                     reason = str(error)
                     continue
@@ -395,7 +403,7 @@ class Writer:
             system=SCENARIO_SYSTEM, user=user, name="scenario", schema=SCENARIO_SCHEMA
         )
 
-    def checked(self, answer: dict[str, Any], slot: Slot) -> ScenarioCreate:
+    def checked(self, answer: dict[str, Any], slot: Slot, persona_id: uuid.UUID) -> ScenarioCreate:
         """The written scenario as the API would take it, or why it cannot be saved."""
         agent = self._prepared.agent
         try:
@@ -403,6 +411,7 @@ class Writer:
                 {
                     **answer,
                     "category": slot.category,
+                    "persona_id": persona_id,
                     "criteria": answer["criteria"][:MAX_CRITERIA],
                     "agent_data": answer["agent_data"] if self._agent_data else [],
                 }

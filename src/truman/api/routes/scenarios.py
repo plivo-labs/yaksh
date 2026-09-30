@@ -11,7 +11,7 @@ from truman.api.deps import SessionDep
 from truman.api.pagination import Page, PageDep
 from truman.api.schemas.scenarios import GenerationRead, ScenarioRead, ScenarioVersionRead
 from truman.domain.generation import GenerateScenarios
-from truman.domain.scenarios import ScenarioCreate, ScenarioDelete, ScenarioUpdate
+from truman.domain.scenarios import AssignPersona, ScenarioCreate, ScenarioDelete, ScenarioUpdate
 from truman.simulation import generation, scenarios
 
 router = APIRouter(tags=["scenarios"], dependencies=[Depends(require_token)])
@@ -99,6 +99,11 @@ async def delete_scenarios(
     agent_id: uuid.UUID, command: ScenarioDelete, session: SessionDep
 ) -> None:
     await scenarios.delete_scenarios(session, agent_id, command)
+
+
+@router.post("/agents/{agent_id}/scenarios/persona", status_code=status.HTTP_204_NO_CONTENT)
+async def assign_persona(agent_id: uuid.UUID, command: AssignPersona, session: SessionDep) -> None:
+    await scenarios.assign_persona(session, agent_id, command)
 
 
 @router.get("/agents/{agent_id}/scenario-generations")

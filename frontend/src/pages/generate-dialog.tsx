@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
+import { usePersonas } from "@/lib/queries";
 import { type Agent, type GenerateInput, type GenerationMode, MAX_GENERATED } from "@/lib/types";
 
 const APPEAR = "transition-opacity duration-150 ease-out starting:opacity-0";
@@ -63,15 +64,31 @@ export function GenerateDialog({
   const [documentIds, setDocumentIds] = useState(() =>
     agent.knowledge_base.map((entry) => entry.document_id),
   );
+  /** Null until the user changes the choice: then the first persona is checked. */
+  const [checkedPersonas, setCheckedPersonas] = useState<ReadonlySet<string> | null>(null);
   const [submitted, setSubmitted] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const personas = usePersonas();
+  const personaList = personas.data ?? [];
+  const checked = checkedPersonas ?? new Set(personaList.slice(0, 1).map((persona) => persona.id));
+  const personaIds = personaList
+    .filter((persona) => checked.has(persona.id))
+    .map((persona) => persona.id);
+  const personasValid = personaIds.length > 0 && personaIds.length <= MAX_GENERATED;
 
   const number = Number(count);
   const countValid = Number.isInteger(number) && number >= 1 && number <= MAX_GENERATED;
   const knowledgeBase = mode === "knowledge_base";
   const documentsValid = !knowledgeBase || documentIds.length > 0;
   const hasDocuments = agent.knowledge_base.length > 0;
+
+  const togglePersona = (id: string, on: boolean) => {
+    const next = new Set(checked);
+    if (on) next.add(id);
+    else next.delete(id);
+    setCheckedPersonas(next);
+  };
 
   const toggleDocument = (id: string, on: boolean) =>
     setDocumentIds((current) =>
@@ -81,7 +98,7 @@ export function GenerateDialog({
   const submit = async (event: SubmitEvent) => {
     event.preventDefault();
     setSubmitted(true);
-    if (!countValid || !documentsValid) return;
+    if (!countValid || !documentsValid || !personasValid) return;
     setPending(true);
     setError(null);
     try {
@@ -90,6 +107,7 @@ export function GenerateDialog({
         count: number,
         instructions: instructions.trim(),
         document_ids: knowledgeBase ? documentIds : [],
+        persona_ids: personaIds,
       });
       setOpen(false);
     } catch (failure) {
@@ -175,6 +193,39 @@ export function GenerateDialog({
                 )}
               </FieldSet>
             )}
+
+            <FieldSet>
+              <FieldLegend variant="label">Personas</FieldLegend>
+              <FieldDescription>
+                New scenarios get the checked personas in turn, in this order.
+              </FieldDescription>
+              <ul className="grid gap-2">
+                {personaList.map((persona) => (
+                  <li key={persona.id} className="flex items-center gap-3">
+                    <Checkbox
+                      id={`generate-persona-${persona.id}`}
+                      checked={checked.has(persona.id)}
+                      onCheckedChange={(on) => togglePersona(persona.id, on)}
+                    />
+                    <label
+                      htmlFor={`generate-persona-${persona.id}`}
+                      className="min-w-0 flex-1 truncate text-sm"
+                    >
+                      {persona.name}
+                    </label>
+                  </li>
+                ))}
+              </ul>
+              {submitted && !personasValid && (
+                <FieldError className={APPEAR}>
+                  {personaList.length === 0
+                    ? "Create a persona first."
+                    : personaIds.length === 0
+                      ? "Pick at least one persona."
+                      : `Pick at most ${MAX_GENERATED} personas.`}
+                </FieldError>
+              )}
+            </FieldSet>
 
             <Field>
               <FieldLabel htmlFor="generate-count">Number of scenarios</FieldLabel>

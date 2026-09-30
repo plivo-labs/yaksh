@@ -137,15 +137,22 @@ async def duplicate_agent(session: AsyncSession, agent_id: uuid.UUID) -> Agent:
     version 1. The external id stays with the original, since it names that agent."""
     source = await get_agent(session, agent_id, lock=True)
     agent = await add_agent(session, f"{source.name} (copy)", None, config_of(source))
-    # Copies share one creation time, so ids order them: copying newest first keeps the listing.
-    scenarios = await session.scalars(
-        select(Scenario)
-        .where(Scenario.agent_id == source.id, Scenario.deleted_at.is_(None))
-        .order_by(Scenario.created_at.desc(), Scenario.id)
+    # Locked, so no scenario changes its persona while it is copied: a live scenario keeps its
+    # persona from being deleted, and the copy then points to a live persona too.
+    scenarios = list(
+        await session.scalars(
+            select(Scenario)
+            .where(Scenario.agent_id == source.id, Scenario.deleted_at.is_(None))
+            .order_by(Scenario.id)
+            .with_for_update()
+        )
     )
-    for scenario in scenarios.all():
+    # Copies share one creation time, so ids order them: copying newest first keeps the listing.
+    scenarios.sort(key=lambda scenario: scenario.created_at, reverse=True)
+    for scenario in scenarios:
         copy = Scenario(
             agent_id=agent.id,
+            persona_id=scenario.persona_id,
             name=scenario.name,
             category=scenario.category,
             description=scenario.description,

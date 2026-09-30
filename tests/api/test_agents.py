@@ -5,8 +5,10 @@ import pytest
 from httpx import AsyncClient
 from pydantic import ValidationError
 
-from tests.conftest import AGENT, SCENARIO, create_agent, create_scenario
+from tests.conftest import AGENT, SCENARIO, create_agent, create_persona, create_scenario
 from truman.config import Settings
+from truman.db.models import Scenario
+from truman.db.session import create_engine, create_sessionmaker
 
 
 async def test_changing_config_creates_a_version_but_renaming_does_not(
@@ -132,9 +134,25 @@ async def test_a_duplicate_copies_the_config_and_live_scenarios_but_not_the_exte
     assert copy["config"] == "Greet, then book."
     copied = (await client.get(f"/api/v1/agents/{copy['id']}/scenarios")).json()["items"]
     assert [
-        (s["name"], s["criteria"], s["current_version"], s["category"], s["description"])
+        (
+            s["name"],
+            s["criteria"],
+            s["current_version"],
+            s["category"],
+            s["description"],
+            s["persona_id"],
+        )
         for s in copied
-    ] == [(SCENARIO["name"], ["Books it."], 1, "recovery", "Checks a corrected date.")]
+    ] == [
+        (
+            SCENARIO["name"],
+            ["Books it."],
+            1,
+            "recovery",
+            "Checks a corrected date.",
+            kept["persona_id"],
+        )
+    ]
     assert (await client.get(f"/api/v1/agents/{original['id']}/scenarios")).json()["total"] == 1
     missing = await client.post(f"/api/v1/agents/{uuid.uuid4()}/duplicate")
     assert missing.status_code == 404
@@ -173,3 +191,30 @@ async def test_the_list_sorts_by_name_and_by_last_update(client: AsyncClient) ->
     assert (await names("-updated_at"))[0] == "bravo"
     invalid = await client.get("/api/v1/agents", params={"sort": "agent_number"})
     assert invalid.status_code == 422
+
+
+async def test_a_duplicate_waits_for_a_persona_change_and_copies_the_new_persona(
+    client: AsyncClient, settings: Settings
+) -> None:
+    original = await create_agent(client)
+    old = await create_persona(client, name="Old caller")
+    new = await create_persona(client, name="New caller")
+    scenario = await create_scenario(client, original["id"], persona_id=old["id"])
+    engine = create_engine(settings.database_url.encoded_string())
+
+    async with create_sessionmaker(engine)() as other:
+        row = await other.get_one(Scenario, uuid.UUID(scenario["id"]), with_for_update=True)
+        row.persona_id = uuid.UUID(new["id"])
+        await other.flush()
+        duplicating = asyncio.create_task(client.post(f"/api/v1/agents/{original['id']}/duplicate"))
+        await asyncio.sleep(0.3)
+        waited = not duplicating.done()
+        await other.commit()
+    copy = (await duplicating).json()
+    deleted = await client.delete(f"/api/v1/personas/{old['id']}")
+    await engine.dispose()
+
+    copied = (await client.get(f"/api/v1/agents/{copy['id']}/scenarios")).json()["items"]
+    assert waited, "the duplicate must wait for a scenario being changed"
+    assert [item["persona_id"] for item in copied] == [new["id"]]
+    assert deleted.status_code == 204

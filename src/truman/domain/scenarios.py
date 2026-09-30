@@ -78,6 +78,8 @@ class ScenarioConfig(BaseModel):
 
 SCENARIO_LABELS = frozenset({"name", "category", "description"})
 """Fields that describe a scenario without changing what a call uses, so not versioned."""
+MAX_BULK = 500
+"""Scenarios one bulk change takes."""
 
 
 class ScenarioCreate(ScenarioConfig):
@@ -85,9 +87,14 @@ class ScenarioCreate(ScenarioConfig):
     category: Category = Category.HAPPY_PATH
     description: Description | None = None
     """Why the scenario exists; for people, never shown to the caller or the judge."""
+    persona_id: uuid.UUID
+    """The persona the scenario runs with. Not versioned: each conversation pins the persona
+    and its version."""
 
     def to_config(self) -> ScenarioConfig:
-        return ScenarioConfig.model_validate(self.model_dump(exclude=set(SCENARIO_LABELS)))
+        return ScenarioConfig.model_validate(
+            self.model_dump(exclude={*SCENARIO_LABELS, "persona_id"})
+        )
 
 
 class ScenarioUpdate(BaseModel):
@@ -98,6 +105,7 @@ class ScenarioUpdate(BaseModel):
     name: Name | None = None
     category: Category | None = None
     description: Description | None = None
+    persona_id: uuid.UUID | None = None
     goal: Goal | None = None
     known_facts: list[Fact] | None = Field(default=None, max_length=30)
     unknown_facts: list[FactName] | None = Field(default=None, max_length=20)
@@ -105,7 +113,14 @@ class ScenarioUpdate(BaseModel):
     agent_data: list[Fact] | None = Field(default=None, max_length=30)
 
     @field_validator(
-        "name", "category", "goal", "known_facts", "unknown_facts", "criteria", "agent_data"
+        "name",
+        "category",
+        "persona_id",
+        "goal",
+        "known_facts",
+        "unknown_facts",
+        "criteria",
+        "agent_data",
     )
     @classmethod
     def cannot_be_cleared(cls, value: Any, info: ValidationInfo) -> Any:
@@ -122,4 +137,13 @@ class ScenarioDelete(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    scenario_ids: list[uuid.UUID] = Field(min_length=1, max_length=500)
+    scenario_ids: list[uuid.UUID] = Field(min_length=1, max_length=MAX_BULK)
+
+
+class AssignPersona(BaseModel):
+    """One persona for several scenarios of one agent: all of them, or none if one is missing."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    scenario_ids: list[uuid.UUID] = Field(min_length=1, max_length=MAX_BULK)
+    persona_id: uuid.UUID

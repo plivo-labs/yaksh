@@ -249,6 +249,9 @@ class Scenario(Base):
 
     id: Mapped[uuid.UUID] = uuid_primary_key()
     agent_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("agents.id"))
+    persona_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("personas.id"))
+    """The persona the scenario runs with. Not versioned: each conversation pins the persona
+    and its version."""
     name: Mapped[str] = mapped_column(Text)
     category: Mapped[Category] = mapped_column(
         pg_enum(Category, "scenario_category"),

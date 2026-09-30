@@ -32,7 +32,7 @@ import {
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { useCloseGuard } from "@/hooks/use-close-guard";
-import { useDeleteScenario, useSaveScenario } from "@/lib/queries";
+import { useDeleteScenario, usePersonas, useSaveScenario } from "@/lib/queries";
 import {
   type AgentSummary,
   CATEGORY_ITEMS,
@@ -48,6 +48,7 @@ const EMPTY: ScenarioInput = {
   name: "",
   category: "happy_path",
   description: null,
+  persona_id: "",
   goal: "",
   known_facts: [],
   unknown_facts: [],
@@ -60,6 +61,7 @@ function toDraft(scenario: Scenario): ScenarioInput {
     name: scenario.name,
     category: scenario.category,
     description: scenario.description,
+    persona_id: scenario.persona_id,
     goal: scenario.goal,
     known_facts: scenario.known_facts,
     unknown_facts: scenario.unknown_facts,
@@ -80,6 +82,7 @@ function toInput(draft: ScenarioInput): ScenarioInput {
     name: draft.name.trim(),
     category: draft.category,
     description: draft.description?.trim() || null,
+    persona_id: draft.persona_id,
     goal: draft.goal.trim(),
     known_facts: trimFacts(draft.known_facts),
     unknown_facts: draft.unknown_facts.map((name) => name.trim()).filter(Boolean),
@@ -193,7 +196,16 @@ export function ScenarioDialog({
   const [initial] = useState<ScenarioInput>(() => (scenario ? toDraft(scenario) : EMPTY));
   const [draft, setDraft] = useState<ScenarioInput>(initial);
   const [submitted, setSubmitted] = useState(false);
-  const guard = useCloseGuard(JSON.stringify(toInput(draft)) !== JSON.stringify(toInput(initial)));
+  const personas = usePersonas();
+  /** A new scenario shows the first persona; both sides of the change check see the same one. */
+  const withPersona = (value: ScenarioInput): ScenarioInput => ({
+    ...value,
+    persona_id: value.persona_id || personas.data?.[0]?.id || "",
+  });
+  const input = toInput(withPersona(draft));
+  const guard = useCloseGuard(
+    JSON.stringify(input) !== JSON.stringify(toInput(withPersona(initial))),
+  );
 
   const change = (next: (current: ScenarioInput) => Partial<ScenarioInput>) => {
     save.reset();
@@ -207,7 +219,10 @@ export function ScenarioDialog({
   const removeListItem = (key: "unknown_facts" | "criteria", index: number) =>
     change((current) => ({ [key]: current[key].filter((_, at) => at !== index) }));
 
-  const input = toInput(draft);
+  const personaItems = (personas.data ?? []).map((persona) => ({
+    value: persona.id,
+    label: persona.name,
+  }));
   const outbound = agent.direction === "outbound";
   const halfFact = (facts: Fact[]) => facts.some((fact) => !fact.name || !fact.value);
   const halfKnown = halfFact(input.known_facts);
@@ -216,7 +231,14 @@ export function ScenarioDialog({
   const submit = (event: SubmitEvent) => {
     event.preventDefault();
     setSubmitted(true);
-    if (!input.name || !input.goal || input.criteria.length === 0 || halfKnown || halfAgentData) {
+    if (
+      !input.name ||
+      !input.persona_id ||
+      !input.goal ||
+      input.criteria.length === 0 ||
+      halfKnown ||
+      halfAgentData
+    ) {
       return;
     }
     save.mutate(input, {
@@ -284,6 +306,37 @@ export function ScenarioDialog({
               <FieldDescription>
                 {CATEGORY_ITEMS.find((item) => item.value === draft.category)?.hint}.
               </FieldDescription>
+            </Field>
+
+            <Field>
+              <FieldLabel htmlFor="scenario-persona">Persona</FieldLabel>
+              <Select
+                items={personaItems}
+                value={input.persona_id}
+                onValueChange={(value) => value && change(() => ({ persona_id: value }))}
+                disabled={personaItems.length === 0}
+              >
+                <SelectTrigger
+                  id="scenario-persona"
+                  className="w-full"
+                  aria-invalid={submitted && !input.persona_id}
+                >
+                  <SelectValue placeholder="No personas yet" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    {personaItems.map((item) => (
+                      <SelectItem key={item.value} value={item.value}>
+                        {item.label}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+              <FieldDescription>How the caller talks: style, language and voice.</FieldDescription>
+              {submitted && !input.persona_id && (
+                <FieldError className={APPEAR}>Create a persona first.</FieldError>
+              )}
             </Field>
 
             <Field>

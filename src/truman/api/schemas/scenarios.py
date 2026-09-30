@@ -12,6 +12,7 @@ from truman.simulation.scenarios import config_of
 class ScenarioRead(BaseModel):
     id: uuid.UUID
     agent_id: uuid.UUID
+    persona_id: uuid.UUID
     name: str
     category: Category
     description: str | None
@@ -30,6 +31,7 @@ class ScenarioRead(BaseModel):
         return cls(
             id=scenario.id,
             agent_id=scenario.agent_id,
+            persona_id=scenario.persona_id,
             name=scenario.name,
             category=scenario.category,
             description=scenario.description,

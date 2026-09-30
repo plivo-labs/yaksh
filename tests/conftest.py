@@ -124,6 +124,10 @@ async def create_persona(client: AsyncClient, **overrides: Any) -> dict[str, Any
 
 
 async def create_scenario(client: AsyncClient, agent_id: str, **overrides: Any) -> dict[str, Any]:
+    if "persona_id" not in overrides:
+        overrides["persona_id"] = (await create_persona(client, name=f"Caller {uuid.uuid4()}"))[
+            "id"
+        ]
     response = await client.post(
         f"/api/v1/agents/{agent_id}/scenarios", json={**SCENARIO, **overrides}
     )
@@ -138,7 +142,12 @@ async def start(client: AsyncClient, agent_id: str, **overrides: Any) -> dict[st
         ]
     if "scenario_id" not in overrides:
         overrides["scenario_id"] = (
-            await create_scenario(client, agent_id, name=f"Scenario {uuid.uuid4()}")
+            await create_scenario(
+                client,
+                agent_id,
+                name=f"Scenario {uuid.uuid4()}",
+                persona_id=overrides["persona_id"],
+            )
         )["id"]
     body = {"agent_id": agent_id, **overrides}
     response = await client.post("/api/v1/conversations", json=body)

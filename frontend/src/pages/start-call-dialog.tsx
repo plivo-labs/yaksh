@@ -52,11 +52,16 @@ export function StartCallDialog({
   const navigate = useNavigate();
   const chosenAgent = agents.find((agent) => agent.id === agentId) ?? agents[0];
   const chosen = chosenAgent?.id ?? "";
-  const chosenPersona = personaId || personas.data?.[0]?.id || "";
   const scenarios = useScenarios(chosen, open);
   const selectedScenario =
     scenarios.data?.find((scenario) => scenario.id === scenarioId) ?? scenarios.data?.[0];
   const chosenScenario = selectedScenario?.id ?? "";
+  const chosenPersona = personaId || selectedScenario?.persona_id || personas.data?.[0]?.id || "";
+  /** A new agent or scenario brings its own persona, so an earlier pick no longer applies. */
+  const pickScenario = (id: string) => {
+    setScenarioId(id);
+    setPersonaId("");
+  };
   const scenarioItems = (scenarios.data ?? []).map((scenario) => ({
     value: scenario.id,
     label: scenario.name,
@@ -101,7 +106,10 @@ export function StartCallDialog({
               <Select
                 items={agentItems}
                 value={chosen}
-                onValueChange={(value) => setAgentId(value ?? "")}
+                onValueChange={(value) => {
+                  setAgentId(value ?? "");
+                  setPersonaId("");
+                }}
               >
                 <SelectTrigger id="agent" className="w-full">
                   <SelectValue />
@@ -123,7 +131,7 @@ export function StartCallDialog({
                 <Select
                   items={scenarioItems}
                   value={chosenScenario}
-                  onValueChange={(value) => setScenarioId(value ?? "")}
+                  onValueChange={(value) => pickScenario(value ?? "")}
                   disabled={scenarioItems.length === 0}
                 >
                   <SelectTrigger id="scenario" className="min-w-0 flex-1">
@@ -227,7 +235,7 @@ export function StartCallDialog({
         {creating && chosenAgent && (
           <ScenarioDialog
             agent={chosenAgent}
-            onSaved={(scenario) => setScenarioId(scenario.id)}
+            onSaved={(scenario) => pickScenario(scenario.id)}
             onClosed={() => setCreating(false)}
           />
         )}

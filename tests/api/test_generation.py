@@ -10,7 +10,14 @@ import pytest
 from httpx import AsyncClient
 from sqlalchemy import select
 
-from tests.conftest import OUTBOUND_AGENT, TOKEN, FakeJsonModel, create_agent, create_scenario
+from tests.conftest import (
+    OUTBOUND_AGENT,
+    TOKEN,
+    FakeJsonModel,
+    create_agent,
+    create_persona,
+    create_scenario,
+)
 from truman.api import create_app
 from truman.config import Settings
 from truman.db.models import Scenario, ScenarioGeneration
@@ -33,7 +40,15 @@ def capability(name: str, quote: str, priority: str = "core", tested: bool = Fal
     }
 
 
+async def persona_ids(client: AsyncClient, count: int = 1) -> list[str]:
+    return [
+        (await create_persona(client, name=f"Caller {uuid.uuid4()}"))["id"] for _ in range(count)
+    ]
+
+
 async def generate(client: AsyncClient, agent_id: str, **body: Any) -> list[tuple[str, dict]]:
+    if "persona_ids" not in body:
+        body["persona_ids"] = await persona_ids(client)
     response = await client.post(f"/api/v1/agents/{agent_id}/scenarios/generate", json=body)
     assert response.status_code == 200, response.text
     events = []
@@ -222,7 +237,10 @@ async def test_a_generation_is_refused_before_it_starts(
     }[setup]
     agent = await create_agent(client, **extra)
 
-    refused = await client.post(f"/api/v1/agents/{agent['id']}/scenarios/generate", json=body)
+    refused = await client.post(
+        f"/api/v1/agents/{agent['id']}/scenarios/generate",
+        json={"persona_ids": await persona_ids(client), **body},
+    )
 
     assert refused.status_code == status
     assert message in refused.json()["error"]["message"]
@@ -238,7 +256,10 @@ async def test_stopping_keeps_what_was_saved_and_records_the_stop(
     sessionmaker = create_sessionmaker(engine)
     async with sessionmaker() as session:
         prepared = await generation.prepare(
-            session, generation_model, uuid.UUID(agent["id"]), GenerateScenarios(count=4)
+            session,
+            generation_model,
+            uuid.UUID(agent["id"]),
+            GenerateScenarios(count=4, persona_ids=await persona_ids(client)),
         )
 
     events = generation.generate(sessionmaker, generation_model, prepared)
@@ -268,7 +289,12 @@ async def test_generation_is_off_without_a_model(client: AsyncClient, settings: 
 
     async with create_sessionmaker(engine)() as session:
         with pytest.raises(UnavailableError, match="scenario generation is off"):
-            await generation.prepare(session, None, uuid.UUID(agent["id"]), GenerateScenarios())
+            await generation.prepare(
+                session,
+                None,
+                uuid.UUID(agent["id"]),
+                GenerateScenarios(persona_ids=await persona_ids(client)),
+            )
     await engine.dispose()
 
 
@@ -350,7 +376,10 @@ async def test_a_disconnect_during_planning_still_records_the_stop(
     sessionmaker = create_sessionmaker(engine)
     async with sessionmaker() as session:
         prepared = await generation.prepare(
-            session, generation_model, uuid.UUID(agent["id"]), GenerateScenarios(count=2)
+            session,
+            generation_model,
+            uuid.UUID(agent["id"]),
+            GenerateScenarios(count=2, persona_ids=await persona_ids(client)),
         )
     seen: list[generation.Event] = []
     scope = anyio.CancelScope()
@@ -386,7 +415,7 @@ async def test_a_disconnect_while_an_event_waits_to_be_sent_still_records_the_st
     app = create_app(settings)
     app.state.generation_model = generation_model
     first_chunk, gone = asyncio.Event(), asyncio.Event()
-    body = json.dumps({"count": 4}).encode()
+    body = json.dumps({"count": 4, "persona_ids": await persona_ids(client)}).encode()
     requested = False
 
     async def receive() -> dict[str, Any]:
@@ -479,3 +508,61 @@ async def test_scenarios_of_another_agent_cannot_be_deleted_through_this_one(
 
     assert response.status_code == 404
     assert (await client.get(f"/api/v1/scenarios/{theirs['id']}")).status_code == 200
+
+
+async def test_new_scenarios_get_the_chosen_personas_in_turn(
+    client: AsyncClient, generation_model: FakeJsonModel
+) -> None:
+    agent = await create_agent(client, brief=BRIEF)
+    generation_model.capabilities = [capability("Reschedule", "Reschedules missed clinic visits.")]
+    first, second = await persona_ids(client, 2)
+
+    events = await generate(client, agent["id"], count=3, persona_ids=[first, second])
+
+    saved = {data["category"]: data["persona_id"] for kind, data in events if kind == "scenario"}
+    assert saved == {"happy_path": first, "recovery": second, "boundary": first}
+
+
+async def test_a_generation_needs_live_personas_each_picked_once(client: AsyncClient) -> None:
+    agent = await create_agent(client, brief=BRIEF)
+    [persona] = await persona_ids(client)
+    url = f"/api/v1/agents/{agent['id']}/scenarios/generate"
+
+    unknown = await client.post(url, json={"persona_ids": [str(uuid.uuid4())]})
+    twice = await client.post(url, json={"persona_ids": [persona, persona]})
+    none = await client.post(url, json={"persona_ids": []})
+
+    assert unknown.status_code == 404
+    assert twice.status_code == 422 and "pick each persona once" in twice.text
+    assert none.status_code == 422
+
+
+async def test_a_persona_deleted_during_a_generation_ends_it_with_the_reason(
+    client: AsyncClient, generation_model: FakeJsonModel, settings: Settings
+) -> None:
+    agent = await create_agent(client, brief=BRIEF)
+    generation_model.capabilities = [capability("Reschedule", "Reschedules missed clinic visits.")]
+    [persona] = await persona_ids(client)
+    engine = create_engine(settings.database_url.encoded_string())
+    sessionmaker = create_sessionmaker(engine)
+    async with sessionmaker() as session:
+        prepared = await generation.prepare(
+            session,
+            generation_model,
+            uuid.UUID(agent["id"]),
+            GenerateScenarios(count=2, persona_ids=[uuid.UUID(persona)]),
+        )
+    await client.delete(f"/api/v1/personas/{persona}")
+
+    events = [
+        event async for event in generation.generate(sessionmaker, generation_model, prepared)
+    ]
+    await engine.dispose()
+
+    finished = events[-1]
+    assert isinstance(finished, generation.Finished)
+    assert (finished.status, finished.error, finished.saved) == (
+        GenerationStatus.FAILED,
+        "persona not found",
+        0,
+    )

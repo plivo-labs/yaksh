@@ -8,7 +8,9 @@ from tests.conftest import (
     PERSONA,
     UNLISTED_VOICE,
     FakeVoiceClient,
+    create_agent_id,
     create_persona,
+    create_scenario,
     listed_voice_id,
 )
 
@@ -156,3 +158,30 @@ async def test_the_voice_gender_comes_from_the_voices_list_and_follows_the_voice
 
     claimed = await client.post("/api/v1/personas", json={**PERSONA, "voice_gender": "female"})
     assert claimed.status_code == 422
+
+
+async def test_a_persona_that_scenarios_use_cannot_be_deleted(client: AsyncClient) -> None:
+    agent = await create_agent_id(client)
+    persona = await create_persona(client)
+    other = await create_persona(client, name="Calm caller")
+    kept = await create_scenario(client, agent, persona_id=persona["id"])
+    dropped = await create_scenario(
+        client, agent, name="Cancel a cleaning", persona_id=persona["id"]
+    )
+    url = f"/api/v1/personas/{persona['id']}"
+
+    used_twice = await client.delete(url)
+    await client.delete(f"/api/v1/scenarios/{dropped['id']}")
+    used_once = await client.delete(url)
+    await client.patch(f"/api/v1/scenarios/{kept['id']}", json={"persona_id": other["id"]})
+    deleted = await client.delete(url)
+
+    assert used_twice.status_code == 409
+    assert used_twice.json()["error"]["message"] == (
+        "2 scenarios use this persona; give them another persona first"
+    )
+    assert used_once.json()["error"]["message"] == (
+        "1 scenario uses this persona; give it another persona first"
+    )
+    assert deleted.status_code == 204
+    assert (await client.get(url)).status_code == 404

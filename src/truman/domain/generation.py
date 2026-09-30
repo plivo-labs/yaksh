@@ -39,6 +39,8 @@ class GenerateScenarios(BaseModel):
     """The user's steering, such as "focus on rescheduling"."""
     document_ids: list[uuid.UUID] = Field(default_factory=list, max_length=20)
     """The knowledge base documents to ask about; knowledge base mode only."""
+    persona_ids: list[uuid.UUID] = Field(min_length=1, max_length=MAX_SCENARIOS)
+    """Given to the new scenarios in turn, in the order of the plan."""
 
     @model_validator(mode="after")
     def documents_fit_mode(self) -> GenerateScenarios:
@@ -46,6 +48,8 @@ class GenerateScenarios(BaseModel):
             raise ValueError("pick at least one knowledge base document")
         if self.mode is GenerationMode.AGENT and self.document_ids:
             raise ValueError("documents are picked only in knowledge base mode")
+        if len(set(self.persona_ids)) != len(self.persona_ids):
+            raise ValueError("pick each persona once")
         return self
 
 

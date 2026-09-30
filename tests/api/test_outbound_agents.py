@@ -99,7 +99,12 @@ async def test_a_scenario_keeps_agent_data_with_distinct_names(client: AsyncClie
     scenario = await create_scenario(client, agent["id"], agent_data=agent_data)
     duplicated = await client.post(
         f"/api/v1/agents/{agent['id']}/scenarios",
-        json={**SCENARIO, "name": "Twice", "agent_data": agent_data * 2},
+        json={
+            **SCENARIO,
+            "name": "Twice",
+            "agent_data": agent_data * 2,
+            "persona_id": scenario["persona_id"],
+        },
     )
 
     assert scenario["agent_data"] == agent_data
