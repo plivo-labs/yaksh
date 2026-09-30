@@ -4,7 +4,7 @@ from datetime import datetime
 from pydantic import BaseModel
 
 from truman.domain.conversations import EndReason, OutcomeGroup
-from truman.domain.runs import RunStatus
+from truman.domain.runs import RunStatus, WaitingReason
 
 
 class CallerClaims(BaseModel):
@@ -33,6 +33,7 @@ class RunSummary(BaseModel):
     retried: int
     caller_claims: CallerClaims
     median_talk_ms: int | None
+    waiting_reason: WaitingReason | None
     started_at: datetime | None
     ended_at: datetime | None
     created_at: datetime

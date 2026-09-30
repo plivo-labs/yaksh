@@ -464,12 +464,10 @@ def free_numbers(receiving_app_id: str | None = None) -> ColumnElement[bool]:
     )
 
 
-async def claim_next(
-    session: AsyncSession, worker_id: str, lease_s: int, receiving_app_id: str | None
-) -> Conversation | None:
-    """Claim the oldest queued conversation that can run now: one that needs a number waits
-    while none it may use is free. Outbound conversations run only on a worker that receives
-    calls for receiving_app_id."""
+def runnable_now(receiving_app_id: str | None) -> ColumnElement[bool]:
+    """A queued conversation that can start now: one that needs a number waits while none it
+    may use is free, and outbound conversations run only on a worker that receives calls for
+    receiving_app_id."""
     inbound = and_(
         Conversation.direction == Direction.INBOUND,
         or_(
@@ -477,35 +475,116 @@ async def claim_next(
             select(PhoneNumber).where(free_numbers()).exists(),
         ),
     )
-    runnable = inbound
-    if receiving_app_id is not None:
-        outbound = and_(
-            Conversation.direction == Direction.OUTBOUND,
-            select(PhoneNumber).where(free_numbers(receiving_app_id)).exists(),
-        )
-        runnable = or_(inbound, outbound)
+    if receiving_app_id is None:
+        return inbound
+    outbound = and_(
+        Conversation.direction == Direction.OUTBOUND,
+        select(PhoneNumber).where(free_numbers(receiving_app_id)).exists(),
+    )
+    return or_(inbound, outbound)
+
+
+def run_full() -> ColumnElement[bool]:
+    """The run has as many calls on the line as its max parallel."""
+    live = aliased(Conversation)
+    on_line = (
+        select(func.count())
+        .where(live.run_id == Run.id, live.status.in_(LIVE_STATUSES))
+        .scalar_subquery()
+    )
+    return and_(Run.max_parallel.is_not(None), on_line >= Run.max_parallel)
+
+
+def run_waiting() -> ColumnElement[bool]:
+    """A call of the run started less than its delay between calls ago."""
+    recent = aliased(Conversation)
+    delay = func.make_interval(0, 0, 0, 0, 0, 0, Run.start_interval_s)
+    return and_(
+        Run.start_interval_s.is_not(None),
+        select(recent.id)
+        .where(recent.run_id == Run.id, recent.started_at > func.statement_timestamp() - delay)
+        .exists(),
+    )
+
+
+def claim_values(worker_id: str, lease_s: int) -> dict[str, Any]:
+    """The statement's time, not the transaction's: a claim that waited for its run's lock
+    starts the run's delay when it claims."""
+    return {
+        "status": ConversationStatus.RUNNING,
+        "started_at": func.statement_timestamp(),
+        "claimed_by": worker_id,
+        "lease_expires_at": func.statement_timestamp() + timedelta(seconds=lease_s),
+    }
+
+
+async def claim_next(
+    session: AsyncSession, worker_id: str, lease_s: int, receiving_app_id: str | None
+) -> Conversation | None:
+    """Claim the oldest queued conversation that can run now: single test calls first, then
+    run conversations in the order their runs were created."""
+    runnable = runnable_now(receiving_app_id)
     candidate = (
         select(Conversation.id)
-        .where(Conversation.status == ConversationStatus.QUEUED, runnable)
+        .where(
+            Conversation.status == ConversationStatus.QUEUED,
+            Conversation.run_id.is_(None),
+            runnable,
+        )
         .order_by(Conversation.created_at, Conversation.id)
         .limit(1)
         .with_for_update(skip_locked=True)
         .scalar_subquery()
     )
-    rows = await session.scalars(
-        update(Conversation)
-        .where(Conversation.id == candidate)
-        .values(
-            status=ConversationStatus.RUNNING,
-            started_at=func.now(),
-            claimed_by=worker_id,
-            lease_expires_at=func.now() + timedelta(seconds=lease_s),
+    single = (
+        await session.scalars(
+            update(Conversation)
+            .where(Conversation.id == candidate)
+            .values(claim_values(worker_id, lease_s))
+            .returning(Conversation)
         )
-        .returning(Conversation)
+    ).one_or_none()
+    if single is not None:
+        await session.commit()
+        return single
+    return await claim_from_runs(session, worker_id, lease_s, runnable)
+
+
+async def claim_from_runs(
+    session: AsyncSession, worker_id: str, lease_s: int, runnable: ColumnElement[bool]
+) -> Conversation | None:
+    """Claim under the run's lock, taken before any conversation row as on every path that
+    locks both, so no two workers pass a run's max parallel or its delay between calls. The
+    candidate is picked without a lock; when the claim finds it taken, or its run no longer
+    ready, the next candidate is tried."""
+    ready = and_(
+        Conversation.status == ConversationStatus.QUEUED, runnable, ~run_full(), ~run_waiting()
     )
-    conversation = rows.one_or_none()
-    await session.commit()
-    return conversation
+    while True:
+        candidate = (
+            await session.execute(
+                select(Conversation.id, Conversation.run_id)
+                .join(Run, Run.id == Conversation.run_id)
+                .where(ready)
+                .order_by(Run.created_at, Run.id, Conversation.created_at, Conversation.id)
+                .limit(1)
+            )
+        ).one_or_none()
+        if candidate is None:
+            await session.commit()
+            return None
+        await session.execute(select(Run.id).where(Run.id == candidate.run_id).with_for_update())
+        claimed = (
+            await session.scalars(
+                update(Conversation)
+                .where(Conversation.id == candidate.id, Run.id == Conversation.run_id, ready)
+                .values(claim_values(worker_id, lease_s))
+                .returning(Conversation)
+            )
+        ).one_or_none()
+        await session.commit()
+        if claimed is not None:
+            return claimed
 
 
 async def prepare_call(
@@ -655,28 +734,56 @@ async def accept_incoming_call(
     return admission
 
 
-async def reap_expired(session: AsyncSession, number_rest_s: int) -> int:
-    reaped = await session.scalars(
-        update(Conversation)
-        .where(
-            Conversation.status.in_(LIVE_STATUSES),
-            Conversation.lease_expires_at <= func.now(),
-        )
-        .values(
-            status=ConversationStatus.FAILED,
-            end_reason=EndReason.LEASE_LOST,
-            failure_reason=LEASE_LOST,
-            ended_at=func.now(),
-            claimed_by=None,
-            lease_expires_at=None,
-        )
-        .returning(Conversation.id)
+def expired() -> ColumnElement[bool]:
+    return and_(
+        Conversation.status.in_(LIVE_STATUSES),
+        Conversation.lease_expires_at <= func.statement_timestamp(),
     )
-    ids = list(reaped.all())
-    if ids:
-        await release_numbers(session, ids, number_rest_s)
+
+
+async def reap_expired(session: AsyncSession, number_rest_s: int) -> int:
+    """Fail the live conversations whose worker lost its lease: single test calls in one
+    transaction, then each run's in its own, under the run's lock taken first, as on every path
+    that locks a run and its conversations."""
+    reaped = len(await end_expired(session, Conversation.run_id.is_(None), number_rest_s))
     await session.commit()
-    return len(ids)
+    run_ids = list(
+        await session.scalars(
+            select(Conversation.run_id)
+            .where(expired(), Conversation.run_id.is_not(None))
+            .distinct()
+            .order_by(Conversation.run_id)
+        )
+    )
+    await session.commit()
+    for run_id in run_ids:
+        await session.execute(select(Run.id).where(Run.id == run_id).with_for_update())
+        reaped += len(await end_expired(session, Conversation.run_id == run_id, number_rest_s))
+        await session.commit()
+    return reaped
+
+
+async def end_expired(
+    session: AsyncSession, which: ColumnElement[bool], number_rest_s: int
+) -> list[uuid.UUID]:
+    ended = list(
+        await session.scalars(
+            update(Conversation)
+            .where(expired(), which)
+            .values(
+                status=ConversationStatus.FAILED,
+                end_reason=EndReason.LEASE_LOST,
+                failure_reason=LEASE_LOST,
+                ended_at=func.statement_timestamp(),
+                claimed_by=None,
+                lease_expires_at=None,
+            )
+            .returning(Conversation.id)
+        )
+    )
+    if ended:
+        await release_numbers(session, ended, number_rest_s)
+    return ended
 
 
 def resolve_status(outcome: CallOutcome) -> ConversationStatus:
@@ -841,13 +948,14 @@ async def release_numbers(
     session: AsyncSession, conversation_ids: list[uuid.UUID], number_rest_s: int
 ) -> None:
     """Free the numbers. A number rests before a new test may receive calls on it, so a late
-    call from the finished test does not reach the next one."""
+    call from the finished test does not reach the next one. The rest runs from this statement,
+    not from the start of a transaction that may have waited for a run's lock."""
     await session.execute(
         update(PhoneNumber)
         .where(PhoneNumber.conversation_id.in_(conversation_ids))
         .values(
             conversation_id=None,
-            available_after=func.now() + timedelta(seconds=number_rest_s),
+            available_after=func.statement_timestamp() + timedelta(seconds=number_rest_s),
         )
     )
 

@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from httpx import AsyncClient, Response
+from httpx import AsyncClient
 from sqlalchemy import func, insert, select, update
 from sqlalchemy.ext.asyncio import create_async_engine
 
@@ -15,7 +15,9 @@ from tests.conftest import (
     create_persona,
     create_scenario,
     make_settings,
+    run_conversations,
     start,
+    start_run,
     wait_for_lock_waiters,
 )
 from truman.config import Settings
@@ -55,33 +57,6 @@ def settings(database_url: str, tmp_path: Path) -> Settings:
         max_run_retries=2,
         max_run_start_interval_s=60,
     )
-
-
-async def start_run(
-    client: AsyncClient,
-    agent_id: str,
-    scenario_ids: list[str],
-    *,
-    key: str | None = None,
-    **fields: Any,
-) -> Response:
-    return await client.post(
-        "/api/v1/runs",
-        json={"agent_id": agent_id, "scenario_ids": scenario_ids, **fields},
-        headers={} if key is None else {"Idempotency-Key": key},
-    )
-
-
-async def run_conversations(
-    client: AsyncClient, run_id: str, **params: Any
-) -> list[dict[str, Any]]:
-    """The run's conversations in queue order."""
-    response = await client.get(
-        "/api/v1/conversations",
-        params={"run_id": run_id, "sort": "created_at", "page_size": 100, **params},
-    )
-    assert response.status_code == 200, response.text
-    return response.json()["items"]
 
 
 async def wait_for_run(

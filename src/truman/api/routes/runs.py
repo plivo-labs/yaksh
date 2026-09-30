@@ -2,7 +2,7 @@ import dataclasses
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Header, status
+from fastapi import APIRouter, Depends, Header, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from truman.api.auth import require_token
@@ -10,7 +10,7 @@ from truman.api.deps import SessionDep, SettingsDep
 from truman.api.pagination import Page, PageDep
 from truman.api.schemas.runs import RunRead, RunSummary
 from truman.db.models import Run
-from truman.domain.runs import RunCreate
+from truman.domain.runs import RunCreate, RunStatus
 from truman.simulation import conversations, runs
 
 router = APIRouter(prefix="/runs", tags=["runs"], dependencies=[Depends(require_token)])
@@ -57,3 +57,11 @@ async def list_runs(
 @router.get("/{run_id}")
 async def get_run(run_id: uuid.UUID, session: SessionDep) -> RunRead:
     return await detail(session, await runs.get_run(session, run_id))
+
+
+@router.post("/{run_id}/cancel")
+async def cancel_run(run_id: uuid.UUID, session: SessionDep, response: Response) -> RunRead:
+    cancelled = await detail(session, await runs.cancel_run(session, run_id))
+    if cancelled.status is RunStatus.CANCELLING:
+        response.status_code = status.HTTP_202_ACCEPTED
+    return cancelled

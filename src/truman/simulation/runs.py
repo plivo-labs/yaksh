@@ -6,17 +6,29 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import Row, func, select
+from sqlalchemy import Row, func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from truman.config import Settings
 from truman.db.models import Conversation, Run
-from truman.domain.conversations import ACTIVE_STATUSES, EndReason, OutcomeGroup, outcome_group
+from truman.domain.conversations import (
+    ACTIVE_STATUSES,
+    ConversationStatus,
+    EndReason,
+    OutcomeGroup,
+    outcome_group,
+)
 from truman.domain.errors import ConflictError, NotFoundError, ValidationError
-from truman.domain.runs import RunCreate, RunStatus, run_status
+from truman.domain.runs import (
+    RunCreate,
+    RunStatus,
+    WaitingReason,
+    run_status,
+    waiting_reason,
+)
 from truman.simulation.agents import get_agent
-from truman.simulation.conversations import retried, snapshot
+from truman.simulation.conversations import retried, run_full, run_waiting, snapshot
 
 REQUEST_KEY_INDEX = "uq_runs_request_key"
 
@@ -43,6 +55,7 @@ class Progress:
     """How many of the run's conversations are retries."""
     caller_claims: Claims
     median_talk_ms: int | None
+    waiting_reason: WaitingReason | None
     started_at: datetime | None
     ended_at: datetime | None
 
@@ -125,6 +138,41 @@ async def earlier_run(
     return run
 
 
+async def cancel_run(session: AsyncSession, run_id: uuid.UUID) -> Run:
+    """Cancel the run's queued conversations and ask the workers to end its live calls, in one
+    transaction under the run's lock, which claims and retries take first too, so neither can
+    slip in between. A run with no active conversation stays as it is."""
+    run = await session.get(Run, run_id, with_for_update=True)
+    if run is None:
+        raise NotFoundError("run not found")
+    of_run = Conversation.run_id == run.id
+    active = await session.scalar(
+        select(Conversation.id).where(of_run, Conversation.status.in_(ACTIVE_STATUSES)).limit(1)
+    )
+    if active is not None:
+        if run.cancelled_at is None:
+            run.cancelled_at = func.statement_timestamp()
+        # Live calls first: a worker hands a running conversation back to the queue without
+        # the run's lock, and the second update then cancels it.
+        await session.execute(
+            update(Conversation)
+            .where(of_run, Conversation.status == ConversationStatus.RUNNING)
+            .values(status=ConversationStatus.ENDING)
+        )
+        await session.execute(
+            update(Conversation)
+            .where(of_run, Conversation.status == ConversationStatus.QUEUED)
+            .values(
+                status=ConversationStatus.CANCELLED,
+                end_reason=EndReason.USER_REQUEST,
+                ended_at=func.statement_timestamp(),
+            )
+        )
+    await session.commit()
+    await session.refresh(run)
+    return run
+
+
 async def get_run(session: AsyncSession, run_id: uuid.UUID) -> Run:
     run = await session.get(Run, run_id)
     if run is None:
@@ -150,8 +198,10 @@ async def progress(session: AsyncSession, runs: Sequence[Run]) -> dict[uuid.UUID
     claim = Conversation.transcript["caller_claim"]["success"].as_boolean()
     rows = await session.execute(
         select(
-            Conversation.run_id,
+            Run.id.label("run_id"),
             Run.cancelled_at,
+            run_full().label("full"),
+            run_waiting().label("waiting"),
             Conversation.status,
             Conversation.end_reason,
             func.count().filter(latest).label("latest"),
@@ -166,9 +216,7 @@ async def progress(session: AsyncSession, runs: Sequence[Run]) -> dict[uuid.UUID
         )
         .join(Run, Run.id == Conversation.run_id)
         .where(Run.id.in_([run.id for run in runs]))
-        .group_by(
-            Conversation.run_id, Run.cancelled_at, Conversation.status, Conversation.end_reason
-        )
+        .group_by(Run.id, Conversation.status, Conversation.end_reason)
     )
     by_run: dict[uuid.UUID, list[Row[Any]]] = defaultdict(list)
     for row in rows:
@@ -189,7 +237,8 @@ def counted(rows: list[Row[Any]]) -> Progress:
     active = any(row.latest and row.status in ACTIVE_STATUSES for row in rows)
     started = [row.started_at for row in rows if row.started_at is not None]
     ended = [row.ended_at for row in rows if row.ended_at is not None]
-    cancelled_at = rows[0].cancelled_at
+    run = rows[0]
+    cancelled_at = run.cancelled_at
     return Progress(
         status=run_status(cancelled=cancelled_at is not None, active=active, started=bool(started)),
         cancelled_at=cancelled_at,
@@ -201,6 +250,9 @@ def counted(rows: list[Row[Any]]) -> Progress:
             not_reached=sum(row.not_reached for row in rows),
         ),
         median_talk_ms=round(statistics.median(talk_ms)) if talk_ms else None,
+        waiting_reason=waiting_reason(
+            queued=counts[OutcomeGroup.WAITING] > 0, full=run.full, waiting=run.waiting
+        ),
         started_at=min(started, default=None),
         ended_at=None if active else max(ended, default=None),
     )

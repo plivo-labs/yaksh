@@ -64,3 +64,23 @@ def run_status(*, cancelled: bool, active: bool, started: bool) -> RunStatus:
     if not active:
         return RunStatus.DONE
     return RunStatus.RUNNING if started else RunStatus.QUEUED
+
+
+class WaitingReason(StrEnum):
+    """Why queued conversations of a run have not started. Only the run's own limits are
+    named; anything else is a worker or a number."""
+
+    MAX_PARALLEL = "max_parallel"
+    DELAY = "delay"
+    """A call of the run started less than its delay between calls ago."""
+    WORKER_OR_NUMBER = "worker_or_number"
+
+
+def waiting_reason(*, queued: bool, full: bool, waiting: bool) -> WaitingReason | None:
+    if not queued:
+        return None
+    if full:
+        return WaitingReason.MAX_PARALLEL
+    if waiting:
+        return WaitingReason.DELAY
+    return WaitingReason.WORKER_OR_NUMBER

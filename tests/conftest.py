@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from httpx import ASGITransport, AsyncClient
+from httpx import ASGITransport, AsyncClient, Response
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine
 from testcontainers.community.postgres import PostgresContainer
@@ -153,6 +153,33 @@ async def start(client: AsyncClient, agent_id: str, **overrides: Any) -> dict[st
     response = await client.post("/api/v1/conversations", json=body)
     assert response.status_code == 202, response.text
     return response.json()
+
+
+async def start_run(
+    client: AsyncClient,
+    agent_id: str,
+    scenario_ids: list[str],
+    *,
+    key: str | None = None,
+    **fields: Any,
+) -> Response:
+    return await client.post(
+        "/api/v1/runs",
+        json={"agent_id": agent_id, "scenario_ids": scenario_ids, **fields},
+        headers={} if key is None else {"Idempotency-Key": key},
+    )
+
+
+async def run_conversations(
+    client: AsyncClient, run_id: str, **params: Any
+) -> list[dict[str, Any]]:
+    """The run's conversations in queue order."""
+    response = await client.get(
+        "/api/v1/conversations",
+        params={"run_id": run_id, "sort": "created_at", "page_size": 100, **params},
+    )
+    assert response.status_code == 200, response.text
+    return response.json()["items"]
 
 
 async def wait_for(
