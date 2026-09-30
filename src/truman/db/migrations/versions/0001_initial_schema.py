@@ -294,6 +294,46 @@ def upgrade() -> None:
         ),
     )
     op.create_table(
+        "runs",
+        sa.Column("id", sa.UUID(), server_default=sa.text("uuidv7()"), nullable=False),
+        sa.Column("agent_id", sa.UUID(), nullable=False),
+        sa.Column("agent_version_id", sa.UUID(), nullable=False),
+        sa.Column("name", sa.Text(), nullable=True),
+        sa.Column("repeats", sa.Integer(), nullable=False),
+        sa.Column("max_duration_s", sa.Integer(), nullable=False),
+        sa.Column("max_parallel", sa.Integer(), nullable=True),
+        sa.Column("start_interval_s", sa.Integer(), nullable=True),
+        sa.Column("retries", sa.Integer(), nullable=False),
+        sa.Column("request_key", sa.Text(), nullable=True),
+        sa.Column("request_hash", sa.Text(), nullable=True),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.Column("cancelled_at", sa.DateTime(timezone=True), nullable=True),
+        sa.CheckConstraint(
+            "(request_key IS NULL) = (request_hash IS NULL)",
+            name=op.f("ck_runs_request_together"),
+        ),
+        sa.ForeignKeyConstraint(["agent_id"], ["agents.id"], name=op.f("fk_runs_agent_id_agents")),
+        sa.ForeignKeyConstraint(
+            ["agent_version_id", "agent_id"],
+            ["agent_versions.id", "agent_versions.agent_id"],
+            name=op.f("fk_runs_agent_version_id_agent_id_agent_versions"),
+        ),
+        sa.PrimaryKeyConstraint("id", name=op.f("pk_runs")),
+        sa.UniqueConstraint("id", "agent_id", name=op.f("uq_runs_id_agent_id")),
+        sa.UniqueConstraint("request_key", name=op.f("uq_runs_request_key")),
+    )
+    op.create_index(
+        "ix_runs_agent_created",
+        "runs",
+        ["agent_id", sa.literal_column("created_at DESC")],
+        unique=False,
+    )
+    op.create_table(
         "conversations",
         sa.Column("id", sa.UUID(), server_default=sa.text("uuidv7()"), nullable=False),
         sa.Column("agent_id", sa.UUID(), nullable=False),
@@ -355,11 +395,23 @@ def upgrade() -> None:
         sa.Column("transcript", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
         sa.Column("claimed_by", sa.Text(), nullable=True),
         sa.Column("lease_expires_at", sa.DateTime(timezone=True), nullable=True),
+        sa.Column("run_id", sa.UUID(), nullable=True),
+        sa.Column("repeat", sa.Integer(), nullable=True),
+        sa.Column("attempt", sa.Integer(), nullable=False),
+        sa.Column("retry_of", sa.UUID(), nullable=True),
         sa.Column(
             "created_at",
             sa.DateTime(timezone=True),
             server_default=sa.text("now()"),
             nullable=False,
+        ),
+        sa.CheckConstraint(
+            '(run_id IS NULL) = ("repeat" IS NULL)', name=op.f("ck_conversations_run_has_repeat")
+        ),
+        sa.CheckConstraint(
+            "attempt >= 1 AND (retry_of IS NULL) = (attempt = 1)"
+            " AND (retry_of IS NULL OR run_id IS NOT NULL)",
+            name=op.f("ck_conversations_retry_is_later_attempt_in_run"),
         ),
         sa.ForeignKeyConstraint(
             ["agent_id"], ["agents.id"], name=op.f("fk_conversations_agent_id_agents")
@@ -387,7 +439,22 @@ def upgrade() -> None:
             ["scenario_versions.id", "scenario_versions.scenario_id"],
             name=op.f("fk_conversations_scenario_version_id_scenario_id_scenario_versions"),
         ),
+        sa.ForeignKeyConstraint(
+            ["run_id", "agent_id"],
+            ["runs.id", "runs.agent_id"],
+            name=op.f("fk_conversations_run_id_agent_id_runs"),
+        ),
+        sa.ForeignKeyConstraint(
+            ["retry_of"], ["conversations.id"], name=op.f("fk_conversations_retry_of_conversations")
+        ),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_conversations")),
+        sa.UniqueConstraint(
+            "run_id",
+            "repeat",
+            "scenario_id",
+            "attempt",
+            name=op.f("uq_conversations_run_id_repeat_scenario_id_attempt"),
+        ),
     )
     op.create_index(
         "ix_conversations_agent_created",
@@ -398,6 +465,10 @@ def upgrade() -> None:
     op.create_index(
         "ix_conversations_status_created", "conversations", ["status", "created_at"], unique=False
     )
+    op.create_index(
+        "ix_conversations_run_status", "conversations", ["run_id", "status"], unique=False
+    )
+    op.create_index("ix_conversations_retry_of", "conversations", ["retry_of"], unique=False)
     op.create_table(
         "phone_numbers",
         sa.Column("number", sa.Text(), nullable=False),
@@ -457,6 +528,7 @@ def downgrade() -> None:
     op.drop_table("documents")
     op.drop_table("phone_numbers")
     op.drop_table("conversations")
+    op.drop_table("runs")
     op.drop_table("scenario_versions")
     op.drop_table("scenarios")
     op.drop_table("scenario_generations")

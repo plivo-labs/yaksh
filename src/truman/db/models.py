@@ -88,6 +88,40 @@ class AgentVersion(Base):
     )
 
 
+class Run(Base):
+    """Conversations started together against one agent: each scenario, repeated."""
+
+    __tablename__ = "runs"
+
+    id: Mapped[uuid.UUID] = uuid_primary_key()
+    agent_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("agents.id"))
+    agent_version_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
+    name: Mapped[str | None] = mapped_column(Text)
+    repeats: Mapped[int] = mapped_column(Integer)
+    max_duration_s: Mapped[int] = mapped_column(Integer)
+    max_parallel: Mapped[int | None] = mapped_column(Integer)
+    """At most this many of its conversations on the line at once; None is no run limit."""
+    start_interval_s: Mapped[int | None] = mapped_column(Integer)
+    """The least time between two call starts of the run; None is no wait."""
+    retries: Mapped[int] = mapped_column(Integer)
+    """How many times a conversation that ends with an error is tried again."""
+    request_key: Mapped[str | None] = mapped_column(Text, unique=True)
+    """The client's idempotency key: the same request with it returns this run."""
+    request_hash: Mapped[str | None] = mapped_column(Text)
+    """A hash of the validated request, so the key with another request is refused."""
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    cancelled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["agent_version_id", "agent_id"], ["agent_versions.id", "agent_versions.agent_id"]
+        ),
+        UniqueConstraint("id", "agent_id"),
+        CheckConstraint("(request_key IS NULL) = (request_hash IS NULL)", name="request_together"),
+        Index("ix_runs_agent_created", "agent_id", text("created_at DESC")),
+    )
+
+
 class Conversation(Base):
     __tablename__ = "conversations"
 
@@ -124,11 +158,27 @@ class Conversation(Base):
     transcript: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     claimed_by: Mapped[str | None] = mapped_column(Text)
     lease_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    run_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    """The run that made the conversation; None for a single test call."""
+    repeat: Mapped[int | None] = mapped_column(Integer)
+    """Which repeat of its scenario in the run, from 1."""
+    attempt: Mapped[int] = mapped_column(Integer, default=1)
+    """1 for the first try; a retry has the next number."""
+    retry_of: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("conversations.id"))
+    """The conversation this one tries again."""
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     __table_args__ = (
         ForeignKeyConstraint(
             ["agent_version_id", "agent_id"], ["agent_versions.id", "agent_versions.agent_id"]
+        ),
+        ForeignKeyConstraint(["run_id", "agent_id"], ["runs.id", "runs.agent_id"]),
+        UniqueConstraint("run_id", "repeat", "scenario_id", "attempt"),
+        CheckConstraint('(run_id IS NULL) = ("repeat" IS NULL)', name="run_has_repeat"),
+        CheckConstraint(
+            "attempt >= 1 AND (retry_of IS NULL) = (attempt = 1)"
+            " AND (retry_of IS NULL OR run_id IS NOT NULL)",
+            name="retry_is_later_attempt_in_run",
         ),
         ForeignKeyConstraint(
             ["persona_version_id", "persona_id"],
@@ -141,6 +191,8 @@ class Conversation(Base):
         ),
         Index("ix_conversations_agent_created", "agent_id", text("created_at DESC")),
         Index("ix_conversations_status_created", "status", "created_at"),
+        Index("ix_conversations_run_status", "run_id", "status"),
+        Index("ix_conversations_retry_of", "retry_of"),
     )
 
 
