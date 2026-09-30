@@ -78,6 +78,34 @@ An outbound agent calls Truman. Truman sends the agent's trigger, a POST request
 | `TRUMAN_ALLOW_PRIVATE_TRIGGERS` | Optional. Allows `http` and private addresses as trigger URLs, for agents on your own network. Default off. |
 | `TRUMAN_NUMBER_REST_S` | How long a number rests after a test before it receives another outbound call, default 300. |
 
+## Runs
+
+A run starts several scenarios of one agent together and repeats them. Each scenario runs with its own persona. In the console, select scenarios in the agent's list and click Run. Through the API:
+
+```sh
+curl -X POST localhost:8000/api/v1/runs -H "Authorization: Bearer $TRUMAN_API_TOKEN" -H 'Content-Type: application/json' \
+  -H 'Idempotency-Key: nightly-2026-10-01' \
+  -d '{"agent_id": "<agent id>", "scenario_ids": ["<scenario id>", "<scenario id>"], "repeats": 3, "max_parallel": 2, "start_interval_s": 10}'
+```
+
+- The run starts one conversation for each repeat of each scenario, all of them or none. Every conversation pins the agent, scenario and persona versions that were current when the run started. A run takes at most 500 scenarios.
+- `max_parallel` sets how many conversations of the run can be on the line at once. `start_interval_s` sets the least time between two conversation starts; a conversation starts when a worker takes it, a few seconds before its call. Without them, the run has no limit and no delay of its own. Both protect the agent under test. Single test calls start before the queued conversations of runs.
+- `max_duration_s` is the time limit of each call, 10 to 1800 seconds, default `TRUMAN_DEFAULT_MAX_DURATION_S` (300).
+- `retries`, default 1, is the number of extra attempts for a conversation that ends with an error on Truman's side or on the line. 0 turns retries off. Conversations in the "did not connect" group are not tried again.
+- The same `Idempotency-Key` with the same body returns the first run, so a client can send a request again safely. The same key with another body is refused.
+- `POST /api/v1/runs/<run id>/cancel` cancels the queued conversations and asks the workers to end the calls on the line. The run shows `cancelling` until those calls end.
+- `GET /api/v1/runs/<run id>` counts the latest attempt of each conversation by outcome: waiting, in progress, completed, did not connect, error and cancelled. These are facts about the calls, not verdicts about the agent.
+
+| Variable | Purpose |
+| --- | --- |
+| `TRUMAN_MAX_ACTIVE_CONVERSATIONS` | The most conversations one worker runs at once, default 4. |
+| `TRUMAN_MAX_RUN_CONVERSATIONS` | The most conversations one run starts, the scenarios times the repeats, default 200. Retries are not counted. |
+| `TRUMAN_MAX_RUN_REPEATS` | Default 10. |
+| `TRUMAN_MAX_RUN_RETRIES` | Default 3. |
+| `TRUMAN_MAX_RUN_START_INTERVAL_S` | The largest `start_interval_s` a run can ask for, default 600. |
+
+The phone provider limits the calls of the whole account that can be on the line at once. Keep the sum of `TRUMAN_MAX_ACTIVE_CONVERSATIONS` over all workers, plus any other use of the same account, under that limit. Otherwise Plivo refuses the extra calls: it refuses the call request (HTTP 403, "Concurrency Limit Breached"), or it ends the call with hangup cause 5030. When Truman calls the agent, such a conversation ends with an error; when the agent calls Truman, it shows as a call that did not connect. The max parallel of a run does not protect the account, because two runs can each use it in full.
+
 ## Develop
 
 ```sh
