@@ -73,7 +73,7 @@ async def test_an_error_is_tried_again_up_to_the_runs_retries(
     client: AsyncClient, caller: FakeCaller, worker: Worker
 ) -> None:
     caller.mode = "refuse"
-    run = await new_run(client, retries=2)
+    run = await new_run(client, max_retries=2)
 
     done = await wait_for_run(client, run["id"], "done")
 
@@ -82,7 +82,7 @@ async def test_an_error_is_tried_again_up_to_the_runs_retries(
         (attempt, "failed", "error") for attempt in (1, 2, 3)
     ]
     assert [c["retry_of"] for c in attempts] == [None, attempts[0]["id"], attempts[1]["id"]]
-    assert (done["counts"]["error"], sum(done["counts"].values()), done["retried"]) == (1, 1, 2)
+    assert (done["counts"]["error"], sum(done["counts"].values()), done["retries"]) == (1, 1, 2)
     first = (await client.get(f"/api/v1/conversations/{attempts[0]['id']}")).json()
     assert first["retried_as"] == attempts[1]["id"] and caller.calls == 3
 
@@ -100,13 +100,13 @@ async def test_only_the_error_group_is_tried_again(
     end_reason: str,
 ) -> None:
     caller.mode = mode
-    run = await new_run(client, retries=2)
+    run = await new_run(client, max_retries=2)
 
     done = await wait_for_run(client, run["id"], "done")
 
     only = await run_conversations(client, run["id"])
     assert [(c["status"], c["end_reason"]) for c in only] == [(status, end_reason)]
-    assert done["retried"] == 0
+    assert done["retries"] == 0
 
 
 async def test_a_lost_lease_is_tried_again_with_the_inputs_and_nothing_else(

@@ -5,11 +5,13 @@ import hashlib
 import json
 import uuid
 from collections import Counter
+from datetime import datetime
 from enum import StrEnum
 from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator
 
+from truman.domain.conversations import EndReason, OutcomeGroup
 from truman.domain.scenarios import MAX_BULK
 
 RunName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=80)]
@@ -28,7 +30,8 @@ class RunCreate(BaseModel):
     max_duration_s: int | None = Field(default=None, ge=10, le=1800)
     max_parallel: int | None = Field(default=None, ge=1)
     start_interval_s: int | None = Field(default=None, ge=1)
-    retries: int = Field(default=1, ge=0)
+    max_retries: int = Field(default=1, ge=0)
+    """How many times a conversation that ends with an error is tried again."""
     name: RunName | None = None
 
     @field_validator("scenario_ids")
@@ -71,8 +74,8 @@ class WaitingReason(StrEnum):
     named; anything else is a worker or a number."""
 
     MAX_PARALLEL = "max_parallel"
-    DELAY = "delay"
-    """A call of the run started less than its delay between calls ago."""
+    START_INTERVAL = "start_interval"
+    """A call of the run started less than its start interval ago."""
     WORKER_OR_NUMBER = "worker_or_number"
 
 
@@ -82,5 +85,34 @@ def waiting_reason(*, queued: bool, full: bool, waiting: bool) -> WaitingReason 
     if full:
         return WaitingReason.MAX_PARALLEL
     if waiting:
-        return WaitingReason.DELAY
+        return WaitingReason.START_INTERVAL
     return WaitingReason.WORKER_OR_NUMBER
+
+
+class ClaimCounts(BaseModel):
+    """What the callers of the latest attempts said when they hung up: claims, not verdicts."""
+
+    model_config = ConfigDict(frozen=True)
+
+    reached: int
+    not_reached: int
+
+
+class RunProgress(BaseModel):
+    """What a run's conversations say about it, counted each time the run is read. The counts,
+    end reasons, claims and talk time take only the latest attempt of each repeat of each
+    scenario."""
+
+    model_config = ConfigDict(frozen=True)
+
+    status: RunStatus
+    cancelled_at: datetime | None
+    counts: dict[OutcomeGroup, int]
+    end_reasons: dict[EndReason, int]
+    retries: int
+    """How many retries the run made."""
+    caller_claims: ClaimCounts
+    median_talk_ms: int | None
+    waiting_reason: WaitingReason | None
+    started_at: datetime | None
+    ended_at: datetime | None

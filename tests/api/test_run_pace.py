@@ -69,7 +69,7 @@ async def test_a_run_waits_its_delay_between_calls_while_other_work_starts(
     await engine.dispose()
     claimed_second = await claim(settings)
 
-    assert (claimed_first, held_back, waiting) == (first, None, "delay")
+    assert (claimed_first, held_back, waiting) == (first, None, "start_interval")
     assert claimed_other == (await queue_of(client, other))[0]
     assert claimed_second == second
 
@@ -248,7 +248,7 @@ async def test_a_reaper_that_waited_for_its_run_still_rests_the_number(
 async def test_the_reaper_and_a_cancel_of_the_same_run_take_turns(
     client: AsyncClient, settings: Settings, reap_first: bool
 ) -> None:
-    run = await new_run(client, repeats=2, retries=0)
+    run = await new_run(client, repeats=2, max_retries=0)
     assert None not in [await claim(settings), await claim(settings)]
     engine = create_engine(settings.database_url.encoded_string())
     async with engine.begin() as connection:

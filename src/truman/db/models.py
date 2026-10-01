@@ -103,7 +103,7 @@ class Run(Base):
     """At most this many of its conversations on the line at once; None is no run limit."""
     start_interval_s: Mapped[int | None] = mapped_column(Integer)
     """The least time between two call starts of the run; None is no wait."""
-    retries: Mapped[int] = mapped_column(Integer)
+    max_retries: Mapped[int] = mapped_column(Integer)
     """How many times a conversation that ends with an error is tried again."""
     request_key: Mapped[str | None] = mapped_column(Text, unique=True)
     """The client's idempotency key: the same request with it returns this run."""

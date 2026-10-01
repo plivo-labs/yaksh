@@ -85,11 +85,11 @@ export type RunStatus = "queued" | "running" | "cancelling" | "done" | "cancelle
 
 export const ACTIVE_RUN_STATUSES: RunStatus[] = ["queued", "running", "cancelling"];
 
-export type WaitingReason = "max_parallel" | "delay" | "worker_or_number";
+export type WaitingReason = "max_parallel" | "start_interval" | "worker_or_number";
 
 export const WAITING_REASON_TEXT: Record<WaitingReason, string> = {
   max_parallel: "max parallel reached",
-  delay: "delay between calls",
+  start_interval: "delay between calls",
   worker_or_number: "a free worker or number",
 };
 
@@ -400,21 +400,28 @@ export interface RunInput {
   /** The least time between two call starts; null is no wait. */
   start_interval_s: number | null;
   /** How many times a conversation that ends with an error is tried again. */
-  retries: number;
+  max_retries: number;
   name: string | null;
 }
 
-export interface RunSummary extends Omit<RunInput, "scenario_ids"> {
+export interface RunSummary {
   id: string;
+  agent_id: string;
   agent_version_id: string;
   agent_version: number;
   agent_name: string;
+  name: string | null;
+  repeats: number;
+  max_duration_s: number;
+  max_parallel: number | null;
+  start_interval_s: number | null;
+  max_retries: number;
   status: RunStatus;
   /** The latest attempt of each repeat of each scenario, by outcome group. */
   counts: Record<OutcomeGroup, number>;
   end_reasons: Partial<Record<EndReason, number>>;
-  /** How many of the run's conversations are retries. */
-  retried: number;
+  /** How many retries the run made. */
+  retries: number;
   /** What the callers said when they hung up: claims, not verdicts. */
   caller_claims: { reached: number; not_reached: number };
   median_talk_ms: number | null;

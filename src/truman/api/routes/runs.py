@@ -1,4 +1,3 @@
-import dataclasses
 import uuid
 from typing import Annotated
 
@@ -19,13 +18,7 @@ router = APIRouter(prefix="/runs", tags=["runs"], dependencies=[Depends(require_
 async def summaries(session: AsyncSession, rows: list[Run]) -> list[RunSummary]:
     agents = await conversations.pinned_agents(session, (row.agent_version_id for row in rows))
     progress = await runs.progress(session, rows)
-    items = []
-    for row in rows:
-        data = {name: getattr(row, name) for name in RunSummary.model_fields if hasattr(row, name)}
-        data["agent_version"], data["agent_name"] = agents[row.agent_version_id]
-        data.update(dataclasses.asdict(progress[row.id]))
-        items.append(RunSummary.model_validate(data))
-    return items
+    return [RunSummary.of(row, agents[row.agent_version_id], progress[row.id]) for row in rows]
 
 
 async def detail(session: AsyncSession, run: Run) -> RunRead:

@@ -2,8 +2,7 @@ import statistics
 import uuid
 from collections import defaultdict
 from collections.abc import Sequence
-from dataclasses import asdict, dataclass, fields
-from datetime import datetime
+from dataclasses import asdict, fields
 from typing import Any
 
 from sqlalchemy import ColumnElement, Row, and_, func, select, update
@@ -24,9 +23,9 @@ from truman.domain.conversations import (
 )
 from truman.domain.errors import ConflictError, NotFoundError, ValidationError
 from truman.domain.runs import (
+    ClaimCounts,
     RunCreate,
-    RunStatus,
-    WaitingReason,
+    RunProgress,
     run_status,
     waiting_reason,
 )
@@ -53,38 +52,11 @@ ENDED = (
 """What the retry step reads from a conversation that just ended."""
 
 
-@dataclass(frozen=True)
-class Claims:
-    """What the callers said when they hung up: claims, not verdicts."""
-
-    reached: int
-    not_reached: int
-
-
-@dataclass(frozen=True)
-class Progress:
-    """What a run's conversations say about it, read in one statement each time the run is
-    read. The counts, end reasons, claims and talk time take only the latest attempt of each
-    repeat of each scenario."""
-
-    status: RunStatus
-    cancelled_at: datetime | None
-    counts: dict[OutcomeGroup, int]
-    end_reasons: dict[EndReason, int]
-    retried: int
-    """How many of the run's conversations are retries."""
-    caller_claims: Claims
-    median_talk_ms: int | None
-    waiting_reason: WaitingReason | None
-    started_at: datetime | None
-    ended_at: datetime | None
-
-
 def check_limits(settings: Settings, command: RunCreate) -> None:
     if command.repeats > settings.max_run_repeats:
         raise ValidationError(f"repeats: at most {settings.max_run_repeats}")
-    if command.retries > settings.max_run_retries:
-        raise ValidationError(f"retries: at most {settings.max_run_retries}")
+    if command.max_retries > settings.max_run_retries:
+        raise ValidationError(f"max_retries: at most {settings.max_run_retries}")
     interval = command.start_interval_s or 0
     if interval > settings.max_run_start_interval_s:
         raise ValidationError(f"start_interval_s: at most {settings.max_run_start_interval_s}")
@@ -123,7 +95,7 @@ async def create_run(
         max_duration_s=command.max_duration_s or settings.default_max_duration_s,
         max_parallel=command.max_parallel,
         start_interval_s=command.start_interval_s,
-        retries=command.retries,
+        max_retries=command.max_retries,
         request_key=request_key,
         request_hash=request_hash,
     )
@@ -212,10 +184,10 @@ async def locked_run(session: AsyncSession, conversation_id: uuid.UUID) -> Run |
     )
 
 
-def retried() -> ColumnElement[bool]:
-    """A later attempt replaced the conversation."""
+def latest_attempt() -> ColumnElement[bool]:
+    """No later attempt replaced the conversation."""
     retry = aliased(Conversation)
-    return select(retry.id).where(retry.retry_of == Conversation.id).exists()
+    return ~select(retry.id).where(retry.retry_of == Conversation.id).exists()
 
 
 def run_full() -> ColumnElement[bool]:
@@ -243,14 +215,14 @@ def run_waiting() -> ColumnElement[bool]:
 
 async def retry(session: AsyncSession, run: Run, ended: Sequence[Row[Any]]) -> None:
     """Queue the next attempt of each just-ended conversation of the run that is in the error
-    group, up to the run's retries, and none once the run is cancelled. The caller holds the
+    group, up to the run's max_retries, and none once the run is cancelled. The caller holds the
     run's lock. An attempt that is already there is left alone, so this step never fails the
     transaction that ended the conversations."""
     due = [
         row
         for row in ended
         if run.cancelled_at is None
-        and row.attempt <= run.retries
+        and row.attempt <= run.max_retries
         and outcome_group(row.status, row.end_reason) is OutcomeGroup.ERROR
     ]
     if not due:
@@ -298,8 +270,8 @@ async def list_runs(
     return list(rows), total or 0
 
 
-async def progress(session: AsyncSession, runs: Sequence[Run]) -> dict[uuid.UUID, Progress]:
-    latest = ~retried()
+async def progress(session: AsyncSession, runs: Sequence[Run]) -> dict[uuid.UUID, RunProgress]:
+    latest = latest_attempt()
     claim = Conversation.caller_claim["success"].as_boolean()
     rows = await session.execute(
         select(
@@ -329,7 +301,7 @@ async def progress(session: AsyncSession, runs: Sequence[Run]) -> dict[uuid.UUID
     return {run_id: counted(run_rows) for run_id, run_rows in by_run.items()}
 
 
-def counted(rows: list[Row[Any]]) -> Progress:
+def counted(rows: list[Row[Any]]) -> RunProgress:
     """One run's progress from its rows grouped by status and end reason."""
     counts = dict.fromkeys(OutcomeGroup, 0)
     end_reasons: dict[EndReason, int] = {}
@@ -344,13 +316,13 @@ def counted(rows: list[Row[Any]]) -> Progress:
     ended = [row.ended_at for row in rows if row.ended_at is not None]
     run = rows[0]
     cancelled_at = run.cancelled_at
-    return Progress(
+    return RunProgress(
         status=run_status(cancelled=cancelled_at is not None, active=active, started=bool(started)),
         cancelled_at=cancelled_at,
         counts=counts,
         end_reasons=end_reasons,
-        retried=sum(row.retries for row in rows),
-        caller_claims=Claims(
+        retries=sum(row.retries for row in rows),
+        caller_claims=ClaimCounts(
             reached=sum(row.reached for row in rows),
             not_reached=sum(row.not_reached for row in rows),
         ),

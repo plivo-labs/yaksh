@@ -111,9 +111,9 @@ function Overview({ run }: { run: Run }) {
           <span className="font-medium tabular-nums">
             {finished} of {total} finished
           </span>
-          {run.retried > 0 && (
+          {run.retries > 0 && (
             <span className="text-muted-foreground tabular-nums">
-              {run.retried} {run.retried === 1 ? "retry" : "retries"}
+              {run.retries} {run.retries === 1 ? "retry" : "retries"}
             </span>
           )}
         </div>
@@ -139,7 +139,7 @@ function Overview({ run }: { run: Run }) {
         <Fact label="Delay between calls">
           {run.start_interval_s === null ? "None" : `${run.start_interval_s} seconds`}
         </Fact>
-        <Fact label="Retries">Up to {run.retries}</Fact>
+        <Fact label="Retries">Up to {run.max_retries}</Fact>
         <Fact label="Median talk time">{duration(run.median_talk_ms) || "None yet"}</Fact>
         <Fact label="Caller claims, not judged">
           {run.caller_claims.reached} reached, {run.caller_claims.not_reached} did not
@@ -262,7 +262,7 @@ function Conversations({ run }: { run: Run }) {
   const conversations = useConversations(
     {
       run_id: run.id,
-      retried: "false",
+      latest_attempts: "true",
       sort: "created_at",
       ...(group ? { group } : {}),
     },
@@ -276,8 +276,8 @@ function Conversations({ run }: { run: Run }) {
         title={groupLabel ? `Conversations: ${groupLabel.toLowerCase()}` : "Conversations"}
       />
       <p className="border-b px-5 py-2.5 text-xs text-muted-foreground">
-        The latest attempt of each repeat of each scenario. A retried one links to the attempt
-        before it.
+        The latest attempt of each repeat of each scenario. Open a retry to see the attempt before
+        it.
       </p>
       {conversations.isError ? (
         <p className="px-5 py-4 text-sm text-destructive">{conversations.error.message}</p>

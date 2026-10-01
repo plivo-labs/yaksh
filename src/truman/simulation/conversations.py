@@ -47,8 +47,8 @@ from truman.simulation.numbers import free_numbers, lease_number, release_number
 from truman.simulation.runs import (
     ENDED,
     get_run,
+    latest_attempt,
     locked_run,
-    retried,
     retry,
     run_full,
     run_waiting,
@@ -118,7 +118,7 @@ async def list_conversations(
     run_id: uuid.UUID | None = None,
     status: ConversationStatus | None = None,
     group: OutcomeGroup | None = None,
-    was_retried: bool | None = None,
+    latest_attempts: bool = False,
     search: str | None = None,
     sort: str = "-created_at",
 ) -> tuple[list[Conversation], int]:
@@ -148,8 +148,8 @@ async def list_conversations(
         query = query.where(Conversation.status == status)
     if group is not None:
         query = query.where(in_group(group))
-    if was_retried is not None:
-        query = query.where(retried() if was_retried else ~retried())
+    if latest_attempts:
+        query = query.where(latest_attempt())
     total = await session.scalar(select(func.count()).select_from(query.subquery()))
     key = SORT_KEYS[sort.removeprefix("-")]
     order = key.desc() if sort.startswith("-") else key.asc()

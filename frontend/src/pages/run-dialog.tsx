@@ -58,7 +58,7 @@ export function RunDialog({
   const [maxDuration, setMaxDuration] = useState(text(earlier?.max_duration_s ?? 300));
   const [maxParallel, setMaxParallel] = useState(text(earlier?.max_parallel));
   const [delay, setDelay] = useState(text(earlier?.start_interval_s));
-  const [retries, setRetries] = useState(text(earlier?.retries ?? 1));
+  const [retries, setRetries] = useState(text(earlier?.max_retries ?? 1));
   const [submitted, setSubmitted] = useState(false);
   const personas = usePersonas();
   const numbers = usePhoneNumbers();
@@ -102,7 +102,7 @@ export function RunDialog({
         max_duration_s: duration,
         max_parallel: parallel,
         start_interval_s: interval,
-        retries: retryCount,
+        max_retries: retryCount,
         name: name.trim() || null,
       },
       { onSuccess: (run) => navigate(`/runs/${run.id}`) },

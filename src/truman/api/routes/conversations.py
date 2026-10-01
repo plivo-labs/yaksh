@@ -93,9 +93,9 @@ async def list_conversations(
     run_id: uuid.UUID | None = None,
     status: ConversationStatus | None = None,
     group: OutcomeGroup | None = None,
-    retried: Annotated[
-        bool | None, Query(description="false keeps the latest attempt of each retried one")
-    ] = None,
+    latest_attempts: Annotated[
+        bool, Query(description="true leaves out the attempts that a retry replaced")
+    ] = False,
     q: Annotated[str | None, Query(max_length=200)] = None,
     sort: Annotated[str, Query(pattern=SORT_PATTERN)] = "-created_at",
 ) -> Page[ConversationSummary]:
@@ -107,7 +107,7 @@ async def list_conversations(
         run_id=run_id,
         status=status,
         group=group,
-        was_retried=retried,
+        latest_attempts=latest_attempts,
         search=q,
         sort=sort,
     )

@@ -303,7 +303,7 @@ def upgrade() -> None:
         sa.Column("max_duration_s", sa.Integer(), nullable=False),
         sa.Column("max_parallel", sa.Integer(), nullable=True),
         sa.Column("start_interval_s", sa.Integer(), nullable=True),
-        sa.Column("retries", sa.Integer(), nullable=False),
+        sa.Column("max_retries", sa.Integer(), nullable=False),
         sa.Column("request_key", sa.Text(), nullable=True),
         sa.Column("request_hash", sa.Text(), nullable=True),
         sa.Column(

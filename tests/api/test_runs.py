@@ -78,12 +78,12 @@ async def test_a_run_starts_each_repeat_of_every_scenario_in_order_with_its_pers
         name="Nightly",
         max_parallel=2,
         start_interval_s=5,
-        retries=2,
+        max_retries=2,
     )
 
     assert response.status_code == 202, response.text
     run = response.json()
-    assert (run["status"], run["name"], run["repeats"], run["retries"]) == (
+    assert (run["status"], run["name"], run["repeats"], run["max_retries"]) == (
         "queued",
         "Nightly",
         3,
@@ -173,7 +173,7 @@ async def test_a_run_needs_distinct_scenarios_within_the_limits(client: AsyncCli
         f"scenario_ids: scenario {ids[0]} is listed more than once"
     )
     assert await refused(ids[:1], repeats=4) == "repeats: at most 3"
-    assert await refused(ids[:1], retries=3) == "retries: at most 2"
+    assert await refused(ids[:1], max_retries=3) == "max_retries: at most 2"
     assert await refused(ids[:1], start_interval_s=61) == "start_interval_s: at most 60"
     assert (await refused(ids[:1], max_parallel=0)).startswith("max_parallel: ")
     assert (await refused(ids[:1], priority="high")).startswith("priority: ")
@@ -190,7 +190,7 @@ async def test_a_repeated_request_returns_its_run_and_its_key_cannot_start_anoth
     scenario = (await create_scenario(client, agent))["id"]
 
     first = await start_run(client, agent, [scenario], key="nightly-1")
-    again = await start_run(client, agent, [scenario], key="nightly-1", repeats=1, retries=1)
+    again = await start_run(client, agent, [scenario], key="nightly-1", repeats=1, max_retries=1)
     other = await start_run(client, agent, [scenario], key="nightly-1", repeats=2)
     unkeyed = await start_run(client, agent, [scenario])
 
@@ -357,19 +357,18 @@ async def test_counts_take_the_latest_attempt_and_the_list_can_leave_out_retried
     await engine.dispose()
 
     detail = (await client.get(f"/api/v1/runs/{run['id']}")).json()
-    latest = await run_conversations(client, run["id"], retried=False)
-    replaced = await run_conversations(client, run["id"], retried=True)
+    latest = await run_conversations(client, run["id"], latest_attempts=True)
     errors = await run_conversations(client, run["id"], group="error")
     retried_from = (await client.get(f"/api/v1/conversations/{first['id']}")).json()
     retried_to = (await client.get(f"/api/v1/conversations/{retry}")).json()
 
     assert detail["counts"] == {**NO_OUTCOMES, "waiting": 1, "completed": 1}
     assert detail["end_reasons"] == {"agent_hangup": 1}
-    assert (detail["retried"], detail["median_talk_ms"]) == (1, 9000)
+    assert (detail["retries"], detail["median_talk_ms"]) == (1, 9000)
     assert len(await run_conversations(client, run["id"])) == 3
     assert [c["id"] for c in latest] == [second["id"], str(retry)]
-    assert [c["id"] for c in replaced] == [c["id"] for c in errors] == [first["id"]]
-    assert await run_conversations(client, run["id"], group="error", retried=False) == []
+    assert [c["id"] for c in errors] == [first["id"]]
+    assert await run_conversations(client, run["id"], group="error", latest_attempts=True) == []
     assert retried_from["retried_as"] == str(retry) and retried_to["retried_as"] is None
     assert (retried_to["retry_of"], retried_to["attempt"]) == (first["id"], 2)
 
