@@ -7,6 +7,7 @@ from typing import Any
 
 from sqlalchemy import ColumnElement, Row, String, and_, cast, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+from sqlalchemy.orm import defer
 
 from truman.config import Settings
 from truman.db.models import (
@@ -25,7 +26,6 @@ from truman.domain.conversations import (
     ACTIVE_STATUSES,
     LIVE_STATUSES,
     Admission,
-    CallerClaim,
     CallOutcome,
     CallRequest,
     ConversationCreate,
@@ -122,7 +122,9 @@ async def list_conversations(
     search: str | None = None,
     sort: str = "-created_at",
 ) -> tuple[list[Conversation], int]:
-    query = select(Conversation)
+    query = select(Conversation).options(
+        defer(Conversation.transcript), defer(Conversation.instructions)
+    )
     if search:
         text = search.strip()
         query = (
@@ -206,12 +208,6 @@ def transcript_of(conversation: Conversation) -> Transcript:
     if conversation.transcript is None:
         return Transcript()
     return Transcript.model_validate(conversation.transcript)
-
-
-def caller_claim_of(conversation: Conversation) -> CallerClaim | None:
-    """The claim alone, without reading the whole transcript."""
-    claim = (conversation.transcript or {}).get("caller_claim")
-    return None if claim is None else CallerClaim.model_validate(claim)
 
 
 async def retried_as(session: AsyncSession, conversation: Conversation) -> uuid.UUID | None:
@@ -567,7 +563,6 @@ async def finalize(
 ) -> bool:
     """Record the terminal state; a run conversation in the error group is queued again, up to
     its run's retries. Returns False when the row was no longer ours to finish."""
-    transcript.caller_claim = outcome.caller_claim
     if outcome.connected:
         transcript.validity = Validity(
             ok=outcome.caller_error is None,
@@ -585,6 +580,7 @@ async def finalize(
                 ended_at=func.statement_timestamp(),
                 talk_ms=outcome.talk_ms,
                 transcript=transcript.model_dump(mode="json"),
+                caller_claim=outcome.caller_claim.model_dump() if outcome.caller_claim else None,
                 recording_path=str(outcome.recording_path) if outcome.recording_path else None,
                 call_uuid=outcome.call_uuid,
                 agent_caller_id=Conversation.agent_caller_id if outcome.call_uuid else None,

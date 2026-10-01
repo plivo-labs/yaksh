@@ -162,7 +162,6 @@ class Transcript(BaseModel):
     turns: list[Turn] = Field(default_factory=list)
     wire_events: list[WireEvent] = Field(default_factory=list)
     validity: Validity | None = None
-    caller_claim: CallerClaim | None = None
 
 
 class ConversationCreate(BaseModel):

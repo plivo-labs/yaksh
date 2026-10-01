@@ -393,6 +393,7 @@ def upgrade() -> None:
         sa.Column("talk_ms", sa.Integer(), nullable=True),
         sa.Column("recording_path", sa.Text(), nullable=True),
         sa.Column("transcript", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
+        sa.Column("caller_claim", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
         sa.Column("claimed_by", sa.Text(), nullable=True),
         sa.Column("lease_expires_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("run_id", sa.UUID(), nullable=True),
@@ -469,6 +470,9 @@ def upgrade() -> None:
         "ix_conversations_run_status", "conversations", ["run_id", "status"], unique=False
     )
     op.create_index("ix_conversations_retry_of", "conversations", ["retry_of"], unique=False)
+    op.create_index(
+        "ix_conversations_run_started", "conversations", ["run_id", "started_at"], unique=False
+    )
     op.create_table(
         "phone_numbers",
         sa.Column("number", sa.Text(), nullable=False),

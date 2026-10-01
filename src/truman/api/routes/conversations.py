@@ -55,7 +55,6 @@ async def summaries(session: AsyncSession, rows: list[Conversation]) -> list[Con
         data["persona_version"], data["persona_name"] = personas[row.persona_version_id]
         data["scenario_version"], data["scenario_name"] = scenarios[row.scenario_version_id]
         data["recording_url"] = recording_url(row)
-        data["caller_claim"] = conversations.caller_claim_of(row)
         items.append(ConversationSummary.model_validate(data))
     return items
 

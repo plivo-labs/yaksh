@@ -300,7 +300,7 @@ async def list_runs(
 
 async def progress(session: AsyncSession, runs: Sequence[Run]) -> dict[uuid.UUID, Progress]:
     latest = ~retried()
-    claim = Conversation.transcript["caller_claim"]["success"].as_boolean()
+    claim = Conversation.caller_claim["success"].as_boolean()
     rows = await session.execute(
         select(
             Run.id.label("run_id"),
