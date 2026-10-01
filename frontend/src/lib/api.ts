@@ -18,7 +18,7 @@ export function setToken(token: string): void {
   }
 }
 
-class ApiError extends Error {
+export class ApiError extends Error {
   readonly status: number;
   readonly code: string;
 

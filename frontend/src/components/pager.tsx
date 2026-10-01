@@ -21,8 +21,8 @@ function withPage(params: URLSearchParams, page: number): URLSearchParams {
 /** Previous and next links for a list paged through the URL. While the next page loads, the
  * pager stays on screen with the total it has. Once a fetch has confirmed the total, a page past
  * the end, such as after a live list shrinks, goes back to the last page. Cached data is not
- * enough: it shows while it is fetched again, and after a failed fetch, and its total can be
- * old. */
+ * enough: it shows while it is fetched again, while a fetch waits for the network, and after a
+ * failed fetch, and its total can be old. */
 export function Pager({
   query,
   pageSize,
@@ -31,7 +31,7 @@ export function Pager({
   query: {
     data?: { total: number };
     isSuccess: boolean;
-    isFetching: boolean;
+    fetchStatus: "fetching" | "paused" | "idle";
     isPlaceholderData: boolean;
   };
   pageSize: number;
@@ -41,7 +41,7 @@ export function Pager({
   const [params, setParams] = useSearchParams();
   const total = query.data?.total;
   const last = Math.max(1, Math.ceil((total ?? 0) / pageSize));
-  const settled = query.isSuccess && !query.isFetching && !query.isPlaceholderData;
+  const settled = query.isSuccess && query.fetchStatus === "idle" && !query.isPlaceholderData;
   useEffect(() => {
     if (settled && page > last) setParams((current) => withPage(current, last), { replace: true });
   }, [settled, page, last, setParams]);

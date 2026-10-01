@@ -2,11 +2,12 @@ import {
   type QueryClient,
   keepPreviousData,
   useMutation,
+  useQueries,
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
 
-import { api, apiBlob } from "@/lib/api";
+import { ApiError, api, apiBlob } from "@/lib/api";
 import {
   ACTIVE_RUN_STATUSES,
   ACTIVE_STATUSES,
@@ -43,6 +44,7 @@ export const keys = {
   conversations: (filters: Record<string, string>) => ["conversations", filters] as const,
   conversation: (id: string) => ["conversations", "one", id] as const,
   personas: ["personas"] as const,
+  scenario: (id: string) => ["scenarios", "one", id] as const,
   scenarios: (agentId: string) => ["agents", agentId, "scenarios"] as const,
   scenariosOf: (agentId: string, generationId: string | null) =>
     ["agents", agentId, "scenarios", generationId ?? "all"] as const,
@@ -123,6 +125,41 @@ export function useScenarios(agentId: string, enabled = true, generationId: stri
       ),
     enabled: enabled && Boolean(agentId),
   });
+}
+
+/** The scenarios of a run to start, in the order asked. The agent's list gives most of them. An
+ * id the list lacks is looked up alone, because a list read in pages can miss a row while
+ * scenarios change; a scenario that is gone is left out. Nothing is ready until every fetch has
+ * finished, so cached or partial data never decides what runs. */
+export function useRunScenarios(agentId: string, scenarioIds: string[]) {
+  const list = useScenarios(agentId);
+  const listed = new Map((list.data ?? []).map((scenario) => [scenario.id, scenario]));
+  const listSettled = list.isSuccess && list.fetchStatus === "idle";
+  const unlisted = listSettled ? scenarioIds.filter((id) => !listed.has(id)) : [];
+  const lookups = useQueries({
+    queries: unlisted.map((id) => ({
+      queryKey: keys.scenario(id),
+      queryFn: async ({ signal }: { signal: AbortSignal }) => {
+        try {
+          return await api<Scenario>(`/scenarios/${id}`, { signal });
+        } catch (error) {
+          if (error instanceof ApiError && error.status === 404) return null;
+          throw error;
+        }
+      },
+    })),
+  });
+  const found = new Map(listed);
+  for (const lookup of lookups) if (lookup.data) found.set(lookup.data.id, lookup.data);
+  const ready =
+    listSettled && lookups.every((lookup) => lookup.isSuccess && lookup.fetchStatus === "idle");
+  const scenarios = ready ? scenarioIds.flatMap((id) => found.get(id) ?? []) : [];
+  return {
+    scenarios,
+    leftOut: ready ? scenarioIds.length - scenarios.length : 0,
+    ready,
+    error: list.error ?? lookups.find((lookup) => lookup.error)?.error ?? null,
+  };
 }
 
 export function useGenerations(agentId: string) {

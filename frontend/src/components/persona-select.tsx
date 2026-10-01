@@ -27,11 +27,12 @@ export function PersonaSelect({
     value: persona.id,
     label: persona.name,
   }));
+  const listed = items.some((item) => item.value === value);
   return (
     <>
       <Select
         items={items}
-        value={items.length > 0 && value ? value : null}
+        value={listed ? value : null}
         onValueChange={(next) => next && onValueChange(next)}
         disabled={items.length === 0}
       >
@@ -42,7 +43,11 @@ export function PersonaSelect({
                 ? "Loading personas"
                 : personas.isError
                   ? "Could not load the personas"
-                  : "No personas yet"
+                  : items.length === 0
+                    ? "No personas yet"
+                    : value
+                      ? "A persona not in the list"
+                      : "Choose a persona"
             }
           />
         </SelectTrigger>

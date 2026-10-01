@@ -15,7 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { counted } from "@/lib/format";
 import { usePersonaNames } from "@/hooks/use-persona-names";
-import { usePhoneNumbers, useScenarios, useStartRun } from "@/lib/queries";
+import { usePhoneNumbers, useRunScenarios, useStartRun } from "@/lib/queries";
 import type { AgentSummary, RunSummary } from "@/lib/types";
 
 const APPEAR = "transition-opacity duration-150 ease-out starting:opacity-0";
@@ -60,15 +60,11 @@ export function RunDialog({
   const [delay, setDelay] = useState(text(earlier?.start_interval_s));
   const [retries, setRetries] = useState(text(earlier?.max_retries));
   const [submitted, setSubmitted] = useState(false);
-  const loaded = useScenarios(agent.id);
+  const { scenarios, leftOut, ready, error: loadError } = useRunScenarios(agent.id, scenarioIds);
   const { personas, name: personaName } = usePersonaNames();
   const numbers = usePhoneNumbers();
   const start = useStartRun(requestKey);
   const navigate = useNavigate();
-
-  const byId = new Map((loaded.data ?? []).map((scenario) => [scenario.id, scenario]));
-  const scenarios = scenarioIds.flatMap((id) => byId.get(id) ?? []);
-  const leftOut = loaded.data ? scenarioIds.length - scenarios.length : 0;
 
   const repeatCount = whole(repeats);
   const duration = whole(maxDuration);
@@ -135,11 +131,11 @@ export function RunDialog({
         >
           <FieldGroup className="pb-6">
             <div className="grid gap-1 rounded-md bg-muted/50 px-3 py-2.5 text-sm">
-              {loaded.isError ? (
+              {loadError ? (
                 <p role="alert" className="text-destructive">
-                  Could not load the scenarios: {loaded.error.message}
+                  Could not load the scenarios: {loadError.message}
                 </p>
-              ) : loaded.isPending ? (
+              ) : !ready ? (
                 <p className="text-muted-foreground">Loading the scenarios</p>
               ) : (
                 <>
