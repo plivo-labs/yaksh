@@ -11,7 +11,7 @@ from tests.conftest import (
     FINAL,
     Db,
     FakeCaller,
-    assert_groups_match_counts,
+    checked_counts,
     claim,
     create_agent_id,
     expire_leases,
@@ -133,20 +133,24 @@ async def test_cancelling_a_run_cancels_its_queue_and_ends_its_live_call(
     run = await new_run(client, repeats=3, max_parallel=1)
     live = (await queue_of(client, run))[0]
     await wait_for(client, live, {"running"})
+    before = await checked_counts(client, run["id"])
 
     cancelled = await client.post(f"/api/v1/runs/{run['id']}/cancel")
 
+    assert (before["waiting"], before["in_progress"]) == (2, 1)
     assert cancelled.status_code == 202 and cancelled.json()["status"] == "cancelling"
     rest = (await run_conversations(client, run["id"]))[1:]
     assert [(c["status"], c["end_reason"]) for c in rest] == [("cancelled", "user_request")] * 2
     assert all(c["ended_at"] is not None for c in rest)
+    ending = await checked_counts(client, run["id"])
+    assert (ending["in_progress"], ending["cancelled"]) == (1, 2)
     recording.set()
     assert (await wait_for(client, live, FINAL))["end_reason"] == "user_request"
     after = (await client.get(f"/api/v1/runs/{run['id']}")).json()
     assert (after["status"], after["counts"]["cancelled"]) == ("cancelled", 3)
     again = await client.post(f"/api/v1/runs/{run['id']}/cancel")
     assert again.status_code == 200 and again.json()["cancelled_at"] == after["cancelled_at"]
-    await assert_groups_match_counts(client, run["id"])
+    assert (await checked_counts(client, run["id"]))["cancelled"] == 3
 
 
 async def test_a_cancel_that_meets_a_requeue_cancels_the_returned_conversation(

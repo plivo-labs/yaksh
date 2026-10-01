@@ -290,12 +290,14 @@ async def wait_until(condition: Callable[[], bool], timeout: float = 5.0) -> Non
     await eventually(check, bool, timeout)
 
 
-async def assert_groups_match_counts(client: AsyncClient, run_id: str) -> None:
-    """Each outcome group lists as many latest attempts as the run counts in it."""
+async def checked_counts(client: AsyncClient, run_id: str) -> dict[str, int]:
+    """The run's counts by outcome group, each checked against the list of the group's latest
+    attempts."""
     counts = (await client.get(f"/api/v1/runs/{run_id}")).json()["counts"]
     for group, count in counts.items():
         listed = await run_conversations(client, run_id, group=group, latest_attempts=True)
         assert len(listed) == count, group
+    return counts
 
 
 async def refuse_calls(call: IncomingCall) -> Admission | str:

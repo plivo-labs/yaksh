@@ -11,7 +11,7 @@ from tests.conftest import (
     TRUMAN_FAILED,
     Db,
     FakeCaller,
-    assert_groups_match_counts,
+    checked_counts,
     claim,
     expire_leases,
     finish,
@@ -62,11 +62,15 @@ async def test_an_error_is_tried_again_up_to_the_runs_retries(
     assert (done["counts"]["error"], sum(done["counts"].values()), done["retries"]) == (1, 1, 2)
     first = (await client.get(f"/api/v1/conversations/{attempts[0]['id']}")).json()
     assert first["retried_as"] == attempts[1]["id"] and caller.calls == 3
+    assert (await checked_counts(client, run["id"]))["error"] == 1
 
 
 @pytest.mark.parametrize(
-    ("mode", "status", "end_reason"),
-    [("normal", "completed", "agent_hangup"), ("no_answer", "failed", "no_answer")],
+    ("mode", "status", "end_reason", "group"),
+    [
+        ("normal", "completed", "agent_hangup", "completed"),
+        ("no_answer", "failed", "no_answer", "did_not_connect"),
+    ],
 )
 async def test_only_the_error_group_is_tried_again(
     client: AsyncClient,
@@ -75,6 +79,7 @@ async def test_only_the_error_group_is_tried_again(
     mode: str,
     status: str,
     end_reason: str,
+    group: str,
 ) -> None:
     caller.mode = mode
     run = await new_run(client, max_retries=2)
@@ -84,7 +89,7 @@ async def test_only_the_error_group_is_tried_again(
     only = await run_conversations(client, run["id"])
     assert [(c["status"], c["end_reason"]) for c in only] == [(status, end_reason)]
     assert done["retries"] == 0
-    await assert_groups_match_counts(client, run["id"])
+    assert (await checked_counts(client, run["id"]))[group] == 1
 
 
 async def test_a_lost_lease_is_tried_again_with_the_inputs_and_nothing_else(
