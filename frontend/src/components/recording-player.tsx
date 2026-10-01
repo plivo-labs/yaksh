@@ -307,10 +307,22 @@ function Player({
     setTime(element.currentTime);
     if (show) reveal(element.currentTime, false);
   };
+  /** Plays through the audio graph, which routes the channels and sets the volume. Browsers
+   * allow a graph only after a user gesture, so it is built on the first play. */
+  const play = async () => {
+    const element = audio.current;
+    if (!element) return;
+    if (!graph.current) {
+      graph.current = build(element, lanes.length);
+      connect(graph.current, listen, output, volume);
+    }
+    await graph.current.context.resume();
+    await element.play();
+  };
   useImperativeHandle(ref, () => ({
     playFrom(seconds: number) {
       seek(seconds, true);
-      void audio.current?.play();
+      void play();
     },
   }));
   const at = (event: PointerEvent<HTMLDivElement>) => {
@@ -345,20 +357,12 @@ function Player({
     else if (view && box && event.clientX < box.left) view.scrollLeft -= box.left - event.clientX;
   };
   const release = () => {
-    if (scrub.current?.resume) void audio.current?.play();
+    if (scrub.current?.resume) void play();
     scrub.current = null;
   };
-  const toggle = async () => {
-    const element = audio.current;
-    if (!element) return;
-    // Browsers only allow an audio graph after a user gesture, so it is built on first play.
-    if (!graph.current) {
-      graph.current = build(element, lanes.length);
-      connect(graph.current, listen, output, volume);
-    }
-    await graph.current.context.resume();
-    if (element.paused) await element.play();
-    else element.pause();
+  const toggle = () => {
+    if (audio.current?.paused) void play();
+    else audio.current?.pause();
   };
   const key = (event: KeyboardEvent<HTMLDivElement>) => {
     const actions: Record<string, () => void> = {
@@ -366,7 +370,7 @@ function Player({
       ArrowLeft: () => seek(time - STEP_S, true),
       Home: () => seek(0, true),
       End: () => seek(duration, true),
-      " ": () => void toggle(),
+      " ": toggle,
       "+": () => zoomTo(zoom * 2),
       "=": () => zoomTo(zoom * 2),
       "-": () => zoomTo(zoom / 2),
@@ -498,11 +502,7 @@ function Player({
         </div>
       </div>
       <div className="flex items-center gap-1">
-        <Button
-          size="icon-sm"
-          aria-label={playing ? "Pause" : "Play"}
-          onClick={() => void toggle()}
-        >
+        <Button size="icon-sm" aria-label={playing ? "Pause" : "Play"} onClick={toggle}>
           {playing ? <Pause /> : <Play />}
         </Button>
         <span className="ml-2 text-sm tabular-nums">
