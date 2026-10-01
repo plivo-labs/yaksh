@@ -156,11 +156,14 @@ export function RecordingPlayer({
   name,
   start = 0,
   ref,
+  onTime,
 }: {
   url: string | null;
   name: string;
   start?: number;
   ref?: Ref<PlayerHandle>;
+  /** Hears where playback is, a few times a second and on each seek. */
+  onTime?: (seconds: number) => void;
 }) {
   const recording = useRecording(url);
   if (url === null) {
@@ -170,7 +173,16 @@ export function RecordingPlayer({
     return <p className="text-sm text-destructive">The recording did not load.</p>;
   }
   if (recording.isPending) return <Skeleton className="h-40 w-full" />;
-  return <Player key={url} recording={recording.data} name={name} start={start} ref={ref} />;
+  return (
+    <Player
+      key={url}
+      recording={recording.data}
+      name={name}
+      start={start}
+      ref={ref}
+      onTime={onTime}
+    />
+  );
 }
 
 function Player({
@@ -178,11 +190,13 @@ function Player({
   name,
   start,
   ref,
+  onTime,
 }: {
   recording: Recording;
   name: string;
   start: number;
   ref?: Ref<PlayerHandle>;
+  onTime?: (seconds: number) => void;
 }) {
   const { src, duration, lanes } = recording;
   const stereo = lanes.length > 1;
@@ -414,6 +428,7 @@ function Player({
           follow();
         }}
         onEnded={() => setPlaying(false)}
+        onTimeUpdate={(event) => onTime?.(event.currentTarget.currentTime)}
       />
       <div className="grid grid-cols-[3rem_minmax(0,1fr)] gap-x-2">
         <div className="grid content-start gap-2 pt-5 text-xs text-muted-foreground">

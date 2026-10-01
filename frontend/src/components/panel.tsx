@@ -1,7 +1,9 @@
 import { Collapsible } from "@base-ui/react/collapsible";
 import { cn } from "cn";
 import { ChevronRight } from "lucide-react";
-import { type ComponentProps, type ReactNode, useState } from "react";
+import type { ComponentProps, ReactNode } from "react";
+
+import { useStoredBoolean } from "@/hooks/use-stored-boolean";
 
 /** A framed section of a page. */
 export function Panel({ className, ...props }: ComponentProps<"section">) {
@@ -15,27 +17,6 @@ export function PanelHeader({ title, action }: { title: ReactNode; action?: Reac
       {action}
     </header>
   );
-}
-
-/** Whether the panel `name` is folded; the choice carries over in this browser. */
-function useFolded(name: string): [boolean, (folded: boolean) => void] {
-  const key = `truman.folded.${name}`;
-  const [folded, setFolded] = useState(() => {
-    try {
-      return localStorage.getItem(key) === "true";
-    } catch {
-      return false;
-    }
-  });
-  const save = (next: boolean) => {
-    setFolded(next);
-    try {
-      localStorage.setItem(key, String(next));
-    } catch {
-      // storage unavailable: the choice lasts for this page only
-    }
-  };
-  return [folded, save];
 }
 
 /** A panel whose body folds away under its header, so a long list does not push the panels
@@ -57,7 +38,7 @@ export function FoldingPanel({
   action?: ReactNode;
   notice?: ReactNode;
 }) {
-  const [folded, setFolded] = useFolded(name);
+  const [folded, setFolded] = useStoredBoolean(`truman.folded.${name}`, false);
   return (
     <Collapsible.Root
       open={!folded}

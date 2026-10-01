@@ -21,7 +21,14 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Bubble, BubbleContent } from "@/components/ui/bubble";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Message, MessageContent, MessageHeader } from "@/components/ui/message";
 import {
   MessageScroller,
@@ -30,12 +37,15 @@ import {
   MessageScrollerItem,
   MessageScrollerProvider,
   MessageScrollerViewport,
+  useMessageScroller,
 } from "@/components/ui/message-scroller";
+import { Switch } from "@/components/ui/switch";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { clock, duration, phone, when, words } from "@/lib/format";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { useStoredBoolean } from "@/hooks/use-stored-boolean";
 import { keys, useAgent, useConversation, useEndConversation } from "@/lib/queries";
 import { subscribe } from "@/lib/sse";
 import {
@@ -56,7 +66,6 @@ export function ConversationPage() {
   const conversation = useConversation(id);
   const agent = useAgent(conversation.data?.agent_id);
   const end = useEndConversation(id);
-  const player = useRef<PlayerHandle>(null);
   useLiveUpdates(id, conversation.data?.status);
 
   if (conversation.isPending) return <Skeleton className="h-96 w-full" />;
@@ -70,8 +79,6 @@ export function ConversationPage() {
   }
   const data = conversation.data;
   const active = ACTIVE_STATUSES.includes(data.status);
-  /** The recording starts when the call connects; turn times count from the dial. */
-  const connectedMs = data.wire_events.find((event) => event.kind === "connected")?.at_ms;
 
   return (
     <div className="flex min-h-full flex-col gap-6 lg:h-full">
@@ -150,32 +157,7 @@ export function ConversationPage() {
       </div>
 
       <div className="grid gap-6 lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(0,1fr)_20rem] lg:grid-rows-[minmax(0,1fr)]">
-        <div className="flex flex-col gap-6 lg:min-h-0">
-          <Card className="shrink-0">
-            <CardHeader>
-              <CardTitle>Recording</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <RecordingPlayer
-                ref={player}
-                url={data.recording_url}
-                name={`truman-${data.id}`}
-                start={Number(params.get("t")) || 0}
-              />
-            </CardContent>
-          </Card>
-          <Transcript
-            turns={data.transcript}
-            active={active}
-            waiting={waitingText(data)}
-            connectedMs={connectedMs ?? 0}
-            onPlay={
-              data.recording_url && connectedMs !== undefined
-                ? (seconds) => player.current?.playFrom(seconds)
-                : undefined
-            }
-          />
-        </div>
+        <CallPane key={data.id} conversation={data} start={Number(params.get("t")) || 0} />
         <ScrollArea className="lg:min-h-0">
           <div className="flex flex-col gap-6 p-px lg:pr-4">
             <ScenarioCard name={data.scenario_name} scenario={data.scenario} />
@@ -201,6 +183,47 @@ export function ConversationPage() {
           </div>
         </ScrollArea>
       </div>
+    </div>
+  );
+}
+
+/** The recording and the transcript. Keyed by the conversation, so the turn that was playing
+ * does not carry over to the next conversation. */
+function CallPane({ conversation, start }: { conversation: Conversation; start: number }) {
+  const player = useRef<PlayerHandle>(null);
+  const [heard, setHeard] = useState<number | null>(null);
+  /** The recording starts when the call connects; turn times count from the dial. */
+  const connectedMs = conversation.wire_events.find((event) => event.kind === "connected")?.at_ms;
+  return (
+    <div className="flex flex-col gap-6 lg:min-h-0">
+      <Card className="shrink-0">
+        <CardHeader>
+          <CardTitle>Recording</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <RecordingPlayer
+            ref={player}
+            url={conversation.recording_url}
+            name={`truman-${conversation.id}`}
+            start={start}
+            onTime={(seconds) =>
+              setHeard(turnAt(conversation.transcript, connectedMs ?? 0, seconds))
+            }
+          />
+        </CardContent>
+      </Card>
+      <Transcript
+        turns={conversation.transcript}
+        active={ACTIVE_STATUSES.includes(conversation.status)}
+        waiting={waitingText(conversation)}
+        connectedMs={connectedMs ?? 0}
+        heard={heard}
+        onPlay={
+          conversation.recording_url && connectedMs !== undefined
+            ? (seconds) => player.current?.playFrom(seconds)
+            : undefined
+        }
+      />
     </div>
   );
 }
@@ -391,11 +414,38 @@ function pause(ms: number, signal: AbortSignal): Promise<void> {
   });
 }
 
+/** The turn the recording plays at that second: the last one to start by then. */
+function turnAt(turns: Turn[], connectedMs: number, seconds: number): number | null {
+  const now = connectedMs + seconds * 1000;
+  let found: number | null = null;
+  turns.forEach((turn, index) => {
+    if (
+      turn.started_at_ms <= now &&
+      (found === null || turn.started_at_ms >= turns[found].started_at_ms)
+    ) {
+      found = index;
+    }
+  });
+  return found;
+}
+
+/** Keeps the turn the recording plays in view. */
+function FollowAudio({ index }: { index: number | null }) {
+  const { scrollToMessage } = useMessageScroller();
+  useEffect(() => {
+    if (index === null) return;
+    const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    scrollToMessage(String(index), { align: "center", behavior: still ? "auto" : "smooth" });
+  }, [index, scrollToMessage]);
+  return null;
+}
+
 function Transcript({
   turns,
   active,
   waiting,
   connectedMs,
+  heard,
   onPlay,
 }: {
   turns: Turn[];
@@ -403,13 +453,24 @@ function Transcript({
   waiting: string;
   /** Turn times count from the dial; they show from the connect, as the recording does. */
   connectedMs: number;
+  /** The turn the recording is playing, by index. */
+  heard: number | null;
   /** Plays the recording from that second; absent while there is no recording. */
   onPlay?: (seconds: number) => void;
 }) {
+  const [follow, setFollow] = useStoredBoolean("truman.transcript.follow", true);
   return (
     <Card className="lg:min-h-0">
       <CardHeader className="shrink-0">
         <CardTitle>Transcript</CardTitle>
+        {onPlay && (
+          <CardAction>
+            <label className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Switch checked={follow} onCheckedChange={setFollow} />
+              Follow audio
+            </label>
+          </CardAction>
+        )}
       </CardHeader>
       <CardContent className="lg:min-h-0 lg:flex-1">
         {turns.length === 0 ? (
@@ -419,6 +480,7 @@ function Transcript({
         ) : (
           <MessageScrollerProvider autoScroll>
             <MessageScroller>
+              {onPlay && <FollowAudio index={follow ? heard : null} />}
               <MessageScrollerViewport className="lg:pr-4">
                 <MessageScrollerContent className="gap-4">
                   {turns.map((turn, index) => {
@@ -455,6 +517,7 @@ function Transcript({
                                 }
                                 className={cn(
                                   onPlay && "cursor-pointer",
+                                  index === heard && "ring-2 ring-ring/60",
                                   turn.provenance === "cut" && "line-through opacity-60",
                                   turn.provenance === "unconfirmed" && "opacity-60",
                                 )}
