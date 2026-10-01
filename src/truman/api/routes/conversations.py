@@ -37,9 +37,13 @@ def recording_url(conversation: Conversation) -> str | None:
 
 
 async def summaries(session: AsyncSession, rows: list[Conversation]) -> list[ConversationSummary]:
-    agents = await conversations.pinned_agents(session, rows)
-    personas = await conversations.pinned_personas(session, rows)
-    scenarios = await conversations.pinned_scenarios(session, rows)
+    agents = await conversations.pinned_agents(session, (row.agent_version_id for row in rows))
+    personas = await conversations.pinned_personas(
+        session, (row.persona_version_id for row in rows)
+    )
+    scenarios = await conversations.pinned_scenarios(
+        session, (row.scenario_version_id for row in rows)
+    )
     items = []
     for row in rows:
         data = {

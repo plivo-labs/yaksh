@@ -35,10 +35,9 @@ from truman.domain.generation import (
 )
 from truman.domain.language_models import JsonModel
 from truman.domain.scenarios import ScenarioCreate
-from truman.domain.triggers import agent_data_names
+from truman.domain.triggers import agent_data_names, check_agent_data
 from truman.simulation import scenarios
 from truman.simulation.agents import get_agent
-from truman.simulation.conversations import check_agent_data
 from truman.simulation.generation_prompts import (
     CAPABILITIES_SCHEMA,
     CAPABILITIES_SYSTEM,
@@ -54,7 +53,7 @@ from truman.simulation.generation_prompts import (
     instructions_section,
     slot_section,
 )
-from truman.simulation.personas import get_persona
+from truman.simulation.personas import live_personas
 
 WRITERS = 4
 """Writer calls at once."""
@@ -131,8 +130,7 @@ async def prepare(
     if model is None:
         raise UnavailableError(MODEL_OFF)
     agent = await get_agent(session, agent_id)
-    for persona_id in command.persona_ids:
-        await get_persona(session, persona_id)
+    await live_personas(session, command.persona_ids)
     version = await session.scalar(
         select(AgentVersion).where(
             AgentVersion.agent_id == agent.id, AgentVersion.version == agent.current_version
@@ -350,11 +348,9 @@ class Writer:
         self._gate = asyncio.Semaphore(WRITERS)
         self.dropped = 0
         agent = prepared.agent
-        self._agent_data = (
-            sorted(agent_data_names(agent.outbound.trigger))
-            if agent.direction is Direction.OUTBOUND and agent.outbound
-            else []
-        )
+        outbound = agent.outbound if agent.direction is Direction.OUTBOUND else None
+        self._trigger = outbound.trigger if outbound else None
+        self._agent_data = sorted(agent_data_names(self._trigger)) if self._trigger else []
 
     async def write_all(self, plan: Plan) -> AsyncGenerator[Saved | Dropped]:
         personas = cycle(self._prepared.command.persona_ids)
@@ -405,7 +401,6 @@ class Writer:
 
     def checked(self, answer: dict[str, Any], slot: Slot, persona_id: uuid.UUID) -> ScenarioCreate:
         """The written scenario as the API would take it, or why it cannot be saved."""
-        agent = self._prepared.agent
         try:
             command = ScenarioCreate.model_validate(
                 {
@@ -419,8 +414,8 @@ class Writer:
         except pydantic.ValidationError as error:
             message = error.errors()[0]["msg"]
             raise ValidationError(f"the written scenario is not valid: {message}") from error
-        if self._agent_data:
-            check_agent_data(agent, command.to_config())
+        if self._trigger is not None:
+            check_agent_data(self._trigger, command.to_config())
         return command
 
     async def save(self, command: ScenarioCreate) -> Scenario:

@@ -8,8 +8,12 @@ from sqlalchemy import ColumnElement, and_, delete, func, or_, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from truman.config import Settings
 from truman.db.models import Conversation, PhoneNumber
 from truman.domain.numbers import AccountNumber
+from truman.simulation.workers import receiving_problem
+
+PHONE_SETTINGS = "set PLIVO_AUTH_ID, PLIVO_AUTH_TOKEN and TRUMAN_PUBLIC_URL"
 
 
 class UnknownNumbersError(Exception):
@@ -146,3 +150,23 @@ async def release_numbers(
             available_after=func.statement_timestamp() + timedelta(seconds=number_rest_s),
         )
     )
+
+
+async def outbound_problem(session: AsyncSession, settings: Settings) -> str | None:
+    """Why an outbound test could not get its call now, or None when it could."""
+    if not settings.phone_enabled:
+        return PHONE_SETTINGS
+    app_id = settings.plivo_app_id
+    if app_id is None:
+        return "set TRUMAN_PLIVO_APP_ID"
+    problem = await receiving_problem(session, app_id, settings.worker_lease_s)
+    if problem is not None:
+        return problem
+    linked = await session.scalar(
+        select(PhoneNumber.number)
+        .where(PhoneNumber.enabled.is_(True), PhoneNumber.application_id == app_id)
+        .limit(1)
+    )
+    if linked is None:
+        return f"no enabled number is linked to Plivo application {app_id}"
+    return None

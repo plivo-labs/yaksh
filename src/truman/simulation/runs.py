@@ -2,18 +2,21 @@ import statistics
 import uuid
 from collections import defaultdict
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass, fields
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import Row, func, select, update
+from sqlalchemy import ColumnElement, Row, and_, func, select, update
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import aliased
 
 from truman.config import Settings
-from truman.db.models import Conversation, Run
+from truman.db.models import Agent, Conversation, Persona, Run, Scenario
 from truman.domain.conversations import (
     ACTIVE_STATUSES,
+    LIVE_STATUSES,
     ConversationStatus,
     EndReason,
     OutcomeGroup,
@@ -28,9 +31,26 @@ from truman.domain.runs import (
     waiting_reason,
 )
 from truman.simulation.agents import get_agent
-from truman.simulation.conversations import retried, run_full, run_waiting, snapshot
+from truman.simulation.starts import Inputs, snapshot
 
 REQUEST_KEY_INDEX = "uq_runs_request_key"
+INPUTS = (
+    *(getattr(Conversation, field.name) for field in fields(Inputs)),
+    Conversation.max_duration_s,
+    Conversation.run_id,
+    Conversation.repeat,
+)
+"""The columns a retry copies from the attempt it replaces."""
+ENDED = (
+    Conversation.id,
+    Conversation.status,
+    Conversation.end_reason,
+    Conversation.attempt,
+    Conversation.agent_id,
+    Conversation.scenario_id,
+    Conversation.persona_id,
+)
+"""What the retry step reads from a conversation that just ended."""
 
 
 @dataclass(frozen=True)
@@ -94,10 +114,10 @@ async def create_run(
     if earlier is not None:
         await session.commit()
         return earlier
-    taken = await snapshot(session, settings, agent, command.scenario_ids)
+    inputs = await snapshot(session, settings, agent, command.scenario_ids)
     run = Run(
         agent_id=agent.id,
-        agent_version_id=taken.agent_version_id,
+        agent_version_id=inputs[0].agent_version_id,
         name=command.name,
         repeats=command.repeats,
         max_duration_s=command.max_duration_s or settings.default_max_duration_s,
@@ -117,10 +137,13 @@ async def create_run(
         earlier = await earlier_run(session, request_key, request_hash)
         assert earlier is not None
         return earlier
-    session.add_all(
-        taken.conversation(pins, run.max_duration_s, run_id=run.id, repeat=repeat)
-        for repeat in range(1, command.repeats + 1)
-        for pins in taken.pins
+    await session.execute(
+        insert(Conversation),
+        [
+            {**asdict(item), "max_duration_s": run.max_duration_s, "run_id": run.id, "repeat": n}
+            for n in range(1, command.repeats + 1)
+            for item in inputs
+        ],
     )
     await session.commit()
     return run
@@ -142,9 +165,7 @@ async def cancel_run(session: AsyncSession, run_id: uuid.UUID) -> Run:
     """Cancel the run's queued conversations and ask the workers to end its live calls, in one
     transaction under the run's lock, which claims and retries take first too, so neither can
     slip in between. A run with no active conversation stays as it is."""
-    run = await session.get(Run, run_id, with_for_update=True)
-    if run is None:
-        raise NotFoundError("run not found")
+    run = await get_run(session, run_id, lock=True)
     of_run = Conversation.run_id == run.id
     active = await session.scalar(
         select(Conversation.id).where(of_run, Conversation.status.in_(ACTIVE_STATUSES)).limit(1)
@@ -173,11 +194,95 @@ async def cancel_run(session: AsyncSession, run_id: uuid.UUID) -> Run:
     return run
 
 
-async def get_run(session: AsyncSession, run_id: uuid.UUID) -> Run:
-    run = await session.get(Run, run_id)
+async def get_run(session: AsyncSession, run_id: uuid.UUID, *, lock: bool = False) -> Run:
+    run = await session.get(Run, run_id, with_for_update=lock, populate_existing=lock)
     if run is None:
         raise NotFoundError("run not found")
     return run
+
+
+async def locked_run(session: AsyncSession, conversation_id: uuid.UUID) -> Run | None:
+    """The conversation's run, locked, or None for a single test call."""
+    return await session.scalar(
+        select(Run)
+        .join(Conversation, Conversation.run_id == Run.id)
+        .where(Conversation.id == conversation_id)
+        .with_for_update(of=Run)
+        .execution_options(populate_existing=True)
+    )
+
+
+def retried() -> ColumnElement[bool]:
+    """A later attempt replaced the conversation."""
+    retry = aliased(Conversation)
+    return select(retry.id).where(retry.retry_of == Conversation.id).exists()
+
+
+def run_full() -> ColumnElement[bool]:
+    """The run has as many calls on the line as its max parallel."""
+    live = aliased(Conversation)
+    on_line = (
+        select(func.count())
+        .where(live.run_id == Run.id, live.status.in_(LIVE_STATUSES))
+        .scalar_subquery()
+    )
+    return and_(Run.max_parallel.is_not(None), on_line >= Run.max_parallel)
+
+
+def run_waiting() -> ColumnElement[bool]:
+    """A call of the run started less than its delay between calls ago."""
+    recent = aliased(Conversation)
+    delay = func.make_interval(0, 0, 0, 0, 0, 0, Run.start_interval_s)
+    return and_(
+        Run.start_interval_s.is_not(None),
+        select(recent.id)
+        .where(recent.run_id == Run.id, recent.started_at > func.statement_timestamp() - delay)
+        .exists(),
+    )
+
+
+async def retry(session: AsyncSession, run: Run, ended: Sequence[Row[Any]]) -> None:
+    """Queue the next attempt of each just-ended conversation of the run that is in the error
+    group, up to the run's retries, and none once the run is cancelled. The caller holds the
+    run's lock. An attempt that is already there is left alone, so this step never fails the
+    transaction that ended the conversations."""
+    due = [
+        row
+        for row in ended
+        if run.cancelled_at is None
+        and row.attempt <= run.retries
+        and outcome_group(row.status, row.end_reason) is OutcomeGroup.ERROR
+    ]
+    if not due:
+        return
+    await key_share_references(session, due)
+    copies = (
+        select(*INPUTS, (Conversation.attempt + 1).label("attempt"), Conversation.id)
+        .where(Conversation.id.in_([row.id for row in due]))
+        .order_by(Conversation.id)
+    )
+    await session.execute(
+        insert(Conversation)
+        .from_select([*(column.key for column in INPUTS), "attempt", "retry_of"], copies)
+        .on_conflict_do_nothing(index_elements=["run_id", "repeat", "scenario_id", "attempt"])
+    )
+
+
+async def key_share_references(session: AsyncSession, rows: Sequence[Row[Any]]) -> None:
+    """Key-share the agents, scenarios and personas that retries reference, in that order and
+    each set in id order, before the insert's foreign key checks take the same locks in an
+    order of their own."""
+    for model, ids in (
+        (Agent, {row.agent_id for row in rows}),
+        (Scenario, {row.scenario_id for row in rows}),
+        (Persona, {row.persona_id for row in rows}),
+    ):
+        await session.execute(
+            select(model.id)
+            .where(model.id.in_(ids))
+            .order_by(model.id)
+            .with_for_update(read=True, key_share=True)
+        )
 
 
 async def list_runs(

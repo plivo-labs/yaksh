@@ -17,7 +17,7 @@ router = APIRouter(prefix="/runs", tags=["runs"], dependencies=[Depends(require_
 
 
 async def summaries(session: AsyncSession, rows: list[Run]) -> list[RunSummary]:
-    agents = await conversations.pinned_agents(session, rows)
+    agents = await conversations.pinned_agents(session, (row.agent_version_id for row in rows))
     progress = await runs.progress(session, rows)
     items = []
     for row in rows:

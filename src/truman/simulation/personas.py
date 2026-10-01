@@ -1,4 +1,5 @@
 import uuid
+from collections.abc import Sequence
 from datetime import UTC, datetime
 from importlib.resources import files
 from typing import Any
@@ -84,6 +85,22 @@ async def get_persona(
     if persona.deleted_at is not None:
         raise NotFoundError("persona not found")
     return persona
+
+
+async def live_personas(
+    session: AsyncSession, persona_ids: Sequence[uuid.UUID], *, share_lock: bool = False
+) -> dict[uuid.UUID, Persona]:
+    """The live personas with these ids, all of them, or NotFoundError naming a missing one.
+    With share_lock they are share-locked in id order: edits and deletes wait, references do
+    not."""
+    query = select(Persona).where(Persona.id.in_(persona_ids)).order_by(Persona.id)
+    if share_lock:
+        query = query.with_for_update(read=True)
+    found = {row.id: row for row in await session.scalars(query) if row.deleted_at is None}
+    for persona_id in persona_ids:
+        if persona_id not in found:
+            raise NotFoundError(f"persona {persona_id} not found")
+    return found
 
 
 async def create_persona(session: AsyncSession, command: PersonaCreate) -> Persona:

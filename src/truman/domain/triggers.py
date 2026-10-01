@@ -13,8 +13,9 @@ from typing import Annotated, Any
 
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl, StringConstraints, field_validator
 
+from truman.domain.errors import ValidationError
 from truman.domain.numbers import E164
-from truman.domain.scenarios import Fact, normalized
+from truman.domain.scenarios import Fact, ScenarioConfig, normalized
 
 SEND_TIMEOUT_S = 15
 """How long Truman waits for the trigger's response; the call may arrive before it ends."""
@@ -207,3 +208,13 @@ def agent_data_names(trigger: Trigger) -> set[str]:
         for name in placeholders(text)
         if name.startswith("agent_data.")
     }
+
+
+def check_agent_data(trigger: Trigger, scenario: ScenarioConfig, name: str | None = None) -> None:
+    """Refuse a scenario that lacks agent data the trigger needs; the refusal names the
+    scenario when its name is given."""
+    have = {normalized(fact.name) for fact in scenario.agent_data}
+    missing = sorted(agent_data_names(trigger) - have)
+    if missing:
+        subject = "the scenario" if name is None else f'the scenario "{name}"'
+        raise ValidationError(f"{subject} has no agent data named {', '.join(missing)}")
