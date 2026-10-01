@@ -12,6 +12,7 @@ from truman.api.errors import register_error_handlers
 from truman.api.routes import (
     agents,
     conversations,
+    defaults,
     documents,
     health,
     personas,
@@ -108,6 +109,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     api.include_router(health.router)
     api.include_router(agents.router)
     api.include_router(conversations.router)
+    api.include_router(defaults.router)
     api.include_router(documents.router)
     api.include_router(personas.router)
     api.include_router(phone_numbers.router)

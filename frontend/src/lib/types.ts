@@ -454,6 +454,13 @@ export const MAX_GENERATED = 20;
 /** Scenarios one bulk change takes. */
 export const MAX_BULK = 500;
 
+/** What the server uses for a field that a request leaves out. */
+export interface Defaults {
+  max_duration_s: number;
+  /** Of a run. */
+  max_retries: number;
+}
+
 export interface GenerateInput {
   mode: GenerationMode;
   count: number;

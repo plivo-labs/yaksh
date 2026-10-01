@@ -25,7 +25,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
-import { useScenarios, useStartConversation } from "@/lib/queries";
+import { useDefaults, useScenarios, useStartConversation } from "@/lib/queries";
 import type { AgentSummary } from "@/lib/types";
 import { ScenarioDialog } from "@/pages/scenario-dialog";
 
@@ -47,7 +47,10 @@ export function StartCallDialog({
   const [personaId, setPersonaId] = useState("");
   const [scenarioId, setScenarioId] = useState(presetScenario);
   const [creating, setCreating] = useState(false);
-  const [maxDuration, setMaxDuration] = useState("");
+  /** Null until the user types: the field then shows the server's default. */
+  const [maxDuration, setMaxDuration] = useState<string | null>(null);
+  const defaults = useDefaults();
+  const durationText = maxDuration ?? String(defaults.data?.max_duration_s ?? "");
   const start = useStartConversation();
   const navigate = useNavigate();
   const chosenAgent = agents.find((agent) => agent.id === agentId) ?? agents[0];
@@ -67,7 +70,7 @@ export function StartCallDialog({
     label: scenario.name,
   }));
   const agentItems = agents.map((agent) => ({ value: agent.id, label: agent.name }));
-  const duration = maxDuration.trim() === "" ? null : Number(maxDuration);
+  const duration = durationText.trim() === "" ? null : Number(durationText);
   const durationOk =
     duration === null || (Number.isInteger(duration) && duration >= 10 && duration <= 1800);
 
@@ -185,7 +188,7 @@ export function StartCallDialog({
                   placeholder="Default"
                   aria-invalid={!durationOk}
                   aria-describedby="max_duration_hint"
-                  value={maxDuration}
+                  value={durationText}
                   onChange={(event) => setMaxDuration(event.target.value)}
                   className="w-24 tabular-nums"
                 />

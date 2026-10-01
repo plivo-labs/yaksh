@@ -58,9 +58,7 @@ def with_defaults(settings: Settings, command: RunCreate) -> RunCreate:
         update={
             "max_duration_s": command.max_duration_s or settings.default_max_duration_s,
             "max_retries": (
-                min(1, settings.max_run_retries)
-                if command.max_retries is None
-                else command.max_retries
+                settings.default_max_retries if command.max_retries is None else command.max_retries
             ),
         }
     )

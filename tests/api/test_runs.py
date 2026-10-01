@@ -393,17 +393,22 @@ async def test_runs_are_listed_newest_first_and_by_agent(client: AsyncClient) ->
     assert (await client.get(f"/api/v1/runs/{uuid.uuid4()}")).status_code == 404
 
 
-async def test_an_omitted_retry_count_follows_the_operators_limit(
+async def test_omitted_fields_take_the_operators_defaults_as_the_api_reports_them(
     client: AsyncClient, settings: Settings
 ) -> None:
     agent = await create_agent_id(client)
     scenario = (await create_scenario(client, agent))["id"]
+    standard = (await client.get("/api/v1/defaults")).json()
 
-    async with client_with(settings, max_run_retries=0) as strict:
+    async with client_with(settings, default_max_duration_s=120, max_run_retries=0) as strict:
+        reported = (await strict.get("/api/v1/defaults")).json()
         started = await start_run(strict, agent, [scenario])
         refused = await start_run(strict, agent, [scenario], max_retries=1)
 
-    assert started.status_code == 202 and started.json()["max_retries"] == 0
+    assert standard == {"max_duration_s": 300, "max_retries": 1}
+    assert reported == {"max_duration_s": 120, "max_retries": 0}
+    assert started.status_code == 202
+    assert (started.json()["max_duration_s"], started.json()["max_retries"]) == (120, 0)
     assert refused.status_code == 422 and refused.json()["error"]["message"] == (
         "max_retries: at most 0"
     )

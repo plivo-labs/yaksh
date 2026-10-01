@@ -72,6 +72,11 @@ class Settings(BaseSettings):
     """The zone of the date the caller is told is today."""
 
     @property
+    def default_max_retries(self) -> int:
+        """The retries of a run that does not set them: 1, or the operator's limit when lower."""
+        return min(1, self.max_run_retries)
+
+    @property
     def phone_enabled(self) -> bool:
         return (
             self.plivo_auth_id is not None

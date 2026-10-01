@@ -15,7 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { counted } from "@/lib/format";
 import { usePersonaNames } from "@/hooks/use-persona-names";
-import { usePhoneNumbers, useRunScenarios, useStartRun } from "@/lib/queries";
+import { useDefaults, usePhoneNumbers, useRunScenarios, useStartRun } from "@/lib/queries";
 import type { AgentSummary, RunSummary } from "@/lib/types";
 
 const APPEAR = "transition-opacity duration-150 ease-out starting:opacity-0";
@@ -55,22 +55,26 @@ export function RunDialog({
   const [requestKey] = useState(newRequestKey);
   const [name, setName] = useState(earlier?.name ?? "");
   const [repeats, setRepeats] = useState(text(earlier?.repeats ?? 1));
-  const [maxDuration, setMaxDuration] = useState(text(earlier?.max_duration_s));
+  /** Null until the user types: the field then shows the server's default. */
+  const [maxDuration, setMaxDuration] = useState(earlier ? text(earlier.max_duration_s) : null);
   const [maxParallel, setMaxParallel] = useState(text(earlier?.max_parallel));
   const [delay, setDelay] = useState(text(earlier?.start_interval_s));
-  const [retries, setRetries] = useState(text(earlier?.max_retries));
+  const [retries, setRetries] = useState(earlier ? text(earlier.max_retries) : null);
   const [submitted, setSubmitted] = useState(false);
   const { scenarios, leftOut, ready, error: loadError } = useRunScenarios(agent.id, scenarioIds);
   const { personas, name: personaName } = usePersonaNames();
+  const defaults = useDefaults();
+  const durationText = maxDuration ?? text(defaults.data?.max_duration_s);
+  const retriesText = retries ?? text(defaults.data?.max_retries);
   const numbers = usePhoneNumbers();
   const start = useStartRun(requestKey);
   const navigate = useNavigate();
 
   const repeatCount = whole(repeats);
-  const duration = whole(maxDuration);
+  const duration = whole(durationText);
   const parallel = whole(maxParallel);
   const interval = whole(delay);
-  const retryCount = whole(retries);
+  const retryCount = whole(retriesText);
   const repeatsOk = repeatCount !== null && repeatCount >= 1;
   const durationOk = duration === null || (duration >= 10 && duration <= 1800);
   const parallelOk = parallel === null || parallel >= 1;
@@ -211,7 +215,7 @@ export function RunDialog({
                   placeholder="Default"
                   aria-invalid={submitted && !durationOk}
                   className="tabular-nums"
-                  value={maxDuration}
+                  value={durationText}
                   onChange={(event) => setMaxDuration(event.target.value)}
                 />
                 {submitted && !durationOk && (
@@ -270,7 +274,7 @@ export function RunDialog({
                 placeholder="Default"
                 aria-invalid={submitted && !retriesOk}
                 className="w-24 tabular-nums"
-                value={retries}
+                value={retriesText}
                 onChange={(event) => setRetries(event.target.value)}
               />
               <FieldDescription>

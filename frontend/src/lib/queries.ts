@@ -19,6 +19,7 @@ import {
   type KnowledgeBaseEntry,
   type Conversation,
   type ConversationInput,
+  type Defaults,
   type ConversationSummary,
   type Generation,
   type Language,
@@ -89,6 +90,15 @@ export function useAgentPage(search: string, sort: string, page: number) {
     queryKey: [...keys.agents, "page", { search, sort, page }],
     queryFn: ({ signal }) => api<Page<AgentSummary>>(`/agents?${params}`, { signal }),
     placeholderData: keepPreviousData,
+  });
+}
+
+/** The server's values for fields a request leaves out; they change only when it restarts. */
+export function useDefaults() {
+  return useQuery({
+    queryKey: ["defaults"],
+    queryFn: () => api<Defaults>("/defaults"),
+    staleTime: 5 * 60_000,
   });
 }
 
