@@ -19,7 +19,7 @@ The worker phones agents with a [Pipecat](https://github.com/pipecat-ai/pipecat)
 | --- | --- |
 | `DEEPGRAM_API_KEY` | Speech to text. `DEEPGRAM_BASE_URL` points at another Deepgram host, such as a self-hosted one; default `https://api.deepgram.com`. |
 | `ELEVENLABS_API_KEY` | Text to speech. The API needs it too, to look up a voice when you add it and to play previews. Each persona picks its own voice from the voices list. |
-| `OPENAI_API_KEY` | The persona model. `OPENAI_BASE_URL` points at any OpenAI-compatible API, such as an Azure OpenAI resource at `https://<resource>.openai.azure.com/openai/v1/`; default `https://api.openai.com/v1`. `TRUMAN_PERSONA_MODEL` names the model (for Azure, the deployment), default `gpt-4.1`. |
+| `OPENAI_API_KEY` | The persona model. `OPENAI_BASE_URL` points at any OpenAI-compatible API, such as an Azure OpenAI resource at `https://<resource>.openai.azure.com/openai/v1/`; default `https://api.openai.com/v1`. `PERSONA_LLM_MODEL` names the model (for Azure, the deployment), default `gpt-4.1`; `GENERATION_LLM_MODEL` names the model that writes scenarios, default the persona model. |
 | `TRUMAN_TIMEZONE` | The IANA timezone that sets the caller's "today" when a conversation or its run is created, default `UTC`. A retry keeps the "today" of the attempt it replaces. |
 
 ## Phone
