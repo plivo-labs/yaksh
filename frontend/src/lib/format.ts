@@ -1,4 +1,4 @@
-import type { AgentSummary } from "@/lib/types";
+import type { AgentSummary, OutcomeGroup } from "@/lib/types";
 
 export function clock(ms: number): string {
   const seconds = ms / 1000;
@@ -76,7 +76,17 @@ export function textSize(characters: number): string {
   return `${characters.toLocaleString()} characters, about ${tokens.toLocaleString()} tokens`;
 }
 
+/** A count with its noun, such as "1 scenario" or "3 scenarios". */
+export function counted(count: number, one: string, many: string): string {
+  return `${count} ${count === 1 ? one : many}`;
+}
+
 /** A run's name, or its creation time when it has none. */
 export function runTitle(run: { name: string | null; created_at: string }): string {
   return run.name ?? `Run of ${when(run.created_at)}`;
+}
+
+/** How many conversations a run counts: the latest attempt of each repeat of each scenario. */
+export function runTotal(run: { counts: Record<OutcomeGroup, number> }): number {
+  return Object.values(run.counts).reduce((sum, count) => sum + count, 0);
 }

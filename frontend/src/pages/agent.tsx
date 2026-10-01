@@ -4,22 +4,21 @@ import { Link, useParams } from "react-router";
 import { toast } from "sonner";
 
 import { CopyId } from "@/components/copy-id";
+import { ConversationList } from "@/components/conversation-list";
 import { Fact, Panel, PanelHeader } from "@/components/panel";
 import { Settle } from "@/components/settle";
-import { RelativeTime } from "@/components/relative-time";
-import { Dot, StatusBadge, StatusDot } from "@/components/status-dot";
+import { Dot, StatusDot } from "@/components/status-dot";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
-import { duration, phone, reach, since, textSize, when } from "@/lib/format";
+import { phone, reach, since, textSize, when } from "@/lib/format";
 import { useAgent, useAgents, useConversations, useLastCall } from "@/lib/queries";
 import {
   ACTIVE_STATUSES,
   type Agent,
   type ConversationSummary,
-  END_REASON_LABELS,
   LANGUAGE_NAMES,
   type OutboundSettings,
 } from "@/lib/types";
@@ -148,8 +147,7 @@ function LineState({
 }
 
 function Calls({ agent }: { agent: Agent }) {
-  const agentId = agent.id;
-  const calls = useConversations({ agent_id: agentId }, 1);
+  const calls = useConversations({ agent_id: agent.id }, 1, { pageSize: CALLS_SHOWN });
   const total = calls.data?.total ?? 0;
   return (
     <Panel className="overflow-hidden">
@@ -161,7 +159,7 @@ function Calls({ agent }: { agent: Agent }) {
               variant="ghost"
               size="sm"
               nativeButton={false}
-              render={<Link to={`/conversations?agent_id=${agentId}`} />}
+              render={<Link to={`/conversations?agent_id=${agent.id}`} />}
             >
               All {total} calls
               <ChevronRight />
@@ -169,56 +167,12 @@ function Calls({ agent }: { agent: Agent }) {
           )
         }
       />
-      {calls.isPending ? (
-        <div className="grid gap-3 p-5">
-          <Skeleton className="h-10" />
-          <Skeleton className="h-10" />
-        </div>
-      ) : calls.isError ? (
-        <p className="px-5 py-4 text-sm text-destructive">{calls.error.message}</p>
-      ) : calls.data.items.length === 0 ? (
-        <p className="px-5 py-6 text-sm text-muted-foreground">
-          No calls yet. Ring a scenario above to place the first one.
-        </p>
-      ) : (
-        <ul className="divide-y">
-          {calls.data.items.slice(0, CALLS_SHOWN).map((call) => (
-            <li key={call.id}>
-              <Link
-                to={`/conversations/${call.id}`}
-                className="group grid grid-cols-[6.5rem_minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 px-5 py-3 outline-none transition-colors duration-150 hover:bg-foreground/[0.025] focus-visible:bg-foreground/[0.04] focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-inset md:grid-cols-[6.5rem_minmax(0,1.4fr)_minmax(0,1fr)_4.5rem_8rem]"
-              >
-                <span className="text-sm">
-                  <StatusBadge status={call.status} />
-                </span>
-                <span className="grid min-w-0 gap-0.5 text-sm">
-                  <span className="truncate font-medium">{call.scenario_name}</span>
-                  <span className="truncate text-muted-foreground">
-                    {call.persona_name}
-                    {call.agent_version < agent.current_version && ", earlier version"}
-                  </span>
-                </span>
-                <span className="hidden truncate text-sm md:block">
-                  {call.end_reason ? (
-                    END_REASON_LABELS[call.end_reason]
-                  ) : (
-                    <span className="capitalize">{call.status}</span>
-                  )}
-                  {call.failure_reason && (
-                    <span className="block truncate text-destructive">{call.failure_reason}</span>
-                  )}
-                </span>
-                <span className="hidden text-right text-sm md:block">
-                  {duration(call.talk_ms) || <span className="text-muted-foreground">–</span>}
-                </span>
-                <span className="text-right text-sm text-muted-foreground">
-                  <RelativeTime iso={call.started_at ?? call.created_at} />
-                </span>
-              </Link>
-            </li>
-          ))}
-        </ul>
-      )}
+      <ConversationList
+        query={calls}
+        place="panel"
+        agentVersion={agent.current_version}
+        empty="No calls yet. Ring a scenario above to place the first one."
+      />
     </Panel>
   );
 }

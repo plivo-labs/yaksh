@@ -272,18 +272,21 @@ export function useDeleteAgent() {
 
 export const CONVERSATIONS_PAGE = 25;
 
-export function useConversations(filters: Record<string, string>, page: number) {
-  const search = new URLSearchParams({
-    page: String(page),
-    page_size: String(CONVERSATIONS_PAGE),
-    ...filters,
-  }).toString();
+/** One page of conversations. It refreshes every 3 seconds while a shown row is active, or
+ * while `live` says more rows can change, such as during a run; otherwise every 15. */
+export function useConversations(
+  filters: Record<string, string>,
+  page: number,
+  { pageSize = CONVERSATIONS_PAGE, live = false }: { pageSize?: number; live?: boolean } = {},
+) {
+  const params = { ...filters, page: String(page), page_size: String(pageSize) };
+  const search = new URLSearchParams(params).toString();
   return useQuery({
-    queryKey: keys.conversations({ ...filters, page: String(page) }),
+    queryKey: keys.conversations(params),
     queryFn: ({ signal }) => api<Page<ConversationSummary>>(`/conversations?${search}`, { signal }),
     placeholderData: keepPreviousData,
     refetchInterval: (query) =>
-      query.state.data?.items.some((item) => ACTIVE_STATUSES.includes(item.status))
+      live || query.state.data?.items.some((item) => ACTIVE_STATUSES.includes(item.status))
         ? 3_000
         : 15_000,
   });

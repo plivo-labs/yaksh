@@ -6,16 +6,15 @@ import { RelativeTime } from "@/components/relative-time";
 import { RunStatusBadge } from "@/components/status-dot";
 import { Skeleton } from "@/components/ui/skeleton";
 import { usePageParam } from "@/hooks/use-page-param";
-import { runTitle } from "@/lib/format";
+import { counted, runTitle, runTotal } from "@/lib/format";
 import { RUNS_PAGE, useRuns } from "@/lib/queries";
 import { type Agent, OUTCOME_GROUPS, type RunSummary } from "@/lib/types";
 
 function progress(run: RunSummary): string {
-  const total = Object.values(run.counts).reduce((sum, count) => sum + count, 0);
   const parts = OUTCOME_GROUPS.filter((group) => run.counts[group.value] > 0).map(
     (group) => `${group.label.toLowerCase()} ${run.counts[group.value]}`,
   );
-  return `${total} ${total === 1 ? "conversation" : "conversations"}: ${parts.join(", ")}`;
+  return `${counted(runTotal(run), "conversation", "conversations")}: ${parts.join(", ")}`;
 }
 
 export function AgentRuns({ agent }: { agent: Agent }) {

@@ -13,6 +13,7 @@ import {
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
+import { counted } from "@/lib/format";
 import { usePersonas, usePhoneNumbers, useStartRun } from "@/lib/queries";
 import type { AgentSummary, RunSummary, Scenario } from "@/lib/types";
 
@@ -24,10 +25,6 @@ export interface RunChoices {
   earlier?: RunSummary;
   /** Scenarios of the earlier run that no longer exist. */
   leftOut?: number;
-}
-
-function counted(count: number, one: string, many: string): string {
-  return `${count} ${count === 1 ? one : many}`;
 }
 
 /** A whole number from an input, null when it is empty, NaN when it is not a whole number. */

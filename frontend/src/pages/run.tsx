@@ -3,10 +3,10 @@ import { useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router";
 import { toast } from "sonner";
 
+import { ConversationList } from "@/components/conversation-list";
 import { Pager } from "@/components/pager";
 import { Fact, Panel, PanelHeader } from "@/components/panel";
-import { RelativeTime } from "@/components/relative-time";
-import { RunStatusBadge, StatusBadge } from "@/components/status-dot";
+import { RunStatusBadge } from "@/components/status-dot";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   AlertDialog,
@@ -19,12 +19,11 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { usePageParam } from "@/hooks/use-page-param";
 import { Spinner } from "@/components/ui/spinner";
-import { duration, runTitle, when } from "@/lib/format";
+import { duration, runTitle, runTotal, when } from "@/lib/format";
 import {
   CONVERSATIONS_PAGE,
   useAgent,
@@ -35,8 +34,6 @@ import {
 } from "@/lib/queries";
 import {
   ACTIVE_RUN_STATUSES,
-  ACTIVE_STATUSES,
-  type ConversationSummary,
   END_REASON_LABELS,
   type EndReason,
   OUTCOME_GROUPS,
@@ -46,8 +43,6 @@ import {
 } from "@/lib/types";
 import { RunDialog } from "@/pages/run-dialog";
 
-const ROW =
-  "grid grid-cols-[6.5rem_minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 px-5 md:grid-cols-[6.5rem_minmax(0,1.3fr)_4.5rem_minmax(0,1fr)_4.5rem_7rem]";
 const FINISHED: OutcomeGroup[] = ["completed", "did_not_connect", "error", "cancelled"];
 
 export function RunPage() {
@@ -82,7 +77,7 @@ export function RunPage() {
 }
 
 function Overview({ run }: { run: Run }) {
-  const total = Object.values(run.counts).reduce((sum, count) => sum + count, 0);
+  const total = runTotal(run);
   const finished = FINISHED.reduce((sum, group) => sum + run.counts[group], 0);
   const endReasons = Object.entries(run.end_reasons) as [EndReason, number][];
   return (
@@ -258,7 +253,6 @@ function GroupFilter({ run }: { run: Run }) {
 function Conversations({ run }: { run: Run }) {
   const [params] = useSearchParams();
   const group = params.get("group");
-  const page = usePageParam();
   const conversations = useConversations(
     {
       run_id: run.id,
@@ -266,7 +260,8 @@ function Conversations({ run }: { run: Run }) {
       sort: "created_at",
       ...(group ? { group } : {}),
     },
-    page,
+    usePageParam(),
+    { live: ACTIVE_RUN_STATUSES.includes(run.status) },
   );
   const groupLabel = OUTCOME_GROUPS.find((item) => item.value === group)?.label;
 
@@ -279,96 +274,12 @@ function Conversations({ run }: { run: Run }) {
         The latest attempt of each repeat of each scenario. Open a retry to see the attempt before
         it.
       </p>
-      {conversations.isError ? (
-        <p className="px-5 py-4 text-sm text-destructive">{conversations.error.message}</p>
-      ) : (
-        <>
-          <div className={`${ROW} hidden border-b py-2.5 text-xs text-muted-foreground md:grid`}>
-            <span>Status</span>
-            <span>Scenario</span>
-            <span>Repeat</span>
-            <span>End</span>
-            <span className="text-right">Talk time</span>
-            <span className="text-right">Started</span>
-          </div>
-          <ul className="divide-y">
-            {conversations.data === undefined ? (
-              [0, 1, 2].map((index) => (
-                <li key={index} className={`${ROW} py-3`}>
-                  <Skeleton className="col-span-full h-9" />
-                </li>
-              ))
-            ) : conversations.data.items.length === 0 ? (
-              <li className="px-5 py-6 text-sm text-muted-foreground">
-                No conversations in this group.
-              </li>
-            ) : (
-              conversations.data.items.map((conversation) => (
-                <Row key={conversation.id} conversation={conversation} />
-              ))
-            )}
-          </ul>
-          <Pager
-            className="border-t px-5 py-3"
-            query={conversations}
-            pageSize={CONVERSATIONS_PAGE}
-          />
-        </>
-      )}
+      <ConversationList
+        query={conversations}
+        place="panel"
+        empty="No conversations in this group."
+      />
+      <Pager className="border-t px-5 py-3" query={conversations} pageSize={CONVERSATIONS_PAGE} />
     </Panel>
-  );
-}
-
-function Row({ conversation }: { conversation: ConversationSummary }) {
-  const claim = conversation.caller_claim;
-  return (
-    <li>
-      <Link
-        to={`/conversations/${conversation.id}`}
-        className={`${ROW} py-3 outline-none transition-colors duration-150 hover:bg-foreground/[0.025] focus-visible:bg-foreground/[0.04] focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-inset`}
-      >
-        <span className="text-sm">
-          <StatusBadge status={conversation.status} />
-        </span>
-        <span className="grid min-w-0 gap-0.5 text-sm">
-          <span className="flex min-w-0 items-center gap-2">
-            <span className="truncate font-medium">{conversation.scenario_name}</span>
-            {conversation.attempt > 1 && (
-              <Badge variant="outline" className="shrink-0">
-                Attempt {conversation.attempt}
-              </Badge>
-            )}
-          </span>
-          <span className="truncate text-muted-foreground">
-            {conversation.persona_name}
-            {claim &&
-              `. Caller claims it ${claim.success ? "reached" : "did not reach"} its goal (not judged)`}
-          </span>
-        </span>
-        <span className="hidden text-sm tabular-nums md:block">{conversation.repeat}</span>
-        <span className="hidden truncate text-sm md:block">
-          {conversation.end_reason ? (
-            END_REASON_LABELS[conversation.end_reason]
-          ) : (
-            <span className="capitalize">{conversation.status}</span>
-          )}
-          {conversation.failure_reason && (
-            <span className="block truncate text-destructive">{conversation.failure_reason}</span>
-          )}
-        </span>
-        <span className="hidden text-right text-sm tabular-nums md:block">
-          {duration(conversation.talk_ms) || <span className="text-muted-foreground">None</span>}
-        </span>
-        <span className="text-right text-sm text-muted-foreground">
-          {conversation.started_at ? (
-            <RelativeTime iso={conversation.started_at} />
-          ) : ACTIVE_STATUSES.includes(conversation.status) ? (
-            "Not yet"
-          ) : (
-            "Never"
-          )}
-        </span>
-      </Link>
-    </li>
   );
 }

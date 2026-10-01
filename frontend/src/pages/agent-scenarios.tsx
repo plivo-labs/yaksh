@@ -24,7 +24,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { type GenerationProgress, useGeneration } from "@/hooks/use-generation";
-import { when } from "@/lib/format";
+import { counted, when } from "@/lib/format";
 import {
   useAgents,
   useAssignPersona,
@@ -47,10 +47,6 @@ import { ScenarioDialog } from "@/pages/scenario-dialog";
 import { StartCallDialog } from "@/pages/start-call-dialog";
 
 const ALL = "all";
-
-function counted(count: number, one: string, many: string): string {
-  return `${count} ${count === 1 ? one : many}`;
-}
 
 function batchLabel(generation: Generation): string {
   const kind = generation.mode === "knowledge_base" ? "Knowledge base questions" : "Generated";
