@@ -46,7 +46,7 @@ export function StartCallDialog({
   const [personaId, setPersonaId] = useState("");
   const [scenarioId, setScenarioId] = useState(presetScenario);
   const [creating, setCreating] = useState(false);
-  const [maxDuration, setMaxDuration] = useState("300");
+  const [maxDuration, setMaxDuration] = useState("");
   const personas = usePersonas();
   const start = useStartConversation();
   const navigate = useNavigate();
@@ -56,7 +56,7 @@ export function StartCallDialog({
   const selectedScenario =
     scenarios.data?.find((scenario) => scenario.id === scenarioId) ?? scenarios.data?.[0];
   const chosenScenario = selectedScenario?.id ?? "";
-  const chosenPersona = personaId || selectedScenario?.persona_id || personas.data?.[0]?.id || "";
+  const chosenPersona = personaId || selectedScenario?.persona_id || "";
   /** A new agent or scenario brings its own persona, so an earlier pick no longer applies. */
   const pickScenario = (id: string) => {
     setScenarioId(id);
@@ -71,8 +71,9 @@ export function StartCallDialog({
     value: persona.id,
     label: persona.name,
   }));
-  const duration = Number(maxDuration);
-  const durationOk = Number.isInteger(duration) && duration >= 10 && duration <= 1800;
+  const duration = maxDuration.trim() === "" ? null : Number(maxDuration);
+  const durationOk =
+    duration === null || (Number.isInteger(duration) && duration >= 10 && duration <= 1800);
 
   const submit = (event: SubmitEvent) => {
     event.preventDefault();
@@ -81,7 +82,7 @@ export function StartCallDialog({
         agent_id: chosen,
         persona_id: chosenPersona,
         scenario_id: chosenScenario,
-        max_duration_s: duration,
+        ...(duration !== null && { max_duration_s: duration }),
       },
       { onSuccess: (conversation) => navigate(`/conversations/${conversation.id}`) },
     );
@@ -202,6 +203,7 @@ export function StartCallDialog({
                   inputMode="numeric"
                   min={10}
                   max={1800}
+                  placeholder="Default"
                   aria-invalid={!durationOk}
                   aria-describedby="max_duration_hint"
                   value={maxDuration}
@@ -212,8 +214,8 @@ export function StartCallDialog({
               </div>
               <FieldDescription id="max_duration_hint">
                 {durationOk
-                  ? "Counts from when the call connects."
-                  : "Enter a whole number from 10 to 1800."}
+                  ? "Counts from when the call connects. Empty uses the server default."
+                  : "Enter a whole number from 10 to 1800, or none."}
               </FieldDescription>
             </Field>
           </FieldGroup>
@@ -224,9 +226,7 @@ export function StartCallDialog({
           <Button
             type="submit"
             form="start-form"
-            disabled={
-              start.isPending || !chosen || !chosenPersona || !chosenScenario || !durationOk
-            }
+            disabled={start.isPending || !chosen || !chosenScenario || !durationOk}
           >
             {start.isPending && <Spinner />}
             Start call

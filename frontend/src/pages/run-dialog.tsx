@@ -55,10 +55,10 @@ export function RunDialog({
   const [requestKey] = useState(() => crypto.randomUUID());
   const [name, setName] = useState(earlier?.name ?? "");
   const [repeats, setRepeats] = useState(text(earlier?.repeats ?? 1));
-  const [maxDuration, setMaxDuration] = useState(text(earlier?.max_duration_s ?? 300));
+  const [maxDuration, setMaxDuration] = useState(text(earlier?.max_duration_s));
   const [maxParallel, setMaxParallel] = useState(text(earlier?.max_parallel));
   const [delay, setDelay] = useState(text(earlier?.start_interval_s));
-  const [retries, setRetries] = useState(text(earlier?.max_retries ?? 1));
+  const [retries, setRetries] = useState(text(earlier?.max_retries));
   const [submitted, setSubmitted] = useState(false);
   const personas = usePersonas();
   const numbers = usePhoneNumbers();
@@ -71,10 +71,10 @@ export function RunDialog({
   const interval = whole(delay);
   const retryCount = whole(retries);
   const repeatsOk = repeatCount !== null && repeatCount >= 1;
-  const durationOk = duration !== null && duration >= 10 && duration <= 1800;
+  const durationOk = duration === null || (duration >= 10 && duration <= 1800);
   const parallelOk = parallel === null || parallel >= 1;
   const intervalOk = interval === null || interval >= 1;
-  const retriesOk = retryCount !== null && retryCount >= 0;
+  const retriesOk = retryCount === null || retryCount >= 0;
   const valid =
     scenarios.length > 0 && repeatsOk && durationOk && parallelOk && intervalOk && retriesOk;
   const total = scenarios.length * (repeatsOk ? repeatCount : 0);
@@ -93,7 +93,7 @@ export function RunDialog({
   const submit = (event: SubmitEvent) => {
     event.preventDefault();
     setSubmitted(true);
-    if (!valid || repeatCount === null || duration === null || retryCount === null) return;
+    if (!valid || repeatCount === null) return;
     start.mutate(
       {
         agent_id: agent.id,
@@ -191,13 +191,16 @@ export function RunDialog({
                   inputMode="numeric"
                   min={10}
                   max={1800}
+                  placeholder="Default"
                   aria-invalid={submitted && !durationOk}
                   className="tabular-nums"
                   value={maxDuration}
                   onChange={(event) => setMaxDuration(event.target.value)}
                 />
                 {submitted && !durationOk && (
-                  <FieldError className={APPEAR}>Enter a whole number from 10 to 1800.</FieldError>
+                  <FieldError className={APPEAR}>
+                    Enter a whole number from 10 to 1800, or none.
+                  </FieldError>
                 )}
               </Field>
               <Field>
@@ -247,6 +250,7 @@ export function RunDialog({
                 type="number"
                 inputMode="numeric"
                 min={0}
+                placeholder="Default"
                 aria-invalid={submitted && !retriesOk}
                 className="w-24 tabular-nums"
                 value={retries}
@@ -254,10 +258,10 @@ export function RunDialog({
               />
               <FieldDescription>
                 A conversation that ends with an error on Truman's side or on the line is tried
-                again, up to this many times.
+                again, up to this many times. Empty uses the server default.
               </FieldDescription>
               {submitted && !retriesOk && (
-                <FieldError className={APPEAR}>Enter a whole number from 0.</FieldError>
+                <FieldError className={APPEAR}>Enter a whole number from 0, or none.</FieldError>
               )}
             </Field>
           </FieldGroup>

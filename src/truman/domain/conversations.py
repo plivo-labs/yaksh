@@ -168,8 +168,9 @@ class ConversationCreate(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     agent_id: uuid.UUID
-    persona_id: uuid.UUID
     scenario_id: uuid.UUID
+    persona_id: uuid.UUID | None = None
+    """Another persona for this one call; None runs the scenario's own persona."""
     max_duration_s: int | None = Field(default=None, ge=10, le=1800)
 
 

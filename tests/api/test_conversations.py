@@ -767,6 +767,22 @@ async def test_the_caller_knows_its_facts_and_today_but_never_the_criteria(
     assert SCENARIO["criteria"][0] not in instructions
 
 
+async def test_a_call_runs_with_the_scenarios_persona_unless_another_is_given(
+    client: AsyncClient,
+) -> None:
+    agent_id = await create_agent_id(client)
+    scenario = await create_scenario(client, agent_id)
+    other = (await create_persona(client, name="Calm caller"))["id"]
+
+    own = await client.post(
+        "/api/v1/conversations", json={"agent_id": agent_id, "scenario_id": scenario["id"]}
+    )
+    chosen = await start(client, agent_id, scenario_id=scenario["id"], persona_id=other)
+
+    assert own.status_code == 202 and own.json()["persona_id"] == scenario["persona_id"]
+    assert chosen["persona_id"] == other
+
+
 async def test_a_conversation_needs_a_live_persona(client: AsyncClient) -> None:
     agent_id = await create_agent_id(client)
     persona = await create_persona(client)

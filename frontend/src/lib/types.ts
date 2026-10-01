@@ -394,13 +394,15 @@ export interface RunInput {
   /** In the order the conversations of each repeat start. */
   scenario_ids: string[];
   repeats: number;
-  max_duration_s: number;
+  /** The server default when null. */
+  max_duration_s: number | null;
   /** Calls of the run on the line at once; null is no run limit. */
   max_parallel: number | null;
   /** The least time between two call starts; null is no wait. */
   start_interval_s: number | null;
-  /** How many times a conversation that ends with an error is tried again. */
-  max_retries: number;
+  /** How many times a conversation that ends with an error is tried again; the server
+   * default when null. */
+  max_retries: number | null;
   name: string | null;
 }
 
@@ -438,8 +440,10 @@ export interface Run extends RunSummary {
 
 export interface ConversationInput {
   agent_id: string;
-  persona_id: string;
   scenario_id: string;
+  /** Another persona for this one call; the scenario's own persona when left out. */
+  persona_id?: string;
+  /** The server default when left out. */
   max_duration_s?: number;
 }
 

@@ -40,15 +40,16 @@ docker compose -f docker/compose.dev.yaml create --force-recreate worker
 docker compose -f docker/compose.dev.yaml start worker
 ```
 
-Create the agent with its number and a scenario for it, then start a conversation with the scenario and a persona. `GET /api/v1/personas` lists the built-in personas. The wire events show `ringing`, `answered` and `connected` as the call progresses:
+Pick a persona, create the agent with its number and a scenario that runs with the persona, then start a conversation with the scenario. `GET /api/v1/personas` lists the built-in personas. A conversation uses the scenario's persona; `persona_id` on the conversation picks another one for that call. The wire events show `ringing`, `answered` and `connected` as the call progresses:
 
 ```sh
+curl localhost:8000/api/v1/personas -H "Authorization: Bearer $TRUMAN_API_TOKEN"
 curl -X POST localhost:8000/api/v1/agents -H "Authorization: Bearer $TRUMAN_API_TOKEN" -H 'Content-Type: application/json' \
   -d '{"name": "Support line", "agent_number": "+14155550100"}'
 curl -X POST localhost:8000/api/v1/agents/<agent id>/scenarios -H "Authorization: Bearer $TRUMAN_API_TOKEN" -H 'Content-Type: application/json' \
-  -d '{"name": "Book a table", "goal": "Book a table for two tonight.", "known_facts": [{"name": "Name", "value": "Priya Raman"}], "criteria": ["Reads the time and party size back before it books."]}'
+  -d '{"name": "Book a table", "persona_id": "<persona id>", "goal": "Book a table for two tonight.", "known_facts": [{"name": "Name", "value": "Priya Raman"}], "criteria": ["Reads the time and party size back before it books."]}'
 curl -X POST localhost:8000/api/v1/conversations -H "Authorization: Bearer $TRUMAN_API_TOKEN" -H 'Content-Type: application/json' \
-  -d '{"agent_id": "<agent id>", "scenario_id": "<scenario id>", "persona_id": "<persona id>"}'
+  -d '{"agent_id": "<agent id>", "scenario_id": "<scenario id>"}'
 ```
 
 ## Files
@@ -88,7 +89,7 @@ curl -X POST localhost:8000/api/v1/runs -H "Authorization: Bearer $TRUMAN_API_TO
   -d '{"agent_id": "<agent id>", "scenario_ids": ["<scenario id>", "<scenario id>"], "repeats": 3, "max_parallel": 2, "start_interval_s": 10}'
 ```
 
-- The run starts one conversation for each repeat of each scenario, all of them or none. Every conversation pins the agent, scenario and persona versions that were current when the run started. A run takes at most 500 scenarios.
+- The run starts one conversation for each repeat of each scenario, all of them or none. Every conversation pins the agent, scenario and persona versions that were current when the run was created.
 - `max_parallel` sets how many conversations of the run can be on the line at once. `start_interval_s` sets the least time between two conversation starts; a conversation starts when a worker takes it, a few seconds before its call. Without them, the run has no limit and no delay of its own. Both protect the agent under test. Single test calls start before the queued conversations of runs.
 - `max_duration_s` is the time limit of each call, 10 to 1800 seconds, default `TRUMAN_DEFAULT_MAX_DURATION_S` (300).
 - `max_retries`, default 1, is the number of extra attempts for a conversation that ends with an error on Truman's side or on the line. 0 turns retries off. Conversations in the "did not connect" group are not tried again.

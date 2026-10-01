@@ -52,11 +52,28 @@ ENDED = (
 """What the retry step reads from a conversation that just ended."""
 
 
+def with_defaults(settings: Settings, command: RunCreate) -> RunCreate:
+    """The request with the operator's defaults filled in, so a request that writes them out
+    hashes the same as one that leaves them out."""
+    return command.model_copy(
+        update={
+            "max_duration_s": command.max_duration_s or settings.default_max_duration_s,
+            "max_retries": (
+                min(1, settings.max_run_retries)
+                if command.max_retries is None
+                else command.max_retries
+            ),
+        }
+    )
+
+
 def check_limits(settings: Settings, command: RunCreate) -> None:
     if command.repeats > settings.max_run_repeats:
         raise ValidationError(f"repeats: at most {settings.max_run_repeats}")
-    if command.max_retries > settings.max_run_retries:
+    if (command.max_retries or 0) > settings.max_run_retries:
         raise ValidationError(f"max_retries: at most {settings.max_run_retries}")
+    if (command.max_parallel or 0) > settings.max_run_conversations:
+        raise ValidationError(f"max_parallel: at most {settings.max_run_conversations}")
     interval = command.start_interval_s or 0
     if interval > settings.max_run_start_interval_s:
         raise ValidationError(f"start_interval_s: at most {settings.max_run_start_interval_s}")
@@ -76,6 +93,7 @@ async def create_run(
     started, whatever changed since. The key is looked up first, and again once the agent's
     lock is held, so a request that waited for another one with its key returns that run; a
     request for another agent collides with it on the unique key instead."""
+    command = with_defaults(settings, command)
     request_hash = command.request_hash() if request_key is not None else None
     earlier = await earlier_run(session, request_key, request_hash)
     if earlier is not None:
@@ -92,7 +110,7 @@ async def create_run(
         agent_version_id=inputs[0].agent_version_id,
         name=command.name,
         repeats=command.repeats,
-        max_duration_s=command.max_duration_s or settings.default_max_duration_s,
+        max_duration_s=command.max_duration_s,
         max_parallel=command.max_parallel,
         start_interval_s=command.start_interval_s,
         max_retries=command.max_retries,

@@ -5,11 +5,12 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from httpx import AsyncClient
+from httpx import ASGITransport, AsyncClient
 from sqlalchemy import func, insert, select, update
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from tests.conftest import (
+    TOKEN,
     FakeCaller,
     create_agent_id,
     create_persona,
@@ -21,6 +22,7 @@ from tests.conftest import (
     wait_for_lock_waiters,
     wait_for_run,
 )
+from truman.api import create_app
 from truman.config import Settings
 from truman.db.models import Conversation, Persona, Scenario
 from truman.db.session import create_engine, create_sessionmaker
@@ -176,6 +178,7 @@ async def test_a_run_needs_distinct_scenarios_within_the_limits(client: AsyncCli
     assert await refused(ids[:1], max_retries=3) == "max_retries: at most 2"
     assert await refused(ids[:1], start_interval_s=61) == "start_interval_s: at most 60"
     assert (await refused(ids[:1], max_parallel=0)).startswith("max_parallel: ")
+    assert await refused(ids[:1], max_parallel=7) == "max_parallel: at most 6"
     assert (await refused(ids[:1], priority="high")).startswith("priority: ")
     assert await refused(ids, repeats=2) == (
         "a run starts at most 6 conversations; 4 scenarios and 2 repeats make 8"
@@ -190,7 +193,9 @@ async def test_a_repeated_request_returns_its_run_and_its_key_cannot_start_anoth
     scenario = (await create_scenario(client, agent))["id"]
 
     first = await start_run(client, agent, [scenario], key="nightly-1")
-    again = await start_run(client, agent, [scenario], key="nightly-1", repeats=1, max_retries=1)
+    again = await start_run(
+        client, agent, [scenario], key="nightly-1", max_duration_s=300, max_retries=1
+    )
     other = await start_run(client, agent, [scenario], key="nightly-1", repeats=2)
     unkeyed = await start_run(client, agent, [scenario])
 
@@ -387,3 +392,24 @@ async def test_runs_are_listed_newest_first_and_by_agent(client: AsyncClient) ->
     assert listed["total"] == 2
     assert (await client.get("/api/v1/runs")).json()["total"] == 3
     assert (await client.get(f"/api/v1/runs/{uuid.uuid4()}")).status_code == 404
+
+
+async def test_an_omitted_retry_count_follows_the_operators_limit(
+    client: AsyncClient, settings: Settings
+) -> None:
+    agent = await create_agent_id(client)
+    scenario = (await create_scenario(client, agent))["id"]
+    app = create_app(settings.model_copy(update={"max_run_retries": 0}))
+    headers = {"Authorization": f"Bearer {TOKEN}"}
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test", headers=headers
+    ) as strict:
+        started = await start_run(strict, agent, [scenario])
+        refused = await start_run(strict, agent, [scenario], max_retries=1)
+    await app.state.engine.dispose()
+
+    assert started.status_code == 202 and started.json()["max_retries"] == 0
+    assert refused.status_code == 422 and refused.json()["error"]["message"] == (
+        "max_retries: at most 0"
+    )

@@ -12,7 +12,6 @@ from typing import Annotated
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator
 
 from truman.domain.conversations import EndReason, OutcomeGroup
-from truman.domain.scenarios import MAX_BULK
 
 RunName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=80)]
 
@@ -24,14 +23,16 @@ class RunCreate(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     agent_id: uuid.UUID
-    scenario_ids: list[uuid.UUID] = Field(min_length=1, max_length=MAX_BULK)
+    scenario_ids: list[uuid.UUID] = Field(min_length=1)
     """In the order the conversations of each repeat start."""
     repeats: int = Field(default=1, ge=1)
     max_duration_s: int | None = Field(default=None, ge=10, le=1800)
+    """None takes the operator's default."""
     max_parallel: int | None = Field(default=None, ge=1)
     start_interval_s: int | None = Field(default=None, ge=1)
-    max_retries: int = Field(default=1, ge=0)
-    """How many times a conversation that ends with an error is tried again."""
+    max_retries: int | None = Field(default=None, ge=0)
+    """How many times a conversation that ends with an error is tried again; None takes 1, or
+    the operator's limit when that is lower."""
     name: RunName | None = None
 
     @field_validator("scenario_ids")
