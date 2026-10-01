@@ -8,7 +8,6 @@ from collections.abc import AsyncGenerator, Sequence
 from contextlib import aclosing
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from itertools import cycle
 from typing import Any
 
 import anyio
@@ -32,6 +31,7 @@ from truman.domain.generation import (
     grounded,
     normalized_text,
     question_slots,
+    spread_personas,
 )
 from truman.domain.language_models import JsonModel
 from truman.domain.scenarios import ScenarioCreate
@@ -353,10 +353,10 @@ class Writer:
         self._agent_data = sorted(agent_data_names(self._trigger)) if self._trigger else []
 
     async def write_all(self, plan: Plan) -> AsyncGenerator[Saved | Dropped]:
-        personas = cycle(self._prepared.command.persona_ids)
+        personas = spread_personas(plan.slots, self._prepared.command.persona_ids)
         tasks = [
             asyncio.ensure_future(self.write(slot, persona_id, plan))
-            for slot, persona_id in zip(plan.slots, personas, strict=False)
+            for slot, persona_id in zip(plan.slots, personas, strict=True)
         ]
         try:
             for next_done in asyncio.as_completed(tasks):

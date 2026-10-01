@@ -459,7 +459,7 @@ export interface GenerateInput {
   count: number;
   instructions: string;
   document_ids: string[];
-  /** Given to the new scenarios in turn. */
+  /** Spread over the new scenarios, so each capability or question meets every persona. */
   persona_ids: string[];
 }
 

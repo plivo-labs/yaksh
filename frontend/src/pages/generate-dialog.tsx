@@ -197,7 +197,7 @@ export function GenerateDialog({
             <FieldSet>
               <FieldLegend variant="label">Personas</FieldLegend>
               <FieldDescription>
-                New scenarios get the checked personas in turn, in this order.
+                Each job or question gets every checked persona before it gets one again.
               </FieldDescription>
               <ul className="grid gap-2">
                 {personaList.map((persona) => (

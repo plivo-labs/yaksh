@@ -1,3 +1,6 @@
+import uuid
+from collections import Counter, defaultdict
+
 import pytest
 
 from truman.domain.generation import (
@@ -11,6 +14,7 @@ from truman.domain.generation import (
     grounded,
     normalized_text,
     question_slots,
+    spread_personas,
 )
 from truman.domain.scenarios import Category
 
@@ -92,3 +96,17 @@ def test_a_small_context_gives_fewer_scenarios_rather_than_repeats() -> None:
         assert len(variants) == len(set(variants))
         assert max(slot.variant for slot in slots) == MAX_REPEATS - 1
     assert len(agent_plan) == 14
+
+
+def test_each_capability_meets_every_persona_whatever_the_counts() -> None:
+    book, cancel = capability("Book", Priority.CORE), capability("Cancel", Priority.CORE)
+    slots = agent_slots([book, cancel], 5)
+    personas = [uuid.UUID(int=1), uuid.UUID(int=2)]
+
+    chosen = spread_personas(slots, personas)
+
+    met: dict[Capability | None, set[uuid.UUID]] = defaultdict(set)
+    for slot, persona in zip(slots, chosen, strict=True):
+        met[slot.capability].add(persona)
+    assert met[book] == met[cancel] == set(personas)
+    assert sorted(Counter(chosen).values()) == [2, 3]

@@ -2,6 +2,8 @@
 
 import dataclasses
 import uuid
+from collections import Counter
+from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import Annotated
@@ -40,7 +42,7 @@ class GenerateScenarios(BaseModel):
     document_ids: list[uuid.UUID] = Field(default_factory=list, max_length=20)
     """The knowledge base documents to ask about; knowledge base mode only."""
     persona_ids: list[uuid.UUID] = Field(min_length=1, max_length=MAX_SCENARIOS)
-    """Given to the new scenarios in turn, in the order of the plan."""
+    """Spread over the new scenarios, so each capability or question meets every persona."""
 
     @model_validator(mode="after")
     def documents_fit_mode(self) -> GenerateScenarios:
@@ -187,6 +189,28 @@ def numbered(slots: list[Slot]) -> list[Slot]:
         if variant < MAX_REPEATS:
             result.append(dataclasses.replace(slot, variant=variant))
     return result
+
+
+def spread_personas(slots: Sequence[Slot], persona_ids: Sequence[uuid.UUID]) -> list[uuid.UUID]:
+    """A persona for each slot: the one used least so far with the slot's subject, then with
+    its category, then overall, and the first listed on a tie. Each capability or question so
+    meets every persona before it meets one twice, whatever the number of personas."""
+    with_subject: Counter[tuple[Capability | Question | None, uuid.UUID]] = Counter()
+    with_category: Counter[tuple[Category, uuid.UUID]] = Counter()
+    overall: Counter[uuid.UUID] = Counter()
+    chosen = []
+    for slot in slots:
+        subject = slot.capability or slot.question
+        usage = [
+            (with_subject[subject, p], with_category[slot.category, p], overall[p])
+            for p in persona_ids
+        ]
+        persona = persona_ids[usage.index(min(usage))]
+        with_subject[subject, persona] += 1
+        with_category[slot.category, persona] += 1
+        overall[persona] += 1
+        chosen.append(persona)
+    return chosen
 
 
 def normalized_text(text: str) -> str:

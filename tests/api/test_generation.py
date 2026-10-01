@@ -510,7 +510,7 @@ async def test_scenarios_of_another_agent_cannot_be_deleted_through_this_one(
     assert (await client.get(f"/api/v1/scenarios/{theirs['id']}")).status_code == 200
 
 
-async def test_new_scenarios_get_the_chosen_personas_in_turn(
+async def test_new_scenarios_spread_the_chosen_personas(
     client: AsyncClient, generation_model: FakeJsonModel
 ) -> None:
     agent = await create_agent(client, brief=BRIEF)
