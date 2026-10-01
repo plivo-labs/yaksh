@@ -311,7 +311,7 @@ export function AgentScenarios({ agent }: { agent: Agent }) {
           </div>
           <ul className="divide-y">
             {items.map((item) => (
-              <li key={item.id} className="flex items-center gap-2 pr-4 pl-5">
+              <li key={item.id} className="flex items-center gap-3 pr-4 pl-5">
                 <Checkbox
                   aria-label={`Select ${item.name}`}
                   checked={picked.has(item.id)}
@@ -320,9 +320,9 @@ export function AgentScenarios({ agent }: { agent: Agent }) {
                 <button
                   type="button"
                   onClick={() => setEditing(item)}
-                  className="flex min-w-0 flex-1 items-center gap-4 py-3 pl-3 text-left outline-none transition-colors duration-150 hover:bg-foreground/[0.025] focus-visible:bg-foreground/[0.04] focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-inset"
+                  className="flex min-w-0 flex-1 items-center gap-6 rounded-md px-2 py-4 text-left outline-none transition-colors duration-150 hover:bg-foreground/[0.025] focus-visible:bg-foreground/[0.04] focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-inset"
                 >
-                  <span className="grid min-w-0 flex-1 gap-0.5">
+                  <span className="grid min-w-0 flex-1 gap-1">
                     <span className="flex min-w-0 items-center gap-2">
                       <span className="truncate text-sm font-medium">{item.name}</span>
                       <Badge variant="outline" className="shrink-0">
@@ -334,7 +334,7 @@ export function AgentScenarios({ agent }: { agent: Agent }) {
                       {item.description ?? item.goal}
                     </span>
                   </span>
-                  <span className="hidden shrink-0 justify-items-end gap-0.5 text-xs text-muted-foreground sm:grid">
+                  <span className="hidden shrink-0 justify-items-end gap-1 text-xs text-muted-foreground sm:grid">
                     <span>{personaName(item.persona_id)}</span>
                     <span>
                       {counted(item.known_facts.length, "fact", "facts")},{" "}
@@ -348,7 +348,7 @@ export function AgentScenarios({ agent }: { agent: Agent }) {
                   scenarioId={item.id}
                   render={
                     <Button
-                      variant="outline"
+                      variant="ghost"
                       size="sm"
                       aria-label={`${outbound ? "Trigger" : "Ring"} ${item.name}`}
                     />
