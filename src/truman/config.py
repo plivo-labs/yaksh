@@ -45,14 +45,15 @@ class Settings(BaseSettings):
         default="https://api.openai.com/v1", validation_alias="OPENAI_BASE_URL"
     )
     persona_llm_model: str = Field(default="gpt-4.1", validation_alias="PERSONA_LLM_MODEL")
-    persona_llm_reasoning_effort: str = Field(
-        default="none", validation_alias="PERSONA_LLM_REASONING_EFFORT"
+    persona_llm_reasoning_effort: str | None = Field(
+        default=None, validation_alias="PERSONA_LLM_REASONING_EFFORT"
     )
-    """Sent with every caller turn when the model takes it: reasoning delays the first word."""
+    """Sent with every caller turn when set. Unset, a reasoning model that accepts none is asked
+    for it, and other models get no effort; a model without reasoning refuses any value."""
     generation_llm_model: str | None = Field(default=None, validation_alias="GENERATION_LLM_MODEL")
     """The model that writes test scenarios; the persona model when unset."""
     generation_llm_reasoning_effort: str = Field(
-        default="xhigh", validation_alias="GENERATION_LLM_REASONING_EFFORT"
+        default="max", validation_alias="GENERATION_LLM_REASONING_EFFORT"
     )
     """Sent with every generation call when the model takes it."""
     generation_llm_timeout_s: float = Field(

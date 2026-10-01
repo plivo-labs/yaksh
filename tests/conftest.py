@@ -631,29 +631,46 @@ async def worker(
     await engine.dispose()
 
 
-def completion(
-    content: str | None, refusal: str | None = None, finish_reason: str = "stop"
+def response_body(
+    text: str, *, refusal: str | None = None, incomplete: str | None = None
 ) -> dict[str, Any]:
+    """A Responses API answer: `text`, or a refusal, or `text` cut short for `incomplete`."""
+    part = (
+        {"type": "refusal", "refusal": refusal}
+        if refusal
+        else {"type": "output_text", "text": text, "annotations": []}
+    )
     return {
-        "id": "chatcmpl-1",
-        "object": "chat.completion",
-        "created": 0,
+        "id": "resp-1",
+        "object": "response",
+        "created_at": 0,
         "model": "gpt-4.1",
-        "choices": [
+        "status": "incomplete" if incomplete else "completed",
+        "incomplete_details": {"reason": incomplete} if incomplete else None,
+        "output": [
             {
-                "index": 0,
-                "message": {"role": "assistant", "content": content, "refusal": refusal},
-                "finish_reason": finish_reason,
+                "type": "message",
+                "id": "msg-1",
+                "role": "assistant",
+                "status": "completed",
+                "content": [part],
             }
         ],
-        "usage": {"prompt_tokens": 12, "completion_tokens": 3, "total_tokens": 15},
+        "usage": {
+            "input_tokens": 12,
+            "output_tokens": 3,
+            "total_tokens": 15,
+            "input_tokens_details": {"cached_tokens": 0},
+            "output_tokens_details": {"reasoning_tokens": 0},
+        },
     }
 
 
 UNSUPPORTED = {
     "error": {
-        "message": "Unsupported parameter: 'reasoning_effort' is not supported with this model.",
+        "message": "Unsupported parameter: 'reasoning.effort' is not supported with this model.",
         "type": "invalid_request_error",
+        "param": "reasoning.effort",
         "code": "unsupported_parameter",
     }
 }
@@ -661,18 +678,18 @@ OUTAGE = {"error": {"message": "The service is temporarily unavailable.", "type"
 
 
 class FakeProvider:
-    """An OpenAI-compatible chat API that records each request."""
+    """An OpenAI-compatible Responses API that records each request."""
 
     def __init__(self) -> None:
         self.requests: list[tuple[str, dict[str, str], dict[str, Any]]] = []
-        self.reply: tuple[int, dict[str, Any]] = (200, completion('{"answer": "yes"}'))
+        self.reply: tuple[int, dict[str, Any]] = (200, response_body('{"answer": "yes"}'))
         self.reasoning = True
-        """Whether the model takes reasoning_effort; gpt-4.1 refuses it with a 400."""
+        """Whether the model takes a reasoning effort; gpt-4.1 refuses it with a 400."""
         self.outages = 0
         """How many of the next requests fail with a 503."""
 
     def efforts(self) -> list[str | None]:
-        return [body.get("reasoning_effort") for _, _, body in self.requests]
+        return [body.get("reasoning", {}).get("effort") for _, _, body in self.requests]
 
 
 @pytest.fixture
@@ -681,13 +698,13 @@ async def provider() -> AsyncIterator[tuple[str, FakeProvider]]:
     app = FastAPI()
 
     @app.post("/{path:path}")
-    async def chat(path: str, request: Request) -> JSONResponse:
+    async def respond(path: str, request: Request) -> JSONResponse:
         sent = await request.json()
         fake.requests.append((f"/{path}", dict(request.query_params), sent))
         if fake.outages:
             fake.outages -= 1
             return JSONResponse(OUTAGE, status_code=503)
-        if not fake.reasoning and "reasoning_effort" in sent:
+        if not fake.reasoning and "reasoning" in sent:
             return JSONResponse(UNSUPPORTED, status_code=400)
         status, body = fake.reply
         return JSONResponse(body, status_code=status)

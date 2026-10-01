@@ -8,7 +8,6 @@ from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
-from openai import AsyncOpenAI
 from pipecat.adapters.schemas.function_schema import FunctionSchema
 from pipecat.adapters.schemas.tools_schema import ToolsSchema
 from pipecat.audio.turn.smart_turn.local_smart_turn_v3 import LocalSmartTurnAnalyzerV3
@@ -33,7 +32,7 @@ from pipecat.processors.frame_processor import FrameProcessor
 from pipecat.services.deepgram.stt import DeepgramSTTService
 from pipecat.services.elevenlabs.tts import ElevenLabsTTSService
 from pipecat.services.llm_service import FunctionCallParams
-from pipecat.services.openai.llm import OpenAILLMService
+from pipecat.services.openai.responses.llm import OpenAIResponsesHttpLLMService
 from pipecat.turns.user_stop import TurnAnalyzerUserTurnStopStrategy
 from pipecat.turns.user_turn_strategies import UserTurnStrategies
 from pipecat.workers.runner import WorkerRunner
@@ -51,13 +50,10 @@ from truman.domain.conversations import (
 )
 from truman.domain.languages import Language
 from truman.integrations import elevenlabs
-from truman.integrations.openai_models import takes_reasoning_effort
 
 log = logging.getLogger(__name__)
 
 END_GRACE_S = 3.0
-CHECK_ATTEMPTS = 3
-CHECK_PAUSE_S = 2.0
 DRAINED = frozenset({EndReason.CALLER_HANGUP})
 VAD = VADParams(confidence=0.5, start_secs=0.1, stop_secs=0.6)
 IDLE_S = 15.0
@@ -98,34 +94,22 @@ def provider_keys(settings: Settings) -> dict[str, str]:
     return {name: value.get_secret_value() for name, value in keys.items() if value}
 
 
-async def persona_turn_options(settings: Settings) -> dict[str, str]:
-    """What each persona turn sends besides its messages: the reasoning effort, when the model
-    takes it. The worker asks when it starts. When no check gets an answer, the turns go
-    without the effort until the worker restarts."""
-    effort = settings.persona_llm_reasoning_effort
-    taken: bool | None = None
-    async with AsyncOpenAI(
-        api_key=provider_keys(settings)["OPENAI_API_KEY"], base_url=settings.openai_base_url
-    ) as client:
-        for attempt in range(CHECK_ATTEMPTS):
-            if attempt:
-                await asyncio.sleep(CHECK_PAUSE_S)
-            taken = await takes_reasoning_effort(client, settings.persona_llm_model, effort)
-            if taken is not None:
-                break
-    if taken is None:
-        log.warning("caller turns go without reasoning effort %s until the worker restarts", effort)
-    return {"reasoning_effort": effort} if taken else {}
-
-
 def llm_service(
-    settings: Settings, keys: dict[str, str], instructions: str, options: dict[str, str]
-) -> OpenAILLMService:
-    return OpenAILLMService(
+    settings: Settings, keys: dict[str, str], instructions: str
+) -> OpenAIResponsesHttpLLMService:
+    """The persona's model over the Responses API. With no effort configured, Pipecat asks a
+    reasoning model that accepts it for effort none, for the fastest first word; other models
+    get no effort."""
+    effort = settings.persona_llm_reasoning_effort
+    return OpenAIResponsesHttpLLMService(
         api_key=keys["OPENAI_API_KEY"],
         base_url=settings.openai_base_url,
-        settings=OpenAILLMService.Settings(
-            model=settings.persona_llm_model, system_instruction=instructions, extra=options
+        settings=OpenAIResponsesHttpLLMService.Settings(
+            model=settings.persona_llm_model,
+            system_instruction=instructions,
+            reasoning=OpenAIResponsesHttpLLMService.ReasoningConfig(effort=effort)
+            if effort
+            else None,
         ),
     )
 
@@ -214,10 +198,9 @@ class Persona:
         transport_output: FrameProcessor,
         after_output: Sequence[FrameProcessor],
         state: CallState,
-        turn_options: dict[str, str],
         before_output: Sequence[FrameProcessor] = (),
     ) -> None:
-        self.llm = llm_service(settings, keys, request.instructions, turn_options)
+        self.llm = llm_service(settings, keys, request.instructions)
         self.stt = DeepgramSTTService(
             api_key=keys["DEEPGRAM_API_KEY"],
             base_url=settings.deepgram_base_url,
@@ -237,6 +220,7 @@ class Persona:
                 language=elevenlabs.LANGUAGE_PINS[request.caller_language],
             ),
         )
+
         aggregators = LLMContextAggregatorPair(
             LLMContext(tools=ToolsSchema(standard_tools=[END_CALL])),
             user_params=LLMUserAggregatorParams(

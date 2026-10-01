@@ -604,16 +604,9 @@ async def handshake(socket: WebSocket) -> tuple[str, str, str]:
 
 class PhoneCaller:
     """Dials the agent and talks over the stream Plivo opens. A stream that dies without a close
-    frame ends with the conversation's duration limit. Each persona turn sends `turn_options`
-    besides its messages (persona_turn_options)."""
+    frame ends with the conversation's duration limit."""
 
-    def __init__(
-        self,
-        settings: Settings,
-        registry: StreamRegistry,
-        api: PlivoApi,
-        turn_options: dict[str, str],
-    ) -> None:
+    def __init__(self, settings: Settings, registry: StreamRegistry, api: PlivoApi) -> None:
         if settings.public_url is None:
             raise ValueError("phone calls need TRUMAN_PUBLIC_URL, the address Plivo can reach")
         self._keys = provider_keys(settings)
@@ -622,7 +615,6 @@ class PhoneCaller:
         self._api = api
         self._dialer = Dialer(api, settings.public_url, settings.ring_timeout_s)
         self._receiver = Receiver()
-        self._turn_options = turn_options
 
     async def run(
         self, request: CallRequest, observer: CallObserver, stop: asyncio.Event
@@ -729,7 +721,6 @@ class PhoneCaller:
             before_output=[checkpoints],
             after_output=[AudioMarks(clock, observer), WireTap(transcript, settled), recorder],
             state=state,
-            turn_options=self._turn_options,
         )
 
         @transport.event_handler("on_client_connected")

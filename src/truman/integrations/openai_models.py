@@ -1,4 +1,5 @@
-"""Structured JSON answers from an OpenAI-compatible API, for generating test scenarios."""
+"""Structured JSON answers from the Responses API of OpenAI or a compatible service, for
+generating test scenarios."""
 
 import asyncio
 import json
@@ -7,6 +8,7 @@ from typing import Any
 
 import openai
 from openai import AsyncOpenAI
+from openai.types.responses import Response
 
 from truman.domain.errors import UnavailableError
 
@@ -41,7 +43,7 @@ class OpenAIJsonModel:
         )
         return cls(client, model, reasoning_effort)
 
-    async def _reasoning(self) -> dict[str, str]:
+    async def _reasoning(self) -> dict[str, dict[str, str]]:
         """The reasoning effort to send, when the model takes it. Asked on the first call, and on
         each later call until a check gets an answer."""
         effort = self._reasoning_effort
@@ -52,38 +54,45 @@ class OpenAIJsonModel:
                 self._reasoning_taken = await takes_reasoning_effort(
                     self._client, self.model, effort
                 )
-        return {"reasoning_effort": effort} if self._reasoning_taken else {}
+        return {"reasoning": {"effort": effort}} if self._reasoning_taken else {}
 
     async def complete_json(
         self, *, system: str, user: str, name: str, schema: dict[str, Any]
     ) -> dict[str, Any]:
         try:
-            response = await self._client.chat.completions.create(
+            response = await self._client.responses.create(
                 model=self.model,
-                messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
-                response_format={
-                    "type": "json_schema",
-                    "json_schema": {"name": name, "schema": schema, "strict": True},
+                instructions=system,
+                input=user,
+                text={
+                    "format": {
+                        "type": "json_schema",
+                        "name": name,
+                        "schema": schema,
+                        "strict": True,
+                    }
                 },
+                store=False,
                 extra_body=await self._reasoning(),
             )
         except openai.OpenAIError as error:
             raise UnavailableError(f"the model call failed: {failure(error)}") from error
-        choice = response.choices[0]
-        if choice.message.refusal:
-            raise UnavailableError(f"the model refused: {choice.message.refusal}")
-        if choice.finish_reason != "stop":
-            raise UnavailableError(f"the model's answer was cut short ({choice.finish_reason})")
+        if refusal := refused(response):
+            raise UnavailableError(f"the model refused: {refusal}")
+        if response.status != "completed":
+            details = response.incomplete_details
+            reason = details.reason if details and details.reason else response.status
+            raise UnavailableError(f"the model's answer was cut short ({reason})")
         if response.usage:
             log.info(
                 "model %s answered %s: %d tokens in, %d out",
                 self.model,
                 name,
-                response.usage.prompt_tokens,
-                response.usage.completion_tokens,
+                response.usage.input_tokens,
+                response.usage.output_tokens,
             )
         try:
-            answer = json.loads(choice.message.content or "")
+            answer = json.loads(response.output_text)
         except json.JSONDecodeError as error:
             raise UnavailableError(f"the model's answer is not JSON: {error}") from error
         if not isinstance(answer, dict):
@@ -94,16 +103,24 @@ class OpenAIJsonModel:
         await self._client.close()
 
 
+def refused(response: Response) -> str | None:
+    """The model's refusal, when it refused instead of answering."""
+    for item in response.output:
+        if item.type == "message":
+            for part in item.content:
+                if part.type == "refusal":
+                    return part.refusal
+    return None
+
+
 async def takes_reasoning_effort(client: AsyncOpenAI, model: str, effort: str) -> bool | None:
-    """Whether the model takes `reasoning_effort` at this level. A model without reasoning,
-    such as gpt-4.1, refuses the parameter with a 400, as does a reasoning model asked for a
-    level it lacks. None when the check fails another way, such as a timeout or an outage: the
-    answer is still open."""
+    """Whether the model takes this reasoning effort. A model without reasoning, such as
+    gpt-4.1, refuses the parameter with a 400, as does a reasoning model asked for a level it
+    lacks. None when the check fails another way, such as a timeout or an outage: the answer is
+    still open."""
     try:
-        await client.with_options(timeout=CHECK_TIMEOUT_S, max_retries=0).chat.completions.create(
-            model=model,
-            messages=[{"role": "user", "content": "Say ok."}],
-            extra_body={"reasoning_effort": effort},
+        await client.with_options(timeout=CHECK_TIMEOUT_S, max_retries=0).responses.create(
+            model=model, input="Say ok.", store=False, extra_body={"reasoning": {"effort": effort}}
         )
     except openai.BadRequestError as error:
         log.info("model %s does not take reasoning effort %s: %s", model, effort, failure(error))

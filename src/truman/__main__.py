@@ -61,8 +61,11 @@ def worker() -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
     settings = Settings()
     upgrade_to_head(str(settings.database_url))
+    registry = StreamRegistry()
+    api = plivo_api(settings)
+    caller = callers(settings, registry, api)
     try:
-        asyncio.run(start_worker(settings))
+        asyncio.run(run_worker(settings, caller, registry, api))
     except UnknownNumbersError as error:
         logging.critical("TRUMAN_PLIVO_NUMBERS: %s", error)
         raise SystemExit(1) from None
@@ -76,22 +79,15 @@ def plivo_api(settings: Settings) -> PlivoApi | None:
     )
 
 
-async def start_worker(settings: Settings) -> None:
-    registry = StreamRegistry()
-    api = plivo_api(settings)
-    await run_worker(settings, await callers(settings, registry, api), registry, api)
-
-
-async def callers(settings: Settings, registry: StreamRegistry, api: PlivoApi | None) -> Caller:
+def callers(settings: Settings, registry: StreamRegistry, api: PlivoApi | None) -> Caller:
     from truman.caller.phone import PhoneCaller
-    from truman.caller.pipeline import persona_turn_options
 
     if api is None:
         reason = "phone calls are off: set PLIVO_AUTH_ID and PLIVO_AUTH_TOKEN"
     elif settings.public_url is None:
         reason = "phone calls are off: set TRUMAN_PUBLIC_URL to the address Plivo can reach"
     else:
-        return PhoneCaller(settings, registry, api, await persona_turn_options(settings))
+        return PhoneCaller(settings, registry, api)
     logging.warning(reason)
     return UnavailableCaller(reason)
 

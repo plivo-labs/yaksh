@@ -3,7 +3,7 @@ from typing import Any
 import pytest
 from pydantic import SecretStr
 
-from tests.conftest import FakeProvider, completion
+from tests.conftest import FakeProvider, response_body
 from truman.api.app import generation_model
 from truman.config import Settings
 from truman.domain.errors import UnavailableError
@@ -26,7 +26,7 @@ async def ask(model: OpenAIJsonModel) -> dict[str, Any]:
         await model.close()
 
 
-async def test_openai_is_asked_for_the_strict_schema(
+async def test_the_responses_api_is_asked_for_the_strict_schema(
     provider: tuple[str, FakeProvider],
 ) -> None:
     base, fake = provider
@@ -37,16 +37,16 @@ async def test_openai_is_asked_for_the_strict_schema(
 
     path, _, body = fake.requests[0]
     assert answer == {"answer": "yes"}
-    assert path == "/v1/chat/completions"
-    assert body["model"] == "gpt-4.1"
-    assert body["messages"] == [
-        {"role": "system", "content": "Be brief."},
-        {"role": "user", "content": "Ready?"},
-    ]
-    assert body["response_format"] == {
-        "type": "json_schema",
-        "json_schema": {"name": "reply", "schema": SCHEMA, "strict": True},
+    assert path == "/v1/responses"
+    assert (body["model"], body["instructions"], body["input"]) == (
+        "gpt-4.1",
+        "Be brief.",
+        "Ready?",
+    )
+    assert body["text"] == {
+        "format": {"type": "json_schema", "name": "reply", "schema": SCHEMA, "strict": True}
     }
+    assert body["store"] is False
 
 
 async def test_scenario_generation_asks_the_configured_openai_base_url(
@@ -65,18 +65,21 @@ async def test_scenario_generation_asks_the_configured_openai_base_url(
     answer = await ask(model)
 
     assert answer == {"answer": "yes"}
-    assert fake.requests[0][0] == "/gateway/v1/chat/completions"
+    assert fake.requests[0][0] == "/gateway/v1/responses"
 
 
 @pytest.mark.parametrize(
     ("reply", "message"),
     [
-        ((200, completion(None, refusal="I can't help with that.")), "the model refused"),
-        ((200, completion("not json")), "the model's answer is not JSON"),
-        ((200, completion("[1, 2]")), "the model's answer is not a JSON object"),
-        ((200, completion('{"answer": "ye"}', finish_reason="length")), r"cut short \(length\)"),
+        ((200, response_body("", refusal="I can't help with that.")), "the model refused"),
+        ((200, response_body("not json")), "the model's answer is not JSON"),
+        ((200, response_body("[1, 2]")), "the model's answer is not a JSON object"),
         (
-            (200, completion('{"answer": "no"}', finish_reason="content_filter")),
+            (200, response_body('{"answer": "ye"', incomplete="max_output_tokens")),
+            r"cut short \(max_output_tokens\)",
+        ),
+        (
+            (200, response_body('{"answer": "no"}', incomplete="content_filter")),
             r"cut short \(content_filter\)",
         ),
         (
@@ -138,8 +141,10 @@ async def test_the_reasoning_effort_goes_with_every_call_only_when_the_model_tak
 
     check, *calls = [body for _, _, body in fake.requests]
     assert answers == [{"answer": "yes"}] * 2
-    assert check["reasoning_effort"] == "xhigh" and "response_format" not in check
-    assert [call.get("reasoning_effort") for call in calls] == ["xhigh" if reasoning else None] * 2
+    assert check["reasoning"] == {"effort": "xhigh"} and "text" not in check
+    assert [call.get("reasoning") for call in calls] == [
+        {"effort": "xhigh"} if reasoning else None
+    ] * 2
 
 
 async def test_a_reasoning_check_that_fails_is_asked_again_on_the_next_call(
