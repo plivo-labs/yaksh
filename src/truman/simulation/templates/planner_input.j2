@@ -1,0 +1,12 @@
+{% include "agent.j2" %}
+
+{% if context %}
+{{ context }}
+
+{% endif %}
+{% include "existing.j2" %}
+{% if instructions %}
+
+## Instructions from the user
+{{ instructions }}
+{% endif %}

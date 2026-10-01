@@ -1,0 +1,7 @@
+## Agent
+{{ name }}. {{ "The caller phones the agent." if agent.direction == "inbound" else "The agent phones the caller; the caller answers." }} {{ "The agent speaks first." if agent.agent_speaks_first else "The caller speaks first." }}
+{% if agent_data %}
+agent_data must hold a value for each of these, consistent with the known facts (the agent receives them before the call): {{ agent_data | join(", ") }}.
+{% else %}
+agent_data must be an empty list.
+{% endif %}

@@ -1,0 +1,20 @@
+{% if brief %}
+## Brief
+{{ brief }}
+
+{% endif %}
+{% if config %}
+## Configuration
+{{ config }}
+
+{% endif %}
+{% if documents %}
+## Knowledge base
+{% for name, text in documents %}
+### {{ name }}
+{{ text }}
+{% if not loop.last %}
+
+{% endif %}
+{% endfor %}
+{% endif %}

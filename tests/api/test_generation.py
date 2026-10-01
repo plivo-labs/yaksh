@@ -25,9 +25,10 @@ from truman.db.session import create_engine, create_sessionmaker
 from truman.domain.errors import UnavailableError
 from truman.domain.generation import MAX_PLANNER_CHARS, GenerateScenarios, GenerationStatus
 from truman.simulation import generation
-from truman.simulation.generation_prompts import OPEN_BOUNDARY_REQUESTS
 
 BRIEF = "Reschedules missed clinic visits. Never gives medical advice; transfers to a nurse."
+OPEN_REQUEST = "Make it a request a caller could plausibly make to this agent.\n"
+"""The line before the request an open refusal test asks for."""
 
 
 def capability(name: str, quote: str, priority: str = "core", tested: bool = False) -> dict:
@@ -329,7 +330,7 @@ async def test_repeats_of_one_area_and_open_refusals_are_each_asked_differently(
     normal = [p for p in prompts if "## What to test\nA normal request" in p]
     changes = [line for p in normal for line in p.splitlines() if line.startswith("Vary it:")]
     refusals = [p for p in prompts if "must refuse, redirect or hand off." in p]
-    asks = {line for p in refusals for line in p.splitlines() if line in OPEN_BOUNDARY_REQUESTS}
+    asks = {p.split(OPEN_REQUEST, 1)[1].split("\n", 1)[0] for p in refusals}
     assert events[1] == ("planned", {"count": 14})
     assert len(prompts) == len(set(prompts)) == 14
     assert (len(normal), len(changes), len(set(changes))) == (5, 4, 4)

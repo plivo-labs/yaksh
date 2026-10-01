@@ -45,13 +45,9 @@ from truman.simulation.generation_prompts import (
     QUESTIONS_SYSTEM,
     SCENARIO_SCHEMA,
     SCENARIO_SYSTEM,
-    agent_section,
-    areas_section,
-    batch_section,
-    context_sections,
-    existing_section,
-    instructions_section,
-    slot_section,
+    context_text,
+    planner_input,
+    writer_input,
 )
 from truman.simulation.personas import live_personas
 
@@ -80,7 +76,7 @@ class Prepared:
         """What the planner reads: in knowledge base mode, the brief and the chosen documents
         only."""
         config = None if self.command.mode is GenerationMode.KNOWLEDGE_BASE else self.agent.config
-        return context_sections(self.agent.brief, config, self.documents)
+        return context_text(self.agent.brief, config, self.documents)
 
 
 @dataclass(frozen=True)
@@ -254,15 +250,8 @@ async def record_end(
 async def plan(model: JsonModel, prepared: Prepared) -> Plan:
     command = prepared.command
     context = prepared.context()
-    user = "\n\n".join(
-        part
-        for part in (
-            agent_section(prepared.agent_name, prepared.agent, []),
-            context,
-            existing_section(prepared.existing),
-            instructions_section(command.instructions),
-        )
-        if part
+    user = planner_input(
+        prepared.agent_name, prepared.agent, context, prepared.existing, command.instructions
     )
     if command.mode is GenerationMode.KNOWLEDGE_BASE:
         answer = await model.complete_json(
@@ -382,18 +371,15 @@ class Writer:
 
     async def ask(self, slot: Slot, plan: Plan) -> dict[str, Any]:
         prepared = self._prepared
-        user = "\n\n".join(
-            part
-            for part in (
-                agent_section(prepared.agent_name, prepared.agent, self._agent_data),
-                f"## Brief\n{prepared.agent.brief}" if prepared.agent.brief else "",
-                areas_section(plan.areas),
-                slot_section(slot),
-                batch_section(slot, plan.slots),
-                existing_section(prepared.existing),
-                instructions_section(prepared.command.instructions),
-            )
-            if part
+        user = writer_input(
+            prepared.agent_name,
+            prepared.agent,
+            self._agent_data,
+            plan.areas,
+            slot,
+            plan.slots,
+            prepared.existing,
+            prepared.command.instructions,
         )
         return await self._model.complete_json(
             system=SCENARIO_SYSTEM, user=user, name="scenario", schema=SCENARIO_SCHEMA
