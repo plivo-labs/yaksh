@@ -1,8 +1,8 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { Fragment, useEffect, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router";
 
-import { RecordingPlayer } from "@/components/recording-player";
+import { type PlayerHandle, RecordingPlayer } from "@/components/recording-player";
 import { StatusBadge } from "@/components/status-dot";
 import {
   AlertDialog,
@@ -35,6 +35,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { clock, duration, phone, when, words } from "@/lib/format";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { keys, useAgent, useConversation, useEndConversation } from "@/lib/queries";
 import { subscribe } from "@/lib/sse";
 import {
@@ -45,6 +46,7 @@ import {
   LANGUAGE_NAMES,
   type ScenarioConfig,
   type Turn,
+  WIRE_EVENT_HELP,
   type WireEvent,
 } from "@/lib/types";
 
@@ -54,6 +56,7 @@ export function ConversationPage() {
   const conversation = useConversation(id);
   const agent = useAgent(conversation.data?.agent_id);
   const end = useEndConversation(id);
+  const player = useRef<PlayerHandle>(null);
   useLiveUpdates(id, conversation.data?.status);
 
   if (conversation.isPending) return <Skeleton className="h-96 w-full" />;
@@ -67,6 +70,8 @@ export function ConversationPage() {
   }
   const data = conversation.data;
   const active = ACTIVE_STATUSES.includes(data.status);
+  /** The recording starts when the call connects; turn times count from the dial. */
+  const connectedMs = data.wire_events.find((event) => event.kind === "connected")?.at_ms;
 
   return (
     <div className="flex min-h-full flex-col gap-6 lg:h-full">
@@ -152,13 +157,24 @@ export function ConversationPage() {
             </CardHeader>
             <CardContent>
               <RecordingPlayer
+                ref={player}
                 url={data.recording_url}
                 name={`truman-${data.id}`}
                 start={Number(params.get("t")) || 0}
               />
             </CardContent>
           </Card>
-          <Transcript turns={data.transcript} active={active} waiting={waitingText(data)} />
+          <Transcript
+            turns={data.transcript}
+            active={active}
+            waiting={waitingText(data)}
+            connectedMs={connectedMs ?? 0}
+            onPlay={
+              data.recording_url && connectedMs !== undefined
+                ? (seconds) => player.current?.playFrom(seconds)
+                : undefined
+            }
+          />
         </div>
         <ScrollArea className="lg:min-h-0">
           <div className="flex flex-col gap-6 p-px lg:pr-4">
@@ -379,10 +395,16 @@ function Transcript({
   turns,
   active,
   waiting,
+  connectedMs,
+  onPlay,
 }: {
   turns: Turn[];
   active: boolean;
   waiting: string;
+  /** Turn times count from the dial; they show from the connect, as the recording does. */
+  connectedMs: number;
+  /** Plays the recording from that second; absent while there is no recording. */
+  onPlay?: (seconds: number) => void;
 }) {
   return (
     <Card className="lg:min-h-0">
@@ -399,37 +421,52 @@ function Transcript({
             <MessageScroller>
               <MessageScrollerViewport className="lg:pr-4">
                 <MessageScrollerContent className="gap-4">
-                  {turns.map((turn, index) => (
-                    <MessageScrollerItem
-                      key={index}
-                      messageId={String(index)}
-                      className="transition-[opacity,translate] duration-200 ease-out starting:translate-y-1 starting:opacity-0 motion-reduce:starting:translate-y-0"
-                    >
-                      <Message align={turn.role === "caller" ? "end" : "start"}>
-                        <MessageContent>
-                          <MessageHeader className="gap-2 font-mono">
-                            <span>{turn.role === "agent" ? "Agent" : "Caller"}</span>
-                            <span>{clock(turn.started_at_ms)}</span>
-                            {turn.scripted && <Badge variant="secondary">fixed nudge</Badge>}
-                            {turn.provenance === "cut" && <Badge variant="outline">cut off</Badge>}
-                            {turn.provenance === "unconfirmed" && (
-                              <Badge variant="outline">not confirmed played</Badge>
-                            )}
-                          </MessageHeader>
-                          <Bubble variant={turn.role === "caller" ? "default" : "outline"}>
-                            <BubbleContent
-                              className={cn(
-                                turn.provenance === "cut" && "line-through opacity-60",
-                                turn.provenance === "unconfirmed" && "opacity-60",
+                  {turns.map((turn, index) => {
+                    const at = Math.max(0, turn.started_at_ms - connectedMs);
+                    return (
+                      <MessageScrollerItem
+                        key={index}
+                        messageId={String(index)}
+                        className="transition-[opacity,translate] duration-200 ease-out starting:translate-y-1 starting:opacity-0 motion-reduce:starting:translate-y-0"
+                      >
+                        <Message align={turn.role === "caller" ? "end" : "start"}>
+                          <MessageContent>
+                            <MessageHeader className="gap-2 font-mono">
+                              <span>{turn.role === "agent" ? "Agent" : "Caller"}</span>
+                              <span>{clock(at)}</span>
+                              {turn.scripted && <Badge variant="secondary">fixed nudge</Badge>}
+                              {turn.provenance === "cut" && (
+                                <Badge variant="outline">cut off</Badge>
                               )}
-                            >
-                              {turn.text}
-                            </BubbleContent>
-                          </Bubble>
-                        </MessageContent>
-                      </Message>
-                    </MessageScrollerItem>
-                  ))}
+                              {turn.provenance === "unconfirmed" && (
+                                <Badge variant="outline">not confirmed played</Badge>
+                              )}
+                            </MessageHeader>
+                            <Bubble variant={turn.role === "caller" ? "default" : "outline"}>
+                              <BubbleContent
+                                render={
+                                  onPlay && (
+                                    <button
+                                      type="button"
+                                      title="Play from here"
+                                      onClick={() => onPlay(at / 1000)}
+                                    />
+                                  )
+                                }
+                                className={cn(
+                                  onPlay && "cursor-pointer",
+                                  turn.provenance === "cut" && "line-through opacity-60",
+                                  turn.provenance === "unconfirmed" && "opacity-60",
+                                )}
+                              >
+                                {turn.text}
+                              </BubbleContent>
+                            </Bubble>
+                          </MessageContent>
+                        </Message>
+                      </MessageScrollerItem>
+                    );
+                  })}
                   {active && (
                     <p className="flex items-center gap-2 text-xs text-muted-foreground">
                       <Spinner className="size-3" />
@@ -458,6 +495,10 @@ function WireEvents({
     <Card>
       <CardHeader>
         <CardTitle>On the wire</CardTitle>
+        <CardDescription>
+          Times count from the start of the call. The recording and the transcript start at
+          connected.
+        </CardDescription>
         {validity && !validity.ok && (
           <CardDescription className="text-status-danger">
             {validity.reasons.join("; ")}
@@ -472,9 +513,21 @@ function WireEvents({
             {events.map((event, index) => (
               <li key={index} className="grid gap-0.5">
                 <div className="flex justify-between gap-4">
-                  <span className={event.kind === "caller_error" ? "text-status-danger" : ""}>
-                    {words(event.kind)}
-                  </span>
+                  <Tooltip>
+                    <TooltipTrigger
+                      render={
+                        <span
+                          className={cn(
+                            "cursor-help underline decoration-dotted underline-offset-2",
+                            event.kind === "caller_error" && "text-status-danger",
+                          )}
+                        />
+                      }
+                    >
+                      {words(event.kind)}
+                    </TooltipTrigger>
+                    <TooltipContent side="left">{WIRE_EVENT_HELP[event.kind]}</TooltipContent>
+                  </Tooltip>
                   <span className="text-muted-foreground">{clock(event.at_ms)}</span>
                 </div>
                 {event.detail && <p className="break-all text-muted-foreground">{event.detail}</p>}

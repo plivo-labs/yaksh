@@ -60,6 +60,27 @@ type WireEventKind =
   | "trigger_sent"
   | "waiting_for_call";
 
+/** What each wire event means, from where Truman records it. */
+export const WIRE_EVENT_HELP: Record<WireEventKind, string> = {
+  connect_started: "Truman started the call: it dials the agent, or waits for the agent's call.",
+  waiting_for_call: "Truman waits for the agent to call the number it leased for this test.",
+  trigger_sent: "Truman sent the request that makes the agent call. The text below is the result.",
+  ringing: "Plivo reports that the agent's phone rings.",
+  answered: "The call is answered: the agent picked up, or Truman took the agent's call.",
+  connected: "The audio stream is open. Talk time and the recording start here.",
+  caller_audio_start:
+    "Truman started to send the caller's speech. This does not prove that the agent heard it.",
+  caller_audio_end: "Truman stopped sending the caller's speech.",
+  agent_audio:
+    "Sound from the agent's side started after a quiet stretch: speech, music, a beep or line noise.",
+  clear_audio:
+    "The agent started to speak, so Truman told Plivo to drop caller speech still queued. It cuts the caller off only when the caller was still speaking.",
+  silence_greeting: "The agent should speak first but stayed silent, so the caller said hello.",
+  stop: "Plivo stopped the audio stream.",
+  caller_error:
+    "Plivo could not play the caller's audio or reported an error, or a speech or model service of the caller failed.",
+};
+
 export const ACTIVE_STATUSES: ConversationStatus[] = ["queued", "running", "ending"];
 
 /** How a conversation went, from its status and end reason only: what happened, not who is at

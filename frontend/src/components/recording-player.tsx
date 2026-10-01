@@ -16,7 +16,9 @@ import {
   type PointerEvent,
   type ReactElement,
   type ReactNode,
+  type Ref,
   useCallback,
+  useImperativeHandle,
   useMemo,
   useRef,
   useState,
@@ -141,16 +143,24 @@ function slice(lane: Float32Array, from: number, to: number): number[] {
   });
 }
 
+/** What a page can ask of a loaded recording. */
+export interface PlayerHandle {
+  /** Plays from that second of the recording. */
+  playFrom: (seconds: number) => void;
+}
+
 /** The call recording as one waveform lane per channel: the agent on the left channel, the
  * caller on the right. `start` opens it at that second, for links to a moment. */
 export function RecordingPlayer({
   url,
   name,
   start = 0,
+  ref,
 }: {
   url: string | null;
   name: string;
   start?: number;
+  ref?: Ref<PlayerHandle>;
 }) {
   const recording = useRecording(url);
   if (url === null) {
@@ -160,10 +170,20 @@ export function RecordingPlayer({
     return <p className="text-sm text-destructive">The recording did not load.</p>;
   }
   if (recording.isPending) return <Skeleton className="h-40 w-full" />;
-  return <Player key={url} recording={recording.data} name={name} start={start} />;
+  return <Player key={url} recording={recording.data} name={name} start={start} ref={ref} />;
 }
 
-function Player({ recording, name, start }: { recording: Recording; name: string; start: number }) {
+function Player({
+  recording,
+  name,
+  start,
+  ref,
+}: {
+  recording: Recording;
+  name: string;
+  start: number;
+  ref?: Ref<PlayerHandle>;
+}) {
   const { src, duration, lanes } = recording;
   const stereo = lanes.length > 1;
   const maxZoom = 2 ** Math.max(0, Math.floor(Math.log2(lanes[0].length / BARS)));
@@ -273,6 +293,12 @@ function Player({ recording, name, start }: { recording: Recording; name: string
     setTime(element.currentTime);
     if (show) reveal(element.currentTime, false);
   };
+  useImperativeHandle(ref, () => ({
+    playFrom(seconds: number) {
+      seek(seconds, true);
+      void audio.current?.play();
+    },
+  }));
   const at = (event: PointerEvent<HTMLDivElement>) => {
     const box = event.currentTarget.getBoundingClientRect();
     return Math.min(Math.max((event.clientX - box.left) / box.width, 0), 1);
