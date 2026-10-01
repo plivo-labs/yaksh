@@ -2,6 +2,8 @@
 
 Simulate, evaluate and improve AI agents. One Python service plus a React frontend.
 
+Truman is open source and self-hosted: users run it on their own infrastructure. Plivo builds it and provides the phone network, but Plivo does not run it as a service. Design for outside users, not for Plivo-internal infrastructure.
+
 ## Layout
 
 ```
