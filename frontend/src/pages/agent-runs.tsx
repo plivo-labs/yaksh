@@ -1,7 +1,7 @@
 import { Link } from "react-router";
 
 import { Pager } from "@/components/pager";
-import { Panel, PanelHeader } from "@/components/panel";
+import { FoldingPanel } from "@/components/panel";
 import { RelativeTime } from "@/components/relative-time";
 import { RunStatusBadge } from "@/components/status-dot";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -20,8 +20,7 @@ function progress(run: RunSummary): string {
 export function AgentRuns({ agent }: { agent: Agent }) {
   const runs = useRuns(agent.id, usePageParam());
   return (
-    <Panel className="overflow-hidden">
-      <PanelHeader title="Runs" />
+    <FoldingPanel name="runs" title="Runs" count={runs.data?.total}>
       {runs.isPending ? (
         <div className="grid gap-3 p-5">
           <Skeleton className="h-10" />
@@ -56,6 +55,6 @@ export function AgentRuns({ agent }: { agent: Agent }) {
         </ul>
       )}
       <Pager className="border-t px-5 py-3" query={runs} pageSize={RUNS_PAGE} />
-    </Panel>
+    </FoldingPanel>
   );
 }

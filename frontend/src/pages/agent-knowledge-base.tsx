@@ -3,7 +3,7 @@ import { type DragEvent, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { DeleteConfirm, DiscardConfirm } from "@/components/confirm-dialogs";
-import { Panel, PanelHeader } from "@/components/panel";
+import { FoldingPanel } from "@/components/panel";
 import { Button } from "@/components/ui/button";
 import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -223,27 +223,33 @@ export function KnowledgeBasePanel({ source }: { source: KnowledgeBaseSource }) 
 
   return (
     <>
-      <Panel className="relative flex flex-col overflow-hidden" {...dropTarget}>
-        <PanelHeader title="Knowledge base" action={documents.length > 0 && addButtons} />
-        <input
-          ref={files}
-          type="file"
-          accept={EXTENSIONS.join(",")}
-          multiple
-          hidden
-          onChange={(e) => {
-            void addFiles(Array.from(e.target.files ?? []));
-            e.target.value = "";
-          }}
-        />
-
-        {progress && (
-          <p className="flex items-center gap-2 px-5 pt-4 text-sm text-muted-foreground">
-            <Spinner />
-            {progress}
-          </p>
-        )}
-
+      <input
+        ref={files}
+        type="file"
+        accept={EXTENSIONS.join(",")}
+        multiple
+        hidden
+        onChange={(e) => {
+          void addFiles(Array.from(e.target.files ?? []));
+          e.target.value = "";
+        }}
+      />
+      <FoldingPanel
+        name="knowledge-base"
+        title="Knowledge base"
+        count={documents.length}
+        action={addButtons}
+        notice={
+          progress && (
+            <p className="flex items-center gap-2 px-5 pt-4 text-sm text-muted-foreground">
+              <Spinner />
+              {progress}
+            </p>
+          )
+        }
+        className="relative"
+        {...dropTarget}
+      >
         {documents.length === 0 ? (
           <div className="flex flex-1 flex-col p-5">
             <div className="grid flex-1 content-center justify-items-center gap-4 rounded-lg border border-dashed px-6 py-8 text-center">
@@ -256,7 +262,6 @@ export function KnowledgeBasePanel({ source }: { source: KnowledgeBaseSource }) 
                   Add the FAQ, policies or product facts the agent answers from.
                 </p>
               </div>
-              {addButtons}
             </div>
           </div>
         ) : (
@@ -324,7 +329,7 @@ export function KnowledgeBasePanel({ source }: { source: KnowledgeBaseSource }) 
             </p>
           </div>
         )}
-      </Panel>
+      </FoldingPanel>
       {open !== null && (
         <DocumentSheet
           key={open === "new" ? "new" : open.document_id}

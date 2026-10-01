@@ -3,7 +3,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { DeleteConfirm } from "@/components/confirm-dialogs";
-import { Panel, PanelHeader } from "@/components/panel";
+import { FoldingPanel } from "@/components/panel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -182,186 +182,186 @@ export function AgentScenarios({ agent }: { agent: Agent }) {
   );
 
   return (
-    <Panel className="overflow-hidden">
-      <PanelHeader
+    <>
+      <FoldingPanel
+        name="scenarios"
         title="Scenarios"
+        count={scenarios.data ? items.length : undefined}
         action={
-          items.length > 0 && (
-            <div className="flex gap-2">
-              {generateButton("outline")}
-              {newButton}
-            </div>
-          )
-        }
-      />
-      {generation.progress && (
-        <GenerationNotice
-          progress={generation.progress}
-          onStop={generation.stop}
-          onDismiss={generation.dismiss}
-        />
-      )}
-      {scenarios.isPending ? (
-        <div className="grid gap-3 p-5">
-          <Skeleton className="h-11" />
-          <Skeleton className="h-11" />
-        </div>
-      ) : scenarios.isError ? (
-        <p className="px-5 py-4 text-sm text-destructive">{scenarios.error.message}</p>
-      ) : items.length === 0 ? (
-        <div className="grid justify-items-start gap-3 px-5 py-6">
-          <p className="text-sm text-muted-foreground">
-            No scenarios yet. Generate them from what Truman knows about the agent, or write one.
-          </p>
           <div className="flex gap-2">
-            {generateButton("default")}
+            {generateButton(scenarios.data && items.length === 0 ? "default" : "outline")}
             {newButton}
           </div>
-        </div>
-      ) : (
-        <>
-          <div className="flex min-h-12 flex-wrap items-center gap-3 border-b px-5 py-2">
-            <Checkbox
-              aria-label="Select all scenarios"
-              checked={allPicked}
-              indeterminate={selected.length > 0 && !allPicked}
-              onCheckedChange={(on) =>
-                setPicked(on ? new Set(items.map((item) => item.id)) : new Set())
-              }
+        }
+        notice={
+          generation.progress && (
+            <GenerationNotice
+              progress={generation.progress}
+              onStop={generation.stop}
+              onDismiss={generation.dismiss}
             />
-            {batches.length > 0 && (
-              <Select
-                items={filterItems}
-                value={shownBatch ?? ALL}
-                onValueChange={(value) => {
-                  setBatch(value === ALL ? null : value);
-                  setPicked(new Set());
-                }}
-              >
-                <SelectTrigger aria-label="Show scenarios from" size="sm" className="min-w-0">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    {filterItems.map((item) => (
-                      <SelectItem key={item.value} value={item.value}>
-                        {item.label}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-            )}
-            <div className="ml-auto flex gap-2">
-              {selected.length > 0 ? (
-                <>
-                  {bulk ? (
-                    <DropdownMenu disabled={assign.isPending || !personas.data?.length}>
-                      <DropdownMenuTrigger
-                        aria-label="Set the persona of the selected scenarios"
-                        render={<Button variant="outline" size="sm" />}
-                      >
-                        Set persona
-                        <ChevronDown />
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        {personas.data?.map((persona) => (
-                          <DropdownMenuItem key={persona.id} onClick={() => assignPersona(persona)}>
-                            {persona.name}
-                          </DropdownMenuItem>
-                        ))}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">
-                      Select at most {MAX_BULK} to change or delete them at once.
-                    </p>
-                  )}
-                  <Button size="sm" onClick={() => setRunning(true)}>
-                    <Play />
-                    Run {selected.length}
-                  </Button>
-                  {bulk && (
+          )
+        }
+      >
+        {scenarios.isPending ? (
+          <div className="grid gap-3 p-5">
+            <Skeleton className="h-11" />
+            <Skeleton className="h-11" />
+          </div>
+        ) : scenarios.isError ? (
+          <p className="px-5 py-4 text-sm text-destructive">{scenarios.error.message}</p>
+        ) : items.length === 0 ? (
+          <p className="px-5 py-6 text-sm text-muted-foreground">
+            No scenarios yet. Generate them from what Truman knows about the agent, or write one.
+          </p>
+        ) : (
+          <>
+            <div className="flex min-h-12 flex-wrap items-center gap-3 border-b px-5 py-2">
+              <Checkbox
+                aria-label="Select all scenarios"
+                checked={allPicked}
+                indeterminate={selected.length > 0 && !allPicked}
+                onCheckedChange={(on) =>
+                  setPicked(on ? new Set(items.map((item) => item.id)) : new Set())
+                }
+              />
+              {batches.length > 0 && (
+                <Select
+                  items={filterItems}
+                  value={shownBatch ?? ALL}
+                  onValueChange={(value) => {
+                    setBatch(value === ALL ? null : value);
+                    setPicked(new Set());
+                  }}
+                >
+                  <SelectTrigger aria-label="Show scenarios from" size="sm" className="min-w-0">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      {filterItems.map((item) => (
+                        <SelectItem key={item.value} value={item.value}>
+                          {item.label}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              )}
+              <div className="ml-auto flex gap-2">
+                {selected.length > 0 ? (
+                  <>
+                    {bulk ? (
+                      <DropdownMenu disabled={assign.isPending || !personas.data?.length}>
+                        <DropdownMenuTrigger
+                          aria-label="Set the persona of the selected scenarios"
+                          render={<Button variant="outline" size="sm" />}
+                        >
+                          Set persona
+                          <ChevronDown />
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          {personas.data?.map((persona) => (
+                            <DropdownMenuItem
+                              key={persona.id}
+                              onClick={() => assignPersona(persona)}
+                            >
+                              {persona.name}
+                            </DropdownMenuItem>
+                          ))}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">
+                        Select at most {MAX_BULK} to change or delete them at once.
+                      </p>
+                    )}
+                    <Button size="sm" onClick={() => setRunning(true)}>
+                      <Play />
+                      Run {selected.length}
+                    </Button>
+                    {bulk && (
+                      <DeleteConfirm
+                        name={counted(selected.length, "scenario", "scenarios")}
+                        label={`Delete ${selected.length} selected`}
+                        description="Past and queued conversations are not changed."
+                        pending={remove.isPending}
+                        onDelete={(close) => deleteScenarios(selected, close)}
+                      />
+                    )}
+                  </>
+                ) : (
+                  shownBatch && (
                     <DeleteConfirm
-                      name={counted(selected.length, "scenario", "scenarios")}
-                      label={`Delete ${selected.length} selected`}
+                      name={`this batch of ${counted(items.length, "scenario", "scenarios")}`}
+                      label="Delete this batch"
                       description="Past and queued conversations are not changed."
                       pending={remove.isPending}
-                      onDelete={(close) => deleteScenarios(selected, close)}
+                      onDelete={(close) =>
+                        deleteScenarios(
+                          items.map((item) => item.id),
+                          close,
+                        )
+                      }
                     />
-                  )}
-                </>
-              ) : (
-                shownBatch && (
-                  <DeleteConfirm
-                    name={`this batch of ${counted(items.length, "scenario", "scenarios")}`}
-                    label="Delete this batch"
-                    description="Past and queued conversations are not changed."
-                    pending={remove.isPending}
-                    onDelete={(close) =>
-                      deleteScenarios(
-                        items.map((item) => item.id),
-                        close,
-                      )
-                    }
-                  />
-                )
-              )}
+                  )
+                )}
+              </div>
             </div>
-          </div>
-          <ul className="divide-y">
-            {items.map((item) => (
-              <li key={item.id} className="flex items-center gap-3 pr-4 pl-5">
-                <Checkbox
-                  aria-label={`Select ${item.name}`}
-                  checked={picked.has(item.id)}
-                  onCheckedChange={(on) => pick(item.id, on)}
-                />
-                <button
-                  type="button"
-                  onClick={() => setEditing(item)}
-                  className="flex min-w-0 flex-1 items-center gap-6 rounded-md px-2 py-4 text-left outline-none transition-colors duration-150 hover:bg-foreground/[0.025] focus-visible:bg-foreground/[0.04] focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-inset"
-                >
-                  <span className="grid min-w-0 flex-1 gap-1">
-                    <span className="flex min-w-0 items-center gap-2">
-                      <span className="truncate text-sm font-medium">{item.name}</span>
-                      <Badge variant="outline" className="shrink-0">
-                        {CATEGORY_LABELS[item.category]}
-                      </Badge>
-                      {generation.newIds.has(item.id) && <Badge className="shrink-0">New</Badge>}
+            <ul className="divide-y">
+              {items.map((item) => (
+                <li key={item.id} className="flex items-center gap-3 pr-4 pl-5">
+                  <Checkbox
+                    aria-label={`Select ${item.name}`}
+                    checked={picked.has(item.id)}
+                    onCheckedChange={(on) => pick(item.id, on)}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setEditing(item)}
+                    className="flex min-w-0 flex-1 items-center gap-6 rounded-md px-2 py-4 text-left outline-none transition-colors duration-150 hover:bg-foreground/[0.025] focus-visible:bg-foreground/[0.04] focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-inset"
+                  >
+                    <span className="grid min-w-0 flex-1 gap-1">
+                      <span className="flex min-w-0 items-center gap-2">
+                        <span className="truncate text-sm font-medium">{item.name}</span>
+                        <Badge variant="outline" className="shrink-0">
+                          {CATEGORY_LABELS[item.category]}
+                        </Badge>
+                        {generation.newIds.has(item.id) && <Badge className="shrink-0">New</Badge>}
+                      </span>
+                      <span className="truncate text-sm text-muted-foreground">
+                        {item.description ?? item.goal}
+                      </span>
                     </span>
-                    <span className="truncate text-sm text-muted-foreground">
-                      {item.description ?? item.goal}
+                    <span className="hidden shrink-0 justify-items-end gap-1 text-xs text-muted-foreground sm:grid">
+                      <span>{personaName(item.persona_id)}</span>
+                      <span>
+                        {counted(item.known_facts.length, "fact", "facts")},{" "}
+                        {counted(item.criteria.length, "criterion", "criteria")}
+                      </span>
                     </span>
-                  </span>
-                  <span className="hidden shrink-0 justify-items-end gap-1 text-xs text-muted-foreground sm:grid">
-                    <span>{personaName(item.persona_id)}</span>
-                    <span>
-                      {counted(item.known_facts.length, "fact", "facts")},{" "}
-                      {counted(item.criteria.length, "criterion", "criteria")}
-                    </span>
-                  </span>
-                </button>
-                <StartCallDialog
-                  agents={agents.data ?? [agent]}
-                  agentId={agent.id}
-                  scenarioId={item.id}
-                  render={
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      aria-label={`${outbound ? "Trigger" : "Ring"} ${item.name}`}
-                    />
-                  }
-                >
-                  {outbound ? <PhoneIncoming /> : <PhoneOutgoing />}
-                  {outbound ? "Trigger" : "Ring"}
-                </StartCallDialog>
-              </li>
-            ))}
-          </ul>
-        </>
-      )}
+                  </button>
+                  <StartCallDialog
+                    agents={agents.data ?? [agent]}
+                    agentId={agent.id}
+                    scenarioId={item.id}
+                    render={
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        aria-label={`${outbound ? "Trigger" : "Ring"} ${item.name}`}
+                      />
+                    }
+                  >
+                    {outbound ? <PhoneIncoming /> : <PhoneOutgoing />}
+                    {outbound ? "Trigger" : "Ring"}
+                  </StartCallDialog>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+      </FoldingPanel>
 
       {editing !== null && (
         <ScenarioDialog
@@ -381,6 +381,6 @@ export function AgentScenarios({ agent }: { agent: Agent }) {
           onClosed={() => setGenerating(false)}
         />
       )}
-    </Panel>
+    </>
   );
 }

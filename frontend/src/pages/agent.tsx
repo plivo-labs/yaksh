@@ -5,7 +5,7 @@ import { toast } from "sonner";
 
 import { CopyId } from "@/components/copy-id";
 import { ConversationList } from "@/components/conversation-list";
-import { Fact, Panel, PanelHeader } from "@/components/panel";
+import { Fact, FoldingPanel, Panel, PanelHeader } from "@/components/panel";
 import { Settle } from "@/components/settle";
 import { Dot, StatusDot } from "@/components/status-dot";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -150,30 +150,31 @@ function Calls({ agent }: { agent: Agent }) {
   const calls = useConversations({ agent_id: agent.id }, 1, { pageSize: CALLS_SHOWN });
   const total = calls.data?.total ?? 0;
   return (
-    <Panel className="overflow-hidden">
-      <PanelHeader
-        title="Calls"
-        action={
-          total > CALLS_SHOWN && (
-            <Button
-              variant="ghost"
-              size="sm"
-              nativeButton={false}
-              render={<Link to={`/conversations?agent_id=${agent.id}`} />}
-            >
-              All {total} calls
-              <ChevronRight />
-            </Button>
-          )
-        }
-      />
+    <FoldingPanel
+      name="calls"
+      title="Calls"
+      count={calls.data?.total}
+      action={
+        total > CALLS_SHOWN && (
+          <Button
+            variant="ghost"
+            size="sm"
+            nativeButton={false}
+            render={<Link to={`/conversations?agent_id=${agent.id}`} />}
+          >
+            All {total} calls
+            <ChevronRight />
+          </Button>
+        )
+      }
+    >
       <ConversationList
         query={calls}
         place="panel"
         agentVersion={agent.current_version}
         empty="No calls yet. Ring a scenario above to place the first one."
       />
-    </Panel>
+    </FoldingPanel>
   );
 }
 
