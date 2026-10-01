@@ -28,7 +28,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
 import { copyText } from "@/lib/clipboard";
-import { duration } from "@/lib/format";
+import { duration, when } from "@/lib/format";
 import { useEndConversation } from "@/lib/queries";
 import {
   ACTIVE_STATUSES,
@@ -236,12 +236,12 @@ function ConversationRow({
   );
 }
 
-/** The scenario with what tells this row from the others of that scenario. */
+/** The scenario with what tells this row from the others of that scenario, in any run. */
 function label(conversation: ConversationSummary): string {
-  const parts = [conversation.scenario_name];
+  const parts = [conversation.scenario_name, conversation.persona_name];
   if (conversation.repeat !== null) parts.push(`repeat ${conversation.repeat}`);
   if (conversation.attempt > 1) parts.push(`attempt ${conversation.attempt}`);
-  parts.push(conversation.status);
+  parts.push(conversation.status, when(conversation.started_at ?? conversation.created_at));
   return parts.join(", ");
 }
 
