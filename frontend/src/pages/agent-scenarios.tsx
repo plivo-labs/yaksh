@@ -24,13 +24,13 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { type GenerationProgress, useGeneration } from "@/hooks/use-generation";
+import { usePersonaNames } from "@/hooks/use-persona-names";
 import { counted, when } from "@/lib/format";
 import {
   useAgents,
   useAssignPersona,
   useDeleteScenarios,
   useGenerations,
-  usePersonas,
   useScenarios,
 } from "@/lib/queries";
 import {
@@ -115,7 +115,7 @@ export function AgentScenarios({ agent }: { agent: Agent }) {
   const agents = useAgents();
   const remove = useDeleteScenarios(agent.id);
   const assign = useAssignPersona(agent.id);
-  const personas = usePersonas();
+  const { personas, name: personaName } = usePersonaNames();
   const generation = useGeneration(agent.id);
   const outbound = agent.direction === "outbound";
   const [editing, setEditing] = useState<Scenario | "new" | null>(null);
@@ -127,6 +127,8 @@ export function AgentScenarios({ agent }: { agent: Agent }) {
   const items = scenarios.data ?? [];
   const selected = items.filter((item) => picked.has(item.id)).map((item) => item.id);
   const allPicked = items.length > 0 && selected.length === items.length;
+  /** Changes to many scenarios at once are capped; a run is limited by the server's own cap. */
+  const bulk = selected.length <= MAX_BULK;
   const pick = (id: string, on: boolean) =>
     setPicked((current) => {
       const next = new Set(current);
@@ -144,7 +146,6 @@ export function AgentScenarios({ agent }: { agent: Agent }) {
         toast.error("Could not delete the scenarios", { description: error.message }),
       onSettled: close,
     });
-  const personaNames = new Map((personas.data ?? []).map((persona) => [persona.id, persona.name]));
   const assignPersona = (persona: Persona) =>
     assign.mutate(
       { scenario_ids: selected, persona_id: persona.id },
@@ -252,37 +253,43 @@ export function AgentScenarios({ agent }: { agent: Agent }) {
               </Select>
             )}
             <div className="ml-auto flex gap-2">
-              {selected.length > MAX_BULK ? (
-                <p className="text-sm text-muted-foreground">Select at most {MAX_BULK} at once.</p>
-              ) : selected.length > 0 ? (
+              {selected.length > 0 ? (
                 <>
-                  <DropdownMenu disabled={assign.isPending || !personas.data?.length}>
-                    <DropdownMenuTrigger
-                      aria-label="Set the persona of the selected scenarios"
-                      render={<Button variant="outline" size="sm" />}
-                    >
-                      Set persona
-                      <ChevronDown />
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      {personas.data?.map((persona) => (
-                        <DropdownMenuItem key={persona.id} onClick={() => assignPersona(persona)}>
-                          {persona.name}
-                        </DropdownMenuItem>
-                      ))}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                  {bulk ? (
+                    <DropdownMenu disabled={assign.isPending || !personas.data?.length}>
+                      <DropdownMenuTrigger
+                        aria-label="Set the persona of the selected scenarios"
+                        render={<Button variant="outline" size="sm" />}
+                      >
+                        Set persona
+                        <ChevronDown />
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        {personas.data?.map((persona) => (
+                          <DropdownMenuItem key={persona.id} onClick={() => assignPersona(persona)}>
+                            {persona.name}
+                          </DropdownMenuItem>
+                        ))}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      Select at most {MAX_BULK} to change or delete them at once.
+                    </p>
+                  )}
                   <Button size="sm" onClick={() => setRunning(true)}>
                     <Play />
                     Run {selected.length}
                   </Button>
-                  <DeleteConfirm
-                    name={counted(selected.length, "scenario", "scenarios")}
-                    label={`Delete ${selected.length} selected`}
-                    description="Past and queued conversations are not changed."
-                    pending={remove.isPending}
-                    onDelete={(close) => deleteScenarios(selected, close)}
-                  />
+                  {bulk && (
+                    <DeleteConfirm
+                      name={counted(selected.length, "scenario", "scenarios")}
+                      label={`Delete ${selected.length} selected`}
+                      description="Past and queued conversations are not changed."
+                      pending={remove.isPending}
+                      onDelete={(close) => deleteScenarios(selected, close)}
+                    />
+                  )}
                 </>
               ) : (
                 shownBatch && (
@@ -328,7 +335,7 @@ export function AgentScenarios({ agent }: { agent: Agent }) {
                     </span>
                   </span>
                   <span className="hidden shrink-0 justify-items-end gap-0.5 text-xs text-muted-foreground sm:grid">
-                    <span>{personaNames.get(item.persona_id)}</span>
+                    <span>{personaName(item.persona_id)}</span>
                     <span>
                       {counted(item.known_facts.length, "fact", "facts")},{" "}
                       {counted(item.criteria.length, "criterion", "criteria")}
@@ -365,11 +372,7 @@ export function AgentScenarios({ agent }: { agent: Agent }) {
         />
       )}
       {running && (
-        <RunDialog
-          agent={agent}
-          choices={{ scenarios: items.filter((item) => picked.has(item.id)) }}
-          onClosed={() => setRunning(false)}
-        />
+        <RunDialog agent={agent} scenarioIds={selected} onClosed={() => setRunning(false)} />
       )}
       {generating && (
         <GenerateDialog

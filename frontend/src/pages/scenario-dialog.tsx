@@ -3,6 +3,7 @@ import { type SubmitEvent, useState } from "react";
 import { toast } from "sonner";
 
 import { DeleteConfirm, DiscardConfirm } from "@/components/confirm-dialogs";
+import { PersonaSelect } from "@/components/persona-select";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -219,10 +220,6 @@ export function ScenarioDialog({
   const removeListItem = (key: "unknown_facts" | "criteria", index: number) =>
     change((current) => ({ [key]: current[key].filter((_, at) => at !== index) }));
 
-  const personaItems = (personas.data ?? []).map((persona) => ({
-    value: persona.id,
-    label: persona.name,
-  }));
   const outbound = agent.direction === "outbound";
   const halfFact = (facts: Fact[]) => facts.some((fact) => !fact.name || !fact.value);
   const halfKnown = halfFact(input.known_facts);
@@ -310,31 +307,14 @@ export function ScenarioDialog({
 
             <Field>
               <FieldLabel htmlFor="scenario-persona">Persona</FieldLabel>
-              <Select
-                items={personaItems}
+              <PersonaSelect
+                id="scenario-persona"
                 value={input.persona_id}
-                onValueChange={(value) => value && change(() => ({ persona_id: value }))}
-                disabled={personaItems.length === 0}
-              >
-                <SelectTrigger
-                  id="scenario-persona"
-                  className="w-full"
-                  aria-invalid={submitted && !input.persona_id}
-                >
-                  <SelectValue placeholder="No personas yet" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    {personaItems.map((item) => (
-                      <SelectItem key={item.value} value={item.value}>
-                        {item.label}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
+                onValueChange={(value) => change(() => ({ persona_id: value }))}
+                invalid={submitted && !input.persona_id}
+              />
               <FieldDescription>How the caller talks: style, language and voice.</FieldDescription>
-              {submitted && !input.persona_id && (
+              {submitted && personas.data?.length === 0 && (
                 <FieldError className={APPEAR}>Create a persona first.</FieldError>
               )}
             </Field>

@@ -14,18 +14,11 @@ import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/c
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { counted } from "@/lib/format";
-import { usePersonas, usePhoneNumbers, useStartRun } from "@/lib/queries";
-import type { AgentSummary, RunSummary, Scenario } from "@/lib/types";
+import { usePersonaNames } from "@/hooks/use-persona-names";
+import { usePhoneNumbers, useScenarios, useStartRun } from "@/lib/queries";
+import type { AgentSummary, RunSummary } from "@/lib/types";
 
 const APPEAR = "transition-opacity duration-150 ease-out starting:opacity-0";
-
-/** What the dialog opens with: the scenarios to run, and for "Run again" the earlier run. */
-export interface RunChoices {
-  scenarios: Scenario[];
-  earlier?: RunSummary;
-  /** Scenarios of the earlier run that no longer exist. */
-  leftOut?: number;
-}
 
 /** A whole number from an input, null when it is empty, NaN when it is not a whole number. */
 function whole(value: string): number | null {
@@ -45,16 +38,19 @@ function text(value: number | null | undefined): string {
   return value === null || value === undefined ? "" : String(value);
 }
 
+/** Starts a run of the scenarios, in the order given. For "Run again", `earlier` fills the
+ * fields, and scenarios deleted since are left out. */
 export function RunDialog({
   agent,
-  choices,
+  scenarioIds,
+  earlier,
   onClosed,
 }: {
   agent: AgentSummary;
-  choices: RunChoices;
+  scenarioIds: string[];
+  earlier?: RunSummary;
   onClosed: () => void;
 }) {
-  const { scenarios, earlier, leftOut = 0 } = choices;
   const [open, setOpen] = useState(true);
   const [requestKey] = useState(newRequestKey);
   const [name, setName] = useState(earlier?.name ?? "");
@@ -64,10 +60,15 @@ export function RunDialog({
   const [delay, setDelay] = useState(text(earlier?.start_interval_s));
   const [retries, setRetries] = useState(text(earlier?.max_retries));
   const [submitted, setSubmitted] = useState(false);
-  const personas = usePersonas();
+  const loaded = useScenarios(agent.id);
+  const { personas, name: personaName } = usePersonaNames();
   const numbers = usePhoneNumbers();
   const start = useStartRun(requestKey);
   const navigate = useNavigate();
+
+  const byId = new Map((loaded.data ?? []).map((scenario) => [scenario.id, scenario]));
+  const scenarios = scenarioIds.flatMap((id) => byId.get(id) ?? []);
+  const leftOut = loaded.data ? scenarioIds.length - scenarios.length : 0;
 
   const repeatCount = whole(repeats);
   const duration = whole(maxDuration);
@@ -83,10 +84,9 @@ export function RunDialog({
     scenarios.length > 0 && repeatsOk && durationOk && parallelOk && intervalOk && retriesOk;
   const total = scenarios.length * (repeatsOk ? repeatCount : 0);
 
-  const personaNames = new Map((personas.data ?? []).map((persona) => [persona.id, persona.name]));
   const perPersona = new Map<string, number>();
   for (const scenario of scenarios) {
-    const persona = personaNames.get(scenario.persona_id) ?? "Unknown persona";
+    const persona = personaName(scenario.persona_id);
     perPersona.set(persona, (perPersona.get(persona) ?? 0) + 1);
   }
   const outbound = agent.direction === "outbound";
@@ -135,15 +135,31 @@ export function RunDialog({
         >
           <FieldGroup className="pb-6">
             <div className="grid gap-1 rounded-md bg-muted/50 px-3 py-2.5 text-sm">
-              <p className="font-medium tabular-nums">
-                {counted(total, "conversation", "conversations")}:{" "}
-                {counted(scenarios.length, "scenario", "scenarios")},{" "}
-                {repeatsOk ? counted(repeatCount, "repeat", "repeats") : "no repeats"}
-              </p>
-              <p className="text-muted-foreground">
-                Personas:{" "}
-                {[...perPersona].map(([persona, count]) => `${persona} ${count}`).join(", ")}
-              </p>
+              {loaded.isError ? (
+                <p role="alert" className="text-destructive">
+                  Could not load the scenarios: {loaded.error.message}
+                </p>
+              ) : loaded.isPending ? (
+                <p className="text-muted-foreground">Loading the scenarios</p>
+              ) : (
+                <>
+                  <p className="font-medium tabular-nums">
+                    {counted(total, "conversation", "conversations")}:{" "}
+                    {counted(scenarios.length, "scenario", "scenarios")},{" "}
+                    {repeatsOk ? counted(repeatCount, "repeat", "repeats") : "no repeats"}
+                  </p>
+                  <p className="text-muted-foreground">
+                    Personas:{" "}
+                    {personas.isError
+                      ? `could not load them: ${personas.error.message}`
+                      : personas.isPending
+                        ? "loading"
+                        : [...perPersona]
+                            .map(([persona, count]) => `${persona} ${count}`)
+                            .join(", ")}
+                  </p>
+                </>
+              )}
               {numbers.data && (
                 <p className="text-muted-foreground">
                   {outbound
@@ -153,8 +169,9 @@ export function RunDialog({
               )}
               {leftOut > 0 && (
                 <p className="text-muted-foreground">
-                  {counted(leftOut, "scenario", "scenarios")} of the earlier run no longer{" "}
-                  {leftOut === 1 ? "exists" : "exist"} and {leftOut === 1 ? "is" : "are"} left out.
+                  {counted(leftOut, "scenario", "scenarios")}
+                  {earlier && " of the earlier run"} no longer {leftOut === 1 ? "exists" : "exist"}{" "}
+                  and {leftOut === 1 ? "is" : "are"} left out.
                 </p>
               )}
             </div>

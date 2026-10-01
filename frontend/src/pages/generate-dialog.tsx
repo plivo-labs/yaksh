@@ -199,6 +199,12 @@ export function GenerateDialog({
               <FieldDescription>
                 A job or question gets a checked persona again only after it got all of them.
               </FieldDescription>
+              {personas.isPending && (
+                <p className="text-sm text-muted-foreground">Loading personas</p>
+              )}
+              {personas.isError && (
+                <FieldError>Could not load the personas: {personas.error.message}</FieldError>
+              )}
               <ul className="grid gap-2">
                 {personaList.map((persona) => (
                   <li key={persona.id} className="flex items-center gap-3">
@@ -216,7 +222,7 @@ export function GenerateDialog({
                   </li>
                 ))}
               </ul>
-              {submitted && !personasValid && (
+              {submitted && personas.isSuccess && !personasValid && (
                 <FieldError className={APPEAR}>
                   {personaList.length === 0
                     ? "Create a persona first."

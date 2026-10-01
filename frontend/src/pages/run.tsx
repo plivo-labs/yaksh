@@ -22,7 +22,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { usePageParam } from "@/hooks/use-page-param";
-import { Spinner } from "@/components/ui/spinner";
 import { duration, runTitle, runTotal, when } from "@/lib/format";
 import {
   CONVERSATIONS_PAGE,
@@ -30,7 +29,6 @@ import {
   useCancelRun,
   useConversations,
   useRun,
-  useScenarios,
 } from "@/lib/queries";
 import {
   ACTIVE_RUN_STATUSES,
@@ -158,15 +156,7 @@ function RunActions({ run }: { run: Run }) {
   const cancel = useCancelRun(run.id);
   const [again, setAgain] = useState(false);
   const agent = useAgent(run.agent_id);
-  const scenarios = useScenarios(run.agent_id, again);
   const active = ACTIVE_RUN_STATUSES.includes(run.status);
-  const byId = new Map((scenarios.data ?? []).map((scenario) => [scenario.id, scenario]));
-  const still = run.scenario_ids.flatMap((id) => byId.get(id) ?? []);
-  const loading = again && scenarios.isFetching;
-  const runAgain = () => {
-    setAgain(true);
-    if (scenarios.isError) void scenarios.refetch();
-  };
   return (
     <div className="grid justify-items-end gap-2">
       <div className="flex gap-2">
@@ -200,24 +190,16 @@ function RunActions({ run }: { run: Run }) {
             </AlertDialogContent>
           </AlertDialog>
         )}
-        <Button variant="outline" disabled={!agent.data || loading} onClick={runAgain}>
-          {loading ? <Spinner /> : <Play />}
+        <Button variant="outline" disabled={!agent.data} onClick={() => setAgain(true)}>
+          <Play />
           Run again
         </Button>
       </div>
-      {again && scenarios.isError && !loading && (
-        <p role="alert" className="text-sm text-destructive">
-          Could not load the scenarios: {scenarios.error.message}
-        </p>
-      )}
-      {again && agent.data && scenarios.data && (
+      {again && agent.data && (
         <RunDialog
           agent={agent.data}
-          choices={{
-            scenarios: still,
-            earlier: run,
-            leftOut: run.scenario_ids.length - still.length,
-          }}
+          scenarioIds={run.scenario_ids}
+          earlier={run}
           onClosed={() => setAgain(false)}
         />
       )}

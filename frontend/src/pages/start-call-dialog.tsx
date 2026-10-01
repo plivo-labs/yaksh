@@ -2,6 +2,7 @@ import { Plus } from "lucide-react";
 import { type ReactElement, type ReactNode, type SubmitEvent, useState } from "react";
 import { useNavigate } from "react-router";
 
+import { PersonaSelect } from "@/components/persona-select";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -24,7 +25,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
-import { usePersonas, useScenarios, useStartConversation } from "@/lib/queries";
+import { useScenarios, useStartConversation } from "@/lib/queries";
 import type { AgentSummary } from "@/lib/types";
 import { ScenarioDialog } from "@/pages/scenario-dialog";
 
@@ -47,7 +48,6 @@ export function StartCallDialog({
   const [scenarioId, setScenarioId] = useState(presetScenario);
   const [creating, setCreating] = useState(false);
   const [maxDuration, setMaxDuration] = useState("");
-  const personas = usePersonas();
   const start = useStartConversation();
   const navigate = useNavigate();
   const chosenAgent = agents.find((agent) => agent.id === agentId) ?? agents[0];
@@ -67,10 +67,6 @@ export function StartCallDialog({
     label: scenario.name,
   }));
   const agentItems = agents.map((agent) => ({ value: agent.id, label: agent.name }));
-  const personaItems = (personas.data ?? []).map((persona) => ({
-    value: persona.id,
-    label: persona.name,
-  }));
   const duration = maxDuration.trim() === "" ? null : Number(maxDuration);
   const durationOk =
     duration === null || (Number.isInteger(duration) && duration >= 10 && duration <= 1800);
@@ -175,24 +171,7 @@ export function StartCallDialog({
             </Field>
             <Field>
               <FieldLabel htmlFor="persona">Persona</FieldLabel>
-              <Select
-                items={personaItems}
-                value={chosenPersona}
-                onValueChange={(value) => setPersonaId(value ?? "")}
-              >
-                <SelectTrigger id="persona" className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    {personaItems.map((item) => (
-                      <SelectItem key={item.value} value={item.value}>
-                        {item.label}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
+              <PersonaSelect id="persona" value={chosenPersona} onValueChange={setPersonaId} />
             </Field>
             <Field>
               <FieldLabel htmlFor="max_duration">Time limit</FieldLabel>
