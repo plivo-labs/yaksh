@@ -1,5 +1,6 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { Fragment, useEffect, useRef, useState } from "react";
+import { useDefaultLayout } from "react-resizable-panels";
 import { Link, useParams, useSearchParams } from "react-router";
 
 import { type PlayerHandle, RecordingPlayer } from "@/components/recording-player";
@@ -39,6 +40,7 @@ import {
   MessageScrollerViewport,
   useMessageScroller,
 } from "@/components/ui/message-scroller";
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { Switch } from "@/components/ui/switch";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -48,6 +50,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { useStoredBoolean } from "@/hooks/use-stored-boolean";
 import { keys, useAgent, useConversation, useEndConversation } from "@/lib/queries";
 import { subscribe } from "@/lib/sse";
+import { storage } from "@/lib/storage";
 import {
   END_REASON_LABELS,
   ACTIVE_STATUSES,
@@ -66,6 +69,11 @@ export function ConversationPage() {
   const conversation = useConversation(id);
   const agent = useAgent(conversation.data?.agent_id);
   const end = useEndConversation(id);
+  const layout = useDefaultLayout({
+    id: "truman.conversation",
+    storage,
+    onlySaveAfterUserInteractions: true,
+  });
   useLiveUpdates(id, conversation.data?.status);
 
   if (conversation.isPending) return <Skeleton className="h-96 w-full" />;
@@ -81,7 +89,7 @@ export function ConversationPage() {
   const active = ACTIVE_STATUSES.includes(data.status);
 
   return (
-    <div className="flex min-h-full flex-col gap-6 lg:h-full">
+    <div className="flex h-full flex-col gap-6">
       <div className="flex shrink-0 flex-wrap items-start justify-between gap-4">
         <div className="grid gap-1.5">
           <div className="flex items-center gap-3">
@@ -156,33 +164,43 @@ export function ConversationPage() {
         )}
       </div>
 
-      <div className="grid gap-6 lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(0,1fr)_20rem] lg:grid-rows-[minmax(0,1fr)]">
-        <CallPane key={data.id} conversation={data} start={Number(params.get("t")) || 0} />
-        <ScrollArea className="lg:min-h-0">
-          <div className="flex flex-col gap-6 p-px lg:pr-4">
-            <ScenarioCard name={data.scenario_name} scenario={data.scenario} />
-            <Card>
-              <CardHeader>
-                <RailTitle role="Caller" name={data.persona_name} />
-                <CardDescription>
-                  {LANGUAGE_NAMES[data.language]}, <CallerLine conversation={data} />, up to{" "}
-                  {data.max_duration_s}s once connected
-                  {data.call_uuid && (
-                    <>
-                      {" · Plivo call "}
-                      <span className="font-mono">{data.call_uuid}</span>
-                    </>
-                  )}
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="grid gap-3 text-sm">
-                <CallerPrompt instructions={data.instructions} />
-              </CardContent>
-            </Card>
-            <WireEvents events={data.wire_events} validity={data.validity} />
-          </div>
-        </ScrollArea>
-      </div>
+      <ResizablePanelGroup
+        orientation="horizontal"
+        className="min-h-0 flex-1"
+        defaultLayout={layout.defaultLayout}
+        onLayoutChanged={layout.onLayoutChanged}
+      >
+        <ResizablePanel id="call" minSize="35%">
+          <CallPane key={data.id} conversation={data} start={Number(params.get("t")) || 0} />
+        </ResizablePanel>
+        <ResizableHandle withHandle />
+        <ResizablePanel id="details" defaultSize={320} minSize={260} maxSize="50%">
+          <ScrollArea className="h-full">
+            <div className="flex flex-col gap-6 p-px pr-4 pl-3">
+              <ScenarioCard name={data.scenario_name} scenario={data.scenario} />
+              <Card>
+                <CardHeader>
+                  <RailTitle role="Caller" name={data.persona_name} />
+                  <CardDescription>
+                    {LANGUAGE_NAMES[data.language]}, <CallerLine conversation={data} />, up to{" "}
+                    {data.max_duration_s}s once connected
+                    {data.call_uuid && (
+                      <>
+                        {" · Plivo call "}
+                        <span className="font-mono">{data.call_uuid}</span>
+                      </>
+                    )}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="grid gap-3 text-sm">
+                  <CallerPrompt instructions={data.instructions} />
+                </CardContent>
+              </Card>
+              <WireEvents events={data.wire_events} validity={data.validity} />
+            </div>
+          </ScrollArea>
+        </ResizablePanel>
+      </ResizablePanelGroup>
     </div>
   );
 }
@@ -195,7 +213,7 @@ function CallPane({ conversation, start }: { conversation: Conversation; start: 
   /** The recording starts when the call connects; turn times count from the dial. */
   const connectedMs = conversation.wire_events.find((event) => event.kind === "connected")?.at_ms;
   return (
-    <div className="flex flex-col gap-6 lg:min-h-0">
+    <div className="flex h-full flex-col gap-6 p-px pr-3">
       <Card className="shrink-0">
         <CardHeader>
           <CardTitle>Recording</CardTitle>
@@ -460,7 +478,7 @@ function Transcript({
 }) {
   const [follow, setFollow] = useStoredBoolean("truman.transcript.follow", true);
   return (
-    <Card className="lg:min-h-0">
+    <Card className="min-h-0">
       <CardHeader className="shrink-0">
         <CardTitle>Transcript</CardTitle>
         {onPlay && (
@@ -472,7 +490,7 @@ function Transcript({
           </CardAction>
         )}
       </CardHeader>
-      <CardContent className="lg:min-h-0 lg:flex-1">
+      <CardContent className="min-h-0 flex-1">
         {turns.length === 0 ? (
           <p className="text-sm text-muted-foreground">
             {active ? waiting : "Nothing was transcribed."}
@@ -481,7 +499,7 @@ function Transcript({
           <MessageScrollerProvider autoScroll>
             <MessageScroller>
               {onPlay && <FollowAudio index={follow ? heard : null} />}
-              <MessageScrollerViewport className="lg:pr-4">
+              <MessageScrollerViewport className="pr-4">
                 <MessageScrollerContent className="gap-4">
                   {turns.map((turn, index) => {
                     const at = Math.max(0, turn.started_at_ms - connectedMs);
