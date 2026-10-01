@@ -59,7 +59,7 @@ class Rig:
             public_url=self.public_url,
             ring_timeout_s=1,
         )
-        return PhoneCaller(settings, self.registry, self.api)
+        return PhoneCaller(settings, self.registry, self.api, turn_options={})
 
     async def report(self, conversation_id: uuid.UUID, **fields: str) -> None:
         path = f"/callbacks/{conversation_id}"

@@ -14,7 +14,8 @@ log = logging.getLogger(__name__)
 
 RETRIES = 1
 """One retry: someone is waiting for the answer in the console."""
-CHECK_TIMEOUT_S = 60.0
+CHECK_TIMEOUT_S = 15.0
+"""For one try of the reasoning check, which takes about a second even at the highest effort."""
 
 
 class OpenAIJsonModel:
@@ -41,7 +42,8 @@ class OpenAIJsonModel:
         return cls(client, model, reasoning_effort)
 
     async def _reasoning(self) -> dict[str, str]:
-        """The reasoning effort to send, when the model takes it; asked on the first call."""
+        """The reasoning effort to send, when the model takes it. Asked on the first call, and on
+        each later call until a check gets an answer."""
         effort = self._reasoning_effort
         if effort is None:
             return {}
@@ -92,27 +94,25 @@ class OpenAIJsonModel:
         await self._client.close()
 
 
-async def takes_reasoning_effort(client: AsyncOpenAI, model: str, effort: str) -> bool:
+async def takes_reasoning_effort(client: AsyncOpenAI, model: str, effort: str) -> bool | None:
     """Whether the model takes `reasoning_effort` at this level. A model without reasoning,
-    such as gpt-4.1, refuses the parameter. A refusal or any other failure counts as no, so the
-    model then runs at its own default."""
+    such as gpt-4.1, refuses the parameter with a 400, as does a reasoning model asked for a
+    level it lacks. None when the check fails another way, such as a timeout or an outage: the
+    answer is still open."""
     try:
-        await client.with_options(timeout=CHECK_TIMEOUT_S).chat.completions.create(
+        await client.with_options(timeout=CHECK_TIMEOUT_S, max_retries=0).chat.completions.create(
             model=model,
             messages=[{"role": "user", "content": "Say ok."}],
             extra_body={"reasoning_effort": effort},
         )
-    except openai.BadRequestError:
-        taken = False
+    except openai.BadRequestError as error:
+        log.info("model %s does not take reasoning effort %s: %s", model, effort, failure(error))
+        return False
     except openai.OpenAIError as error:
         log.warning("could not check reasoning effort %s on %s: %s", effort, model, failure(error))
-        taken = False
-    else:
-        taken = True
-    log.info(
-        "model %s %s reasoning effort %s", model, "takes" if taken else "does not take", effort
-    )
-    return taken
+        return None
+    log.info("model %s takes reasoning effort %s", model, effort)
+    return True
 
 
 def failure(error: openai.OpenAIError) -> str:

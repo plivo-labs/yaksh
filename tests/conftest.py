@@ -6,12 +6,15 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from httpx import ASGITransport, AsyncClient, Response
 from sqlalchemy import ColumnElement, func, text, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from testcontainers.community.postgres import PostgresContainer
 
 from truman.api import create_app
+from truman.caller.plivo_server import PlivoServer
 from truman.config import Settings
 from truman.db.migrate import upgrade_to_head
 from truman.db.models import Conversation, Voice
@@ -627,3 +630,70 @@ async def worker(
     stop.set()
     await task
     await engine.dispose()
+
+
+def completion(
+    content: str | None, refusal: str | None = None, finish_reason: str = "stop"
+) -> dict[str, Any]:
+    return {
+        "id": "chatcmpl-1",
+        "object": "chat.completion",
+        "created": 0,
+        "model": "gpt-4.1",
+        "choices": [
+            {
+                "index": 0,
+                "message": {"role": "assistant", "content": content, "refusal": refusal},
+                "finish_reason": finish_reason,
+            }
+        ],
+        "usage": {"prompt_tokens": 12, "completion_tokens": 3, "total_tokens": 15},
+    }
+
+
+UNSUPPORTED = {
+    "error": {
+        "message": "Unsupported parameter: 'reasoning_effort' is not supported with this model.",
+        "type": "invalid_request_error",
+        "code": "unsupported_parameter",
+    }
+}
+OUTAGE = {"error": {"message": "The service is temporarily unavailable.", "type": "server_error"}}
+
+
+class FakeProvider:
+    """An OpenAI-compatible chat API that records each request."""
+
+    def __init__(self) -> None:
+        self.requests: list[tuple[str, dict[str, str], dict[str, Any]]] = []
+        self.reply: tuple[int, dict[str, Any]] = (200, completion('{"answer": "yes"}'))
+        self.reasoning = True
+        """Whether the model takes reasoning_effort; gpt-4.1 refuses it with a 400."""
+        self.outages = 0
+        """How many of the next requests fail with a 503."""
+
+    def efforts(self) -> list[str | None]:
+        return [body.get("reasoning_effort") for _, _, body in self.requests]
+
+
+@pytest.fixture
+async def provider() -> AsyncIterator[tuple[str, FakeProvider]]:
+    fake = FakeProvider()
+    app = FastAPI()
+
+    @app.post("/{path:path}")
+    async def chat(path: str, request: Request) -> JSONResponse:
+        sent = await request.json()
+        fake.requests.append((f"/{path}", dict(request.query_params), sent))
+        if fake.outages:
+            fake.outages -= 1
+            return JSONResponse(OUTAGE, status_code=503)
+        if not fake.reasoning and "reasoning_effort" in sent:
+            return JSONResponse(UNSUPPORTED, status_code=400)
+        status, body = fake.reply
+        return JSONResponse(body, status_code=status)
+
+    server = PlivoServer(app, port=0)
+    await server.start()
+    yield f"http://127.0.0.1:{server.port}", fake
+    await server.stop(2.0)

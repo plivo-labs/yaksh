@@ -57,6 +57,8 @@ from truman.integrations.openai_models import takes_reasoning_effort
 log = logging.getLogger(__name__)
 
 END_GRACE_S = 3.0
+CHECK_ATTEMPTS = 3
+CHECK_PAUSE_S = 2.0
 DRAINED = frozenset({EndReason.CALLER_HANGUP})
 VAD = VADParams(confidence=0.5, start_secs=0.1, stop_secs=0.6)
 IDLE_S = 15.0
@@ -94,14 +96,23 @@ def provider_keys(settings: Settings) -> dict[str, str]:
     return {name: value.get_secret_value() for name, value in keys.items() if value}
 
 
-async def persona_turn_options(settings: Settings, keys: dict[str, str]) -> dict[str, str]:
+async def persona_turn_options(settings: Settings) -> dict[str, str]:
     """What each persona turn sends besides its messages: the reasoning effort, when the model
-    takes it."""
+    takes it. The worker asks when it starts. When no check gets an answer, the turns go
+    without the effort until the worker restarts."""
     effort = settings.persona_llm_reasoning_effort
+    taken: bool | None = None
     async with AsyncOpenAI(
-        api_key=keys["OPENAI_API_KEY"], base_url=settings.openai_base_url
+        api_key=provider_keys(settings)["OPENAI_API_KEY"], base_url=settings.openai_base_url
     ) as client:
-        taken = await takes_reasoning_effort(client, settings.persona_llm_model, effort)
+        for attempt in range(CHECK_ATTEMPTS):
+            if attempt:
+                await asyncio.sleep(CHECK_PAUSE_S)
+            taken = await takes_reasoning_effort(client, settings.persona_llm_model, effort)
+            if taken is not None:
+                break
+    if taken is None:
+        log.warning("caller turns go without reasoning effort %s until the worker restarts", effort)
     return {"reasoning_effort": effort} if taken else {}
 
 
