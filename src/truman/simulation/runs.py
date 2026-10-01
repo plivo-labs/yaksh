@@ -53,8 +53,7 @@ ENDED = (
 
 
 def with_defaults(settings: Settings, command: RunCreate) -> RunCreate:
-    """The request with the operator's defaults filled in, so a request that writes them out
-    hashes the same as one that leaves them out."""
+    """The request with the operator's defaults in place of the fields it leaves out."""
     return command.model_copy(
         update={
             "max_duration_s": command.max_duration_s or settings.default_max_duration_s,
@@ -93,11 +92,11 @@ async def create_run(
     started, whatever changed since. The key is looked up first, and again once the agent's
     lock is held, so a request that waited for another one with its key returns that run; a
     request for another agent collides with it on the unique key instead."""
-    command = with_defaults(settings, command)
     request_hash = command.request_hash() if request_key is not None else None
     earlier = await earlier_run(session, request_key, request_hash)
     if earlier is not None:
         return earlier
+    command = with_defaults(settings, command)
     check_limits(settings, command)
     agent = await get_agent(session, command.agent_id, lock=True)
     earlier = await earlier_run(session, request_key, request_hash)

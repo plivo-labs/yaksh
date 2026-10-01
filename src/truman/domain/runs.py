@@ -44,8 +44,9 @@ class RunCreate(BaseModel):
         return ids
 
     def request_hash(self) -> str:
-        """The same for the same request with its defaults applied, so a repeated request can
-        be told from another request with the same idempotency key."""
+        """The same for the same request, so a repeated request can be told from another request
+        with the same idempotency key. It covers the request before the operator's defaults,
+        which can change between the two."""
         body = json.dumps(self.model_dump(mode="json"), sort_keys=True)
         return hashlib.sha256(body.encode()).hexdigest()
 

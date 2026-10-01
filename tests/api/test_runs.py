@@ -1,6 +1,8 @@
 import asyncio
 import re
 import uuid
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 
@@ -193,9 +195,7 @@ async def test_a_repeated_request_returns_its_run_and_its_key_cannot_start_anoth
     scenario = (await create_scenario(client, agent))["id"]
 
     first = await start_run(client, agent, [scenario], key="nightly-1")
-    again = await start_run(
-        client, agent, [scenario], key="nightly-1", max_duration_s=300, max_retries=1
-    )
+    again = await start_run(client, agent, [scenario], key="nightly-1", repeats=1)
     other = await start_run(client, agent, [scenario], key="nightly-1", repeats=2)
     unkeyed = await start_run(client, agent, [scenario])
 
@@ -203,6 +203,20 @@ async def test_a_repeated_request_returns_its_run_and_its_key_cannot_start_anoth
     assert again.json()["id"] == first.json()["id"] != unkeyed.json()["id"]
     assert other.status_code == 409 and "Idempotency-Key" in other.json()["error"]["message"]
     assert (await client.get("/api/v1/conversations")).json()["total"] == 2
+
+
+async def test_a_repeated_request_returns_its_run_after_the_operator_changes_the_defaults(
+    client: AsyncClient, settings: Settings
+) -> None:
+    agent = await create_agent_id(client)
+    scenario = (await create_scenario(client, agent))["id"]
+    first = await start_run(client, agent, [scenario], key="nightly-3")
+
+    async with client_with(settings, default_max_duration_s=600, max_run_retries=0) as changed:
+        again = await start_run(changed, agent, [scenario], key="nightly-3")
+
+    assert again.status_code == 202 and again.json()["id"] == first.json()["id"]
+    assert (await client.get("/api/v1/conversations")).json()["total"] == 1
 
 
 async def test_a_repeated_request_returns_its_run_after_the_agent_is_gone(
@@ -399,17 +413,26 @@ async def test_an_omitted_retry_count_follows_the_operators_limit(
 ) -> None:
     agent = await create_agent_id(client)
     scenario = (await create_scenario(client, agent))["id"]
-    app = create_app(settings.model_copy(update={"max_run_retries": 0}))
-    headers = {"Authorization": f"Bearer {TOKEN}"}
 
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test", headers=headers
-    ) as strict:
+    async with client_with(settings, max_run_retries=0) as strict:
         started = await start_run(strict, agent, [scenario])
         refused = await start_run(strict, agent, [scenario], max_retries=1)
-    await app.state.engine.dispose()
 
     assert started.status_code == 202 and started.json()["max_retries"] == 0
     assert refused.status_code == 422 and refused.json()["error"]["message"] == (
         "max_retries: at most 0"
     )
+
+
+@asynccontextmanager
+async def client_with(settings: Settings, **changes: Any) -> AsyncGenerator[AsyncClient]:
+    """A client of a second app on the same database, with other operator settings."""
+    app = create_app(settings.model_copy(update=changes))
+    headers = {"Authorization": f"Bearer {TOKEN}"}
+    try:
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test", headers=headers
+        ) as client:
+            yield client
+    finally:
+        await app.state.engine.dispose()
