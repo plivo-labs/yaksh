@@ -197,7 +197,7 @@ export function GenerateDialog({
             <FieldSet>
               <FieldLegend variant="label">Personas</FieldLegend>
               <FieldDescription>
-                Each job or question gets every checked persona before it gets one again.
+                A job or question gets a checked persona again only after it got all of them.
               </FieldDescription>
               <ul className="grid gap-2">
                 {personaList.map((persona) => (

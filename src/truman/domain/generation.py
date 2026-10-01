@@ -42,7 +42,8 @@ class GenerateScenarios(BaseModel):
     document_ids: list[uuid.UUID] = Field(default_factory=list, max_length=20)
     """The knowledge base documents to ask about; knowledge base mode only."""
     persona_ids: list[uuid.UUID] = Field(min_length=1, max_length=MAX_SCENARIOS)
-    """Spread over the new scenarios, so each capability or question meets every persona."""
+    """Spread over the new scenarios: a capability or question gets a persona again only after
+    it got all of them."""
 
     @model_validator(mode="after")
     def documents_fit_mode(self) -> GenerateScenarios:

@@ -459,7 +459,7 @@ export interface GenerateInput {
   count: number;
   instructions: string;
   document_ids: string[];
-  /** Spread over the new scenarios, so each capability or question meets every persona. */
+  /** Spread over the new scenarios: a capability or question gets a persona again only after it got all of them. */
   persona_ids: string[];
 }
 
