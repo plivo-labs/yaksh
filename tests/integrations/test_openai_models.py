@@ -39,10 +39,21 @@ def completion(
     }
 
 
+UNSUPPORTED = {
+    "error": {
+        "message": "Unsupported parameter: 'reasoning_effort' is not supported with this model.",
+        "type": "invalid_request_error",
+        "code": "unsupported_parameter",
+    }
+}
+
+
 class FakeProvider:
     def __init__(self) -> None:
         self.requests: list[tuple[str, dict[str, str], dict[str, Any]]] = []
         self.reply: tuple[int, dict[str, Any]] = (200, completion('{"answer": "yes"}'))
+        self.reasoning = True
+        """Whether the model takes reasoning_effort; gpt-4.1 refuses it with a 400."""
 
 
 @pytest.fixture
@@ -52,7 +63,10 @@ async def provider() -> AsyncIterator[tuple[str, FakeProvider]]:
 
     @app.post("/{path:path}")
     async def chat(path: str, request: Request) -> Response:
-        fake.requests.append((f"/{path}", dict(request.query_params), await request.json()))
+        sent = await request.json()
+        fake.requests.append((f"/{path}", dict(request.query_params), sent))
+        if not fake.reasoning and "reasoning_effort" in sent:
+            return Response(json.dumps(UNSUPPORTED), status_code=400, media_type="application/json")
         status, body = fake.reply
         return Response(json.dumps(body), status_code=status, media_type="application/json")
 
@@ -76,7 +90,9 @@ async def test_openai_is_asked_for_the_strict_schema(
 ) -> None:
     base, fake = provider
 
-    answer = await ask(OpenAIJsonModel.openai("sk-test", "gpt-4.1", base_url=f"{base}/v1"))
+    answer = await ask(
+        OpenAIJsonModel.openai("sk-test", "gpt-4.1", base_url=f"{base}/v1", timeout_s=30)
+    )
 
     path, _, body = fake.requests[0]
     assert answer == {"answer": "yes"}
@@ -136,7 +152,7 @@ async def test_unusable_answers_are_reported_as_unavailable(
     fake.reply = reply
 
     with pytest.raises(UnavailableError, match=message):
-        await ask(OpenAIJsonModel.openai("sk-test", "gpt-4.1", base_url=f"{base}/v1"))
+        await ask(OpenAIJsonModel.openai("sk-test", "gpt-4.1", base_url=f"{base}/v1", timeout_s=30))
 
 
 async def test_a_failure_message_never_repeats_the_providers_response(
@@ -154,6 +170,32 @@ async def test_a_failure_message_never_repeats_the_providers_response(
     )
 
     with pytest.raises(UnavailableError) as raised:
-        await ask(OpenAIJsonModel.openai("sk-secret-123", "gpt-4.1", base_url=f"{base}/v1"))
+        await ask(
+            OpenAIJsonModel.openai("sk-secret-123", "gpt-4.1", base_url=f"{base}/v1", timeout_s=30)
+        )
 
     assert str(raised.value) == "the model call failed: HTTP 401 invalid_api_key"
+
+
+@pytest.mark.parametrize("reasoning", [True, False])
+async def test_the_reasoning_effort_goes_with_every_call_only_when_the_model_takes_it(
+    provider: tuple[str, FakeProvider], reasoning: bool
+) -> None:
+    base, fake = provider
+    fake.reasoning = reasoning
+    model = OpenAIJsonModel.openai(
+        "sk-test", "gpt-6-luna", base_url=f"{base}/v1", timeout_s=30, reasoning_effort="xhigh"
+    )
+
+    try:
+        answers = [
+            await model.complete_json(system="Be brief.", user=user, name="reply", schema=SCHEMA)
+            for user in ("Ready?", "Still ready?")
+        ]
+    finally:
+        await model.close()
+
+    check, *calls = [body for _, _, body in fake.requests]
+    assert answers == [{"answer": "yes"}] * 2
+    assert check["reasoning_effort"] == "xhigh" and "response_format" not in check
+    assert [call.get("reasoning_effort") for call in calls] == ["xhigh" if reasoning else None] * 2

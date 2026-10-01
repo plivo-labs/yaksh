@@ -8,6 +8,7 @@ from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
+from openai import AsyncOpenAI
 from pipecat.adapters.schemas.function_schema import FunctionSchema
 from pipecat.adapters.schemas.tools_schema import ToolsSchema
 from pipecat.audio.turn.smart_turn.local_smart_turn_v3 import LocalSmartTurnAnalyzerV3
@@ -51,6 +52,7 @@ from truman.domain.conversations import (
 )
 from truman.domain.languages import Language
 from truman.integrations import elevenlabs
+from truman.integrations.openai_models import takes_reasoning_effort
 
 log = logging.getLogger(__name__)
 
@@ -92,12 +94,25 @@ def provider_keys(settings: Settings) -> dict[str, str]:
     return {name: value.get_secret_value() for name, value in keys.items() if value}
 
 
-def llm_service(settings: Settings, keys: dict[str, str], instructions: str) -> OpenAILLMService:
+async def persona_turn_options(settings: Settings, keys: dict[str, str]) -> dict[str, str]:
+    """What each persona turn sends besides its messages: the reasoning effort, when the model
+    takes it."""
+    effort = settings.persona_llm_reasoning_effort
+    async with AsyncOpenAI(
+        api_key=keys["OPENAI_API_KEY"], base_url=settings.openai_base_url
+    ) as client:
+        taken = await takes_reasoning_effort(client, settings.persona_llm_model, effort)
+    return {"reasoning_effort": effort} if taken else {}
+
+
+def llm_service(
+    settings: Settings, keys: dict[str, str], instructions: str, options: dict[str, str]
+) -> OpenAILLMService:
     return OpenAILLMService(
         api_key=keys["OPENAI_API_KEY"],
         base_url=settings.openai_base_url,
         settings=OpenAILLMService.Settings(
-            model=settings.persona_model, system_instruction=instructions
+            model=settings.persona_llm_model, system_instruction=instructions, extra=options
         ),
     )
 
@@ -186,9 +201,10 @@ class Persona:
         transport_output: FrameProcessor,
         after_output: Sequence[FrameProcessor],
         state: CallState,
+        turn_options: dict[str, str],
         before_output: Sequence[FrameProcessor] = (),
     ) -> None:
-        self.llm = llm_service(settings, keys, request.instructions)
+        self.llm = llm_service(settings, keys, request.instructions, turn_options)
         self.stt = DeepgramSTTService(
             api_key=keys["DEEPGRAM_API_KEY"],
             base_url=settings.deepgram_base_url,

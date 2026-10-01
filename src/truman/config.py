@@ -44,9 +44,21 @@ class Settings(BaseSettings):
     openai_base_url: str = Field(
         default="https://api.openai.com/v1", validation_alias="OPENAI_BASE_URL"
     )
-    persona_model: str = Field(default="gpt-4.1", validation_alias="PERSONA_LLM_MODEL")
-    generation_model: str | None = Field(default=None, validation_alias="GENERATION_LLM_MODEL")
+    persona_llm_model: str = Field(default="gpt-4.1", validation_alias="PERSONA_LLM_MODEL")
+    persona_llm_reasoning_effort: str = Field(
+        default="none", validation_alias="PERSONA_LLM_REASONING_EFFORT"
+    )
+    """Sent with every caller turn when the model takes it: reasoning delays the first word."""
+    generation_llm_model: str | None = Field(default=None, validation_alias="GENERATION_LLM_MODEL")
     """The model that writes test scenarios; the persona model when unset."""
+    generation_llm_reasoning_effort: str = Field(
+        default="xhigh", validation_alias="GENERATION_LLM_REASONING_EFFORT"
+    )
+    """Sent with every generation call when the model takes it."""
+    generation_llm_timeout_s: float = Field(
+        default=300.0, gt=0, validation_alias="GENERATION_LLM_TIMEOUT_S"
+    )
+    """One model call while writing scenarios; high reasoning effort takes minutes."""
     plivo_auth_id: SecretStr | None = Field(default=None, validation_alias="PLIVO_AUTH_ID")
     plivo_auth_token: SecretStr | None = Field(default=None, validation_alias="PLIVO_AUTH_TOKEN")
     plivo_numbers: Annotated[list[E164], NoDecode] = []

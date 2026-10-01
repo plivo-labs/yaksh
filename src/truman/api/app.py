@@ -85,11 +85,15 @@ def file_store(settings: Settings) -> FileStore | None:
 
 def generation_model(settings: Settings) -> JsonModel | None:
     """The OpenAI-compatible API at OPENAI_BASE_URL, as for the caller."""
-    model = settings.generation_model or settings.persona_model
+    model = settings.generation_llm_model or settings.persona_llm_model
     if settings.openai_api_key is None:
         return None
     return OpenAIJsonModel.openai(
-        settings.openai_api_key.get_secret_value(), model, base_url=settings.openai_base_url
+        settings.openai_api_key.get_secret_value(),
+        model,
+        base_url=settings.openai_base_url,
+        timeout_s=settings.generation_llm_timeout_s,
+        reasoning_effort=settings.generation_llm_reasoning_effort,
     )
 
 

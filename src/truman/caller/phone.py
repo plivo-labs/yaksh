@@ -33,7 +33,13 @@ from pipecat.serializers.base_serializer import FrameSerializer
 from pipecat.transports.websocket.fastapi import FastAPIWebsocketParams, FastAPIWebsocketTransport
 
 from truman.caller.audio import GAP_BYTES, LOUD_PEAK, SAMPLE_RATE, Clock, Playout, Stamper
-from truman.caller.pipeline import CallState, Persona, converse, provider_keys
+from truman.caller.pipeline import (
+    CallState,
+    Persona,
+    converse,
+    persona_turn_options,
+    provider_keys,
+)
 from truman.caller.plivo_server import (
     CALLBACK_RETRIES,
     TIME_LIMIT_MARGIN_S,
@@ -610,10 +616,13 @@ class PhoneCaller:
         self._api = api
         self._dialer = Dialer(api, settings.public_url, settings.ring_timeout_s)
         self._receiver = Receiver()
+        self._turn_options: dict[str, str] | None = None
+        self._turn_options_check = asyncio.Lock()
 
     async def run(
         self, request: CallRequest, observer: CallObserver, stop: asyncio.Event
     ) -> CallOutcome:
+        options = await self._persona_options()
         clock = Clock()
         observer.wire_event(WireEvent(kind=WireEventKind.CONNECT_STARTED, at_ms=clock.ms()))
         entry = self._registry.expect(request.conversation_id)
@@ -631,7 +640,7 @@ class PhoneCaller:
             if isinstance(dialed, CallOutcome):
                 return dialed
             try:
-                return await self._talk(request, observer, stop, clock, dialed, entry)
+                return await self._talk(request, observer, stop, clock, dialed, entry, options)
             finally:
                 await self._hang_up(dialed.call_uuid)
         finally:
@@ -639,6 +648,13 @@ class PhoneCaller:
             if trigger is not None:
                 trigger.cancel()
                 await asyncio.gather(trigger, return_exceptions=True)
+
+    async def _persona_options(self) -> dict[str, str]:
+        """The persona's turn options, decided on the first call, before anything is dialed."""
+        async with self._turn_options_check:
+            if self._turn_options is None:
+                self._turn_options = await persona_turn_options(self._settings, self._keys)
+        return self._turn_options
 
     async def _send_trigger(
         self, request: CallRequest, observer: CallObserver, clock: Clock
@@ -676,6 +692,7 @@ class PhoneCaller:
         clock: Clock,
         dialed: Connected,
         entry: PendingStream,
+        options: dict[str, str],
     ) -> CallOutcome:
         log.info(
             "stream %s for conversation %s, call %s, %s",
@@ -716,6 +733,7 @@ class PhoneCaller:
             before_output=[checkpoints],
             after_output=[AudioMarks(clock, observer), WireTap(transcript, settled), recorder],
             state=state,
+            turn_options=options,
         )
 
         @transport.event_handler("on_client_connected")
