@@ -37,6 +37,13 @@ function whole(value: string): number | null {
   return Number.isInteger(number) ? number : Number.NaN;
 }
 
+/** 128 random bits as hex. crypto.randomUUID exists only in a secure context, which a plain
+ * HTTP host other than localhost is not. */
+function newRequestKey(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
 function text(value: number | null | undefined): string {
   return value === null || value === undefined ? "" : String(value);
 }
@@ -52,7 +59,7 @@ export function RunDialog({
 }) {
   const { scenarios, earlier, leftOut = 0 } = choices;
   const [open, setOpen] = useState(true);
-  const [requestKey] = useState(() => crypto.randomUUID());
+  const [requestKey] = useState(newRequestKey);
   const [name, setName] = useState(earlier?.name ?? "");
   const [repeats, setRepeats] = useState(text(earlier?.repeats ?? 1));
   const [maxDuration, setMaxDuration] = useState(text(earlier?.max_duration_s));

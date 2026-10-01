@@ -1,4 +1,4 @@
-import { PhoneIncoming, PhoneOutgoing, Play, Plus, Sparkles, X } from "lucide-react";
+import { ChevronDown, PhoneIncoming, PhoneOutgoing, Play, Plus, Sparkles, X } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -7,6 +7,12 @@ import { Panel, PanelHeader } from "@/components/panel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Select,
   SelectContent,
@@ -27,7 +33,14 @@ import {
   usePersonas,
   useScenarios,
 } from "@/lib/queries";
-import { type Agent, CATEGORY_LABELS, type Generation, MAX_BULK, type Scenario } from "@/lib/types";
+import {
+  type Agent,
+  CATEGORY_LABELS,
+  type Generation,
+  MAX_BULK,
+  type Persona,
+  type Scenario,
+} from "@/lib/types";
 import { GenerateDialog } from "@/pages/generate-dialog";
 import { RunDialog } from "@/pages/run-dialog";
 import { ScenarioDialog } from "@/pages/scenario-dialog";
@@ -135,18 +148,14 @@ export function AgentScenarios({ agent }: { agent: Agent }) {
         toast.error("Could not delete the scenarios", { description: error.message }),
       onSettled: close,
     });
-  const personaItems = (personas.data ?? []).map((persona) => ({
-    value: persona.id,
-    label: persona.name,
-  }));
-  const personaNames = new Map(personaItems.map((item) => [item.value, item.label]));
-  const assignPersona = (personaId: string) =>
+  const personaNames = new Map((personas.data ?? []).map((persona) => [persona.id, persona.name]));
+  const assignPersona = (persona: Persona) =>
     assign.mutate(
-      { scenario_ids: selected, persona_id: personaId },
+      { scenario_ids: selected, persona_id: persona.id },
       {
         onSuccess: () =>
           toast.success(
-            `${personaNames.get(personaId)} is now the persona of ${counted(selected.length, "scenario", "scenarios")}`,
+            `${persona.name} is now the persona of ${counted(selected.length, "scenario", "scenarios")}`,
           ),
         onError: (error) =>
           toast.error("Could not change the persona", { description: error.message }),
@@ -251,25 +260,22 @@ export function AgentScenarios({ agent }: { agent: Agent }) {
                 <p className="text-sm text-muted-foreground">Select at most {MAX_BULK} at once.</p>
               ) : selected.length > 0 ? (
                 <>
-                  <Select
-                    items={personaItems}
-                    value={null}
-                    onValueChange={(value) => value && assignPersona(value)}
-                    disabled={assign.isPending || personaItems.length === 0}
-                  >
-                    <SelectTrigger aria-label="Set the persona of the selected scenarios" size="sm">
-                      <SelectValue placeholder="Set persona" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectGroup>
-                        {personaItems.map((item) => (
-                          <SelectItem key={item.value} value={item.value}>
-                            {item.label}
-                          </SelectItem>
-                        ))}
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
+                  <DropdownMenu disabled={assign.isPending || !personas.data?.length}>
+                    <DropdownMenuTrigger
+                      aria-label="Set the persona of the selected scenarios"
+                      render={<Button variant="outline" size="sm" />}
+                    >
+                      Set persona
+                      <ChevronDown />
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      {personas.data?.map((persona) => (
+                        <DropdownMenuItem key={persona.id} onClick={() => assignPersona(persona)}>
+                          {persona.name}
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                   <Button size="sm" onClick={() => setRunning(true)}>
                     <Play />
                     Run {selected.length}
