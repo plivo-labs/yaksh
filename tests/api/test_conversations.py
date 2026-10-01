@@ -94,7 +94,7 @@ async def test_a_conversation_runs_to_completion_with_its_transcript(
     assert done["call_uuid"] == "call-42"
     assert [turn["role"] for turn in done["transcript"]] == ["agent", "caller"]
     assert done["transcript"][1]["provenance"] == "transmitted"
-    assert done["caller_claim"] is None
+    assert done["caller_reason"] is None
 
     assert [event["kind"] for event in done["wire_events"]] == [
         "connect_started",
@@ -117,7 +117,7 @@ async def test_the_caller_hanging_up_keeps_its_claim_apart_from_the_end_reason(
     done = await wait_for(client, started["id"], {"completed"})
 
     assert done["end_reason"] == "caller_hangup"
-    assert done["caller_claim"] == {"success": True, "reason": "the room is booked"}
+    assert done["caller_reason"] == "the room is booked"
 
 
 async def test_ending_a_queued_conversation_cancels_it_without_a_call(

@@ -21,7 +21,6 @@ from truman.db.models import Conversation, Voice
 from truman.db.session import create_engine, create_sessionmaker
 from truman.domain.conversations import (
     Admission,
-    CallerClaim,
     CallObserver,
     CallOutcome,
     CallRequest,
@@ -412,7 +411,7 @@ class FakeCaller:
             return CallOutcome(
                 connected=True,
                 end_reason=EndReason.CALLER_HANGUP,
-                caller_claim=CallerClaim(success=True, reason="the room is booked"),
+                caller_reason="the room is booked",
             )
         return CallOutcome(
             connected=True,

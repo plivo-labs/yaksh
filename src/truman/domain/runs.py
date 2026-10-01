@@ -91,18 +91,9 @@ def waiting_reason(*, queued: bool, full: bool, waiting: bool) -> WaitingReason 
     return WaitingReason.WORKER_OR_NUMBER
 
 
-class ClaimCounts(BaseModel):
-    """What the callers of the latest attempts said when they hung up: claims, not verdicts."""
-
-    model_config = ConfigDict(frozen=True)
-
-    reached: int
-    not_reached: int
-
-
 class RunProgress(BaseModel):
     """What a run's conversations say about it, counted each time the run is read. The counts,
-    end reasons, claims and talk time take only the latest attempt of each repeat of each
+    end reasons and talk time take only the latest attempt of each repeat of each
     scenario."""
 
     model_config = ConfigDict(frozen=True)
@@ -113,7 +104,6 @@ class RunProgress(BaseModel):
     end_reasons: dict[EndReason, int]
     retries: int
     """How many retries the run made."""
-    caller_claims: ClaimCounts
     median_talk_ms: int | None
     waiting_reason: WaitingReason | None
     started_at: datetime | None

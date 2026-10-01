@@ -134,10 +134,7 @@ function Overview({ run }: { run: Run }) {
         </Fact>
         <Fact label="Retries">Up to {run.max_retries}</Fact>
         <Fact label="Median talk time">{duration(run.median_talk_ms) || "None yet"}</Fact>
-        <Fact label="Caller claims, not judged">
-          {run.caller_claims.reached} reached, {run.caller_claims.not_reached} did not
-        </Fact>
-        <div className="col-span-2 grid min-w-0 gap-0.5 sm:col-span-3 lg:col-span-5">
+        <div className="col-span-2 grid min-w-0 gap-0.5 sm:col-span-3 lg:col-span-6">
           <dt className="text-xs text-muted-foreground">End reasons</dt>
           <dd className="text-sm font-medium">
             {endReasons.length === 0

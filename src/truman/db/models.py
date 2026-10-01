@@ -156,8 +156,8 @@ class Conversation(Base):
     talk_ms: Mapped[int | None] = mapped_column(Integer)
     recording_path: Mapped[str | None] = mapped_column(Text)
     transcript: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
-    caller_claim: Mapped[dict[str, Any] | None] = mapped_column(JSONB(none_as_null=True))
-    """What the caller said when it hung up: a claim, not a verdict."""
+    caller_reason: Mapped[str | None] = mapped_column(Text)
+    """Why the caller ended the call, in its own words: not a verdict."""
     claimed_by: Mapped[str | None] = mapped_column(Text)
     lease_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     run_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))

@@ -19,7 +19,6 @@ from tests.conftest import (
     create_scenario,
     finish,
     make_settings,
-    new_run,
     run_conversations,
     start,
     start_run,
@@ -29,7 +28,7 @@ from tests.conftest import (
 from truman.api import create_app
 from truman.config import Settings
 from truman.db.models import Conversation, Persona, Scenario
-from truman.domain.conversations import CallerClaim, CallOutcome, ConversationStatus, EndReason
+from truman.domain.conversations import CallOutcome, ConversationStatus, EndReason
 from truman.worker.worker import Worker
 
 NO_OUTCOMES = dict.fromkeys(
@@ -93,7 +92,6 @@ async def test_a_run_starts_each_repeat_of_every_scenario_in_order_with_its_pers
     assert single["run_id"] is None and single["id"] not in {c["id"] for c in queued}
     detail = (await client.get(f"/api/v1/runs/{run['id']}")).json()
     assert detail["scenario_ids"] == [second["id"], first["id"]]
-    assert detail["caller_claims"] == {"reached": 0, "not_reached": 0}
     assert detail["median_talk_ms"] is None
 
 
@@ -313,9 +311,8 @@ async def test_a_run_is_counted_from_its_conversations_as_they_finish(
     assert done["counts"] == {**NO_OUTCOMES, "completed": 4}
     assert done["end_reasons"] == {"caller_hangup": 4}
     assert done["started_at"] is not None and done["ended_at"] is not None
-    assert done["caller_claims"] == {"reached": 4, "not_reached": 0}
     completed = await run_conversations(client, run["id"], group="completed")
-    assert len(completed) == 4 and all(c["caller_claim"]["success"] for c in completed)
+    assert [c["caller_reason"] for c in completed] == ["the room is booked"] * 4
     assert await run_conversations(client, run["id"], group="waiting") == []
 
 
@@ -350,31 +347,6 @@ async def test_counts_take_the_latest_attempt_and_the_list_can_leave_out_retried
     assert await run_conversations(client, run["id"], group="error", latest_attempts=True) == []
     assert retried_from["retried_as"] == retry and retried_to["retried_as"] is None
     assert (retried_to["retry_of"], retried_to["attempt"]) == (first["id"], 2)
-
-
-async def test_caller_claims_count_both_ways_and_a_call_without_one_has_none(
-    client: AsyncClient, db: Db
-) -> None:
-    run = await new_run(client, scenarios=3)
-    claims = [
-        CallerClaim(success=True, reason="the cleaning moved"),
-        CallerClaim(success=False, reason="no evening was free"),
-        None,
-    ]
-    ended = [await claim(db) for _ in claims]
-    for conversation_id, said in zip(ended, claims, strict=True):
-        assert conversation_id is not None
-        outcome = CallOutcome(connected=True, end_reason=EndReason.CALLER_HANGUP, caller_claim=said)
-        await finish(db, conversation_id, outcome)
-
-    detail = (await client.get(f"/api/v1/runs/{run['id']}")).json()
-    listed = {c["id"]: c["caller_claim"] for c in await run_conversations(client, run["id"])}
-    assert detail["caller_claims"] == {"reached": 1, "not_reached": 1}
-    assert [listed[c] for c in ended] == [
-        {"success": True, "reason": "the cleaning moved"},
-        {"success": False, "reason": "no evening was free"},
-        None,
-    ]
 
 
 async def test_runs_are_listed_newest_first_and_by_agent(client: AsyncClient) -> None:

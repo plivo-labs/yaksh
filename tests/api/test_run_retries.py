@@ -39,7 +39,7 @@ RESULTS = {
     "talk_ms",
     "recording_path",
     "transcript",
-    "caller_claim",
+    "caller_reason",
     "claimed_by",
     "lease_expires_at",
 }
@@ -110,7 +110,7 @@ async def test_a_lost_lease_is_tried_again_with_the_inputs_and_nothing_else(
                 talk_ms=1200,
                 recording_path="recording.wav",
                 transcript={"turns": [], "wire_events": []},
-                caller_claim={"success": True, "reason": "booked"},
+                caller_reason="booked",
                 lease_expires_at=func.now() - timedelta(seconds=1),
             )
         )

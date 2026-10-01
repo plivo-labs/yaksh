@@ -37,10 +37,6 @@ export const END_REASON_LABELS: Record<EndReason, string> = {
   no_call: "Agent did not call",
 };
 
-export interface CallerClaim {
-  success: boolean;
-  reason: string;
-}
 type Role = "agent" | "caller";
 export type Language = "en" | "hinglish";
 export type VoiceGender = "male" | "female" | "neutral";
@@ -391,8 +387,8 @@ export interface ConversationSummary {
   ended_at: string | null;
   talk_ms: number | null;
   recording_url: string | null;
-  /** What the caller said when it hung up: a claim, not a verdict. */
-  caller_claim: CallerClaim | null;
+  /** Why the caller ended the call, in its own words: not a verdict. */
+  caller_reason: string | null;
   run_id: string | null;
   repeat: number | null;
   attempt: number;
@@ -446,8 +442,6 @@ export interface RunSummary {
   end_reasons: Partial<Record<EndReason, number>>;
   /** How many retries the run made. */
   retries: number;
-  /** What the callers said when they hung up: claims, not verdicts. */
-  caller_claims: { reached: number; not_reached: number };
   median_talk_ms: number | null;
   waiting_reason: WaitingReason | null;
   started_at: string | null;

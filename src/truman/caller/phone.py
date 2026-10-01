@@ -768,7 +768,7 @@ class PhoneCaller:
             connected=state.connected,
             end_reason=state.end_reason or EndReason.ERROR,
             caller_error=state.error,
-            caller_claim=state.claim,
+            caller_reason=state.caller_reason,
             talk_ms=talk_ms,
             recording_path=recorder.path,
             call_uuid=dialed.call_uuid,

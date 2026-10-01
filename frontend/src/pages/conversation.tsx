@@ -136,10 +136,9 @@ export function ConversationPage() {
               )}
             </p>
           )}
-          {data.caller_claim && (
+          {data.caller_reason && (
             <p className="text-sm text-muted-foreground">
-              The caller says it {data.caller_claim.success ? "reached" : "did not reach"} its goal
-              {data.caller_claim.reason && `: ${data.caller_claim.reason}`}
+              Why the caller hung up: {data.caller_reason}
             </p>
           )}
         </div>

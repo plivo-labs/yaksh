@@ -5,7 +5,6 @@ from pydantic import BaseModel, ConfigDict
 
 from truman.domain.agents import Direction
 from truman.domain.conversations import (
-    CallerClaim,
     Channel,
     ConversationStatus,
     EndReason,
@@ -47,7 +46,7 @@ class ConversationSummary(BaseModel):
     ended_at: datetime | None
     talk_ms: int | None
     recording_url: str | None
-    caller_claim: CallerClaim | None
+    caller_reason: str | None
     run_id: uuid.UUID | None
     repeat: int | None
     attempt: int

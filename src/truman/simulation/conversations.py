@@ -574,7 +574,7 @@ async def finalize(
                 ended_at=func.statement_timestamp(),
                 talk_ms=outcome.talk_ms,
                 transcript=transcript.model_dump(mode="json"),
-                caller_claim=outcome.caller_claim.model_dump() if outcome.caller_claim else None,
+                caller_reason=outcome.caller_reason,
                 recording_path=str(outcome.recording_path) if outcome.recording_path else None,
                 call_uuid=outcome.call_uuid,
                 agent_caller_id=Conversation.agent_caller_id if outcome.call_uuid else None,

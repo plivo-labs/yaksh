@@ -43,7 +43,6 @@ from truman.caller.transcript import AgentTurnTap, GeneratedTap, TranscriptBuild
 from truman.config import Settings
 from truman.diagnostics import describe_exception
 from truman.domain.conversations import (
-    CallerClaim,
     CallObserver,
     CallRequest,
     EndReason,
@@ -77,10 +76,13 @@ END_CALL = FunctionSchema(
         "achieved; never in a normal turn."
     ),
     properties={
-        "success": {"type": "boolean", "description": "Whether you achieved your goal."},
-        "reason": {"type": "string", "description": "One sentence on why you are ending the call."},
+        "reason": {
+            "type": "string",
+            "description": "One sentence on why you are ending the call, naming only what was "
+            "said in it.",
+        },
     },
-    required=["success", "reason"],
+    required=["reason"],
 )
 
 
@@ -135,7 +137,7 @@ class CallState:
     connected_ms: int | None = None
     end_reason: EndReason | None = None
     error: str | None = None
-    claim: CallerClaim | None = None
+    caller_reason: str | None = None
     ended: asyncio.Event = field(default_factory=asyncio.Event)
 
     @property
@@ -273,16 +275,13 @@ class Persona:
         )
 
         async def end_call(params: FunctionCallParams) -> None:
-            claim = CallerClaim(
-                success=bool(params.arguments.get("success")),
-                reason=str(params.arguments.get("reason") or ""),
-            )
-            log.info("caller ended conversation %s: %s", request.conversation_id, claim)
+            reason = str(params.arguments.get("reason") or "")
+            log.info("caller ended conversation %s: %s", request.conversation_id, reason)
             await params.result_callback(
                 {"status": "call ended"}, properties=FunctionCallResultProperties(run_llm=False)
             )
             if state.end_reason is None:
-                state.claim = claim
+                state.caller_reason = reason
             state.end(EndReason.CALLER_HANGUP)
 
         self.llm.register_function(END_CALL.name, end_call, cancel_on_interruption=False)

@@ -23,7 +23,6 @@ from truman.domain.conversations import (
 )
 from truman.domain.errors import ConflictError, NotFoundError, ValidationError
 from truman.domain.runs import (
-    ClaimCounts,
     RunCreate,
     RunProgress,
     run_status,
@@ -286,7 +285,6 @@ async def list_runs(
 
 async def progress(session: AsyncSession, runs: Sequence[Run]) -> dict[uuid.UUID, RunProgress]:
     latest = latest_attempt()
-    claim = Conversation.caller_claim["success"].as_boolean()
     rows = await session.execute(
         select(
             Run.id.label("run_id"),
@@ -297,8 +295,6 @@ async def progress(session: AsyncSession, runs: Sequence[Run]) -> dict[uuid.UUID
             Conversation.end_reason,
             func.count().filter(latest).label("latest"),
             func.count().filter(Conversation.attempt > 1).label("retries"),
-            func.count().filter(latest, claim.is_(True)).label("reached"),
-            func.count().filter(latest, claim.is_(False)).label("not_reached"),
             func.array_agg(Conversation.talk_ms)
             .filter(latest, Conversation.talk_ms.is_not(None))
             .label("talk_ms"),
@@ -336,10 +332,6 @@ def counted(rows: list[Row[Any]]) -> RunProgress:
         counts=counts,
         end_reasons=end_reasons,
         retries=sum(row.retries for row in rows),
-        caller_claims=ClaimCounts(
-            reached=sum(row.reached for row in rows),
-            not_reached=sum(row.not_reached for row in rows),
-        ),
         median_talk_ms=round(statistics.median(talk_ms)) if talk_ms else None,
         waiting_reason=waiting_reason(
             queued=counts[OutcomeGroup.WAITING] > 0, full=run.full, waiting=run.waiting

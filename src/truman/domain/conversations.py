@@ -149,15 +149,6 @@ class Validity(BaseModel):
     reasons: list[str] = Field(default_factory=list)
 
 
-class CallerClaim(BaseModel):
-    """What the caller model said when it hung up. A claim, not a verdict on the agent."""
-
-    model_config = ConfigDict(frozen=True)
-
-    success: bool
-    reason: str
-
-
 class Transcript(BaseModel):
     turns: list[Turn] = Field(default_factory=list)
     wire_events: list[WireEvent] = Field(default_factory=list)
@@ -218,7 +209,9 @@ class CallOutcome(BaseModel):
     connected: bool
     end_reason: EndReason
     caller_error: str | None = None
-    caller_claim: CallerClaim | None = None
+    caller_reason: str | None = None
+    """Why the caller ended the call, in its own words. Whether the agent passed is a judge's
+    call, never the caller's."""
     talk_ms: int | None = None
     """From the moment the call connected until the conversation ended, on the caller's clock."""
     recording_path: Path | None = None

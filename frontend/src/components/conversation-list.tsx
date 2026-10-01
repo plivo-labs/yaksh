@@ -156,7 +156,6 @@ function ConversationRow({
   showAgent: boolean;
   agentVersion: number | undefined;
 }) {
-  const claim = conversation.caller_claim;
   const name = label(conversation);
   const end = conversation.end_reason ? (
     END_REASON_LABELS[conversation.end_reason]
@@ -201,8 +200,6 @@ function ConversationRow({
           {agentVersion !== undefined &&
             conversation.agent_version < agentVersion &&
             ", earlier version"}
-          {claim &&
-            `. Caller claims it ${claim.success ? "reached" : "did not reach"} its goal (not judged)`}
         </span>
         <span className="truncate text-sm text-muted-foreground @3xl/conversations:hidden">
           {end}
