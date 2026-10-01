@@ -15,8 +15,8 @@ from tests.conftest import (
     TOKEN,
     FakeJsonModel,
     create_agent,
-    create_persona,
     create_scenario,
+    new_persona_id,
 )
 from truman.api import create_app
 from truman.config import Settings
@@ -41,9 +41,7 @@ def capability(name: str, quote: str, priority: str = "core", tested: bool = Fal
 
 
 async def persona_ids(client: AsyncClient, count: int = 1) -> list[str]:
-    return [
-        (await create_persona(client, name=f"Caller {uuid.uuid4()}"))["id"] for _ in range(count)
-    ]
+    return [await new_persona_id(client) for _ in range(count)]
 
 
 async def generate(client: AsyncClient, agent_id: str, **body: Any) -> list[tuple[str, dict]]:

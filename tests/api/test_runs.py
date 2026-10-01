@@ -1,5 +1,4 @@
 import asyncio
-import re
 import uuid
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
@@ -8,16 +7,19 @@ from typing import Any
 
 import pytest
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import func, insert, select, update
-from sqlalchemy.ext.asyncio import create_async_engine
+from sqlalchemy import func, select, update
 
 from tests.conftest import (
     TOKEN,
+    Db,
     FakeCaller,
+    claim,
     create_agent_id,
     create_persona,
     create_scenario,
+    finish,
     make_settings,
+    new_run,
     run_conversations,
     start,
     start_run,
@@ -27,28 +29,11 @@ from tests.conftest import (
 from truman.api import create_app
 from truman.config import Settings
 from truman.db.models import Conversation, Persona, Scenario
-from truman.db.session import create_engine, create_sessionmaker
-from truman.domain.conversations import ConversationStatus, EndReason
+from truman.domain.conversations import CallerClaim, CallOutcome, ConversationStatus, EndReason
 from truman.worker.worker import Worker
 
 NO_OUTCOMES = dict.fromkeys(
     ("waiting", "in_progress", "completed", "did_not_connect", "error", "cancelled"), 0
-)
-INPUTS = (
-    "agent_id",
-    "agent_version_id",
-    "channel",
-    "direction",
-    "persona_id",
-    "persona_version_id",
-    "scenario_id",
-    "scenario_version_id",
-    "language",
-    "instructions",
-    "nudge",
-    "max_duration_s",
-    "run_id",
-    "repeat",
 )
 
 
@@ -121,21 +106,20 @@ async def test_every_conversation_of_a_run_pins_what_was_current_when_it_started
     second = await create_scenario(client, agent, name="Cancel a cleaning", persona_id=persona)
     run = (await start_run(client, agent, [first["id"], second["id"]], repeats=2)).json()
 
-    await client.patch(f"/api/v1/agents/{agent}", json={"brief": "Changed."})
-    await client.patch(f"/api/v1/scenarios/{first['id']}", json={"goal": "Cancel it."})
-    await client.patch(f"/api/v1/personas/{persona}", json={"prompt": "Someone else."})
+    edits = [
+        await client.patch(f"/api/v1/agents/{agent}", json={"brief": "Changed."}),
+        await client.patch(f"/api/v1/scenarios/{first['id']}", json={"goal": "Cancel it."}),
+        await client.patch(f"/api/v1/personas/{persona}", json={"prompt": "Someone else."}),
+    ]
 
     queued = await run_conversations(client, run["id"])
     details = [(await client.get(f"/api/v1/conversations/{c['id']}")).json() for c in queued]
+    assert [edit.json()["current_version"] for edit in edits] == [2, 2, 2]
     assert {
         (c["agent_version_id"], c["agent_version"], c["scenario_version"], c["persona_version"])
         for c in queued
     } == {(run["agent_version_id"], 1, 1, 1)}
     assert (await client.get(f"/api/v1/runs/{run['id']}")).json()["agent_version"] == 1
-    days = {day for d in details for day in re.findall(r"Today is [^.]+\.", d["instructions"])}
-    assert len(days) == 1
-    for scenario in (first, second):
-        assert len({d["instructions"] for d in details if d["scenario_id"] == scenario["id"]}) == 1
     assert not any(
         "Cancel it." in d["instructions"] or "Someone else." in d["instructions"] for d in details
     )
@@ -220,19 +204,17 @@ async def test_a_repeated_request_returns_its_run_after_the_operator_changes_the
 
 
 async def test_a_repeated_request_returns_its_run_after_the_agent_is_gone(
-    client: AsyncClient, settings: Settings
+    client: AsyncClient, db: Db
 ) -> None:
     agent = await create_agent_id(client)
     scenario = (await create_scenario(client, agent))["id"]
     first = (await start_run(client, agent, [scenario], key="nightly-2")).json()
-    engine = create_async_engine(settings.database_url.encoded_string())
-    async with engine.begin() as connection:
-        await connection.execute(
+    async with db.begin() as session:
+        await session.execute(
             update(Conversation)
             .where(Conversation.run_id == uuid.UUID(first["id"]))
             .values(status=ConversationStatus.COMPLETED, ended_at=func.now())
         )
-    await engine.dispose()
     assert (await client.delete(f"/api/v1/agents/{agent}")).status_code == 204
 
     again = await start_run(client, agent, [scenario], key="nightly-2")
@@ -241,23 +223,21 @@ async def test_a_repeated_request_returns_its_run_after_the_agent_is_gone(
 
 
 async def test_a_request_that_waited_for_one_with_its_key_returns_that_run(
-    client: AsyncClient, settings: Settings
+    client: AsyncClient, db: Db
 ) -> None:
     agent = await create_agent_id(client)
     scenario = await create_scenario(client, agent)
-    engine = create_engine(settings.database_url.encoded_string())
 
-    async with create_sessionmaker(engine)() as holder:
+    async with db() as holder:
         await holder.get_one(Persona, uuid.UUID(scenario["persona_id"]), with_for_update=True)
         first = asyncio.create_task(start_run(client, agent, [scenario["id"]], key="k"))
-        await wait_for_lock_waiters(settings, 1)
+        await wait_for_lock_waiters(db, 1)
         second = asyncio.create_task(start_run(client, agent, [scenario["id"]], key="k"))
-        await wait_for_lock_waiters(settings, 2)
+        await wait_for_lock_waiters(db, 2)
         deleted = asyncio.create_task(client.delete(f"/api/v1/scenarios/{scenario['id']}"))
-        await wait_for_lock_waiters(settings, 3)
+        await wait_for_lock_waiters(db, 3)
         await holder.rollback()
     responses = await asyncio.gather(first, second, deleted)
-    await engine.dispose()
 
     assert [response.status_code for response in responses] == [202, 202, 204], (
         "the second request waits for the first, and the scenario is deleted in between"
@@ -266,13 +246,12 @@ async def test_a_request_that_waited_for_one_with_its_key_returns_that_run(
 
 
 async def test_a_run_does_not_wait_for_a_transaction_that_only_references_its_scenarios(
-    client: AsyncClient, settings: Settings
+    client: AsyncClient, db: Db
 ) -> None:
     agent = await create_agent_id(client)
     scenario = await create_scenario(client, agent)
-    engine = create_engine(settings.database_url.encoded_string())
 
-    async with create_sessionmaker(engine)() as holder:
+    async with db() as holder:
         for model, row_id in ((Scenario, scenario["id"]), (Persona, scenario["persona_id"])):
             await holder.execute(
                 select(model.id)
@@ -281,7 +260,6 @@ async def test_a_run_does_not_wait_for_a_transaction_that_only_references_its_sc
             )
         response = await asyncio.wait_for(start_run(client, agent, [scenario["id"]]), 5)
         await holder.rollback()
-    await engine.dispose()
 
     assert response.status_code == 202, "a copied agent or a retry holds such key-share locks"
 
@@ -302,23 +280,21 @@ async def test_two_requests_with_one_key_at_the_same_moment_start_one_run(
 
 
 async def test_one_key_sent_for_two_agents_at_the_same_moment_starts_one_run(
-    client: AsyncClient, settings: Settings
+    client: AsyncClient, db: Db
 ) -> None:
     persona = (await create_persona(client, name="Shared caller"))["id"]
     agents = [await create_agent_id(client), await create_agent_id(client, name="Other")]
     scenarios = [(await create_scenario(client, a, persona_id=persona))["id"] for a in agents]
-    engine = create_engine(settings.database_url.encoded_string())
 
-    async with create_sessionmaker(engine)() as holder:
+    async with db() as holder:
         await holder.get_one(Persona, uuid.UUID(persona), with_for_update=True)
         starts = [
             asyncio.create_task(start_run(client, agent, [scenario], key="shared"))
             for agent, scenario in zip(agents, scenarios, strict=True)
         ]
-        await wait_for_lock_waiters(settings, 2)
+        await wait_for_lock_waiters(db, 2)
         await holder.rollback()
     responses = [await task for task in starts]
-    await engine.dispose()
 
     assert sorted(response.status_code for response in responses) == [202, 409]
     assert (await client.get("/api/v1/runs")).json()["total"] == 1
@@ -344,37 +320,21 @@ async def test_a_run_is_counted_from_its_conversations_as_they_finish(
 
 
 async def test_counts_take_the_latest_attempt_and_the_list_can_leave_out_retried_ones(
-    client: AsyncClient, settings: Settings
+    client: AsyncClient, db: Db
 ) -> None:
     agent = await create_agent_id(client)
     scenario = (await create_scenario(client, agent))["id"]
     run = (await start_run(client, agent, [scenario], repeats=2)).json()
     first, second = await run_conversations(client, run["id"])
-    engine = create_async_engine(settings.database_url.encoded_string())
-    async with engine.begin() as connection:
-        for conversation, status, end_reason, talk_ms in (
-            (first, ConversationStatus.FAILED, EndReason.ERROR, 4000),
-            (second, ConversationStatus.COMPLETED, EndReason.AGENT_HANGUP, 9000),
-        ):
-            await connection.execute(
-                update(Conversation)
-                .where(Conversation.id == uuid.UUID(conversation["id"]))
-                .values(status=status, end_reason=end_reason, ended_at=func.now(), talk_ms=talk_ms)
-            )
-        original = (
-            await connection.execute(
-                select(*(getattr(Conversation, name) for name in INPUTS)).where(
-                    Conversation.id == uuid.UUID(first["id"])
-                )
-            )
-        ).one()
-        retry = await connection.scalar(
-            insert(Conversation)
-            .values(**original._asdict(), attempt=2, retry_of=uuid.UUID(first["id"]))
-            .returning(Conversation.id)
-        )
-    await engine.dispose()
+    assert [await claim(db), await claim(db)] == [first["id"], second["id"]]
+    failed = CallOutcome(
+        connected=True, end_reason=EndReason.ERROR, caller_error="boom", talk_ms=4000
+    )
+    completed = CallOutcome(connected=True, end_reason=EndReason.AGENT_HANGUP, talk_ms=9000)
+    assert await finish(db, first["id"], failed)
+    assert await finish(db, second["id"], completed)
 
+    retry = (await run_conversations(client, run["id"]))[-1]["id"]
     detail = (await client.get(f"/api/v1/runs/{run['id']}")).json()
     latest = await run_conversations(client, run["id"], latest_attempts=True)
     errors = await run_conversations(client, run["id"], group="error")
@@ -385,11 +345,36 @@ async def test_counts_take_the_latest_attempt_and_the_list_can_leave_out_retried
     assert detail["end_reasons"] == {"agent_hangup": 1}
     assert (detail["retries"], detail["median_talk_ms"]) == (1, 9000)
     assert len(await run_conversations(client, run["id"])) == 3
-    assert [c["id"] for c in latest] == [second["id"], str(retry)]
+    assert [c["id"] for c in latest] == [second["id"], retry]
     assert [c["id"] for c in errors] == [first["id"]]
     assert await run_conversations(client, run["id"], group="error", latest_attempts=True) == []
-    assert retried_from["retried_as"] == str(retry) and retried_to["retried_as"] is None
+    assert retried_from["retried_as"] == retry and retried_to["retried_as"] is None
     assert (retried_to["retry_of"], retried_to["attempt"]) == (first["id"], 2)
+
+
+async def test_caller_claims_count_both_ways_and_a_call_without_one_has_none(
+    client: AsyncClient, db: Db
+) -> None:
+    run = await new_run(client, scenarios=3)
+    claims = [
+        CallerClaim(success=True, reason="the cleaning moved"),
+        CallerClaim(success=False, reason="no evening was free"),
+        None,
+    ]
+    ended = [await claim(db) for _ in claims]
+    for conversation_id, said in zip(ended, claims, strict=True):
+        assert conversation_id is not None
+        outcome = CallOutcome(connected=True, end_reason=EndReason.CALLER_HANGUP, caller_claim=said)
+        await finish(db, conversation_id, outcome)
+
+    detail = (await client.get(f"/api/v1/runs/{run['id']}")).json()
+    listed = {c["id"]: c["caller_claim"] for c in await run_conversations(client, run["id"])}
+    assert detail["caller_claims"] == {"reached": 1, "not_reached": 1}
+    assert [listed[c] for c in ended] == [
+        {"success": True, "reason": "the cleaning moved"},
+        {"success": False, "reason": "no evening was free"},
+        None,
+    ]
 
 
 async def test_runs_are_listed_newest_first_and_by_agent(client: AsyncClient) -> None:

@@ -6,12 +6,15 @@ from typing import Any
 import pytest
 from httpx import AsyncClient
 from sqlalchemy import func, select, update
-from sqlalchemy.ext.asyncio import create_async_engine
 
 from tests.conftest import (
+    FINAL,
+    Db,
     FakeCaller,
+    assert_groups_match_counts,
     claim,
     create_agent_id,
+    expire_leases,
     new_run,
     reap,
     run_conversations,
@@ -19,14 +22,10 @@ from tests.conftest import (
     wait_for,
     wait_for_lock_waiters,
 )
-from truman.config import Settings
 from truman.db.models import Conversation, PhoneNumber, Run
-from truman.db.session import create_engine, create_sessionmaker
 from truman.domain.conversations import ConversationStatus, EndReason
 from truman.simulation import conversations, numbers
 from truman.worker.worker import Worker
-
-FINAL = {"completed", "failed", "invalid", "cancelled"}
 
 
 async def queue_of(client: AsyncClient, run: dict[str, Any]) -> list[str]:
@@ -38,36 +37,34 @@ async def reason(client: AsyncClient, run: dict[str, Any]) -> str | None:
 
 
 async def test_workers_claiming_at_the_same_moment_keep_a_runs_max_parallel(
-    client: AsyncClient, settings: Settings
+    client: AsyncClient, db: Db
 ) -> None:
     run = await new_run(client, scenarios=2, repeats=3, max_parallel=2)
 
-    claimed = await asyncio.gather(*(claim(settings, f"w{n}") for n in range(6)))
+    claimed = await asyncio.gather(*(claim(db, worker_id=f"w{n}") for n in range(6)))
 
     assert sorted(c for c in claimed if c is not None) == sorted((await queue_of(client, run))[:2])
     assert await reason(client, run) == "max_parallel"
 
 
 async def test_a_run_waits_its_delay_between_calls_while_other_work_starts(
-    client: AsyncClient, settings: Settings
+    client: AsyncClient, db: Db
 ) -> None:
     run = await new_run(client, repeats=2, start_interval_s=60)
     first, second = await queue_of(client, run)
 
-    claimed_first = await claim(settings)
-    held_back = await claim(settings)
+    claimed_first = await claim(db)
+    held_back = await claim(db)
     waiting = await reason(client, run)
     other = await new_run(client)
-    claimed_other = await claim(settings)
-    engine = create_async_engine(settings.database_url.encoded_string())
-    async with engine.begin() as connection:
-        await connection.execute(
+    claimed_other = await claim(db)
+    async with db.begin() as session:
+        await session.execute(
             update(Conversation)
             .where(Conversation.id == uuid.UUID(first))
             .values(started_at=func.now() - timedelta(seconds=61))
         )
-    await engine.dispose()
-    claimed_second = await claim(settings)
+    claimed_second = await claim(db)
 
     assert (claimed_first, held_back, waiting) == (first, None, "start_interval")
     assert claimed_other == (await queue_of(client, other))[0]
@@ -75,33 +72,31 @@ async def test_a_run_waits_its_delay_between_calls_while_other_work_starts(
 
 
 async def test_a_claim_that_waited_for_its_run_starts_the_delay_when_it_claims(
-    client: AsyncClient, settings: Settings
+    client: AsyncClient, db: Db
 ) -> None:
     run = await new_run(client, repeats=2, start_interval_s=1)
-    engine = create_engine(settings.database_url.encoded_string())
 
-    async with create_sessionmaker(engine)() as holder:
+    async with db() as holder:
         await holder.get_one(Run, uuid.UUID(run["id"]), with_for_update=True)
-        first = asyncio.create_task(claim(settings))
-        await wait_for_lock_waiters(settings, 1)
+        first = asyncio.create_task(claim(db))
+        await wait_for_lock_waiters(db, 1)
         await asyncio.sleep(1.5)
         await holder.rollback()
     claimed = await first
-    await engine.dispose()
 
     assert claimed == (await queue_of(client, run))[0]
-    assert await claim(settings) is None, "the delay runs from the claim, not from its wait"
+    assert await claim(db) is None, "the delay runs from the claim, not from its wait"
 
 
 async def test_single_calls_start_first_then_runs_in_the_order_they_were_started(
-    client: AsyncClient, settings: Settings
+    client: AsyncClient, db: Db
 ) -> None:
     earlier = await new_run(client)
     later = await new_run(client)
     single = await start(client, await create_agent_id(client, name="Single calls"))
     waiting = await reason(client, earlier)
 
-    order = [await claim(settings) for _ in range(4)]
+    order = [await claim(db) for _ in range(4)]
 
     assert waiting == "worker_or_number"
     assert order == [
@@ -112,13 +107,11 @@ async def test_single_calls_start_first_then_runs_in_the_order_they_were_started
     ]
 
 
-async def test_a_full_run_does_not_hold_up_a_later_run(
-    client: AsyncClient, settings: Settings
-) -> None:
+async def test_a_full_run_does_not_hold_up_a_later_run(client: AsyncClient, db: Db) -> None:
     full = await new_run(client, repeats=2, max_parallel=1)
     later = await new_run(client)
 
-    order = [await claim(settings) for _ in range(3)]
+    order = [await claim(db) for _ in range(3)]
 
     assert order == [(await queue_of(client, full))[0], *await queue_of(client, later), None]
     assert await reason(client, full) == "max_parallel"
@@ -153,15 +146,38 @@ async def test_cancelling_a_run_cancels_its_queue_and_ends_its_live_call(
     assert (after["status"], after["counts"]["cancelled"]) == ("cancelled", 3)
     again = await client.post(f"/api/v1/runs/{run['id']}/cancel")
     assert again.status_code == 200 and again.json()["cancelled_at"] == after["cancelled_at"]
+    await assert_groups_match_counts(client, run["id"])
 
 
-async def test_cancelling_a_finished_run_changes_nothing(
-    client: AsyncClient, settings: Settings
+async def test_a_cancel_that_meets_a_requeue_cancels_the_returned_conversation(
+    client: AsyncClient, db: Db
 ) -> None:
     run = await new_run(client)
-    engine = create_async_engine(settings.database_url.encoded_string())
-    async with engine.begin() as connection:
-        await connection.execute(
+    returned = await claim(db)
+    assert returned is not None
+
+    async def requeue() -> bool:
+        async with db() as session:
+            return await conversations.requeue(session, uuid.UUID(returned), "w1")
+
+    async with db() as holder:
+        await holder.get_one(Conversation, uuid.UUID(returned), with_for_update=True)
+        requeueing = asyncio.create_task(requeue())
+        await wait_for_lock_waiters(db, 1)
+        cancelling = asyncio.create_task(client.post(f"/api/v1/runs/{run['id']}/cancel"))
+        await wait_for_lock_waiters(db, 2)
+        await holder.rollback()
+    requeued, cancelled = await asyncio.wait_for(asyncio.gather(requeueing, cancelling), 10)
+
+    after = (await client.get(f"/api/v1/conversations/{returned}")).json()
+    assert requeued is True and cancelled.json()["status"] == "cancelled"
+    assert (after["status"], after["end_reason"]) == ("cancelled", "user_request")
+
+
+async def test_cancelling_a_finished_run_changes_nothing(client: AsyncClient, db: Db) -> None:
+    run = await new_run(client)
+    async with db.begin() as session:
+        await session.execute(
             update(Conversation)
             .where(Conversation.run_id == uuid.UUID(run["id"]))
             .values(
@@ -170,7 +186,6 @@ async def test_cancelling_a_finished_run_changes_nothing(
                 ended_at=func.now(),
             )
         )
-    await engine.dispose()
 
     response = await client.post(f"/api/v1/runs/{run['id']}/cancel")
     missing = await client.post(f"/api/v1/runs/{uuid.uuid4()}/cancel")
@@ -182,26 +197,24 @@ async def test_cancelling_a_finished_run_changes_nothing(
 
 @pytest.mark.parametrize("claim_first", [True, False])
 async def test_a_claim_and_a_cancel_at_the_same_moment_leave_nothing_queued(
-    client: AsyncClient, settings: Settings, claim_first: bool
+    client: AsyncClient, db: Db, claim_first: bool
 ) -> None:
     run = await new_run(client, repeats=2)
-    engine = create_engine(settings.database_url.encoded_string())
 
-    async with create_sessionmaker(engine)() as holder:
+    async with db() as holder:
         await holder.get_one(Run, uuid.UUID(run["id"]), with_for_update=True)
         if claim_first:
-            claiming = asyncio.create_task(claim(settings))
-            await wait_for_lock_waiters(settings, 1)
+            claiming = asyncio.create_task(claim(db))
+            await wait_for_lock_waiters(db, 1)
             cancelling = asyncio.create_task(client.post(f"/api/v1/runs/{run['id']}/cancel"))
         else:
             cancelling = asyncio.create_task(client.post(f"/api/v1/runs/{run['id']}/cancel"))
-            await wait_for_lock_waiters(settings, 1)
-            claiming = asyncio.create_task(claim(settings))
-        await wait_for_lock_waiters(settings, 2)
+            await wait_for_lock_waiters(db, 1)
+            claiming = asyncio.create_task(claim(db))
+        await wait_for_lock_waiters(db, 2)
         await holder.rollback()
     claimed = await asyncio.wait_for(claiming, 10)
     cancelled = (await asyncio.wait_for(cancelling, 10)).json()
-    await engine.dispose()
 
     statuses = [c["status"] for c in await run_conversations(client, run["id"])]
     if claim_first:
@@ -213,66 +226,52 @@ async def test_a_claim_and_a_cancel_at_the_same_moment_leave_nothing_queued(
 
 
 async def test_a_reaper_that_waited_for_its_run_still_rests_the_number(
-    client: AsyncClient, settings: Settings
+    client: AsyncClient, db: Db
 ) -> None:
     run = await new_run(client)
-    lost = await claim(settings)
+    lost = await claim(db)
     assert lost is not None
-    engine = create_engine(settings.database_url.encoded_string())
-    async with create_sessionmaker(engine)() as session:
+    async with db() as session:
         number = await numbers.lease_number(session, uuid.UUID(lost))
-        await session.execute(
-            update(Conversation)
-            .where(Conversation.id == uuid.UUID(lost))
-            .values(lease_expires_at=func.now() - timedelta(seconds=1))
-        )
-        await session.commit()
+    await expire_leases(db, Conversation.id == uuid.UUID(lost))
 
-    async with create_sessionmaker(engine)() as holder:
+    async with db() as holder:
         await holder.get_one(Run, uuid.UUID(run["id"]), with_for_update=True)
-        reaping = asyncio.create_task(reap(settings, rest_s=1))
-        await wait_for_lock_waiters(settings, 1)
+        reaping = asyncio.create_task(reap(db, rest_s=1))
+        await wait_for_lock_waiters(db, 1)
         await asyncio.sleep(1.5)
         await holder.rollback()
     reaped = await reaping
-    async with engine.connect() as connection:
-        resting = await connection.scalar(
+    async with db() as session:
+        resting = await session.scalar(
             select(PhoneNumber.available_after > func.now()).where(PhoneNumber.number == number)
         )
-    await engine.dispose()
 
     assert reaped == 1 and resting, "the rest runs from the release, not from the lock wait"
 
 
 @pytest.mark.parametrize("reap_first", [True, False])
 async def test_the_reaper_and_a_cancel_of_the_same_run_take_turns(
-    client: AsyncClient, settings: Settings, reap_first: bool
+    client: AsyncClient, db: Db, reap_first: bool
 ) -> None:
     run = await new_run(client, repeats=2, max_retries=0)
-    assert None not in [await claim(settings), await claim(settings)]
-    engine = create_engine(settings.database_url.encoded_string())
-    async with engine.begin() as connection:
-        await connection.execute(
-            update(Conversation)
-            .where(Conversation.run_id == uuid.UUID(run["id"]))
-            .values(lease_expires_at=func.now() - timedelta(seconds=1))
-        )
+    assert None not in [await claim(db), await claim(db)]
+    await expire_leases(db, Conversation.run_id == uuid.UUID(run["id"]))
 
-    async with create_sessionmaker(engine)() as holder:
+    async with db() as holder:
         await holder.get_one(Run, uuid.UUID(run["id"]), with_for_update=True)
         if reap_first:
-            reaping = asyncio.create_task(reap(settings))
-            await wait_for_lock_waiters(settings, 1)
+            reaping = asyncio.create_task(reap(db))
+            await wait_for_lock_waiters(db, 1)
             cancelling = asyncio.create_task(client.post(f"/api/v1/runs/{run['id']}/cancel"))
         else:
             cancelling = asyncio.create_task(client.post(f"/api/v1/runs/{run['id']}/cancel"))
-            await wait_for_lock_waiters(settings, 1)
-            reaping = asyncio.create_task(reap(settings))
-        await wait_for_lock_waiters(settings, 2)
+            await wait_for_lock_waiters(db, 1)
+            reaping = asyncio.create_task(reap(db))
+        await wait_for_lock_waiters(db, 2)
         await holder.rollback()
     reaped = await asyncio.wait_for(reaping, 10)
     await asyncio.wait_for(cancelling, 10)
-    await engine.dispose()
 
     after = (await client.get(f"/api/v1/runs/{run['id']}")).json()
     ended = await run_conversations(client, run["id"])

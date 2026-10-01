@@ -5,10 +5,17 @@ import pytest
 from httpx import AsyncClient
 from pydantic import ValidationError
 
-from tests.conftest import AGENT, SCENARIO, create_agent, create_persona, create_scenario
+from tests.conftest import (
+    AGENT,
+    SCENARIO,
+    Db,
+    create_agent,
+    create_persona,
+    create_scenario,
+    wait_for_lock_waiters,
+)
 from truman.config import Settings
 from truman.db.models import Scenario
-from truman.db.session import create_engine, create_sessionmaker
 
 
 async def test_changing_config_creates_a_version_but_renaming_does_not(
@@ -194,27 +201,23 @@ async def test_the_list_sorts_by_name_and_by_last_update(client: AsyncClient) ->
 
 
 async def test_a_duplicate_waits_for_a_persona_change_and_copies_the_new_persona(
-    client: AsyncClient, settings: Settings
+    client: AsyncClient, db: Db
 ) -> None:
     original = await create_agent(client)
     old = await create_persona(client, name="Old caller")
     new = await create_persona(client, name="New caller")
     scenario = await create_scenario(client, original["id"], persona_id=old["id"])
-    engine = create_engine(settings.database_url.encoded_string())
 
-    async with create_sessionmaker(engine)() as other:
+    async with db() as other:
         row = await other.get_one(Scenario, uuid.UUID(scenario["id"]), with_for_update=True)
         row.persona_id = uuid.UUID(new["id"])
         await other.flush()
         duplicating = asyncio.create_task(client.post(f"/api/v1/agents/{original['id']}/duplicate"))
-        await asyncio.sleep(0.3)
-        waited = not duplicating.done()
+        await wait_for_lock_waiters(db, 1)
         await other.commit()
     copy = (await duplicating).json()
     deleted = await client.delete(f"/api/v1/personas/{old['id']}")
-    await engine.dispose()
 
     copied = (await client.get(f"/api/v1/agents/{copy['id']}/scenarios")).json()["items"]
-    assert waited, "the duplicate must wait for a scenario being changed"
     assert [item["persona_id"] for item in copied] == [new["id"]]
     assert deleted.status_code == 204

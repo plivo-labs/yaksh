@@ -13,14 +13,17 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from tests.conftest import (
+    FINAL,
     OUTBOUND_AGENT,
     PERSONA,
     SCENARIO,
     TOKEN,
+    Db,
     FakeCaller,
     create_agent_id,
     create_persona,
     create_scenario,
+    eventually,
     start,
     wait_for,
     wait_until,
@@ -34,8 +37,6 @@ from truman.domain.languages import Language
 from truman.simulation import conversations
 from truman.simulation.calls import STOP_IGNORED
 from truman.worker.worker import FINALIZE_ATTEMPTS, Worker
-
-FINAL = {"completed", "failed", "invalid", "cancelled"}
 
 
 def unchecked(agent_id: str) -> dict[str, str]:
@@ -59,19 +60,14 @@ async def stuck_worker(kind: str, settings: Settings, data_dir: Path) -> asyncio
     )
 
 
-async def worker_reported(settings: Settings) -> None:
+async def worker_reported(db: Db) -> None:
     """Wait until a worker has reported itself, which it does once it handles signals."""
-    engine = create_async_engine(settings.database_url.encoded_string())
-    deadline = asyncio.get_running_loop().time() + 20
-    try:
-        while True:
-            async with engine.connect() as connection:
-                if await connection.scalar(select(func.count()).select_from(RunningWorker)):
-                    return
-            assert asyncio.get_running_loop().time() < deadline, "the worker never reported"
-            await asyncio.sleep(0.05)
-    finally:
-        await engine.dispose()
+
+    async def reported() -> int:
+        async with db() as session:
+            return await session.scalar(select(func.count()).select_from(RunningWorker)) or 0
+
+    await eventually(reported, bool, timeout=20)
 
 
 async def wait_for_event(client: AsyncClient, conversation_id: str, kind: str) -> None:
@@ -689,11 +685,11 @@ async def test_shutdown_with_an_uncancellable_result_write_still_exits(
 
 
 async def test_shutdown_with_stuck_engine_disposal_still_exits(
-    client: AsyncClient, settings: Settings, tmp_path: Path
+    client: AsyncClient, settings: Settings, db: Db, tmp_path: Path
 ) -> None:
     process = await stuck_worker("stuck_disposal", settings, tmp_path)
     try:
-        await worker_reported(settings)
+        await worker_reported(db)
         process.terminate()
         exit_code = await asyncio.wait_for(process.wait(), timeout=20)
     finally:

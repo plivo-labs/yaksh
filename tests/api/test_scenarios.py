@@ -5,10 +5,15 @@ from typing import Any
 import pytest
 from httpx import AsyncClient
 
-from tests.conftest import SCENARIO, create_agent_id, create_persona, create_scenario
-from truman.config import Settings
+from tests.conftest import (
+    SCENARIO,
+    Db,
+    create_agent_id,
+    create_persona,
+    create_scenario,
+    wait_for_lock_waiters,
+)
 from truman.db.models import Agent
-from truman.db.session import create_engine, create_sessionmaker
 
 
 async def test_a_config_change_writes_a_version_but_a_rename_does_not(
@@ -204,25 +209,21 @@ async def test_set_persona_changes_every_selected_scenario_or_none(client: Async
 
 @pytest.mark.parametrize("action", ["delete", "persona"])
 async def test_a_bulk_change_waits_while_the_agent_is_locked(
-    client: AsyncClient, settings: Settings, action: str
+    client: AsyncClient, db: Db, action: str
 ) -> None:
     agent = await create_agent_id(client)
     scenario = await create_scenario(client, agent)
     body: dict[str, Any] = {"scenario_ids": [scenario["id"]]}
     if action == "persona":
         body["persona_id"] = (await create_persona(client, name="Calm caller"))["id"]
-    engine = create_engine(settings.database_url.encoded_string())
 
-    async with create_sessionmaker(engine)() as other:
+    async with db() as other:
         await other.get_one(Agent, uuid.UUID(agent), with_for_update=True)
         changing = asyncio.create_task(
             client.post(f"/api/v1/agents/{agent}/scenarios/{action}", json=body)
         )
-        await asyncio.sleep(0.3)
-        waited = not changing.done()
+        await wait_for_lock_waiters(db, 1)
         await other.rollback()
     response = await changing
-    await engine.dispose()
 
-    assert waited, "a bulk change locks the agent first, as agent deletion does"
     assert response.status_code == 204

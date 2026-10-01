@@ -9,12 +9,15 @@ from sqlalchemy import func, insert, select, update
 
 from tests.conftest import (
     OUTBOUND_AGENT,
+    Db,
     FakeCaller,
+    claim,
     create_agent,
-    create_persona,
     create_scenario,
+    expire_leases,
     make_settings,
     reap,
+    start_run,
 )
 from truman.config import Settings
 from truman.db.models import Conversation, PhoneNumber, RunningWorker
@@ -64,10 +67,8 @@ async def report(
 async def start_outbound(client: AsyncClient, **scenario: Any) -> Any:
     agent = await create_agent(client, **OUTBOUND_AGENT)
     created = await create_scenario(client, agent["id"], **scenario)
-    persona = await create_persona(client, name=f"Caller {uuid.uuid4()}")
     return await client.post(
-        "/api/v1/conversations",
-        json={"agent_id": agent["id"], "scenario_id": created["id"], "persona_id": persona["id"]},
+        "/api/v1/conversations", json={"agent_id": agent["id"], "scenario_id": created["id"]}
     )
 
 
@@ -98,17 +99,11 @@ async def test_an_outbound_run_needs_the_same_setup_and_names_a_scenario_without
     with_data = await create_scenario(client, agent["id"], agent_data=AGENT_DATA)
     without = await create_scenario(client, agent["id"], name="No data")
 
-    async def start_run(*scenarios: dict[str, Any]) -> Any:
-        return await client.post(
-            "/api/v1/runs",
-            json={"agent_id": agent["id"], "scenario_ids": [s["id"] for s in scenarios]},
-        )
-
-    off = await start_run(with_data)
+    off = await start_run(client, agent["id"], [with_data["id"]])
     await report(settings)
     await link_number(settings)
-    lacking = await start_run(with_data, without)
-    started = await start_run(with_data)
+    lacking = await start_run(client, agent["id"], [with_data["id"], without["id"]])
+    started = await start_run(client, agent["id"], [with_data["id"]])
 
     assert off.status_code == 422
     assert off.json()["error"]["message"].startswith("outbound tests are off: ")
@@ -121,58 +116,47 @@ async def test_an_outbound_run_needs_the_same_setup_and_names_a_scenario_without
     assert [c["direction"] for c in queued.json()["items"]] == ["outbound"]
 
 
-async def claim(settings: Settings, receiving_app_id: str | None) -> Conversation | None:
-    engine = create_engine(settings.database_url.encoded_string())
-    async with create_sessionmaker(engine)() as session:
-        claimed = await conversations.claim_next(session, "w1", 30, receiving_app_id)
-    await engine.dispose()
-    return claimed
-
-
 async def test_an_outbound_conversation_runs_only_where_its_call_can_be_received(
-    client: AsyncClient, settings: Settings
+    client: AsyncClient, settings: Settings, db: Db
 ) -> None:
     await report(settings)
     await link_number(settings, available_after=datetime.now(UTC) + timedelta(minutes=5))
     started = (await start_outbound(client, agent_data=AGENT_DATA)).json()
 
-    no_application = await claim(settings, None)
-    resting = await claim(settings, APP_ID)
-    engine = create_engine(settings.database_url.encoded_string())
-    async with engine.begin() as connection:
-        await connection.execute(update(PhoneNumber).values(available_after=None))
-    await engine.dispose()
-    rested = await claim(settings, APP_ID)
+    no_application = await claim(db)
+    resting = await claim(db, receiving_app_id=APP_ID)
+    async with db.begin() as session:
+        await session.execute(update(PhoneNumber).values(available_after=None))
+    rested = await claim(db, receiving_app_id=APP_ID)
 
     assert no_application is None and resting is None
-    assert rested is not None and str(rested.id) == started["id"]
+    assert rested == started["id"]
 
 
 async def test_preparing_the_call_opens_the_dial_window_and_keeps_the_pinned_data(
-    client: AsyncClient, settings: Settings
+    client: AsyncClient, settings: Settings, db: Db
 ) -> None:
     await report(settings)
     await link_number(settings)
     outbound = {**OUTBOUND_AGENT["outbound"], "dial_window_s": 30}
     agent = await create_agent(client, **{**OUTBOUND_AGENT, "outbound": outbound})
     scenario = await create_scenario(client, agent["id"], agent_data=AGENT_DATA)
-    persona = await create_persona(client, name=f"Caller {uuid.uuid4()}")
     await client.post(
-        "/api/v1/conversations",
-        json={"agent_id": agent["id"], "scenario_id": scenario["id"], "persona_id": persona["id"]},
+        "/api/v1/conversations", json={"agent_id": agent["id"], "scenario_id": scenario["id"]}
     )
     edited = [{"name": "Customer name", "value": "Someone else"}]
     await client.patch(f"/api/v1/scenarios/{scenario['id']}", json={"agent_data": edited})
-    claimed = await claim(settings, APP_ID)
+    claimed = await claim(db, receiving_app_id=APP_ID)
     assert claimed is not None
 
-    engine = create_engine(settings.database_url.encoded_string())
-    async with create_sessionmaker(engine)() as session:
-        request = await conversations.prepare_call(session, settings, claimed, APP_ID)
+    async with db() as session:
+        conversation = await session.get_one(Conversation, uuid.UUID(claimed))
+        request = await conversations.prepare_call(session, settings, conversation, APP_ID)
         window = await session.scalar(
-            select(Conversation.dial_deadline_at - func.now()).where(Conversation.id == claimed.id)
+            select(Conversation.dial_deadline_at - func.now()).where(
+                Conversation.id == conversation.id
+            )
         )
-    await engine.dispose()
 
     assert request.caller_number == RECEIVING
     assert [fact.value for fact in request.agent_data] == ["Priya Raman"]
@@ -180,7 +164,7 @@ async def test_preparing_the_call_opens_the_dial_window_and_keeps_the_pinned_dat
 
 
 async def test_a_waiting_outbound_conversation_does_not_hold_up_inbound_ones(
-    client: AsyncClient, settings: Settings
+    client: AsyncClient, settings: Settings, db: Db
 ) -> None:
     await report(settings)
     await link_number(settings)
@@ -188,19 +172,13 @@ async def test_a_waiting_outbound_conversation_does_not_hold_up_inbound_ones(
     assert waiting.status_code == 202
     inbound = await create_agent(client)
     scenario = await create_scenario(client, inbound["id"])
-    persona = await create_persona(client, name=f"Caller {uuid.uuid4()}")
     queued = await client.post(
-        "/api/v1/conversations",
-        json={
-            "agent_id": inbound["id"],
-            "scenario_id": scenario["id"],
-            "persona_id": persona["id"],
-        },
+        "/api/v1/conversations", json={"agent_id": inbound["id"], "scenario_id": scenario["id"]}
     )
 
-    claimed = await claim(settings, None)
+    claimed = await claim(db)
 
-    assert claimed is not None and str(claimed.id) == queued.json()["id"]
+    assert claimed == queued.json()["id"]
 
 
 async def test_the_numbers_page_shows_the_outbound_numbers_and_their_rest(
@@ -253,28 +231,22 @@ async def test_an_outbound_start_needs_a_running_worker_that_receives_its_calls(
     assert running.status_code == 202
 
 
-async def test_an_outbound_retry_runs_as_outbound(client: AsyncClient, settings: Settings) -> None:
+async def test_an_outbound_retry_runs_as_outbound(
+    client: AsyncClient, settings: Settings, db: Db
+) -> None:
     await report(settings)
     await link_number(settings)
     agent = await create_agent(client, **OUTBOUND_AGENT)
     scenario = await create_scenario(client, agent["id"], agent_data=AGENT_DATA)
-    run = await client.post(
-        "/api/v1/runs", json={"agent_id": agent["id"], "scenario_ids": [scenario["id"]]}
-    )
-    lost = await claim(settings, APP_ID)
+    run = await start_run(client, agent["id"], [scenario["id"]])
+    lost = await claim(db, receiving_app_id=APP_ID)
     assert run.status_code == 202 and lost is not None
-    engine = create_engine(settings.database_url.encoded_string())
-    async with engine.begin() as connection:
-        await connection.execute(
-            update(Conversation)
-            .where(Conversation.id == lost.id)
-            .values(lease_expires_at=func.now() - timedelta(seconds=1))
-        )
-    await engine.dispose()
-    await reap(settings)
+    await expire_leases(db, Conversation.id == uuid.UUID(lost))
+    await reap(db)
 
-    inbound_only = await claim(settings, None)
-    retried = await claim(settings, APP_ID)
+    inbound_only = await claim(db)
+    retried = await claim(db, receiving_app_id=APP_ID)
 
-    assert inbound_only is None
-    assert retried is not None and (retried.direction, retried.attempt) == ("outbound", 2)
+    assert inbound_only is None and retried is not None
+    detail = (await client.get(f"/api/v1/conversations/{retried}")).json()
+    assert (detail["direction"], detail["attempt"]) == ("outbound", 2)

@@ -8,8 +8,13 @@ from httpx import AsyncClient
 from sqlalchemy import func, select, update
 
 from tests.conftest import (
+    TRUMAN_FAILED,
+    Db,
     FakeCaller,
+    assert_groups_match_counts,
     claim,
+    expire_leases,
+    finish,
     new_run,
     reap,
     run_conversations,
@@ -17,56 +22,28 @@ from tests.conftest import (
     wait_for_run,
 )
 from truman.config import Settings
-from truman.db.models import Conversation, Run
-from truman.db.session import create_engine, create_sessionmaker
-from truman.domain.conversations import CallOutcome, EndReason, Transcript
-from truman.simulation import conversations
+from truman.db.models import Conversation, Run, Scenario
 from truman.worker.worker import Worker
 
-INPUTS = (
-    "agent_id",
-    "agent_version_id",
-    "channel",
-    "direction",
-    "persona_id",
-    "persona_version_id",
-    "scenario_id",
-    "scenario_version_id",
-    "language",
-    "instructions",
-    "nudge",
-    "max_duration_s",
-    "run_id",
-    "repeat",
-)
-RESULTS = ("caller_number", "call_uuid", "dial_deadline_at", "talk_ms", "transcript", "ended_at")
-
-
-async def expire_leases(settings: Settings, run: dict[str, Any]) -> None:
-    engine = create_engine(settings.database_url.encoded_string())
-    async with engine.begin() as connection:
-        await connection.execute(
-            update(Conversation)
-            .where(Conversation.run_id == uuid.UUID(run["id"]))
-            .values(lease_expires_at=func.now() - timedelta(seconds=1))
-        )
-    await engine.dispose()
-
-
-async def fail(settings: Settings, conversation_id: str) -> bool:
-    """Finalize a conversation claimed by w1 as a call that failed on Truman's side."""
-    engine = create_engine(settings.database_url.encoded_string())
-    async with create_sessionmaker(engine)() as session:
-        recorded = await conversations.finalize(
-            session,
-            uuid.UUID(conversation_id),
-            "w1",
-            CallOutcome(connected=False, end_reason=EndReason.ERROR, caller_error="boom"),
-            Transcript(),
-            0,
-        )
-    await engine.dispose()
-    return recorded
+ATTEMPT = {"id", "status", "attempt", "retry_of", "created_at"}
+"""The columns that name an attempt."""
+RESULTS = {
+    "caller_number",
+    "call_uuid",
+    "dial_deadline_at",
+    "agent_caller_id",
+    "end_reason",
+    "failure_reason",
+    "started_at",
+    "ended_at",
+    "talk_ms",
+    "recording_path",
+    "transcript",
+    "caller_claim",
+    "claimed_by",
+    "lease_expires_at",
+}
+"""What an attempt got while it ran; its retry starts with none of it."""
 
 
 async def test_an_error_is_tried_again_up_to_the_runs_retries(
@@ -107,91 +84,110 @@ async def test_only_the_error_group_is_tried_again(
     only = await run_conversations(client, run["id"])
     assert [(c["status"], c["end_reason"]) for c in only] == [(status, end_reason)]
     assert done["retries"] == 0
+    await assert_groups_match_counts(client, run["id"])
 
 
 async def test_a_lost_lease_is_tried_again_with_the_inputs_and_nothing_else(
-    client: AsyncClient, settings: Settings
+    client: AsyncClient, db: Db
 ) -> None:
     run = await new_run(client)
-    lost = await claim(settings)
+    lost = await claim(db)
     assert lost is not None
-    engine = create_engine(settings.database_url.encoded_string())
-    async with engine.begin() as connection:
-        await connection.execute(
+    async with db.begin() as session:
+        await session.execute(
             update(Conversation)
             .where(Conversation.id == uuid.UUID(lost))
             .values(
                 caller_number="+15550100000",
                 call_uuid="call-1",
                 dial_deadline_at=func.now(),
+                agent_caller_id="+15550100001",
                 talk_ms=1200,
+                recording_path="recording.wav",
                 transcript={"turns": [], "wire_events": []},
+                caller_claim={"success": True, "reason": "booked"},
                 lease_expires_at=func.now() - timedelta(seconds=1),
             )
         )
 
-    reaped = await reap(settings)
+    reaped = await reap(db)
 
-    async with create_sessionmaker(engine)() as session:
+    async with db() as session:
         original, retry = await session.scalars(
             select(Conversation)
             .where(Conversation.run_id == uuid.UUID(run["id"]))
             .order_by(Conversation.attempt)
         )
-    await engine.dispose()
+    copied = set(Conversation.__table__.columns.keys()) - ATTEMPT - RESULTS
     assert reaped == 1
     assert (original.status, original.end_reason) == ("failed", "lease_lost")
-    assert {name: getattr(retry, name) for name in INPUTS} == {
-        name: getattr(original, name) for name in INPUTS
+    assert {name: getattr(retry, name) for name in copied} == {
+        name: getattr(original, name) for name in copied
     }
     assert (retry.status, retry.attempt, retry.retry_of) == ("queued", 2, original.id)
-    assert [getattr(retry, name) for name in RESULTS] == [None] * len(RESULTS)
+    assert {name: getattr(retry, name) for name in RESULTS} == dict.fromkeys(RESULTS)
 
 
-async def test_reapers_and_a_late_result_write_make_one_retry(
-    client: AsyncClient, settings: Settings
+@pytest.mark.parametrize("write_first", [True, False])
+async def test_a_result_write_that_outlived_its_lease_and_the_reapers_make_one_retry(
+    client: AsyncClient, db: Db, write_first: bool
 ) -> None:
     run = await new_run(client)
-    lost = await claim(settings)
-    assert lost is not None
-    await expire_leases(settings, run)
-
-    first, second, recorded = await asyncio.gather(
-        reap(settings), reap(settings), fail(settings, lost)
-    )
-
-    attempts = await run_conversations(client, run["id"])
-    assert [c["attempt"] for c in attempts] == [1, 2]
-    assert sorted([first, second]) == [0, 1] and recorded is False
-
-
-async def test_a_result_write_that_outlived_the_lease_while_waiting_is_refused(
-    client: AsyncClient, settings: Settings
-) -> None:
-    run = await new_run(client)
-    late = await claim(settings)
+    late = await claim(db)
     assert late is not None
-    engine = create_engine(settings.database_url.encoded_string())
-    async with engine.begin() as connection:
-        await connection.execute(
+    async with db.begin() as session:
+        await session.execute(
             update(Conversation)
             .where(Conversation.id == uuid.UUID(late))
             .values(lease_expires_at=func.now() + timedelta(seconds=1))
         )
 
-    async with create_sessionmaker(engine)() as holder:
+    async with db() as holder:
         await holder.get_one(Run, uuid.UUID(run["id"]), with_for_update=True)
-        writing = asyncio.create_task(fail(settings, late))
-        await wait_for_lock_waiters(settings, 1)
-        await asyncio.sleep(1.5)
+        if write_first:
+            writing = asyncio.create_task(finish(db, late, TRUMAN_FAILED))
+            await wait_for_lock_waiters(db, 1)
+            await asyncio.sleep(1.5)
+            reaping = [asyncio.create_task(reap(db)) for _ in range(2)]
+        else:
+            await asyncio.sleep(1.5)
+            reaping = [asyncio.create_task(reap(db)) for _ in range(2)]
+            await wait_for_lock_waiters(db, 2)
+            writing = asyncio.create_task(finish(db, late, TRUMAN_FAILED))
+        await wait_for_lock_waiters(db, 3)
         await holder.rollback()
-    recorded = await writing
-    await engine.dispose()
-    reaped = await reap(settings)
+    recorded = await asyncio.wait_for(writing, 10)
+    reaped = sorted(await asyncio.wait_for(asyncio.gather(*reaping), 10))
 
     attempts = await run_conversations(client, run["id"])
-    assert recorded is False and reaped == 1
+    assert recorded is False and reaped == [0, 1], "the lease ran out while the run was locked"
     assert [(c["attempt"], c["end_reason"]) for c in attempts] == [(1, "lease_lost"), (2, None)]
+
+
+async def test_a_retry_and_an_edit_of_its_scenario_at_the_same_moment_both_go_through(
+    client: AsyncClient, db: Db
+) -> None:
+    run = await new_run(client)
+    [queued] = await run_conversations(client, run["id"])
+    assert await claim(db) == queued["id"]
+
+    async with db() as holder:
+        await holder.get_one(Scenario, uuid.UUID(queued["scenario_id"]), with_for_update=True)
+        editing = asyncio.create_task(
+            client.patch(
+                f"/api/v1/scenarios/{queued['scenario_id']}",
+                json={"goal": "Cancel the cleaning.", "persona_id": queued["persona_id"]},
+            )
+        )
+        await wait_for_lock_waiters(db, 1)
+        recording = asyncio.create_task(finish(db, queued["id"], TRUMAN_FAILED))
+        await wait_for_lock_waiters(db, 2)
+        await holder.rollback()
+    edited, recorded = await asyncio.wait_for(asyncio.gather(editing, recording), 10)
+
+    attempts = await run_conversations(client, run["id"])
+    assert edited.status_code == 200 and recorded is True, "the retry key-shares in lock order"
+    assert [(c["attempt"], c["status"]) for c in attempts] == [(1, "failed"), (2, "queued")]
 
 
 async def test_the_reaper_makes_the_retry_when_every_result_write_fails(
@@ -216,35 +212,33 @@ async def test_the_reaper_makes_the_retry_when_every_result_write_fails(
 @pytest.mark.parametrize("path", ["finalize", "reaper"])
 @pytest.mark.parametrize("cancel_first", [True, False])
 async def test_a_retry_and_a_cancel_at_the_same_moment_leave_nothing_queued(
-    client: AsyncClient, settings: Settings, path: str, cancel_first: bool
+    client: AsyncClient, db: Db, path: str, cancel_first: bool
 ) -> None:
     run = await new_run(client)
-    conversation = await claim(settings)
+    conversation = await claim(db)
     assert conversation is not None
     if path == "reaper":
-        await expire_leases(settings, run)
-    engine = create_engine(settings.database_url.encoded_string())
+        await expire_leases(db, Conversation.run_id == uuid.UUID(run["id"]))
 
     def ending() -> asyncio.Task[Any]:
         if path == "reaper":
-            return asyncio.create_task(reap(settings))
+            return asyncio.create_task(reap(db))
         assert conversation is not None
-        return asyncio.create_task(fail(settings, conversation))
+        return asyncio.create_task(finish(db, conversation, TRUMAN_FAILED))
 
-    async with create_sessionmaker(engine)() as holder:
+    async with db() as holder:
         await holder.get_one(Run, uuid.UUID(run["id"]), with_for_update=True)
         if cancel_first:
             cancelling = asyncio.create_task(client.post(f"/api/v1/runs/{run['id']}/cancel"))
-            await wait_for_lock_waiters(settings, 1)
+            await wait_for_lock_waiters(db, 1)
             ended = ending()
         else:
             ended = ending()
-            await wait_for_lock_waiters(settings, 1)
+            await wait_for_lock_waiters(db, 1)
             cancelling = asyncio.create_task(client.post(f"/api/v1/runs/{run['id']}/cancel"))
-        await wait_for_lock_waiters(settings, 2)
+        await wait_for_lock_waiters(db, 2)
         await holder.rollback()
     await asyncio.wait_for(asyncio.gather(ended, cancelling), 10)
-    await engine.dispose()
 
     attempts = await run_conversations(client, run["id"])
     assert "queued" not in {c["status"] for c in attempts}

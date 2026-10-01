@@ -1,19 +1,20 @@
 import asyncio
 import uuid
-from collections.abc import AsyncGenerator, AsyncIterator, Callable, Iterator
+from collections.abc import AsyncGenerator, AsyncIterator, Awaitable, Callable, Iterator
+from datetime import timedelta
 from pathlib import Path
 from typing import Any
 
 import pytest
 from httpx import ASGITransport, AsyncClient, Response
-from sqlalchemy import text
-from sqlalchemy.ext.asyncio import create_async_engine
+from sqlalchemy import ColumnElement, func, text, update
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from testcontainers.community.postgres import PostgresContainer
 
 from truman.api import create_app
 from truman.config import Settings
 from truman.db.migrate import upgrade_to_head
-from truman.db.models import Voice
+from truman.db.models import Conversation, Voice
 from truman.db.session import create_engine, create_sessionmaker
 from truman.domain.conversations import (
     Admission,
@@ -25,6 +26,7 @@ from truman.domain.conversations import (
     IncomingCall,
     Provenance,
     Role,
+    Transcript,
     Turn,
     WireEvent,
     WireEventKind,
@@ -37,10 +39,19 @@ from truman.integrations.plivo_signature import signature, signed_text
 from truman.simulation import conversations, numbers
 from truman.worker.worker import Worker
 
+type Db = async_sessionmaker[AsyncSession]
+
 TOKEN = "test-token"
 PLIVO_TOKEN = "token"
 POOL = [AccountNumber(number=f"+1555010{n:04d}") for n in range(8)]
 OFFLINE_DATABASE_URL = "postgresql+asyncpg://truman:truman@localhost:5432/truman"
+FINAL = {"completed", "failed", "invalid", "cancelled"}
+TRUMAN_FAILED = CallOutcome(connected=False, end_reason=EndReason.ERROR, caller_error="boom")
+"""A call that failed on Truman's side, which a run tries again."""
+LOCK_WAITERS = text(
+    "SELECT count(*) FROM pg_stat_activity"
+    " WHERE datname = current_database() AND wait_event_type = 'Lock'"
+)
 
 
 AGENT = {"name": "Front desk", "agent_number": "+14155550100"}
@@ -123,11 +134,13 @@ async def create_persona(client: AsyncClient, **overrides: Any) -> dict[str, Any
     return response.json()
 
 
+async def new_persona_id(client: AsyncClient) -> str:
+    return (await create_persona(client, name=f"Caller {uuid.uuid4()}"))["id"]
+
+
 async def create_scenario(client: AsyncClient, agent_id: str, **overrides: Any) -> dict[str, Any]:
     if "persona_id" not in overrides:
-        overrides["persona_id"] = (await create_persona(client, name=f"Caller {uuid.uuid4()}"))[
-            "id"
-        ]
+        overrides["persona_id"] = await new_persona_id(client)
     response = await client.post(
         f"/api/v1/agents/{agent_id}/scenarios", json={**SCENARIO, **overrides}
     )
@@ -137,9 +150,7 @@ async def create_scenario(client: AsyncClient, agent_id: str, **overrides: Any) 
 
 async def start(client: AsyncClient, agent_id: str, **overrides: Any) -> dict[str, Any]:
     if "persona_id" not in overrides:
-        overrides["persona_id"] = (await create_persona(client, name=f"Caller {uuid.uuid4()}"))[
-            "id"
-        ]
+        overrides["persona_id"] = await new_persona_id(client)
     if "scenario_id" not in overrides:
         overrides["scenario_id"] = (
             await create_scenario(
@@ -193,76 +204,98 @@ async def new_run(client: AsyncClient, *, scenarios: int = 1, **fields: Any) -> 
     return response.json()
 
 
-async def claim(settings: Settings, worker_id: str = "w1") -> str | None:
+async def claim(
+    db: Db,
+    *,
+    worker_id: str = "w1",
+    receiving_app_id: str | None = None,
+) -> str | None:
     """The id of the conversation a worker claims next, if any."""
-    engine = create_engine(settings.database_url.encoded_string())
-    async with create_sessionmaker(engine)() as session:
-        claimed = await conversations.claim_next(session, worker_id, 30, None)
-    await engine.dispose()
+    async with db() as session:
+        claimed = await conversations.claim_next(session, worker_id, 30, receiving_app_id)
     return None if claimed is None else str(claimed.id)
 
 
-async def reap(settings: Settings, rest_s: int = 0) -> int:
-    engine = create_engine(settings.database_url.encoded_string())
-    async with create_sessionmaker(engine)() as session:
-        reaped = await conversations.reap_expired(session, rest_s)
-    await engine.dispose()
-    return reaped
+async def reap(db: Db, rest_s: int = 0) -> int:
+    async with db() as session:
+        return await conversations.reap_expired(session, rest_s)
+
+
+async def finish(
+    db: Db,
+    conversation_id: str,
+    outcome: CallOutcome,
+    worker_id: str = "w1",
+) -> bool:
+    """Record the outcome of a conversation the worker claimed, as the worker does."""
+    async with db() as session:
+        return await conversations.finalize(
+            session, uuid.UUID(conversation_id), worker_id, outcome, Transcript(), 0
+        )
+
+
+async def expire_leases(db: Db, which: ColumnElement[bool]) -> None:
+    """End the leases of these conversations, as if their workers had stopped."""
+    async with db.begin() as session:
+        await session.execute(
+            update(Conversation)
+            .where(which)
+            .values(lease_expires_at=func.now() - timedelta(seconds=1))
+        )
+
+
+async def eventually[T](
+    probe: Callable[[], Awaitable[T]], done: Callable[[T], bool], timeout: float = 5.0
+) -> T:
+    """Probe until done holds for the value, and fail with the last value after timeout
+    seconds."""
+    deadline = asyncio.get_running_loop().time() + timeout
+    while not done(value := await probe()):
+        assert asyncio.get_running_loop().time() < deadline, value
+        await asyncio.sleep(0.05)
+    return value
 
 
 async def wait_for_run(
     client: AsyncClient, run_id: str, status: str, timeout: float = 10.0
 ) -> dict[str, Any]:
-    deadline = asyncio.get_running_loop().time() + timeout
-    while True:
-        run = (await client.get(f"/api/v1/runs/{run_id}")).json()
-        if run["status"] == status:
-            return run
-        assert asyncio.get_running_loop().time() < deadline, run
-        await asyncio.sleep(0.05)
+    async def run() -> dict[str, Any]:
+        return (await client.get(f"/api/v1/runs/{run_id}")).json()
+
+    return await eventually(run, lambda found: found["status"] == status, timeout)
 
 
 async def wait_for(
     client: AsyncClient, conversation_id: str, statuses: set[str], timeout: float = 5.0
 ) -> dict[str, Any]:
-    deadline = asyncio.get_running_loop().time() + timeout
-    while True:
-        conversation = (await client.get(f"/api/v1/conversations/{conversation_id}")).json()
-        if conversation["status"] in statuses:
-            return conversation
-        assert asyncio.get_running_loop().time() < deadline, conversation
-        await asyncio.sleep(0.05)
+    async def conversation() -> dict[str, Any]:
+        return (await client.get(f"/api/v1/conversations/{conversation_id}")).json()
+
+    return await eventually(conversation, lambda found: found["status"] in statuses, timeout)
 
 
-async def wait_for_lock_waiters(settings: Settings, count: int, timeout: float = 5.0) -> None:
+async def wait_for_lock_waiters(db: Db, count: int, timeout: float = 5.0) -> None:
     """Wait until `count` database sessions wait on a lock, so a test releases a lock it holds
-    only after every request it races has reached that lock."""
-    engine = create_async_engine(
-        settings.database_url.encoded_string(), isolation_level="AUTOCOMMIT"
-    )
-    deadline = asyncio.get_running_loop().time() + timeout
-    try:
-        async with engine.connect() as connection:
-            while True:
-                waiting = await connection.scalar(
-                    text(
-                        "SELECT count(*) FROM pg_stat_activity"
-                        " WHERE datname = current_database() AND wait_event_type = 'Lock'"
-                    )
-                )
-                if waiting is not None and waiting >= count:
-                    return
-                assert asyncio.get_running_loop().time() < deadline, f"{waiting} of {count} wait"
-                await asyncio.sleep(0.02)
-    finally:
-        await engine.dispose()
+    only after every request it races has reached that lock. Each read is its own
+    transaction, because Postgres reads pg_stat_activity once per transaction."""
+    async with db() as session:
+        connection = await session.connection(execution_options={"isolation_level": "AUTOCOMMIT"})
+        await eventually(lambda: connection.scalar(LOCK_WAITERS), lambda n: n >= count, timeout)
 
 
 async def wait_until(condition: Callable[[], bool], timeout: float = 5.0) -> None:
-    deadline = asyncio.get_running_loop().time() + timeout
-    while not condition():
-        assert asyncio.get_running_loop().time() < deadline
-        await asyncio.sleep(0.02)
+    async def check() -> bool:
+        return condition()
+
+    await eventually(check, bool, timeout)
+
+
+async def assert_groups_match_counts(client: AsyncClient, run_id: str) -> None:
+    """Each outcome group lists as many latest attempts as the run counts in it."""
+    counts = (await client.get(f"/api/v1/runs/{run_id}")).json()["counts"]
+    for group, count in counts.items():
+        listed = await run_conversations(client, run_id, group=group, latest_attempts=True)
+        assert len(listed) == count, group
 
 
 async def refuse_calls(call: IncomingCall) -> Admission | str:
@@ -511,6 +544,14 @@ def offline_settings(tmp_path: Path) -> Settings:
 @pytest.fixture
 def settings(database_url: str, tmp_path: Path) -> Settings:
     return make_settings(tmp_path, database_url=database_url)
+
+
+@pytest.fixture
+async def db(settings: Settings) -> AsyncIterator[Db]:
+    """Sessions on the test database, for steps the API does not offer."""
+    engine = create_engine(settings.database_url.encoded_string())
+    yield create_sessionmaker(engine)
+    await engine.dispose()
 
 
 @pytest.fixture
