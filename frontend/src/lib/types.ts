@@ -64,7 +64,8 @@ type WireEventKind =
 export const WIRE_EVENT_HELP: Record<WireEventKind, string> = {
   connect_started: "Truman started the call: it dials the agent, or waits for the agent's call.",
   waiting_for_call: "Truman waits for the agent to call the number it leased for this test.",
-  trigger_sent: "Truman sent the request that makes the agent call. The text below is the result.",
+  trigger_sent:
+    "Truman tried to send the request that makes the agent call. The text below gives the result, or why it was not sent.",
   ringing: "Plivo reports that the agent's phone rings.",
   answered: "The call is answered: the agent picked up, or Truman took the agent's call.",
   connected: "The audio stream is open. Talk time and the recording start here.",

@@ -596,14 +596,10 @@ function WireEvents({
                 <div className="flex justify-between gap-4">
                   <Tooltip>
                     <TooltipTrigger
-                      render={
-                        <span
-                          className={cn(
-                            "cursor-help underline decoration-dotted underline-offset-2",
-                            event.kind === "caller_error" && "text-status-danger",
-                          )}
-                        />
-                      }
+                      className={cn(
+                        "cursor-help rounded-sm underline decoration-dotted underline-offset-2 outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50",
+                        event.kind === "caller_error" && "text-status-danger",
+                      )}
                     >
                       {words(event.kind)}
                     </TooltipTrigger>
