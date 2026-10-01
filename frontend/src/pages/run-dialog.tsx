@@ -103,10 +103,12 @@ export function RunDialog({
         agent_id: agent.id,
         scenario_ids: scenarios.map((scenario) => scenario.id),
         repeats: repeatCount,
-        max_duration_s: duration,
+        // Untouched fields go as null, for the defaults they show: a resent request then stays
+        // the same whether or not the defaults had loaded when it was first sent.
+        max_duration_s: maxDuration === null ? null : duration,
         max_parallel: parallel,
         start_interval_s: interval,
-        max_retries: retryCount,
+        max_retries: retries === null ? null : retryCount,
         name: name.trim() || null,
       },
       { onSuccess: (run) => navigate(`/runs/${run.id}`) },
