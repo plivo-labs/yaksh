@@ -73,8 +73,8 @@ DEEPGRAM_LANGUAGES: dict[Language, str] = {
 END_CALL = FunctionSchema(
     name="end_call",
     description=(
-        "End the call. Call this instead of speaking once your goal is achieved "
-        "or it is clear the agent cannot help."
+        "End the call. Call it only when the agent's latest turn shows that your goal is "
+        "achieved; never in a normal turn."
     ),
     properties={
         "success": {"type": "boolean", "description": "Whether you achieved your goal."},
