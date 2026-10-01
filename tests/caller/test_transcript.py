@@ -37,6 +37,25 @@ def test_an_interrupted_reply_keeps_what_the_agent_heard_apart_from_the_rest() -
     ]
 
 
+def test_the_line_is_quiet_only_once_the_last_words_are_reported_played() -> None:
+    builder = TranscriptBuilder(Clock(), Observer())
+    assert builder.quiet
+    builder.scripted("Okay, thanks. Bye.")
+    assert not builder.quiet
+    playout = played(arrived=9_600, sent=0)
+    builder.caller_started(playout)
+    builder.transmitted("Okay,", 0, playout, self_spaced=False)
+    builder.reply_ended()
+    assert not builder.quiet
+
+    playout.played(9_600)
+    builder.audio_progressed()
+    assert builder.quiet
+
+    builder.agent_started()
+    assert not builder.quiet
+
+
 def test_a_finished_reply_is_recorded_once_the_wire_has_sent_it() -> None:
     observer = Observer()
     builder = TranscriptBuilder(Clock(), observer)

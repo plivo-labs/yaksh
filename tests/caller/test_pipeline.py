@@ -1,4 +1,6 @@
+import asyncio
 from pathlib import Path
+from typing import cast
 
 import pytest
 from pipecat.frames.frames import (
@@ -8,9 +10,12 @@ from pipecat.frames.frames import (
     VADUserStartedSpeakingFrame,
     VADUserStoppedSpeakingFrame,
 )
+from pipecat.pipeline.pipeline import Pipeline
+from pipecat.pipeline.worker import PipelineWorker
 from pipecat.processors.aggregators.llm_context import LLMContext
 from pipecat.processors.aggregators.llm_response_universal import (
     LLMContextAggregatorPair,
+    LLMUserAggregator,
     LLMUserAggregatorParams,
 )
 from pipecat.tests.utils import SleepFrame, run_test
@@ -18,7 +23,8 @@ from pipecat.turns.user_stop import SpeechTimeoutUserTurnStopStrategy
 from pipecat.turns.user_turn_strategies import UserTurnStrategies
 
 from tests.conftest import FakeProvider, make_settings
-from truman.caller.pipeline import CallState, TurnLimit, llm_service, watch_silence
+from truman.caller import pipeline
+from truman.caller.pipeline import CallState, Persona, TurnLimit, llm_service, watch_silence
 from truman.config import Settings
 from truman.domain.conversations import EndReason
 
@@ -35,8 +41,8 @@ def model_settings(tmp_path: Path, base: str, model: str, effort: str | None) ->
     )
 
 
-async def test_the_persona_gives_up_on_a_quiet_agent_only_after_two_nudges_in_one_silence() -> None:
-    user = LLMContextAggregatorPair(
+def idle_user() -> LLMUserAggregator:
+    return LLMContextAggregatorPair(
         LLMContext(),
         user_params=LLMUserAggregatorParams(
             user_idle_timeout=0.05,
@@ -45,6 +51,10 @@ async def test_the_persona_gives_up_on_a_quiet_agent_only_after_two_nudges_in_on
             ),
         ),
     ).user()
+
+
+async def test_the_persona_gives_up_on_a_quiet_agent_only_after_two_nudges_in_one_silence() -> None:
+    user = idle_user()
     state = CallState()
     nudges: list[EndReason | None] = []
 
@@ -64,6 +74,22 @@ async def test_the_persona_gives_up_on_a_quiet_agent_only_after_two_nudges_in_on
 
     assert nudges == [None, None, None, None]
     assert state.end_reason is EndReason.AGENT_SILENT
+
+
+async def test_a_call_that_is_ending_gets_no_nudge() -> None:
+    user = idle_user()
+    state = CallState()
+    state.end(EndReason.CALLER_HANGUP)
+    nudges: list[None] = []
+
+    async def nudge() -> None:
+        nudges.append(None)
+
+    watch_silence(user, state, nudge)
+
+    await run_test(user, frames_to_send=[BotStoppedSpeakingFrame(), SleepFrame(0.15)])
+
+    assert nudges == []
 
 
 @pytest.mark.parametrize(
@@ -118,3 +144,92 @@ async def test_the_persona_answers_its_most_agent_turns_and_then_the_limit_takes
     assert asked[0] is opening
     assert [frame.speculation for frame in asked] == [False, False, True, False]
     assert reached == ["goodbye"]
+
+
+class Line:
+    """A persona with a pipeline that does nothing, for driving converse()."""
+
+    def __init__(self, *, quiet: bool) -> None:
+        self.worker = PipelineWorker(Pipeline([]), idle_timeout_secs=None, enable_rtvi=False)
+        self._quiet = quiet
+
+    def quiet(self) -> bool:
+        return self._quiet
+
+    def unusable(self) -> list[str]:
+        return []
+
+
+async def test_a_close_ends_once_both_sides_have_been_quiet_long_enough_without_a_break(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(pipeline, "CLOSING_QUIET_S", 0.3)
+    monkeypatch.setattr(pipeline, "QUIET_POLL_S", 0.01)
+    loop = asyncio.get_running_loop()
+    started = loop.time()
+    answers = [True] * 5 + [False] * 3
+    last_break = [started]
+
+    def quiet() -> bool:
+        if not answers:
+            return True
+        if not answers[0]:
+            last_break[0] = loop.time()
+        return answers.pop(0)
+
+    await pipeline.close(quiet, [])
+
+    ended = loop.time()
+    assert not answers
+    assert ended - last_break[0] >= 0.3
+    assert ended - started < 5.0
+
+
+async def test_a_close_that_never_gets_quiet_ends_at_its_limit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(pipeline, "CLOSING_LIMIT_S", 0.1)
+    loop = asyncio.get_running_loop()
+    started = loop.time()
+
+    await pipeline.close(lambda: False, [])
+
+    assert 0.1 <= loop.time() - started < 5.0
+
+
+async def test_a_caller_that_ends_a_call_whose_stream_is_already_gone_does_not_hold_the_line(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(pipeline, "CLOSING_LIMIT_S", 10.0)
+    state = CallState()
+    gone = asyncio.Event()
+    state.end(EndReason.CALLER_HANGUP)
+    gone.set()
+    loop = asyncio.get_running_loop()
+    started = loop.time()
+
+    await pipeline.converse(
+        cast(Persona, Line(quiet=False)), state, asyncio.Event(), {gone: EndReason.STREAM_ENDED}
+    )
+
+    assert loop.time() - started < 5.0
+    assert state.end_reason is EndReason.CALLER_HANGUP
+
+
+async def test_an_agent_that_hangs_up_during_the_close_ends_it_and_the_callers_reason_stays(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(pipeline, "CLOSING_LIMIT_S", 10.0)
+    state = CallState()
+    gone = asyncio.Event()
+    state.end(EndReason.TURN_LIMIT)
+    loop = asyncio.get_running_loop()
+    started = loop.time()
+    loop.call_later(0.2, gone.set)
+
+    await pipeline.converse(
+        cast(Persona, Line(quiet=False)), state, asyncio.Event(), {gone: EndReason.STREAM_ENDED}
+    )
+
+    assert 0.2 <= loop.time() - started < 5.0
+    assert state.end_reason is EndReason.TURN_LIMIT

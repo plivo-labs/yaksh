@@ -4,7 +4,7 @@ transcript taps, and how a call ends."""
 import asyncio
 import contextlib
 import logging
-from collections.abc import Awaitable, Callable, Mapping, Sequence
+from collections.abc import Awaitable, Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
@@ -62,6 +62,12 @@ log = logging.getLogger(__name__)
 
 END_GRACE_S = 3.0
 DRAINED = frozenset({EndReason.CALLER_HANGUP, EndReason.TURN_LIMIT})
+"""The ends the caller chooses: Truman closes the call before it hangs up."""
+CLOSING_QUIET_S = 8.0
+"""How long both sides stay silent, after the caller ends the call, before Truman hangs up."""
+CLOSING_LIMIT_S = 30.0
+"""The longest a close lasts, for a reply that Plivo never reports played."""
+QUIET_POLL_S = 0.25
 VAD = VADParams(confidence=0.5, start_secs=0.1, stop_secs=0.6)
 IDLE_S = 15.0
 IDLE_NUDGES = 2
@@ -162,7 +168,8 @@ class Silence:
 def watch_silence(
     user: LLMUserAggregator, state: CallState, nudge: Callable[[], Awaitable[None]]
 ) -> None:
-    """A quiet agent gets a nudge; silence through every nudge ends the call."""
+    """A quiet agent gets a nudge; silence through every nudge ends the call. A call that is
+    ending gets no nudge."""
     silence = Silence(IDLE_NUDGES)
 
     @user.event_handler("on_user_turn_started")
@@ -171,6 +178,8 @@ def watch_silence(
 
     @user.event_handler("on_user_turn_idle")
     async def on_idle(_aggregator: Any) -> None:
+        if state.end_reason is not None:
+            return
         if silence.give_up():
             state.end(EndReason.AGENT_SILENT)
             return
@@ -335,6 +344,9 @@ class Persona:
         self._transcript.scripted(text)
         await self.worker.queue_frame(TTSSpeakFrame(text))
 
+    def quiet(self) -> bool:
+        return self._transcript.quiet
+
     async def greet_if_silent(self) -> None:
         """An agent that should speak first but says nothing gets a hello, as a caller would."""
         await asyncio.sleep(IDLE_S)
@@ -355,14 +367,18 @@ async def converse(
     wake: Mapping[asyncio.Event, EndReason] | None = None,
 ) -> None:
     """Run the pipeline until the call ends, a stop arrives, or a transport event in `wake`
-    fires with its end reason; then hang up and note anything that broke."""
+    fires with its end reason; close a call that the caller ended, then hang up and note
+    anything that broke."""
     runner = WorkerRunner(handle_sigint=False)
     await runner.add_workers(persona.worker)
     running = asyncio.create_task(runner.run())
     wake = wake or {}
-    waiters = [asyncio.ensure_future(event.wait()) for event in (state.ended, stop, *wake)]
+    ended = asyncio.ensure_future(state.ended.wait())
+    interrupts = [asyncio.ensure_future(event.wait()) for event in (stop, *wake)]
     try:
-        await asyncio.wait({*waiters, running}, return_when=asyncio.FIRST_COMPLETED)
+        await asyncio.wait({ended, *interrupts, running}, return_when=asyncio.FIRST_COMPLETED)
+        if state.end_reason in DRAINED:
+            await close(persona.quiet, [*interrupts, running])
         if stop.is_set():
             state.end(EndReason.USER_REQUEST)
         for event, reason in wake.items():
@@ -375,12 +391,40 @@ async def converse(
     except asyncio.CancelledError:
         state.end(EndReason.WORKER_STOPPED)
     finally:
-        for waiter in waiters:
+        for waiter in (ended, *interrupts):
             waiter.cancel()
         await hang_up(state, persona.worker, running)
     broken = persona.unusable()
     if broken:
         state.blame(f"{', '.join(broken)} stopped working")
+
+
+async def close(quiet: Callable[[], bool], interrupts: Iterable[asyncio.Future[Any]]) -> None:
+    """The caller ended the call: keep the line open, so its last words play and the agent can
+    answer, until both sides have been quiet for CLOSING_QUIET_S, an interrupt fires (a stop, the
+    stream ending, the pipeline stopping), or CLOSING_LIMIT_S passes."""
+    silence = asyncio.ensure_future(until_quiet(quiet))
+    try:
+        await asyncio.wait(
+            {silence, *interrupts}, timeout=CLOSING_LIMIT_S, return_when=asyncio.FIRST_COMPLETED
+        )
+    finally:
+        silence.cancel()
+        await asyncio.gather(silence, return_exceptions=True)
+
+
+async def until_quiet(quiet: Callable[[], bool]) -> None:
+    """Return once `quiet` has held for CLOSING_QUIET_S without a break."""
+    loop = asyncio.get_running_loop()
+    since: float | None = None
+    while True:
+        if not quiet():
+            since = None
+        elif since is None:
+            since = loop.time()
+        elif loop.time() - since >= CLOSING_QUIET_S:
+            return
+        await asyncio.sleep(QUIET_POLL_S)
 
 
 async def hang_up(state: CallState, worker: Stoppable, running: asyncio.Task[None]) -> None:

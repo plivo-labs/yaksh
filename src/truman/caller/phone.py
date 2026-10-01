@@ -708,6 +708,7 @@ class PhoneCaller:
             ),
         )
         state = CallState()
+        disconnected = asyncio.Event()
         recorder = Recorder(request.output_dir / "recording.wav")
         persona = Persona(
             self._settings,
@@ -736,7 +737,7 @@ class PhoneCaller:
 
         @transport.event_handler("on_client_disconnected")
         async def on_disconnected(_transport: Any, _socket: Any) -> None:
-            state.end(EndReason.STREAM_ENDED)
+            disconnected.set()
 
         greeting = None
         if request.agent.agent_speaks_first:
@@ -746,7 +747,11 @@ class PhoneCaller:
                 persona,
                 state,
                 stop,
-                {serializer.stopped: EndReason.STREAM_ENDED, serializer.failed: EndReason.ERROR},
+                {
+                    serializer.stopped: EndReason.STREAM_ENDED,
+                    disconnected: EndReason.STREAM_ENDED,
+                    serializer.failed: EndReason.ERROR,
+                },
             )
         finally:
             if greeting is not None:

@@ -109,6 +109,17 @@ class TranscriptBuilder:
         self.agent_speaking = False
         self.agent_spoke = False
 
+    @property
+    def quiet(self) -> bool:
+        """Neither side is speaking: no agent turn is open, and no caller reply is being
+        generated, waits to be spoken, or has audio that Plivo has not reported played."""
+        return not (
+            self.agent_speaking
+            or self._generating is not None
+            or self._generated
+            or self._reply is not None
+        )
+
     def agent_started(self) -> None:
         self.agent_speaking = True
         if self._agent_started is None:
