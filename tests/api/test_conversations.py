@@ -8,7 +8,7 @@ from zoneinfo import ZoneInfo
 
 import pytest
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import insert, select, update
+from sqlalchemy import func, insert, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import create_async_engine
 
@@ -26,7 +26,7 @@ from tests.conftest import (
     wait_until,
 )
 from truman.config import Settings
-from truman.db.models import AgentVersion, Conversation, ScenarioVersion
+from truman.db.models import AgentVersion, Conversation, RunningWorker, ScenarioVersion
 from truman.db.session import create_engine, create_sessionmaker
 from truman.domain.agents import AgentConfig
 from truman.domain.conversations import ConversationCreate, ConversationStatus
@@ -57,6 +57,21 @@ async def stuck_worker(kind: str, settings: Settings, data_dir: Path) -> asyncio
         str(data_dir),
         cwd=Path(__file__).parents[2],
     )
+
+
+async def worker_reported(settings: Settings) -> None:
+    """Wait until a worker has reported itself, which it does once it handles signals."""
+    engine = create_async_engine(settings.database_url.encoded_string())
+    deadline = asyncio.get_running_loop().time() + 20
+    try:
+        while True:
+            async with engine.connect() as connection:
+                if await connection.scalar(select(func.count()).select_from(RunningWorker)):
+                    return
+            assert asyncio.get_running_loop().time() < deadline, "the worker never reported"
+            await asyncio.sleep(0.05)
+    finally:
+        await engine.dispose()
 
 
 async def wait_for_event(client: AsyncClient, conversation_id: str, kind: str) -> None:
@@ -678,7 +693,7 @@ async def test_shutdown_with_stuck_engine_disposal_still_exits(
 ) -> None:
     process = await stuck_worker("stuck_disposal", settings, tmp_path)
     try:
-        await asyncio.sleep(1.5)
+        await worker_reported(settings)
         process.terminate()
         exit_code = await asyncio.wait_for(process.wait(), timeout=20)
     finally:
