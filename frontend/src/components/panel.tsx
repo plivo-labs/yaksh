@@ -5,15 +5,7 @@ import { type ComponentProps, type ReactNode, useState } from "react";
 
 /** A framed section of a page. */
 export function Panel({ className, ...props }: ComponentProps<"section">) {
-  return (
-    <section
-      className={cn(
-        "rounded-lg border bg-card shadow-[inset_0_1px_0_rgb(255_255_255/0.55),0_1px_2px_rgb(0_0_0/0.05)] dark:shadow-[inset_0_1px_0_rgb(255_255_255/0.03)]",
-        className,
-      )}
-      {...props}
-    />
-  );
+  return <section className={cn("rounded-lg border bg-card", className)} {...props} />;
 }
 
 export function PanelHeader({ title, action }: { title: ReactNode; action?: ReactNode }) {
