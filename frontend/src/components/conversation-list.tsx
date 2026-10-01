@@ -236,12 +236,15 @@ function ConversationRow({
   );
 }
 
-/** The scenario with what tells this row from the others of that scenario, in any run. */
+/** The scenario with what tells this row from the others of that scenario, in any run. The
+ * id ends it because two rows can share everything else down to the minute; its last
+ * characters are random, its first ones are a timestamp. */
 function label(conversation: ConversationSummary): string {
   const parts = [conversation.scenario_name, conversation.persona_name];
   if (conversation.repeat !== null) parts.push(`repeat ${conversation.repeat}`);
   if (conversation.attempt > 1) parts.push(`attempt ${conversation.attempt}`);
   parts.push(conversation.status, when(conversation.started_at ?? conversation.created_at));
+  parts.push(`id ${conversation.id.slice(-8)}`);
   return parts.join(", ");
 }
 
