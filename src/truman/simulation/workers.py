@@ -8,7 +8,7 @@ from truman.db.models import RunningWorker
 
 
 def seen_within(lease_s: int) -> ColumnElement[bool]:
-    return RunningWorker.seen_at > func.now() - timedelta(seconds=lease_s)
+    return RunningWorker.seen_at > func.statement_timestamp() - timedelta(seconds=lease_s)
 
 
 async def report_worker(
@@ -24,7 +24,7 @@ async def report_worker(
     row = {
         "receiving_app_id": receiving_app_id,
         "outbound_problem": outbound_problem,
-        "seen_at": func.now(),
+        "seen_at": func.statement_timestamp(),
     }
     await session.execute(
         insert(RunningWorker)

@@ -225,7 +225,7 @@ async def end_conversation(session: AsyncSession, conversation_id: uuid.UUID) ->
     if conversation.status is ConversationStatus.QUEUED:
         conversation.status = ConversationStatus.CANCELLED
         conversation.end_reason = EndReason.USER_REQUEST
-        conversation.ended_at = func.now()
+        conversation.ended_at = func.statement_timestamp()
     elif conversation.status is ConversationStatus.RUNNING:
         conversation.status = ConversationStatus.ENDING
     await session.commit()
@@ -254,8 +254,6 @@ def runnable_now(receiving_app_id: str | None) -> ColumnElement[bool]:
 
 
 def claim_values(worker_id: str, lease_s: int) -> dict[str, Any]:
-    """The statement's time, not the transaction's: a claim that waited for its run's lock
-    starts the run's delay when it claims."""
     return {
         "status": ConversationStatus.RUNNING,
         "started_at": func.statement_timestamp(),
@@ -299,10 +297,9 @@ async def claim_next(
 async def claim_from_runs(
     session: AsyncSession, worker_id: str, lease_s: int, runnable: ColumnElement[bool]
 ) -> Conversation | None:
-    """Claim under the run's lock, taken before any conversation row as on every path that
-    locks both, so no two workers pass a run's max parallel or its delay between calls. The
-    candidate is picked without a lock; when the claim finds it taken, or its run no longer
-    ready, the next candidate is tried."""
+    """Claim under the run's lock, so no two workers pass a run's max parallel or its start
+    interval. The candidate is picked without a lock; when the claim finds it taken, or its
+    run no longer ready, the next candidate is tried."""
     ready = and_(
         Conversation.status == ConversationStatus.QUEUED, runnable, ~run_full(), ~run_waiting()
     )
@@ -394,7 +391,7 @@ async def renew_lease(
     progress: Transcript | None,
 ) -> ConversationStatus | None:
     values: dict[str, object] = {
-        "lease_expires_at": func.now() + timedelta(seconds=lease_s),
+        "lease_expires_at": func.statement_timestamp() + timedelta(seconds=lease_s),
     }
     if progress is not None:
         values["transcript"] = progress.model_dump(mode="json")
@@ -428,8 +425,6 @@ async def requeue(session: AsyncSession, conversation_id: uuid.UUID, worker_id: 
 
 
 def owned_by(conversation_id: uuid.UUID, worker_id: str) -> ColumnElement[bool]:
-    """The worker still holds the lease when the statement runs, even after a wait for the
-    conversation's run lock in the same transaction."""
     return and_(
         Conversation.id == conversation_id,
         Conversation.claimed_by == worker_id,
@@ -491,8 +486,7 @@ def expired() -> ColumnElement[bool]:
 
 async def reap_expired(session: AsyncSession, number_rest_s: int) -> int:
     """Fail the live conversations whose worker lost its lease: single test calls in one
-    transaction, then each run's in its own, under the run's lock taken first, as on every path
-    that locks a run and its conversations."""
+    transaction, then each run's in its own, under the run's lock, with its retries."""
     reaped = len(await end_expired(session, Conversation.run_id.is_(None), number_rest_s))
     await session.commit()
     run_ids = list(

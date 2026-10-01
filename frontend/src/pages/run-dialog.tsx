@@ -160,7 +160,7 @@ export function RunDialog({
               <Input
                 id="run-name"
                 maxLength={80}
-                placeholder="The start time when empty"
+                placeholder="The creation time when empty"
                 value={name}
                 onChange={(event) => setName(event.target.value)}
               />

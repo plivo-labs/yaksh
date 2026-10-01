@@ -29,7 +29,10 @@ def free_numbers(receiving_app_id: str | None = None) -> ColumnElement[bool]:
     return and_(
         free,
         PhoneNumber.application_id == receiving_app_id,
-        or_(PhoneNumber.available_after.is_(None), PhoneNumber.available_after <= func.now()),
+        or_(
+            PhoneNumber.available_after.is_(None),
+            PhoneNumber.available_after <= func.statement_timestamp(),
+        ),
     )
 
 
@@ -118,14 +121,14 @@ async def lease_number(
     number = await session.scalar(
         update(PhoneNumber)
         .where(PhoneNumber.number == candidate)
-        .values(conversation_id=conversation_id, leased_at=func.now())
+        .values(conversation_id=conversation_id, leased_at=func.statement_timestamp())
         .returning(PhoneNumber.number)
     )
     if number is not None:
         deadline = (
             None
             if accept_calls_for_s is None
-            else func.now() + timedelta(seconds=accept_calls_for_s)
+            else func.statement_timestamp() + timedelta(seconds=accept_calls_for_s)
         )
         await session.execute(
             update(Conversation)
@@ -140,8 +143,7 @@ async def release_numbers(
     session: AsyncSession, conversation_ids: list[uuid.UUID], number_rest_s: int
 ) -> None:
     """Free the numbers. A number rests before a new test may receive calls on it, so a late
-    call from the finished test does not reach the next one. The rest runs from this statement,
-    not from the start of a transaction that may have waited for a run's lock."""
+    call from the finished test does not reach the next one."""
     await session.execute(
         update(PhoneNumber)
         .where(PhoneNumber.conversation_id.in_(conversation_ids))

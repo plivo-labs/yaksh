@@ -153,8 +153,7 @@ async def earlier_run(
 
 async def cancel_run(session: AsyncSession, run_id: uuid.UUID) -> Run:
     """Cancel the run's queued conversations and ask the workers to end its live calls, in one
-    transaction under the run's lock, which claims and retries take first too, so neither can
-    slip in between. A run with no active conversation stays as it is."""
+    transaction under the run's lock. A run with no active conversation stays as it is."""
     run = await get_run(session, run_id, lock=True)
     of_run = Conversation.run_id == run.id
     active = await session.scalar(

@@ -76,7 +76,7 @@ export function textSize(characters: number): string {
   return `${characters.toLocaleString()} characters, about ${tokens.toLocaleString()} tokens`;
 }
 
-/** A run's name, or its start time when it has none. */
+/** A run's name, or its creation time when it has none. */
 export function runTitle(run: { name: string | null; created_at: string }): string {
   return run.name ?? `Run of ${when(run.created_at)}`;
 }

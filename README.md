@@ -20,7 +20,7 @@ The worker phones agents with a [Pipecat](https://github.com/pipecat-ai/pipecat)
 | `DEEPGRAM_API_KEY` | Speech to text. `DEEPGRAM_BASE_URL` points at another Deepgram host, such as a self-hosted one; default `https://api.deepgram.com`. |
 | `ELEVENLABS_API_KEY` | Text to speech. The API needs it too, to look up a voice when you add it and to play previews. Each persona picks its own voice from the voices list. |
 | `OPENAI_API_KEY` | The persona model. `OPENAI_BASE_URL` points at any OpenAI-compatible API, such as an Azure OpenAI resource at `https://<resource>.openai.azure.com/openai/v1/`; default `https://api.openai.com/v1`. `TRUMAN_PERSONA_MODEL` names the model (for Azure, the deployment), default `gpt-4.1`. |
-| `TRUMAN_TIMEZONE` | The IANA timezone that sets the caller's "today" when a conversation is created, default `UTC`. |
+| `TRUMAN_TIMEZONE` | The IANA timezone that sets the caller's "today" when a conversation or its run is created, default `UTC`. A retry keeps the "today" of the attempt it replaces. |
 
 ## Phone
 
@@ -90,7 +90,7 @@ curl -X POST localhost:8000/api/v1/runs -H "Authorization: Bearer $TRUMAN_API_TO
 ```
 
 - The run starts one conversation for each repeat of each scenario, all of them or none. Every conversation pins the agent, scenario and persona versions that were current when the run was created.
-- `max_parallel` sets how many conversations of the run can be on the line at once. `start_interval_s` sets the least time between two conversation starts; a conversation starts when a worker takes it, a few seconds before its call. Without them, the run has no limit and no delay of its own. Both protect the agent under test. Single test calls start before the queued conversations of runs.
+- `max_parallel` sets how many conversations of the run can be on the line at once. `start_interval_s` sets the least time between two conversation starts; a conversation starts when a worker takes it. When Truman calls the agent, the call follows a few seconds later; when the agent calls Truman, the start sends the trigger, and the call can come up to the agent's dial window later. Without them, the run has no limit and no delay of its own. Both protect the agent under test. Single test calls start before the queued conversations of runs.
 - `max_duration_s` is the time limit of each call, 10 to 1800 seconds, default `TRUMAN_DEFAULT_MAX_DURATION_S` (300).
 - `max_retries`, default 1, is the number of extra attempts for a conversation that ends with an error on Truman's side or on the line. 0 turns retries off. Conversations in the "did not connect" group are not tried again.
 - The same `Idempotency-Key` with the same body returns the first run, so a client can send a request again safely. The same key with another body is refused.
