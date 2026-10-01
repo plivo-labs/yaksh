@@ -37,11 +37,13 @@ import {
   type Page,
 } from "@/lib/types";
 
+/** Columns follow the list's own width, not the window's: the same list sits in a full page
+ * and in a narrow panel. */
 const COLUMNS = {
   withAgent:
-    "grid grid-cols-[minmax(0,1fr)_2rem] items-center gap-x-4 gap-y-1 md:grid-cols-[7rem_minmax(12rem,1.3fr)_minmax(9rem,1fr)_minmax(9rem,1fr)_5rem_8rem_2rem]",
+    "grid grid-cols-[minmax(0,1fr)_2rem] items-center gap-x-4 gap-y-1 @3xl/conversations:grid-cols-[7rem_minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,1fr)_5rem_8rem_2rem]",
   withoutAgent:
-    "grid grid-cols-[minmax(0,1fr)_2rem] items-center gap-x-4 gap-y-1 md:grid-cols-[7rem_minmax(12rem,1.4fr)_minmax(9rem,1fr)_5rem_8rem_2rem]",
+    "grid grid-cols-[minmax(0,1fr)_2rem] items-center gap-x-4 gap-y-1 @3xl/conversations:grid-cols-[7rem_minmax(0,1.4fr)_minmax(0,1fr)_5rem_8rem_2rem]",
 };
 const GUTTER = { page: "px-3", panel: "px-5" };
 
@@ -79,9 +81,17 @@ export function ConversationList({
   return (
     <div
       aria-busy={query.isFetching}
-      className={cn("transition-opacity duration-150", query.isPlaceholderData && "opacity-60")}
+      className={cn(
+        "@container/conversations transition-opacity duration-150",
+        query.isPlaceholderData && "opacity-60",
+      )}
     >
-      <div className={cn(grid, "hidden border-b py-2.5 text-xs text-muted-foreground md:grid")}>
+      <div
+        className={cn(
+          grid,
+          "hidden border-b py-2.5 text-xs text-muted-foreground @3xl/conversations:grid",
+        )}
+      >
         <span>Status</span>
         <span>Scenario</span>
         {showAgent && <span>Agent</span>}
@@ -147,6 +157,7 @@ function ConversationRow({
   agentVersion: number | undefined;
 }) {
   const claim = conversation.caller_claim;
+  const name = label(conversation);
   const end = conversation.end_reason ? (
     END_REASON_LABELS[conversation.end_reason]
   ) : (
@@ -169,10 +180,11 @@ function ConversationRow({
       <div>
         <StatusBadge status={conversation.status} />
       </div>
-      <div className="col-span-2 grid min-w-0 gap-0.5 md:col-span-1">
+      <div className="col-span-2 grid min-w-0 gap-0.5 @3xl/conversations:col-span-1">
         <span className="flex min-w-0 items-center gap-2">
           <Link
             to={`/conversations/${conversation.id}`}
+            aria-label={name}
             className="truncate text-sm font-medium outline-none after:absolute after:inset-0"
           >
             {conversation.scenario_name}
@@ -192,13 +204,13 @@ function ConversationRow({
           {claim &&
             `. Caller claims it ${claim.success ? "reached" : "did not reach"} its goal (not judged)`}
         </span>
-        <span className="truncate text-sm text-muted-foreground md:hidden">
+        <span className="truncate text-sm text-muted-foreground @3xl/conversations:hidden">
           {end}
           {conversation.talk_ms !== null && `, ${duration(conversation.talk_ms)}`}, {started}
         </span>
       </div>
       {showAgent && (
-        <div className="col-span-2 min-w-0 text-sm md:col-span-1">
+        <div className="col-span-2 min-w-0 text-sm @3xl/conversations:col-span-1">
           <Link
             to={`/agents/${conversation.agent_id}`}
             className="relative z-10 block w-fit max-w-full truncate rounded-sm underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring/50"
@@ -207,7 +219,7 @@ function ConversationRow({
           </Link>
         </div>
       )}
-      <div className="hidden min-w-0 gap-0.5 text-sm md:grid">
+      <div className="hidden min-w-0 gap-0.5 text-sm @3xl/conversations:grid">
         <span className="truncate">{end}</span>
         {conversation.failure_reason && (
           <span className="truncate text-destructive" title={conversation.failure_reason}>
@@ -215,30 +227,39 @@ function ConversationRow({
           </span>
         )}
       </div>
-      <div className="hidden text-sm tabular-nums md:block">
+      <div className="hidden text-sm tabular-nums @3xl/conversations:block">
         {duration(conversation.talk_ms) || <span className="text-muted-foreground">None</span>}
       </div>
-      <div className="hidden text-sm text-muted-foreground md:block">{started}</div>
-      <ConversationMenu conversation={conversation} />
+      <div className="hidden text-sm text-muted-foreground @3xl/conversations:block">{started}</div>
+      <ConversationMenu conversation={conversation} name={name} />
     </li>
   );
 }
 
-function ConversationMenu({ conversation }: { conversation: ConversationSummary }) {
+/** The scenario with what tells this row from the others of that scenario. */
+function label(conversation: ConversationSummary): string {
+  const parts = [conversation.scenario_name];
+  if (conversation.repeat !== null) parts.push(`repeat ${conversation.repeat}`);
+  if (conversation.attempt > 1) parts.push(`attempt ${conversation.attempt}`);
+  parts.push(conversation.status);
+  return parts.join(", ");
+}
+
+function ConversationMenu({
+  conversation,
+  name,
+}: {
+  conversation: ConversationSummary;
+  name: string;
+}) {
   const end = useEndConversation(conversation.id);
   const [ending, setEnding] = useState(false);
   const active = ACTIVE_STATUSES.includes(conversation.status);
   return (
-    <div className="relative z-10 col-start-2 row-start-1 md:col-start-auto md:row-start-auto">
+    <div className="relative z-10 col-start-2 row-start-1 @3xl/conversations:col-start-auto @3xl/conversations:row-start-auto">
       <DropdownMenu>
         <DropdownMenuTrigger
-          render={
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              aria-label={`More actions for ${conversation.scenario_name}`}
-            />
-          }
+          render={<Button variant="ghost" size="icon-sm" aria-label={`More actions for ${name}`} />}
         >
           <Ellipsis />
         </DropdownMenuTrigger>
