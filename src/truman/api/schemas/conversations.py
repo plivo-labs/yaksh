@@ -39,6 +39,7 @@ class ConversationSummary(BaseModel):
     agent_caller_id: str | None
     call_uuid: str | None
     max_duration_s: int
+    max_turns: int
     status: ConversationStatus
     end_reason: EndReason | None
     failure_reason: str | None

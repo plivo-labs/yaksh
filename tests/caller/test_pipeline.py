@@ -3,6 +3,7 @@ from pathlib import Path
 import pytest
 from pipecat.frames.frames import (
     BotStoppedSpeakingFrame,
+    LLMContextFrame,
     TranscriptionFrame,
     VADUserStartedSpeakingFrame,
     VADUserStoppedSpeakingFrame,
@@ -17,7 +18,7 @@ from pipecat.turns.user_stop import SpeechTimeoutUserTurnStopStrategy
 from pipecat.turns.user_turn_strategies import UserTurnStrategies
 
 from tests.conftest import FakeProvider, make_settings
-from truman.caller.pipeline import CallState, llm_service, watch_silence
+from truman.caller.pipeline import CallState, TurnLimit, llm_service, watch_silence
 from truman.config import Settings
 from truman.domain.conversations import EndReason
 
@@ -89,3 +90,31 @@ async def test_the_persona_asks_the_responses_api_with_reasoning_off_unless_conf
 
     path, _, body = fake.requests[0]
     assert (path, body["model"], body.get("reasoning")) == ("/v1/responses", model, reasoning)
+
+
+async def test_the_persona_answers_its_most_agent_turns_and_then_the_limit_takes_over() -> None:
+    reached: list[str] = []
+
+    async def at_limit() -> None:
+        reached.append("goodbye")
+
+    def after(*agent_turns: str) -> LLMContext:
+        return LLMContext(messages=[{"role": "user", "content": turn} for turn in agent_turns])
+
+    opening = LLMContextFrame(context=after())
+    turns = [
+        opening,
+        LLMContextFrame(context=after("Hi.")),
+        LLMContextFrame(context=after("Hi.", "Your name?"), speculation=True),
+        LLMContextFrame(context=after("Hi.", "Your name?")),
+        LLMContextFrame(context=after("Hi.", "Your name?", "Age?"), speculation=True),
+        LLMContextFrame(context=after("Hi.", "Your name?", "Age?")),
+        LLMContextFrame(context=after("Hi.", "Your name?", "Age?", "Hello?")),
+    ]
+
+    down, _ = await run_test(TurnLimit(2, at_limit), frames_to_send=turns)
+
+    asked = [frame for frame in down if isinstance(frame, LLMContextFrame)]
+    assert asked[0] is opening
+    assert [frame.speculation for frame in asked] == [False, False, True, False]
+    assert reached == ["goodbye"]

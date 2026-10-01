@@ -35,6 +35,7 @@ REQUEST_KEY_INDEX = "uq_runs_request_key"
 INPUTS = (
     *(getattr(Conversation, field.name) for field in fields(Inputs)),
     Conversation.max_duration_s,
+    Conversation.max_turns,
     Conversation.run_id,
     Conversation.repeat,
 )
@@ -56,6 +57,7 @@ def with_defaults(settings: Settings, command: RunCreate) -> RunCreate:
     return command.model_copy(
         update={
             "max_duration_s": command.max_duration_s or settings.default_max_duration_s,
+            "max_turns": command.max_turns or settings.default_max_turns,
             "max_retries": (
                 settings.default_max_retries if command.max_retries is None else command.max_retries
             ),
@@ -107,6 +109,7 @@ async def create_run(
         name=command.name,
         repeats=command.repeats,
         max_duration_s=command.max_duration_s,
+        max_turns=command.max_turns,
         max_parallel=command.max_parallel,
         start_interval_s=command.start_interval_s,
         max_retries=command.max_retries,
@@ -126,7 +129,13 @@ async def create_run(
     await session.execute(
         insert(Conversation),
         [
-            {**asdict(item), "max_duration_s": run.max_duration_s, "run_id": run.id, "repeat": n}
+            {
+                **asdict(item),
+                "max_duration_s": run.max_duration_s,
+                "max_turns": run.max_turns,
+                "run_id": run.id,
+                "repeat": n,
+            }
             for n in range(1, command.repeats + 1)
             for item in inputs
         ],

@@ -22,6 +22,9 @@ class Settings(BaseSettings):
     data_dir: Path = REPO_ROOT / "data"
     frontend_dist: Path = REPO_ROOT / "frontend" / "dist"
     default_max_duration_s: int = 300
+    default_max_turns: int = Field(default=20, ge=1, le=100)
+    """How many agent turns the caller answers before it says goodbye, when a request does not
+    say."""
     max_run_conversations: int = Field(default=200, ge=1)
     """Conversations one run starts, the scenarios times the repeats. Retries are not counted."""
     max_run_repeats: int = Field(default=10, ge=1)

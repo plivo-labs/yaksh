@@ -28,6 +28,9 @@ class RunCreate(BaseModel):
     repeats: int = Field(default=1, ge=1)
     max_duration_s: int | None = Field(default=None, ge=10, le=1800)
     """None takes the operator's default."""
+    max_turns: int | None = Field(default=None, ge=1, le=100)
+    """How many agent turns the caller answers before it says goodbye; None takes the
+    operator's default."""
     max_parallel: int | None = Field(default=None, ge=1)
     start_interval_s: int | None = Field(default=None, ge=1)
     max_retries: int | None = Field(default=None, ge=0)

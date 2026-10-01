@@ -182,7 +182,7 @@ export function ConversationPage() {
                   <RailTitle role="Caller" name={data.persona_name} />
                   <CardDescription>
                     {LANGUAGE_NAMES[data.language]}, <CallerLine conversation={data} />, up to{" "}
-                    {data.max_duration_s}s once connected
+                    {data.max_turns} turns and {data.max_duration_s}s once connected
                     {data.call_uuid && (
                       <>
                         {" · Plivo call "}

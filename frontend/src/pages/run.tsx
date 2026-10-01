@@ -125,16 +125,17 @@ function Overview({ run }: { run: Run }) {
         </div>
         <GroupFilter run={run} />
       </div>
-      <dl className="grid grid-cols-2 gap-4 border-t px-5 py-4 sm:grid-cols-3 lg:grid-cols-6">
+      <dl className="grid grid-cols-2 gap-4 border-t px-5 py-4 sm:grid-cols-3 lg:grid-cols-7">
         <Fact label="Repeats">{run.repeats}</Fact>
         <Fact label="Time limit">{run.max_duration_s} seconds</Fact>
+        <Fact label="Turn limit">{run.max_turns} turns</Fact>
         <Fact label="Max parallel">{run.max_parallel ?? "No run limit"}</Fact>
         <Fact label="Delay between calls">
           {run.start_interval_s === null ? "None" : `${run.start_interval_s} seconds`}
         </Fact>
         <Fact label="Retries">Up to {run.max_retries}</Fact>
         <Fact label="Median talk time">{duration(run.median_talk_ms) || "None yet"}</Fact>
-        <div className="col-span-2 grid min-w-0 gap-0.5 sm:col-span-3 lg:col-span-6">
+        <div className="col-span-2 grid min-w-0 gap-0.5 sm:col-span-3 lg:col-span-7">
           <dt className="text-xs text-muted-foreground">End reasons</dt>
           <dd className="text-sm font-medium">
             {endReasons.length === 0

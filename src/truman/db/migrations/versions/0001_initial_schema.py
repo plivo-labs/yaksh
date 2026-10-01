@@ -301,6 +301,7 @@ def upgrade() -> None:
         sa.Column("name", sa.Text(), nullable=True),
         sa.Column("repeats", sa.Integer(), nullable=False),
         sa.Column("max_duration_s", sa.Integer(), nullable=False),
+        sa.Column("max_turns", sa.Integer(), nullable=False),
         sa.Column("max_parallel", sa.Integer(), nullable=True),
         sa.Column("start_interval_s", sa.Integer(), nullable=True),
         sa.Column("max_retries", sa.Integer(), nullable=False),
@@ -354,6 +355,7 @@ def upgrade() -> None:
         sa.Column("dial_deadline_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("agent_caller_id", sa.Text(), nullable=True),
         sa.Column("max_duration_s", sa.Integer(), nullable=False),
+        sa.Column("max_turns", sa.Integer(), nullable=False),
         sa.Column(
             "status",
             sa.Enum(
@@ -383,6 +385,7 @@ def upgrade() -> None:
                 "lease_lost",
                 "trigger_failed",
                 "no_call",
+                "turn_limit",
                 name="end_reason",
             ),
             nullable=True,

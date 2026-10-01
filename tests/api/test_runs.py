@@ -372,15 +372,22 @@ async def test_omitted_fields_take_the_operators_defaults_as_the_api_reports_the
     scenario = (await create_scenario(client, agent))["id"]
     standard = (await client.get("/api/v1/defaults")).json()
 
-    async with client_with(settings, default_max_duration_s=120, max_run_retries=0) as strict:
+    async with client_with(
+        settings, default_max_duration_s=120, default_max_turns=8, max_run_retries=0
+    ) as strict:
         reported = (await strict.get("/api/v1/defaults")).json()
         started = await start_run(strict, agent, [scenario])
+        chosen = await start_run(strict, agent, [scenario], max_turns=3)
         refused = await start_run(strict, agent, [scenario], max_retries=1)
+        calls = [await run_conversations(strict, r.json()["id"]) for r in (started, chosen)]
 
-    assert standard == {"max_duration_s": 300, "max_retries": 1}
-    assert reported == {"max_duration_s": 120, "max_retries": 0}
+    assert standard == {"max_duration_s": 300, "max_turns": 20, "max_retries": 1}
+    assert reported == {"max_duration_s": 120, "max_turns": 8, "max_retries": 0}
     assert started.status_code == 202
-    assert (started.json()["max_duration_s"], started.json()["max_retries"]) == (120, 0)
+    run = started.json()
+    assert (run["max_duration_s"], run["max_turns"], run["max_retries"]) == (120, 8, 0)
+    assert chosen.json()["max_turns"] == 3
+    assert [[c["max_turns"] for c in run_calls] for run_calls in calls] == [[8], [3]]
     assert refused.status_code == 422 and refused.json()["error"]["message"] == (
         "max_retries: at most 0"
     )

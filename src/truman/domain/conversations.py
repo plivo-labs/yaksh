@@ -47,6 +47,8 @@ class EndReason(StrEnum):
     """The outbound agent's system refused the trigger, or it could not be sent."""
     NO_CALL = "no_call"
     """The outbound agent did not call within its dial window."""
+    TURN_LIMIT = "turn_limit"
+    """The caller answered its most agent turns, said goodbye and hung up."""
 
 
 ACTIVE_STATUSES = frozenset(
@@ -163,6 +165,7 @@ class ConversationCreate(BaseModel):
     persona_id: uuid.UUID | None = None
     """Another persona for this one call; None runs the scenario's own persona."""
     max_duration_s: int | None = Field(default=None, ge=10, le=1800)
+    max_turns: int | None = Field(default=None, ge=1, le=100)
 
 
 class IncomingCall(BaseModel):
@@ -195,6 +198,10 @@ class CallRequest(BaseModel):
     voice: VoiceSettings
     caller_number: str
     max_duration_s: int
+    max_turns: int
+    """How many agent turns the caller answers; at the next one it says `goodbye` and hangs
+    up."""
+    goodbye: str
     agent_data: list[Fact] = []
     pickup: str = "Hello?"
     """What the caller says on answering an outbound agent that waits for the callee."""

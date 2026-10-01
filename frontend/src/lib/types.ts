@@ -20,7 +20,8 @@ export type EndReason =
   | "worker_stopped"
   | "lease_lost"
   | "trigger_failed"
-  | "no_call";
+  | "no_call"
+  | "turn_limit";
 
 export const END_REASON_LABELS: Record<EndReason, string> = {
   user_request: "Stopped on request",
@@ -35,6 +36,7 @@ export const END_REASON_LABELS: Record<EndReason, string> = {
   lease_lost: "Worker lease lost",
   trigger_failed: "Trigger failed",
   no_call: "Agent did not call",
+  turn_limit: "Turn limit reached",
 };
 
 type Role = "agent" | "caller";
@@ -380,6 +382,7 @@ export interface ConversationSummary {
   direction: Direction;
   call_uuid: string | null;
   max_duration_s: number;
+  max_turns: number;
   status: ConversationStatus;
   end_reason: EndReason | null;
   failure_reason: string | null;
@@ -414,6 +417,8 @@ export interface RunInput {
   repeats: number;
   /** The server default when null. */
   max_duration_s: number | null;
+  /** How many agent turns the caller answers; the server default when null. */
+  max_turns: number | null;
   /** Calls of the run on the line at once; null is no run limit. */
   max_parallel: number | null;
   /** The least time between two call starts; null is no wait. */
@@ -433,6 +438,7 @@ export interface RunSummary {
   name: string | null;
   repeats: number;
   max_duration_s: number;
+  max_turns: number;
   max_parallel: number | null;
   start_interval_s: number | null;
   max_retries: number;
@@ -461,6 +467,8 @@ export interface ConversationInput {
   persona_id?: string;
   /** The server default when left out. */
   max_duration_s?: number;
+  /** The server default when left out. */
+  max_turns?: number;
 }
 
 export type GenerationMode = "agent" | "knowledge_base";
@@ -473,6 +481,7 @@ export const MAX_BULK = 500;
 /** What the server uses for a field that a request leaves out. */
 export interface Defaults {
   max_duration_s: number;
+  max_turns: number;
   /** Of a run. */
   max_retries: number;
 }

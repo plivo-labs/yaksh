@@ -97,6 +97,8 @@ CALLER = {
     "nudge": "Hello? Are you still there?",
     "caller_language": Language.EN,
     "voice": VoiceSettings(provider=VoiceProvider.ELEVENLABS, id=ENGLISH_VOICE.id),
+    "max_turns": 20,
+    "goodbye": "Okay, thanks. I have to go now. Bye.",
 }
 PERSONA = {
     "name": "Rushed caller",

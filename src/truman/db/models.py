@@ -99,6 +99,7 @@ class Run(Base):
     name: Mapped[str | None] = mapped_column(Text)
     repeats: Mapped[int] = mapped_column(Integer)
     max_duration_s: Mapped[int] = mapped_column(Integer)
+    max_turns: Mapped[int] = mapped_column(Integer)
     max_parallel: Mapped[int | None] = mapped_column(Integer)
     """At most this many of its conversations on the line at once; None is no run limit."""
     start_interval_s: Mapped[int | None] = mapped_column(Integer)
@@ -146,6 +147,7 @@ class Conversation(Base):
     agent_caller_id: Mapped[str | None] = mapped_column(Text)
     """Outbound only: the number the agent called from."""
     max_duration_s: Mapped[int] = mapped_column(Integer)
+    max_turns: Mapped[int] = mapped_column(Integer)
     status: Mapped[ConversationStatus] = mapped_column(
         pg_enum(ConversationStatus, "conversation_status"), default=ConversationStatus.QUEUED
     )

@@ -49,8 +49,10 @@ export function StartCallDialog({
   const [creating, setCreating] = useState(false);
   /** Null until the user types: the field then shows the server's default. */
   const [maxDuration, setMaxDuration] = useState<string | null>(null);
+  const [maxTurns, setMaxTurns] = useState<string | null>(null);
   const defaults = useDefaults();
   const durationText = maxDuration ?? String(defaults.data?.max_duration_s ?? "");
+  const turnsText = maxTurns ?? String(defaults.data?.max_turns ?? "");
   const start = useStartConversation();
   const navigate = useNavigate();
   const chosenAgent = agents.find((agent) => agent.id === agentId) ?? agents[0];
@@ -71,6 +73,8 @@ export function StartCallDialog({
   }));
   const agentItems = agents.map((agent) => ({ value: agent.id, label: agent.name }));
   const duration = durationText.trim() === "" ? null : Number(durationText);
+  const turns = turnsText.trim() === "" ? null : Number(turnsText);
+  const turnsOk = turns === null || (Number.isInteger(turns) && turns >= 1 && turns <= 100);
   const durationOk =
     duration === null || (Number.isInteger(duration) && duration >= 10 && duration <= 1800);
 
@@ -82,6 +86,7 @@ export function StartCallDialog({
         persona_id: chosenPersona,
         scenario_id: chosenScenario,
         ...(duration !== null && { max_duration_s: duration }),
+        ...(turns !== null && { max_turns: turns }),
       },
       { onSuccess: (conversation) => navigate(`/conversations/${conversation.id}`) },
     );
@@ -200,6 +205,30 @@ export function StartCallDialog({
                   : "Enter a whole number from 10 to 1800, or none."}
               </FieldDescription>
             </Field>
+            <Field>
+              <FieldLabel htmlFor="max_turns">Turn limit</FieldLabel>
+              <div className="flex items-center gap-2">
+                <Input
+                  id="max_turns"
+                  type="number"
+                  inputMode="numeric"
+                  min={1}
+                  max={100}
+                  placeholder="Default"
+                  aria-invalid={!turnsOk}
+                  aria-describedby="max_turns_hint"
+                  value={turnsText}
+                  onChange={(event) => setMaxTurns(event.target.value)}
+                  className="w-24 tabular-nums"
+                />
+                <span className="text-sm text-muted-foreground">turns</span>
+              </div>
+              <FieldDescription id="max_turns_hint">
+                {turnsOk
+                  ? "The caller answers the agent this many times, then says goodbye. Empty uses the server default."
+                  : "Enter a whole number from 1 to 100, or none."}
+              </FieldDescription>
+            </Field>
           </FieldGroup>
         </form>
         {start.error && <FieldError className="px-6 pb-3">{start.error.message}</FieldError>}
@@ -208,7 +237,7 @@ export function StartCallDialog({
           <Button
             type="submit"
             form="start-form"
-            disabled={start.isPending || !chosen || !chosenScenario || !durationOk}
+            disabled={start.isPending || !chosen || !chosenScenario || !durationOk || !turnsOk}
           >
             {start.isPending && <Spinner />}
             Start call

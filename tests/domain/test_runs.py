@@ -17,6 +17,7 @@ FAILED = {
     EndReason.LEASE_LOST: OutcomeGroup.ERROR,
     EndReason.TRIGGER_FAILED: OutcomeGroup.DID_NOT_CONNECT,
     EndReason.NO_CALL: OutcomeGroup.DID_NOT_CONNECT,
+    EndReason.TURN_LIMIT: OutcomeGroup.ERROR,
 }
 """A failed conversation's group by end reason. Every end reason is listed, so a new one fails
 the test below until it is given a group."""

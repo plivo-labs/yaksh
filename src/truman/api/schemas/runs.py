@@ -14,6 +14,7 @@ class RunSummary(RunProgress):
     name: str | None
     repeats: int
     max_duration_s: int
+    max_turns: int
     max_parallel: int | None
     start_interval_s: int | None
     max_retries: int
@@ -33,6 +34,7 @@ class RunSummary(RunProgress):
             name=run.name,
             repeats=run.repeats,
             max_duration_s=run.max_duration_s,
+            max_turns=run.max_turns,
             max_parallel=run.max_parallel,
             start_interval_s=run.start_interval_s,
             max_retries=run.max_retries,

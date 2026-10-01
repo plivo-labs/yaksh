@@ -15,7 +15,9 @@ from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.audio.vad.vad_analyzer import VADParams
 from pipecat.frames.frames import (
     ErrorFrame,
+    Frame,
     FunctionCallResultProperties,
+    LLMContextFrame,
     LLMRunFrame,
     TTSSpeakFrame,
 )
@@ -28,7 +30,7 @@ from pipecat.processors.aggregators.llm_response_universal import (
     LLMUserAggregatorParams,
 )
 from pipecat.processors.audio.vad_processor import VADProcessor
-from pipecat.processors.frame_processor import FrameProcessor
+from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
 from pipecat.services.deepgram.stt import DeepgramSTTService
 from pipecat.services.elevenlabs.tts import ElevenLabsTTSService
 from pipecat.services.llm_service import FunctionCallParams
@@ -38,7 +40,12 @@ from pipecat.turns.user_turn_strategies import UserTurnStrategies
 from pipecat.workers.runner import WorkerRunner
 
 from truman.caller.audio import SAMPLE_RATE, Clock
-from truman.caller.transcript import AgentTurnTap, GeneratedTap, TranscriptBuilder
+from truman.caller.transcript import (
+    AgentTurnTap,
+    GeneratedTap,
+    TranscriptBuilder,
+    last_user_message,
+)
 from truman.config import Settings
 from truman.diagnostics import describe_exception
 from truman.domain.conversations import (
@@ -54,7 +61,7 @@ from truman.integrations import elevenlabs
 log = logging.getLogger(__name__)
 
 END_GRACE_S = 3.0
-DRAINED = frozenset({EndReason.CALLER_HANGUP})
+DRAINED = frozenset({EndReason.CALLER_HANGUP, EndReason.TURN_LIMIT})
 VAD = VADParams(confidence=0.5, start_secs=0.1, stop_secs=0.6)
 IDLE_S = 15.0
 IDLE_NUDGES = 2
@@ -170,6 +177,31 @@ def watch_silence(
         await nudge()
 
 
+class TurnLimit(FrameProcessor):
+    """Between the agent's turns and the persona model: the model answers at most `turns` agent
+    turns. At the next one, `at_limit` runs instead, once. A run of the model that answers no
+    agent turn, such as the caller's opening, does not count."""
+
+    def __init__(self, turns: int, at_limit: Callable[[], Awaitable[None]]) -> None:
+        super().__init__()
+        self._left = turns
+        self._at_limit = at_limit
+        self._reached = False
+
+    async def process_frame(self, frame: Frame, direction: FrameDirection) -> None:
+        await super().process_frame(frame, direction)
+        if isinstance(frame, LLMContextFrame) and direction is FrameDirection.DOWNSTREAM:
+            answers = not frame.speculation and last_user_message(frame.context) is not None
+            if self._left == 0:
+                if answers and not self._reached:
+                    self._reached = True
+                    await self._at_limit()
+                return
+            if answers:
+                self._left -= 1
+        await self.push_frame(frame, direction)
+
+
 class Stoppable(Protocol):
     def has_finished(self) -> bool: ...
 
@@ -221,6 +253,10 @@ class Persona:
             ),
         )
 
+        async def goodbye() -> None:
+            await self.say(request.goodbye)
+            state.end(EndReason.TURN_LIMIT)
+
         aggregators = LLMContextAggregatorPair(
             LLMContext(tools=ToolsSchema(standard_tools=[END_CALL])),
             user_params=LLMUserAggregatorParams(
@@ -239,6 +275,7 @@ class Persona:
                 self.stt,
                 aggregators.user(),
                 AgentTurnTap(transcript),
+                TurnLimit(request.max_turns, goodbye),
                 self.llm,
                 GeneratedTap(transcript),
                 self.tts,

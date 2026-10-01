@@ -57,6 +57,7 @@ export function RunDialog({
   const [repeats, setRepeats] = useState(text(earlier?.repeats ?? 1));
   /** Null until the user types: the field then shows the server's default. */
   const [maxDuration, setMaxDuration] = useState(earlier ? text(earlier.max_duration_s) : null);
+  const [maxTurns, setMaxTurns] = useState(earlier ? text(earlier.max_turns) : null);
   const [maxParallel, setMaxParallel] = useState(text(earlier?.max_parallel));
   const [delay, setDelay] = useState(text(earlier?.start_interval_s));
   const [retries, setRetries] = useState(earlier ? text(earlier.max_retries) : null);
@@ -65,6 +66,7 @@ export function RunDialog({
   const { personas, name: personaName } = usePersonaNames();
   const defaults = useDefaults();
   const durationText = maxDuration ?? text(defaults.data?.max_duration_s);
+  const turnsText = maxTurns ?? text(defaults.data?.max_turns);
   const retriesText = retries ?? text(defaults.data?.max_retries);
   const numbers = usePhoneNumbers();
   const start = useStartRun(requestKey);
@@ -72,16 +74,24 @@ export function RunDialog({
 
   const repeatCount = whole(repeats);
   const duration = whole(durationText);
+  const turns = whole(turnsText);
   const parallel = whole(maxParallel);
   const interval = whole(delay);
   const retryCount = whole(retriesText);
   const repeatsOk = repeatCount !== null && repeatCount >= 1;
   const durationOk = duration === null || (duration >= 10 && duration <= 1800);
+  const turnsOk = turns === null || (turns >= 1 && turns <= 100);
   const parallelOk = parallel === null || parallel >= 1;
   const intervalOk = interval === null || interval >= 1;
   const retriesOk = retryCount === null || retryCount >= 0;
   const valid =
-    scenarios.length > 0 && repeatsOk && durationOk && parallelOk && intervalOk && retriesOk;
+    scenarios.length > 0 &&
+    repeatsOk &&
+    durationOk &&
+    turnsOk &&
+    parallelOk &&
+    intervalOk &&
+    retriesOk;
   const total = scenarios.length * (repeatsOk ? repeatCount : 0);
 
   const perPersona = new Map<string, number>();
@@ -106,6 +116,7 @@ export function RunDialog({
         // Untouched fields go as null, for the defaults they show: a resent request then stays
         // the same whether or not the defaults had loaded when it was first sent.
         max_duration_s: maxDuration === null ? null : duration,
+        max_turns: maxTurns === null ? null : turns,
         max_parallel: parallel,
         start_interval_s: interval,
         max_retries: retries === null ? null : retryCount,
@@ -265,6 +276,31 @@ export function RunDialog({
               Max parallel and the delay protect the agent under test. The workers' limits protect
               Truman's phone account.
             </FieldDescription>
+
+            <Field>
+              <FieldLabel htmlFor="run-turns">Turn limit</FieldLabel>
+              <Input
+                id="run-turns"
+                type="number"
+                inputMode="numeric"
+                min={1}
+                max={100}
+                placeholder="Default"
+                aria-invalid={submitted && !turnsOk}
+                className="w-24 tabular-nums"
+                value={turnsText}
+                onChange={(event) => setMaxTurns(event.target.value)}
+              />
+              <FieldDescription>
+                The caller answers the agent this many times, then says goodbye and hangs up. Empty
+                uses the server default.
+              </FieldDescription>
+              {submitted && !turnsOk && (
+                <FieldError className={APPEAR}>
+                  Enter a whole number from 1 to 100, or none.
+                </FieldError>
+              )}
+            </Field>
 
             <Field>
               <FieldLabel htmlFor="run-retries">Retries</FieldLabel>

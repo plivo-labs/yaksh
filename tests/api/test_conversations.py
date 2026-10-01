@@ -248,6 +248,7 @@ async def test_an_expired_lease_is_marked_failed_while_a_live_one_is_not(
                 nudge="Hello?",
                 caller_number="+15550100000",
                 max_duration_s=60,
+                max_turns=20,
                 status=ConversationStatus.RUNNING,
                 claimed_by="dead-worker",
                 lease_expires_at=datetime.now(UTC) - timedelta(seconds=1),

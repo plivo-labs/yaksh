@@ -71,7 +71,9 @@ async def create_conversation(
     agent = await get_agent(session, command.agent_id, lock=True)
     (inputs,) = await snapshot(session, settings, agent, [command.scenario_id], command.persona_id)
     conversation = Conversation(
-        **asdict(inputs), max_duration_s=command.max_duration_s or settings.default_max_duration_s
+        **asdict(inputs),
+        max_duration_s=command.max_duration_s or settings.default_max_duration_s,
+        max_turns=command.max_turns or settings.default_max_turns,
     )
     session.add(conversation)
     await session.commit()
@@ -376,6 +378,8 @@ async def call_request(
         voice=PersonaConfig.model_validate(persona_version.config).voice,
         caller_number=number,
         max_duration_s=conversation.max_duration_s,
+        max_turns=conversation.max_turns,
+        goodbye=LANGUAGES[conversation.language].goodbye,
         agent_data=ScenarioConfig.model_validate(scenario_version.config).agent_data,
         pickup=LANGUAGES[conversation.language].pickup,
         accept_calls_until=conversation.dial_deadline_at,

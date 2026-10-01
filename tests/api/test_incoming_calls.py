@@ -62,6 +62,7 @@ async def waiting_conversation(
                 instructions="You answer the phone.",
                 nudge="Hello?",
                 max_duration_s=120,
+                max_turns=20,
                 status=ConversationStatus.RUNNING,
                 claimed_by="w1",
                 lease_expires_at=now + timedelta(seconds=60),
