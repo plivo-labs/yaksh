@@ -317,13 +317,18 @@ export function useEndConversation(id: string) {
   });
 }
 
-export const RUNS_SHOWN = 8;
+export const RUNS_PAGE = 8;
 
-export function useRuns(agentId: string) {
-  const search = new URLSearchParams({ agent_id: agentId, page_size: String(RUNS_SHOWN) });
+export function useRuns(agentId: string, page: number) {
+  const search = new URLSearchParams({
+    agent_id: agentId,
+    page: String(page),
+    page_size: String(RUNS_PAGE),
+  });
   return useQuery({
-    queryKey: keys.runs(agentId),
+    queryKey: [...keys.runs(agentId), page],
     queryFn: ({ signal }) => api<Page<RunSummary>>(`/runs?${search}`, { signal }),
+    placeholderData: keepPreviousData,
     refetchInterval: (query) =>
       query.state.data?.items.some((run) => ACTIVE_RUN_STATUSES.includes(run.status))
         ? 3_000

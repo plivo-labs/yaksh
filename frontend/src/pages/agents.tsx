@@ -1,10 +1,11 @@
 import { Copy, CopyPlus, Ellipsis, Plus, Trash2 } from "lucide-react";
-import { type MouseEvent, useState } from "react";
+import { useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
 
 import { toast } from "sonner";
 
 import { DeleteDialog } from "@/components/confirm-dialogs";
+import { Pager } from "@/components/pager";
 import { SearchInput } from "@/components/search-input";
 import { SortHeader } from "@/components/sort-header";
 import { RelativeTime } from "@/components/relative-time";
@@ -17,14 +18,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  Pagination,
-  PaginationContent,
-  PaginationItem,
-  PaginationNext,
-  PaginationPrevious,
-} from "@/components/ui/pagination";
 import { Skeleton } from "@/components/ui/skeleton";
+import { usePageParam } from "@/hooks/use-page-param";
 import { copyText } from "@/lib/clipboard";
 import { duration, reach, words } from "@/lib/format";
 import {
@@ -44,7 +39,7 @@ export function AgentsPage() {
   const [params, setParams] = useSearchParams();
   const search = params.get("q") ?? "";
   const sort = params.get("sort") ?? "";
-  const page = Math.max(1, Number(params.get("page") ?? "1") || 1);
+  const page = usePageParam();
   const agents = useAgentPage(search, sort, page);
   const searchFor = (text: string) => {
     const next = new URLSearchParams(params);
@@ -59,18 +54,6 @@ export function AgentsPage() {
     target.delete("page");
     setParams(target, { replace: true });
   };
-  const pageParams = (target: number) => {
-    const next = new URLSearchParams(params);
-    if (target <= 1) next.delete("page");
-    else next.set("page", String(target));
-    return next;
-  };
-  const goTo = (target: number) => (event: MouseEvent) => {
-    event.preventDefault();
-    setParams(pageParams(target));
-  };
-  const total = agents.data?.total ?? 0;
-  const last = Math.max(1, Math.ceil(total / AGENTS_PAGE));
 
   return (
     <div className="grid gap-6">
@@ -142,31 +125,7 @@ export function AgentsPage() {
               agents.data.items.map((agent) => <AgentRow key={agent.id} agent={agent} />)
             )}
           </ul>
-          {total > AGENTS_PAGE && (
-            <Pagination className="mt-4 justify-between">
-              <span className="text-sm text-muted-foreground">
-                {(page - 1) * AGENTS_PAGE + 1}–{Math.min(page * AGENTS_PAGE, total)} of {total}
-              </span>
-              <PaginationContent>
-                <PaginationItem>
-                  <PaginationPrevious
-                    href={`?${pageParams(page - 1)}`}
-                    onClick={goTo(page - 1)}
-                    aria-disabled={page <= 1}
-                    className={page <= 1 ? "pointer-events-none opacity-50" : ""}
-                  />
-                </PaginationItem>
-                <PaginationItem>
-                  <PaginationNext
-                    href={`?${pageParams(page + 1)}`}
-                    onClick={goTo(page + 1)}
-                    aria-disabled={page >= last}
-                    className={page >= last ? "pointer-events-none opacity-50" : ""}
-                  />
-                </PaginationItem>
-              </PaginationContent>
-            </Pagination>
-          )}
+          <Pager className="mt-4" query={agents} pageSize={AGENTS_PAGE} />
         </div>
       )}
     </div>

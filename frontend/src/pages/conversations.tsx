@@ -209,12 +209,7 @@ export function ConversationsPage() {
               ))
             )}
           </ul>
-          <Pager
-            className="mt-4"
-            page={page}
-            total={conversations.isPlaceholderData ? undefined : conversations.data?.total}
-            pageSize={CONVERSATIONS_PAGE}
-          />
+          <Pager className="mt-4" query={conversations} pageSize={CONVERSATIONS_PAGE} />
         </div>
       )}
     </div>

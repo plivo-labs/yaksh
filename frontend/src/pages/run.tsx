@@ -310,8 +310,7 @@ function Conversations({ run }: { run: Run }) {
           </ul>
           <Pager
             className="border-t px-5 py-3"
-            page={page}
-            total={conversations.isPlaceholderData ? undefined : conversations.data?.total}
+            query={conversations}
             pageSize={CONVERSATIONS_PAGE}
           />
         </>

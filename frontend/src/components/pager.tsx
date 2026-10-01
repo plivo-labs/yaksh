@@ -9,6 +9,7 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
+import { usePageParam } from "@/hooks/use-page-param";
 
 function withPage(params: URLSearchParams, page: number): URLSearchParams {
   const next = new URLSearchParams(params);
@@ -17,28 +18,30 @@ function withPage(params: URLSearchParams, page: number): URLSearchParams {
   return next;
 }
 
-/** Previous and next links for a list paged through the URL. When a live list shrinks under
- * the page, it goes back to the last page. The total is undefined while the shown data is a
- * placeholder, so a stale total never moves the page. */
+/** Previous and next links for a list paged through the URL. While the next page loads, the
+ * pager stays on screen with the total it has. Once the data is settled, a page past the end,
+ * such as after a live list shrinks, goes back to the last page. */
 export function Pager({
-  page,
-  total,
+  query,
   pageSize,
   className,
 }: {
-  page: number;
-  total: number | undefined;
+  query: { data?: { total: number }; isPlaceholderData: boolean };
   pageSize: number;
   className?: string;
 }) {
+  const page = usePageParam();
   const [params, setParams] = useSearchParams();
-  const last = total === undefined ? page : Math.max(1, Math.ceil(total / pageSize));
+  const total = query.data?.total;
+  const last = Math.max(1, Math.ceil((total ?? 0) / pageSize));
+  const settled = total !== undefined && !query.isPlaceholderData;
   useEffect(() => {
-    if (page > last) setParams((current) => withPage(current, last), { replace: true });
-  }, [page, last, setParams]);
+    if (settled && page > last) setParams((current) => withPage(current, last), { replace: true });
+  }, [settled, page, last, setParams]);
   if (total === undefined || total <= pageSize) return null;
   const go = (target: number) => (event: MouseEvent) => {
     event.preventDefault();
+    if (target < 1 || target > last) return;
     setParams(withPage(params, target));
   };
   return (

@@ -1,11 +1,13 @@
 import { Link } from "react-router";
 
+import { Pager } from "@/components/pager";
 import { Panel, PanelHeader } from "@/components/panel";
 import { RelativeTime } from "@/components/relative-time";
 import { RunStatusBadge } from "@/components/status-dot";
 import { Skeleton } from "@/components/ui/skeleton";
+import { usePageParam } from "@/hooks/use-page-param";
 import { runTitle } from "@/lib/format";
-import { RUNS_SHOWN, useRuns } from "@/lib/queries";
+import { RUNS_PAGE, useRuns } from "@/lib/queries";
 import { type Agent, OUTCOME_GROUPS, type RunSummary } from "@/lib/types";
 
 function progress(run: RunSummary): string {
@@ -17,20 +19,10 @@ function progress(run: RunSummary): string {
 }
 
 export function AgentRuns({ agent }: { agent: Agent }) {
-  const runs = useRuns(agent.id);
-  const total = runs.data?.total ?? 0;
+  const runs = useRuns(agent.id, usePageParam());
   return (
     <Panel className="overflow-hidden">
-      <PanelHeader
-        title="Runs"
-        action={
-          total > RUNS_SHOWN && (
-            <span className="text-sm text-muted-foreground">
-              The newest {RUNS_SHOWN} of {total}
-            </span>
-          )
-        }
-      />
+      <PanelHeader title="Runs" />
       {runs.isPending ? (
         <div className="grid gap-3 p-5">
           <Skeleton className="h-10" />
@@ -64,6 +56,7 @@ export function AgentRuns({ agent }: { agent: Agent }) {
           ))}
         </ul>
       )}
+      <Pager className="border-t px-5 py-3" query={runs} pageSize={RUNS_PAGE} />
     </Panel>
   );
 }
