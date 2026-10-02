@@ -131,15 +131,10 @@ def llm_service(
 class CallState:
     """How the call stands; the first end reason and the first error win."""
 
-    connected_ms: int | None = None
     end_reason: EndReason | None = None
     error: str | None = None
     caller_reason: str | None = None
     ended: asyncio.Event = field(default_factory=asyncio.Event)
-
-    @property
-    def connected(self) -> bool:
-        return self.connected_ms is not None
 
     def end(self, reason: EndReason) -> None:
         if self.end_reason is None:

@@ -1,7 +1,7 @@
 from pipecat.frames.frames import CancelFrame, InterruptionFrame, TTSStartedFrame, TTSTextFrame
 from pipecat.tests.utils import run_test
 
-from tests.conftest import Observer
+from tests.conftest import FixedClock, Observer
 from truman.caller.audio import FRAME_BYTES, Clock, Playout
 from truman.caller.transcript import OFFSET, PLAYOUT, TranscriptBuilder, WireTap
 from truman.domain.conversations import Provenance, Role
@@ -138,15 +138,6 @@ def test_a_reply_cut_before_any_audio_is_all_cut() -> None:
     assert [(turn.provenance, turn.text) for turn in observer.turns] == [
         (Provenance.CUT, "Actually, never mind.")
     ]
-
-
-class FixedClock(Clock):
-    def __init__(self) -> None:
-        super().__init__()
-        self.now = 0
-
-    def ms(self) -> int:
-        return self.now
 
 
 def test_an_agent_turn_runs_from_its_first_voice_to_its_last_minus_the_detector_delay() -> None:

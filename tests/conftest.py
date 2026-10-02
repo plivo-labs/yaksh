@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from testcontainers.community.postgres import PostgresContainer
 
 from truman.api import create_app
+from truman.caller.audio import Clock
 from truman.caller.plivo_server import PlivoServer
 from truman.config import Settings
 from truman.db.migrate import upgrade_to_head
@@ -347,6 +348,15 @@ async def first(*events: asyncio.Event) -> asyncio.Event:
     for waiter in pending:
         waiter.cancel()
     return waiters[next(iter(done))]
+
+
+class FixedClock(Clock):
+    def __init__(self) -> None:
+        super().__init__()
+        self.now = 0
+
+    def ms(self) -> int:
+        return self.now
 
 
 class Observer:

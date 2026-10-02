@@ -112,6 +112,7 @@ class WireEventKind(StrEnum):
     RINGING = "ringing"
     ANSWERED = "answered"
     CONNECTED = "connected"
+    """Plivo's stream opened. Talk time, the duration limit and the recording count from here."""
     CALLER_AUDIO_START = "caller_audio_start"
     """Truman's output started sending caller audio; not proof it played on the line."""
     CALLER_AUDIO_END = "caller_audio_end"

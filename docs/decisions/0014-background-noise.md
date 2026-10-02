@@ -23,7 +23,6 @@ Status: accepted
 ## Cost
 
 - Truman sends audio for the whole call: 50 messages a second, also in the pauses.
-- Until the recording is built from Truman's own clock (`docs/bugs/recording-caller-track-late.md`), the recording can have short gaps in the noise.
 - A missing or broken sound file fails the conversation, with the reason.
 
 ## Other options

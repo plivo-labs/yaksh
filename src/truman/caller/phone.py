@@ -5,11 +5,9 @@ import base64
 import json
 import logging
 import os
-import wave
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from pathlib import Path
 from typing import Any
 
 import audioop
@@ -28,12 +26,19 @@ from pipecat.frames.frames import (
     TTSStartedFrame,
     TTSStoppedFrame,
 )
-from pipecat.processors.audio.audio_buffer_processor import AudioBufferProcessor
 from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
 from pipecat.serializers.base_serializer import FrameSerializer
 from pipecat.transports.websocket.fastapi import FastAPIWebsocketParams, FastAPIWebsocketTransport
 
-from truman.caller.audio import GAP_BYTES, LOUD_PEAK, SAMPLE_RATE, Clock, Playout, Stamper
+from truman.caller.audio import (
+    GAP_BYTES,
+    LOUD_PEAK,
+    SAMPLE_RATE,
+    CallRecording,
+    Clock,
+    Playout,
+    Stamper,
+)
 from truman.caller.pipeline import (
     CallState,
     Persona,
@@ -344,6 +349,14 @@ def pieces(frame: TTSAudioRawFrame) -> list[TTSAudioRawFrame]:
     ]
 
 
+def plivo_ms(timestamp: Any) -> int | None:
+    """Plivo's media timestamp: Unix milliseconds, sent as a string."""
+    try:
+        return int(timestamp)
+    except TypeError, ValueError:
+        return None
+
+
 class StreamSerializer(FrameSerializer):
     """Plivo's stream protocol in the encoding the stream opened with, plus the reports Truman
     listens for."""
@@ -355,6 +368,7 @@ class StreamSerializer(FrameSerializer):
         clock: Clock,
         observer: CallObserver,
         checkpoints: Checkpoints,
+        recording: CallRecording,
     ) -> None:
         super().__init__()
         self._stream_id = stream_id
@@ -362,6 +376,7 @@ class StreamSerializer(FrameSerializer):
         self._clock = clock
         self._observer = observer
         self._checkpoints = checkpoints
+        self._recording = recording
         self._quiet = GAP_BYTES
         self.stopped = asyncio.Event()
         self.failed = asyncio.Event()
@@ -374,6 +389,7 @@ class StreamSerializer(FrameSerializer):
         if isinstance(frame, AudioRawFrame):
             if not frame.audio:
                 return None
+            self._recording.caller(frame.audio, self._clock.ms())
             audio = frame.audio if self._linear else audioop.lin2ulaw(frame.audio, 2)
             media = {
                 "contentType": LINEAR if self._linear else MULAW,
@@ -394,12 +410,14 @@ class StreamSerializer(FrameSerializer):
             return None
         match message.get("event"):
             case "media":
-                payload = (message.get("media") or {}).get("payload")
+                media = message.get("media") or {}
+                payload = media.get("payload")
                 if not payload:
                     return None
                 raw = base64.b64decode(payload)
                 pcm = raw if self._linear else audioop.ulaw2lin(raw, 2)
                 self._heard(pcm)
+                self._recording.agent(pcm, self._clock.ms(), plivo_ms(media.get("timestamp")))
                 return InputAudioRawFrame(audio=pcm, sample_rate=SAMPLE_RATE, num_channels=1)
             case "playedStream":
                 self._checkpoints.played(str(message.get("name")))
@@ -454,37 +472,6 @@ class AudioMarks(FrameProcessor):
 
     def _mark(self, kind: WireEventKind) -> None:
         self._observer.wire_event(WireEvent(kind=kind, at_ms=self._clock.ms()))
-
-
-class Recorder(AudioBufferProcessor):
-    """A stereo 8 kHz WAV built by Truman: left, the agent as Truman received it; right, the
-    caller as Truman sent it. Pipecat pads silence by elapsed wall-clock time to line the two
-    up, so it is not Plivo's recording, and after a barge-in it can hold caller audio the
-    agent never heard."""
-
-    def __init__(self, path: Path) -> None:
-        super().__init__(sample_rate=SAMPLE_RATE, num_channels=2, auto_start_recording=True)
-        self.path: Path | None = None
-        self._target = path
-        self._audio = bytearray()
-
-        @self.event_handler("on_audio_data")
-        async def on_audio(_processor: Any, audio: bytes, _rate: int, _channels: int) -> None:
-            self._audio += audio
-
-    async def cleanup(self) -> None:
-        await super().cleanup()
-        if self._audio:
-            await asyncio.to_thread(self._write)
-            self.path = self._target
-
-    def _write(self) -> None:
-        self._target.parent.mkdir(parents=True, exist_ok=True)
-        with wave.open(str(self._target), "wb") as recording:
-            recording.setnchannels(2)
-            recording.setsampwidth(2)
-            recording.setframerate(SAMPLE_RATE)
-            recording.writeframes(bytes(self._audio))
 
 
 def mixer(noise: NoiseMix | None) -> SoundfileMixer | None:
@@ -693,6 +680,8 @@ class PhoneCaller:
         dialed: Connected,
         entry: PendingStream,
     ) -> CallOutcome:
+        connected_ms = clock.ms()
+        observer.wire_event(WireEvent(kind=WireEventKind.CONNECTED, at_ms=connected_ms))
         log.info(
             "stream %s for conversation %s, call %s, %s",
             dialed.stream_id,
@@ -702,8 +691,9 @@ class PhoneCaller:
         )
         transcript = TranscriptBuilder(clock, observer)
         checkpoints = Checkpoints(dialed.stream_id, transcript)
+        recording = CallRecording()
         serializer = StreamSerializer(
-            dialed.stream_id, dialed.encoding, clock, observer, checkpoints
+            dialed.stream_id, dialed.encoding, clock, observer, checkpoints, recording
         )
         transport = FastAPIWebsocketTransport(
             dialed.socket,
@@ -721,7 +711,6 @@ class PhoneCaller:
         )
         state = CallState()
         disconnected = asyncio.Event()
-        recorder = Recorder(request.output_dir / "recording.wav")
         persona = Persona(
             self._settings,
             self._keys,
@@ -732,14 +721,12 @@ class PhoneCaller:
             transport_input=transport.input(),
             transport_output=transport.output(),
             before_output=[checkpoints],
-            after_output=[AudioMarks(clock, observer), WireTap(transcript, settled), recorder],
+            after_output=[AudioMarks(clock, observer), WireTap(transcript, settled)],
             state=state,
         )
 
         @transport.event_handler("on_client_connected")
         async def on_connected(_transport: Any, _socket: Any) -> None:
-            state.connected_ms = clock.ms()
-            observer.wire_event(WireEvent(kind=WireEventKind.CONNECTED, at_ms=clock.ms()))
             if request.agent.agent_speaks_first:
                 return
             if request.agent.outbound is None:
@@ -768,17 +755,20 @@ class PhoneCaller:
         finally:
             if greeting is not None:
                 greeting.cancel()
-        talk_ms = None if state.connected_ms is None else clock.ms() - state.connected_ms
+        talk_ms = clock.ms() - connected_ms
+        recording_path = await asyncio.to_thread(
+            recording.save, request.output_dir / "recording.wav", connected_ms
+        )
         agent_side = CALLED_SIDE if request.agent.outbound is None else CALLING_SIDE
         await resolve_stream_end(state, entry.callbacks, agent_side)
         state.blame(serializer.failure)
         return CallOutcome(
-            connected=state.connected,
+            connected=True,
             end_reason=state.end_reason or EndReason.ERROR,
             caller_error=state.error,
             caller_reason=state.caller_reason,
             talk_ms=talk_ms,
-            recording_path=recorder.path,
+            recording_path=recording_path,
             call_uuid=dialed.call_uuid,
         )
 

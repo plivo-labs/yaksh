@@ -1,8 +1,12 @@
-"""The audio the phone leg works in: 8 kHz in 20 ms frames, one clock per call, and the
-accounting of one reply's playout."""
+"""The audio the phone leg works in: 8 kHz in 20 ms frames, one clock per call, the
+accounting of one reply's playout, and the call's recording."""
 
 import time
+import wave
+from collections.abc import Iterable
+from pathlib import Path
 
+import audioop
 from pipecat.frames.frames import (
     Frame,
     LLMFullResponseEndFrame,
@@ -88,3 +92,61 @@ class Stamper:
             frame.metadata[OFFSET] = self.arriving.stamp_word(frame.pts)
         elif isinstance(frame, TTSStoppedFrame | LLMFullResponseEndFrame) and self.arriving:
             frame.metadata[PLAYOUT] = self.arriving
+
+
+class CallRecording:
+    """Both sides of a call as a stereo WAV on Truman's clock: left, the agent at the
+    timestamp Plivo puts on each frame; right, the caller at the time Truman sent each frame.
+
+    Plivo's timestamps move onto Truman's clock by the shortest delay that any frame had, so
+    frames that waited in a queue keep their place. A frame without a timestamp counts at its
+    arrival. A frame that starts before the end of its side, or up to one frame after it,
+    follows it directly, as Plivo plays queued audio back to back; a later frame leaves
+    silence. After a clearAudio, the right side can hold audio that Plivo dropped and the
+    agent never heard.
+    """
+
+    def __init__(self) -> None:
+        self._agent: list[tuple[int, int | None, bytes]] = []
+        self._caller: list[tuple[int, bytes]] = []
+
+    def agent(self, pcm: bytes, at_ms: int, plivo_ms: int | None) -> None:
+        self._agent.append((at_ms, plivo_ms, pcm))
+
+    def caller(self, pcm: bytes, at_ms: int) -> None:
+        self._caller.append((at_ms, pcm))
+
+    def save(self, path: Path, start_ms: int) -> Path | None:
+        """Write the recording from start_ms on, if any audio came after it."""
+        offset = min((at - plivo for at, plivo, _ in self._agent if plivo is not None), default=0)
+        agent = track(
+            [(at if plivo is None else plivo + offset, pcm) for at, plivo, pcm in self._agent],
+            start_ms,
+        )
+        caller = track(self._caller, start_ms)
+        size = max(len(agent), len(caller))
+        if size == 0:
+            return None
+        stereo = audioop.add(
+            audioop.tostereo(agent.ljust(size, b"\0"), 2, 1, 0),
+            audioop.tostereo(caller.ljust(size, b"\0"), 2, 0, 1),
+            2,
+        )
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with wave.open(str(path), "wb") as recording:
+            recording.setnchannels(2)
+            recording.setsampwidth(2)
+            recording.setframerate(SAMPLE_RATE)
+            recording.writeframes(stereo)
+        return path
+
+
+def track(frames: Iterable[tuple[int, bytes]], start_ms: int) -> bytearray:
+    """One side from start_ms on, each frame at its time on Truman's clock."""
+    audio = bytearray()
+    for at_ms, pcm in frames:
+        at = (at_ms - start_ms) * SAMPLE_RATE // 1000 * 2
+        if at > len(audio) + FRAME_BYTES:
+            audio += bytes(at - len(audio))
+        audio += pcm[max(0, -at) :]
+    return audio
