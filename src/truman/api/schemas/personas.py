@@ -4,6 +4,7 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict
 
 from truman.db.models import Persona
+from truman.domain.background_noise import BackgroundNoise
 from truman.domain.languages import Language
 from truman.domain.personas import PersonaConfig
 from truman.domain.voices import VoiceGender, VoiceSettings
@@ -18,6 +19,7 @@ class PersonaRead(BaseModel):
     language: Language
     voice: VoiceSettings
     voice_gender: VoiceGender | None
+    background_noise: BackgroundNoise
     current_version: int
     created_at: datetime
     updated_at: datetime

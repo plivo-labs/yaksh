@@ -185,3 +185,35 @@ async def test_a_persona_that_scenarios_use_cannot_be_deleted(client: AsyncClien
     )
     assert deleted.status_code == 204
     assert (await client.get(url)).status_code == 404
+
+
+async def test_a_persona_keeps_its_background_noise_and_a_change_makes_a_version(
+    client: AsyncClient,
+) -> None:
+    quiet = await create_persona(client)
+    noisy = await create_persona(
+        client, name="Street caller", background_noise={"sound": "street", "level": "loud"}
+    )
+    url = f"/api/v1/personas/{noisy['id']}"
+
+    softer = await client.patch(
+        url, json={"background_noise": {"sound": "street", "level": "light"}}
+    )
+    cleared = await client.patch(url, json={"background_noise": None})
+    off = await client.patch(url, json={"background_noise": {"sound": "none", "level": "loud"}})
+    off_again = await client.patch(url, json={"background_noise": {"sound": "none"}})
+    versions = (await client.get(f"{url}/versions")).json()["items"]
+
+    assert quiet["background_noise"] == {"sound": "none", "level": "busy"}
+    assert noisy["background_noise"] == {"sound": "street", "level": "loud"}
+    assert softer.json()["current_version"] == 2
+    assert cleared.status_code == 422 and cleared.json()["error"]["message"] == (
+        "background_noise: background_noise cannot be null"
+    )
+    assert off.json()["background_noise"] == {"sound": "none", "level": "busy"}
+    assert off.json()["current_version"] == off_again.json()["current_version"] == 3
+    assert [v["config"]["background_noise"] for v in versions] == [
+        {"sound": "none", "level": "busy"},
+        {"sound": "street", "level": "light"},
+        {"sound": "street", "level": "loud"},
+    ]

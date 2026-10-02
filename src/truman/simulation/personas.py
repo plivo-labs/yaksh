@@ -13,6 +13,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from truman.db.models import Persona, PersonaVersion, Scenario, Voice
+from truman.domain.background_noise import BackgroundNoise
 from truman.domain.errors import ConflictError, NotFoundError, ValidationError
 from truman.domain.personas import PersonaConfig, PersonaCreate, PersonaSettings, PersonaUpdate
 from truman.domain.voices import VoiceSettings
@@ -32,6 +33,9 @@ def config_of(persona: Persona) -> PersonaConfig:
             stability=persona.voice_stability,
         ),
         voice_gender=persona.voice_gender,
+        background_noise=BackgroundNoise(
+            sound=persona.background_noise_sound, level=persona.background_noise_level
+        ),
     )
 
 
@@ -44,6 +48,8 @@ def config_columns(config: PersonaConfig) -> dict[str, Any]:
         "voice_speed": config.voice.speed,
         "voice_stability": config.voice.stability,
         "voice_gender": config.voice_gender,
+        "background_noise_sound": config.background_noise.sound,
+        "background_noise_level": config.background_noise.level,
     }
 
 

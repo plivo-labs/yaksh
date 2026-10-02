@@ -24,6 +24,7 @@ from sqlalchemy.orm import Mapped, MappedColumn, mapped_column
 
 from truman.db.base import Base
 from truman.domain.agents import Direction, Transport
+from truman.domain.background_noise import NoiseLevel, NoiseSound
 from truman.domain.conversations import Channel, ConversationStatus, EndReason
 from truman.domain.generation import GenerationMode, GenerationStatus
 from truman.domain.languages import Language
@@ -214,6 +215,8 @@ class Persona(Base):
     voice_speed: Mapped[float] = mapped_column(Float)
     voice_stability: Mapped[float] = mapped_column(Float)
     voice_gender: Mapped[VoiceGender | None] = mapped_column(pg_enum(VoiceGender, "voice_gender"))
+    background_noise_sound: Mapped[NoiseSound] = mapped_column(pg_enum(NoiseSound, "noise_sound"))
+    background_noise_level: Mapped[NoiseLevel] = mapped_column(pg_enum(NoiseLevel, "noise_level"))
     current_version: Mapped[int] = mapped_column(Integer, default=1)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(

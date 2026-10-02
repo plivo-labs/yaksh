@@ -8,6 +8,7 @@ from pydantic import (
     field_validator,
 )
 
+from truman.domain.background_noise import BackgroundNoise
 from truman.domain.languages import Language
 from truman.domain.voices import VoiceGender, VoiceSettings
 
@@ -20,6 +21,7 @@ class PersonaSettings(BaseModel):
     prompt: str = Field(min_length=1, max_length=4000)
     language: Language = Language.EN
     voice: VoiceSettings
+    background_noise: BackgroundNoise = BackgroundNoise()
 
 
 class PersonaConfig(PersonaSettings):
@@ -42,8 +44,9 @@ class PersonaUpdate(BaseModel):
     prompt: str | None = Field(default=None, min_length=1, max_length=4000)
     language: Language | None = None
     voice: VoiceSettings | None = None
+    background_noise: BackgroundNoise | None = None
 
-    @field_validator("name", "prompt", "language", "voice")
+    @field_validator("name", "prompt", "language", "voice", "background_noise")
     @classmethod
     def cannot_be_cleared(cls, value: Any, info: ValidationInfo) -> Any:
         if value is None:

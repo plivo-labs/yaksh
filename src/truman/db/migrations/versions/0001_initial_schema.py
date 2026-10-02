@@ -74,6 +74,27 @@ def upgrade() -> None:
         sa.Column(
             "voice_gender", sa.Enum("male", "female", "neutral", name="voice_gender"), nullable=True
         ),
+        sa.Column(
+            "background_noise_sound",
+            sa.Enum(
+                "none",
+                "street",
+                "cafe",
+                "office",
+                "car",
+                "tv",
+                "crowd",
+                "kitchen",
+                "wind",
+                name="noise_sound",
+            ),
+            nullable=False,
+        ),
+        sa.Column(
+            "background_noise_level",
+            sa.Enum("light", "busy", "loud", name="noise_level"),
+            nullable=False,
+        ),
         sa.Column("current_version", sa.Integer(), nullable=False),
         sa.Column(
             "created_at",
@@ -556,5 +577,7 @@ def downgrade() -> None:
         "scenario_category",
         "generation_mode",
         "generation_status",
+        "noise_sound",
+        "noise_level",
     ):
         op.execute(f"DROP TYPE {enum}")
