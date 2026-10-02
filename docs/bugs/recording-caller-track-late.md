@@ -20,6 +20,8 @@ Call `01a0f660-edb9-7c0c-bf99-ced9609e95c7`, a 94.3 s recording that starts at `
 
 A second effect, confirmed in the installed Pipecat 1.11: `start_recording` sets the time of the last write of both tracks to None, so no silence goes before the first frame. The file starts at the first audio frame after `connected`, not at `connected`. Plivo sends audio from the start of the stream, so today the two are close, but nothing makes them equal.
 
+With background noise (decision 0014), the caller's frames arrive all through the call, also in its pauses. The padding then puts 20 ms of zeros into the noise each time two agent frames come between two caller frames, and the file gets longer than the call. The agent hears the noise without a break; only the recording has the gaps. This comes from reading Pipecat's `AudioBufferProcessor`; it is not measured yet.
+
 ## Fix
 
 - Build the WAV from Truman's own clock: write each agent frame at the time it arrived and each caller frame at the time Truman sent it, both measured from `connected`, into one stereo buffer. The recording then matches the transcript and the wire events by construction.

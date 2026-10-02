@@ -55,6 +55,12 @@ curl -X POST localhost:8000/api/v1/conversations -H "Authorization: Bearer $TRUM
   -d '{"agent_id": "<agent id>", "scenario_id": "<scenario id>"}'
 ```
 
+## Background noise
+
+A persona can have background noise: street, cafe, office, car, TV, crowd, kitchen or wind, at a light, busy or loud level. At these levels the caller's voice is about 20, 10 or 5 dB above the noise. The noise plays for the whole call, also when the caller is silent, and the recording includes it. Truman's own speech to text hears only the agent, so the noise changes only what the agent hears.
+
+`background_noise` on a conversation replaces the persona's setting for that call, for example `{"sound": "none"}` for no noise or `{"sound": "street", "level": "loud"}`. A conversation keeps the setting it started with, and so does its retry. The sound files are loops in `src/truman/simulation/sounds/`; their README says how they were made. See `docs/decisions/0014-background-noise.md`.
+
 ## Files
 
 Uploaded files (PDF, TXT and MD documents about an agent) are kept in S3-compatible storage. The compose files run [SeaweedFS](https://github.com/seaweedfs/seaweedfs) for this, with its data in the `storage` volume. To use S3, R2 or another S3-compatible service instead, set:
@@ -96,6 +102,7 @@ curl -X POST localhost:8000/api/v1/runs -H "Authorization: Bearer $TRUMAN_API_TO
 - `max_parallel` sets how many conversations of the run can be on the line at once. `start_interval_s` sets the least time between two conversation starts; a conversation starts when a worker takes it. When Truman calls the agent, the call follows a few seconds later; when the agent calls Truman, the start sends the trigger, and the call can come up to the agent's dial window later. Without them, the run has no limit and no delay of its own. Both protect the agent under test. Single test calls start before the queued conversations of runs.
 - `max_duration_s` is the time limit of each call, 10 to 1800 seconds, default `TRUMAN_DEFAULT_MAX_DURATION_S` (300).
 - `max_turns` is how many agent turns the caller answers, 1 to 100, default `TRUMAN_DEFAULT_MAX_TURNS` (20). At the next turn the caller says goodbye and says nothing more, and the conversation ends with `turn_limit`. The caller ends the call on its own only when its goal is achieved, so this limit ends the calls that go nowhere. When the caller ends the call, Truman waits until both sides are quiet for 8 seconds before it hangs up, so the agent can close the call. See `docs/decisions/0013-close-before-hang-up.md`.
+- `background_noise` plays one background in every conversation of the run, for example `{"sound": "none"}` to compare a run with and without noise. Left out, each conversation plays its persona's setting.
 - `max_retries`, default 1, is the number of extra attempts for a conversation that ends with an error on Truman's side or on the line. 0 turns retries off. Conversations in the "did not connect" group are not tried again.
 - `GET /api/v1/defaults` returns the values the server uses when a request leaves these fields out: `max_duration_s`, `max_turns`, and `max_retries` of a run. The console fills its forms with them.
 - The same `Idempotency-Key` with the same body returns the first run, so a client can send a request again safely. The same key with another body is refused.
