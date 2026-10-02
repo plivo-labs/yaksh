@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from truman.config import Settings
 from truman.db.models import Agent, AgentVersion, Persona, PersonaVersion, Scenario, ScenarioVersion
 from truman.domain.agents import Direction
+from truman.domain.background_noise import NoiseLevel, NoiseSound
 from truman.domain.errors import NotFoundError, ValidationError
 from truman.domain.languages import Language
 from truman.domain.triggers import check_agent_data
@@ -39,6 +40,8 @@ class Inputs:
     language: Language
     instructions: str
     nudge: str
+    background_noise_sound: NoiseSound
+    background_noise_level: NoiseLevel
 
 
 async def snapshot(
@@ -123,6 +126,8 @@ async def snapshot(
                     direction=agent.direction,
                 ),
                 nudge=LANGUAGES[config.language].nudge,
+                background_noise_sound=config.background_noise.sound,
+                background_noise_level=config.background_noise.level,
             )
         )
     return inputs

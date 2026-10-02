@@ -8,6 +8,7 @@ from typing import Protocol
 from pydantic import BaseModel, ConfigDict, Field
 
 from truman.domain.agents import AgentConfig
+from truman.domain.background_noise import NoiseMix
 from truman.domain.languages import Language
 from truman.domain.scenarios import Fact
 from truman.domain.voices import VoiceSettings
@@ -196,6 +197,8 @@ class CallRequest(BaseModel):
     nudge: str
     caller_language: Language
     voice: VoiceSettings
+    background_noise: NoiseMix | None = None
+    """The sound the caller's audio is mixed with; None sends the voice alone."""
     caller_number: str
     max_duration_s: int
     max_turns: int

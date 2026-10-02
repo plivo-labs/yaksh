@@ -1,6 +1,7 @@
 import asyncio
 import sys
 import uuid
+import wave
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -32,9 +33,11 @@ from truman.config import Settings
 from truman.db.models import AgentVersion, Conversation, RunningWorker, ScenarioVersion
 from truman.db.session import create_engine, create_sessionmaker
 from truman.domain.agents import AgentConfig
+from truman.domain.background_noise import NoiseLevel, NoiseMix, NoiseSound
 from truman.domain.conversations import ConversationCreate, ConversationStatus
 from truman.domain.languages import Language
 from truman.simulation import conversations
+from truman.simulation.background_noise import sound_path, volume
 from truman.simulation.calls import STOP_IGNORED
 from truman.worker.worker import FINALIZE_ATTEMPTS, Worker
 
@@ -249,6 +252,8 @@ async def test_an_expired_lease_is_marked_failed_while_a_live_one_is_not(
                 caller_number="+15550100000",
                 max_duration_s=60,
                 max_turns=20,
+                background_noise_sound=NoiseSound.NONE,
+                background_noise_level=NoiseLevel.BUSY,
                 status=ConversationStatus.RUNNING,
                 claimed_by="dead-worker",
                 lease_expires_at=datetime.now(UTC) - timedelta(seconds=1),
@@ -587,6 +592,29 @@ async def test_a_conversation_that_cannot_be_prepared_fails_without_stopping_the
     assert completed["status"] == "completed" and caller.calls == 1
 
 
+async def test_a_call_whose_sound_file_is_broken_fails_with_the_reason(
+    client: AsyncClient,
+    worker: Worker,
+    caller: FakeCaller,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    with wave.open(str(tmp_path / "street.wav"), "wb") as stereo:
+        stereo.setnchannels(2)
+        stereo.setsampwidth(2)
+        stereo.setframerate(8000)
+        stereo.writeframes(bytes(1280))
+    monkeypatch.setattr("truman.simulation.background_noise.SOUNDS", tmp_path)
+    persona = await create_persona(client, background_noise={"sound": "street"})
+    agent_id = await create_agent_id(client)
+
+    started = await start(client, agent_id, persona_id=persona["id"])
+    failed = await wait_for(client, started["id"], FINAL)
+
+    assert failed["status"] == "failed" and caller.calls == 0
+    assert failed["failure_reason"] == "ValueError: street.wav is not 8 kHz 16-bit mono audio"
+
+
 async def test_events_for_an_unknown_conversation_is_a_json_404(client: AsyncClient) -> None:
     response = await client.get(f"/api/v1/conversations/{uuid.uuid4()}/events")
 
@@ -705,12 +733,18 @@ async def test_a_conversation_freezes_its_persona_scenario_and_prompt(
     client: AsyncClient, settings: Settings
 ) -> None:
     agent_id = await create_agent_id(client)
-    persona = await create_persona(client, language="hinglish")
+    persona = await create_persona(
+        client, language="hinglish", background_noise={"sound": "cafe", "level": "busy"}
+    )
     scenario = await create_scenario(client, agent_id)
     started = await start(client, agent_id, persona_id=persona["id"], scenario_id=scenario["id"])
     await client.patch(
         f"/api/v1/personas/{persona['id']}",
-        json={"prompt": "Someone else.", "voice": {**persona["voice"], "speed": 1.2}},
+        json={
+            "prompt": "Someone else.",
+            "voice": {**persona["voice"], "speed": 1.2},
+            "background_noise": {"sound": "none"},
+        },
     )
     await client.patch(
         f"/api/v1/scenarios/{scenario['id']}",
@@ -736,6 +770,10 @@ async def test_a_conversation_freezes_its_persona_scenario_and_prompt(
     assert SCENARIO["goal"] in request.instructions and "Cancel" not in request.instructions
     assert "- Name: Priya Raman" in request.instructions and "Hinglish" in request.instructions
     assert request.voice.speed == 1.0 and request.nudge == "हेलो? आप वहाँ हैं?"
+    assert detail["background_noise"] == {"sound": "cafe", "level": "busy"}
+    assert request.background_noise == NoiseMix(
+        path=sound_path(NoiseSound.CAFE), volume=volume(NoiseLevel.BUSY)
+    )
 
 
 @pytest.mark.parametrize("timezone", ["Pacific/Kiritimati", "Pacific/Pago_Pago"])

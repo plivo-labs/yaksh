@@ -13,6 +13,7 @@ from truman.api.deps import SessionDep, SettingsDep
 from truman.api.pagination import Page, PageDep
 from truman.api.schemas.conversations import ConversationRead, ConversationSummary
 from truman.db.models import Conversation
+from truman.domain.background_noise import BackgroundNoise
 from truman.domain.conversations import (
     ACTIVE_STATUSES,
     ConversationCreate,
@@ -55,6 +56,9 @@ async def summaries(session: AsyncSession, rows: list[Conversation]) -> list[Con
         data["persona_version"], data["persona_name"] = personas[row.persona_version_id]
         data["scenario_version"], data["scenario_name"] = scenarios[row.scenario_version_id]
         data["recording_url"] = recording_url(row)
+        data["background_noise"] = BackgroundNoise(
+            sound=row.background_noise_sound, level=row.background_noise_level
+        )
         items.append(ConversationSummary.model_validate(data))
     return items
 

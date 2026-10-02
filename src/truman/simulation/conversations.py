@@ -22,6 +22,7 @@ from truman.db.models import (
     ScenarioVersion,
 )
 from truman.domain.agents import AgentConfig, Direction
+from truman.domain.background_noise import BackgroundNoise
 from truman.domain.conversations import (
     ACTIVE_STATUSES,
     LIVE_STATUSES,
@@ -42,6 +43,7 @@ from truman.domain.personas import PersonaConfig
 from truman.domain.scenarios import ScenarioConfig
 from truman.domain.triggers import SEND_TIMEOUT_S
 from truman.simulation.agents import get_agent
+from truman.simulation.background_noise import noise_mix
 from truman.simulation.languages import LANGUAGES
 from truman.simulation.numbers import free_numbers, lease_number, release_numbers
 from truman.simulation.runs import (
@@ -376,6 +378,12 @@ async def call_request(
         nudge=conversation.nudge,
         caller_language=conversation.language,
         voice=PersonaConfig.model_validate(persona_version.config).voice,
+        background_noise=noise_mix(
+            BackgroundNoise(
+                sound=conversation.background_noise_sound,
+                level=conversation.background_noise_level,
+            )
+        ),
         caller_number=number,
         max_duration_s=conversation.max_duration_s,
         max_turns=conversation.max_turns,

@@ -149,6 +149,8 @@ class Conversation(Base):
     """Outbound only: the number the agent called from."""
     max_duration_s: Mapped[int] = mapped_column(Integer)
     max_turns: Mapped[int] = mapped_column(Integer)
+    background_noise_sound: Mapped[NoiseSound] = mapped_column(pg_enum(NoiseSound, "noise_sound"))
+    background_noise_level: Mapped[NoiseLevel] = mapped_column(pg_enum(NoiseLevel, "noise_level"))
     status: Mapped[ConversationStatus] = mapped_column(
         pg_enum(ConversationStatus, "conversation_status"), default=ConversationStatus.QUEUED
     )

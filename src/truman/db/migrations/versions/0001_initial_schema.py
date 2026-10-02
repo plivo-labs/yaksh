@@ -378,6 +378,27 @@ def upgrade() -> None:
         sa.Column("max_duration_s", sa.Integer(), nullable=False),
         sa.Column("max_turns", sa.Integer(), nullable=False),
         sa.Column(
+            "background_noise_sound",
+            sa.Enum(
+                "none",
+                "street",
+                "cafe",
+                "office",
+                "car",
+                "tv",
+                "crowd",
+                "kitchen",
+                "wind",
+                name="noise_sound",
+            ),
+            nullable=False,
+        ),
+        sa.Column(
+            "background_noise_level",
+            sa.Enum("light", "busy", "loud", name="noise_level"),
+            nullable=False,
+        ),
+        sa.Column(
             "status",
             sa.Enum(
                 "queued",

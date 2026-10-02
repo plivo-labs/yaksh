@@ -11,6 +11,7 @@ from tests.conftest import OUTBOUND_AGENT, create_agent, create_persona, create_
 from truman.config import Settings
 from truman.db.models import Conversation, PhoneNumber
 from truman.db.session import create_engine, create_sessionmaker
+from truman.domain.background_noise import NoiseLevel, NoiseSound
 from truman.domain.conversations import (
     Admission,
     CallOutcome,
@@ -63,6 +64,8 @@ async def waiting_conversation(
                 nudge="Hello?",
                 max_duration_s=120,
                 max_turns=20,
+                background_noise_sound=NoiseSound.NONE,
+                background_noise_level=NoiseLevel.BUSY,
                 status=ConversationStatus.RUNNING,
                 claimed_by="w1",
                 lease_expires_at=now + timedelta(seconds=60),

@@ -4,6 +4,7 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict
 
 from truman.domain.agents import Direction
+from truman.domain.background_noise import BackgroundNoise
 from truman.domain.conversations import (
     Channel,
     ConversationStatus,
@@ -40,6 +41,7 @@ class ConversationSummary(BaseModel):
     call_uuid: str | None
     max_duration_s: int
     max_turns: int
+    background_noise: BackgroundNoise
     status: ConversationStatus
     end_reason: EndReason | None
     failure_reason: str | None
