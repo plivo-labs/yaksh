@@ -2,6 +2,7 @@ import { Plus } from "lucide-react";
 import { type ReactElement, type ReactNode, type SubmitEvent, useState } from "react";
 import { useNavigate } from "react-router";
 
+import { BackgroundNoiseField } from "@/components/background-noise-field";
 import { PersonaSelect } from "@/components/persona-select";
 import { Button } from "@/components/ui/button";
 import {
@@ -26,7 +27,7 @@ import {
 } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 import { useDefaults, useScenarios, useStartConversation } from "@/lib/queries";
-import type { AgentSummary } from "@/lib/types";
+import type { AgentSummary, BackgroundNoise } from "@/lib/types";
 import { ScenarioDialog } from "@/pages/scenario-dialog";
 
 export function StartCallDialog({
@@ -47,6 +48,8 @@ export function StartCallDialog({
   const [personaId, setPersonaId] = useState("");
   const [scenarioId, setScenarioId] = useState(presetScenario);
   const [creating, setCreating] = useState(false);
+  /** Null plays the persona's own setting. */
+  const [noise, setNoise] = useState<BackgroundNoise | null>(null);
   /** Null until the user types: the field then shows the server's default. */
   const [maxDuration, setMaxDuration] = useState<string | null>(null);
   const [maxTurns, setMaxTurns] = useState<string | null>(null);
@@ -87,6 +90,7 @@ export function StartCallDialog({
         scenario_id: chosenScenario,
         ...(duration !== null && { max_duration_s: duration }),
         ...(turns !== null && { max_turns: turns }),
+        ...(noise && { background_noise: noise }),
       },
       { onSuccess: (conversation) => navigate(`/conversations/${conversation.id}`) },
     );
@@ -181,6 +185,12 @@ export function StartCallDialog({
               <FieldLabel htmlFor="persona">Persona</FieldLabel>
               <PersonaSelect id="persona" value={chosenPersona} onValueChange={setPersonaId} />
             </Field>
+            <BackgroundNoiseField
+              id="noise"
+              value={noise}
+              onChange={setNoise}
+              inherit="Persona's setting"
+            />
             <Field>
               <FieldLabel htmlFor="max_duration">Time limit</FieldLabel>
               <div className="flex items-center gap-2">

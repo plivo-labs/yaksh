@@ -1,6 +1,7 @@
 import { Square, Play } from "lucide-react";
 import { type ReactNode, type SubmitEvent, useState } from "react";
 
+import { BackgroundNoiseField } from "@/components/background-noise-field";
 import { DeleteConfirm, DiscardConfirm } from "@/components/confirm-dialogs";
 import { Button } from "@/components/ui/button";
 import {
@@ -27,8 +28,10 @@ import { useCloseGuard } from "@/hooks/use-close-guard";
 import type { VoicePreview } from "@/hooks/use-voice-preview";
 import { useDeletePersona, useSavePersona, useVoices } from "@/lib/queries";
 import {
+  type BackgroundNoise,
   LANGUAGE_ITEMS,
   type Language,
+  NO_NOISE,
   type Persona,
   type PersonaInput,
   type Voice,
@@ -41,6 +44,7 @@ interface Draft {
   voice_id: string;
   speed: number;
   stability: number;
+  noise: BackgroundNoise;
 }
 
 const EMPTY: Draft = {
@@ -50,11 +54,13 @@ const EMPTY: Draft = {
   voice_id: "",
   speed: 1,
   stability: 0.5,
+  noise: NO_NOISE,
 };
 
 const APPEAR = "transition-opacity duration-150 ease-out starting:opacity-0";
 
 const FORM = "form";
+const FORM_NOISE = "form-noise";
 
 function toDraft(persona: Persona): Draft {
   return {
@@ -64,6 +70,7 @@ function toDraft(persona: Persona): Draft {
     voice_id: persona.voice.id,
     speed: persona.voice.speed,
     stability: persona.voice.stability,
+    noise: persona.background_noise,
   };
 }
 
@@ -78,6 +85,7 @@ function toInput(draft: Draft): PersonaInput {
       speed: draft.speed,
       stability: draft.stability,
     },
+    background_noise: draft.noise,
   };
 }
 
@@ -170,6 +178,7 @@ export function PersonaDialog({
       onOpenChangeComplete={(next) => {
         if (next) return;
         preview.reset(FORM);
+        preview.reset(FORM_NOISE);
         onClosed();
       }}
     >
@@ -326,6 +335,38 @@ export function PersonaDialog({
                 </FieldDescription>
               </SliderField>
             </div>
+
+            <BackgroundNoiseField
+              id="noise"
+              value={draft.noise}
+              onChange={(noise) => {
+                // None disables the play button, so stop a playing clip and drop a late one.
+                preview.reset(FORM_NOISE);
+                if (noise) set("noise", noise);
+              }}
+              error={preview.error(FORM_NOISE)}
+              action={
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  aria-label={preview.isPlaying(FORM_NOISE) ? "Stop preview" : "Preview with noise"}
+                  disabled={!hasVoice || draft.noise.sound === "none"}
+                  aria-busy={preview.isLoading(FORM_NOISE)}
+                  onClick={() =>
+                    preview.toggle(FORM_NOISE, input.voice, input.language, draft.noise)
+                  }
+                >
+                  {preview.isLoading(FORM_NOISE) ? (
+                    <Spinner />
+                  ) : preview.isPlaying(FORM_NOISE) ? (
+                    <Square />
+                  ) : (
+                    <Play />
+                  )}
+                </Button>
+              }
+            />
           </FieldGroup>
         </form>
 

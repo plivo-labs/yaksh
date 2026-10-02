@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 
 import { usePreviewVoice } from "@/lib/queries";
-import type { Language, VoiceSettings } from "@/lib/types";
+import type { BackgroundNoise, Language, VoiceSettings } from "@/lib/types";
 
-/** Plays ElevenLabs speech generated with the settings a call uses, one clip at a time.
- * `key` names who asked (a persona card, the form) so each can show its own state. Clips are
- * kept by settings, so the same voice, speed, stability and language play again without a
- * new request. */
+/** Plays ElevenLabs speech generated with the settings a call uses, one clip at a time, over
+ * a background noise when one is given. `key` names who asked (a persona card, the form) so
+ * each can show its own state. Clips are kept by settings, so the same voice, speed,
+ * stability, language and noise play again without a new request. */
 export function useVoicePreview() {
   const generate = usePreviewVoice();
   const clips = useRef(new Map<string, string>());
@@ -53,13 +53,19 @@ export function useVoicePreview() {
     setPlaying(null);
   };
 
-  const toggle = (key: string, voice: VoiceSettings, language: Language) => {
+  const toggle = (
+    key: string,
+    voice: VoiceSettings,
+    language: Language,
+    noise?: BackgroundNoise,
+  ) => {
     if (loading === key) return;
     if (playing === key) {
       stop();
       return;
     }
-    const settings = JSON.stringify([voice, language]);
+    const mixed = noise?.sound === "none" ? undefined : noise;
+    const settings = JSON.stringify([voice, language, mixed ?? null]);
     const clip = clips.current.get(settings);
     if (clip) {
       start(key, clip);
@@ -69,7 +75,7 @@ export function useVoicePreview() {
     setLoading(key);
     setFailed(null);
     generate.mutate(
-      { voice, language },
+      { voice, language, ...(mixed && { background_noise: mixed }) },
       {
         onSuccess: (audio) => {
           const url = URL.createObjectURL(audio);

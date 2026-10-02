@@ -17,6 +17,7 @@ import { Empty, EmptyContent, EmptyHeader, EmptyMedia, EmptyTitle } from "@/comp
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { useVoicePreview } from "@/hooks/use-voice-preview";
+import { noiseLabel } from "@/lib/format";
 import { usePersonas } from "@/lib/queries";
 import { LANGUAGE_NAMES, type Persona } from "@/lib/types";
 import { PersonaDialog } from "@/pages/persona-dialog";
@@ -79,6 +80,9 @@ export function PersonasPage() {
                     </button>
                     {item.voice_gender && <GenderBadge gender={item.voice_gender} />}
                     {item.builtin_key && <Badge variant="secondary">Built-in</Badge>}
+                    {noiseLabel(item.background_noise) && (
+                      <Badge variant="outline">{noiseLabel(item.background_noise)}</Badge>
+                    )}
                   </CardTitle>
                   <CardDescription>{LANGUAGE_NAMES[item.language]}</CardDescription>
                   <CardAction>
@@ -91,7 +95,9 @@ export function PersonasPage() {
                         preview.isPlaying(item.id) ? `Stop ${item.name}` : `Play ${item.name}`
                       }
                       aria-busy={preview.isLoading(item.id)}
-                      onClick={() => preview.toggle(item.id, item.voice, item.language)}
+                      onClick={() =>
+                        preview.toggle(item.id, item.voice, item.language, item.background_noise)
+                      }
                     >
                       {preview.isLoading(item.id) ? (
                         <Spinner />

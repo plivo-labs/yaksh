@@ -14,6 +14,7 @@ import {
   type Agent,
   type AgentInput,
   type AgentSummary,
+  type BackgroundNoise,
   type DocumentRead,
   type DocumentSummary,
   type KnowledgeBaseEntry,
@@ -229,8 +230,11 @@ export function useDeleteScenario(agentId: string) {
 
 export function usePreviewVoice() {
   return useMutation({
-    mutationFn: (input: { voice: VoiceSettings; language: Language }) =>
-      apiBlob("/voices/preview", { method: "POST", json: input }),
+    mutationFn: (input: {
+      voice: VoiceSettings;
+      language: Language;
+      background_noise?: BackgroundNoise;
+    }) => apiBlob("/voices/preview", { method: "POST", json: input }),
   });
 }
 

@@ -45,7 +45,7 @@ import { Switch } from "@/components/ui/switch";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
-import { clock, duration, phone, when, words } from "@/lib/format";
+import { clock, duration, noiseLabel, phone, when, words } from "@/lib/format";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useStoredBoolean } from "@/hooks/use-stored-boolean";
 import { keys, useAgent, useConversation, useEndConversation } from "@/lib/queries";
@@ -190,6 +190,11 @@ export function ConversationPage() {
                       </>
                     )}
                   </CardDescription>
+                  {noiseLabel(data.background_noise) && (
+                    <CardDescription>
+                      Background noise: {noiseLabel(data.background_noise)}
+                    </CardDescription>
+                  )}
                 </CardHeader>
                 <CardContent className="grid gap-3 text-sm">
                   <CallerPrompt instructions={data.instructions} />

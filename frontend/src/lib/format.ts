@@ -1,4 +1,9 @@
-import type { AgentSummary, OutcomeGroup } from "@/lib/types";
+import {
+  type AgentSummary,
+  type BackgroundNoise,
+  NOISE_SOUND_LABELS,
+  type OutcomeGroup,
+} from "@/lib/types";
 
 export function clock(ms: number): string {
   const seconds = ms / 1000;
@@ -21,6 +26,11 @@ export function when(iso: string | null): string {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+/** "Cafe, busy", or null when there is no noise. */
+export function noiseLabel(noise: BackgroundNoise): string | null {
+  return noise.sound === "none" ? null : `${NOISE_SOUND_LABELS[noise.sound]}, ${noise.level}`;
 }
 
 export function words(value: string): string {

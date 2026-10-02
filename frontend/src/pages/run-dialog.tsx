@@ -1,6 +1,7 @@
 import { type SubmitEvent, useState } from "react";
 import { useNavigate } from "react-router";
 
+import { BackgroundNoiseField } from "@/components/background-noise-field";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -16,7 +17,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { counted } from "@/lib/format";
 import { usePersonaNames } from "@/hooks/use-persona-names";
 import { useDefaults, usePhoneNumbers, useRunScenarios, useStartRun } from "@/lib/queries";
-import type { AgentSummary, RunSummary } from "@/lib/types";
+import type { AgentSummary, BackgroundNoise, RunSummary } from "@/lib/types";
 
 const APPEAR = "transition-opacity duration-150 ease-out starting:opacity-0";
 
@@ -61,6 +62,8 @@ export function RunDialog({
   const [maxParallel, setMaxParallel] = useState(text(earlier?.max_parallel));
   const [delay, setDelay] = useState(text(earlier?.start_interval_s));
   const [retries, setRetries] = useState(earlier ? text(earlier.max_retries) : null);
+  /** Null plays each persona's own setting. */
+  const [noise, setNoise] = useState<BackgroundNoise | null>(earlier?.background_noise ?? null);
   const [submitted, setSubmitted] = useState(false);
   const { scenarios, leftOut, ready, error: loadError } = useRunScenarios(agent.id, scenarioIds);
   const { personas, name: personaName } = usePersonaNames();
@@ -120,6 +123,7 @@ export function RunDialog({
         max_parallel: parallel,
         start_interval_s: interval,
         max_retries: retries === null ? null : retryCount,
+        background_noise: noise,
         name: name.trim() || null,
       },
       { onSuccess: (run) => navigate(`/runs/${run.id}`) },
@@ -301,6 +305,13 @@ export function RunDialog({
                 </FieldError>
               )}
             </Field>
+
+            <BackgroundNoiseField
+              id="run-noise"
+              value={noise}
+              onChange={setNoise}
+              inherit="Each persona's setting"
+            />
 
             <Field>
               <FieldLabel htmlFor="run-retries">Retries</FieldLabel>

@@ -28,7 +28,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
 import { copyText } from "@/lib/clipboard";
-import { duration, when } from "@/lib/format";
+import { duration, noiseLabel, when } from "@/lib/format";
 import { useEndConversation } from "@/lib/queries";
 import {
   ACTIVE_STATUSES,
@@ -193,6 +193,11 @@ function ConversationRow({
               Attempt {conversation.attempt}
             </Badge>
           )}
+          {noiseLabel(conversation.background_noise) && (
+            <Badge variant="outline" className="shrink-0">
+              {noiseLabel(conversation.background_noise)}
+            </Badge>
+          )}
         </span>
         <span className="truncate text-sm text-muted-foreground">
           {conversation.persona_name}
@@ -240,6 +245,8 @@ function label(conversation: ConversationSummary): string {
   const parts = [conversation.scenario_name, conversation.persona_name];
   if (conversation.repeat !== null) parts.push(`repeat ${conversation.repeat}`);
   if (conversation.attempt > 1) parts.push(`attempt ${conversation.attempt}`);
+  const noise = noiseLabel(conversation.background_noise);
+  if (noise) parts.push(`background noise ${noise}`);
   parts.push(conversation.status, when(conversation.started_at ?? conversation.created_at));
   parts.push(`id ${conversation.id.slice(-8)}`);
   return parts.join(", ");

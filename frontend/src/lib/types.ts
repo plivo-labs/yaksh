@@ -123,6 +123,48 @@ export const LANGUAGE_ITEMS = (Object.keys(LANGUAGE_NAMES) as Language[]).map((l
   label: LANGUAGE_NAMES[language],
 }));
 
+export type NoiseSound =
+  | "none"
+  | "street"
+  | "cafe"
+  | "office"
+  | "car"
+  | "tv"
+  | "crowd"
+  | "kitchen"
+  | "wind";
+export type NoiseLevel = "light" | "busy" | "loud";
+
+/** The sound behind the caller. With the sound "none", the level is always "busy". */
+export interface BackgroundNoise {
+  sound: NoiseSound;
+  level: NoiseLevel;
+}
+
+export const NO_NOISE: BackgroundNoise = { sound: "none", level: "busy" };
+
+export const NOISE_SOUND_ITEMS: { value: NoiseSound; label: string }[] = [
+  { value: "none", label: "None" },
+  { value: "street", label: "Street" },
+  { value: "cafe", label: "Cafe" },
+  { value: "office", label: "Office" },
+  { value: "car", label: "Car" },
+  { value: "tv", label: "TV" },
+  { value: "crowd", label: "Crowd" },
+  { value: "kitchen", label: "Kitchen" },
+  { value: "wind", label: "Wind" },
+];
+
+export const NOISE_SOUND_LABELS = Object.fromEntries(
+  NOISE_SOUND_ITEMS.map((item) => [item.value, item.label]),
+) as Record<NoiseSound, string>;
+
+export const NOISE_LEVEL_ITEMS: { value: NoiseLevel; label: string }[] = [
+  { value: "light", label: "Light" },
+  { value: "busy", label: "Busy" },
+  { value: "loud", label: "Loud" },
+];
+
 export interface Page<T> {
   items: T[];
   total: number;
@@ -278,6 +320,7 @@ export interface PersonaInput {
   prompt: string;
   language: Language;
   voice: VoiceSettings;
+  background_noise: BackgroundNoise;
 }
 
 export interface Persona {
@@ -288,6 +331,7 @@ export interface Persona {
   language: Language;
   voice: VoiceSettings;
   voice_gender: VoiceGender | null;
+  background_noise: BackgroundNoise;
   current_version: number;
   created_at: string;
   updated_at: string;
@@ -383,6 +427,7 @@ export interface ConversationSummary {
   call_uuid: string | null;
   max_duration_s: number;
   max_turns: number;
+  background_noise: BackgroundNoise;
   status: ConversationStatus;
   end_reason: EndReason | null;
   failure_reason: string | null;
@@ -426,6 +471,8 @@ export interface RunInput {
   /** How many times a conversation that ends with an error is tried again; the server
    * default when null. */
   max_retries: number | null;
+  /** Played in every conversation of the run; each persona's own setting when null. */
+  background_noise: BackgroundNoise | null;
   name: string | null;
 }
 
@@ -442,6 +489,8 @@ export interface RunSummary {
   max_parallel: number | null;
   start_interval_s: number | null;
   max_retries: number;
+  /** Each persona's own setting when null. */
+  background_noise: BackgroundNoise | null;
   status: RunStatus;
   /** The latest attempt of each repeat of each scenario, by outcome group. */
   counts: Record<OutcomeGroup, number>;
@@ -469,6 +518,8 @@ export interface ConversationInput {
   max_duration_s?: number;
   /** The server default when left out. */
   max_turns?: number;
+  /** Another background for this one call; the persona's setting when left out. */
+  background_noise?: BackgroundNoise;
 }
 
 export type GenerationMode = "agent" | "knowledge_base";
