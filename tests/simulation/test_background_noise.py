@@ -1,14 +1,24 @@
+import io
 import math
 import wave
+from array import array
 from collections.abc import Sequence
 from itertools import pairwise
 
 import audioop
 import pytest
+from pipecat.audio.mixers.soundfile_mixer import SoundfileMixer
 
 from truman.caller.audio import FRAME_BYTES, SAMPLE_RATE
-from truman.domain.background_noise import NoiseSound
-from truman.simulation.background_noise import sound_path
+from truman.domain.background_noise import BackgroundNoise, NoiseLevel, NoiseSound
+from truman.simulation.background_noise import (
+    LEAD_S,
+    TAIL_S,
+    sound_path,
+    volume,
+    wav,
+    with_noise,
+)
 
 SOUNDS = [sound for sound in NoiseSound if sound is not NoiseSound.NONE]
 SPAN = SAMPLE_RATE  # half a second of 16-bit samples, in bytes
@@ -45,3 +55,28 @@ def test_every_sound_loops_cleanly_in_the_call_format(sound: NoiseSound) -> None
     assert audioop.max(audio, 2) <= 32768 * 10 ** (-3 / 20)
     assert abs(samples[0] - samples[-1]) <= percentile_99(steps)
     assert level_change(audio[-SPAN:], audio[:SPAN]) <= percentile_99(changes)
+
+
+@pytest.mark.parametrize("level", list(NoiseLevel))
+async def test_a_preview_mixes_the_noise_as_a_call_does(level: NoiseLevel) -> None:
+    # Two seconds at full scale: the sum clips, and a volume below 1 also cuts toward zero.
+    voice = array("h", [32767, -32768] * SAMPLE_RATE)
+    mixer = SoundfileMixer(
+        sound_files={"cafe": str(sound_path(NoiseSound.CAFE))},
+        default_sound="cafe",
+        volume=volume(level),
+    )
+    await mixer.start(SAMPLE_RATE)
+    padded = (
+        bytes(int(2 * LEAD_S * SAMPLE_RATE))
+        + voice.tobytes()
+        + bytes(int(2 * TAIL_S * SAMPLE_RATE))
+    )
+    sent = [
+        await mixer.mix(padded[at : at + FRAME_BYTES]) for at in range(0, len(padded), FRAME_BYTES)
+    ]
+
+    previewed = with_noise(wav(voice), BackgroundNoise(sound=NoiseSound.CAFE, level=level))
+
+    with wave.open(io.BytesIO(previewed)) as file:
+        assert file.readframes(file.getnframes()) == b"".join(sent)

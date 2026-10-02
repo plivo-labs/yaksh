@@ -1,10 +1,14 @@
+import io
+import wave
 from typing import Any
 
+import audioop
 from httpx import AsyncClient
 
 from tests.conftest import (
     ENGLISH_VOICE,
     HINDI_VOICE,
+    SPOKEN,
     UNLISTED_VOICE,
     FakeVoiceClient,
     listed_voice_id,
@@ -150,7 +154,7 @@ async def test_a_preview_speaks_the_language_sample_with_the_call_settings(
     )
 
     assert heard.status_code == 200 and heard.headers["content-type"] == "audio/wav"
-    assert heard.content == b"RIFF fake wav"
+    assert heard.content == SPOKEN
     spoken_voice, language, text = voice_client.spoken[0]
     assert (spoken_voice.speed, spoken_voice.stability, language) == (1.15, 0.3, Language.HINGLISH)
     assert text == LANGUAGES[Language.HINGLISH].sample
@@ -159,3 +163,25 @@ async def test_a_preview_speaks_the_language_sample_with_the_call_settings(
     voice_client.down = True
     down = await client.post("/api/v1/voices/preview", json={"voice": voice, "language": "en"})
     assert down.status_code == 503
+
+
+async def test_a_preview_with_background_noise_plays_the_noise_around_the_voice(
+    client: AsyncClient,
+) -> None:
+    voice = {"provider": "elevenlabs", "id": ENGLISH_VOICE.id}
+
+    noisy = await client.post(
+        "/api/v1/voices/preview",
+        json={"voice": voice, "language": "en", "background_noise": {"sound": "cafe"}},
+    )
+    quiet = await client.post(
+        "/api/v1/voices/preview",
+        json={"voice": voice, "language": "en", "background_noise": {"sound": "none"}},
+    )
+    with wave.open(io.BytesIO(noisy.content)) as mixed, wave.open(io.BytesIO(SPOKEN)) as spoken:
+        added_s = (mixed.getnframes() - spoken.getnframes()) / mixed.getframerate()
+        lead = mixed.readframes(mixed.getframerate())
+
+    assert noisy.status_code == 200 and added_s == 1.5
+    assert audioop.rms(lead, 2) > 0
+    assert quiet.content == SPOKEN

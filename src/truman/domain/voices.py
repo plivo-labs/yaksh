@@ -3,6 +3,7 @@ from typing import Any, Protocol
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator
 
+from truman.domain.background_noise import BackgroundNoise
 from truman.domain.languages import Language
 
 PROVIDER_VOICE_ID = r"^[A-Za-z0-9_-]+$"
@@ -80,6 +81,7 @@ class VoicePreview(BaseModel):
 
     voice: VoiceSettings
     language: Language
+    background_noise: BackgroundNoise | None = None
 
 
 class VoiceClient(Protocol):

@@ -60,5 +60,7 @@ async def delete_voice(voice_id: uuid.UUID, session: SessionDep) -> None:
 
 @router.post("/preview", response_class=Response, responses={200: {"content": {"audio/wav": {}}}})
 async def preview_voice(command: VoicePreview, clients: VoiceClientsDep) -> Response:
-    audio = await voices.preview_voice(clients, command.voice, command.language)
+    audio = await voices.preview_voice(
+        clients, command.voice, command.language, command.background_noise
+    )
     return Response(content=audio, media_type="audio/wav")

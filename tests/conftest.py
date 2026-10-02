@@ -1,5 +1,6 @@
 import asyncio
 import uuid
+from array import array
 from collections.abc import AsyncGenerator, AsyncIterator, Awaitable, Callable, Iterator
 from datetime import timedelta
 from pathlib import Path
@@ -37,6 +38,7 @@ from truman.domain.errors import UnavailableError
 from truman.domain.languages import Language
 from truman.domain.numbers import AccountNumber
 from truman.domain.voices import ProviderVoice, VoiceGender, VoiceProvider, VoiceSettings
+from truman.integrations.elevenlabs import as_wav
 from truman.integrations.plivo_signature import signature, signed_text
 from truman.simulation import conversations, numbers
 from truman.worker.worker import Worker
@@ -92,6 +94,8 @@ UNLISTED_VOICE = ProviderVoice(
     id="voice-new", name="Riya", gender=VoiceGender.FEMALE, accent="indian"
 )
 """On the provider account but not in the voices list until a test adds it."""
+SPOKEN = as_wav(array("h", [8000, -8000] * 2000).tobytes())
+"""What the fake voice says: half a second of call audio, a loud square wave."""
 CALLER = {
     "instructions": "You want to book a room.",
     "nudge": "Hello? Are you still there?",
@@ -509,7 +513,7 @@ class FakeVoiceClient:
     async def speak(self, voice: VoiceSettings, language: Language, text: str) -> bytes | None:
         self._answer()
         self.spoken.append((voice, language, text))
-        return b"RIFF fake wav" if voice.id in self.voices else None
+        return SPOKEN if voice.id in self.voices else None
 
     def _answer(self) -> None:
         if self.down:

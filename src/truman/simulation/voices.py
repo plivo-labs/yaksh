@@ -1,3 +1,4 @@
+import asyncio
 import uuid
 from collections.abc import Collection, Mapping
 from datetime import UTC, datetime
@@ -11,6 +12,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from truman.db.models import Voice
+from truman.domain.background_noise import BackgroundNoise
 from truman.domain.errors import ConflictError, NotFoundError, UnavailableError, ValidationError
 from truman.domain.languages import Language
 from truman.domain.voices import (
@@ -23,6 +25,7 @@ from truman.domain.voices import (
     VoiceSettings,
     VoiceUpdate,
 )
+from truman.simulation.background_noise import with_noise
 from truman.simulation.languages import LANGUAGES
 
 LIVE_INDEX = "ix_voices_provider_voice_live"
@@ -53,10 +56,15 @@ async def lookup_voice(
     return found
 
 
-async def preview_voice(clients: VoiceClients, voice: VoiceSettings, language: Language) -> bytes:
+async def preview_voice(
+    clients: VoiceClients,
+    voice: VoiceSettings,
+    language: Language,
+    noise: BackgroundNoise | None = None,
+) -> bytes:
     """The language's sample sentence, spoken with the same model, voice settings and 8 kHz
     format as a call. A call streams through a websocket and this is one request, so the
-    delivery can differ a little."""
+    delivery can differ a little. With noise, the sentence plays over it as a call sends it."""
     audio = await client_for(clients, voice.provider).speak(
         voice, language, LANGUAGES[language].sample
     )
@@ -64,7 +72,7 @@ async def preview_voice(clients: VoiceClients, voice: VoiceSettings, language: L
         raise ValidationError(
             f"voice {voice.id} was not found on the {voice.provider.label} account"
         )
-    return audio
+    return await asyncio.to_thread(with_noise, audio, noise)
 
 
 async def flush(session: AsyncSession) -> None:
