@@ -7,5 +7,6 @@
 - [Load-balanced workers](load-balanced-workers.md)
 - [Scenario groups](scenario-groups.md)
 - [Several personas for each scenario in a run](run-persona-matrix.md)
+- [Sign in with ChatGPT for the models](sign-in-with-chatgpt.md)
 - [Symmetric silence timer](symmetric-silence-timer.md)
 - [Trigger secrets in the UI](trigger-secrets-in-ui.md)
