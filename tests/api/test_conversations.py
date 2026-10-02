@@ -615,6 +615,26 @@ async def test_a_call_whose_sound_file_is_broken_fails_with_the_reason(
     assert failed["failure_reason"] == "ValueError: street.wav is not 8 kHz 16-bit mono audio"
 
 
+async def test_a_call_plays_its_own_noise_or_else_the_personas(client: AsyncClient) -> None:
+    agent_id = await create_agent_id(client)
+    persona = await create_persona(client, background_noise={"sound": "street", "level": "busy"})
+
+    own = await start(client, agent_id, persona_id=persona["id"])
+    replaced = await start(
+        client,
+        agent_id,
+        persona_id=persona["id"],
+        background_noise={"sound": "cafe", "level": "loud"},
+    )
+    quiet = await start(
+        client, agent_id, persona_id=persona["id"], background_noise={"sound": "none"}
+    )
+
+    assert own["background_noise"] == {"sound": "street", "level": "busy"}
+    assert replaced["background_noise"] == {"sound": "cafe", "level": "loud"}
+    assert quiet["background_noise"] == {"sound": "none", "level": "busy"}
+
+
 async def test_events_for_an_unknown_conversation_is_a_json_404(client: AsyncClient) -> None:
     response = await client.get(f"/api/v1/conversations/{uuid.uuid4()}/events")
 

@@ -11,6 +11,7 @@ from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator
 
+from truman.domain.background_noise import BackgroundNoise
 from truman.domain.conversations import EndReason, OutcomeGroup
 
 RunName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=80)]
@@ -36,6 +37,8 @@ class RunCreate(BaseModel):
     max_retries: int | None = Field(default=None, ge=0)
     """How many times a conversation that ends with an error is tried again; None takes 1, or
     the operator's limit when that is lower."""
+    background_noise: BackgroundNoise | None = None
+    """Played in every conversation of the run; None plays each persona's own setting."""
     name: RunName | None = None
 
     @field_validator("scenario_ids")

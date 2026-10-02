@@ -102,7 +102,10 @@ async def create_run(
     if earlier is not None:
         await session.commit()
         return earlier
-    inputs = await snapshot(session, settings, agent, command.scenario_ids)
+    inputs = await snapshot(
+        session, settings, agent, command.scenario_ids, background_noise=command.background_noise
+    )
+    noise = command.background_noise
     run = Run(
         agent_id=agent.id,
         agent_version_id=inputs[0].agent_version_id,
@@ -113,6 +116,8 @@ async def create_run(
         max_parallel=command.max_parallel,
         start_interval_s=command.start_interval_s,
         max_retries=command.max_retries,
+        background_noise_sound=None if noise is None else noise.sound,
+        background_noise_level=None if noise is None else noise.level,
         request_key=request_key,
         request_hash=request_hash,
     )

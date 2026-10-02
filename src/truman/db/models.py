@@ -107,6 +107,13 @@ class Run(Base):
     """The least time between two call starts of the run; None is no wait."""
     max_retries: Mapped[int] = mapped_column(Integer)
     """How many times a conversation that ends with an error is tried again."""
+    background_noise_sound: Mapped[NoiseSound | None] = mapped_column(
+        pg_enum(NoiseSound, "noise_sound")
+    )
+    """None plays each persona's own setting."""
+    background_noise_level: Mapped[NoiseLevel | None] = mapped_column(
+        pg_enum(NoiseLevel, "noise_level")
+    )
     request_key: Mapped[str | None] = mapped_column(Text, unique=True)
     """The client's idempotency key: the same request with it returns this run."""
     request_hash: Mapped[str | None] = mapped_column(Text)
@@ -120,6 +127,10 @@ class Run(Base):
         ),
         UniqueConstraint("id", "agent_id"),
         CheckConstraint("(request_key IS NULL) = (request_hash IS NULL)", name="request_together"),
+        CheckConstraint(
+            "(background_noise_sound IS NULL) = (background_noise_level IS NULL)",
+            name="background_noise_together",
+        ),
         Index("ix_runs_agent_created", "agent_id", text("created_at DESC")),
     )
 

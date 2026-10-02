@@ -326,6 +326,27 @@ def upgrade() -> None:
         sa.Column("max_parallel", sa.Integer(), nullable=True),
         sa.Column("start_interval_s", sa.Integer(), nullable=True),
         sa.Column("max_retries", sa.Integer(), nullable=False),
+        sa.Column(
+            "background_noise_sound",
+            sa.Enum(
+                "none",
+                "street",
+                "cafe",
+                "office",
+                "car",
+                "tv",
+                "crowd",
+                "kitchen",
+                "wind",
+                name="noise_sound",
+            ),
+            nullable=True,
+        ),
+        sa.Column(
+            "background_noise_level",
+            sa.Enum("light", "busy", "loud", name="noise_level"),
+            nullable=True,
+        ),
         sa.Column("request_key", sa.Text(), nullable=True),
         sa.Column("request_hash", sa.Text(), nullable=True),
         sa.Column(
@@ -338,6 +359,10 @@ def upgrade() -> None:
         sa.CheckConstraint(
             "(request_key IS NULL) = (request_hash IS NULL)",
             name=op.f("ck_runs_request_together"),
+        ),
+        sa.CheckConstraint(
+            "(background_noise_sound IS NULL) = (background_noise_level IS NULL)",
+            name=op.f("ck_runs_background_noise_together"),
         ),
         sa.ForeignKeyConstraint(["agent_id"], ["agents.id"], name=op.f("fk_runs_agent_id_agents")),
         sa.ForeignKeyConstraint(

@@ -8,7 +8,7 @@ from typing import Protocol
 from pydantic import BaseModel, ConfigDict, Field
 
 from truman.domain.agents import AgentConfig
-from truman.domain.background_noise import NoiseMix
+from truman.domain.background_noise import BackgroundNoise, NoiseMix
 from truman.domain.languages import Language
 from truman.domain.scenarios import Fact
 from truman.domain.voices import VoiceSettings
@@ -165,6 +165,8 @@ class ConversationCreate(BaseModel):
     scenario_id: uuid.UUID
     persona_id: uuid.UUID | None = None
     """Another persona for this one call; None runs the scenario's own persona."""
+    background_noise: BackgroundNoise | None = None
+    """Another background for this one call; None plays the persona's setting."""
     max_duration_s: int | None = Field(default=None, ge=10, le=1800)
     max_turns: int | None = Field(default=None, ge=1, le=100)
 

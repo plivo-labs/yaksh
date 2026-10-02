@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from truman.config import Settings
 from truman.db.models import Agent, AgentVersion, Persona, PersonaVersion, Scenario, ScenarioVersion
 from truman.domain.agents import Direction
-from truman.domain.background_noise import NoiseLevel, NoiseSound
+from truman.domain.background_noise import BackgroundNoise, NoiseLevel, NoiseSound
 from truman.domain.errors import NotFoundError, ValidationError
 from truman.domain.languages import Language
 from truman.domain.triggers import check_agent_data
@@ -50,11 +50,13 @@ async def snapshot(
     agent: Agent,
     scenario_ids: Sequence[uuid.UUID],
     persona_id: uuid.UUID | None = None,
+    background_noise: BackgroundNoise | None = None,
 ) -> list[Inputs]:
     """Check that conversations of the agent's scenarios can start now, and read what they pin,
     once for all of them: the current agent, scenario and persona versions, and today. Each
-    scenario runs with its own persona, or with persona_id when one is given. The caller holds
-    the agent's lock. A refusal about a scenario names it."""
+    scenario runs with its own persona, or with persona_id when one is given, and plays
+    background_noise when one is given, else its persona's. The caller holds the agent's lock.
+    A refusal about a scenario names it."""
     if not settings.phone_enabled:
         raise ValidationError(f"phone calls are off: {PHONE_SETTINGS}")
     if agent.direction is Direction.OUTBOUND:
@@ -104,6 +106,7 @@ async def snapshot(
     inputs = []
     for scenario, persona in zip(scenarios, (personas[pid] for pid in chosen), strict=True):
         config = persona_config_of(persona)
+        noise = background_noise if background_noise is not None else config.background_noise
         wants = scenario_config_of(scenario)
         if outbound is not None:
             check_agent_data(outbound.trigger, wants, scenario.name)
@@ -126,8 +129,8 @@ async def snapshot(
                     direction=agent.direction,
                 ),
                 nudge=LANGUAGES[config.language].nudge,
-                background_noise_sound=config.background_noise.sound,
-                background_noise_level=config.background_noise.level,
+                background_noise_sound=noise.sound,
+                background_noise_level=noise.level,
             )
         )
     return inputs

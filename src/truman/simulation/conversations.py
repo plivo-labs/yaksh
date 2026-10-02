@@ -71,7 +71,14 @@ async def create_conversation(
     session: AsyncSession, settings: Settings, command: ConversationCreate
 ) -> Conversation:
     agent = await get_agent(session, command.agent_id, lock=True)
-    (inputs,) = await snapshot(session, settings, agent, [command.scenario_id], command.persona_id)
+    (inputs,) = await snapshot(
+        session,
+        settings,
+        agent,
+        [command.scenario_id],
+        command.persona_id,
+        command.background_noise,
+    )
     conversation = Conversation(
         **asdict(inputs),
         max_duration_s=command.max_duration_s or settings.default_max_duration_s,

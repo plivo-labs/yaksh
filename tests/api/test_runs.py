@@ -170,6 +170,43 @@ async def test_a_run_needs_distinct_scenarios_within_the_limits(client: AsyncCli
     assert (await client.get("/api/v1/runs")).json()["total"] == 0
 
 
+async def test_a_run_replaces_the_noise_of_every_conversation_or_keeps_each_personas(
+    client: AsyncClient,
+) -> None:
+    agent = await create_agent_id(client)
+    street = await create_persona(
+        client, name="Street caller", background_noise={"sound": "street"}
+    )
+    quiet = await create_persona(client, name="Quiet caller")
+    scenarios = [
+        (await create_scenario(client, agent, persona_id=street["id"]))["id"],
+        (await create_scenario(client, agent, name="Cancel a cleaning", persona_id=quiet["id"]))[
+            "id"
+        ],
+    ]
+
+    own = (await start_run(client, agent, scenarios)).json()
+    loud = {"sound": "cafe", "level": "loud"}
+    replaced = (
+        await start_run(client, agent, scenarios, key="noisy", background_noise=loud)
+    ).json()
+    other = await start_run(
+        client, agent, scenarios, key="noisy", background_noise={"sound": "none"}
+    )
+
+    assert own["background_noise"] is None
+    assert [c["background_noise"] for c in await run_conversations(client, own["id"])] == [
+        {"sound": "street", "level": "busy"},
+        {"sound": "none", "level": "busy"},
+    ]
+    assert replaced["background_noise"] == loud
+    assert [c["background_noise"] for c in await run_conversations(client, replaced["id"])] == [
+        loud,
+        loud,
+    ]
+    assert other.status_code == 409
+
+
 async def test_a_repeated_request_returns_its_run_and_its_key_cannot_start_another(
     client: AsyncClient,
 ) -> None:
