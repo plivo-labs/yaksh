@@ -29,7 +29,8 @@ async def measure(
 
 async def speech_starts(agent: bytes) -> list[int]:
     """Where speech starts in the agent's channel, in ms from its first sample. The analyzer turns
-    to speaking only after a few windows of speech; the start is that many windows earlier."""
+    to speaking only after a few windows of speech; the start is that many windows earlier.
+    Speech already under way when the channel begins starts at 0."""
     analyzer = SileroVADAnalyzer(params=VAD)
     analyzer.set_sample_rate(SAMPLE_RATE)  # what a pipeline does at start; it sets the windows
     window = analyzer.num_frames_required() * 2
