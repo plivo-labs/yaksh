@@ -71,11 +71,9 @@ func (a *app) conversationStartCmd() *cobra.Command {
 				return err
 			}
 			if !follow {
-				if err := printJSON(cmd.OutOrStdout(), created); err != nil {
-					return err
-				}
+				// The ID goes out first, so a failed write to stdout cannot lose the call.
 				fmt.Fprintf(cmd.ErrOrStderr(), "next: truman conversation view %s\n", id)
-				return nil
+				return printJSON(cmd.OutOrStdout(), created)
 			}
 			fmt.Fprintf(cmd.ErrOrStderr(), "conversation %s started\n", id)
 			return followConversation(cmd.Context(), c, id, cmd.OutOrStdout(), cmd.ErrOrStderr())

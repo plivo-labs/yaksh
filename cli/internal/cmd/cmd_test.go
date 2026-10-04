@@ -222,6 +222,35 @@ func TestRunStartSendsOnlyTheFieldsThatWereSet(t *testing.T) {
 	}
 }
 
+type closedPipe struct{}
+
+func (closedPipe) Write([]byte) (int, error) { return 0, io.ErrClosedPipe }
+
+func TestStartKeepsTheIDWhenStdoutFails(t *testing.T) {
+	f := newFakeAPI(t, map[string]http.HandlerFunc{
+		"POST /api/v1/runs":          reply(202, runJSON("queued", `"waiting":1`)),
+		"POST /api/v1/conversations": reply(202, fmt.Sprintf(`{"id":"%s","status":"queued"}`, convID)),
+	})
+	vars := against(f)
+	tests := []struct {
+		args []string
+		id   string
+	}{
+		{[]string{"run", "start", "--agent", agentID, "--scenario", scenA}, runID},
+		{[]string{"conversation", "start", "--agent", agentID, "--scenario", scenA}, convID},
+	}
+	for _, tt := range tests {
+		t.Run(tt.args[0], func(t *testing.T) {
+			a := &app{version: "0.1.0", getenv: func(k string) string { return vars[k] }}
+			var stderr bytes.Buffer
+			code := a.execute(context.Background(), tt.args, strings.NewReader(""), closedPipe{}, &stderr)
+			if code != 1 || !strings.Contains(stderr.String(), tt.id) {
+				t.Fatalf("code = %d, stderr = %q; want 1 and the ID", code, stderr.String())
+			}
+		})
+	}
+}
+
 func TestRunStartAllTakesEveryPageOfScenarios(t *testing.T) {
 	page := func(first, n, total int) string {
 		items := make([]string, n)

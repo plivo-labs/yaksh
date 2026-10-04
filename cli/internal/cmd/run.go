@@ -119,11 +119,9 @@ func (a *app) startRun(cmd *cobra.Command, f runStartFlags) error {
 		return err
 	}
 	if !f.wait {
-		if err := printJSON(cmd.OutOrStdout(), created); err != nil {
-			return err
-		}
+		// The ID goes out first, so a failed write to stdout cannot lose the run.
 		fmt.Fprintf(cmd.ErrOrStderr(), "next: truman run wait %s\n", id)
-		return nil
+		return printJSON(cmd.OutOrStdout(), created)
 	}
 	fmt.Fprintf(cmd.ErrOrStderr(), "run %s started\n", id)
 	return a.waitForRun(cmd, c, id, f.timeout, true)
