@@ -467,49 +467,55 @@ func (e WaitingReason) Valid() bool {
 
 // Defines values for WireEventKind.
 const (
-	AgentAudio       WireEventKind = "agent_audio"
-	Answered         WireEventKind = "answered"
-	CallerAudioEnd   WireEventKind = "caller_audio_end"
-	CallerAudioStart WireEventKind = "caller_audio_start"
-	CallerError      WireEventKind = "caller_error"
-	ClearAudio       WireEventKind = "clear_audio"
-	ConnectStarted   WireEventKind = "connect_started"
-	Connected        WireEventKind = "connected"
-	Ringing          WireEventKind = "ringing"
-	SilenceGreeting  WireEventKind = "silence_greeting"
-	Stop             WireEventKind = "stop"
-	TriggerSent      WireEventKind = "trigger_sent"
-	WaitingForCall   WireEventKind = "waiting_for_call"
+	WireEventKindAgentAudio       WireEventKind = "agent_audio"
+	WireEventKindAnswered         WireEventKind = "answered"
+	WireEventKindCallerAudioEnd   WireEventKind = "caller_audio_end"
+	WireEventKindCallerAudioStart WireEventKind = "caller_audio_start"
+	WireEventKindCallerError      WireEventKind = "caller_error"
+	WireEventKindClearAudio       WireEventKind = "clear_audio"
+	WireEventKindConnectStarted   WireEventKind = "connect_started"
+	WireEventKindConnected        WireEventKind = "connected"
+	WireEventKindEndCall          WireEventKind = "end_call"
+	WireEventKindRinging          WireEventKind = "ringing"
+	WireEventKindSilenceGreeting  WireEventKind = "silence_greeting"
+	WireEventKindStop             WireEventKind = "stop"
+	WireEventKindTriggerSent      WireEventKind = "trigger_sent"
+	WireEventKindTurnLimit        WireEventKind = "turn_limit"
+	WireEventKindWaitingForCall   WireEventKind = "waiting_for_call"
 )
 
 // Valid indicates whether the value is a known member of the WireEventKind enum.
 func (e WireEventKind) Valid() bool {
 	switch e {
-	case AgentAudio:
+	case WireEventKindAgentAudio:
 		return true
-	case Answered:
+	case WireEventKindAnswered:
 		return true
-	case CallerAudioEnd:
+	case WireEventKindCallerAudioEnd:
 		return true
-	case CallerAudioStart:
+	case WireEventKindCallerAudioStart:
 		return true
-	case CallerError:
+	case WireEventKindCallerError:
 		return true
-	case ClearAudio:
+	case WireEventKindClearAudio:
 		return true
-	case ConnectStarted:
+	case WireEventKindConnectStarted:
 		return true
-	case Connected:
+	case WireEventKindConnected:
 		return true
-	case Ringing:
+	case WireEventKindEndCall:
 		return true
-	case SilenceGreeting:
+	case WireEventKindRinging:
 		return true
-	case Stop:
+	case WireEventKindSilenceGreeting:
 		return true
-	case TriggerSent:
+	case WireEventKindStop:
 		return true
-	case WaitingForCall:
+	case WireEventKindTriggerSent:
+		return true
+	case WireEventKindTurnLimit:
+		return true
+	case WireEventKindWaitingForCall:
 		return true
 	default:
 		return false

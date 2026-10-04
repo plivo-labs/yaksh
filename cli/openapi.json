@@ -6978,6 +6978,8 @@
           "silence_greeting",
           "stop",
           "caller_error",
+          "end_call",
+          "turn_limit",
           "trigger_sent",
           "waiting_for_call"
         ],

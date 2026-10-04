@@ -141,10 +141,13 @@ class CallState:
     caller_reason: str | None = None
     ended: asyncio.Event = field(default_factory=asyncio.Event)
 
-    def end(self, reason: EndReason) -> None:
-        if self.end_reason is None:
-            self.end_reason = reason
-            self.ended.set()
+    def end(self, reason: EndReason) -> bool:
+        """True when this reason is the one that ends the call."""
+        if self.end_reason is not None:
+            return False
+        self.end_reason = reason
+        self.ended.set()
+        return True
 
     def blame(self, error: str | None) -> None:
         self.error = self.error or error
@@ -219,6 +222,65 @@ class Stoppable(Protocol):
     async def cancel(self) -> None: ...
 
 
+class Ending:
+    """How the caller ends a call: its own end_call tool, or the goodbye at the turn limit.
+    Each one leaves a wire event, so the record shows who ended the call and when."""
+
+    def __init__(
+        self,
+        request: CallRequest,
+        state: CallState,
+        transcript: TranscriptBuilder,
+        observer: CallObserver,
+        clock: Clock,
+        say: Callable[[str], Awaitable[None]],
+    ) -> None:
+        self._request = request
+        self._state = state
+        self._transcript = transcript
+        self._observer = observer
+        self._clock = clock
+        self._say = say
+        self._retried_silent_end = False
+
+    def _mark(self, kind: WireEventKind, detail: str | None = None) -> None:
+        self._observer.wire_event(WireEvent(kind=kind, at_ms=self._clock.ms(), detail=detail))
+
+    async def goodbye(self) -> None:
+        if self._state.end(EndReason.TURN_LIMIT):
+            self._mark(WireEventKind.TURN_LIMIT)
+        await self._say(self._request.goodbye)
+
+    async def end_call(self, params: FunctionCallParams) -> None:
+        """A reply that ends the call without a word would leave the agent's last turn
+        unanswered: the model gets one more reply to speak in, and after that Truman says the
+        goodbye itself. The handler runs on its own task, when a later reply can have started,
+        so the generated tap notes the words when the tool calls start."""
+        reason = str(params.arguments.get("reason") or "")
+        silent = not self._transcript.called_after_words(params.tool_call_id)
+        if silent and not self._retried_silent_end and self._state.end_reason is None:
+            self._retried_silent_end = True
+            log.info(
+                "caller tried to end conversation %s without a word: %s",
+                self._request.conversation_id,
+                reason,
+            )
+            await params.result_callback(
+                {"status": SILENT_END}, properties=FunctionCallResultProperties(run_llm=True)
+            )
+            return
+        log.info("caller ended conversation %s: %s", self._request.conversation_id, reason)
+        accepted = self._state.end(EndReason.CALLER_HANGUP)
+        if accepted:
+            self._state.caller_reason = reason
+            self._mark(WireEventKind.END_CALL, reason)
+        await params.result_callback(
+            {"status": "call ended"}, properties=FunctionCallResultProperties(run_llm=False)
+        )
+        if silent and accepted:
+            await self._say(self._request.goodbye)
+
+
 class Persona:
     """One call's persona pipeline around a transport, with the transcript taps in place.
 
@@ -262,10 +324,7 @@ class Persona:
             ),
         )
 
-        async def goodbye() -> None:
-            await self.say(request.goodbye)
-            state.end(EndReason.TURN_LIMIT)
-
+        self.ending = Ending(request, state, transcript, observer, clock, self.say)
         aggregators = LLMContextAggregatorPair(
             LLMContext(tools=ToolsSchema(standard_tools=[END_CALL])),
             user_params=LLMUserAggregatorParams(
@@ -284,7 +343,7 @@ class Persona:
                 self.stt,
                 aggregators.user(),
                 AgentTurnTap(transcript),
-                TurnLimit(request.max_turns, goodbye),
+                TurnLimit(request.max_turns, self.ending.goodbye),
                 self.llm,
                 GeneratedTap(transcript),
                 self.tts,
@@ -304,38 +363,9 @@ class Persona:
             enable_rtvi=False,
         )
 
-        retried_silent_end = False
-
-        async def end_call(params: FunctionCallParams) -> None:
-            """A reply that ends the call without a word would leave the agent's last turn
-            unanswered: the model gets one more reply to speak in, and after that Truman says
-            the goodbye itself. The handler runs on its own task, when a later reply can have
-            started, so the generated tap notes the words when the tool calls start."""
-            nonlocal retried_silent_end
-            reason = str(params.arguments.get("reason") or "")
-            silent = not transcript.called_after_words(params.tool_call_id)
-            if silent and not retried_silent_end and state.end_reason is None:
-                retried_silent_end = True
-                log.info(
-                    "caller tried to end conversation %s without a word: %s",
-                    request.conversation_id,
-                    reason,
-                )
-                await params.result_callback(
-                    {"status": SILENT_END}, properties=FunctionCallResultProperties(run_llm=True)
-                )
-                return
-            log.info("caller ended conversation %s: %s", request.conversation_id, reason)
-            await params.result_callback(
-                {"status": "call ended"}, properties=FunctionCallResultProperties(run_llm=False)
-            )
-            if silent and state.end_reason is None:
-                await self.say(request.goodbye)
-            if state.end_reason is None:
-                state.caller_reason = reason
-            state.end(EndReason.CALLER_HANGUP)
-
-        self.llm.register_function(END_CALL.name, end_call, cancel_on_interruption=False)
+        self.llm.register_function(
+            END_CALL.name, self.ending.end_call, cancel_on_interruption=False
+        )
         self._transcript = transcript
         self._observer = observer
         self._clock = clock
