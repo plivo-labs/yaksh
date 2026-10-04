@@ -61,6 +61,16 @@ A persona can have background noise: street, cafe, office, car, TV, crowd, kitch
 
 `background_noise` on a conversation replaces the persona's setting for that call, for example `{"sound": "none"}` for no noise or `{"sound": "street", "level": "loud"}`. A conversation keeps the setting it started with, and so does its retry. The sound files are loops in `src/truman/simulation/sounds/`; their README says how they were made. See `docs/decisions/0014-background-noise.md`.
 
+## Response time
+
+After each call, Truman measures how long the agent made the caller wait. For each caller reply, the response time runs from the end of the caller's speech to the start of the agent's first speech after it. Before the caller has spoken, it runs from the moment Truman's stream opened, so a slow greeting shows too. An agent that was already speaking then gets no value for the call's start. When the agent starts before the caller finishes, the reply is a talk-over and has no response time. A reply the agent does not answer before the caller speaks again has no response time either, so the percentiles leave that wait out.
+
+- The end of the caller's speech is where the voice detector last finds speech in the reply's own TTS audio, before Truman mixes in background noise. The TTS puts 0.03 to 0.35 s of quiet audio after the last word; this end leaves it out. A reply cut off before its TTS finished ends when Truman sent its last audio, the `caller_audio_end` wire event.
+- The agent's speech comes from the voice detector of the live call, Pipecat's Silero VAD, run over the agent channel of the recording. A spoken "hmm" counts as speech. In tests, an agent's quiet "thinking" sound did not.
+- Truman measures at its own connection, so the number includes the path between Truman and the agent's system, both ways. For a phone call, that is the path to Plivo, about 0.2 s through the development tunnel, and the phone path to the agent.
+
+The conversation page shows the p90 and the p50 (nearest rank), the number of replies and of talk-overs, the response time on each agent turn that answers a caller reply, and a band on the recording for each wait: green under 1 s, amber from 1 to 2 s, red over 2 s. `GET /api/v1/runs/<run id>` pools the replies of the latest attempts into `response_p50_ms` and `response_p90_ms`. `GET /api/v1/conversations?run_id=<run id>&sort=-response_p90_ms` lists the slowest conversations first. Calls without the measurement show "Latency not measured". See `docs/decisions/0019-response-time-at-trumans-connection.md`.
+
 ## Files
 
 Uploaded files (PDF, TXT and MD documents about an agent) are kept in S3-compatible storage. The compose files run [SeaweedFS](https://github.com/seaweedfs/seaweedfs) for this, with its data in the `storage` volume. To use S3, R2 or another S3-compatible service instead, set:

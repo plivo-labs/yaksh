@@ -392,6 +392,26 @@ export interface Turn {
   ended_at_ms: number;
   provenance: Provenance | null;
   scripted: boolean;
+  /** On an agent turn that starts a reply: how long the agent made the caller wait. Turns that
+   * arrive live during the call have neither field. */
+  response_ms?: number | null;
+  /** On an agent turn that starts a reply: the agent began before the caller finished. */
+  talked_over?: boolean;
+}
+
+/** The agent's response times in one call; null on a call that was not measured. */
+export interface LatencySummary {
+  p50_ms: number | null;
+  p90_ms: number | null;
+  replies: number;
+  talked_over: number;
+}
+
+/** One reply on the call's clock: when the caller's reply ended, and when the agent's speech
+ * began. The speech comes first in a talk-over. */
+export interface Reply {
+  start_ms: number;
+  speech_ms: number;
 }
 
 export interface WireEvent {
@@ -434,6 +454,7 @@ export interface ConversationSummary {
   started_at: string | null;
   ended_at: string | null;
   talk_ms: number | null;
+  latency: LatencySummary | null;
   recording_url: string | null;
   /** Why the caller ended the call, in its own words: not a verdict. */
   caller_reason: string | null;
@@ -449,6 +470,7 @@ export interface Conversation extends ConversationSummary {
   instructions: string;
   scenario: ScenarioConfig;
   transcript: Turn[];
+  replies: Reply[];
   wire_events: WireEvent[];
   validity: Validity | null;
   /** The retry that replaced this conversation. */
@@ -498,6 +520,8 @@ export interface RunSummary {
   /** How many retries the run made. */
   retries: number;
   median_talk_ms: number | null;
+  response_p50_ms: number | null;
+  response_p90_ms: number | null;
   waiting_reason: WaitingReason | null;
   started_at: string | null;
   ended_at: string | null;

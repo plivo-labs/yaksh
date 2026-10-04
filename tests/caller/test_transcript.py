@@ -9,7 +9,7 @@ from truman.domain.conversations import Provenance, Role
 
 def played(arrived: int, sent: int) -> Playout:
     playout = Playout()
-    playout.received(arrived, 0)
+    playout.received(bytes(arrived), 0)
     playout.played(sent)
     return playout
 

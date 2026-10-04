@@ -111,6 +111,9 @@ class RunProgress(BaseModel):
     retries: int
     """How many retries the run made."""
     median_talk_ms: int | None
+    response_p50_ms: int | None
+    response_p90_ms: int | None
+    """Nearest rank over every measured reply of the latest attempts, pooled."""
     waiting_reason: WaitingReason | None
     started_at: datetime | None
     ended_at: datetime | None

@@ -19,6 +19,7 @@ from tests.conftest import (
     create_scenario,
     finish,
     make_settings,
+    new_run,
     run_conversations,
     start,
     start_run,
@@ -28,7 +29,16 @@ from tests.conftest import (
 from truman.api import create_app
 from truman.config import Settings
 from truman.db.models import Conversation, Persona, Scenario
-from truman.domain.conversations import CallOutcome, ConversationStatus, EndReason
+from truman.domain.conversations import (
+    CallOutcome,
+    ConversationStatus,
+    EndReason,
+    Provenance,
+    Role,
+    Transcript,
+    Turn,
+)
+from truman.domain.latency import Latency, response_times
 from truman.worker.worker import Worker
 
 NO_OUTCOMES = dict.fromkeys(
@@ -444,3 +454,61 @@ async def client_with(settings: Settings, **changes: Any) -> AsyncGenerator[Asyn
             yield client
     finally:
         await app.state.engine.dispose()
+
+
+async def test_response_times_reach_the_turns_the_list_and_the_run(
+    client: AsyncClient, db: Db
+) -> None:
+    run = await new_run(client, repeats=2)
+    first, second = await claim(db), await claim(db)
+    assert first is not None and second is not None
+    asked = Turn(
+        role=Role.CALLER,
+        text="Can I move my visit?",
+        started_at_ms=1_000,
+        ended_at_ms=2_000,
+        provenance=Provenance.TRANSMITTED,
+    )
+
+    def answered(*agent_turn_starts: int) -> Transcript:
+        agent_turns = [
+            Turn(role=Role.AGENT, text="Sure.", started_at_ms=at, ended_at_ms=at + 500)
+            for at in agent_turn_starts
+        ]
+        return Transcript(turns=[asked, *agent_turns])
+
+    def outcome(latency: Latency | None) -> CallOutcome:
+        return CallOutcome(connected=True, end_reason=EndReason.AGENT_HANGUP, latency=latency)
+
+    # The first call answers 200 ms after the caller's reply, then talks over the next reply;
+    # its transcript turns start a little later than the recording's speech, as they do live.
+    quick = response_times(0, [(1_000, 2_000), (4_000, 4_800)], [2_200, 4_500])
+    await finish(db, first, outcome(quick), transcript=answered(2_300, 4_600))
+    slow = response_times(0, [(1_000, 2_000)], [3_800])
+    await finish(db, second, outcome(slow), transcript=answered(3_900))
+    single = await start(client, run["agent_id"])
+    assert await claim(db) == single["id"]
+    await finish(db, single["id"], outcome(None))
+
+    detail = (await client.get(f"/api/v1/conversations/{first}")).json()
+    assert [(t["role"], t["response_ms"], t["talked_over"]) for t in detail["transcript"]] == [
+        ("caller", None, False),
+        ("agent", 200, False),
+        ("agent", None, True),
+    ]
+    assert detail["latency"] == {"p50_ms": 200, "p90_ms": 200, "replies": 2, "talked_over": 1}
+    assert detail["replies"] == [
+        {"start_ms": 2_000, "speech_ms": 2_200},
+        {"start_ms": 4_800, "speech_ms": 4_500},
+    ]
+    listed = await client.get(
+        "/api/v1/conversations",
+        params={"agent_id": run["agent_id"], "sort": "-response_p90_ms"},
+    )
+    assert [(item["id"], item["latency"]) for item in listed.json()["items"]] == [
+        (second, {"p50_ms": 1_800, "p90_ms": 1_800, "replies": 1, "talked_over": 0}),
+        (first, detail["latency"]),
+        (single["id"], None),
+    ]
+    pooled = (await client.get(f"/api/v1/runs/{run['id']}")).json()
+    assert (pooled["response_p50_ms"], pooled["response_p90_ms"]) == (200, 1_800)

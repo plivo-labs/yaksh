@@ -14,7 +14,34 @@ from truman.domain.conversations import (
     WireEvent,
 )
 from truman.domain.languages import Language
+from truman.domain.latency import Latency, Reply
 from truman.domain.scenarios import ScenarioConfig
+
+
+class LatencySummary(BaseModel):
+    """The agent's response times in one call: nearest-rank percentiles over the measured
+    replies, how many replies there were, and how many of them talked over the caller."""
+
+    p50_ms: int | None
+    p90_ms: int | None
+    replies: int
+    talked_over: int
+
+    @classmethod
+    def of(cls, latency: Latency) -> LatencySummary:
+        return cls(
+            p50_ms=latency.p50_ms,
+            p90_ms=latency.p90_ms,
+            replies=len(latency.replies),
+            talked_over=sum(reply.response_ms is None for reply in latency.replies),
+        )
+
+
+class TurnRead(Turn):
+    response_ms: int | None = None
+    """On an agent turn that starts a reply: how long the agent made the caller wait."""
+    talked_over: bool = False
+    """On an agent turn that starts a reply: the agent began before the caller finished."""
 
 
 class ConversationSummary(BaseModel):
@@ -48,6 +75,8 @@ class ConversationSummary(BaseModel):
     started_at: datetime | None
     ended_at: datetime | None
     talk_ms: int | None
+    latency: LatencySummary | None
+    """None when the call was not measured, or when the agent never spoke."""
     recording_url: str | None
     caller_reason: str | None
     run_id: uuid.UUID | None
@@ -60,7 +89,9 @@ class ConversationSummary(BaseModel):
 class ConversationRead(ConversationSummary):
     instructions: str
     scenario: ScenarioConfig
-    transcript: list[Turn]
+    transcript: list[TurnRead]
+    replies: list[Reply]
+    """Each reply's start point and the agent's first speech, on the call's clock."""
     wire_events: list[WireEvent]
     validity: Validity | None
     retried_as: uuid.UUID | None
