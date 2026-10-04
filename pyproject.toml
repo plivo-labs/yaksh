@@ -29,7 +29,7 @@ dependencies = [
 ]
 
 [project.scripts]
-truman = "truman.__main__:main"
+truman-server = "truman.__main__:main"
 
 [build-system]
 requires = ["hatchling"]

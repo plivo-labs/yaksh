@@ -96,7 +96,10 @@ async def list_conversations(
     agent_id: uuid.UUID | None = None,
     run_id: uuid.UUID | None = None,
     status: ConversationStatus | None = None,
-    group: OutcomeGroup | None = None,
+    group: Annotated[
+        list[OutcomeGroup] | None,
+        Query(description="conversations in any of these groups; repeat it for several"),
+    ] = None,
     latest_attempts: Annotated[
         bool, Query(description="true leaves out the attempts that a retry replaced")
     ] = False,
@@ -110,7 +113,7 @@ async def list_conversations(
         agent_id=agent_id,
         run_id=run_id,
         status=status,
-        group=group,
+        groups=group or (),
         latest_attempts=latest_attempts,
         search=q,
         sort=sort,

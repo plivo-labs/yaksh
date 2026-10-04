@@ -1,6 +1,6 @@
 import asyncio
 import uuid
-from collections.abc import AsyncIterator, Iterable
+from collections.abc import AsyncIterator, Iterable, Sequence
 from dataclasses import asdict
 from datetime import timedelta
 from typing import Any
@@ -128,11 +128,12 @@ async def list_conversations(
     agent_id: uuid.UUID | None = None,
     run_id: uuid.UUID | None = None,
     status: ConversationStatus | None = None,
-    group: OutcomeGroup | None = None,
+    groups: Sequence[OutcomeGroup] = (),
     latest_attempts: bool = False,
     search: str | None = None,
     sort: str = "-created_at",
 ) -> tuple[list[Conversation], int]:
+    """groups keeps the conversations in any of them; empty keeps all."""
     query = select(Conversation).options(
         defer(Conversation.transcript), defer(Conversation.instructions)
     )
@@ -157,8 +158,8 @@ async def list_conversations(
         query = query.where(Conversation.run_id == run_id)
     if status is not None:
         query = query.where(Conversation.status == status)
-    if group is not None:
-        query = query.where(in_group(group))
+    if groups:
+        query = query.where(or_(*(in_group(group) for group in groups)))
     if latest_attempts:
         query = query.where(latest_attempt())
     total = await session.scalar(select(func.count()).select_from(query.subquery()))

@@ -119,6 +119,27 @@ curl -X POST localhost:8000/api/v1/runs -H "Authorization: Bearer $TRUMAN_API_TO
 
 The phone provider limits the calls of the whole account that can be on the line at once. Keep the sum of `TRUMAN_MAX_ACTIVE_CONVERSATIONS` over all workers, plus any other use of the same account, under that limit. Otherwise Plivo refuses the extra calls: it refuses the call request (HTTP 403, "Concurrency Limit Breached"), or it ends the call with hangup cause 5030. When Truman calls the agent, such a conversation ends with an error; when the agent calls Truman, it shows as a call that did not connect. The max parallel of a run does not protect the account, because two runs can each use it in full.
 
+## CLI
+
+`truman` is a command-line client for this API, for coding agents, CI and people. Each command prints the server's JSON on stdout, and progress, hints and errors on stderr. It exits 0 when the command worked, and 1 otherwise.
+
+To set it up through your coding agent, paste this into the agent:
+
+```text
+Install the Truman CLI with curl -fsSL https://raw.githubusercontent.com/plivo-labs/truman/main/install.sh | bash, then run npx skills add plivo-labs/truman -g and follow the truman skill to test my voice agent.
+```
+
+Until the release builds exist, build it from source with Go:
+
+```sh
+cd cli && go build -o ~/.truman/bin/truman .
+export PATH="$HOME/.truman/bin:$PATH"                    # add this line to your shell profile too
+truman auth login --server http://localhost:8000         # or set TRUMAN_URL and TRUMAN_API_TOKEN
+truman run start --agent <agent id> --all --wait
+```
+
+`truman guide` prints how a coding agent tests a voice agent with it; the same text is the skill in `cli/skill/SKILL.md`. To install the skill into your coding agent, run `npx skills add plivo-labs/truman`.
+
 ## Develop
 
 ```sh
@@ -127,4 +148,4 @@ docker compose -f docker/compose.dev.yaml up --build
 
 Open http://localhost:5173. Python and frontend changes reload in place.
 
-Without Docker: `uv sync && uv run prek install`, start Postgres (`docker compose -f docker/compose.dev.yaml up postgres`), export `TRUMAN_API_TOKEN` and `TRUMAN_DATABASE_URL=postgresql+asyncpg://truman:truman@localhost:5433/truman`, then `uv run truman api --reload`, `uv run truman worker` in a second terminal, and, in `frontend/`, `bun install && bun run dev`. Tests start their own Postgres through Docker.
+Without Docker: `uv sync && uv run prek install`, start Postgres (`docker compose -f docker/compose.dev.yaml up postgres`), export `TRUMAN_API_TOKEN` and `TRUMAN_DATABASE_URL=postgresql+asyncpg://truman:truman@localhost:5433/truman`, then `uv run truman-server api --reload`, `uv run truman-server worker` in a second terminal, and, in `frontend/`, `bun install && bun run dev`. Tests start their own Postgres through Docker.

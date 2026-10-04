@@ -1,0 +1,6838 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Truman",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/api/v1/health": {
+      "get": {
+        "tags": [
+          "health"
+        ],
+        "summary": "Health",
+        "operationId": "health_api_v1_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/agents": {
+      "post": {
+        "tags": [
+          "agents"
+        ],
+        "summary": "Create Agent",
+        "operationId": "create_agent_api_v1_agents_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "agents"
+        ],
+        "summary": "List Agents",
+        "operationId": "list_agents_api_v1_agents_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "external_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "External Id"
+            }
+          },
+          {
+            "name": "direction",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/Direction"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Direction"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 200
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^-?(name|language|created_at|updated_at)$",
+              "default": "-created_at",
+              "title": "Sort"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1,
+              "title": "Page"
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Page Size"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_AgentSummary_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/agents/{agent_id}": {
+      "get": {
+        "tags": [
+          "agents"
+        ],
+        "summary": "Get Agent",
+        "operationId": "get_agent_api_v1_agents__agent_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Agent Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "agents"
+        ],
+        "summary": "Update Agent",
+        "operationId": "update_agent_api_v1_agents__agent_id__patch",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Agent Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "agents"
+        ],
+        "summary": "Delete Agent",
+        "operationId": "delete_agent_api_v1_agents__agent_id__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Agent Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/agents/{agent_id}/duplicate": {
+      "post": {
+        "tags": [
+          "agents"
+        ],
+        "summary": "Duplicate Agent",
+        "operationId": "duplicate_agent_api_v1_agents__agent_id__duplicate_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Agent Id"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/agents/{agent_id}/versions": {
+      "get": {
+        "tags": [
+          "agents"
+        ],
+        "summary": "List Versions",
+        "operationId": "list_versions_api_v1_agents__agent_id__versions_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Agent Id"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1,
+              "title": "Page"
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Page Size"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_AgentVersionRead_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/agents/{agent_id}/versions/{version}": {
+      "get": {
+        "tags": [
+          "agents"
+        ],
+        "summary": "Get Version",
+        "operationId": "get_version_api_v1_agents__agent_id__versions__version__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Agent Id"
+            }
+          },
+          {
+            "name": "version",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Version"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentVersionRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/conversations": {
+      "post": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Create Conversation",
+        "operationId": "create_conversation_api_v1_conversations_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConversationCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationSummary"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "List Conversations",
+        "operationId": "list_conversations_api_v1_conversations_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Agent Id"
+            }
+          },
+          {
+            "name": "run_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/ConversationStatus"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "name": "group",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/OutcomeGroup"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "conversations in any of these groups; repeat it for several",
+              "title": "Group"
+            },
+            "description": "conversations in any of these groups; repeat it for several"
+          },
+          {
+            "name": "latest_attempts",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "true leaves out the attempts that a retry replaced",
+              "default": false,
+              "title": "Latest Attempts"
+            },
+            "description": "true leaves out the attempts that a retry replaced"
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 200
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^-?(created_at|talk_ms)$",
+              "default": "-created_at",
+              "title": "Sort"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1,
+              "title": "Page"
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Page Size"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_ConversationSummary_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/conversations/{conversation_id}": {
+      "get": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Get Conversation",
+        "operationId": "get_conversation_api_v1_conversations__conversation_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Conversation Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/conversations/{conversation_id}/recording": {
+      "get": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Get Recording",
+        "operationId": "get_recording_api_v1_conversations__conversation_id__recording_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Conversation Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/conversations/{conversation_id}/end": {
+      "post": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "End Conversation",
+        "operationId": "end_conversation_api_v1_conversations__conversation_id__end_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Conversation Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/conversations/{conversation_id}/events": {
+      "get": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Stream Events",
+        "operationId": "stream_events_api_v1_conversations__conversation_id__events_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Conversation Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/event-stream": {
+                "itemSchema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "string"
+                    },
+                    "event": {
+                      "type": "string"
+                    },
+                    "id": {
+                      "type": "string"
+                    },
+                    "retry": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/defaults": {
+      "get": {
+        "tags": [
+          "defaults"
+        ],
+        "summary": "Defaults",
+        "operationId": "defaults_api_v1_defaults_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Defaults"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/documents": {
+      "post": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Create Text Document",
+        "description": "A document from pasted text.",
+        "operationId": "create_text_document_api_v1_documents_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TextDocumentCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentSummary"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/documents/upload": {
+      "post": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Upload Document",
+        "description": "A document from a PDF, TXT or MD file. The file is kept and its text extracted.",
+        "operationId": "upload_document_api_v1_documents_upload_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_document_api_v1_documents_upload_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentSummary"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/documents/{document_id}": {
+      "get": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Get Document",
+        "operationId": "get_document_api_v1_documents__document_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Document Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/documents/{document_id}/file": {
+      "get": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Download Document",
+        "operationId": "download_document_api_v1_documents__document_id__file_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Document Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/personas": {
+      "post": {
+        "tags": [
+          "personas"
+        ],
+        "summary": "Create Persona",
+        "operationId": "create_persona_api_v1_personas_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PersonaCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PersonaRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "personas"
+        ],
+        "summary": "List Personas",
+        "operationId": "list_personas_api_v1_personas_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1,
+              "title": "Page"
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Page Size"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_PersonaRead_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/personas/{persona_id}": {
+      "get": {
+        "tags": [
+          "personas"
+        ],
+        "summary": "Get Persona",
+        "operationId": "get_persona_api_v1_personas__persona_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "persona_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Persona Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PersonaRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "personas"
+        ],
+        "summary": "Update Persona",
+        "operationId": "update_persona_api_v1_personas__persona_id__patch",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "persona_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Persona Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PersonaUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PersonaRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "personas"
+        ],
+        "summary": "Delete Persona",
+        "operationId": "delete_persona_api_v1_personas__persona_id__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "persona_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Persona Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/personas/{persona_id}/versions": {
+      "get": {
+        "tags": [
+          "personas"
+        ],
+        "summary": "List Versions",
+        "operationId": "list_versions_api_v1_personas__persona_id__versions_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "persona_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Persona Id"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1,
+              "title": "Page"
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Page Size"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_PersonaVersionRead_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/personas/{persona_id}/versions/{version}": {
+      "get": {
+        "tags": [
+          "personas"
+        ],
+        "summary": "Get Version",
+        "operationId": "get_version_api_v1_personas__persona_id__versions__version__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "persona_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Persona Id"
+            }
+          },
+          {
+            "name": "version",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Version"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PersonaVersionRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/phone-numbers": {
+      "get": {
+        "tags": [
+          "phone-numbers"
+        ],
+        "summary": "List Phone Numbers",
+        "description": "The numbers Truman may use, as the worker last synced them from the Plivo account.",
+        "operationId": "list_phone_numbers_api_v1_phone_numbers_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhoneNumbers"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/runs": {
+      "post": {
+        "tags": [
+          "runs"
+        ],
+        "summary": "Create Run",
+        "operationId": "create_run_api_v1_runs_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "idempotency-key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RunCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunSummary"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "runs"
+        ],
+        "summary": "List Runs",
+        "operationId": "list_runs_api_v1_runs_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Agent Id"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1,
+              "title": "Page"
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Page Size"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_RunSummary_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/runs/{run_id}": {
+      "get": {
+        "tags": [
+          "runs"
+        ],
+        "summary": "Get Run",
+        "operationId": "get_run_api_v1_runs__run_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/runs/{run_id}/cancel": {
+      "post": {
+        "tags": [
+          "runs"
+        ],
+        "summary": "Cancel Run",
+        "operationId": "cancel_run_api_v1_runs__run_id__cancel_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/agents/{agent_id}/scenarios": {
+      "post": {
+        "tags": [
+          "scenarios"
+        ],
+        "summary": "Create Scenario",
+        "operationId": "create_scenario_api_v1_agents__agent_id__scenarios_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Agent Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScenarioCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScenarioRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "scenarios"
+        ],
+        "summary": "List Scenarios",
+        "operationId": "list_scenarios_api_v1_agents__agent_id__scenarios_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Agent Id"
+            }
+          },
+          {
+            "name": "generation_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Generation Id"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1,
+              "title": "Page"
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Page Size"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_ScenarioRead_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/agents/{agent_id}/scenarios/generate": {
+      "post": {
+        "tags": [
+          "scenarios"
+        ],
+        "summary": "Generate Scenarios",
+        "description": "Writes scenarios and streams each one as it is saved. Closing the stream stops the\ngeneration; what is saved stays.",
+        "operationId": "generate_scenarios_api_v1_agents__agent_id__scenarios_generate_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Agent Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GenerateScenarios"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/event-stream": {
+                "itemSchema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "string"
+                    },
+                    "event": {
+                      "type": "string"
+                    },
+                    "id": {
+                      "type": "string"
+                    },
+                    "retry": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/agents/{agent_id}/scenarios/delete": {
+      "post": {
+        "tags": [
+          "scenarios"
+        ],
+        "summary": "Delete Scenarios",
+        "operationId": "delete_scenarios_api_v1_agents__agent_id__scenarios_delete_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Agent Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScenarioDelete"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/agents/{agent_id}/scenarios/persona": {
+      "post": {
+        "tags": [
+          "scenarios"
+        ],
+        "summary": "Assign Persona",
+        "operationId": "assign_persona_api_v1_agents__agent_id__scenarios_persona_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Agent Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssignPersona"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/agents/{agent_id}/scenario-generations": {
+      "get": {
+        "tags": [
+          "scenarios"
+        ],
+        "summary": "List Generations",
+        "operationId": "list_generations_api_v1_agents__agent_id__scenario_generations_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Agent Id"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1,
+              "title": "Page"
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Page Size"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_GenerationRead_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/scenarios/{scenario_id}": {
+      "get": {
+        "tags": [
+          "scenarios"
+        ],
+        "summary": "Get Scenario",
+        "operationId": "get_scenario_api_v1_scenarios__scenario_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "scenario_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Scenario Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScenarioRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "scenarios"
+        ],
+        "summary": "Update Scenario",
+        "operationId": "update_scenario_api_v1_scenarios__scenario_id__patch",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "scenario_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Scenario Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScenarioUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScenarioRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "scenarios"
+        ],
+        "summary": "Delete Scenario",
+        "operationId": "delete_scenario_api_v1_scenarios__scenario_id__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "scenario_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Scenario Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/scenarios/{scenario_id}/versions": {
+      "get": {
+        "tags": [
+          "scenarios"
+        ],
+        "summary": "List Versions",
+        "operationId": "list_versions_api_v1_scenarios__scenario_id__versions_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "scenario_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Scenario Id"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1,
+              "title": "Page"
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Page Size"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_ScenarioVersionRead_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/scenarios/{scenario_id}/versions/{version}": {
+      "get": {
+        "tags": [
+          "scenarios"
+        ],
+        "summary": "Get Version",
+        "operationId": "get_version_api_v1_scenarios__scenario_id__versions__version__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "scenario_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Scenario Id"
+            }
+          },
+          {
+            "name": "version",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Version"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScenarioVersionRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/voices": {
+      "get": {
+        "tags": [
+          "voices"
+        ],
+        "summary": "List Voices",
+        "operationId": "list_voices_api_v1_voices_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "language",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/Language"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Language"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1,
+              "title": "Page"
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Page Size"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_VoiceRead_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "voices"
+        ],
+        "summary": "Create Voice",
+        "operationId": "create_voice_api_v1_voices_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VoiceCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VoiceRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/voices/lookup": {
+      "get": {
+        "tags": [
+          "voices"
+        ],
+        "summary": "Lookup Voice",
+        "description": "What the provider says about a voice on the account. Saves nothing.",
+        "operationId": "lookup_voice_api_v1_voices_lookup_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "provider",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/VoiceProvider"
+            }
+          },
+          {
+            "name": "provider_voice_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]+$",
+              "title": "Provider Voice Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProviderVoice"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/voices/{voice_id}": {
+      "patch": {
+        "tags": [
+          "voices"
+        ],
+        "summary": "Update Voice",
+        "operationId": "update_voice_api_v1_voices__voice_id__patch",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "voice_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Voice Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VoiceUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VoiceRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "voices"
+        ],
+        "summary": "Delete Voice",
+        "operationId": "delete_voice_api_v1_voices__voice_id__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "voice_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Voice Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/voices/preview": {
+      "post": {
+        "tags": [
+          "voices"
+        ],
+        "summary": "Preview Voice",
+        "operationId": "preview_voice_api_v1_voices_preview_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VoicePreview"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "audio/wav": {}
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AgentConfig": {
+        "properties": {
+          "direction": {
+            "$ref": "#/components/schemas/Direction",
+            "default": "inbound"
+          },
+          "transport": {
+            "$ref": "#/components/schemas/Transport",
+            "default": "phone"
+          },
+          "agent_number": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^\\+[1-9]\\d{6,14}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Number"
+          },
+          "outbound": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OutboundConfig"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "agent_speaks_first": {
+            "type": "boolean",
+            "title": "Agent Speaks First",
+            "default": true
+          },
+          "language": {
+            "$ref": "#/components/schemas/Language",
+            "default": "en"
+          },
+          "brief": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 10000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Brief"
+          },
+          "config": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config"
+          },
+          "knowledge_base": {
+            "items": {
+              "$ref": "#/components/schemas/KnowledgeBaseEntry"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Knowledge Base",
+            "default": []
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "AgentConfig"
+      },
+      "AgentCreate": {
+        "properties": {
+          "direction": {
+            "$ref": "#/components/schemas/Direction",
+            "default": "inbound"
+          },
+          "transport": {
+            "$ref": "#/components/schemas/Transport",
+            "default": "phone"
+          },
+          "agent_number": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^\\+[1-9]\\d{6,14}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Number"
+          },
+          "outbound": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OutboundConfig"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "agent_speaks_first": {
+            "type": "boolean",
+            "title": "Agent Speaks First",
+            "default": true
+          },
+          "language": {
+            "$ref": "#/components/schemas/Language",
+            "default": "en"
+          },
+          "brief": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 10000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Brief"
+          },
+          "config": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config"
+          },
+          "knowledge_base": {
+            "items": {
+              "$ref": "#/components/schemas/KnowledgeBaseEntry"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Knowledge Base",
+            "default": []
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Name"
+          },
+          "external_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "External Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "AgentCreate"
+      },
+      "AgentRead": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "external_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "External Id"
+          },
+          "direction": {
+            "$ref": "#/components/schemas/Direction"
+          },
+          "transport": {
+            "$ref": "#/components/schemas/Transport"
+          },
+          "agent_number": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Number"
+          },
+          "outbound": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OutboundConfig"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "agent_speaks_first": {
+            "type": "boolean",
+            "title": "Agent Speaks First"
+          },
+          "language": {
+            "$ref": "#/components/schemas/Language"
+          },
+          "brief": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Brief"
+          },
+          "current_version": {
+            "type": "integer",
+            "title": "Current Version"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "config": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config"
+          },
+          "knowledge_base": {
+            "items": {
+              "$ref": "#/components/schemas/KnowledgeBaseDocument"
+            },
+            "type": "array",
+            "title": "Knowledge Base"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "external_id",
+          "direction",
+          "transport",
+          "agent_number",
+          "outbound",
+          "agent_speaks_first",
+          "language",
+          "brief",
+          "current_version",
+          "created_at",
+          "updated_at",
+          "config",
+          "knowledge_base"
+        ],
+        "title": "AgentRead"
+      },
+      "AgentSummary": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "external_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "External Id"
+          },
+          "direction": {
+            "$ref": "#/components/schemas/Direction"
+          },
+          "transport": {
+            "$ref": "#/components/schemas/Transport"
+          },
+          "agent_number": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Number"
+          },
+          "outbound": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OutboundConfig"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "agent_speaks_first": {
+            "type": "boolean",
+            "title": "Agent Speaks First"
+          },
+          "language": {
+            "$ref": "#/components/schemas/Language"
+          },
+          "brief": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Brief"
+          },
+          "current_version": {
+            "type": "integer",
+            "title": "Current Version"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "external_id",
+          "direction",
+          "transport",
+          "agent_number",
+          "outbound",
+          "agent_speaks_first",
+          "language",
+          "brief",
+          "current_version",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "AgentSummary",
+        "description": "An agent without its config and knowledge base, for lists."
+      },
+      "AgentUpdate": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "external_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "External Id"
+          },
+          "direction": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Direction"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "transport": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Transport"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "agent_number": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^\\+[1-9]\\d{6,14}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Number"
+          },
+          "outbound": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OutboundConfig"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "agent_speaks_first": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Speaks First"
+          },
+          "language": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Language"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "brief": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 10000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Brief"
+          },
+          "config": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config"
+          },
+          "knowledge_base": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/KnowledgeBaseEntry"
+                },
+                "type": "array",
+                "maxItems": 20
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Knowledge Base"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "AgentUpdate"
+      },
+      "AgentVersionRead": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "agent_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Agent Id"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "config": {
+            "$ref": "#/components/schemas/AgentConfig"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "agent_id",
+          "version",
+          "config",
+          "created_at"
+        ],
+        "title": "AgentVersionRead"
+      },
+      "AssignPersona": {
+        "properties": {
+          "scenario_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "maxItems": 500,
+            "minItems": 1,
+            "title": "Scenario Ids"
+          },
+          "persona_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Persona Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "scenario_ids",
+          "persona_id"
+        ],
+        "title": "AssignPersona",
+        "description": "One persona for several scenarios of one agent: all of them, or none if one is missing."
+      },
+      "BackgroundNoise": {
+        "properties": {
+          "sound": {
+            "$ref": "#/components/schemas/NoiseSound",
+            "default": "none"
+          },
+          "level": {
+            "$ref": "#/components/schemas/NoiseLevel",
+            "default": "busy"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "BackgroundNoise",
+        "description": "The sound behind the caller."
+      },
+      "Body_upload_document_api_v1_documents_upload_post": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file"
+        ],
+        "title": "Body_upload_document_api_v1_documents_upload_post"
+      },
+      "Category": {
+        "type": "string",
+        "enum": [
+          "happy_path",
+          "recovery",
+          "boundary"
+        ],
+        "title": "Category",
+        "description": "What kind of situation a scenario tests. How the caller talks comes from the persona."
+      },
+      "Channel": {
+        "type": "string",
+        "enum": [
+          "voice"
+        ],
+        "title": "Channel"
+      },
+      "ConversationCreate": {
+        "properties": {
+          "agent_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Agent Id"
+          },
+          "scenario_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Scenario Id"
+          },
+          "persona_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Persona Id"
+          },
+          "background_noise": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BackgroundNoise"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "max_duration_s": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 1800.0,
+                "minimum": 10.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Duration S"
+          },
+          "max_turns": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 100.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Turns"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "agent_id",
+          "scenario_id"
+        ],
+        "title": "ConversationCreate"
+      },
+      "ConversationRead": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "agent_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Agent Id"
+          },
+          "agent_version_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Agent Version Id"
+          },
+          "agent_version": {
+            "type": "integer",
+            "title": "Agent Version"
+          },
+          "agent_name": {
+            "type": "string",
+            "title": "Agent Name"
+          },
+          "persona_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Persona Id"
+          },
+          "persona_version_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Persona Version Id"
+          },
+          "persona_version": {
+            "type": "integer",
+            "title": "Persona Version"
+          },
+          "persona_name": {
+            "type": "string",
+            "title": "Persona Name"
+          },
+          "scenario_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Scenario Id"
+          },
+          "scenario_version_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Scenario Version Id"
+          },
+          "scenario_version": {
+            "type": "integer",
+            "title": "Scenario Version"
+          },
+          "scenario_name": {
+            "type": "string",
+            "title": "Scenario Name"
+          },
+          "direction": {
+            "$ref": "#/components/schemas/Direction"
+          },
+          "language": {
+            "$ref": "#/components/schemas/Language"
+          },
+          "channel": {
+            "$ref": "#/components/schemas/Channel"
+          },
+          "caller_number": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Caller Number"
+          },
+          "agent_caller_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Caller Id"
+          },
+          "call_uuid": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Call Uuid"
+          },
+          "max_duration_s": {
+            "type": "integer",
+            "title": "Max Duration S"
+          },
+          "max_turns": {
+            "type": "integer",
+            "title": "Max Turns"
+          },
+          "background_noise": {
+            "$ref": "#/components/schemas/BackgroundNoise"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ConversationStatus"
+          },
+          "end_reason": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EndReason"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "failure_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Failure Reason"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "ended_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ended At"
+          },
+          "talk_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Talk Ms"
+          },
+          "recording_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recording Url"
+          },
+          "caller_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Caller Reason"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "repeat": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Repeat"
+          },
+          "attempt": {
+            "type": "integer",
+            "title": "Attempt"
+          },
+          "retry_of": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Retry Of"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "instructions": {
+            "type": "string",
+            "title": "Instructions"
+          },
+          "scenario": {
+            "$ref": "#/components/schemas/ScenarioConfig"
+          },
+          "transcript": {
+            "items": {
+              "$ref": "#/components/schemas/Turn"
+            },
+            "type": "array",
+            "title": "Transcript"
+          },
+          "wire_events": {
+            "items": {
+              "$ref": "#/components/schemas/WireEvent"
+            },
+            "type": "array",
+            "title": "Wire Events"
+          },
+          "validity": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Validity"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "retried_as": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Retried As"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "agent_id",
+          "agent_version_id",
+          "agent_version",
+          "agent_name",
+          "persona_id",
+          "persona_version_id",
+          "persona_version",
+          "persona_name",
+          "scenario_id",
+          "scenario_version_id",
+          "scenario_version",
+          "scenario_name",
+          "direction",
+          "language",
+          "channel",
+          "caller_number",
+          "agent_caller_id",
+          "call_uuid",
+          "max_duration_s",
+          "max_turns",
+          "background_noise",
+          "status",
+          "end_reason",
+          "failure_reason",
+          "started_at",
+          "ended_at",
+          "talk_ms",
+          "recording_url",
+          "caller_reason",
+          "run_id",
+          "repeat",
+          "attempt",
+          "retry_of",
+          "created_at",
+          "instructions",
+          "scenario",
+          "transcript",
+          "wire_events",
+          "validity",
+          "retried_as"
+        ],
+        "title": "ConversationRead"
+      },
+      "ConversationStatus": {
+        "type": "string",
+        "enum": [
+          "queued",
+          "running",
+          "ending",
+          "completed",
+          "failed",
+          "invalid",
+          "cancelled"
+        ],
+        "title": "ConversationStatus"
+      },
+      "ConversationSummary": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "agent_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Agent Id"
+          },
+          "agent_version_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Agent Version Id"
+          },
+          "agent_version": {
+            "type": "integer",
+            "title": "Agent Version"
+          },
+          "agent_name": {
+            "type": "string",
+            "title": "Agent Name"
+          },
+          "persona_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Persona Id"
+          },
+          "persona_version_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Persona Version Id"
+          },
+          "persona_version": {
+            "type": "integer",
+            "title": "Persona Version"
+          },
+          "persona_name": {
+            "type": "string",
+            "title": "Persona Name"
+          },
+          "scenario_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Scenario Id"
+          },
+          "scenario_version_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Scenario Version Id"
+          },
+          "scenario_version": {
+            "type": "integer",
+            "title": "Scenario Version"
+          },
+          "scenario_name": {
+            "type": "string",
+            "title": "Scenario Name"
+          },
+          "direction": {
+            "$ref": "#/components/schemas/Direction"
+          },
+          "language": {
+            "$ref": "#/components/schemas/Language"
+          },
+          "channel": {
+            "$ref": "#/components/schemas/Channel"
+          },
+          "caller_number": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Caller Number"
+          },
+          "agent_caller_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Caller Id"
+          },
+          "call_uuid": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Call Uuid"
+          },
+          "max_duration_s": {
+            "type": "integer",
+            "title": "Max Duration S"
+          },
+          "max_turns": {
+            "type": "integer",
+            "title": "Max Turns"
+          },
+          "background_noise": {
+            "$ref": "#/components/schemas/BackgroundNoise"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ConversationStatus"
+          },
+          "end_reason": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EndReason"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "failure_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Failure Reason"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "ended_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ended At"
+          },
+          "talk_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Talk Ms"
+          },
+          "recording_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recording Url"
+          },
+          "caller_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Caller Reason"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "repeat": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Repeat"
+          },
+          "attempt": {
+            "type": "integer",
+            "title": "Attempt"
+          },
+          "retry_of": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Retry Of"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "agent_id",
+          "agent_version_id",
+          "agent_version",
+          "agent_name",
+          "persona_id",
+          "persona_version_id",
+          "persona_version",
+          "persona_name",
+          "scenario_id",
+          "scenario_version_id",
+          "scenario_version",
+          "scenario_name",
+          "direction",
+          "language",
+          "channel",
+          "caller_number",
+          "agent_caller_id",
+          "call_uuid",
+          "max_duration_s",
+          "max_turns",
+          "background_noise",
+          "status",
+          "end_reason",
+          "failure_reason",
+          "started_at",
+          "ended_at",
+          "talk_ms",
+          "recording_url",
+          "caller_reason",
+          "run_id",
+          "repeat",
+          "attempt",
+          "retry_of",
+          "created_at"
+        ],
+        "title": "ConversationSummary"
+      },
+      "Defaults": {
+        "properties": {
+          "max_duration_s": {
+            "type": "integer",
+            "title": "Max Duration S"
+          },
+          "max_turns": {
+            "type": "integer",
+            "title": "Max Turns"
+          },
+          "max_retries": {
+            "type": "integer",
+            "title": "Max Retries"
+          }
+        },
+        "type": "object",
+        "required": [
+          "max_duration_s",
+          "max_turns",
+          "max_retries"
+        ],
+        "title": "Defaults",
+        "description": "What the server uses for a field that a request leaves out."
+      },
+      "Direction": {
+        "type": "string",
+        "enum": [
+          "inbound",
+          "outbound"
+        ],
+        "title": "Direction"
+      },
+      "DocumentRead": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "media_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Media Type"
+          },
+          "size_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Size Bytes"
+          },
+          "characters": {
+            "type": "integer",
+            "title": "Characters"
+          },
+          "pages": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pages"
+          },
+          "empty_pages": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Empty Pages"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "media_type",
+          "size_bytes",
+          "characters",
+          "pages",
+          "empty_pages",
+          "created_at",
+          "text"
+        ],
+        "title": "DocumentRead"
+      },
+      "DocumentSummary": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "media_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Media Type"
+          },
+          "size_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Size Bytes"
+          },
+          "characters": {
+            "type": "integer",
+            "title": "Characters"
+          },
+          "pages": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pages"
+          },
+          "empty_pages": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Empty Pages"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "media_type",
+          "size_bytes",
+          "characters",
+          "pages",
+          "empty_pages",
+          "created_at"
+        ],
+        "title": "DocumentSummary",
+        "description": "A document without its text, for lists and upload results."
+      },
+      "EndReason": {
+        "type": "string",
+        "enum": [
+          "user_request",
+          "caller_hangup",
+          "agent_hangup",
+          "agent_silent",
+          "no_answer",
+          "stream_ended",
+          "duration_limit",
+          "error",
+          "worker_stopped",
+          "lease_lost",
+          "trigger_failed",
+          "no_call",
+          "turn_limit"
+        ],
+        "title": "EndReason",
+        "description": "Who or what ended the conversation, as Truman observed it."
+      },
+      "Fact": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "value": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Value"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "value"
+        ],
+        "title": "Fact",
+        "description": "A value the caller has and gives when the agent asks for it."
+      },
+      "GenerateScenarios": {
+        "properties": {
+          "mode": {
+            "$ref": "#/components/schemas/GenerationMode",
+            "default": "agent"
+          },
+          "count": {
+            "type": "integer",
+            "maximum": 20.0,
+            "minimum": 1.0,
+            "title": "Count",
+            "default": 5
+          },
+          "instructions": {
+            "type": "string",
+            "maxLength": 2000,
+            "title": "Instructions",
+            "default": ""
+          },
+          "document_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Document Ids"
+          },
+          "persona_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "minItems": 1,
+            "title": "Persona Ids"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "persona_ids"
+        ],
+        "title": "GenerateScenarios"
+      },
+      "GenerationMode": {
+        "type": "string",
+        "enum": [
+          "agent",
+          "knowledge_base"
+        ],
+        "title": "GenerationMode"
+      },
+      "GenerationRead": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "mode": {
+            "$ref": "#/components/schemas/GenerationMode"
+          },
+          "status": {
+            "$ref": "#/components/schemas/GenerationStatus"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "scenarios": {
+            "type": "integer",
+            "title": "Scenarios"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "mode",
+          "status",
+          "created_at",
+          "scenarios"
+        ],
+        "title": "GenerationRead"
+      },
+      "GenerationStatus": {
+        "type": "string",
+        "enum": [
+          "running",
+          "done",
+          "failed",
+          "stopped"
+        ],
+        "title": "GenerationStatus"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "Header": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "value": {
+            "type": "string",
+            "maxLength": 2000,
+            "title": "Value"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "value"
+        ],
+        "title": "Header"
+      },
+      "HealthResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "version"
+        ],
+        "title": "HealthResponse"
+      },
+      "KnowledgeBaseDocument": {
+        "properties": {
+          "document_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Document Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "media_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Media Type"
+          },
+          "size_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Size Bytes"
+          },
+          "characters": {
+            "type": "integer",
+            "title": "Characters"
+          },
+          "pages": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pages"
+          },
+          "empty_pages": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Empty Pages"
+          }
+        },
+        "type": "object",
+        "required": [
+          "document_id",
+          "name",
+          "media_type",
+          "size_bytes",
+          "characters",
+          "pages",
+          "empty_pages"
+        ],
+        "title": "KnowledgeBaseDocument",
+        "description": "A knowledge base entry with what the list shows about its document."
+      },
+      "KnowledgeBaseEntry": {
+        "properties": {
+          "document_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Document Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "document_id",
+          "name"
+        ],
+        "title": "KnowledgeBaseEntry",
+        "description": "A document the agent answers from, under the name the agent shows for it."
+      },
+      "Language": {
+        "type": "string",
+        "enum": [
+          "en",
+          "hinglish"
+        ],
+        "title": "Language"
+      },
+      "NoiseLevel": {
+        "type": "string",
+        "enum": [
+          "light",
+          "busy",
+          "loud"
+        ],
+        "title": "NoiseLevel",
+        "description": "How loud the background is, as the caller's speech level above the noise."
+      },
+      "NoiseSound": {
+        "type": "string",
+        "enum": [
+          "none",
+          "street",
+          "cafe",
+          "office",
+          "car",
+          "tv",
+          "crowd",
+          "kitchen",
+          "wind"
+        ],
+        "title": "NoiseSound"
+      },
+      "NumberState": {
+        "type": "string",
+        "enum": [
+          "in_use",
+          "resting",
+          "free"
+        ],
+        "title": "NumberState"
+      },
+      "OutboundConfig": {
+        "properties": {
+          "trigger": {
+            "$ref": "#/components/schemas/Trigger"
+          },
+          "calling_numbers": {
+            "items": {
+              "type": "string",
+              "pattern": "^\\+[1-9]\\d{6,14}$"
+            },
+            "type": "array",
+            "maxItems": 50,
+            "title": "Calling Numbers"
+          },
+          "dial_window_s": {
+            "type": "integer",
+            "maximum": 600.0,
+            "minimum": 10.0,
+            "title": "Dial Window S",
+            "default": 120
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "trigger"
+        ],
+        "title": "OutboundConfig",
+        "description": "How an outbound agent is made to call Truman, and how its call is recognized."
+      },
+      "OutcomeGroup": {
+        "type": "string",
+        "enum": [
+          "waiting",
+          "in_progress",
+          "completed",
+          "did_not_connect",
+          "error",
+          "cancelled"
+        ],
+        "title": "OutcomeGroup",
+        "description": "How a conversation went, from its status and end reason only. Before any judge, the\ngroups say what happened, not who is at fault."
+      },
+      "Page_AgentSummary_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AgentSummary"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "page": {
+            "type": "integer",
+            "title": "Page"
+          },
+          "page_size": {
+            "type": "integer",
+            "title": "Page Size"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "page",
+          "page_size"
+        ],
+        "title": "Page[AgentSummary]"
+      },
+      "Page_AgentVersionRead_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AgentVersionRead"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "page": {
+            "type": "integer",
+            "title": "Page"
+          },
+          "page_size": {
+            "type": "integer",
+            "title": "Page Size"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "page",
+          "page_size"
+        ],
+        "title": "Page[AgentVersionRead]"
+      },
+      "Page_ConversationSummary_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ConversationSummary"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "page": {
+            "type": "integer",
+            "title": "Page"
+          },
+          "page_size": {
+            "type": "integer",
+            "title": "Page Size"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "page",
+          "page_size"
+        ],
+        "title": "Page[ConversationSummary]"
+      },
+      "Page_GenerationRead_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/GenerationRead"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "page": {
+            "type": "integer",
+            "title": "Page"
+          },
+          "page_size": {
+            "type": "integer",
+            "title": "Page Size"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "page",
+          "page_size"
+        ],
+        "title": "Page[GenerationRead]"
+      },
+      "Page_PersonaRead_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PersonaRead"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "page": {
+            "type": "integer",
+            "title": "Page"
+          },
+          "page_size": {
+            "type": "integer",
+            "title": "Page Size"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "page",
+          "page_size"
+        ],
+        "title": "Page[PersonaRead]"
+      },
+      "Page_PersonaVersionRead_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PersonaVersionRead"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "page": {
+            "type": "integer",
+            "title": "Page"
+          },
+          "page_size": {
+            "type": "integer",
+            "title": "Page Size"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "page",
+          "page_size"
+        ],
+        "title": "Page[PersonaVersionRead]"
+      },
+      "Page_RunSummary_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/RunSummary"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "page": {
+            "type": "integer",
+            "title": "Page"
+          },
+          "page_size": {
+            "type": "integer",
+            "title": "Page Size"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "page",
+          "page_size"
+        ],
+        "title": "Page[RunSummary]"
+      },
+      "Page_ScenarioRead_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ScenarioRead"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "page": {
+            "type": "integer",
+            "title": "Page"
+          },
+          "page_size": {
+            "type": "integer",
+            "title": "Page Size"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "page",
+          "page_size"
+        ],
+        "title": "Page[ScenarioRead]"
+      },
+      "Page_ScenarioVersionRead_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ScenarioVersionRead"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "page": {
+            "type": "integer",
+            "title": "Page"
+          },
+          "page_size": {
+            "type": "integer",
+            "title": "Page Size"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "page",
+          "page_size"
+        ],
+        "title": "Page[ScenarioVersionRead]"
+      },
+      "Page_VoiceRead_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/VoiceRead"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "page": {
+            "type": "integer",
+            "title": "Page"
+          },
+          "page_size": {
+            "type": "integer",
+            "title": "Page Size"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "page",
+          "page_size"
+        ],
+        "title": "Page[VoiceRead]"
+      },
+      "PersonaConfig": {
+        "properties": {
+          "prompt": {
+            "type": "string",
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Prompt"
+          },
+          "language": {
+            "$ref": "#/components/schemas/Language",
+            "default": "en"
+          },
+          "voice": {
+            "$ref": "#/components/schemas/VoiceSettings"
+          },
+          "background_noise": {
+            "$ref": "#/components/schemas/BackgroundNoise",
+            "default": {
+              "sound": "none",
+              "level": "busy"
+            }
+          },
+          "voice_gender": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VoiceGender"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "prompt",
+          "voice"
+        ],
+        "title": "PersonaConfig",
+        "description": "What a persona version pins: the settings plus the voice gender from the voices list."
+      },
+      "PersonaCreate": {
+        "properties": {
+          "prompt": {
+            "type": "string",
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Prompt"
+          },
+          "language": {
+            "$ref": "#/components/schemas/Language",
+            "default": "en"
+          },
+          "voice": {
+            "$ref": "#/components/schemas/VoiceSettings"
+          },
+          "background_noise": {
+            "$ref": "#/components/schemas/BackgroundNoise",
+            "default": {
+              "sound": "none",
+              "level": "busy"
+            }
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Name"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "prompt",
+          "voice",
+          "name"
+        ],
+        "title": "PersonaCreate"
+      },
+      "PersonaRead": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "builtin_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Builtin Key"
+          },
+          "prompt": {
+            "type": "string",
+            "title": "Prompt"
+          },
+          "language": {
+            "$ref": "#/components/schemas/Language"
+          },
+          "voice": {
+            "$ref": "#/components/schemas/VoiceSettings"
+          },
+          "voice_gender": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VoiceGender"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "background_noise": {
+            "$ref": "#/components/schemas/BackgroundNoise"
+          },
+          "current_version": {
+            "type": "integer",
+            "title": "Current Version"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "builtin_key",
+          "prompt",
+          "language",
+          "voice",
+          "voice_gender",
+          "background_noise",
+          "current_version",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "PersonaRead"
+      },
+      "PersonaUpdate": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 80,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "prompt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 4000,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prompt"
+          },
+          "language": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Language"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "voice": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VoiceSettings"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "background_noise": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BackgroundNoise"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "PersonaUpdate"
+      },
+      "PersonaVersionRead": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "persona_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Persona Id"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "config": {
+            "$ref": "#/components/schemas/PersonaConfig"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "persona_id",
+          "version",
+          "config",
+          "created_at"
+        ],
+        "title": "PersonaVersionRead"
+      },
+      "PhoneNumberRead": {
+        "properties": {
+          "number": {
+            "type": "string",
+            "title": "Number"
+          },
+          "alias": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alias"
+          },
+          "region": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Region"
+          },
+          "application_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Application Id"
+          },
+          "application_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Application Name"
+          },
+          "on_outbound_application": {
+            "type": "boolean",
+            "title": "On Outbound Application"
+          },
+          "state": {
+            "$ref": "#/components/schemas/NumberState"
+          }
+        },
+        "type": "object",
+        "required": [
+          "number",
+          "alias",
+          "region",
+          "application_id",
+          "application_name",
+          "on_outbound_application",
+          "state"
+        ],
+        "title": "PhoneNumberRead"
+      },
+      "PhoneNumbers": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PhoneNumberRead"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "outbound_problem": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outbound Problem"
+          },
+          "rest_s": {
+            "type": "integer",
+            "title": "Rest S"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "outbound_problem",
+          "rest_s"
+        ],
+        "title": "PhoneNumbers"
+      },
+      "Provenance": {
+        "type": "string",
+        "enum": [
+          "transmitted",
+          "cut",
+          "unconfirmed"
+        ],
+        "title": "Provenance"
+      },
+      "ProviderVoice": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "gender": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VoiceGender"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "accent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accent"
+          },
+          "listed_languages": {
+            "items": {
+              "$ref": "#/components/schemas/Language"
+            },
+            "type": "array",
+            "title": "Listed Languages",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "ProviderVoice",
+        "description": "A voice as its provider describes it. `listed_languages` are the languages the provider\nlists for the voice in any model; the model decides what the voice can really speak."
+      },
+      "Role": {
+        "type": "string",
+        "enum": [
+          "agent",
+          "caller"
+        ],
+        "title": "Role"
+      },
+      "RunCreate": {
+        "properties": {
+          "agent_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Agent Id"
+          },
+          "scenario_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Scenario Ids"
+          },
+          "repeats": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Repeats",
+            "default": 1
+          },
+          "max_duration_s": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 1800.0,
+                "minimum": 10.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Duration S"
+          },
+          "max_turns": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 100.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Turns"
+          },
+          "max_parallel": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Parallel"
+          },
+          "start_interval_s": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Interval S"
+          },
+          "max_retries": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Retries"
+          },
+          "background_noise": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BackgroundNoise"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 80,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "agent_id",
+          "scenario_ids"
+        ],
+        "title": "RunCreate",
+        "description": "Limits that an operator sets, such as the most repeats, are checked where the settings\nare known."
+      },
+      "RunRead": {
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/RunStatus"
+          },
+          "cancelled_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cancelled At"
+          },
+          "counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "propertyNames": {
+              "$ref": "#/components/schemas/OutcomeGroup"
+            },
+            "type": "object",
+            "title": "Counts"
+          },
+          "end_reasons": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "propertyNames": {
+              "$ref": "#/components/schemas/EndReason"
+            },
+            "type": "object",
+            "title": "End Reasons"
+          },
+          "retries": {
+            "type": "integer",
+            "title": "Retries"
+          },
+          "median_talk_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Median Talk Ms"
+          },
+          "waiting_reason": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WaitingReason"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "ended_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ended At"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "agent_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Agent Id"
+          },
+          "agent_version_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Agent Version Id"
+          },
+          "agent_version": {
+            "type": "integer",
+            "title": "Agent Version"
+          },
+          "agent_name": {
+            "type": "string",
+            "title": "Agent Name"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "repeats": {
+            "type": "integer",
+            "title": "Repeats"
+          },
+          "max_duration_s": {
+            "type": "integer",
+            "title": "Max Duration S"
+          },
+          "max_turns": {
+            "type": "integer",
+            "title": "Max Turns"
+          },
+          "max_parallel": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Parallel"
+          },
+          "start_interval_s": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Interval S"
+          },
+          "max_retries": {
+            "type": "integer",
+            "title": "Max Retries"
+          },
+          "background_noise": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BackgroundNoise"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "scenario_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Scenario Ids"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "cancelled_at",
+          "counts",
+          "end_reasons",
+          "retries",
+          "median_talk_ms",
+          "waiting_reason",
+          "started_at",
+          "ended_at",
+          "id",
+          "agent_id",
+          "agent_version_id",
+          "agent_version",
+          "agent_name",
+          "name",
+          "repeats",
+          "max_duration_s",
+          "max_turns",
+          "max_parallel",
+          "start_interval_s",
+          "max_retries",
+          "background_noise",
+          "created_at",
+          "scenario_ids"
+        ],
+        "title": "RunRead"
+      },
+      "RunStatus": {
+        "type": "string",
+        "enum": [
+          "queued",
+          "running",
+          "cancelling",
+          "done",
+          "cancelled"
+        ],
+        "title": "RunStatus"
+      },
+      "RunSummary": {
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/RunStatus"
+          },
+          "cancelled_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cancelled At"
+          },
+          "counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "propertyNames": {
+              "$ref": "#/components/schemas/OutcomeGroup"
+            },
+            "type": "object",
+            "title": "Counts"
+          },
+          "end_reasons": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "propertyNames": {
+              "$ref": "#/components/schemas/EndReason"
+            },
+            "type": "object",
+            "title": "End Reasons"
+          },
+          "retries": {
+            "type": "integer",
+            "title": "Retries"
+          },
+          "median_talk_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Median Talk Ms"
+          },
+          "waiting_reason": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WaitingReason"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "ended_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ended At"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "agent_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Agent Id"
+          },
+          "agent_version_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Agent Version Id"
+          },
+          "agent_version": {
+            "type": "integer",
+            "title": "Agent Version"
+          },
+          "agent_name": {
+            "type": "string",
+            "title": "Agent Name"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "repeats": {
+            "type": "integer",
+            "title": "Repeats"
+          },
+          "max_duration_s": {
+            "type": "integer",
+            "title": "Max Duration S"
+          },
+          "max_turns": {
+            "type": "integer",
+            "title": "Max Turns"
+          },
+          "max_parallel": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Parallel"
+          },
+          "start_interval_s": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Interval S"
+          },
+          "max_retries": {
+            "type": "integer",
+            "title": "Max Retries"
+          },
+          "background_noise": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BackgroundNoise"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "cancelled_at",
+          "counts",
+          "end_reasons",
+          "retries",
+          "median_talk_ms",
+          "waiting_reason",
+          "started_at",
+          "ended_at",
+          "id",
+          "agent_id",
+          "agent_version_id",
+          "agent_version",
+          "agent_name",
+          "name",
+          "repeats",
+          "max_duration_s",
+          "max_turns",
+          "max_parallel",
+          "start_interval_s",
+          "max_retries",
+          "background_noise",
+          "created_at"
+        ],
+        "title": "RunSummary"
+      },
+      "ScenarioConfig": {
+        "properties": {
+          "goal": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Goal"
+          },
+          "known_facts": {
+            "items": {
+              "$ref": "#/components/schemas/Fact"
+            },
+            "type": "array",
+            "maxItems": 30,
+            "title": "Known Facts"
+          },
+          "unknown_facts": {
+            "items": {
+              "type": "string",
+              "maxLength": 80,
+              "minLength": 1
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Unknown Facts"
+          },
+          "criteria": {
+            "items": {
+              "type": "string",
+              "maxLength": 500,
+              "minLength": 1
+            },
+            "type": "array",
+            "maxItems": 10,
+            "minItems": 1,
+            "title": "Criteria"
+          },
+          "agent_data": {
+            "items": {
+              "$ref": "#/components/schemas/Fact"
+            },
+            "type": "array",
+            "maxItems": 30,
+            "title": "Agent Data"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "goal",
+          "criteria"
+        ],
+        "title": "ScenarioConfig",
+        "description": "What a scenario version pins. The goal and the facts go to the caller. The criteria never\ndo: they are what the agent must say or do on the call. Agent data goes only to the agent,\nin an outbound agent's trigger."
+      },
+      "ScenarioCreate": {
+        "properties": {
+          "goal": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Goal"
+          },
+          "known_facts": {
+            "items": {
+              "$ref": "#/components/schemas/Fact"
+            },
+            "type": "array",
+            "maxItems": 30,
+            "title": "Known Facts"
+          },
+          "unknown_facts": {
+            "items": {
+              "type": "string",
+              "maxLength": 80,
+              "minLength": 1
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Unknown Facts"
+          },
+          "criteria": {
+            "items": {
+              "type": "string",
+              "maxLength": 500,
+              "minLength": 1
+            },
+            "type": "array",
+            "maxItems": 10,
+            "minItems": 1,
+            "title": "Criteria"
+          },
+          "agent_data": {
+            "items": {
+              "$ref": "#/components/schemas/Fact"
+            },
+            "type": "array",
+            "maxItems": 30,
+            "title": "Agent Data"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "category": {
+            "$ref": "#/components/schemas/Category",
+            "default": "happy_path"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "persona_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Persona Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "goal",
+          "criteria",
+          "name",
+          "persona_id"
+        ],
+        "title": "ScenarioCreate"
+      },
+      "ScenarioDelete": {
+        "properties": {
+          "scenario_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "maxItems": 500,
+            "minItems": 1,
+            "title": "Scenario Ids"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "scenario_ids"
+        ],
+        "title": "ScenarioDelete",
+        "description": "Scenarios of one agent to delete together: all of them, or none if one is missing."
+      },
+      "ScenarioRead": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "agent_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Agent Id"
+          },
+          "persona_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Persona Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "category": {
+            "$ref": "#/components/schemas/Category"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "generation_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Generation Id"
+          },
+          "goal": {
+            "type": "string",
+            "title": "Goal"
+          },
+          "known_facts": {
+            "items": {
+              "$ref": "#/components/schemas/Fact"
+            },
+            "type": "array",
+            "title": "Known Facts"
+          },
+          "unknown_facts": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Unknown Facts"
+          },
+          "criteria": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Criteria"
+          },
+          "agent_data": {
+            "items": {
+              "$ref": "#/components/schemas/Fact"
+            },
+            "type": "array",
+            "title": "Agent Data"
+          },
+          "current_version": {
+            "type": "integer",
+            "title": "Current Version"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "agent_id",
+          "persona_id",
+          "name",
+          "category",
+          "description",
+          "generation_id",
+          "goal",
+          "known_facts",
+          "unknown_facts",
+          "criteria",
+          "agent_data",
+          "current_version",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "ScenarioRead"
+      },
+      "ScenarioUpdate": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 80,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "category": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Category"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "persona_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Persona Id"
+          },
+          "goal": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Goal"
+          },
+          "known_facts": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/Fact"
+                },
+                "type": "array",
+                "maxItems": 30
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Known Facts"
+          },
+          "unknown_facts": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "maxLength": 80,
+                  "minLength": 1
+                },
+                "type": "array",
+                "maxItems": 20
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unknown Facts"
+          },
+          "criteria": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "maxLength": 500,
+                  "minLength": 1
+                },
+                "type": "array",
+                "maxItems": 10,
+                "minItems": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Criteria"
+          },
+          "agent_data": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/Fact"
+                },
+                "type": "array",
+                "maxItems": 30
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Data"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "ScenarioUpdate",
+        "description": "A partial change; lists replace the stored list as a whole."
+      },
+      "ScenarioVersionRead": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "scenario_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Scenario Id"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "config": {
+            "$ref": "#/components/schemas/ScenarioConfig"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "scenario_id",
+          "version",
+          "config",
+          "created_at"
+        ],
+        "title": "ScenarioVersionRead"
+      },
+      "TextDocumentCreate": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "text": {
+            "type": "string",
+            "maxLength": 1000000,
+            "title": "Text"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "text"
+        ],
+        "title": "TextDocumentCreate"
+      },
+      "Transport": {
+        "type": "string",
+        "enum": [
+          "phone"
+        ],
+        "title": "Transport",
+        "description": "How Truman reaches an agent; phone only today, kept as the seam for other ways."
+      },
+      "Trigger": {
+        "properties": {
+          "url": {
+            "type": "string",
+            "maxLength": 2083,
+            "minLength": 1,
+            "format": "uri",
+            "title": "Url"
+          },
+          "headers": {
+            "items": {
+              "$ref": "#/components/schemas/Header"
+            },
+            "type": "array",
+            "maxItems": 30,
+            "title": "Headers"
+          },
+          "body": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Body"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "url",
+          "body"
+        ],
+        "title": "Trigger",
+        "description": "A POST with a JSON body, sent once for each conversation."
+      },
+      "Turn": {
+        "properties": {
+          "role": {
+            "$ref": "#/components/schemas/Role"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "started_at_ms": {
+            "type": "integer",
+            "title": "Started At Ms"
+          },
+          "ended_at_ms": {
+            "type": "integer",
+            "title": "Ended At Ms"
+          },
+          "provenance": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Provenance"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "scripted": {
+            "type": "boolean",
+            "title": "Scripted",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "role",
+          "text",
+          "started_at_ms",
+          "ended_at_ms"
+        ],
+        "title": "Turn"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      },
+      "Validity": {
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "title": "Ok"
+          },
+          "reasons": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Reasons"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ok"
+        ],
+        "title": "Validity"
+      },
+      "VoiceCreate": {
+        "properties": {
+          "provider": {
+            "$ref": "#/components/schemas/VoiceProvider"
+          },
+          "provider_voice_id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]+$",
+            "title": "Provider Voice Id"
+          },
+          "languages": {
+            "items": {
+              "$ref": "#/components/schemas/Language"
+            },
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "title": "Languages"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 80,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "provider",
+          "provider_voice_id",
+          "languages"
+        ],
+        "title": "VoiceCreate"
+      },
+      "VoiceGender": {
+        "type": "string",
+        "enum": [
+          "male",
+          "female",
+          "neutral"
+        ],
+        "title": "VoiceGender"
+      },
+      "VoicePreview": {
+        "properties": {
+          "voice": {
+            "$ref": "#/components/schemas/VoiceSettings"
+          },
+          "language": {
+            "$ref": "#/components/schemas/Language"
+          },
+          "background_noise": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BackgroundNoise"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "voice",
+          "language"
+        ],
+        "title": "VoicePreview"
+      },
+      "VoiceProvider": {
+        "type": "string",
+        "enum": [
+          "elevenlabs"
+        ],
+        "title": "VoiceProvider"
+      },
+      "VoiceRead": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "provider": {
+            "$ref": "#/components/schemas/VoiceProvider"
+          },
+          "provider_voice_id": {
+            "type": "string",
+            "title": "Provider Voice Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "gender": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VoiceGender"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "accent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accent"
+          },
+          "languages": {
+            "items": {
+              "$ref": "#/components/schemas/Language"
+            },
+            "type": "array",
+            "title": "Languages"
+          },
+          "listed_languages": {
+            "items": {
+              "$ref": "#/components/schemas/Language"
+            },
+            "type": "array",
+            "title": "Listed Languages"
+          },
+          "builtin": {
+            "type": "boolean",
+            "title": "Builtin"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "provider",
+          "provider_voice_id",
+          "name",
+          "gender",
+          "accent",
+          "languages",
+          "listed_languages",
+          "builtin",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "VoiceRead"
+      },
+      "VoiceSettings": {
+        "properties": {
+          "provider": {
+            "$ref": "#/components/schemas/VoiceProvider"
+          },
+          "id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]+$",
+            "title": "Id"
+          },
+          "speed": {
+            "type": "number",
+            "maximum": 1.2,
+            "minimum": 0.7,
+            "title": "Speed",
+            "default": 1.0
+          },
+          "stability": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Stability",
+            "default": 0.5
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "provider",
+          "id"
+        ],
+        "title": "VoiceSettings",
+        "description": "A voice of one text-to-speech provider and how it speaks; the id means nothing\noutside that provider. The id goes into provider URLs, so dots and slashes are refused."
+      },
+      "VoiceUpdate": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 80,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "languages": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/Language"
+                },
+                "type": "array",
+                "minItems": 1,
+                "uniqueItems": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Languages"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "VoiceUpdate"
+      },
+      "WaitingReason": {
+        "type": "string",
+        "enum": [
+          "max_parallel",
+          "start_interval",
+          "worker_or_number"
+        ],
+        "title": "WaitingReason",
+        "description": "Why queued conversations of a run have not started. Only the run's own limits are\nnamed; anything else is a worker or a number."
+      },
+      "WireEvent": {
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/WireEventKind"
+          },
+          "at_ms": {
+            "type": "integer",
+            "title": "At Ms"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "at_ms"
+        ],
+        "title": "WireEvent"
+      },
+      "WireEventKind": {
+        "type": "string",
+        "enum": [
+          "connect_started",
+          "ringing",
+          "answered",
+          "connected",
+          "caller_audio_start",
+          "caller_audio_end",
+          "agent_audio",
+          "clear_audio",
+          "silence_greeting",
+          "stop",
+          "caller_error",
+          "trigger_sent",
+          "waiting_for_call"
+        ],
+        "title": "WireEventKind"
+      }
+    },
+    "securitySchemes": {
+      "HTTPBearer": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    }
+  }
+}
