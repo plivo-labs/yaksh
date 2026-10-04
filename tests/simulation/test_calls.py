@@ -117,6 +117,18 @@ async def test_the_time_limit_counts_from_connect_not_from_dialing() -> None:
     assert loop.time() - started >= 0.8
 
 
+def test_a_second_connected_event_moves_the_first() -> None:
+    live = LiveCall()
+    live.wire_event(WireEvent(kind=WireEventKind.CONNECTED, at_ms=3_000))
+    live.wire_event(WireEvent(kind=WireEventKind.AGENT_AUDIO, at_ms=4_500))
+    live.wire_event(WireEvent(kind=WireEventKind.CONNECTED, at_ms=2_200))
+
+    assert [(e.kind, e.at_ms) for e in live.snapshot().wire_events] == [
+        (WireEventKind.CONNECTED, 2_200),
+        (WireEventKind.AGENT_AUDIO, 4_500),
+    ]
+
+
 async def test_a_caller_that_never_connects_is_stopped_at_the_dial_deadline_with_a_reason() -> None:
     live = LiveCall()
 

@@ -755,9 +755,13 @@ class PhoneCaller:
         finally:
             if greeting is not None:
                 greeting.cancel()
-        talk_ms = clock.ms() - connected_ms
+        ended_ms = clock.ms()
+        started_ms = recording.start_ms(connected_ms)
+        if started_ms < connected_ms:
+            observer.wire_event(WireEvent(kind=WireEventKind.CONNECTED, at_ms=started_ms))
+        talk_ms = ended_ms - started_ms
         recording_path = await asyncio.to_thread(
-            recording.save, request.output_dir / "recording.wav", connected_ms
+            recording.save, request.output_dir / "recording.wav", started_ms
         )
         agent_side = CALLED_SIDE if request.agent.outbound is None else CALLING_SIDE
         await resolve_stream_end(state, entry.callbacks, agent_side)

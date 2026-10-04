@@ -197,9 +197,9 @@ async def test_a_recording_puts_each_side_where_it_was_on_the_line(tmp_path: Pat
     )
     connected = 1_000
     for line in range(960, 5_000, 20):
-        # The agent greets while its frames wait in the socket for the pipeline to start at
-        # 2_400, and a stall holds the frames from 3_000 to 3_600. The two loud frames from
-        # before connected must not reach the recording.
+        # The agent greets from before connected, while its frames wait in the socket for the
+        # pipeline to start at 2_400, and a stall holds the frames from 3_000 to 3_600. The
+        # recording starts at the agent's first frame, two frames before connected.
         clock.now = max(line, 2_400) if line < 3_000 else max(line, 3_600)
         speech = line < connected or 1_200 <= line < 2_000 or 3_100 <= line < 3_300
         await serializer.deserialize(media(LOUD if speech else HUSH, PLIVO_EPOCH + line))
@@ -209,15 +209,25 @@ async def test_a_recording_puts_each_side_where_it_was_on_the_line(tmp_path: Pat
         clock.now = sent
         await serializer.serialize(OutputAudioRawFrame(LOUD, SAMPLE_RATE, 1))
 
-    saved = recording.save(tmp_path / "recording.wav", connected)
+    start = recording.start_ms(connected)
+    saved = recording.save(tmp_path / "recording.wav", start)
 
+    assert start == 960
     assert saved is not None
     with wave.open(str(saved)) as file:
         assert (file.getnchannels(), file.getframerate()) == (2, SAMPLE_RATE)
         audio = file.readframes(file.getnframes())
     assert audioop.tomono(audio, 2, 1, 0) == (
-        HUSH * 10 + LOUD * 40 + HUSH * 55 + LOUD * 10 + HUSH * 85
+        LOUD * 2 + HUSH * 10 + LOUD * 40 + HUSH * 55 + LOUD * 10 + HUSH * 85
     )
     assert audioop.tomono(audio, 2, 0, 1) == (
-        silence(1_400) + LOUD * 20 + silence(1_200) + LOUD * 10 + silence(800)
+        silence(1_440) + LOUD * 20 + silence(1_200) + LOUD * 10 + silence(800)
     )
+
+
+def test_a_recording_starts_at_connected_when_no_agent_audio_came_before() -> None:
+    recording = CallRecording()
+    recording.agent(LOUD, 1_300, PLIVO_EPOCH + 1_200)
+    recording.agent(LOUD, 1_320, PLIVO_EPOCH + 1_220)
+
+    assert recording.start_ms(1_000) == 1_000

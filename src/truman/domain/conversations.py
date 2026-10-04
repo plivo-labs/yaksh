@@ -112,7 +112,8 @@ class WireEventKind(StrEnum):
     RINGING = "ringing"
     ANSWERED = "answered"
     CONNECTED = "connected"
-    """Plivo's stream opened. Talk time, the duration limit and the recording count from here."""
+    """The call's audio started: when Plivo's stream opened, or earlier when the agent's first
+    frame is stamped before that. Talk time and the recording count from here."""
     CALLER_AUDIO_START = "caller_audio_start"
     """Truman's output started sending caller audio; not proof it played on the line."""
     CALLER_AUDIO_END = "caller_audio_end"
@@ -234,7 +235,10 @@ class CallOutcome(BaseModel):
 class CallObserver(Protocol):
     def turn(self, turn: Turn) -> None: ...
 
-    def wire_event(self, event: WireEvent) -> None: ...
+    def wire_event(self, event: WireEvent) -> None:
+        """A second `connected` event replaces the first: the time is final only when the call
+        ends."""
+        ...
 
 
 class Caller(Protocol):

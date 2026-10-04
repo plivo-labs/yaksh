@@ -116,13 +116,15 @@ class CallRecording:
     def caller(self, pcm: bytes, at_ms: int) -> None:
         self._caller.append((at_ms, pcm))
 
+    def start_ms(self, connected_ms: int) -> int:
+        """Where the call's audio starts: at connected_ms, or earlier at the agent's first
+        frame. An agent that speaks first starts when Plivo answers, and Plivo stamps that audio
+        from before it opens the stream."""
+        return min([connected_ms] + [at for at, _ in self._agent_frames()])
+
     def save(self, path: Path, start_ms: int) -> Path | None:
         """Write the recording from start_ms on, if any audio came after it."""
-        offset = min((at - plivo for at, plivo, _ in self._agent if plivo is not None), default=0)
-        agent = track(
-            [(at if plivo is None else plivo + offset, pcm) for at, plivo, pcm in self._agent],
-            start_ms,
-        )
+        agent = track(self._agent_frames(), start_ms)
         caller = track(self._caller, start_ms)
         size = max(len(agent), len(caller))
         if size == 0:
@@ -139,6 +141,10 @@ class CallRecording:
             recording.setframerate(SAMPLE_RATE)
             recording.writeframes(stereo)
         return path
+
+    def _agent_frames(self) -> list[tuple[int, bytes]]:
+        offset = min((at - plivo for at, plivo, _ in self._agent if plivo is not None), default=0)
+        return [(at if plivo is None else plivo + offset, pcm) for at, plivo, pcm in self._agent]
 
 
 def track(frames: Iterable[tuple[int, bytes]], start_ms: int) -> bytearray:

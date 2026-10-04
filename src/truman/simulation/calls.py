@@ -39,7 +39,13 @@ class LiveCall:
         self.dirty = True
 
     def wire_event(self, event: WireEvent) -> None:
-        self.wire_events.append(event)
+        if event.kind is WireEventKind.CONNECTED and self.connected:
+            first = next(
+                i for i, seen in enumerate(self.wire_events) if seen.kind is WireEventKind.CONNECTED
+            )
+            self.wire_events[first] = event
+        else:
+            self.wire_events.append(event)
         if event.kind is WireEventKind.CONNECTED:
             self.connected_event.set()
         self.dirty = True
