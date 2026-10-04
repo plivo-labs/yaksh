@@ -64,7 +64,7 @@ Truman makes no retries for the conversations in the `did_not_connect` outcome g
 - `GET /api/v1/defaults` returns the values that the server uses when a request does not set these fields: `max_duration_s`, `max_turns`, and `max_retries` of a run. The console fills its forms with these values.
 - The same `Idempotency-Key` with the same body returns the first run. Thus, a client can safely send a request again. The same key with a different body gets an error.
 - `POST /api/v1/runs/<run id>/cancel` cancels the queued conversations and tells the workers to stop the calls that are in progress. The run shows `cancelling` until those calls stop.
-- `GET /api/v1/runs/<run id>` counts the conversations by outcome group: `waiting`, `in_progress`, `completed`, `did_not_connect`, `error` and `cancelled`. For a conversation that has retries, it counts only the last retry. These counts are facts about the calls. They are not results for the agent. The run also has `response_p50_ms` and `response_p90_ms`. Refer to [Response time](/docs/response-time).
+- `GET /api/v1/runs/<run id>` counts the conversations by [outcome group](/docs/results#outcome-groups): `waiting`, `in_progress`, `completed`, `did_not_connect`, `error` and `cancelled`. For a conversation that has retries, it counts only the last retry. These counts are facts about the calls. They are not results for the agent. The run also has `response_p50_ms` and `response_p90_ms`. Refer to [Response time](/docs/response-time).
 - `GET /api/v1/conversations?run_id=<run id>&latest_attempts=true` lists the conversations of the run without the conversations that a retry replaced.
 
 ## Calls at the same time

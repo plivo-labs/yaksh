@@ -24,6 +24,14 @@ For development, use `docker/compose.dev.yaml` in these commands.
 | `TRUMAN_DATABASE_URL` | The URL of the Postgres database. Truman does not start without it. The URL must start with `postgresql+asyncpg://`. The database must be PostgreSQL 18 or later. Docker Compose sets this variable to its `postgres` service, and a value in `docker/.env` has no effect. |
 | `TRUMAN_TIMEZONE` | The IANA time zone that sets the "today" of the caller when Truman makes a conversation or its run. The default is `UTC`. A retry keeps the "today" of the conversation that it replaces. |
 
+## Security
+
+- Truman has one API token and no user accounts. A person with the token can read and change all data.
+- The API uses HTTP without TLS on port 8000. Before you open port 8000 to a network, put an HTTPS proxy in front of it.
+- `GET /api/v1/health` and `GET /api/v1/defaults` do not use the token. All other API requests must have it.
+- The console keeps the token in the storage of the browser. The CLI keeps it in `$XDG_CONFIG_HOME/truman/config.json`, or in `~/.config/truman/config.json` if `XDG_CONFIG_HOME` is not set. Only your user can read that file.
+- Port 8770 of the worker must be public for Plivo. The worker examines the Plivo signature of each request, and it rejects a request without a correct signature.
+
 ## Caller
 
 For phone calls, the worker must have `DEEPGRAM_API_KEY`, `ELEVENLABS_API_KEY` and `OPENAI_API_KEY`. The worker does not start if you set `PLIVO_AUTH_ID`, `PLIVO_AUTH_TOKEN` and `TRUMAN_PUBLIC_URL`, and one of these keys has no value. Its log shows `the caller needs` and the names of the keys that have no value.

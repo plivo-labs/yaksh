@@ -1,0 +1,51 @@
+---
+title: Results
+description: The status, the outcome group and the end reason of a conversation.
+---
+
+Each conversation has a status, an outcome group and an end reason. These values tell what occurred on the call. They do not tell if the agent did its tasks correctly. A call is connected when its audio stream starts, at the `connected` wire event.
+
+## Statuses
+
+| Status | Description |
+| --- | --- |
+| `queued` | The conversation waits for a worker and a free number. |
+| `running` | A worker has the conversation. The call starts or is in progress. |
+| `ending` | You stopped the conversation while a worker had it. The worker has not completed the stop. |
+| `completed` | The call connected and stopped, and Truman found no error. This status is not a pass result. |
+| `invalid` | The call connected, but an error occurred in the caller or in the audio stream. Do not use the transcript to examine the agent. |
+| `failed` | The call did not connect, or the worker stopped or lost the conversation. |
+| `cancelled` | You stopped the conversation before its call connected. |
+
+## Outcome groups
+
+The outcome group comes from the status and the end reason. If you stopped a conversation, its outcome group is `cancelled`, also if its status is `completed` or `invalid`.
+
+| Outcome group | Conversations |
+| --- | --- |
+| `waiting` | The `queued` conversations. |
+| `in_progress` | The `running` and `ending` conversations. |
+| `completed` | The `completed` conversations that you did not stop. |
+| `did_not_connect` | The `failed` conversations with the end reason `no_answer`, `no_call`, `trigger_failed` or `agent_hangup`. |
+| `error` | All other `failed` conversations, and the `invalid` conversations that you did not stop. A run makes retries for these conversations, up to its `max_retries`, if you did not cancel the run. |
+| `cancelled` | The conversations that you stopped. |
+
+## End reasons
+
+| End reason | Description |
+| --- | --- |
+| `caller_hangup` | The caller stopped the call. The caller does this when it decides that it completed its goal. This end reason does not show that the goal is complete. |
+| `agent_hangup` | The agent disconnected the call. |
+| `agent_silent` | The agent did not speak. After 15 seconds of silence, the caller asks if the agent is there. After two such questions in one silence, the next silence stops the call. When the agent speaks, the count starts again. |
+| `turn_limit` | The caller answered `max_turns` agent turns, said goodbye and stopped the call. |
+| `duration_limit` | The call reached its time limit, `max_duration_s`. |
+| `user_request` | You stopped the conversation, or you cancelled its run. |
+| `no_answer` | The agent did not answer the call. |
+| `no_call` | The outbound agent did not call during its dial window. |
+| `trigger_failed` | The system of the outbound agent rejected the trigger, or Truman could not send it. |
+| `stream_ended` | The audio stream stopped, and Plivo did not tell which side stopped the call. |
+| `error` | An error occurred in Truman or on the phone line. The failure reason gives the cause. |
+| `worker_stopped` | The worker stopped during the call. The result of the call is not known. |
+| `lease_lost` | The worker lost its claim on the conversation. The result of the call is not known. |
+
+For the causes of a failed call, refer to [Troubleshooting](/docs/troubleshooting).
