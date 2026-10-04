@@ -27,19 +27,22 @@ func TestLoad(t *testing.T) {
 		name string
 		file string
 		vars map[string]string
-		want Settings
+		want Loaded
 	}{
-		{name: "nothing", want: Settings{}},
-		{name: "file only", file: saved, want: Settings{"https://saved.example.com", "saved-token"}},
+		{name: "nothing", want: Loaded{ServerFrom: Unset, TokenFrom: Unset}},
+		{
+			name: "file only", file: saved,
+			want: Loaded{Settings{"https://saved.example.com", "saved-token"}, FromFile, FromFile},
+		},
 		{
 			name: "environment wins", file: saved,
 			vars: map[string]string{"TRUMAN_URL": "http://localhost:8000", "TRUMAN_API_TOKEN": "env-token"},
-			want: Settings{"http://localhost:8000", "env-token"},
+			want: Loaded{Settings{"http://localhost:8000", "env-token"}, FromEnvironment, FromEnvironment},
 		},
 		{
-			name: "environment fills one value", file: saved,
+			name: "environment sets one value", file: saved,
 			vars: map[string]string{"TRUMAN_API_TOKEN": "env-token"},
-			want: Settings{"https://saved.example.com", "env-token"},
+			want: Loaded{Settings{"https://saved.example.com", "env-token"}, FromFile, FromEnvironment},
 		},
 	}
 	for _, tt := range tests {
@@ -65,6 +68,29 @@ func TestLoadRejectsABrokenFile(t *testing.T) {
 	writeConfig(t, home, "{not json")
 	if _, err := Load(env(map[string]string{"HOME": home})); err == nil {
 		t.Fatal("Load accepted a file that is not JSON")
+	}
+}
+
+func TestSaveThenLoadThenRemove(t *testing.T) {
+	getenv := env(map[string]string{"HOME": t.TempDir()})
+	want := Settings{Server: "https://truman.example.com", Token: "t0k"}
+
+	if err := Save(getenv, want); err != nil {
+		t.Fatal(err)
+	}
+	path, _ := Path(getenv)
+	info, err := os.Stat(path)
+	if err != nil || info.Mode().Perm() != 0o600 {
+		t.Fatalf("saved file mode = %v, %v; want 0600", info.Mode().Perm(), err)
+	}
+	if got, err := Load(getenv); err != nil || got.Settings != want {
+		t.Fatalf("Load after Save = %+v, %v", got, err)
+	}
+	if removed, err := Remove(getenv); !removed || err != nil {
+		t.Fatalf("Remove = %v, %v; want true", removed, err)
+	}
+	if removed, err := Remove(getenv); removed || err != nil {
+		t.Fatalf("second Remove = %v, %v; want false", removed, err)
 	}
 }
 

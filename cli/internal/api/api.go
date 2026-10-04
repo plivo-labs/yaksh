@@ -11,18 +11,42 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
 )
 
-// New returns a client for server that sends token as a bearer token on every request. Use it
-// instead of the generated NewClient.
+// requestTimeout bounds a whole request, body included, so a server that stalls at any point
+// fails the command instead of hanging it. A test makes it short.
+var requestTimeout = 2 * time.Minute
+
+// headerTimeout bounds the wait for an event stream's headers; the stream itself has no limit.
+const headerTimeout = time.Minute
+
+// New returns a client for server that sends token as a bearer token on every request, each
+// within requestTimeout. Use it instead of the generated NewClient, and Stream for event streams.
 func New(server, token, userAgent string) (*Client, error) {
-	return NewClient(strings.TrimRight(server, "/"), WithRequestEditorFn(
-		func(_ context.Context, req *http.Request) error {
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.ResponseHeaderTimeout = headerTimeout
+	return NewClient(
+		strings.TrimRight(server, "/"),
+		WithHTTPClient(&http.Client{Transport: transport, Timeout: requestTimeout}),
+		WithRequestEditorFn(func(_ context.Context, req *http.Request) error {
 			req.Header.Set("Authorization", "Bearer "+token)
 			req.Header.Set("User-Agent", userAgent)
 			return nil
-		},
-	))
+		}),
+	)
+}
+
+// Stream returns a copy of c whose requests have no overall time limit, for an event stream
+// that stays open as long as a call lasts. Its headers still must come within headerTimeout.
+func Stream(c *Client) *Client {
+	s := *c
+	if hc, ok := c.Client.(*http.Client); ok {
+		unbounded := *hc
+		unbounded.Timeout = 0
+		s.Client = &unbounded
+	}
+	return &s
 }
 
 // Error is a response with a status that is not 2xx.

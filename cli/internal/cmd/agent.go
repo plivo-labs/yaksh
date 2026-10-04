@@ -1,9 +1,6 @@
 package cmd
 
 import (
-	"fmt"
-
-	"github.com/google/uuid"
 	"github.com/spf13/cobra"
 
 	"github.com/plivo-labs/truman/cli/internal/api"
@@ -52,8 +49,7 @@ func (a *app) agentListCmd() *cobra.Command {
 	f.StringVar(&direction, "direction", "", "only inbound or outbound agents")
 	f.StringVar(&q, "q", "", "search the name, external ID, ID or number")
 	f.StringVar(&sort, "sort", "", "name, language, created_at or updated_at; a leading - sorts descending")
-	f.IntVar(&page, "page", 0, "page number, from 1")
-	f.IntVar(&pageSize, "page-size", 0, "agents per page, up to 100")
+	addPageFlags(cmd, &page, &pageSize)
 	return cmd
 }
 
@@ -63,9 +59,9 @@ func (a *app) agentViewCmd() *cobra.Command {
 		Short: "Show one agent, with its configuration",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			id, err := uuid.Parse(args[0])
+			id, err := parseID("agent", args[0])
 			if err != nil {
-				return fmt.Errorf(`%q is not an agent ID: find it with "truman agent list"`, args[0])
+				return err
 			}
 			c, err := a.client()
 			if err != nil {

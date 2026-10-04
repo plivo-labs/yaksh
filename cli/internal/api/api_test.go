@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 )
 
 func respond(status int, body string) *http.Response {
@@ -61,6 +62,40 @@ func TestBodyPassesCallErrors(t *testing.T) {
 	callErr := errors.New("dial tcp: connection refused")
 	if _, err := Body(nil, callErr); !errors.Is(err, callErr) {
 		t.Fatalf("error = %v, want %v", err, callErr)
+	}
+}
+
+// slowBody sends its headers at once and its body only after delay.
+func slowBody(t *testing.T, delay time.Duration) *httptest.Server {
+	t.Helper()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.(http.Flusher).Flush()
+		select {
+		case <-time.After(delay):
+			w.Write([]byte(`{"status":"ok","version":"0.1.0"}`))
+		case <-r.Context().Done():
+		}
+	}))
+	t.Cleanup(srv.Close)
+	return srv
+}
+
+func TestABodyThatStallsFailsTheRequestButNotAStream(t *testing.T) {
+	old := requestTimeout
+	requestTimeout = 50 * time.Millisecond
+	t.Cleanup(func() { requestTimeout = old })
+	srv := slowBody(t, 200*time.Millisecond)
+	c, err := New(srv.URL, "t", "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := Body(c.HealthApiV1HealthGet(context.Background())); err == nil {
+		t.Fatal("a body that stalled past the request timeout did not fail")
+	}
+	if body, err := Body(Stream(c).HealthApiV1HealthGet(context.Background())); err != nil || len(body) == 0 {
+		t.Fatalf("Stream = %q, %v; want the body after the delay", body, err)
 	}
 }
 

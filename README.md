@@ -119,6 +119,18 @@ curl -X POST localhost:8000/api/v1/runs -H "Authorization: Bearer $TRUMAN_API_TO
 
 The phone provider limits the calls of the whole account that can be on the line at once. Keep the sum of `TRUMAN_MAX_ACTIVE_CONVERSATIONS` over all workers, plus any other use of the same account, under that limit. Otherwise Plivo refuses the extra calls: it refuses the call request (HTTP 403, "Concurrency Limit Breached"), or it ends the call with hangup cause 5030. When Truman calls the agent, such a conversation ends with an error; when the agent calls Truman, it shows as a call that did not connect. The max parallel of a run does not protect the account, because two runs can each use it in full.
 
+## CLI
+
+`truman` is a command-line client for this API, for coding agents, CI and people. Each command prints the server's JSON on stdout, and progress, hints and errors on stderr. It exits 0 when the command worked, and 1 otherwise. Until the release builds exist, build it from source with Go:
+
+```sh
+cd cli && go build -o ~/.truman/bin/truman .
+truman auth login --server http://localhost:8000         # or set TRUMAN_URL and TRUMAN_API_TOKEN
+truman run start --agent <agent id> --all --wait
+```
+
+`truman guide` prints how a coding agent tests a voice agent with it; the same text is the skill in `cli/skill/SKILL.md`.
+
 ## Develop
 
 ```sh
