@@ -342,6 +342,9 @@ class Persona:
             LLMContext(tools=ToolsSchema(standard_tools=[END_CALL])),
             user_params=LLMUserAggregatorParams(
                 user_idle_timeout=IDLE_S,
+                # The user here is the agent under test: a turn of line noise with no words must
+                # not make the persona ask it to repeat.
+                empty_user_turn=None,
                 user_turn_strategies=UserTurnStrategies(
                     stop=[
                         TurnAnalyzerUserTurnStopStrategy(turn_analyzer=LocalSmartTurnAnalyzerV3())
