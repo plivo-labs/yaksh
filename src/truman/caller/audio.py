@@ -16,6 +16,8 @@ from pipecat.frames.frames import (
     TTSTextFrame,
 )
 
+from truman.domain.latency import Span
+
 SAMPLE_RATE = 8000
 FRAME_BYTES = 320
 LOUD_PEAK = 500
@@ -125,13 +127,15 @@ class CallRecording:
         from before it opens the stream."""
         return min([connected_ms] + [at for at, _ in self._agent_frames()])
 
-    def agent_track(self, start_ms: int) -> bytes:
-        """The agent's side from start_ms on, as the recording holds it."""
-        return bytes(track(self._agent_frames(), start_ms))
+    def agent_track(self, start_ms: int) -> tuple[bytes, list[Span]]:
+        """The agent's side from start_ms on, as the recording holds it, and its gaps in ms
+        from start_ms."""
+        audio, gaps = placed(self._agent_frames(), start_ms)
+        return bytes(audio), gaps
 
     def save(self, path: Path, start_ms: int) -> Path | None:
         """Write the recording from start_ms on, if any audio came after it."""
-        agent = self.agent_track(start_ms)
+        agent, _ = self.agent_track(start_ms)
         caller = track(self._caller, start_ms)
         size = max(len(agent), len(caller))
         if size == 0:
@@ -156,10 +160,23 @@ class CallRecording:
 
 def track(frames: Iterable[tuple[int, bytes]], start_ms: int) -> bytearray:
     """One side from start_ms on, each frame at its time on Truman's clock."""
+    return placed(frames, start_ms)[0]
+
+
+def placed(frames: Iterable[tuple[int, bytes]], start_ms: int) -> tuple[bytearray, list[Span]]:
+    """One side from start_ms on, and the stretches between frames that it fills with silence,
+    in ms from start_ms."""
     audio = bytearray()
+    gaps: list[Span] = []
     for at_ms, pcm in frames:
         at = (at_ms - start_ms) * SAMPLE_RATE // 1000 * 2
         if at > len(audio) + FRAME_BYTES:
+            if audio:
+                gaps.append(Span(start_ms=bytes_ms(len(audio)), end_ms=bytes_ms(at)))
             audio += bytes(at - len(audio))
         audio += pcm[max(0, -at) :]
-    return audio
+    return audio, gaps
+
+
+def bytes_ms(size: int) -> int:
+    return round(size * 1000 / (2 * SAMPLE_RATE))

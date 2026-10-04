@@ -39,7 +39,7 @@ from truman.domain.conversations import (
     Transcript,
     Turn,
 )
-from truman.domain.latency import Latency, response_times
+from truman.domain.latency import Latency, Span, Speech, response_times
 from truman.worker.worker import Worker
 
 NO_OUTCOMES = dict.fromkeys(
@@ -386,6 +386,29 @@ async def test_a_retry_keeps_the_today_its_caller_was_given(client: AsyncClient,
 
     assert retry != first["id"]
     assert (row.today, row.time_zone) == (date(2026, 1, 15), "Asia/Kolkata")
+
+
+async def test_a_finished_call_keeps_where_each_side_spoke_and_when_its_stream_opened(
+    client: AsyncClient, db: Db
+) -> None:
+    agent = await create_agent_id(client)
+    conversation = await start(client, agent)
+    assert await claim(db) == conversation["id"]
+    speech = Speech(
+        agent=[Span(start_ms=300, end_ms=2_100)],
+        caller=[Span(start_ms=2_600, end_ms=3_900)],
+        agent_gaps=[Span(start_ms=5_000, end_ms=5_400)],
+    )
+    outcome = CallOutcome(
+        connected=True, end_reason=EndReason.AGENT_HANGUP, speech=speech, stream_opened_ms=120
+    )
+    assert await finish(db, conversation["id"], outcome)
+
+    async with db() as session:
+        row = await session.get_one(Conversation, uuid.UUID(conversation["id"]))
+    stored = Transcript.model_validate(row.transcript)
+
+    assert (stored.speech, stored.stream_opened_ms) == (speech, 120)
 
 
 async def test_counts_take_the_latest_attempt_and_the_list_can_leave_out_retried_ones(

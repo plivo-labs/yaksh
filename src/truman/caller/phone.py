@@ -784,8 +784,9 @@ class PhoneCaller:
         recording_path = await asyncio.to_thread(
             recording.save, request.output_dir / "recording.wav", started_ms
         )
-        latency = await self._detector.measure(
-            recording.agent_track(started_ms), started_ms, connected_ms, marks.replies
+        agent_audio, agent_gaps = recording.agent_track(started_ms)
+        measured = await self._detector.measure(
+            agent_audio, agent_gaps, started_ms, connected_ms, marks.replies
         )
         agent_side = CALLED_SIDE if request.agent.outbound is None else CALLING_SIDE
         await resolve_stream_end(state, entry.callbacks, agent_side)
@@ -797,7 +798,9 @@ class PhoneCaller:
             caller_reason=state.caller_reason,
             talk_ms=talk_ms,
             recording_path=recording_path,
-            latency=latency,
+            latency=measured.latency if measured else None,
+            speech=measured.speech if measured else None,
+            stream_opened_ms=connected_ms,
             call_uuid=dialed.call_uuid,
         )
 

@@ -597,6 +597,8 @@ async def finalize(
     """Record the terminal state; a run conversation in the error group is queued again, up to
     its run's retries. Returns False when the row was no longer ours to finish."""
     transcript.latency = outcome.latency
+    transcript.speech = outcome.speech
+    transcript.stream_opened_ms = outcome.stream_opened_ms
     if outcome.connected:
         transcript.validity = Validity(
             ok=outcome.caller_error is None,

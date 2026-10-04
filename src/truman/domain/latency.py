@@ -6,6 +6,29 @@ from collections.abc import Sequence
 from pydantic import BaseModel, ConfigDict
 
 
+class Span(BaseModel):
+    """A stretch of a call, in ms on the call's clock."""
+
+    model_config = ConfigDict(frozen=True)
+
+    start_ms: int
+    end_ms: int
+
+
+class Speech(BaseModel):
+    """Where each side spoke, as the voice detector found it after the call. The caller's
+    speech comes from its replies' own audio, before any background noise; a reply cut off
+    before its TTS finished counts from its first audio to its last. Gaps are stretches of the
+    agent's channel with no audio from the line, which the recording fills with silence: they
+    are missing media, not the agent being quiet."""
+
+    model_config = ConfigDict(frozen=True)
+
+    agent: list[Span]
+    caller: list[Span]
+    agent_gaps: list[Span]
+
+
 class Reply(BaseModel):
     """The agent's answer to one caller reply, or to the start of the call."""
 

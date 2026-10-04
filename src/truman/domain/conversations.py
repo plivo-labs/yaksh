@@ -10,7 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from truman.domain.agents import AgentConfig
 from truman.domain.background_noise import BackgroundNoise, NoiseMix
 from truman.domain.languages import Language
-from truman.domain.latency import Latency
+from truman.domain.latency import Latency, Speech
 from truman.domain.scenarios import Fact
 from truman.domain.voices import VoiceSettings
 
@@ -165,6 +165,11 @@ class Transcript(BaseModel):
     validity: Validity | None = None
     latency: Latency | None = None
     """The agent's response times; None when the call was not measured."""
+    speech: Speech | None = None
+    """Where each side spoke; None when the call was not measured."""
+    stream_opened_ms: int | None = None
+    """When Truman's stream opened. A `connected` event can move earlier, to the agent's
+    first audio, but the stream opened here."""
 
 
 class ConversationCreate(BaseModel):
@@ -238,6 +243,8 @@ class CallOutcome(BaseModel):
     recording_path: Path | None = None
     latency: Latency | None = None
     """The agent's response times; None when the call was not measured."""
+    speech: Speech | None = None
+    stream_opened_ms: int | None = None
     call_uuid: str | None = None
 
 
