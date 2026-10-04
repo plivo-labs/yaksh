@@ -40,7 +40,7 @@ from truman.caller.audio import (
     Playout,
     Stamper,
 )
-from truman.caller.latency import CallerReply, measure
+from truman.caller.latency import CallerReply, Detector
 from truman.caller.pipeline import (
     CallState,
     Persona,
@@ -628,6 +628,11 @@ class PhoneCaller:
         self._api = api
         self._dialer = Dialer(api, settings.public_url, settings.ring_timeout_s)
         self._receiver = Receiver()
+        self._detector = Detector()
+
+    def start_detector(self) -> None:
+        """Start the voice detector's process now rather than at the first call's end."""
+        self._detector.start()
 
     async def run(
         self, request: CallRequest, observer: CallObserver, stop: asyncio.Event
@@ -779,7 +784,7 @@ class PhoneCaller:
         recording_path = await asyncio.to_thread(
             recording.save, request.output_dir / "recording.wav", started_ms
         )
-        latency = await measure(
+        latency = await self._detector.measure(
             recording.agent_track(started_ms), started_ms, connected_ms, marks.replies
         )
         agent_side = CALLED_SIDE if request.agent.outbound is None else CALLING_SIDE

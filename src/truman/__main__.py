@@ -87,7 +87,9 @@ def callers(settings: Settings, registry: StreamRegistry, api: PlivoApi | None) 
     elif settings.public_url is None:
         reason = "phone calls are off: set TRUMAN_PUBLIC_URL to the address Plivo can reach"
     else:
-        return PhoneCaller(settings, registry, api)
+        phone = PhoneCaller(settings, registry, api)
+        phone.start_detector()
+        return phone
     logging.warning(reason)
     return UnavailableCaller(reason)
 
