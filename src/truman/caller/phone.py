@@ -755,7 +755,7 @@ class PhoneCaller:
     ) -> CallOutcome:
         connected_ms = clock.ms()
         observer.wire_event(WireEvent(kind=WireEventKind.CONNECTED, at_ms=connected_ms))
-        lag = LagSampler()
+        lag = LagSampler(clock.ms)
         try:
             spoken = await self._converse(request, observer, stop, clock, dialed)
         finally:

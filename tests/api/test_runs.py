@@ -420,7 +420,7 @@ async def test_a_finished_call_keeps_the_facts_its_call_captured(
         caller_settings=settings,
         caller_usage=usage,
         line_facts=line,
-        loop_lag=LoopLag(max_ms=31, p99_ms=12, samples=2_400),
+        loop_lag=LoopLag(max_ms=31, max_at_ms=900, p99_ms=12, samples=2_400),
     )
     assert await finish(db, conversation["id"], outcome)
 
@@ -429,7 +429,7 @@ async def test_a_finished_call_keeps_the_facts_its_call_captured(
     stored = Transcript.model_validate(row.transcript)
 
     assert (stored.speech, stored.stream_opened_ms) == (speech, 120)
-    assert stored.loop_lag == LoopLag(max_ms=31, p99_ms=12, samples=2_400)
+    assert stored.loop_lag == LoopLag(max_ms=31, max_at_ms=900, p99_ms=12, samples=2_400)
     assert CallerSettings.model_validate(row.caller_settings) == settings
     assert CallerUsage.model_validate(row.caller_usage) == usage
     assert LineFacts.model_validate(row.line_facts) == line

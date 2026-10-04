@@ -36,6 +36,8 @@ class LoopLag(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     max_ms: int
+    max_at_ms: int
+    """When the worst stall ended, on the call's clock."""
     p99_ms: int
     samples: int
 
