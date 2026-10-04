@@ -1,4 +1,3 @@
-import { cn } from "cn";
 import { type MouseEvent, useEffect } from "react";
 import { useSearchParams } from "react-router";
 
@@ -10,6 +9,7 @@ import {
   PaginationPrevious,
 } from "@/components/ui/pagination";
 import { usePageParam } from "@/hooks/use-page-param";
+import { cn } from "@/lib/utils";
 
 function withPage(params: URLSearchParams, page: number): URLSearchParams {
   const next = new URLSearchParams(params);
@@ -53,7 +53,7 @@ export function Pager({
   };
   return (
     <Pagination className={cn("justify-between", className)}>
-      <span className="text-sm text-muted-foreground tabular-nums">
+      <span className="font-mono text-xs-400 text-muted-foreground tabular-nums">
         {(page - 1) * pageSize + 1} to {Math.min(page * pageSize, total)} of {total}
       </span>
       <PaginationContent>

@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
 import { Textarea } from "@/components/ui/textarea";
 import { textSize } from "@/lib/format";
+import { APPEAR } from "@/lib/motion";
 
 export const MAX_CONFIG_CHARS = 1_000_000;
 
@@ -63,7 +64,7 @@ export function ConfigField({
           {MAX_CONFIG_CHARS.toLocaleString()}.
         </FieldError>
       ) : (
-        value && <FieldDescription>{textSize(value.length)}.</FieldDescription>
+        value && <FieldDescription className={APPEAR}>{textSize(value.length)}.</FieldDescription>
       )}
       {unreadable && <FieldError>{unreadable}</FieldError>}
     </Field>

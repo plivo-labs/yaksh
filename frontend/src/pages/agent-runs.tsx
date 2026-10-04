@@ -3,7 +3,7 @@ import { Link } from "react-router";
 import { Pager } from "@/components/pager";
 import { FoldingPanel } from "@/components/panel";
 import { RelativeTime } from "@/components/relative-time";
-import { RunStatusBadge } from "@/components/status-dot";
+import { RunStatusLabel } from "@/components/status-label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { usePageParam } from "@/hooks/use-page-param";
 import { counted, runTitle, runTotal } from "@/lib/format";
@@ -26,7 +26,9 @@ export function AgentRuns({ agent }: { agent: Agent }) {
           <Skeleton className="h-10" />
         </div>
       ) : runs.isError ? (
-        <p className="px-5 py-4 text-sm text-destructive">{runs.error.message}</p>
+        <p role="alert" className="px-5 py-4 text-sm text-destructive">
+          {runs.error.message}
+        </p>
       ) : runs.data.items.length === 0 ? (
         <p className="px-5 py-6 text-sm text-muted-foreground">
           No runs yet. Select scenarios above and click Run.
@@ -37,16 +39,18 @@ export function AgentRuns({ agent }: { agent: Agent }) {
             <li key={run.id}>
               <Link
                 to={`/runs/${run.id}`}
-                className="grid grid-cols-[6.5rem_minmax(0,1fr)_auto] items-center gap-x-4 px-5 py-3 outline-none transition-colors duration-150 hover:bg-foreground/[0.025] focus-visible:bg-foreground/[0.04] focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-inset"
+                className="grid grid-cols-[6.5rem_minmax(0,1fr)_auto] group items-center gap-x-4 px-5 py-3.5 outline-none transition-colors duration-150 hover:bg-muted/60 active:bg-muted focus-visible:bg-muted focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-inset"
               >
                 <span className="text-sm">
-                  <RunStatusBadge status={run.status} />
+                  <RunStatusLabel status={run.status} />
                 </span>
-                <span className="grid min-w-0 gap-0.5 text-sm">
-                  <span className="truncate font-medium">{runTitle(run)}</span>
+                <span className="grid min-w-0 gap-0.5 text-s-400">
+                  <span className="truncate text-s-500 transition-colors group-hover:text-brand-text">
+                    {runTitle(run)}
+                  </span>
                   <span className="truncate text-muted-foreground">{progress(run)}</span>
                 </span>
-                <span className="text-right text-sm text-muted-foreground">
+                <span className="text-right font-mono text-xs-400 text-muted-foreground">
                   <RelativeTime iso={run.created_at} />
                 </span>
               </Link>

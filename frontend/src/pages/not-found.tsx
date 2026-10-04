@@ -17,8 +17,8 @@ export function NotFoundPage() {
         <EmptyDescription>Nothing lives at this address.</EmptyDescription>
       </EmptyHeader>
       <EmptyContent>
-        <Button nativeButton={false} render={<Link to="/conversations" />} variant="outline">
-          Go to conversations
+        <Button nativeButton={false} render={<Link to="/agents" />} variant="outline">
+          Go to agents
         </Button>
       </EmptyContent>
     </Empty>

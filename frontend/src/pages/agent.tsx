@@ -1,21 +1,19 @@
 import { ChevronRight, PhoneOutgoing } from "lucide-react";
 import { useState } from "react";
 import { Link, useParams } from "react-router";
-import { toast } from "sonner";
 
 import { BackButton } from "@/components/back-button";
 import { CopyId } from "@/components/copy-id";
 import { ConversationList } from "@/components/conversation-list";
 import { Fact, FoldingPanel, Panel, PanelHeader } from "@/components/panel";
 import { Settle } from "@/components/settle";
-import { Dot, StatusDot } from "@/components/status-dot";
+import { StatusLabel } from "@/components/status-label";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { phone, reach, since, textSize, when } from "@/lib/format";
 import { useAgent, useAgents, useConversations, useLastCall } from "@/lib/queries";
+import { CONVERSATION_TONE } from "@/lib/status";
 import {
   ACTIVE_STATUSES,
   type Agent,
@@ -23,7 +21,7 @@ import {
   LANGUAGE_NAMES,
   type OutboundSettings,
 } from "@/lib/types";
-import { AgentForm } from "@/pages/agent-form";
+import { EditAgentSheet } from "@/pages/agent-form";
 import { AgentKnowledgeBase } from "@/pages/agent-knowledge-base";
 import { AgentRuns } from "@/pages/agent-runs";
 import { AgentScenarios } from "@/pages/agent-scenarios";
@@ -46,18 +44,26 @@ export function AgentPage() {
 
   return (
     <div className="grid gap-6">
-      <BackButton fallback="/agents" />
       {agent.isPending ? (
-        <Skeleton className="h-40 w-full rounded-lg" />
+        <Skeleton className="h-24 w-full rounded-lg" />
       ) : (
         <Designation agent={agent.data} />
       )}
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_21rem]">
         <div className="grid gap-6">
-          {agent.data && <AgentScenarios agent={agent.data} />}
-          {agent.data && <AgentRuns agent={agent.data} />}
-          {agent.data && <AgentKnowledgeBase agent={agent.data} />}
-          {agent.data && <Calls agent={agent.data} />}
+          {agent.data ? (
+            <>
+              <AgentScenarios agent={agent.data} />
+              <AgentRuns agent={agent.data} />
+              <AgentKnowledgeBase agent={agent.data} />
+              <Calls agent={agent.data} />
+            </>
+          ) : (
+            <>
+              <Skeleton className="h-14 rounded-lg" />
+              <Skeleton className="h-14 rounded-lg" />
+            </>
+          )}
         </div>
         {agent.data ? (
           <Settings key={agent.data.id} agent={agent.data} />
@@ -76,8 +82,11 @@ function Designation({ agent }: { agent: Agent }) {
     <Panel>
       <div className="flex flex-wrap items-center gap-x-6 gap-y-4 px-5 pt-5 pb-4">
         <div className="grid min-w-0 flex-1 basis-72 gap-1">
-          <h1 className="truncate text-2xl font-semibold tracking-[-0.015em]">{agent.name}</h1>
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+          <div className="flex min-w-0 items-center gap-2">
+            <BackButton fallback="/agents" />
+            <h1 className="truncate text-h3-500">{agent.name}</h1>
+          </div>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-s-400">
             <span className="text-muted-foreground">{reach(agent)}</span>
             <LineState call={last.data} pending={last.isPending} />
           </div>
@@ -85,7 +94,7 @@ function Designation({ agent }: { agent: Agent }) {
         <StartCallDialog
           agents={agents.data ?? [agent]}
           agentId={agent.id}
-          render={<Button size="lg" className="w-full sm:ml-auto sm:w-auto" />}
+          render={<Button size="sm" className="w-full sm:ml-auto sm:w-auto" />}
         >
           <PhoneOutgoing />
           Start call
@@ -106,10 +115,7 @@ function LineState({
   if (!call) {
     return (
       <div className="flex items-center gap-2 text-sm">
-        <Badge variant="outline" className="gap-1.5">
-          <Dot tone="off" size="sm" />
-          Idle
-        </Badge>
+        <StatusLabel tone="off">Idle</StatusLabel>
         <span className="text-muted-foreground">Never called</span>
       </div>
     );
@@ -124,13 +130,15 @@ function LineState({
   return (
     <Link
       to={`/conversations/${call.id}`}
-      className="-mx-2 flex items-center gap-2 rounded-md px-2 py-1 text-sm outline-none transition-colors hover:bg-foreground/[0.04] focus-visible:ring-2 focus-visible:ring-ring/50"
+      className="-mx-2 flex items-center gap-2 rounded-md px-2 py-1 text-s-400 outline-none transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring/50"
     >
       <Settle value={active ? state : "Idle"}>
-        <Badge variant="outline" className="gap-1.5">
-          {active ? <StatusDot status={call.status} size="sm" /> : <Dot tone="off" size="sm" />}
+        <StatusLabel
+          tone={active ? CONVERSATION_TONE[call.status] : "off"}
+          live={call.status === "running"}
+        >
           {active ? state : "Idle"}
-        </Badge>
+        </StatusLabel>
       </Settle>
       <span className="text-muted-foreground">
         {active
@@ -212,27 +220,7 @@ function Settings({ agent }: { agent: Agent }) {
         </Fact>
         <Fact label="Added">{when(agent.created_at)}</Fact>
       </dl>
-      <Sheet open={editing} onOpenChange={setEditing}>
-        <SheetContent size="lg" className="overflow-y-auto">
-          <SheetHeader>
-            <SheetTitle>Edit {agent.name}</SheetTitle>
-          </SheetHeader>
-          <div className="px-6 pb-6">
-            <AgentForm
-              agent={agent}
-              onSaved={() => {
-                setEditing(false);
-                toast.success("Settings saved");
-              }}
-              cancel={
-                <Button type="button" variant="ghost" onClick={() => setEditing(false)}>
-                  Cancel
-                </Button>
-              }
-            />
-          </div>
-        </SheetContent>
-      </Sheet>
+      {editing && <EditAgentSheet agent={agent} onClosed={() => setEditing(false)} />}
     </Panel>
   );
 }

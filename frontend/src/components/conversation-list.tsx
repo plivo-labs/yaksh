@@ -1,23 +1,12 @@
-import { cn } from "cn";
 import { Copy, Ellipsis, PhoneOff } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router";
-import { toast } from "sonner";
 
+import { EndCallDialog } from "@/components/confirm-dialogs";
 import { RelativeTime } from "@/components/relative-time";
 import { ResponseTime } from "@/components/response-time";
 import { SortHeader } from "@/components/sort-header";
-import { StatusBadge } from "@/components/status-dot";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+import { ConversationStatusLabel } from "@/components/status-label";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -30,7 +19,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { copyText } from "@/lib/clipboard";
 import { duration, noiseLabel, when } from "@/lib/format";
-import { useEndConversation } from "@/lib/queries";
+import { cn } from "@/lib/utils";
 import {
   ACTIVE_STATUSES,
   type ConversationSummary,
@@ -42,9 +31,9 @@ import {
  * and in a narrow panel. */
 const COLUMNS = {
   withAgent:
-    "grid grid-cols-[minmax(0,1fr)_2rem] items-center gap-x-4 gap-y-1 @3xl/conversations:grid-cols-[7rem_minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,1fr)_5rem_7rem_8rem_2rem]",
+    "grid grid-cols-[minmax(0,1fr)_2rem] items-center gap-x-4 gap-y-1 @3xl/conversations:grid-cols-[6.5rem_minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)_6rem_7rem_8rem_2rem]",
   withoutAgent:
-    "grid grid-cols-[minmax(0,1fr)_2rem] items-center gap-x-4 gap-y-1 @3xl/conversations:grid-cols-[7rem_minmax(0,1.4fr)_minmax(0,1fr)_5rem_7rem_8rem_2rem]",
+    "grid grid-cols-[minmax(0,1fr)_2rem] items-center gap-x-4 gap-y-1 @3xl/conversations:grid-cols-[6.5rem_minmax(0,2fr)_minmax(0,1fr)_6rem_7rem_8rem_2rem]",
 };
 const GUTTER = { page: "px-3", panel: "px-5" };
 
@@ -90,7 +79,7 @@ export function ConversationList({
       <div
         className={cn(
           grid,
-          "hidden border-b py-2.5 text-xs text-muted-foreground @3xl/conversations:grid",
+          "hidden border-b py-3 text-label text-muted-foreground @3xl/conversations:grid",
         )}
       >
         <span>Status</span>
@@ -169,11 +158,7 @@ function ConversationRow({
   agentVersion: number | undefined;
 }) {
   const name = label(conversation);
-  const end = conversation.end_reason ? (
-    END_REASON_LABELS[conversation.end_reason]
-  ) : (
-    <span className="capitalize">{conversation.status}</span>
-  );
+  const end = conversation.end_reason && END_REASON_LABELS[conversation.end_reason];
   const started = conversation.started_at ? (
     <RelativeTime iso={conversation.started_at} />
   ) : ACTIVE_STATUSES.includes(conversation.status) ? (
@@ -185,46 +170,43 @@ function ConversationRow({
     <li
       className={cn(
         grid,
-        "group relative py-3.5 transition-colors duration-150 hover:bg-foreground/[0.02] has-[a:focus-visible]:bg-foreground/[0.04]",
+        "group relative py-3.5 transition-colors duration-150 hover:bg-muted/60 has-[a:active]:bg-muted has-[a:focus-visible]:bg-muted has-[a:focus-visible]:ring-2 has-[a:focus-visible]:ring-ring/50 has-[a:focus-visible]:ring-inset",
       )}
     >
       <div>
-        <StatusBadge status={conversation.status} />
+        <ConversationStatusLabel status={conversation.status} />
       </div>
       <div className="col-span-2 grid min-w-0 gap-0.5 @3xl/conversations:col-span-1">
         <span className="flex min-w-0 items-center gap-2">
           <Link
             to={`/conversations/${conversation.id}`}
             aria-label={name}
-            className="truncate text-sm font-medium outline-none after:absolute after:inset-0"
+            className="truncate text-s-500 outline-none transition-colors after:absolute after:inset-0 group-hover:text-brand-text"
           >
             {conversation.scenario_name}
           </Link>
           {conversation.attempt > 1 && (
-            <Badge variant="outline" className="shrink-0">
-              Attempt {conversation.attempt}
-            </Badge>
+            <Badge className="shrink-0">Attempt {conversation.attempt}</Badge>
           )}
           {noiseLabel(conversation.background_noise) && (
-            <Badge variant="outline" className="shrink-0">
-              {noiseLabel(conversation.background_noise)}
-            </Badge>
+            <Badge className="shrink-0">{noiseLabel(conversation.background_noise)}</Badge>
           )}
         </span>
-        <span className="truncate text-sm text-muted-foreground">
+        <span className="truncate text-s-400 text-muted-foreground">
           {conversation.persona_name}
           {conversation.repeat !== null && `, repeat ${conversation.repeat}`}
           {agentVersion !== undefined &&
             conversation.agent_version < agentVersion &&
             ", earlier version"}
         </span>
-        <span className="truncate text-sm text-muted-foreground @3xl/conversations:hidden">
-          {end}
-          {conversation.talk_ms !== null && `, ${duration(conversation.talk_ms)}`}, {started}
+        <span className="truncate text-s-400 text-muted-foreground @3xl/conversations:hidden">
+          {end && `${end}, `}
+          {conversation.talk_ms !== null && `${duration(conversation.talk_ms)}, `}
+          {started}
         </span>
       </div>
       {showAgent && (
-        <div className="col-span-2 min-w-0 text-sm @3xl/conversations:col-span-1">
+        <div className="col-span-2 min-w-0 text-s-400 @3xl/conversations:col-span-1">
           <Link
             to={`/agents/${conversation.agent_id}`}
             className="relative z-10 block w-fit max-w-full truncate rounded-sm underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring/50"
@@ -233,7 +215,7 @@ function ConversationRow({
           </Link>
         </div>
       )}
-      <div className="hidden min-w-0 gap-0.5 text-sm @3xl/conversations:grid">
+      <div className="hidden min-w-0 gap-0.5 text-s-400 @3xl/conversations:grid">
         <span className="truncate">{end}</span>
         {conversation.failure_reason && (
           <span className="truncate text-destructive" title={conversation.failure_reason}>
@@ -241,17 +223,15 @@ function ConversationRow({
           </span>
         )}
       </div>
-      <div className="hidden text-sm tabular-nums @3xl/conversations:block">
-        {duration(conversation.talk_ms) || <span className="text-muted-foreground">None</span>}
+      <div className="hidden font-mono text-xs-400 tabular-nums @3xl/conversations:block">
+        {duration(conversation.talk_ms)}
       </div>
-      <div className="hidden text-sm @3xl/conversations:block">
-        {typeof conversation.latency?.p90_ms === "number" ? (
+      <div className="hidden text-s-400 @3xl/conversations:block">
+        {typeof conversation.latency?.p90_ms === "number" && (
           <ResponseTime ms={conversation.latency.p90_ms} />
-        ) : (
-          <span className="text-muted-foreground">None</span>
         )}
       </div>
-      <div className="hidden text-sm text-muted-foreground @3xl/conversations:block">{started}</div>
+      <div className="hidden font-mono text-xs-400 @3xl/conversations:block">{started}</div>
       <ConversationMenu conversation={conversation} name={name} />
     </li>
   );
@@ -278,7 +258,6 @@ function ConversationMenu({
   conversation: ConversationSummary;
   name: string;
 }) {
-  const end = useEndConversation(conversation.id);
   const [ending, setEnding] = useState(false);
   const active = ACTIVE_STATUSES.includes(conversation.status);
   return (
@@ -307,36 +286,7 @@ function ConversationMenu({
           )}
         </DropdownMenuContent>
       </DropdownMenu>
-      <AlertDialog open={ending} onOpenChange={setEnding}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>End this call?</AlertDialogTitle>
-            <AlertDialogDescription>
-              {conversation.status === "queued"
-                ? "It has not connected yet, so it will be cancelled."
-                : "The caller hangs up and what was said so far is kept."}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Keep going</AlertDialogCancel>
-            <AlertDialogAction
-              disabled={end.isPending}
-              onClick={() =>
-                end.mutate(undefined, {
-                  onSuccess: () => {
-                    setEnding(false);
-                    toast.success("Ending the call");
-                  },
-                  onError: (error) =>
-                    toast.error("Could not end the call", { description: error.message }),
-                })
-              }
-            >
-              End call
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <EndCallDialog conversation={conversation} open={ending} onOpenChange={setEnding} />
     </div>
   );
 }

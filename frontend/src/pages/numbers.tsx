@@ -1,4 +1,4 @@
-import { Dot } from "@/components/status-dot";
+import { StatusLabel } from "@/components/status-label";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -19,7 +19,9 @@ export function NumbersPage() {
   const numbers = usePhoneNumbers();
   return (
     <div className="grid gap-6">
-      <h1 className="text-2xl font-semibold tracking-[-0.015em]">Numbers</h1>
+      <div className="flex min-h-[30px] flex-wrap items-center gap-x-2 gap-y-4">
+        <h1 className="mr-auto text-h3-500">Numbers</h1>
+      </div>
       {numbers.isError ? (
         <Alert variant="destructive">
           <AlertTitle>Could not load numbers</AlertTitle>
@@ -40,7 +42,7 @@ export function NumbersPage() {
             </Alert>
           )}
           <div>
-            <div className={`${ROW} border-b pb-2.5 text-xs text-muted-foreground`}>
+            <div className={`${ROW} border-b pb-3 text-label text-muted-foreground`}>
               <span>Number</span>
               <span>Name</span>
               <span>Region</span>
@@ -51,7 +53,7 @@ export function NumbersPage() {
               {numbers.data === undefined ? (
                 [0, 1, 2].map((index) => (
                   <li key={index} className={`${ROW} py-3.5`}>
-                    <Skeleton className="h-5" />
+                    <Skeleton className="col-span-full h-5" />
                   </li>
                 ))
               ) : numbers.data.items.length === 0 ? (
@@ -75,26 +77,19 @@ export function NumbersPage() {
 function NumberRow({ item }: { item: PhoneNumber }) {
   const state = STATES[item.state];
   return (
-    <li className={`${ROW} py-3.5 text-sm`}>
-      <span className="font-medium">{phone(item.number)}</span>
-      <span className="truncate">{item.alias ?? <Muted>None</Muted>}</span>
-      <span className="truncate">{item.region ?? <Muted>Unknown</Muted>}</span>
+    <li className={`${ROW} py-3.5 text-s-400`}>
+      <span className="font-mono text-xs-400">{phone(item.number)}</span>
+      <span className="truncate">{item.alias}</span>
+      <span className="truncate">{item.region}</span>
       <span className="flex min-w-0 flex-wrap items-center gap-2">
-        <span className="truncate">
-          {item.application_name ?? item.application_id ?? <Muted>None</Muted>}
-        </span>
-        {item.on_outbound_application && <Badge variant="secondary">Outbound application</Badge>}
+        <span className="truncate">{item.application_name ?? item.application_id}</span>
+        {item.on_outbound_application && <Badge>Outbound application</Badge>}
       </span>
       <span>
-        <Badge variant="outline" className="gap-1.5">
-          <Dot tone={state.tone} live={item.state === "in_use"} size="sm" />
+        <StatusLabel tone={state.tone} live={item.state === "in_use"}>
           {state.label}
-        </Badge>
+        </StatusLabel>
       </span>
     </li>
   );
-}
-
-function Muted({ children }: { children: string }) {
-  return <span className="text-muted-foreground">{children}</span>;
 }

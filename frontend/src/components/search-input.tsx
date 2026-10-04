@@ -1,5 +1,5 @@
 import { Search } from "lucide-react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { Input } from "@/components/ui/input";
 
@@ -21,6 +21,8 @@ export function SearchInput({
 }) {
   const [typed, setTyped] = useState(value);
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  // A search still waiting when the page closes would change the next page's address.
+  useEffect(() => () => clearTimeout(timer.current), []);
   const type = (text: string) => {
     setTyped(text);
     clearTimeout(timer.current);
@@ -28,12 +30,12 @@ export function SearchInput({
   };
   return (
     <div className={`relative ${className ?? ""}`}>
-      <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+      <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-placeholder" />
       <Input
         type="search"
         aria-label={label}
         placeholder={placeholder}
-        className="pl-8"
+        className="h-[30px] pl-8 text-s-400"
         value={typed}
         onChange={(event) => type(event.target.value)}
       />

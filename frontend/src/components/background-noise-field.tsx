@@ -10,6 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { APPEAR } from "@/lib/motion";
 import {
   type BackgroundNoise,
   NO_NOISE,
@@ -64,12 +65,14 @@ export function BackgroundNoiseField({
         {action}
       </div>
       {value && value.sound !== "none" && (
-        <Segmented
-          label="Level"
-          value={value.level}
-          options={NOISE_LEVEL_ITEMS}
-          onChange={(level) => onChange({ ...value, level })}
-        />
+        <div className={APPEAR}>
+          <Segmented
+            label="Level"
+            value={value.level}
+            options={NOISE_LEVEL_ITEMS}
+            onChange={(level) => onChange({ ...value, level })}
+          />
+        </div>
       )}
       <FieldDescription>
         Plays behind the caller for the whole call. Light, busy and loud put the caller's voice

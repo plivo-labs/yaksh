@@ -16,10 +16,9 @@ import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { counted } from "@/lib/format";
 import { usePersonaNames } from "@/hooks/use-persona-names";
+import { revealErrors } from "@/lib/forms";
 import { useDefaults, usePhoneNumbers, useRunScenarios, useStartRun } from "@/lib/queries";
 import type { AgentSummary, BackgroundNoise, RunSummary } from "@/lib/types";
-
-const APPEAR = "transition-opacity duration-150 ease-out starting:opacity-0";
 
 /** A whole number from an input, null when it is empty, NaN when it is not a whole number. */
 function whole(value: string): number | null {
@@ -55,12 +54,12 @@ export function RunDialog({
   const [open, setOpen] = useState(true);
   const [requestKey] = useState(newRequestKey);
   const [name, setName] = useState(earlier?.name ?? "");
-  const [repeats, setRepeats] = useState(text(earlier?.repeats ?? 1));
+  const [repeats, setRepeats] = useState(() => text(earlier?.repeats ?? 1));
   /** Null until the user types: the field then shows the server's default. */
   const [maxDuration, setMaxDuration] = useState(earlier ? text(earlier.max_duration_s) : null);
   const [maxTurns, setMaxTurns] = useState(earlier ? text(earlier.max_turns) : null);
-  const [maxParallel, setMaxParallel] = useState(text(earlier?.max_parallel));
-  const [delay, setDelay] = useState(text(earlier?.start_interval_s));
+  const [maxParallel, setMaxParallel] = useState(() => text(earlier?.max_parallel));
+  const [delay, setDelay] = useState(() => text(earlier?.start_interval_s));
   const [retries, setRetries] = useState(earlier ? text(earlier.max_retries) : null);
   /** Null plays each persona's own setting. */
   const [noise, setNoise] = useState<BackgroundNoise | null>(earlier?.background_noise ?? null);
@@ -107,10 +106,14 @@ export function RunDialog({
     (number) => !outbound || number.on_outbound_application,
   );
 
-  const submit = (event: SubmitEvent) => {
+  const submit = (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setSubmitted(true);
-    if (!valid || repeatCount === null) return;
+    if (
+      !revealErrors(event.currentTarget, () => setSubmitted(true), valid) ||
+      repeatCount === null
+    ) {
+      return;
+    }
     start.mutate(
       {
         agent_id: agent.id,
@@ -217,9 +220,7 @@ export function RunDialog({
                   value={repeats}
                   onChange={(event) => setRepeats(event.target.value)}
                 />
-                {submitted && !repeatsOk && (
-                  <FieldError className={APPEAR}>Enter a whole number from 1.</FieldError>
-                )}
+                {submitted && !repeatsOk && <FieldError>Enter a whole number from 1.</FieldError>}
               </Field>
               <Field>
                 <FieldLabel htmlFor="run-duration">Time limit, seconds</FieldLabel>
@@ -236,9 +237,7 @@ export function RunDialog({
                   onChange={(event) => setMaxDuration(event.target.value)}
                 />
                 {submitted && !durationOk && (
-                  <FieldError className={APPEAR}>
-                    Enter a whole number from 10 to 1800, or none.
-                  </FieldError>
+                  <FieldError>Enter a whole number from 10 to 1800, or none.</FieldError>
                 )}
               </Field>
               <Field>
@@ -255,7 +254,7 @@ export function RunDialog({
                   onChange={(event) => setMaxParallel(event.target.value)}
                 />
                 {submitted && !parallelOk && (
-                  <FieldError className={APPEAR}>Enter a whole number from 1, or none.</FieldError>
+                  <FieldError>Enter a whole number from 1, or none.</FieldError>
                 )}
               </Field>
               <Field>
@@ -272,7 +271,7 @@ export function RunDialog({
                   onChange={(event) => setDelay(event.target.value)}
                 />
                 {submitted && !intervalOk && (
-                  <FieldError className={APPEAR}>Enter a whole number from 1, or none.</FieldError>
+                  <FieldError>Enter a whole number from 1, or none.</FieldError>
                 )}
               </Field>
             </div>
@@ -300,9 +299,7 @@ export function RunDialog({
                 uses the server default.
               </FieldDescription>
               {submitted && !turnsOk && (
-                <FieldError className={APPEAR}>
-                  Enter a whole number from 1 to 100, or none.
-                </FieldError>
+                <FieldError>Enter a whole number from 1 to 100, or none.</FieldError>
               )}
             </Field>
 
@@ -331,7 +328,7 @@ export function RunDialog({
                 again, up to this many times. Empty uses the server default.
               </FieldDescription>
               {submitted && !retriesOk && (
-                <FieldError className={APPEAR}>Enter a whole number from 0, or none.</FieldError>
+                <FieldError>Enter a whole number from 0, or none.</FieldError>
               )}
             </Field>
           </FieldGroup>

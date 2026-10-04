@@ -33,6 +33,7 @@ import {
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { useCloseGuard } from "@/hooks/use-close-guard";
+import { revealErrors } from "@/lib/forms";
 import { useDeleteScenario, usePersonas, useSaveScenario } from "@/lib/queries";
 import {
   type AgentSummary,
@@ -42,8 +43,6 @@ import {
   type Scenario,
   type ScenarioInput,
 } from "@/lib/types";
-
-const APPEAR = "transition-opacity duration-150 ease-out starting:opacity-0";
 
 const EMPTY: ScenarioInput = {
   name: "",
@@ -225,19 +224,16 @@ export function ScenarioDialog({
   const halfKnown = halfFact(input.known_facts);
   const halfAgentData = outbound && halfFact(input.agent_data);
 
-  const submit = (event: SubmitEvent) => {
+  const submit = (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setSubmitted(true);
-    if (
-      !input.name ||
-      !input.persona_id ||
-      !input.goal ||
-      input.criteria.length === 0 ||
-      halfKnown ||
-      halfAgentData
-    ) {
-      return;
-    }
+    const valid =
+      Boolean(input.name) &&
+      Boolean(input.persona_id) &&
+      Boolean(input.goal) &&
+      input.criteria.length > 0 &&
+      !halfKnown &&
+      !halfAgentData;
+    if (!revealErrors(event.currentTarget, () => setSubmitted(true), valid)) return;
     save.mutate(input, {
       onSuccess: (saved) => {
         toast.success(id ? "Scenario saved" : `Added ${saved.name}`);
@@ -275,9 +271,7 @@ export function ScenarioDialog({
                 value={draft.name}
                 onChange={(e) => change(() => ({ name: e.target.value }))}
               />
-              {submitted && !input.name && (
-                <FieldError className={APPEAR}>Enter a name.</FieldError>
-              )}
+              {submitted && !input.name && <FieldError>Enter a name.</FieldError>}
             </Field>
 
             <Field>
@@ -315,7 +309,7 @@ export function ScenarioDialog({
               />
               <FieldDescription>How the caller talks: style, language and voice.</FieldDescription>
               {submitted && personas.data?.length === 0 && (
-                <FieldError className={APPEAR}>Create a persona first.</FieldError>
+                <FieldError>Create a persona first.</FieldError>
               )}
             </Field>
 
@@ -345,9 +339,7 @@ export function ScenarioDialog({
                 onChange={(e) => change(() => ({ goal: e.target.value }))}
               />
               <FieldDescription>Put names, numbers and dates in the facts below.</FieldDescription>
-              {submitted && !input.goal && (
-                <FieldError className={APPEAR}>Describe what the caller wants.</FieldError>
-              )}
+              {submitted && !input.goal && <FieldError>Describe what the caller wants.</FieldError>}
             </Field>
 
             <FieldSet>
@@ -362,7 +354,7 @@ export function ScenarioDialog({
                 onChange={(facts) => setFacts("known_facts", facts)}
               />
               {submitted && halfKnown && (
-                <FieldError className={APPEAR}>Give each fact a name and a value.</FieldError>
+                <FieldError>Give each fact a name and a value.</FieldError>
               )}
             </FieldSet>
 
@@ -380,7 +372,7 @@ export function ScenarioDialog({
                   onChange={(facts) => setFacts("agent_data", facts)}
                 />
                 {submitted && halfAgentData && (
-                  <FieldError className={APPEAR}>Give each item a name and a value.</FieldError>
+                  <FieldError>Give each item a name and a value.</FieldError>
                 )}
               </FieldSet>
             )}
@@ -449,7 +441,7 @@ export function ScenarioDialog({
                 ))}
               </div>
               {submitted && input.criteria.length === 0 && (
-                <FieldError className={APPEAR}>Add at least one criterion.</FieldError>
+                <FieldError>Add at least one criterion.</FieldError>
               )}
               <AddRow
                 count={draft.criteria.length}
@@ -463,9 +455,7 @@ export function ScenarioDialog({
         </form>
 
         {(save.error || remove.error) && (
-          <FieldError className={`px-6 pb-3 ${APPEAR}`}>
-            {(save.error ?? remove.error)?.message}
-          </FieldError>
+          <FieldError className="px-6 pb-3">{(save.error ?? remove.error)?.message}</FieldError>
         )}
 
         <DialogFooter className="border-t px-6 py-4">

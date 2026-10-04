@@ -65,14 +65,14 @@ export function ConversationsPage() {
 
   return (
     <div className="grid gap-6">
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-4">
-        <h1 className="mr-auto text-2xl font-semibold tracking-[-0.015em]">Conversations</h1>
+      <div className="flex min-h-[30px] flex-wrap items-center gap-x-2 gap-y-4">
+        <h1 className="mr-auto text-h3-500">Conversations</h1>
         <StartCallDialog
           agents={agents.data ?? []}
-          render={<Button disabled={!agents.data?.length} />}
+          render={<Button size="sm" disabled={!agents.data?.length} />}
         >
           <Plus />
-          Start conversation
+          Start call
         </StartCallDialog>
       </div>
 
@@ -90,6 +90,7 @@ export function ConversationsPage() {
           onValueChange={(value) => setParam("agent_id", value ?? ANY)}
         >
           <SelectTrigger
+            size="sm"
             className="min-w-0 flex-1 sm:w-48 sm:flex-none"
             aria-label="Filter by agent"
           >
@@ -111,6 +112,7 @@ export function ConversationsPage() {
           onValueChange={(value) => setParam("status", value ?? ANY)}
         >
           <SelectTrigger
+            size="sm"
             className="min-w-0 flex-1 sm:w-40 sm:flex-none"
             aria-label="Filter by status"
           >

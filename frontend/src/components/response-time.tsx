@@ -1,5 +1,5 @@
-import { cn } from "cn";
 import { BAND_FILL, BAND_TEXT, responseBand, seconds } from "@/lib/format";
+import { cn } from "@/lib/utils";
 
 /** How long the agent made the caller wait, in the colour of its band. */
 export function ResponseTime({ ms, className }: { ms: number; className?: string }) {
@@ -7,7 +7,7 @@ export function ResponseTime({ ms, className }: { ms: number; className?: string
   return (
     <span
       className={cn(
-        "rounded-full px-1.5 font-mono text-xs leading-5 tabular-nums",
+        "rounded-sm px-1.5 font-mono text-xs leading-5 tabular-nums",
         BAND_FILL[band],
         BAND_TEXT[band],
         className,

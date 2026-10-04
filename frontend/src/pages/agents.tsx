@@ -1,4 +1,4 @@
-import { Copy, CopyPlus, Ellipsis, Plus, Trash2 } from "lucide-react";
+import { Bot, Copy, CopyPlus, Ellipsis, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
 
@@ -18,6 +18,14 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
 import { usePageParam } from "@/hooks/use-page-param";
 import { copyText } from "@/lib/clipboard";
@@ -57,8 +65,8 @@ export function AgentsPage() {
 
   return (
     <div className="grid gap-6">
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-4">
-        <h1 className="mr-auto text-2xl font-semibold tracking-[-0.015em]">Agents</h1>
+      <div className="flex min-h-[30px] flex-wrap items-center gap-x-2 gap-y-4">
+        <h1 className="mr-auto text-h3-500">Agents</h1>
         <SearchInput
           value={search}
           onSearch={searchFor}
@@ -66,7 +74,7 @@ export function AgentsPage() {
           placeholder="Search by name, number or id"
           className="order-last basis-full sm:order-none sm:basis-64"
         />
-        <Button nativeButton={false} render={<Link to="/agents/new" />}>
+        <Button size="sm" nativeButton={false} render={<Link to="/agents/new" />}>
           <Plus />
           New agent
         </Button>
@@ -78,25 +86,30 @@ export function AgentsPage() {
           <AlertDescription>{agents.error.message}</AlertDescription>
         </Alert>
       ) : agents.data?.total === 0 && !search ? (
-        <div className="grid justify-items-start gap-4 border-y py-10">
-          <div className="grid max-w-md gap-1.5">
-            <h2 className="text-lg font-semibold">No agents yet</h2>
-            <p className="text-sm text-muted-foreground">
+        <Empty>
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <Bot />
+            </EmptyMedia>
+            <EmptyTitle>No agents yet</EmptyTitle>
+            <EmptyDescription>
               An agent is the phone number Truman calls. Add one, give it a scenario, and Truman
               phones it with a simulated caller.
-            </p>
-          </div>
-          <Button nativeButton={false} render={<Link to="/agents/new" />}>
-            <Plus />
-            Add your first agent
-          </Button>
-        </div>
+            </EmptyDescription>
+          </EmptyHeader>
+          <EmptyContent>
+            <Button nativeButton={false} render={<Link to="/agents/new" />}>
+              <Plus />
+              Add your first agent
+            </Button>
+          </EmptyContent>
+        </Empty>
       ) : (
         <div
           aria-busy={agents.isFetching}
           className={`transition-opacity duration-150 ${agents.isPlaceholderData ? "opacity-60" : ""}`}
         >
-          <div className={`${ROW} hidden border-b pb-2.5 text-xs text-muted-foreground md:grid`}>
+          <div className={`${ROW} hidden border-b pb-3 text-label text-muted-foreground md:grid`}>
             <SortHeader label="Agent" field="name" sort={sort} onSort={sortBy} />
             <SortHeader label="Language" field="language" sort={sort} onSort={sortBy} />
             <span>Scenarios</span>
@@ -113,8 +126,8 @@ export function AgentsPage() {
           <ul className="divide-y border-b">
             {agents.data === undefined ? (
               [0, 1, 2].map((index) => (
-                <li key={index} className={`${ROW} py-4`}>
-                  <Skeleton className="h-10" />
+                <li key={index} className={`${ROW} py-3.5`}>
+                  <Skeleton className="col-span-full h-10" />
                 </li>
               ))
             ) : agents.data.items.length === 0 ? (
@@ -138,33 +151,33 @@ function AgentRow({ agent }: { agent: AgentSummary }) {
   const call = last.data;
   return (
     <li
-      className={`${ROW} group relative py-3.5 transition-colors duration-150 hover:bg-foreground/[0.02] has-[a:focus-visible]:bg-foreground/[0.04]`}
+      className={`${ROW} group relative py-3.5 transition-colors duration-150 hover:bg-muted/60 has-[a:active]:bg-muted has-[a:focus-visible]:bg-muted has-[a:focus-visible]:ring-2 has-[a:focus-visible]:ring-ring/50 has-[a:focus-visible]:ring-inset`}
     >
       <div className="min-w-0">
         <div className="grid min-w-0 gap-0.5">
           <Link
             to={`/agents/${agent.id}`}
-            className="truncate text-[15px] font-semibold outline-none after:absolute after:inset-0"
+            className="truncate text-s-500 outline-none after:absolute after:inset-0 transition-colors group-hover:text-brand-text"
           >
             {agent.name}
           </Link>
-          <span className="text-sm text-muted-foreground">{reach(agent)}</span>
+          <span className="text-s-400 text-muted-foreground">{reach(agent)}</span>
         </div>
       </div>
-      <div className="col-span-2 text-sm md:col-span-1">{LANGUAGE_NAMES[agent.language]}</div>
-      <div className="col-span-2 text-sm md:col-span-1">
+      <div className="col-span-2 text-s-400 md:col-span-1">{LANGUAGE_NAMES[agent.language]}</div>
+      <div className="col-span-2 text-s-400 md:col-span-1">
         {scenarios.data === undefined ? (
           <Skeleton className="h-4 w-12" />
         ) : (
           <>
-            <span className="font-semibold">{scenarios.data}</span>{" "}
+            <span className="font-mono">{scenarios.data}</span>{" "}
             <span className="text-muted-foreground">
               {scenarios.data === 1 ? "scenario" : "scenarios"}
             </span>
           </>
         )}
       </div>
-      <div className="col-span-2 grid min-w-0 gap-0.5 text-sm md:col-span-1">
+      <div className="col-span-2 grid min-w-0 gap-0.5 text-s-400 md:col-span-1">
         {last.isPending ? (
           <Skeleton className="h-9 w-40" />
         ) : call ? (
@@ -185,7 +198,7 @@ function AgentRow({ agent }: { agent: AgentSummary }) {
           <span className="text-muted-foreground">Never called</span>
         )}
       </div>
-      <div className="col-span-2 text-sm text-muted-foreground md:col-span-1">
+      <div className="col-span-2 font-mono text-xs-400 text-muted-foreground md:col-span-1">
         <span className="md:hidden">Updated </span>
         <RelativeTime iso={agent.updated_at} />
       </div>

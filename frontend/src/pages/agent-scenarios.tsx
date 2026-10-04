@@ -26,6 +26,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { type GenerationProgress, useGeneration } from "@/hooks/use-generation";
 import { usePersonaNames } from "@/hooks/use-persona-names";
 import { counted, when } from "@/lib/format";
+import { APPEAR, RISE } from "@/lib/motion";
 import {
   useAgents,
   useAssignPersona,
@@ -41,6 +42,7 @@ import {
   type Persona,
   type Scenario,
 } from "@/lib/types";
+import { cn } from "@/lib/utils";
 import { GenerateDialog } from "@/pages/generate-dialog";
 import { RunDialog } from "@/pages/run-dialog";
 import { ScenarioDialog } from "@/pages/scenario-dialog";
@@ -85,7 +87,10 @@ function GenerationNotice({
   return (
     <div role="status" className="flex items-center gap-3 border-b bg-muted/40 px-5 py-3 text-sm">
       {running && <Spinner />}
-      <p className={`min-w-0 flex-1 ${progress.status === "failed" ? "text-destructive" : ""}`}>
+      <p
+        key={progress.status}
+        className={cn("min-w-0 flex-1", progress.status === "failed" && "text-destructive", APPEAR)}
+      >
         {progressMessage(progress)}
       </p>
       {running ? (
@@ -209,7 +214,9 @@ export function AgentScenarios({ agent }: { agent: Agent }) {
             <Skeleton className="h-11" />
           </div>
         ) : scenarios.isError ? (
-          <p className="px-5 py-4 text-sm text-destructive">{scenarios.error.message}</p>
+          <p role="alert" className="px-5 py-4 text-sm text-destructive">
+            {scenarios.error.message}
+          </p>
         ) : items.length === 0 ? (
           <p className="px-5 py-6 text-sm text-muted-foreground">
             No scenarios yet. Generate them from what Truman knows about the agent, or write one.
@@ -310,7 +317,13 @@ export function AgentScenarios({ agent }: { agent: Agent }) {
             </div>
             <ul className="divide-y">
               {items.map((item) => (
-                <li key={item.id} className="flex items-center gap-3 pr-4 pl-5">
+                <li
+                  key={item.id}
+                  className={cn(
+                    "flex items-center gap-3 pr-4 pl-5 transition-colors duration-150 hover:bg-muted/60 has-[[data-slot=scenario-open]:active]:bg-muted",
+                    generation.newIds.has(item.id) && RISE,
+                  )}
+                >
                   <Checkbox
                     aria-label={`Select ${item.name}`}
                     checked={picked.has(item.id)}
@@ -318,22 +331,25 @@ export function AgentScenarios({ agent }: { agent: Agent }) {
                   />
                   <button
                     type="button"
+                    data-slot="scenario-open"
                     onClick={() => setEditing(item)}
-                    className="flex min-w-0 flex-1 items-center gap-6 rounded-md px-2 py-4 text-left outline-none transition-colors duration-150 hover:bg-foreground/[0.025] focus-visible:bg-foreground/[0.04] focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-inset"
+                    className="flex min-w-0 flex-1 items-center gap-6 py-3.5 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-inset"
                   >
                     <span className="grid min-w-0 flex-1 gap-1">
                       <span className="flex min-w-0 items-center gap-2">
-                        <span className="truncate text-sm font-medium">{item.name}</span>
-                        <Badge variant="outline" className="shrink-0">
-                          {CATEGORY_LABELS[item.category]}
-                        </Badge>
-                        {generation.newIds.has(item.id) && <Badge className="shrink-0">New</Badge>}
+                        <span className="truncate text-s-500">{item.name}</span>
+                        <Badge className="shrink-0">{CATEGORY_LABELS[item.category]}</Badge>
+                        {generation.newIds.has(item.id) && (
+                          <Badge variant="info" className="shrink-0">
+                            New
+                          </Badge>
+                        )}
                       </span>
-                      <span className="truncate text-sm text-muted-foreground">
+                      <span className="truncate text-s-400 text-muted-foreground">
                         {item.description ?? item.goal}
                       </span>
                     </span>
-                    <span className="hidden shrink-0 justify-items-end gap-1 text-xs text-muted-foreground sm:grid">
+                    <span className="hidden shrink-0 justify-items-end gap-1 text-xs-400 text-muted-foreground sm:grid">
                       <span>{personaName(item.persona_id)}</span>
                       <span>
                         {counted(item.known_facts.length, "fact", "facts")},{" "}

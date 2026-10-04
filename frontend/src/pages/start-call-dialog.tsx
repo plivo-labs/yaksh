@@ -99,7 +99,7 @@ export function StartCallDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger render={render}>{children}</DialogTrigger>
-      <DialogContent className="gap-0 p-0 sm:max-w-lg">
+      <DialogContent className="flex max-h-[90vh] flex-col gap-0 p-0 sm:max-w-lg">
         <DialogHeader className="px-6 pt-6 pb-4">
           <DialogTitle>Start a conversation</DialogTitle>
           <DialogDescription>
@@ -108,8 +108,12 @@ export function StartCallDialog({
               : "Truman calls the agent as the persona and follows the scenario."}
           </DialogDescription>
         </DialogHeader>
-        <form id="start-form" onSubmit={submit} className="px-6 pb-6">
-          <FieldGroup>
+        <form
+          id="start-form"
+          onSubmit={submit}
+          className="min-h-0 flex-1 overflow-y-auto px-6 py-1"
+        >
+          <FieldGroup className="pb-6">
             <Field>
               <FieldLabel htmlFor="agent">Agent</FieldLabel>
               <Select
@@ -209,11 +213,15 @@ export function StartCallDialog({
                 />
                 <span className="text-sm text-muted-foreground">seconds</span>
               </div>
-              <FieldDescription id="max_duration_hint">
-                {durationOk
-                  ? "Counts from when the call connects. Empty uses the server default."
-                  : "Enter a whole number from 10 to 1800, or none."}
-              </FieldDescription>
+              {durationOk ? (
+                <FieldDescription id="max_duration_hint">
+                  Counts from when the call connects. Empty uses the server default.
+                </FieldDescription>
+              ) : (
+                <FieldError id="max_duration_hint">
+                  Enter a whole number from 10 to 1800, or none.
+                </FieldError>
+              )}
             </Field>
             <Field>
               <FieldLabel htmlFor="max_turns">Turn limit</FieldLabel>
@@ -233,11 +241,16 @@ export function StartCallDialog({
                 />
                 <span className="text-sm text-muted-foreground">turns</span>
               </div>
-              <FieldDescription id="max_turns_hint">
-                {turnsOk
-                  ? "The caller answers the agent this many times, then says goodbye. Empty uses the server default."
-                  : "Enter a whole number from 1 to 100, or none."}
-              </FieldDescription>
+              {turnsOk ? (
+                <FieldDescription id="max_turns_hint">
+                  The caller answers the agent this many times, then says goodbye. Empty uses the
+                  server default.
+                </FieldDescription>
+              ) : (
+                <FieldError id="max_turns_hint">
+                  Enter a whole number from 1 to 100, or none.
+                </FieldError>
+              )}
             </Field>
           </FieldGroup>
         </form>

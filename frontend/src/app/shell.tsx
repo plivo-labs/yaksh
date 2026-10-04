@@ -60,8 +60,9 @@ function useDarkMode(): [boolean, () => void] {
   return [dark, toggle];
 }
 
-const links = [
-  { to: "/agents", label: "Agents", icon: Bot },
+const links: { to: string; label: string; icon: typeof Bot; under?: string[] }[] = [
+  /* A run belongs to an agent, so a run page keeps Agents active. */
+  { to: "/agents", label: "Agents", icon: Bot, under: ["/runs"] },
   { to: "/conversations", label: "Conversations", icon: PhoneCall },
   { to: "/personas", label: "Personas", icon: UserRound },
   { to: "/voices", label: "Voices", icon: AudioLines },
@@ -80,7 +81,7 @@ export function Shell() {
     <TooltipProvider delay={500}>
       <SidebarProvider
         defaultOpen={sidebarOpen()}
-        style={{ "--sidebar-width": "12rem" } as CSSProperties}
+        style={{ "--sidebar-width": "15rem" } as CSSProperties}
       >
         <Sidebar collapsible="icon">
           <SidebarHeader>
@@ -88,7 +89,7 @@ export function Shell() {
               <SidebarMenuItem>
                 <SidebarMenuButton size="lg" render={<NavLink to="/agents" />}>
                   <img src="/favicon.svg" alt="" className="size-8 shrink-0" />
-                  <span className="text-base font-semibold tracking-tight">Truman</span>
+                  <span className="text-h4-500">Truman</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>
@@ -97,10 +98,10 @@ export function Shell() {
             <SidebarGroup>
               <SidebarGroupContent>
                 <SidebarMenu>
-                  {links.map(({ to, label, icon: Icon }) => (
+                  {links.map(({ to, label, icon: Icon, under = [] }) => (
                     <SidebarMenuItem key={to}>
                       <SidebarMenuButton
-                        isActive={pathname.startsWith(to)}
+                        isActive={[to, ...under].some((path) => pathname.startsWith(path))}
                         tooltip={label}
                         render={<NavLink to={to} />}
                       >
@@ -113,7 +114,7 @@ export function Shell() {
               </SidebarGroupContent>
             </SidebarGroup>
           </SidebarContent>
-          <SidebarFooter>
+          <SidebarFooter className="border-t border-sidebar-border">
             <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarMenuButton tooltip={theme} onClick={toggleDark}>
@@ -132,10 +133,10 @@ export function Shell() {
           <SidebarRail />
         </Sidebar>
         <SidebarInset className="h-svh max-h-svh overflow-hidden">
-          <header className="flex h-12 shrink-0 items-center gap-2 border-b px-4">
+          <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4">
             <SidebarTrigger />
           </header>
-          <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 md:px-8 md:py-6">
+          <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
             <Outlet />
           </div>
         </SidebarInset>

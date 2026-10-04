@@ -2,7 +2,9 @@ import { Play, Square } from "lucide-react";
 import { type KeyboardEvent, type SubmitEvent, useState } from "react";
 
 import { DeleteConfirm, DiscardConfirm } from "@/components/confirm-dialogs";
+import { CopyId } from "@/components/copy-id";
 import { GenderBadge } from "@/components/gender-badge";
+import { Fact } from "@/components/panel";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -25,6 +27,8 @@ import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { useCloseGuard } from "@/hooks/use-close-guard";
 import type { VoicePreview } from "@/hooks/use-voice-preview";
+import { revealErrors } from "@/lib/forms";
+import { APPEAR } from "@/lib/motion";
 import { useAddVoice, useDeleteVoice, useEditVoice, useLookupVoice } from "@/lib/queries";
 import {
   LANGUAGE_NAMES,
@@ -33,8 +37,6 @@ import {
   type Voice,
   type VoiceSettings,
 } from "@/lib/types";
-
-const APPEAR = "transition-opacity duration-150 ease-out starting:opacity-0";
 
 const LANGUAGES = Object.keys(LANGUAGE_NAMES) as Language[];
 
@@ -139,12 +141,12 @@ export function VoiceDialog({
     getDetails();
   };
 
-  const submit = (event: SubmitEvent) => {
+  const submit = (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!details) return;
     const name = draft.name.trim();
-    setSubmitted(true);
-    if (!name || draft.languages.length === 0) return;
+    const valid = Boolean(name) && draft.languages.length > 0;
+    if (!revealErrors(event.currentTarget, () => setSubmitted(true), valid)) return;
     const body = { name, languages: draft.languages };
     if (voice) edit.mutate({ id: voice.id, ...body }, { onSuccess: guard.close });
     else
@@ -210,7 +212,7 @@ export function VoiceDialog({
                     Get details
                   </Button>
                 </div>
-                {lookup.error && <FieldError className={APPEAR}>{lookup.error.message}</FieldError>}
+                {lookup.error && <FieldError>{lookup.error.message}</FieldError>}
               </Field>
             )}
 
@@ -221,12 +223,17 @@ export function VoiceDialog({
                   {details.accent && (
                     <span className="text-muted-foreground capitalize">{details.accent}</span>
                   )}
-                  {voice && (
-                    <span className="ml-auto font-mono text-xs text-muted-foreground">
-                      {details.providerVoiceId}
-                    </span>
-                  )}
                 </div>
+                {voice && (
+                  <dl className="flex flex-wrap gap-x-10 gap-y-3">
+                    <Fact label="Voice id">
+                      <CopyId id={voice.id} label="voice id" />
+                    </Fact>
+                    <Fact label="ElevenLabs voice ID">
+                      <CopyId id={voice.provider_voice_id} label="ElevenLabs voice ID" full />
+                    </Fact>
+                  </dl>
+                )}
 
                 <Field className={APPEAR}>
                   <FieldLabel htmlFor="voice-name">Name</FieldLabel>
@@ -234,12 +241,11 @@ export function VoiceDialog({
                     id="voice-name"
                     required
                     maxLength={80}
+                    aria-invalid={submitted && !draft.name.trim()}
                     value={draft.name}
                     onChange={(e) => change(() => ({ name: e.target.value }))}
                   />
-                  {submitted && !draft.name.trim() && (
-                    <FieldError className={APPEAR}>Enter a name.</FieldError>
-                  )}
+                  {submitted && !draft.name.trim() && <FieldError>Enter a name.</FieldError>}
                 </Field>
 
                 <FieldSet className={APPEAR}>
@@ -288,9 +294,9 @@ export function VoiceDialog({
                     </FieldDescription>
                   )}
                   {submitted && draft.languages.length === 0 && (
-                    <FieldError className={APPEAR}>Choose at least one language.</FieldError>
+                    <FieldError>Choose at least one language.</FieldError>
                   )}
-                  {previewError && <FieldError className={APPEAR}>{previewError}</FieldError>}
+                  {previewError && <FieldError>{previewError}</FieldError>}
                 </FieldSet>
               </>
             )}
@@ -298,9 +304,7 @@ export function VoiceDialog({
         </form>
 
         {(save.error || remove.error) && (
-          <FieldError className={`px-6 pb-3 ${APPEAR}`}>
-            {(save.error ?? remove.error)?.message}
-          </FieldError>
+          <FieldError className="px-6 pb-3">{(save.error ?? remove.error)?.message}</FieldError>
         )}
 
         <DialogFooter className="border-t px-6 py-4">

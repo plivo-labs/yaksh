@@ -26,6 +26,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { useCloseGuard } from "@/hooks/use-close-guard";
 import type { VoicePreview } from "@/hooks/use-voice-preview";
+import { revealErrors } from "@/lib/forms";
 import { useDeletePersona, useSavePersona, useVoices } from "@/lib/queries";
 import {
   type BackgroundNoise,
@@ -56,8 +57,6 @@ const EMPTY: Draft = {
   stability: 0.5,
   noise: NO_NOISE,
 };
-
-const APPEAR = "transition-opacity duration-150 ease-out starting:opacity-0";
 
 const FORM = "form";
 const FORM_NOISE = "form-noise";
@@ -164,10 +163,10 @@ export function PersonaDialog({
   const guard = useCloseGuard(JSON.stringify(draft) !== JSON.stringify(initial));
   const input = toInput(draft);
 
-  const submit = (event: SubmitEvent) => {
+  const submit = (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setSubmitted(true);
-    if (!hasVoice || !input.name || !input.prompt) return;
+    const valid = hasVoice && Boolean(input.name) && Boolean(input.prompt);
+    if (!revealErrors(event.currentTarget, () => setSubmitted(true), valid)) return;
     save.mutate(input, { onSuccess: guard.close });
   };
 
@@ -201,12 +200,11 @@ export function PersonaDialog({
                   id="name"
                   required
                   maxLength={80}
+                  aria-invalid={submitted && !input.name}
                   value={draft.name}
                   onChange={(e) => set("name", e.target.value)}
                 />
-                {submitted && !input.name && (
-                  <FieldError className={APPEAR}>Enter a name.</FieldError>
-                )}
+                {submitted && !input.name && <FieldError>Enter a name.</FieldError>}
               </Field>
               <Field>
                 <FieldLabel htmlFor="language">Language</FieldLabel>
@@ -237,13 +235,14 @@ export function PersonaDialog({
                 id="prompt"
                 rows={5}
                 required
+                aria-invalid={submitted && !input.prompt}
                 maxLength={4000}
                 placeholder="You are in a hurry. Give short answers and sometimes leave out a detail until the agent asks again."
                 value={draft.prompt}
                 onChange={(e) => set("prompt", e.target.value)}
               />
               {submitted && !input.prompt && (
-                <FieldError className={APPEAR}>Describe how this caller behaves.</FieldError>
+                <FieldError>Describe how this caller behaves.</FieldError>
               )}
               <FieldDescription>
                 Do not put a goal or facts here; the scenario gives them.
@@ -259,7 +258,11 @@ export function PersonaDialog({
                   onValueChange={(value) => value && set("voice_id", value)}
                   disabled={voices.isPending || voices.isPlaceholderData || voices.isError}
                 >
-                  <SelectTrigger id="voice" className="min-w-0 flex-1">
+                  <SelectTrigger
+                    id="voice"
+                    aria-invalid={submitted && !hasVoice}
+                    className="min-w-0 flex-1"
+                  >
                     <SelectValue
                       placeholder={
                         voices.isPending
@@ -300,17 +303,11 @@ export function PersonaDialog({
                   )}
                 </Button>
               </div>
-              {submitted && !hasVoice && (
-                <FieldError className={APPEAR}>Choose a voice.</FieldError>
-              )}
+              {submitted && !hasVoice && <FieldError>Choose a voice.</FieldError>}
               {voices.isError && (
-                <FieldError className={APPEAR}>
-                  Could not load voices: {voices.error.message}
-                </FieldError>
+                <FieldError>Could not load voices: {voices.error.message}</FieldError>
               )}
-              {preview.error(FORM) && (
-                <FieldError className={APPEAR}>{preview.error(FORM)}</FieldError>
-              )}
+              {preview.error(FORM) && <FieldError>{preview.error(FORM)}</FieldError>}
             </Field>
 
             <div className="grid gap-6 sm:grid-cols-2">
@@ -371,9 +368,7 @@ export function PersonaDialog({
         </form>
 
         {(save.error || remove.error) && (
-          <FieldError className={`px-6 pb-3 ${APPEAR}`}>
-            {(save.error ?? remove.error)?.message}
-          </FieldError>
+          <FieldError className="px-6 pb-3">{(save.error ?? remove.error)?.message}</FieldError>
         )}
 
         <DialogFooter className="border-t px-6 py-4">
