@@ -1,4 +1,4 @@
-# 0017 Measure the agent's response time at Truman's connection
+# 0019 Measure the agent's response time at Truman's connection
 
 Date: 2026-10-04
 Status: accepted
