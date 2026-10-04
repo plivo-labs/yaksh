@@ -122,9 +122,13 @@ class CallRecording:
         from before it opens the stream."""
         return min([connected_ms] + [at for at, _ in self._agent_frames()])
 
+    def agent_track(self, start_ms: int) -> bytes:
+        """The agent's side from start_ms on, as the recording holds it."""
+        return bytes(track(self._agent_frames(), start_ms))
+
     def save(self, path: Path, start_ms: int) -> Path | None:
         """Write the recording from start_ms on, if any audio came after it."""
-        agent = track(self._agent_frames(), start_ms)
+        agent = self.agent_track(start_ms)
         caller = track(self._caller, start_ms)
         size = max(len(agent), len(caller))
         if size == 0:

@@ -10,6 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from truman.domain.agents import AgentConfig
 from truman.domain.background_noise import BackgroundNoise, NoiseMix
 from truman.domain.languages import Language
+from truman.domain.latency import Latency
 from truman.domain.scenarios import Fact
 from truman.domain.voices import VoiceSettings
 
@@ -229,6 +230,8 @@ class CallOutcome(BaseModel):
     talk_ms: int | None = None
     """From the moment the call connected until the conversation ended, on the caller's clock."""
     recording_path: Path | None = None
+    latency: Latency | None = None
+    """The agent's response times; None when the call was not measured."""
     call_uuid: str | None = None
 
 

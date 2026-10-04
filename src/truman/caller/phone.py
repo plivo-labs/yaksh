@@ -39,6 +39,7 @@ from truman.caller.audio import (
     Playout,
     Stamper,
 )
+from truman.caller.latency import measure
 from truman.caller.pipeline import (
     CallState,
     Persona,
@@ -454,24 +455,31 @@ class StreamSerializer(FrameSerializer):
 
 
 class AudioMarks(FrameProcessor):
-    """After the transport output: when the persona's audio starts and stops going out."""
+    """After the transport output: when the persona's audio starts and stops going out. It
+    keeps each reply as (start, end) for the response times; the end stays None when the call
+    stops during the reply, as Pipecat then reports no stop."""
 
     def __init__(self, clock: Clock, observer: CallObserver) -> None:
         super().__init__(enable_direct_mode=True)
         self._clock = clock
         self._observer = observer
+        self.replies: list[tuple[int, int | None]] = []
 
     async def process_frame(self, frame: Frame, direction: FrameDirection) -> None:
         await super().process_frame(frame, direction)
         if direction is FrameDirection.DOWNSTREAM:
             if isinstance(frame, BotStartedSpeakingFrame):
-                self._mark(WireEventKind.CALLER_AUDIO_START)
+                self.replies.append((self._mark(WireEventKind.CALLER_AUDIO_START), None))
             elif isinstance(frame, BotStoppedSpeakingFrame):
-                self._mark(WireEventKind.CALLER_AUDIO_END)
+                ended = self._mark(WireEventKind.CALLER_AUDIO_END)
+                if self.replies and self.replies[-1][1] is None:
+                    self.replies[-1] = (self.replies[-1][0], ended)
         await self.push_frame(frame, direction)
 
-    def _mark(self, kind: WireEventKind) -> None:
-        self._observer.wire_event(WireEvent(kind=kind, at_ms=self._clock.ms()))
+    def _mark(self, kind: WireEventKind) -> int:
+        at = self._clock.ms()
+        self._observer.wire_event(WireEvent(kind=kind, at_ms=at))
+        return at
 
 
 def mixer(noise: NoiseMix | None) -> SoundfileMixer | None:
@@ -692,6 +700,7 @@ class PhoneCaller:
         transcript = TranscriptBuilder(clock, observer)
         checkpoints = Checkpoints(dialed.stream_id, transcript)
         recording = CallRecording()
+        marks = AudioMarks(clock, observer)
         serializer = StreamSerializer(
             dialed.stream_id, dialed.encoding, clock, observer, checkpoints, recording
         )
@@ -721,7 +730,7 @@ class PhoneCaller:
             transport_input=transport.input(),
             transport_output=transport.output(),
             before_output=[checkpoints],
-            after_output=[AudioMarks(clock, observer), WireTap(transcript, settled)],
+            after_output=[marks, WireTap(transcript, settled)],
             state=state,
         )
 
@@ -763,6 +772,7 @@ class PhoneCaller:
         recording_path = await asyncio.to_thread(
             recording.save, request.output_dir / "recording.wav", started_ms
         )
+        latency = await measure(recording.agent_track(started_ms), started_ms, marks.replies)
         agent_side = CALLED_SIDE if request.agent.outbound is None else CALLING_SIDE
         await resolve_stream_end(state, entry.callbacks, agent_side)
         state.blame(serializer.failure)
@@ -773,6 +783,7 @@ class PhoneCaller:
             caller_reason=state.caller_reason,
             talk_ms=talk_ms,
             recording_path=recording_path,
+            latency=latency,
             call_uuid=dialed.call_uuid,
         )
 
