@@ -18,15 +18,39 @@ class Span(BaseModel):
 class Speech(BaseModel):
     """Where each side spoke, as the voice detector found it after the call. The caller's
     speech comes from its replies' own audio, before any background noise; a reply cut off
-    before its TTS finished counts from its first audio to its last. Gaps are stretches of the
-    agent's channel with no audio from the line, which the recording fills with silence: they
-    are missing media, not the agent being quiet."""
+    before its TTS finished counts from its first audio to its last."""
 
     model_config = ConfigDict(frozen=True)
 
     agent: list[Span]
     caller: list[Span]
-    agent_gaps: list[Span]
+
+
+class AgentMedia(BaseModel):
+    """Where the line carried the agent's audio, on the call's clock. The recording fills a gap
+    with silence, but a gap is missing media, not the agent being quiet."""
+
+    model_config = ConfigDict(frozen=True)
+
+    first_ms: int
+    last_ms: int
+    gaps: list[Span]
+
+
+class CallerReplyWindow(BaseModel):
+    """One reply of the caller: when its audio went out, and where its own audio, as the TTS
+    made it before any background noise, sits in the conversation's caller voice file."""
+
+    model_config = ConfigDict(frozen=True)
+
+    start_ms: int
+    end_ms: int | None
+    """When its last audio went out; None when the end of the call cut it off."""
+    finished: bool
+    """The TTS finished it, so its own audio is the whole reply; a reply cut off sent only the
+    first end_ms - start_ms of it."""
+    audio_start_ms: int
+    audio_ms: int
 
 
 class LoopLag(BaseModel):

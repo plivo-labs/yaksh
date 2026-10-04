@@ -464,6 +464,7 @@ def upgrade() -> None:
         sa.Column("ended_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("talk_ms", sa.Integer(), nullable=True),
         sa.Column("recording_path", sa.Text(), nullable=True),
+        sa.Column("caller_voice_path", sa.Text(), nullable=True),
         sa.Column("transcript", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
         sa.Column("caller_reason", sa.Text(), nullable=True),
         sa.Column("caller_settings", postgresql.JSONB(astext_type=sa.Text()), nullable=True),

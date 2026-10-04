@@ -10,6 +10,13 @@ import pytest
 import websockets
 from fastapi import FastAPI, Request, Response, WebSocket
 from httpx import AsyncClient
+from pipecat.frames.frames import (
+    BotStartedSpeakingFrame,
+    BotStoppedSpeakingFrame,
+    TTSStoppedFrame,
+    TTSTextFrame,
+)
+from pipecat.tests.utils import run_test
 
 from tests.conftest import (
     CALLER,
@@ -21,7 +28,7 @@ from tests.conftest import (
     refuse_calls,
 )
 from truman.caller import phone
-from truman.caller.audio import Clock
+from truman.caller.audio import PLAYOUT, Clock, Playout
 from truman.caller.phone import Connected, Dialer, PhoneCaller, Receiver
 from truman.caller.pipeline import CallState
 from truman.caller.plivo_server import PendingStream, PlivoServer, StreamRegistry, create_app
@@ -562,3 +569,32 @@ async def test_an_accepted_call_wins_over_events_that_arrive_with_it(
     rig.registry.forget(call.conversation_id)
 
     assert isinstance(connected, Connected) and connected.call_uuid == "call-1"
+
+
+async def test_a_reply_keeps_its_playout_even_when_a_barge_in_cuts_it_off() -> None:
+    cut, whole = Playout(), Playout()
+
+    def words(playout: Playout) -> TTSTextFrame:
+        frame = TTSTextFrame("Hello", aggregated_by="word")
+        frame.metadata[PLAYOUT] = playout
+        return frame
+
+    stopped = TTSStoppedFrame()
+    stopped.metadata[PLAYOUT] = whole
+    marks = phone.AudioMarks(Clock(), Observer())
+
+    await run_test(
+        marks,
+        frames_to_send=[
+            BotStartedSpeakingFrame(),
+            words(cut),
+            BotStoppedSpeakingFrame(),
+            BotStartedSpeakingFrame(),
+            words(whole),
+            BotStoppedSpeakingFrame(),
+            stopped,
+        ],
+    )
+
+    assert [(r.playout is cut, r.finished) for r in marks.replies[:1]] == [(True, False)]
+    assert [(r.playout is whole, r.finished) for r in marks.replies[1:]] == [(True, True)]

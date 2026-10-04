@@ -175,6 +175,8 @@ class Conversation(Base):
     ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     talk_ms: Mapped[int | None] = mapped_column(Integer)
     recording_path: Mapped[str | None] = mapped_column(Text)
+    caller_voice_path: Mapped[str | None] = mapped_column(Text)
+    """The caller's own voice, each reply back to back (see the transcript's caller replies)."""
     transcript: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     caller_reason: Mapped[str | None] = mapped_column(Text)
     """Why the caller ended the call, in its own words: not a verdict."""

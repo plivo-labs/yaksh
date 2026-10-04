@@ -633,6 +633,9 @@ async def finalize(
     transcript.speech = outcome.speech
     transcript.stream_opened_ms = outcome.stream_opened_ms
     transcript.loop_lag = outcome.loop_lag
+    transcript.recording_start_ms = outcome.recording_start_ms
+    transcript.agent_media = outcome.agent_media
+    transcript.caller_replies = outcome.caller_replies
     if outcome.connected:
         transcript.validity = Validity(
             ok=outcome.caller_error is None,
@@ -655,6 +658,9 @@ async def finalize(
                 caller_usage=dump(outcome.caller_usage),
                 line_facts=dump(outcome.line_facts),
                 recording_path=str(outcome.recording_path) if outcome.recording_path else None,
+                caller_voice_path=(
+                    str(outcome.caller_voice_path) if outcome.caller_voice_path else None
+                ),
                 call_uuid=outcome.call_uuid,
                 agent_caller_id=Conversation.agent_caller_id if outcome.call_uuid else None,
                 claimed_by=None,

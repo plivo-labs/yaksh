@@ -14,31 +14,14 @@ from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.audio.vad.vad_analyzer import VADState
 from pipecat.audio.volume import VOLUME_WINDOW_SECS
 
-from truman.caller.audio import SAMPLE_RATE, Playout, bytes_ms
+from truman.caller.audio import SAMPLE_RATE, CallerReply, Track, bytes_ms
 from truman.caller.pipeline import VAD
 from truman.domain.latency import Latency, Span, Speech, response_times
 
 log = logging.getLogger(__name__)
 
-type Track = tuple[int, int | None, bytes | None]
-"""A caller reply as the detector process gets it: its audio start and end on the call's clock,
-and the reply's own audio when the TTS finished it."""
 type Window = tuple[float, float, VADState]
 """The detector's state after one window of audio: the window's end and length in ms."""
-
-
-@dataclass
-class CallerReply:
-    """One reply of the persona: when its audio started and stopped going out, and, when the
-    TTS finished it, its playout with the audio before any background noise."""
-
-    start_ms: int
-    end_ms: int | None = None
-    playout: Playout | None = None
-
-    def track(self) -> Track:
-        audio = None if self.end_ms is None or self.playout is None else bytes(self.playout.audio)
-        return self.start_ms, self.end_ms, audio
 
 
 @dataclass(frozen=True)
@@ -64,17 +47,11 @@ class Detector:
         return self._pool
 
     async def measure(
-        self,
-        agent: bytes,
-        agent_gaps: Sequence[Span],
-        started_ms: int,
-        connected_ms: int,
-        replies: Sequence[CallerReply],
+        self, agent: bytes, started_ms: int, connected_ms: int, replies: Sequence[CallerReply]
     ) -> Measured | None:
         """The call's speech and response times, from the agent's channel as recorded from
-        started_ms on, its gaps in ms from there, and the moment Truman's stream opened. A
-        detector that fails leaves the call unmeasured; it does not take the call's outcome
-        with it."""
+        started_ms on and the moment Truman's stream opened. A detector that fails leaves the
+        call unmeasured; it does not take the call's outcome with it."""
         loop = asyncio.get_running_loop()
         tracks = [reply.track() for reply in replies]
         try:
@@ -99,9 +76,7 @@ class Detector:
             [span.start_ms for span in agent_speech],
         )
         speech = Speech(
-            agent=agent_speech,
-            caller=[span for spans in caller_spans for span in spans],
-            agent_gaps=[shifted(gap, started_ms) for gap in agent_gaps],
+            agent=agent_speech, caller=[span for spans in caller_spans for span in spans]
         )
         return Measured(latency, speech)
 

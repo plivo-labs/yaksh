@@ -25,6 +25,7 @@ from pipecat.frames.frames import (
     TTSAudioRawFrame,
     TTSStartedFrame,
     TTSStoppedFrame,
+    TTSTextFrame,
 )
 from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
 from pipecat.serializers.base_serializer import FrameSerializer
@@ -35,13 +36,15 @@ from truman.caller.audio import (
     LOUD_PEAK,
     PLAYOUT,
     SAMPLE_RATE,
+    CallerReply,
     CallRecording,
     Clock,
     Playout,
     Stamper,
+    save_caller_voice,
 )
 from truman.caller.lag import LagSampler
-from truman.caller.latency import CallerReply, Detector
+from truman.caller.latency import Detector
 from truman.caller.pipeline import (
     CallState,
     Persona,
@@ -512,9 +515,9 @@ class StreamSerializer(FrameSerializer):
 
 class AudioMarks(FrameProcessor):
     """After the transport output: when the persona's audio starts and stops going out. It
-    keeps each reply for the response times. A reply that the TTS finished stops when the
-    output handles its TTSStoppedFrame, which then follows the stop at once; that frame carries
-    the reply's playout. A reply that the call or a barge-in cut off has no such frame."""
+    keeps each reply with its playout, which its spoken words carry. A reply that the TTS
+    finished stops when the output handles its TTSStoppedFrame, which then follows the stop at
+    once. A reply that the call or a barge-in cut off has no such frame."""
 
     def __init__(self, clock: Clock, observer: CallObserver) -> None:
         super().__init__(enable_direct_mode=True)
@@ -534,8 +537,11 @@ class AudioMarks(FrameProcessor):
                 if self.replies and self.replies[-1].end_ms is None:
                     self.replies[-1].end_ms = ended
                     self._just_stopped = True
+            elif isinstance(frame, TTSTextFrame) and self.replies and not self.replies[-1].playout:
+                self.replies[-1].playout = frame.metadata.get(PLAYOUT)
             elif isinstance(frame, TTSStoppedFrame) and just_stopped:
                 self.replies[-1].playout = frame.metadata.get(PLAYOUT)
+                self.replies[-1].finished = True
         await self.push_frame(frame, direction)
 
     def _mark(self, kind: WireEventKind) -> int:
@@ -775,9 +781,15 @@ class PhoneCaller:
             recording_path = await asyncio.to_thread(
                 spoken.recording.save, request.output_dir / "recording.wav", started_ms
             )
-            agent_audio, agent_gaps = spoken.recording.agent_track(started_ms)
+            caller_voice_path = request.output_dir / "caller-voice.wav"
+            caller_replies = await asyncio.to_thread(
+                save_caller_voice, spoken.marks.replies, caller_voice_path
+            )
             measured = await self._detector.measure(
-                agent_audio, agent_gaps, started_ms, connected_ms, spoken.marks.replies
+                spoken.recording.agent_track(started_ms),
+                started_ms,
+                connected_ms,
+                spoken.marks.replies,
             )
             report = await ending
         finally:
@@ -795,6 +807,10 @@ class PhoneCaller:
             latency=measured.latency if measured else None,
             speech=measured.speech if measured else None,
             stream_opened_ms=connected_ms,
+            recording_start_ms=started_ms,
+            agent_media=spoken.recording.agent_media(started_ms),
+            caller_replies=caller_replies,
+            caller_voice_path=caller_voice_path if caller_voice_path.is_file() else None,
             caller_settings=spoken.persona.settings,
             caller_usage=spoken.persona.usage.usage(),
             line_facts=line_facts(report) if report else None,

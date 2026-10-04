@@ -10,7 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from truman.domain.agents import AgentConfig
 from truman.domain.background_noise import BackgroundNoise, NoiseMix
 from truman.domain.languages import Language
-from truman.domain.latency import Latency, LoopLag, Speech
+from truman.domain.latency import AgentMedia, CallerReplyWindow, Latency, LoopLag, Speech
 from truman.domain.scenarios import Fact
 from truman.domain.voices import VoiceSettings
 
@@ -172,6 +172,11 @@ class Transcript(BaseModel):
     first audio, but the stream opened here."""
     loop_lag: LoopLag | None = None
     """How late the worker's event loop ran while the call was live."""
+    recording_start_ms: int | None = None
+    """Where the recording and the agent's channel start on the call's clock."""
+    agent_media: AgentMedia | None = None
+    caller_replies: list[CallerReplyWindow] | None = None
+    """Each caller reply, with where its own audio sits in the caller voice file."""
 
 
 class LineFacts(BaseModel):
@@ -294,6 +299,10 @@ class CallOutcome(BaseModel):
     caller_usage: CallerUsage | None = None
     line_facts: LineFacts | None = None
     loop_lag: LoopLag | None = None
+    recording_start_ms: int | None = None
+    agent_media: AgentMedia | None = None
+    caller_replies: list[CallerReplyWindow] | None = None
+    caller_voice_path: Path | None = None
     call_uuid: str | None = None
 
 

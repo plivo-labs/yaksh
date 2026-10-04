@@ -3,7 +3,8 @@ accounting of one reply's playout, and the call's recording."""
 
 import time
 import wave
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
+from dataclasses import dataclass
 from pathlib import Path
 
 import audioop
@@ -16,7 +17,7 @@ from pipecat.frames.frames import (
     TTSTextFrame,
 )
 
-from truman.domain.latency import Span
+from truman.domain.latency import AgentMedia, CallerReplyWindow, Span
 
 SAMPLE_RATE = 8000
 FRAME_BYTES = 320
@@ -99,6 +100,58 @@ class Stamper:
             frame.metadata[PLAYOUT] = self.arriving
 
 
+type Track = tuple[int, int | None, bytes | None]
+"""A caller reply as the detector process gets it: its audio start and end on the call's clock,
+and the reply's own audio when the TTS finished it."""
+
+
+@dataclass
+class CallerReply:
+    """One reply of the persona: when its audio started and stopped going out, and, when the
+    TTS finished it, its playout with the audio before any background noise."""
+
+    start_ms: int
+    end_ms: int | None = None
+    playout: Playout | None = None
+    finished: bool = False
+    """The TTS finished the reply: its playout holds all of it."""
+
+    def track(self) -> Track:
+        if not self.finished or self.end_ms is None or self.playout is None:
+            return self.start_ms, self.end_ms, None
+        return self.start_ms, self.end_ms, bytes(self.playout.audio)
+
+
+def save_caller_voice(replies: Sequence[CallerReply], path: Path) -> list[CallerReplyWindow]:
+    """Write each reply's own audio, back to back, as a mono WAV, and say where each one is. A
+    reply cut off keeps only as much as went out before the cut; one that the end of the call
+    cut off keeps all it had."""
+    voice = bytearray()
+    windows = []
+    for reply in replies:
+        own = bytes(reply.playout.audio) if reply.playout else b""
+        if not reply.finished and reply.end_ms is not None:
+            own = own[: ms_bytes(reply.end_ms - reply.start_ms)]
+        windows.append(
+            CallerReplyWindow(
+                start_ms=reply.start_ms,
+                end_ms=reply.end_ms,
+                finished=reply.finished,
+                audio_start_ms=bytes_ms(len(voice)),
+                audio_ms=bytes_ms(len(own)),
+            )
+        )
+        voice += own
+    if voice:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with wave.open(str(path), "wb") as file:
+            file.setnchannels(1)
+            file.setsampwidth(2)
+            file.setframerate(SAMPLE_RATE)
+            file.writeframes(voice)
+    return windows
+
+
 class CallRecording:
     """Both sides of a call as a stereo WAV on Truman's clock: left, the agent at the
     timestamp Plivo puts on each frame; right, the caller at the time Truman sent each frame.
@@ -127,15 +180,30 @@ class CallRecording:
         from before it opens the stream."""
         return min([connected_ms] + [at for at, _ in self._agent_frames()])
 
-    def agent_track(self, start_ms: int) -> tuple[bytes, list[Span]]:
-        """The agent's side from start_ms on, as the recording holds it, and its gaps in ms
-        from start_ms."""
-        audio, gaps = placed(self._agent_frames(), start_ms)
-        return bytes(audio), gaps
+    def agent_track(self, start_ms: int) -> bytes:
+        """The agent's side from start_ms on, as the recording holds it."""
+        return bytes(track(self._agent_frames(), start_ms))
+
+    def agent_media(self, start_ms: int) -> AgentMedia | None:
+        """Where the line carried the agent's audio, on the call's clock; None when no audio
+        came."""
+        frames = self._agent_frames()
+        if not frames:
+            return None
+        audio, gaps = placed(frames, start_ms)
+        return AgentMedia(
+            first_ms=start_ms + (gaps[0].end_ms if gaps and gaps[0].start_ms == 0 else 0),
+            last_ms=start_ms + bytes_ms(len(audio)),
+            gaps=[
+                Span(start_ms=start_ms + gap.start_ms, end_ms=start_ms + gap.end_ms)
+                for gap in gaps
+                if gap.start_ms > 0
+            ],
+        )
 
     def save(self, path: Path, start_ms: int) -> Path | None:
         """Write the recording from start_ms on, if any audio came after it."""
-        agent, _ = self.agent_track(start_ms)
+        agent = self.agent_track(start_ms)
         caller = track(self._caller, start_ms)
         size = max(len(agent), len(caller))
         if size == 0:
@@ -171,8 +239,7 @@ def placed(frames: Iterable[tuple[int, bytes]], start_ms: int) -> tuple[bytearra
     for at_ms, pcm in frames:
         at = (at_ms - start_ms) * SAMPLE_RATE // 1000 * 2
         if at > len(audio) + FRAME_BYTES:
-            if audio:
-                gaps.append(Span(start_ms=bytes_ms(len(audio)), end_ms=bytes_ms(at)))
+            gaps.append(Span(start_ms=bytes_ms(len(audio)), end_ms=bytes_ms(at)))
             audio += bytes(at - len(audio))
         audio += pcm[max(0, -at) :]
     return audio, gaps
@@ -180,3 +247,7 @@ def placed(frames: Iterable[tuple[int, bytes]], start_ms: int) -> tuple[bytearra
 
 def bytes_ms(size: int) -> int:
     return round(size * 1000 / (2 * SAMPLE_RATE))
+
+
+def ms_bytes(ms: int) -> int:
+    return max(0, ms) * SAMPLE_RATE // 1000 * 2

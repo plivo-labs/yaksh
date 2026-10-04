@@ -42,7 +42,15 @@ from truman.domain.conversations import (
     Transcript,
     Turn,
 )
-from truman.domain.latency import Latency, LoopLag, Span, Speech, response_times
+from truman.domain.latency import (
+    AgentMedia,
+    CallerReplyWindow,
+    Latency,
+    LoopLag,
+    Span,
+    Speech,
+    response_times,
+)
 from truman.domain.voices import VoiceProvider, VoiceSettings
 from truman.worker.worker import Worker
 
@@ -399,10 +407,14 @@ async def test_a_finished_call_keeps_the_facts_its_call_captured(
     conversation = await start(client, agent)
     assert await claim(db) == conversation["id"]
     speech = Speech(
-        agent=[Span(start_ms=300, end_ms=2_100)],
-        caller=[Span(start_ms=2_600, end_ms=3_900)],
-        agent_gaps=[Span(start_ms=5_000, end_ms=5_400)],
+        agent=[Span(start_ms=300, end_ms=2_100)], caller=[Span(start_ms=2_600, end_ms=3_900)]
     )
+    media = AgentMedia(first_ms=120, last_ms=9_000, gaps=[Span(start_ms=5_000, end_ms=5_400)])
+    replies = [
+        CallerReplyWindow(
+            start_ms=2_600, end_ms=4_100, finished=True, audio_start_ms=0, audio_ms=1_450
+        )
+    ]
     settings = CallerSettings(
         llm_model="gpt-4.1",
         reasoning_effort=None,
@@ -421,6 +433,10 @@ async def test_a_finished_call_keeps_the_facts_its_call_captured(
         caller_usage=usage,
         line_facts=line,
         loop_lag=LoopLag(max_ms=31, max_at_ms=900, p99_ms=12, samples=2_400),
+        recording_start_ms=100,
+        agent_media=media,
+        caller_replies=replies,
+        caller_voice_path=Path("/data/c/caller-voice.wav"),
     )
     assert await finish(db, conversation["id"], outcome)
 
@@ -430,6 +446,12 @@ async def test_a_finished_call_keeps_the_facts_its_call_captured(
 
     assert (stored.speech, stored.stream_opened_ms) == (speech, 120)
     assert stored.loop_lag == LoopLag(max_ms=31, max_at_ms=900, p99_ms=12, samples=2_400)
+    assert (stored.recording_start_ms, stored.agent_media, stored.caller_replies) == (
+        100,
+        media,
+        replies,
+    )
+    assert row.caller_voice_path == "/data/c/caller-voice.wav"
     assert CallerSettings.model_validate(row.caller_settings) == settings
     assert CallerUsage.model_validate(row.caller_usage) == usage
     assert LineFacts.model_validate(row.line_facts) == line
