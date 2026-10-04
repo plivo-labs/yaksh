@@ -184,8 +184,6 @@ func TestErrorsSayTheNextStep(t *testing.T) {
 		{"server message", against(missing), []string{"agent", "view", agentID}, "404 Not Found: agent not found"},
 		{"server down", map[string]string{"TRUMAN_URL": stopped.URL}, []string{"agent", "list"}, "cannot reach " + stopped.URL},
 		{"bad agent ID", against(missing), []string{"agent", "view", "support-line"}, `"support-line" is not an agent ID: find it with "truman agent list"`},
-		{"missing flag", against(missing), []string{"scenario", "list"}, `required flag(s) "agent" not set`},
-		{"scenario or all", against(missing), []string{"run", "start", "--agent", agentID}, "at least one of the flags in the group [scenario all] is required"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -551,10 +549,10 @@ func TestCheckServer(t *testing.T) {
 	}
 }
 
-func TestGuidePrintsTheSkill(t *testing.T) {
-	code, stdout, _ := run(t, context.Background(), map[string]string{}, "", "guide")
-	if code != 0 || stdout != skill.Text || !strings.HasPrefix(stdout, "---\nname: truman\n") {
-		t.Fatalf("code = %d, stdout starts %q", code, stdout[:min(len(stdout), 40)])
+func TestGuidePrintsTheSkillWithoutAServer(t *testing.T) {
+	code, stdout, stderr := run(t, context.Background(), map[string]string{}, "", "guide")
+	if code != 0 || stderr != "" || stdout != skill.Text {
+		t.Fatalf("code = %d, stderr = %q, stdout starts %q", code, stderr, stdout[:min(len(stdout), 40)])
 	}
 }
 

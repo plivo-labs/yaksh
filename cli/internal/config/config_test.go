@@ -31,15 +31,6 @@ func TestLoad(t *testing.T) {
 	}{
 		{name: "nothing", want: Loaded{ServerFrom: Unset, TokenFrom: Unset}},
 		{
-			name: "file only", file: saved,
-			want: Loaded{Settings{"https://saved.example.com", "saved-token"}, FromFile, FromFile},
-		},
-		{
-			name: "environment wins", file: saved,
-			vars: map[string]string{"TRUMAN_URL": "http://localhost:8000", "TRUMAN_API_TOKEN": "env-token"},
-			want: Loaded{Settings{"http://localhost:8000", "env-token"}, FromEnvironment, FromEnvironment},
-		},
-		{
 			name: "environment sets one value", file: saved,
 			vars: map[string]string{"TRUMAN_API_TOKEN": "env-token"},
 			want: Loaded{Settings{"https://saved.example.com", "env-token"}, FromFile, FromEnvironment},

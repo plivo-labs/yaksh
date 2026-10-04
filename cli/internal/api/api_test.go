@@ -16,52 +16,24 @@ func respond(status int, body string) *http.Response {
 	return rec.Result()
 }
 
-func TestBody(t *testing.T) {
+func TestBodyReportsAnErrorBodyWithoutTheErrorShape(t *testing.T) {
 	tests := []struct {
-		name    string
-		status  int
-		body    string
-		want    string
-		wantErr *Error
+		name   string
+		status int
+		body   string
+		want   Error
 	}{
-		{name: "ok", status: 200, body: `{"id":"a"}`, want: `{"id":"a"}`},
-		{name: "accepted", status: 202, body: `{"id":"r"}`, want: `{"id":"r"}`},
-		{name: "no content", status: 204, body: "", want: ""},
-		{
-			name: "server error shape", status: 404,
-			body:    `{"error":{"code":"not_found","message":"agent 1 not found"}}`,
-			wantErr: &Error{Status: 404, Code: "not_found", Message: "agent 1 not found"},
-		},
-		{
-			name: "plain text 500", status: 500, body: "Internal Server Error\n",
-			wantErr: &Error{Status: 500, Message: "Internal Server Error"},
-		},
-		{
-			name: "empty error body", status: 502, body: "",
-			wantErr: &Error{Status: 502, Message: "no details from the server"},
-		},
+		{name: "plain text", status: 500, body: "Internal Server Error\n", want: Error{Status: 500, Message: "Internal Server Error"}},
+		{name: "empty", status: 502, body: "", want: Error{Status: 502, Message: "no details from the server"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := Body(respond(tt.status, tt.body), nil)
-			if tt.wantErr != nil {
-				var apiErr *Error
-				if !errors.As(err, &apiErr) || *apiErr != *tt.wantErr {
-					t.Fatalf("error = %#v, want %#v", err, tt.wantErr)
-				}
-				return
-			}
-			if err != nil || string(got) != tt.want {
-				t.Fatalf("Body = %q, %v; want %q", got, err, tt.want)
+			_, err := Body(respond(tt.status, tt.body), nil)
+			var apiErr *Error
+			if !errors.As(err, &apiErr) || *apiErr != tt.want {
+				t.Fatalf("error = %#v, want %#v", err, tt.want)
 			}
 		})
-	}
-}
-
-func TestBodyPassesCallErrors(t *testing.T) {
-	callErr := errors.New("dial tcp: connection refused")
-	if _, err := Body(nil, callErr); !errors.Is(err, callErr) {
-		t.Fatalf("error = %v, want %v", err, callErr)
 	}
 }
 

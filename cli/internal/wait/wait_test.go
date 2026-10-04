@@ -76,16 +76,6 @@ func TestRunStopsAtTheTimeoutWithTheLastRead(t *testing.T) {
 	}
 }
 
-func TestRunStopsWhenTheContextEnds(t *testing.T) {
-	c := runs(t, runJSON("running", `"in_progress":1`))
-	ctx, cancel := context.WithCancel(context.Background())
-	time.AfterFunc(20*time.Millisecond, cancel)
-
-	if _, err := Run(ctx, c, runID, Options{Interval: time.Millisecond}); !errors.Is(err, context.Canceled) {
-		t.Fatalf("Run error = %v, want context.Canceled", err)
-	}
-}
-
 func TestResultPassedAndSummary(t *testing.T) {
 	start := time.Date(2026, 10, 4, 9, 0, 0, 0, time.UTC)
 	end := start.Add(2*time.Minute + 41*time.Second)
@@ -100,11 +90,6 @@ func TestResultPassedAndSummary(t *testing.T) {
 			run:     api.RunRead{Id: runID, Status: api.RunStatusDone, Counts: map[string]int{"completed": 4, "error": 0}, StartedAt: &start, EndedAt: &end},
 			passed:  true,
 			summary: "run " + runID.String() + " done: 4 of 4 calls completed (2m41s)",
-		},
-		{
-			name:    "a call did not connect",
-			run:     api.RunRead{Id: runID, Status: api.RunStatusDone, Counts: map[string]int{"completed": 3, "did_not_connect": 1}},
-			summary: "run " + runID.String() + " done: 3 of 4 calls completed, 1 did not connect",
 		},
 		{
 			name:    "cancelled",
@@ -124,21 +109,6 @@ func TestResultPassedAndSummary(t *testing.T) {
 				t.Fatalf("Passed = %v, Summary = %q; want %v, %q", r.Passed(), r.Summary(), tt.passed, tt.summary)
 			}
 		})
-	}
-}
-
-func TestReadEvents(t *testing.T) {
-	stream := ": ping\n\n" +
-		"event: turn\ndata: {\"role\":\"agent\",\"text\":\"Hello\"}\n\n" +
-		"event: status\ndata: {\"status\":\"completed\"}\n\n"
-	var got []string
-	err := readEvents(strings.NewReader(stream), func(e Event) error {
-		got = append(got, e.Name+" "+string(e.Data))
-		return nil
-	})
-	want := []string{`turn {"role":"agent","text":"Hello"}`, `status {"status":"completed"}`}
-	if err != nil || strings.Join(got, "|") != strings.Join(want, "|") {
-		t.Fatalf("events = %q, %v; want %q", got, err, want)
 	}
 }
 

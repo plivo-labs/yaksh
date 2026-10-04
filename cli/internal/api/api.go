@@ -51,9 +51,7 @@ func Stream(c *Client) *Client {
 
 // Error is a response with a status that is not 2xx.
 type Error struct {
-	Status int
-	// Code is the server's error code, such as "not_found", or empty when the body had none.
-	Code    string
+	Status  int
 	Message string
 }
 
@@ -79,17 +77,17 @@ func Body(resp *http.Response, err error) ([]byte, error) {
 	return nil, responseError(resp.StatusCode, body)
 }
 
-// responseError reads the server's error shape, {"error": {"code", "message"}}. A body without
-// it, such as the plain-text 500 of an unhandled server error, becomes the message as it is.
+// responseError reads the message from the server's error shape, {"error": {"code", "message"}}.
+// A body without it, such as the plain-text 500 of an unhandled server error, becomes the
+// message as it is.
 func responseError(status int, body []byte) *Error {
 	var shape struct {
 		Error struct {
-			Code    string `json:"code"`
 			Message string `json:"message"`
 		} `json:"error"`
 	}
 	if json.Unmarshal(body, &shape) == nil && shape.Error.Message != "" {
-		return &Error{Status: status, Code: shape.Error.Code, Message: shape.Error.Message}
+		return &Error{Status: status, Message: shape.Error.Message}
 	}
 	message := strings.TrimSpace(string(body))
 	if message == "" {
