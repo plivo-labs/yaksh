@@ -396,6 +396,8 @@ def upgrade() -> None:
         sa.Column("language", sa.Enum("en", "hinglish", name="language"), nullable=False),
         sa.Column("instructions", sa.Text(), nullable=False),
         sa.Column("nudge", sa.Text(), nullable=False),
+        sa.Column("today", sa.Date(), nullable=False),
+        sa.Column("time_zone", sa.Text(), nullable=False),
         sa.Column("caller_number", sa.Text(), nullable=True),
         sa.Column("call_uuid", sa.Text(), nullable=True),
         sa.Column("dial_deadline_at", sa.DateTime(timezone=True), nullable=True),

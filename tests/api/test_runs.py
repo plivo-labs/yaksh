@@ -2,6 +2,7 @@ import asyncio
 import uuid
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from datetime import date
 from pathlib import Path
 from typing import Any
 
@@ -361,6 +362,30 @@ async def test_a_run_is_counted_from_its_conversations_as_they_finish(
     completed = await run_conversations(client, run["id"], group="completed")
     assert [c["caller_reason"] for c in completed] == ["the room is booked"] * 4
     assert await run_conversations(client, run["id"], group="waiting") == []
+
+
+async def test_a_retry_keeps_the_today_its_caller_was_given(client: AsyncClient, db: Db) -> None:
+    agent = await create_agent_id(client)
+    scenario = (await create_scenario(client, agent))["id"]
+    run = (await start_run(client, agent, [scenario])).json()
+    (first,) = await run_conversations(client, run["id"])
+    async with db() as session:
+        await session.execute(
+            update(Conversation)
+            .where(Conversation.id == uuid.UUID(first["id"]))
+            .values(today=date(2026, 1, 15), time_zone="Asia/Kolkata")
+        )
+        await session.commit()
+    assert await claim(db) == first["id"]
+    failed = CallOutcome(connected=True, end_reason=EndReason.ERROR, caller_error="boom")
+    assert await finish(db, first["id"], failed)
+
+    retry = (await run_conversations(client, run["id"]))[-1]["id"]
+    async with db() as session:
+        row = await session.get_one(Conversation, uuid.UUID(retry))
+
+    assert retry != first["id"]
+    assert (row.today, row.time_zone) == (date(2026, 1, 15), "Asia/Kolkata")
 
 
 async def test_counts_take_the_latest_attempt_and_the_list_can_leave_out_retried_ones(

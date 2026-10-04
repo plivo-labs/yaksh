@@ -3,7 +3,7 @@
 import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import select
@@ -40,6 +40,9 @@ class Inputs:
     language: Language
     instructions: str
     nudge: str
+    today: date
+    """The date the caller is told is today; a judge must use the same one."""
+    time_zone: str
     background_noise_sound: NoiseSound
     background_noise_level: NoiseLevel
 
@@ -129,6 +132,8 @@ async def snapshot(
                     direction=agent.direction,
                 ),
                 nudge=LANGUAGES[config.language].nudge,
+                today=today,
+                time_zone=settings.timezone,
                 background_noise_sound=noise.sound,
                 background_noise_level=noise.level,
             )

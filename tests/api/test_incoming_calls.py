@@ -1,7 +1,7 @@
 import asyncio
 import random
 import uuid
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 
 import pytest
 from httpx import AsyncClient
@@ -62,6 +62,8 @@ async def waiting_conversation(
                 language=Language.EN,
                 instructions="You answer the phone.",
                 nudge="Hello?",
+                today=date(2026, 10, 5),
+                time_zone="UTC",
                 max_duration_s=120,
                 max_turns=20,
                 background_noise_sound=NoiseSound.NONE,

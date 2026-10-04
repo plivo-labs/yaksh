@@ -1,11 +1,12 @@
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from enum import StrEnum
 from typing import Any
 
 from sqlalchemy import (
     Boolean,
     CheckConstraint,
+    Date,
     DateTime,
     Enum,
     Float,
@@ -152,6 +153,9 @@ class Conversation(Base):
     language: Mapped[Language] = mapped_column(pg_enum(Language, "language"))
     instructions: Mapped[str] = mapped_column(Text)
     nudge: Mapped[str] = mapped_column(Text)
+    today: Mapped[date] = mapped_column(Date)
+    """The date the caller is told is today, in time_zone."""
+    time_zone: Mapped[str] = mapped_column(Text)
     caller_number: Mapped[str | None] = mapped_column(Text)
     call_uuid: Mapped[str | None] = mapped_column(Text)
     dial_deadline_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
