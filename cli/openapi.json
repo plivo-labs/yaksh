@@ -624,14 +624,19 @@
             "schema": {
               "anyOf": [
                 {
-                  "$ref": "#/components/schemas/OutcomeGroup"
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/OutcomeGroup"
+                  }
                 },
                 {
                   "type": "null"
                 }
               ],
+              "description": "conversations in any of these groups; repeat it for several",
               "title": "Group"
-            }
+            },
+            "description": "conversations in any of these groups; repeat it for several"
           },
           {
             "name": "latest_attempts",

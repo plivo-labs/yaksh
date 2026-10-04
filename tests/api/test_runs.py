@@ -372,6 +372,7 @@ async def test_counts_take_the_latest_attempt_and_the_list_can_leave_out_retried
     detail = (await client.get(f"/api/v1/runs/{run['id']}")).json()
     latest = await run_conversations(client, run["id"], latest_attempts=True)
     errors = await run_conversations(client, run["id"], group="error")
+    error_or_waiting = await run_conversations(client, run["id"], group=["error", "waiting"])
     retried_from = (await client.get(f"/api/v1/conversations/{first['id']}")).json()
     retried_to = (await client.get(f"/api/v1/conversations/{retry}")).json()
 
@@ -381,6 +382,7 @@ async def test_counts_take_the_latest_attempt_and_the_list_can_leave_out_retried
     assert len(await run_conversations(client, run["id"])) == 3
     assert [c["id"] for c in latest] == [second["id"], retry]
     assert [c["id"] for c in errors] == [first["id"]]
+    assert [c["id"] for c in error_or_waiting] == [first["id"], retry]
     assert await run_conversations(client, run["id"], group="error", latest_attempts=True) == []
     assert retried_from["retried_as"] == retry and retried_to["retried_as"] is None
     assert (retried_to["retry_of"], retried_to["attempt"]) == (first["id"], 2)

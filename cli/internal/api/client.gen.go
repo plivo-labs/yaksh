@@ -1350,7 +1350,9 @@ type ListConversationsApiV1ConversationsGetParams struct {
 	AgentId *openapi_types.UUID `form:"agent_id,omitempty" json:"agent_id,omitempty"`
 	RunId   *openapi_types.UUID `form:"run_id,omitempty" json:"run_id,omitempty"`
 	Status  *ConversationStatus `form:"status,omitempty" json:"status,omitempty"`
-	Group   *OutcomeGroup       `form:"group,omitempty" json:"group,omitempty"`
+
+	// Group conversations in any of these groups; repeat it for several
+	Group *[]OutcomeGroup `form:"group,omitempty" json:"group,omitempty"`
 
 	// LatestAttempts true leaves out the attempts that a retry replaced
 	LatestAttempts *bool   `form:"latest_attempts,omitempty" json:"latest_attempts,omitempty"`
