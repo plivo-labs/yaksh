@@ -107,6 +107,7 @@ async def ask(
     *,
     slots: asyncio.Semaphore,
     retry_later: bool,
+    patient: bool = True,
 ) -> Answered:
     """The model's answer once it passes the code checks. An answer with problems gets one
     re-ask; a second answer with hard problems is invalid evidence."""
@@ -114,7 +115,7 @@ async def ask(
     request = user
     for re_asks in (0, 1):
         answered = await answer(
-            model, spec, request, attempts, slots=slots, retry_later=retry_later
+            model, spec, request, attempts, slots=slots, retry_later=retry_later, patient=patient
         )
         if isinstance(answered, str):
             return Answered(None, attempts, re_asks, answered)
@@ -137,12 +138,13 @@ async def answer(
     *,
     slots: asyncio.Semaphore,
     retry_later: bool,
+    patient: bool,
 ) -> ModelAnswer | str:
     """The model's answer, or why it gave none. A temporary failure is asked again after each
     wait; when the waits run out, it puts the evaluation off with JudgeUnavailable if it can
-    be tried again later, else it is the item's error."""
+    be tried again later, else it is the item's error. An impatient ask does not wait."""
     failure: ModelCallError | None = None
-    for wait in (*WAITS_S, None):
+    for wait in (*(WAITS_S if patient else ()), None):
         async with slots:
             started = time.monotonic()
             try:

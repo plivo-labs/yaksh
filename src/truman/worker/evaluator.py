@@ -8,16 +8,19 @@ import os
 import socket
 import uuid
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from truman.config import Settings
 from truman.db.models import AgentVersion, Conversation, Evaluation, ScenarioVersion
+from truman.db.models import Document as DocumentRow
 from truman.diagnostics import describe_exception
 from truman.domain.agents import AgentConfig
 from truman.domain.language_models import JsonModel, ModelCallError
 from truman.domain.scenarios import ScenarioConfig
 from truman.evaluation import call, evaluations
-from truman.evaluation.call import JUDGES, Judging
+from truman.evaluation.call import JUDGES, SOURCE_JUDGES, Judging
+from truman.evaluation.sources import Document
 from truman.integrations.openai_models import OpenAIJsonModel
 
 log = logging.getLogger(__name__)
@@ -39,8 +42,10 @@ PROBE_TIMEOUT_S = 20.0
 PROVIDER = "openai_compatible"
 
 
-def judge_model(settings: Settings) -> OpenAIJsonModel | None:
-    """The model that judges calls; None when no model or key is set."""
+def judge_model(settings: Settings, *, sources: bool = False) -> OpenAIJsonModel | None:
+    """The model that judges calls; None when no model or key is set. The judges of the agent's
+    whole instructions or documents get a longer timeout and one retry: their requests are
+    large."""
     key = settings.judge_openai_api_key or settings.openai_api_key
     if not settings.judge_llm_model or key is None:
         return None
@@ -48,11 +53,28 @@ def judge_model(settings: Settings) -> OpenAIJsonModel | None:
         key.get_secret_value(),
         settings.judge_llm_model,
         base_url=settings.judge_openai_base_url or settings.openai_base_url,
-        timeout_s=settings.judge_llm_timeout_s,
+        timeout_s=settings.judge_sources_timeout_s if sources else settings.judge_llm_timeout_s,
         reasoning_effort=settings.judge_llm_reasoning_effort,
-        retries=3,
+        retries=1 if sources else 3,
         max_output_tokens=settings.judge_max_output_tokens,
     )
+
+
+async def knowledge_base(session: AsyncSession, agent: AgentConfig) -> list[Document]:
+    """The agent's knowledge-base documents, each under the name the agent gives it, in its
+    order."""
+    ids = [entry.document_id for entry in agent.knowledge_base]
+    if not ids:
+        return []
+    rows = await session.execute(
+        select(DocumentRow.id, DocumentRow.text).where(DocumentRow.id.in_(ids))
+    )
+    texts = dict(rows.tuples().all())
+    return [
+        Document(name=entry.name, text=texts[entry.document_id])
+        for entry in agent.knowledge_base
+        if entry.document_id in texts
+    ]
 
 
 class Evaluator:
@@ -61,11 +83,14 @@ class Evaluator:
         sessionmaker: async_sessionmaker[AsyncSession],
         settings: Settings,
         model: JsonModel | None = None,
+        sources_model: JsonModel | None = None,
     ) -> None:
-        """model judges calls; None runs the code metrics and phrase rules only."""
+        """model judges calls; None runs the code metrics and phrase rules only. sources_model
+        judges the agent's instructions and documents; model when None."""
         self._sessionmaker = sessionmaker
         self._settings = settings
         self._model = model
+        self._sources_model = sources_model
         self._judging: Judging | None = None
         self.evaluator_id = f"{socket.gethostname()}:{os.getpid()}:{uuid.uuid4().hex[:8]}"
         self._slots = asyncio.Semaphore(settings.evaluator_concurrency)
@@ -79,7 +104,9 @@ class Evaluator:
             "reasoning_effort": self._settings.judge_llm_reasoning_effort,
             "max_output_tokens": self._settings.judge_max_output_tokens,
             "timeout_s": self._settings.judge_llm_timeout_s,
+            "retries": 3,
         }
+        sources = settings | {"timeout_s": self._settings.judge_sources_timeout_s, "retries": 1}
         model = self._settings.judge_llm_model
         try:
             await asyncio.wait_for(
@@ -102,13 +129,19 @@ class Evaluator:
             log.warning("the judge model %s did not answer a first check: %s", model, error)
         async with self._sessionmaker() as session:
             versions = await evaluations.stored_judge_versions(
-                session, [judge.version(PROVIDER, model, settings) for judge in JUDGES]
+                session,
+                [
+                    judge.version(PROVIDER, model, sources if judge in SOURCE_JUDGES else settings)
+                    for judge in JUDGES
+                ],
             )
         log.info("judging with %s", model)
         return Judging(
             model=self._model,
+            sources_model=self._sources_model or self._model,
             versions=versions,
             slots=asyncio.Semaphore(self._settings.evaluator_judge_concurrency),
+            max_input_chars=self._settings.judge_max_input_chars,
         )
 
     async def run(self, stop: asyncio.Event) -> None:
@@ -159,10 +192,14 @@ class Evaluator:
                 conversation = await session.get_one(Conversation, evaluation.conversation_id)
                 agent = await session.get_one(AgentVersion, conversation.agent_version_id)
                 scenario = await session.get_one(ScenarioVersion, conversation.scenario_version_id)
+                agent_config = AgentConfig.model_validate(agent.config)
+                judged = self._judging is not None and call.judged(conversation)
+                documents = await knowledge_base(session, agent_config) if judged else []
             evaluated = await call.evaluate(
                 conversation,
-                AgentConfig.model_validate(agent.config),
+                agent_config,
                 ScenarioConfig.model_validate(scenario.config),
+                documents,
                 self._judging,
                 retry_later=evaluation.attempts < evaluations.MAX_ATTEMPTS,
             )

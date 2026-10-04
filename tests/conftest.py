@@ -496,6 +496,26 @@ class FakeJsonModel:
         pass
 
 
+class Scripted:
+    """A judge model that gives its answers in order, or raises the error in their place."""
+
+    def __init__(self, *answers: dict[str, Any] | Exception) -> None:
+        self.answers = list(answers)
+        self.requests: list[str] = []
+
+    async def complete_json(
+        self, *, system: str, user: str, name: str, schema: dict[str, Any]
+    ) -> ModelAnswer:
+        self.requests.append(user)
+        found = self.answers.pop(0)
+        if isinstance(found, Exception):
+            raise found
+        return ModelAnswer(data=found, model="judge-1", input_tokens=100, output_tokens=20)
+
+    async def close(self) -> None:
+        pass
+
+
 def written_scenario(prompt: str) -> dict[str, Any]:
     """A valid scenario named after what the writer was asked to test."""
     subject = next(

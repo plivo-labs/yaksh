@@ -104,6 +104,10 @@ The evaluator also judges each completed call that no one stopped: one model cal
 | `JUDGE_LLM_MODEL` | The judge model, default `gpt-6-luna`. Empty turns the judges off. |
 | `JUDGE_LLM_REASONING_EFFORT` | Default `medium`. |
 | `JUDGE_OPENAI_API_KEY`, `JUDGE_OPENAI_BASE_URL` | The judge's key and address; the caller's `OPENAI_API_KEY` and `OPENAI_BASE_URL` when unset. |
+| `JUDGE_MAX_INPUT_CHARS` | The most text one judge request holds, default 400,000 characters. |
+| `JUDGE_SOURCES_TIMEOUT_S` | How long one request of the instruction adherence and hallucination judges may take, default 180 s. They get one try; a failure is their item's error. |
+
+Two more judges read the agent's own sources and only report, so they do not change a verdict. Instruction adherence runs when the agent has its `config`: it asks whether the agent kept the goal of its instructions, did the steps they require and stayed inside what they allow, and a fail quotes both the call and the instruction line. Hallucination runs when the agent has knowledge-base documents: it fails only an agent statement that a document contradicts, and quotes both; a fact the documents do not mention is not a failure, since the agent can know it from its own tools. Sources larger than `JUDGE_MAX_INPUT_CHARS` make that item an error, `sources_too_large`.
 
 An agent's rules check every judged call of that agent. An LLM rule says when it applies, when it passes and when it fails; its gate, `always` or `agent_spoke`, is checked in code first. A phrase rule is a required or forbidden phrase or regular expression in the agent's lines, checked in code: it matches the line as written or with numbers, dates and times in one written form, and a pattern has 0.5 s for each line. A rule with the role `deciding` counts in the conversation verdict. When the judge model fails for a while, its item waits and asks again; after the evaluator's last attempt, the item ends as an error and the call keeps its code metrics. `GET /api/v1/conversations/<conversation id>/evaluation` returns the verdicts, each item with its judge's answer, and the metrics.
 

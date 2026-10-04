@@ -5,12 +5,12 @@ from typing import Any
 import pytest
 from pydantic import ValidationError
 
-from tests.conftest import Db
+from tests.conftest import Db, Scripted
 from truman.config import Settings
 from truman.diagnostics import describe_exception
 from truman.domain.conversations import Role, Transcript, Turn, WireEvent, WireEventKind
 from truman.domain.evaluations import DecidedBy, ItemRole, Outcome, UnsureKind, Verdict
-from truman.domain.language_models import ModelAnswer, ModelCallError
+from truman.domain.language_models import ModelCallError
 from truman.domain.rules import LlmRule, PhraseRule, RuleGate
 from truman.evaluation import judging
 from truman.evaluation.criteria import judge_criterion, judge_rule
@@ -44,26 +44,6 @@ def answer(verdict: str = "pass", **fields: Any) -> dict[str, Any]:
         "verdict": verdict,
         "kind": None,
     } | fields
-
-
-class Scripted:
-    """A judge model that gives its answers in order, or raises the error in their place."""
-
-    def __init__(self, *answers: dict[str, Any] | Exception) -> None:
-        self.answers = list(answers)
-        self.requests: list[str] = []
-
-    async def complete_json(
-        self, *, system: str, user: str, name: str, schema: dict[str, Any]
-    ) -> ModelAnswer:
-        self.requests.append(user)
-        found = self.answers.pop(0)
-        if isinstance(found, Exception):
-            raise found
-        return ModelAnswer(data=found, model="judge-1", input_tokens=100, output_tokens=20)
-
-    async def close(self) -> None:
-        pass
 
 
 async def criterion(

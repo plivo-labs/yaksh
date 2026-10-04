@@ -85,15 +85,17 @@ async def run_evaluator(settings: Settings) -> None:
 
     engine = create_engine(str(settings.database_url))
     model = judge_model(settings)
+    sources_model = judge_model(settings, sources=True)
     stop = asyncio.Event()
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGINT, signal.SIGTERM):
         loop.add_signal_handler(sig, stop.set)
     try:
-        await Evaluator(create_sessionmaker(engine), settings, model).run(stop)
+        await Evaluator(create_sessionmaker(engine), settings, model, sources_model).run(stop)
     finally:
-        if model is not None:
-            await model.close()
+        for client in (model, sources_model):
+            if client is not None:
+                await client.close()
         if not await bounded_dispose(engine, settings.end_timeout_s):
             logging.shutdown()
             os._exit(1)

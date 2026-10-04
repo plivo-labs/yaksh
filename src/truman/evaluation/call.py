@@ -3,7 +3,7 @@ its verdicts."""
 
 import asyncio
 import uuid
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -29,6 +29,13 @@ from truman.evaluation.evaluations import Evaluated
 from truman.evaluation.evidence import CallView, render
 from truman.evaluation.judging import ItemResult
 from truman.evaluation.rules import gate_open, gated, phrase_item
+from truman.evaluation.sources import (
+    HALLUCINATION,
+    INSTRUCTIONS,
+    Document,
+    judge_hallucination,
+    judge_instructions,
+)
 from truman.evaluation.verdicts import verdict
 
 
@@ -38,11 +45,18 @@ class Judging:
     judge versions by judge name, and the slots that bound the model calls in flight."""
 
     model: JsonModel
+    sources_model: JsonModel
+    """The same judge model with a longer timeout, for the judges that read the agent's whole
+    instructions or documents."""
     versions: Mapping[str, uuid.UUID]
     slots: asyncio.Semaphore
+    max_input_chars: int
+    """The most text one judge request holds; a judge whose sources do not fit is an error."""
 
 
-JUDGES = (CRITERION, AGENT_RULE)
+SOURCE_JUDGES = (INSTRUCTIONS, HALLUCINATION)
+"""The judges that read the agent's whole instructions or documents, with the sources model."""
+JUDGES = (CRITERION, AGENT_RULE, *SOURCE_JUDGES)
 """Every judge an evaluation can name; the evaluator stores a version of each at start."""
 
 
@@ -50,6 +64,7 @@ async def evaluate(
     conversation: Conversation,
     agent: AgentConfig,
     scenario: ScenarioConfig,
+    documents: Sequence[Document],
     judging: Judging | None,
     *,
     retry_later: bool,
@@ -57,8 +72,9 @@ async def evaluate(
     """Code metrics for every call. A call that completed and that no one stopped also gets its
     agent's phrase rules and, with a judge model, its judges and verdicts; any other call none.
     retry_later lets a temporary judge failure put the evaluation off; on its last attempt,
-    the failure is the item's error instead. Items come in order: criteria by number, then
-    rules as the agent lists them."""
+    the failure is the item's error instead. Items come in order: criteria by number, rules as
+    the agent lists them, then instruction adherence when the agent has its instructions and
+    hallucination when it has knowledge-base documents."""
     transcript = Transcript.model_validate(conversation.transcript or {})
     found = await measure_call(conversation, agent.agent_speaks_first)
     if not judged(conversation):
@@ -93,7 +109,39 @@ async def evaluate(
             else rule
             for rule in agent.rules
         ]
-    items = [task.result() for task in criteria] + [rule_item(rule, turns) for rule in rules]
+        sources = []
+        if agent.config:
+            sources.append(
+                group.create_task(
+                    judge_instructions(
+                        judging.sources_model,
+                        view,
+                        turns,
+                        agent.config,
+                        judging.max_input_chars,
+                        slots=judging.slots,
+                    )
+                )
+            )
+        if documents:
+            sources.append(
+                group.create_task(
+                    judge_hallucination(
+                        judging.sources_model,
+                        view,
+                        turns,
+                        documents,
+                        agent.config,
+                        judging.max_input_chars,
+                        slots=judging.slots,
+                    )
+                )
+            )
+    items = (
+        [task.result() for task in criteria]
+        + [rule_item(rule, turns) for rule in rules]
+        + [task.result() for task in sources]
+    )
     return Evaluated(
         metrics=found,
         items=items,

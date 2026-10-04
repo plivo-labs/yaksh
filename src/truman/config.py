@@ -78,6 +78,15 @@ class Settings(BaseSettings):
         default=8000, gt=0, validation_alias="JUDGE_MAX_OUTPUT_TOKENS"
     )
     """Reasoning tokens count too."""
+    judge_sources_timeout_s: float = Field(
+        default=180.0, gt=0, validation_alias="JUDGE_SOURCES_TIMEOUT_S"
+    )
+    """One request of the judges that read the agent's whole instructions or documents."""
+    judge_max_input_chars: int = Field(
+        default=400_000, gt=0, validation_alias="JUDGE_MAX_INPUT_CHARS"
+    )
+    """The most text one judge request holds: the call with the agent's instructions or its
+    documents. Larger sources make that judge's item an error."""
     judge_openai_api_key: SecretStr | None = Field(
         default=None, validation_alias="JUDGE_OPENAI_API_KEY"
     )

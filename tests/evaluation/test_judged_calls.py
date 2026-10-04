@@ -67,7 +67,30 @@ class Judge:
         self, *, system: str, user: str, name: str, schema: dict[str, Any]
     ) -> ModelAnswer:
         self.asked.append(name)
-        data: dict[str, Any] = {
+        if name == "instructions":
+            followed = {
+                "call_quote": None,
+                "instruction_quote": None,
+                "reasoning": "...",
+                "verdict": "pass",
+            }
+            broken = followed | {
+                "call_quote": {"turn": 3, "quote": "next Thursday at four p.m."},
+                "instruction_quote": "Read the new time back",
+                "verdict": "fail",
+            }
+            data = {"objective": followed, "procedure": broken, "boundary": followed}
+            return ModelAnswer(data=data, model="judge-1", input_tokens=900, output_tokens=60)
+        if name == "hallucination":
+            contradiction = {
+                "call_quote": {"turn": 3, "quote": "four p.m."},
+                "document": "hours.md",
+                "document_quote": "Thursday: 8 am to 5 pm.",
+                "reasoning": "...",
+            }
+            data = {"contradictions": [contradiction], "reasoning": "...", "verdict": "fail"}
+            return ModelAnswer(data=data, model="judge-1", input_tokens=900, output_tokens=60)
+        data = {
             "evidence": [{"turn": 3, "quote": "next Thursday at 4 pm"}],
             "absence": False,
             "absence_turns": None,
@@ -86,7 +109,16 @@ class Judge:
 async def test_a_completed_call_is_judged_and_a_stopped_one_gets_only_code_checks(
     client: AsyncClient, db: Db, settings: Settings
 ) -> None:
-    agent = await create_agent_id(client, name="Clinic", rules=RULES)
+    hours = await client.post(
+        "/api/v1/documents", json={"name": "hours", "text": "Thursday: 8 am to 5 pm."}
+    )
+    agent = await create_agent_id(
+        client,
+        name="Clinic",
+        rules=RULES,
+        config="Read the new time back before you end the call.",
+        knowledge_base=[{"document_id": hours.json()["id"], "name": "hours.md"}],
+    )
     scenario = await create_scenario(client, agent, criteria=["The agent reads the new time back."])
     run = await start_run(client, agent, [scenario["id"]], repeats=2)
     assert run.status_code == 202, run.text
@@ -120,18 +152,20 @@ async def test_a_completed_call_is_judged_and_a_stopped_one_gets_only_code_check
     async with db() as session:
         items = {
             (str(item.evaluation_id), item.item_key): item
-            for item in await session.scalars(select(EvaluationItem))
+            for item in await session.scalars(select(EvaluationItem).order_by(EvaluationItem.id))
         }
         calls = list(await session.scalars(select(JudgeCall)))
         versions = {v.judge: v for v in await session.scalars(select(JudgeVersion))}
     judged, plain = by_call[completed], by_call[stopped]
     assert (judged.scenario_verdict, judged.conversation_verdict) == (Verdict.PASS, Verdict.FAIL)
     assert (judged.effective_scenario_verdict, plain.scenario_verdict) == (Verdict.PASS, None)
-    assert {key for (evaluation, key) in items if evaluation == str(judged.id)} == {
+    assert [key for (evaluation, key) in items if evaluation == str(judged.id)] == [
         "criterion-1",
         "rule-no-promises",
         "rule-greets",
-    }
+        "instructions",
+        "hallucination",
+    ]
     assert {key for (evaluation, key) in items if evaluation == str(plain.id)} == set()
     criterion = items[str(judged.id), "criterion-1"]
     assert (criterion.machine_outcome, criterion.decided_by, criterion.subject) == (
@@ -141,9 +175,15 @@ async def test_a_completed_call_is_judged_and_a_stopped_one_gets_only_code_check
     )
     assert criterion.judge_version_id == versions["criterion"].id
     assert items[str(judged.id), "rule-greets"].decided_by is DecidedBy.CODE
-    assert sorted(judge.asked) == ["agent_rule", "criterion", "probe"]
+    assert sorted(judge.asked) == [
+        "agent_rule",
+        "criterion",
+        "hallucination",
+        "instructions",
+        "probe",
+    ]
     assert {(call.input_tokens, call.model_returned) for call in calls} == {(900, "judge-1")}
-    assert len(calls) == 2
+    assert len(calls) == 4
     stored_rules = (await client.get(f"/api/v1/agents/{agent}")).json()["rules"]
     assert [rule["key"] for rule in stored_rules] == ["no-promises", "greets"]
     shown = (await client.get(f"/api/v1/conversations/{completed}/evaluation")).json()
@@ -152,6 +192,8 @@ async def test_a_completed_call_is_judged_and_a_stopped_one_gets_only_code_check
         "criterion-1": "pass",
         "rule-no-promises": "fail",
         "rule-greets": "pass",
+        "instructions": "fail",
+        "hallucination": "fail",
     }
 
 
