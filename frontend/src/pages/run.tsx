@@ -8,6 +8,7 @@ import { ConversationList } from "@/components/conversation-list";
 import { CopyId } from "@/components/copy-id";
 import { Pager } from "@/components/pager";
 import { Fact, Panel, PanelHeader } from "@/components/panel";
+import { RunMetricsPanel } from "@/components/run-metrics";
 import { RunStatusLabel } from "@/components/status-label";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
@@ -24,7 +25,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { usePageParam } from "@/hooks/use-page-param";
-import { duration, noiseLabel, runTitle, runTotal, seconds, when } from "@/lib/format";
+import { duration, noiseLabel, runTitle, runTotal, when } from "@/lib/format";
 import {
   CONVERSATIONS_PAGE,
   useAgent,
@@ -70,6 +71,7 @@ export function RunPage() {
   return (
     <div className="grid gap-6">
       <Overview run={data} />
+      <RunMetricsPanel runId={data.id} active={ACTIVE_RUN_STATUSES.includes(data.status)} />
       <Conversations run={data} />
     </div>
   );
@@ -144,11 +146,6 @@ function Overview({ run }: { run: Run }) {
         </Fact>
         <Fact label="Retries">Up to {run.max_retries}</Fact>
         <Fact label="Median talk time">{duration(run.median_talk_ms) || "None yet"}</Fact>
-        <Fact label="Response p50 / p90">
-          {run.response_p50_ms === null || run.response_p90_ms === null
-            ? "None yet"
-            : `${seconds(run.response_p50_ms)} / ${seconds(run.response_p90_ms)}`}
-        </Fact>
         <Fact label="Run id">
           <CopyId id={run.id} label="run id" />
         </Fact>

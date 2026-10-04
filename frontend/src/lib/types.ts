@@ -455,6 +455,9 @@ export interface ConversationSummary {
   ended_at: string | null;
   talk_ms: number | null;
   latency: LatencySummary | null;
+  /** Null for a conversation with no evaluation: one not ended yet, or cancelled before its
+   * call connected. */
+  evaluation: EvaluationState | null;
   recording_url: string | null;
   /** Why the caller ended the call, in its own words: not a verdict. */
   caller_reason: string | null;
@@ -577,4 +580,130 @@ export interface Generation {
   created_at: string;
   /** Its scenarios that are not deleted. */
   scenarios: number;
+}
+
+export type EvaluationState = "queued" | "running" | "done" | "failed";
+
+/** The evaluation is still to come: queued, or running now. */
+export function evaluationPending(state: EvaluationState | null): boolean {
+  return state === "queued" || state === "running";
+}
+
+export interface Metric<T> {
+  value: T;
+  flags: string[];
+}
+
+export interface TurnTaking {
+  expected: number;
+  unanswered: number;
+  talked_over: number;
+  /** Waits of at least each length, by the length in ms. */
+  at_least_ms: Record<string, number>;
+  longest_wait_ms: number | null;
+}
+
+export interface Speaking {
+  agent_ms: number;
+  caller_ms: number;
+  agent_share: number | null;
+  longest_monologue_ms: number;
+}
+
+export interface AgentRepetition {
+  runs: { text: string; count: number; at_ms: number }[];
+}
+
+/** The faults of a call saved in full, or, for a call whose worker stopped before that,
+ * only that its record is incomplete. */
+export type CaptureFaults =
+  | {
+      caller_error: string[];
+      unconfirmed_caller_turns: number;
+      media_gaps: number;
+      media_gap_ms: number;
+      worker_stall: { max_ms: number; at_ms: number } | null;
+    }
+  | { incomplete_record: true };
+
+export interface Usage {
+  settings: { llm_model: string; stt_model: string; tts_model: string } | null;
+  usage: {
+    llm_prompt_tokens: number | null;
+    llm_completion_tokens: number | null;
+    stt_audio_seconds: number | null;
+    tts_characters: number | null;
+  } | null;
+  bill_duration_s: number | null;
+  ringing_ms: number | null;
+  answered_ms: number | null;
+  stream_opened_ms: number | null;
+}
+
+export interface ConversationMetrics {
+  evaluation: EvaluationState | null;
+  /** Why the last attempt failed. */
+  failure: string | null;
+  /** By metric key; empty until the evaluation is done. A call gets only the metrics its
+   * facts support. */
+  metrics: Partial<{
+    speech: Metric<Record<"agent" | "caller", { start_ms: number; end_ms: number }[]>>;
+    response_time: Metric<Record<string, unknown>>;
+    turn_taking: Metric<TurnTaking>;
+    speaking: Metric<Speaking>;
+    agent_repetition: Metric<AgentRepetition>;
+    capture_faults: Metric<CaptureFaults>;
+    usage: Metric<Usage>;
+  }>;
+}
+
+export const FLAG_TEXT: Record<string, string> = {
+  unanswered: "Unanswered reply",
+  long_wait: "Wait of 5s or more",
+  dead_air: "Silence of 10s or more",
+  media_gap: "Gap in the agent's media",
+  monologue: "Monologue of 45s or more",
+  repetition: "Repeated answer",
+  caller_error: "Caller error",
+  unconfirmed_caller_turns: "Unconfirmed caller turns",
+  missing_recording: "No recording",
+  no_agent_media: "No media from the agent",
+  worker_stall: "Truman worker paused",
+  incomplete_record: "Call record not saved in full",
+};
+
+/** How many of a total, with the 95% Wilson interval of the rate. */
+export interface Share {
+  count: number;
+  total: number;
+  low: number | null;
+  high: number | null;
+}
+
+export interface RunNumbers {
+  conversations: number;
+  evaluated: number;
+  pending: number;
+  failed: number;
+  connected: Share;
+  errors_before_connect: number;
+  response_p50_ms: number | null;
+  response_p90_ms: number | null;
+  /** Calls with a reply the agent did not answer, of the calls with turn taking. */
+  unanswered: Share;
+  /** Calls where the agent talked over a reply. */
+  talked_over: Share;
+  /** Calls with a wait of 5s or more. */
+  long_wait: Share;
+  /** Calls with a wait of 10s or more. */
+  dead_air: Share;
+  /** How many calls raised each flag. */
+  flags: Record<string, number>;
+}
+
+export interface RunMetrics {
+  overall: RunNumbers;
+  /** By the scenario's category as it is now; a category is not versioned. */
+  by_category: { category: Category; numbers: RunNumbers }[];
+  by_noise: { noise: BackgroundNoise; numbers: RunNumbers }[];
 }

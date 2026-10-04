@@ -48,20 +48,23 @@ export function ActionPanel({
   );
 }
 
-/** One labelled fact in a row of fixed furniture. */
+/** One labelled fact in a row of fixed furniture. A `wrap` fact breaks onto more lines
+ * instead of cutting its value short. */
 export function Fact({
   label,
   className,
+  wrap = false,
   children,
 }: {
   label: string;
   className?: string;
+  wrap?: boolean;
   children: ReactNode;
 }) {
   return (
     <div className={cn("grid min-w-0 gap-0.5", className)}>
       <dt className="text-xs-400 text-muted-foreground">{label}</dt>
-      <dd className="truncate text-s-400">{children}</dd>
+      <dd className={cn("text-s-400", wrap ? "wrap-anywhere" : "truncate")}>{children}</dd>
     </div>
   );
 }

@@ -4,6 +4,7 @@ import { useDefaultLayout } from "react-resizable-panels";
 import { Link, useParams, useSearchParams } from "react-router";
 
 import { BackButton } from "@/components/back-button";
+import { CallMetricsCard } from "@/components/call-metrics";
 import { EndCallDialog } from "@/components/confirm-dialogs";
 import { CopyId } from "@/components/copy-id";
 import { Fact } from "@/components/panel";
@@ -60,6 +61,7 @@ import {
   END_REASON_LABELS,
   ACTIVE_STATUSES,
   type Conversation,
+  type EvaluationState,
   type Fact as ScenarioFact,
   LANGUAGE_NAMES,
   type Reply,
@@ -168,6 +170,7 @@ export function ConversationPage() {
         <ResizablePanel id="details" defaultSize={320} minSize={260} maxSize="50%">
           <ScrollArea className="h-full">
             <div className="flex flex-col gap-6 p-px pr-4 pl-3">
+              <CallMetricsCard conversationId={data.id} evaluation={data.evaluation} />
               <ScenarioCard name={data.scenario_name} scenario={data.scenario} />
               <Card>
                 <CardHeader>
@@ -247,7 +250,7 @@ function ConversationFacts({ conversation }: { conversation: Conversation }) {
       )}
       {latency === null && finished && conversation.talk_ms !== null && (
         <Fact className={arrived} label="Response time">
-          Not measured
+          {measuring[conversation.evaluation ?? "none"]}
         </Fact>
       )}
       {conversation.run_id && (
@@ -294,6 +297,14 @@ function ConversationFacts({ conversation }: { conversation: Conversation }) {
     </dl>
   );
 }
+
+const measuring: Record<EvaluationState | "none", string> = {
+  queued: "Measuring",
+  running: "Measuring",
+  failed: "Measurement failed",
+  done: "Not measured",
+  none: "Not measured",
+};
 
 /** One reply as a band on the waveform: the wait in its colour, or the overlap of a talk-over. */
 function replyMark(reply: Reply, connectedMs: number): Mark {

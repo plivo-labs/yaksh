@@ -20,6 +20,9 @@ import {
   type KnowledgeBaseEntry,
   type Conversation,
   type ConversationInput,
+  type ConversationMetrics,
+  type EvaluationState,
+  evaluationPending,
   type Defaults,
   type ConversationSummary,
   type Generation,
@@ -31,6 +34,7 @@ import {
   type ProviderVoice,
   type Run,
   type RunInput,
+  type RunMetrics,
   type RunSummary,
   type Scenario,
   type ScenarioInput,
@@ -45,6 +49,8 @@ export const keys = {
   agent: (id: string) => ["agents", id] as const,
   conversations: (filters: Record<string, string>) => ["conversations", filters] as const,
   conversation: (id: string) => ["conversations", "one", id] as const,
+  conversationMetrics: (id: string, evaluation: EvaluationState | null) =>
+    ["conversations", "metrics", id, evaluation ?? "none"] as const,
   personas: ["personas"] as const,
   scenario: (id: string) => ["scenarios", "one", id] as const,
   scenarios: (agentId: string) => ["agents", agentId, "scenarios"] as const,
@@ -56,6 +62,7 @@ export const keys = {
   phoneNumbers: ["phone-numbers"] as const,
   runs: (agentId: string) => ["runs", agentId] as const,
   run: (id: string) => ["runs", "one", id] as const,
+  runMetrics: (id: string) => ["runs", "metrics", id] as const,
   document: (id: string) => ["documents", id] as const,
 };
 
@@ -323,8 +330,9 @@ export function useDeleteAgent() {
 
 export const CONVERSATIONS_PAGE = 25;
 
-/** One page of conversations. It refreshes every 3 seconds while a shown row is active, or
- * while `live` says more rows can change, such as during a run; otherwise every 15. */
+/** One page of conversations. It refreshes every 3 seconds while a shown row is active or its
+ * evaluation is pending, or while `live` says more rows can change, such as during a run;
+ * otherwise every 15. */
 export function useConversations(
   filters: Record<string, string>,
   page: number,
@@ -337,17 +345,34 @@ export function useConversations(
     queryFn: ({ signal }) => api<Page<ConversationSummary>>(`/conversations?${search}`, { signal }),
     placeholderData: keepPreviousData,
     refetchInterval: (query) =>
-      live || query.state.data?.items.some((item) => ACTIVE_STATUSES.includes(item.status))
+      live ||
+      query.state.data?.items.some(
+        (item) => ACTIVE_STATUSES.includes(item.status) || evaluationPending(item.evaluation),
+      )
         ? 3_000
         : 15_000,
   });
 }
 
+/** One conversation. It refreshes while its evaluation is pending, so the response times
+ * arrive without a reload. */
 export function useConversation(id: string | undefined) {
   return useQuery({
     queryKey: keys.conversation(id ?? ""),
     queryFn: () => api<Conversation>(`/conversations/${id}`),
     enabled: Boolean(id),
+    refetchInterval: (query) =>
+      query.state.data && evaluationPending(query.state.data.evaluation) ? 2_000 : false,
+  });
+}
+
+/** The metrics of a finished evaluation, or why it failed; read again when the state
+ * changes. */
+export function useConversationMetrics(id: string, evaluation: EvaluationState | null) {
+  return useQuery({
+    queryKey: keys.conversationMetrics(id, evaluation),
+    queryFn: ({ signal }) => api<ConversationMetrics>(`/conversations/${id}/metrics`, { signal }),
+    enabled: evaluation === "done" || evaluation === "failed",
   });
 }
 
@@ -397,6 +422,16 @@ export function useRun(id: string | undefined) {
     enabled: Boolean(id),
     refetchInterval: (query) =>
       query.state.data && ACTIVE_RUN_STATUSES.includes(query.state.data.status) ? 3_000 : false,
+  });
+}
+
+/** The run's numbers. They refresh while the run is active or an evaluation is pending. */
+export function useRunMetrics(id: string, active: boolean) {
+  return useQuery({
+    queryKey: keys.runMetrics(id),
+    queryFn: ({ signal }) => api<RunMetrics>(`/runs/${id}/metrics`, { signal }),
+    refetchInterval: (query) =>
+      active || (query.state.data?.overall.pending ?? 0) > 0 ? 3_000 : false,
   });
 }
 
