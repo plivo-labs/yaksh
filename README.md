@@ -130,7 +130,7 @@ truman auth login --server http://localhost:8000         # or set TRUMAN_URL and
 truman run start --agent <agent id> --all --wait
 ```
 
-`truman guide` prints how a coding agent tests a voice agent with it; the same text is the skill in `cli/skill/SKILL.md`.
+`truman guide` prints how a coding agent tests a voice agent with it; the same text is the skill in `cli/skill/SKILL.md`. To install the skill into your coding agent, run `npx skills add plivo-labs/truman`.
 
 ## Develop
 
