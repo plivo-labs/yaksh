@@ -42,7 +42,7 @@ from truman.domain.conversations import (
     Transcript,
     Turn,
 )
-from truman.domain.latency import Latency, Span, Speech, response_times
+from truman.domain.latency import Latency, LoopLag, Span, Speech, response_times
 from truman.domain.voices import VoiceProvider, VoiceSettings
 from truman.worker.worker import Worker
 
@@ -420,6 +420,7 @@ async def test_a_finished_call_keeps_the_facts_its_call_captured(
         caller_settings=settings,
         caller_usage=usage,
         line_facts=line,
+        loop_lag=LoopLag(max_ms=31, p99_ms=12, samples=2_400),
     )
     assert await finish(db, conversation["id"], outcome)
 
@@ -428,6 +429,7 @@ async def test_a_finished_call_keeps_the_facts_its_call_captured(
     stored = Transcript.model_validate(row.transcript)
 
     assert (stored.speech, stored.stream_opened_ms) == (speech, 120)
+    assert stored.loop_lag == LoopLag(max_ms=31, p99_ms=12, samples=2_400)
     assert CallerSettings.model_validate(row.caller_settings) == settings
     assert CallerUsage.model_validate(row.caller_usage) == usage
     assert LineFacts.model_validate(row.line_facts) == line

@@ -40,6 +40,7 @@ from truman.caller.audio import (
     Playout,
     Stamper,
 )
+from truman.caller.lag import LagSampler
 from truman.caller.latency import CallerReply, Detector
 from truman.caller.pipeline import (
     CallState,
@@ -285,6 +286,17 @@ def line_facts(report: Mapping[str, str]) -> LineFacts:
         answer_time=report.get("AnswerTime"),
         end_time=report.get("EndTime"),
     )
+
+
+@dataclass(frozen=True)
+class Spoken:
+    """What a finished conversation leaves for the work after it."""
+
+    state: CallState
+    persona: Persona
+    recording: CallRecording
+    marks: AudioMarks
+    serializer: StreamSerializer
 
 
 class Line:
@@ -743,6 +755,58 @@ class PhoneCaller:
     ) -> CallOutcome:
         connected_ms = clock.ms()
         observer.wire_event(WireEvent(kind=WireEventKind.CONNECTED, at_ms=connected_ms))
+        lag = LagSampler()
+        try:
+            spoken = await self._converse(request, observer, stop, clock, dialed)
+        finally:
+            loop_lag = lag.stop()
+        ended_ms = clock.ms()
+        # The line hangs up now; its report comes while the recording is saved and measured.
+        ending = asyncio.ensure_future(line.end())
+        try:
+            started_ms = spoken.recording.start_ms(connected_ms)
+            if started_ms < connected_ms:
+                observer.wire_event(WireEvent(kind=WireEventKind.CONNECTED, at_ms=started_ms))
+            talk_ms = ended_ms - started_ms
+            recording_path = await asyncio.to_thread(
+                spoken.recording.save, request.output_dir / "recording.wav", started_ms
+            )
+            agent_audio, agent_gaps = spoken.recording.agent_track(started_ms)
+            measured = await self._detector.measure(
+                agent_audio, agent_gaps, started_ms, connected_ms, spoken.marks.replies
+            )
+            report = await ending
+        finally:
+            ending.cancel()
+        agent_side = CALLED_SIDE if request.agent.outbound is None else CALLING_SIDE
+        resolve_stream_end(spoken.state, report, agent_side)
+        spoken.state.blame(spoken.serializer.failure)
+        return CallOutcome(
+            connected=True,
+            end_reason=spoken.state.end_reason or EndReason.ERROR,
+            caller_error=spoken.state.error,
+            caller_reason=spoken.state.caller_reason,
+            talk_ms=talk_ms,
+            recording_path=recording_path,
+            latency=measured.latency if measured else None,
+            speech=measured.speech if measured else None,
+            stream_opened_ms=connected_ms,
+            caller_settings=spoken.persona.settings,
+            caller_usage=spoken.persona.usage.usage(),
+            line_facts=line_facts(report) if report else None,
+            loop_lag=loop_lag,
+            call_uuid=dialed.call_uuid,
+        )
+
+    async def _converse(
+        self,
+        request: CallRequest,
+        observer: CallObserver,
+        stop: asyncio.Event,
+        clock: Clock,
+        dialed: Connected,
+    ) -> Spoken:
+        """Build the caller around the stream and hold the conversation until it ends."""
         log.info(
             "stream %s for conversation %s, call %s, %s",
             dialed.stream_id,
@@ -817,42 +881,7 @@ class PhoneCaller:
         finally:
             if greeting is not None:
                 greeting.cancel()
-        ended_ms = clock.ms()
-        # The line hangs up now; its report comes while the recording is saved and measured.
-        ending = asyncio.ensure_future(line.end())
-        try:
-            started_ms = recording.start_ms(connected_ms)
-            if started_ms < connected_ms:
-                observer.wire_event(WireEvent(kind=WireEventKind.CONNECTED, at_ms=started_ms))
-            talk_ms = ended_ms - started_ms
-            recording_path = await asyncio.to_thread(
-                recording.save, request.output_dir / "recording.wav", started_ms
-            )
-            agent_audio, agent_gaps = recording.agent_track(started_ms)
-            measured = await self._detector.measure(
-                agent_audio, agent_gaps, started_ms, connected_ms, marks.replies
-            )
-            report = await ending
-        finally:
-            ending.cancel()
-        agent_side = CALLED_SIDE if request.agent.outbound is None else CALLING_SIDE
-        resolve_stream_end(state, report, agent_side)
-        state.blame(serializer.failure)
-        return CallOutcome(
-            connected=True,
-            end_reason=state.end_reason or EndReason.ERROR,
-            caller_error=state.error,
-            caller_reason=state.caller_reason,
-            talk_ms=talk_ms,
-            recording_path=recording_path,
-            latency=measured.latency if measured else None,
-            speech=measured.speech if measured else None,
-            stream_opened_ms=connected_ms,
-            caller_settings=persona.settings,
-            caller_usage=persona.usage.usage(),
-            line_facts=line_facts(report) if report else None,
-            call_uuid=dialed.call_uuid,
-        )
+        return Spoken(state, persona, recording, marks, serializer)
 
     async def _hang_up(self, call_id: str) -> None:
         try:

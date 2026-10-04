@@ -604,6 +604,7 @@ async def finalize(
     transcript.latency = outcome.latency
     transcript.speech = outcome.speech
     transcript.stream_opened_ms = outcome.stream_opened_ms
+    transcript.loop_lag = outcome.loop_lag
     if outcome.connected:
         transcript.validity = Validity(
             ok=outcome.caller_error is None,

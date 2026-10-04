@@ -10,7 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from truman.domain.agents import AgentConfig
 from truman.domain.background_noise import BackgroundNoise, NoiseMix
 from truman.domain.languages import Language
-from truman.domain.latency import Latency, Speech
+from truman.domain.latency import Latency, LoopLag, Speech
 from truman.domain.scenarios import Fact
 from truman.domain.voices import VoiceSettings
 
@@ -170,6 +170,8 @@ class Transcript(BaseModel):
     stream_opened_ms: int | None = None
     """When Truman's stream opened. A `connected` event can move earlier, to the agent's
     first audio, but the stream opened here."""
+    loop_lag: LoopLag | None = None
+    """How late the worker's event loop ran while the call was live."""
 
 
 class LineFacts(BaseModel):
@@ -291,6 +293,7 @@ class CallOutcome(BaseModel):
     caller_settings: CallerSettings | None = None
     caller_usage: CallerUsage | None = None
     line_facts: LineFacts | None = None
+    loop_lag: LoopLag | None = None
     call_uuid: str | None = None
 
 

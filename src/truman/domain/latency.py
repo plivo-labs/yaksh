@@ -29,6 +29,17 @@ class Speech(BaseModel):
     agent_gaps: list[Span]
 
 
+class LoopLag(BaseModel):
+    """How late the worker's event loop woke up while a call was live, in ms: a lag here also
+    delays the call's audio."""
+
+    model_config = ConfigDict(frozen=True)
+
+    max_ms: int
+    p99_ms: int
+    samples: int
+
+
 class Reply(BaseModel):
     """The agent's answer to one caller reply, or to the start of the call."""
 
