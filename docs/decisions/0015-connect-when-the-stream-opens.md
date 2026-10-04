@@ -1,7 +1,7 @@
 # 0015 A call connects when Plivo's stream opens
 
 Date: 2026-10-04
-Status: accepted
+Status: replaced by 0016; the agent's audio can start before the stream opens
 
 ## Decision
 
