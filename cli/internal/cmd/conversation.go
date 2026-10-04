@@ -228,7 +228,7 @@ func (a *app) conversationListCmd() *cobra.Command {
 	fl.StringSliceVar(&groups, "group", nil, "only these outcome groups, for example error,did_not_connect")
 	fl.BoolVar(&latestAttempts, "latest-attempts", false, "leave out the attempts that a retry replaced")
 	fl.StringVar(&q, "q", "", "search the agent, scenario or persona name, or the ID")
-	fl.StringVar(&sort, "sort", "", "created_at or talk_ms; a leading - sorts descending")
+	fl.StringVar(&sort, "sort", "", "created_at, talk_ms or response_p90_ms; a leading - sorts descending")
 	addPageFlags(cmd, &page, &pageSize)
 	return cmd
 }
