@@ -225,6 +225,22 @@ class Conversation(Base):
     )
 
 
+class RefusedCall(Base):
+    """A call to one of Truman's numbers that Truman did not take, and why. "No call came" can
+    then be told from a call that Truman turned away."""
+
+    __tablename__ = "refused_calls"
+
+    id: Mapped[uuid.UUID] = uuid_primary_key()
+    call_uuid: Mapped[str] = mapped_column(Text, unique=True)
+    to_number: Mapped[str] = mapped_column(Text)
+    from_number: Mapped[str] = mapped_column(Text)
+    reason: Mapped[str] = mapped_column(Text)
+    conversation_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("conversations.id"))
+    """The conversation that held the number, when one did."""
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 class Persona(Base):
     __tablename__ = "personas"
 

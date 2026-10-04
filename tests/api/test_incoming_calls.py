@@ -9,7 +9,7 @@ from sqlalchemy import insert, select, update
 
 from tests.conftest import OUTBOUND_AGENT, create_agent, create_persona, create_scenario
 from truman.config import Settings
-from truman.db.models import Conversation, PhoneNumber
+from truman.db.models import Conversation, PhoneNumber, RefusedCall
 from truman.db.session import create_engine, create_sessionmaker
 from truman.domain.background_noise import NoiseLevel, NoiseSound
 from truman.domain.conversations import (
@@ -192,6 +192,31 @@ async def test_calls_that_no_waiting_conversation_owns_are_refused(
         await accept(settings, call(elsewhere), worker_id="w2")
         == "the conversation is not running on this worker"
     )
+
+
+async def test_each_refused_call_is_kept_once_with_its_reason(
+    client: AsyncClient, settings: Settings
+) -> None:
+    conversation_id, number = await waiting_conversation(client, settings)
+
+    assert await accept(settings, call("+15550000000", "call-x")) == (
+        "no conversation holds this number"
+    )
+    await accept(settings, call("+15550000000", "call-x"))
+    assert await accept(settings, call(number, "call-y"), worker_id="w2") == (
+        "the conversation is not running on this worker"
+    )
+    assert isinstance(await accept(settings, call(number, "call-z")), Admission)
+
+    engine = create_engine(settings.database_url.encoded_string())
+    async with create_sessionmaker(engine)() as session:
+        refused = (await session.scalars(select(RefusedCall).order_by(RefusedCall.id))).all()
+    await engine.dispose()
+
+    assert [(r.call_uuid, r.to_number, r.reason, r.conversation_id) for r in refused] == [
+        ("call-x", "+15550000000", "no conversation holds this number", None),
+        ("call-y", number, "the conversation is not running on this worker", conversation_id),
+    ]
 
 
 async def test_a_call_the_worker_never_took_leaves_no_caller_on_the_conversation(

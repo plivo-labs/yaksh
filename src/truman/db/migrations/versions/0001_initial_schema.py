@@ -545,6 +545,24 @@ def upgrade() -> None:
         "ix_conversations_run_status", "conversations", ["run_id", "status"], unique=False
     )
     op.create_index("ix_conversations_retry_of", "conversations", ["retry_of"], unique=False)
+    op.create_table(
+        "refused_calls",
+        sa.Column("id", sa.UUID(), server_default=sa.text("uuidv7()"), nullable=False),
+        sa.Column("call_uuid", sa.Text(), nullable=False),
+        sa.Column("to_number", sa.Text(), nullable=False),
+        sa.Column("from_number", sa.Text(), nullable=False),
+        sa.Column("reason", sa.Text(), nullable=False),
+        sa.Column("conversation_id", sa.UUID(), nullable=True),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.ForeignKeyConstraint(["conversation_id"], ["conversations.id"]),
+        sa.PrimaryKeyConstraint("id"),
+        sa.UniqueConstraint("call_uuid"),
+    )
     op.create_index(
         "ix_conversations_run_started", "conversations", ["run_id", "started_at"], unique=False
     )
@@ -606,6 +624,7 @@ def downgrade() -> None:
     op.drop_table("workers")
     op.drop_table("documents")
     op.drop_table("phone_numbers")
+    op.drop_table("refused_calls")
     op.drop_table("conversations")
     op.drop_table("runs")
     op.drop_table("scenario_versions")
