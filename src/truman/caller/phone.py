@@ -33,13 +33,14 @@ from pipecat.transports.websocket.fastapi import FastAPIWebsocketParams, FastAPI
 from truman.caller.audio import (
     GAP_BYTES,
     LOUD_PEAK,
+    PLAYOUT,
     SAMPLE_RATE,
     CallRecording,
     Clock,
     Playout,
     Stamper,
 )
-from truman.caller.latency import measure
+from truman.caller.latency import CallerReply, measure
 from truman.caller.pipeline import (
     CallState,
     Persona,
@@ -456,24 +457,30 @@ class StreamSerializer(FrameSerializer):
 
 class AudioMarks(FrameProcessor):
     """After the transport output: when the persona's audio starts and stops going out. It
-    keeps each reply as (start, end) for the response times; the end stays None when the call
-    stops during the reply, as Pipecat then reports no stop."""
+    keeps each reply for the response times. A reply that the TTS finished stops when the
+    output handles its TTSStoppedFrame, which then follows the stop at once; that frame carries
+    the reply's playout. A reply that the call or a barge-in cut off has no such frame."""
 
     def __init__(self, clock: Clock, observer: CallObserver) -> None:
         super().__init__(enable_direct_mode=True)
         self._clock = clock
         self._observer = observer
-        self.replies: list[tuple[int, int | None]] = []
+        self._just_stopped = False
+        self.replies: list[CallerReply] = []
 
     async def process_frame(self, frame: Frame, direction: FrameDirection) -> None:
         await super().process_frame(frame, direction)
         if direction is FrameDirection.DOWNSTREAM:
+            just_stopped, self._just_stopped = self._just_stopped, False
             if isinstance(frame, BotStartedSpeakingFrame):
-                self.replies.append((self._mark(WireEventKind.CALLER_AUDIO_START), None))
+                self.replies.append(CallerReply(self._mark(WireEventKind.CALLER_AUDIO_START)))
             elif isinstance(frame, BotStoppedSpeakingFrame):
                 ended = self._mark(WireEventKind.CALLER_AUDIO_END)
-                if self.replies and self.replies[-1][1] is None:
-                    self.replies[-1] = (self.replies[-1][0], ended)
+                if self.replies and self.replies[-1].end_ms is None:
+                    self.replies[-1].end_ms = ended
+                    self._just_stopped = True
+            elif isinstance(frame, TTSStoppedFrame) and just_stopped:
+                self.replies[-1].playout = frame.metadata.get(PLAYOUT)
         await self.push_frame(frame, direction)
 
     def _mark(self, kind: WireEventKind) -> int:
@@ -772,7 +779,9 @@ class PhoneCaller:
         recording_path = await asyncio.to_thread(
             recording.save, request.output_dir / "recording.wav", started_ms
         )
-        latency = await measure(recording.agent_track(started_ms), started_ms, marks.replies)
+        latency = await measure(
+            recording.agent_track(started_ms), started_ms, connected_ms, marks.replies
+        )
         agent_side = CALLED_SIDE if request.agent.outbound is None else CALLING_SIDE
         await resolve_stream_end(state, entry.callbacks, agent_side)
         state.blame(serializer.failure)

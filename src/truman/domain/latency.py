@@ -12,7 +12,8 @@ class Reply(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     start_ms: int
-    """When the caller's reply ended, or when the call connected if the caller had not spoken."""
+    """When the caller's reply ended, or when Truman's stream opened if the caller had not
+    spoken."""
     speech_ms: int
     """When the agent's first speech after the start of that reply began."""
 
@@ -38,20 +39,26 @@ def response_times(
 ) -> Latency:
     """Pair each caller reply, given as (start, end), with the first agent speech that starts
     after the reply began and before the next reply begins. Before the first caller reply, the
-    call's start counts as a reply that began and ended when the call connected; speech
-    already under way then, which starts at the connect, answers it with no value, as its true
-    start is unknown. A reply with no end, cut off by the end of the call, still bounds the reply
-    before it but gets no value: without its end, a wait cannot be told from a talk-over."""
-    windows: list[tuple[int, int | None]] = [(connected_ms, connected_ms), *caller_replies]
+    call's start counts as a reply that ended when Truman's stream opened, at connected_ms, and
+    the agent's first speech answers it. Speech that started by then was under way: it gets no
+    value, as its true start is unknown. A reply with no end, cut off by the end of the call,
+    still bounds the reply before it but gets no value: without its end, a wait cannot be told
+    from a talk-over."""
+    windows: list[tuple[int | None, int | None]] = [(None, connected_ms), *caller_replies]
     next_starts = [start for start, _ in caller_replies]
     replies = []
     for index, (began, ended) in enumerate(windows):
         until = next_starts[index] if index < len(next_starts) else None
         answer = next(
-            (at for at in speech_starts if at >= began and (until is None or at < until)), None
+            (
+                at
+                for at in speech_starts
+                if (began is None or at >= began) and (until is None or at < until)
+            ),
+            None,
         )
-        greeting_under_way = index == 0 and answer is not None and answer <= connected_ms
-        if answer is not None and ended is not None and not greeting_under_way:
+        under_way = began is None and answer is not None and answer <= connected_ms
+        if answer is not None and ended is not None and not under_way:
             replies.append(Reply(start_ms=ended, speech_ms=answer))
     waits = sorted(r.response_ms for r in replies if r.response_ms is not None)
     return Latency(

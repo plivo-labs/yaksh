@@ -63,9 +63,9 @@ A persona can have background noise: street, cafe, office, car, TV, crowd, kitch
 
 ## Response time
 
-After each call, Truman measures how long the agent made the caller wait. For each caller reply, the response time runs from the end of the caller's speech to the start of the agent's first speech after it. Before the caller has spoken, it runs from the start of the call's audio, the `connected` wire event, so a slow greeting shows too. When the agent starts before the caller finishes, the reply is a talk-over and has no response time. A reply the agent does not answer before the caller speaks again has no response time either, so the percentiles leave that wait out.
+After each call, Truman measures how long the agent made the caller wait. For each caller reply, the response time runs from the end of the caller's speech to the start of the agent's first speech after it. Before the caller has spoken, it runs from the moment Truman's stream opened, so a slow greeting shows too. An agent that was already speaking then gets no value for the call's start. When the agent starts before the caller finishes, the reply is a talk-over and has no response time. A reply the agent does not answer before the caller speaks again has no response time either, so the percentiles leave that wait out.
 
-- The end of the caller's speech is when Truman sent the last audio of its reply, the `caller_audio_end` wire event.
+- The end of the caller's speech is where the voice detector last finds speech in the reply's own TTS audio, before Truman mixes in background noise. The TTS puts 0.03 to 0.35 s of quiet audio after the last word; this end leaves it out. A reply cut off before its TTS finished ends when Truman sent its last audio, the `caller_audio_end` wire event.
 - The agent's speech comes from the voice detector of the live call, Pipecat's Silero VAD, run over the agent channel of the recording. A spoken "hmm" counts as speech. In tests, an agent's quiet "thinking" sound did not.
 - Truman measures at its own connection, so the number includes the path between Truman and the agent's system, both ways. For a phone call, that is the path to Plivo, about 0.2 s through the development tunnel, and the phone path to the agent.
 

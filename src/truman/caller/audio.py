@@ -42,6 +42,8 @@ class Playout:
 
     def __init__(self) -> None:
         self._arrived = 0
+        self.audio = bytearray()
+        """The reply's audio as the TTS made it, before any background noise."""
         self._sent = 0
         self._origin: int | None = None
         self._words = 0
@@ -50,10 +52,11 @@ class Playout:
     def arrived(self) -> int:
         return self._arrived
 
-    def received(self, size: int, now_ns: int) -> None:
+    def received(self, audio: bytes, now_ns: int) -> None:
         if self._origin is None:
             self._origin = now_ns
-        self._arrived += size
+        self._arrived += len(audio)
+        self.audio += audio
 
     def stamp_word(self, pts: int | None) -> int:
         """Count a word and return where its audio starts, in bytes of the reply."""
@@ -86,7 +89,7 @@ class Stamper:
         if isinstance(frame, TTSStartedFrame):
             self.arriving = frame.metadata[PLAYOUT] = Playout()
         elif isinstance(frame, TTSAudioRawFrame) and self.arriving is not None:
-            self.arriving.received(len(frame.audio), now_ns)
+            self.arriving.received(frame.audio, now_ns)
         elif isinstance(frame, TTSTextFrame) and self.arriving is not None:
             frame.metadata[PLAYOUT] = self.arriving
             frame.metadata[OFFSET] = self.arriving.stamp_word(frame.pts)
