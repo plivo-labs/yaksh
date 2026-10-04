@@ -774,6 +774,54 @@
         }
       }
     },
+    "/api/v1/conversations/{conversation_id}/metrics": {
+      "get": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Get Metrics",
+        "operationId": "get_metrics_api_v1_conversations__conversation_id__metrics_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Conversation Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationMetrics"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/conversations/{conversation_id}/recording": {
       "get": {
         "tags": [
@@ -3466,6 +3514,45 @@
         ],
         "title": "ConversationCreate"
       },
+      "ConversationMetrics": {
+        "properties": {
+          "evaluation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EvaluationState"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "failure": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Failure"
+          },
+          "metrics": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/Metric"
+            },
+            "type": "object",
+            "title": "Metrics"
+          }
+        },
+        "type": "object",
+        "required": [
+          "evaluation",
+          "failure",
+          "metrics"
+        ],
+        "title": "ConversationMetrics"
+      },
       "ConversationRead": {
         "properties": {
           "id": {
@@ -3649,6 +3736,16 @@
               }
             ]
           },
+          "evaluation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EvaluationState"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "recording_url": {
             "anyOf": [
               {
@@ -3797,6 +3894,7 @@
           "ended_at",
           "talk_ms",
           "latency",
+          "evaluation",
           "recording_url",
           "caller_reason",
           "run_id",
@@ -4010,6 +4108,16 @@
               }
             ]
           },
+          "evaluation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EvaluationState"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "recording_url": {
             "anyOf": [
               {
@@ -4108,6 +4216,7 @@
           "ended_at",
           "talk_ms",
           "latency",
+          "evaluation",
           "recording_url",
           "caller_reason",
           "run_id",
@@ -4331,6 +4440,16 @@
         ],
         "title": "EndReason",
         "description": "Who or what ended the conversation, as Truman observed it."
+      },
+      "EvaluationState": {
+        "type": "string",
+        "enum": [
+          "queued",
+          "running",
+          "done",
+          "failed"
+        ],
+        "title": "EvaluationState"
       },
       "Fact": {
         "properties": {
@@ -4650,6 +4769,29 @@
         ],
         "title": "LatencySummary",
         "description": "The agent's response times in one call: nearest-rank percentiles over the measured\nreplies, how many replies there were, and how many of them talked over the caller."
+      },
+      "Metric": {
+        "properties": {
+          "value": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Value"
+          },
+          "flags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Flags",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "value"
+        ],
+        "title": "Metric",
+        "description": "One metric's value and the flags it raised."
       },
       "NoiseLevel": {
         "type": "string",

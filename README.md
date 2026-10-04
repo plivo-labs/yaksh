@@ -63,13 +63,27 @@ A persona can have background noise: street, cafe, office, car, TV, crowd, kitch
 
 ## Response time
 
-After each call is saved, the evaluator measures how long the agent made the caller wait. For each caller reply, the response time runs from the end of the caller's speech to the start of the agent's first speech after it. Before the caller has spoken, it runs from the moment Truman's stream opened, so a slow greeting shows too. An agent that was already speaking then gets no value for the call's start. When the agent starts before the caller finishes, the reply is a talk-over and has no response time. A reply the agent does not answer before the caller speaks again has no response time either, so the percentiles leave that wait out.
+After each call is saved, the evaluator measures how long the agent made the caller wait. For each caller reply, the response time runs from the end of the caller's speech to the start of the agent's first speech after it. When the agent was still speaking at the end of the caller's speech, the time starts where the agent stopped. Before the caller has spoken, the time runs from the moment Truman's stream opened, so a slow greeting shows too. An agent that was already speaking then gets no value for the call's start, and neither does a call that Truman's caller opens. When the agent starts before the caller finishes, the reply is a talk-over and has no response time. A reply that the agent does not answer before the caller speaks again has no response time either, so the percentiles leave that wait out. The caller's goodbye and a wait over a gap in the agent's media get no value.
 
 - The end of the caller's speech is where the voice detector last finds speech in the reply's own TTS audio, before Truman mixes in background noise. The TTS puts 0.03 to 0.35 s of quiet audio after the last word; this end leaves it out. A reply cut off before its TTS finished ends when Truman sent its last audio, the `caller_audio_end` wire event.
 - The agent's speech comes from the voice detector of the live call, Pipecat's Silero VAD, with the same settings, run over the agent channel of the recording. A spoken "hmm" counts as speech. In tests, an agent's quiet "thinking" sound did not.
 - Truman measures at its own connection, so the number includes the path between Truman and the agent's system, both ways. For a phone call, that is the path to Plivo, about 0.2 s through the development tunnel, and the phone path to the agent.
 
 The conversation page shows the p90 and the p50 (nearest rank), the number of replies and of talk-overs, the response time on each agent turn that answers a caller reply, and a band on the recording for each wait: green under 1 s, amber from 1 to 2 s, red over 2 s. `GET /api/v1/runs/<run id>` pools the replies of the latest attempts into `response_p50_ms` and `response_p90_ms`. `GET /api/v1/conversations?run_id=<run id>&sort=-response_p90_ms` lists the slowest conversations first. Calls without the measurement show "Latency not measured". See `docs/decisions/0019-response-time-at-trumans-connection.md`.
+
+## Call metrics
+
+After each call, the evaluator also computes metrics from what the call saved. `GET /api/v1/conversations/<conversation id>/metrics` returns them, with the state of the evaluation: `queued`, `running`, `done` or `failed`. A call that did not connect gets only `usage`. A call without a recording gets no speech metrics: a missing value, not a zero.
+
+| Metric | What it holds | Flags |
+| --- | --- | --- |
+| `turn_taking` | One row for each caller reply and for the start of the call: when the agent answered, and how long the caller waited in silence. The caller's goodbye, a reply that the end of the call cut off, and the start of a call that Truman's caller opens expect no answer. A wait over a gap in the agent's media counts only up to the gap. A reply is unanswered when the caller spoke again before the agent answered. Counts: unanswered replies, talk-overs, waits of 3, 5 and 10 s or more, the longest wait. | `unanswered`, `long_wait` (5 s), `dead_air` (10 s), `media_gap` |
+| `response_time` | The response times of the section above, over the waits that expected an answer, without the waits that a media gap cut short. | |
+| `speech` | Where each side spoke. | |
+| `speaking` | Each side's speech time before the caller's goodbye, the agent's share, and the agent's longest speech with no caller speech in it. | `monologue` (45 s) |
+| `agent_repetition` | The same agent answer, given 3 or more times in a row, each time after a caller reply. | `repetition` |
+| `capture_faults` | Faults on Truman's side: a caller error, caller turns that Plivo did not confirm as played before the last reply, a missing recording, no media or gaps in the media from the agent's side, a worker stall over 100 ms. Read the other metrics of such a call with care. | one for each fault |
+| `usage` | The caller's models and what they used, Plivo's billed duration, and the time from the call's start to ringing, answer and stream open. | |
 
 ## Files
 

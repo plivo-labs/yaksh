@@ -1,6 +1,6 @@
 from pipecat.audio.vad.vad_analyzer import VADState
 
-from truman.domain.latency import CallerReplyWindow, Latency, Span, Speech
+from truman.domain.latency import CallerReplyWindow, Span, Speech
 from truman.evaluation.speech import Window, measure, placed_reply, segments
 
 QUIET, STARTING, SPEAKING, STOPPING = (
@@ -94,12 +94,12 @@ def test_a_reply_the_call_cut_off_ends_with_the_call_and_has_no_speech_end() -> 
     assert placed_reply(reply, windows, 320, 5100) == ([Span(start_ms=5000, end_ms=5100)], None)
 
 
-async def test_a_silent_call_has_no_speech_and_no_response_times() -> None:
+async def test_a_silent_call_has_no_speech_and_keeps_each_reply_end() -> None:
     replies = [
         CallerReplyWindow(start_ms=1000, end_ms=1500, finished=True, audio_start_ms=0, audio_ms=500)
     ]
 
-    heard, latency = await measure(silence(3), silence(0.5), RATE, 100, 0, replies)
+    heard = await measure(silence(3), silence(0.5), RATE, 100, replies)
 
-    assert heard == Speech(agent=[], caller=[])
-    assert latency == Latency(replies=[], p50_ms=None, p90_ms=None)
+    assert heard.speech == Speech(agent=[], caller=[])
+    assert (heard.replies, heard.end_ms) == ([(1000, 1500)], 3100)

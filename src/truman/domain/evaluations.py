@@ -7,8 +7,13 @@ from pydantic import BaseModel, ConfigDict
 
 
 class MetricKey(StrEnum):
+    USAGE = "usage"
+    CAPTURE_FAULTS = "capture_faults"
+    AGENT_REPETITION = "agent_repetition"
     SPEECH = "speech"
     RESPONSE_TIME = "response_time"
+    TURN_TAKING = "turn_taking"
+    SPEAKING = "speaking"
 
 
 class EvaluationState(StrEnum):

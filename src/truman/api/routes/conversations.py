@@ -12,6 +12,7 @@ from truman.api.auth import require_token
 from truman.api.deps import SessionDep, SettingsDep
 from truman.api.pagination import Page, PageDep
 from truman.api.schemas.conversations import (
+    ConversationMetrics,
     ConversationRead,
     ConversationSummary,
     LatencySummary,
@@ -49,9 +50,9 @@ def recording_url(conversation: Conversation) -> str | None:
 async def summaries(
     session: AsyncSession,
     rows: list[Conversation],
-    measured: Mapping[uuid.UUID, Latency] | None = None,
+    found: Mapping[uuid.UUID, results.Evaluated] | None = None,
 ) -> list[ConversationSummary]:
-    """`measured` holds response times already read; the rest are read here."""
+    """`found` holds evaluations already read; the rest are read here."""
     agents = await conversations.pinned_agents(session, (row.agent_version_id for row in rows))
     personas = await conversations.pinned_personas(
         session, (row.persona_version_id for row in rows)
@@ -59,8 +60,8 @@ async def summaries(
     scenarios = await conversations.pinned_scenarios(
         session, (row.scenario_version_id for row in rows)
     )
-    if measured is None:
-        measured = await results.latencies(session, (row.id for row in rows))
+    if found is None:
+        found = await results.evaluated(session, (row.id for row in rows))
     items = []
     for row in rows:
         data = {
@@ -72,8 +73,10 @@ async def summaries(
         data["persona_version"], data["persona_name"] = personas[row.persona_version_id]
         data["scenario_version"], data["scenario_name"] = scenarios[row.scenario_version_id]
         data["recording_url"] = recording_url(row)
-        latency = measured.get(row.id)
+        evaluation = found.get(row.id)
+        latency = evaluation.latency if evaluation else None
         data["latency"] = LatencySummary.of(latency) if latency and latency.replies else None
+        data["evaluation"] = evaluation.state if evaluation else None
         data["background_noise"] = BackgroundNoise(
             sound=row.background_noise_sound, level=row.background_noise_level
         )
@@ -84,9 +87,9 @@ async def summaries(
 async def summary(
     session: AsyncSession,
     conversation: Conversation,
-    measured: Mapping[uuid.UUID, Latency] | None = None,
+    found: Mapping[uuid.UUID, results.Evaluated] | None = None,
 ) -> ConversationSummary:
-    return (await summaries(session, [conversation], measured))[0]
+    return (await summaries(session, [conversation], found))[0]
 
 
 def turns_with_replies(transcript: Transcript, latency: Latency | None) -> list[TurnRead]:
@@ -110,9 +113,9 @@ def turns_with_replies(transcript: Transcript, latency: Latency | None) -> list[
 
 async def detail(session: AsyncSession, conversation: Conversation) -> ConversationRead:
     transcript = conversations.transcript_of(conversation)
-    measured = await results.latencies(session, [conversation.id])
-    latency = measured.get(conversation.id)
-    base = await summary(session, conversation, measured)
+    found = await results.evaluated(session, [conversation.id])
+    latency = found[conversation.id].latency if conversation.id in found else None
+    base = await summary(session, conversation, found)
     return ConversationRead(
         **base.model_dump(),
         instructions=conversation.instructions,
@@ -168,6 +171,17 @@ async def list_conversations(
 @router.get("/{conversation_id}")
 async def get_conversation(conversation_id: uuid.UUID, session: SessionDep) -> ConversationRead:
     return await detail(session, await conversations.get_conversation(session, conversation_id))
+
+
+@router.get("/{conversation_id}/metrics")
+async def get_metrics(conversation_id: uuid.UUID, session: SessionDep) -> ConversationMetrics:
+    await conversations.get_conversation(session, conversation_id)
+    evaluation, found = await results.metrics(session, conversation_id)
+    return ConversationMetrics(
+        evaluation=evaluation.state if evaluation else None,
+        failure=evaluation.failure if evaluation else None,
+        metrics=found,
+    )
 
 
 @router.get("/{conversation_id}/recording")

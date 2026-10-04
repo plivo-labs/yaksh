@@ -13,6 +13,7 @@ from truman.domain.conversations import (
     Validity,
     WireEvent,
 )
+from truman.domain.evaluations import EvaluationState, Metric
 from truman.domain.languages import Language
 from truman.domain.latency import Latency, Reply
 from truman.domain.scenarios import ScenarioConfig
@@ -77,6 +78,9 @@ class ConversationSummary(BaseModel):
     talk_ms: int | None
     latency: LatencySummary | None
     """None when the call was not measured, or when the agent never spoke."""
+    evaluation: EvaluationState | None
+    """None for a conversation with no evaluation: one not ended yet, or cancelled before its
+    call connected."""
     recording_url: str | None
     caller_reason: str | None
     run_id: uuid.UUID | None
@@ -95,3 +99,12 @@ class ConversationRead(ConversationSummary):
     wire_events: list[WireEvent]
     validity: Validity | None
     retried_as: uuid.UUID | None
+
+
+class ConversationMetrics(BaseModel):
+    evaluation: EvaluationState | None
+    """None for a conversation with no evaluation."""
+    failure: str | None
+    """Why the last attempt failed, while it is tried again and after it ended failed."""
+    metrics: dict[str, Metric]
+    """By metric key; empty until the evaluation is done."""

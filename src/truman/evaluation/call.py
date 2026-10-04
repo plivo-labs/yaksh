@@ -4,30 +4,74 @@ import asyncio
 from pathlib import Path
 
 from truman.db.models import Conversation
-from truman.domain.conversations import Transcript
+from truman.domain.conversations import CallerSettings, CallerUsage, LineFacts, Transcript
 from truman.domain.evaluations import Metric, MetricKey
-from truman.evaluation import speech
+from truman.domain.latency import Latency, Span, waits
+from truman.evaluation import metrics, speech
 
 
-async def evaluate(conversation: Conversation) -> dict[MetricKey, Metric]:
+async def evaluate(conversation: Conversation, agent_speaks_first: bool) -> dict[MetricKey, Metric]:
+    """The metrics of a saved call. A call that never connected has only its usage, and one
+    without a recording or its caller replies has no speech metrics: a missing value, never a
+    zero. agent_speaks_first is the pinned agent's setting: without it, Truman's caller opens
+    the call."""
     transcript = Transcript.model_validate(conversation.transcript or {})
-    metrics: dict[MetricKey, Metric] = {}
-    measured = await measure(conversation, transcript)
-    if measured is not None:
-        heard, latency = measured
-        metrics[MetricKey.SPEECH] = Metric(value=heard.model_dump(mode="json"))
-        metrics[MetricKey.RESPONSE_TIME] = Metric(value=latency.model_dump(mode="json"))
-    return metrics
+    found = {
+        MetricKey.USAGE: metrics.usage(
+            transcript,
+            parsed(CallerSettings, conversation.caller_settings),
+            parsed(CallerUsage, conversation.caller_usage),
+            parsed(LineFacts, conversation.line_facts),
+        )
+    }
+    if transcript.stream_opened_ms is None:
+        return found
+    gaps = media_gaps(transcript, transcript.stream_opened_ms)
+    found[MetricKey.CAPTURE_FAULTS] = metrics.capture_faults(
+        transcript, conversation.recording_path is not None, gaps
+    )
+    found[MetricKey.AGENT_REPETITION] = metrics.agent_repetition(transcript.turns)
+    heard = await hear(conversation, transcript)
+    if heard is None:
+        return found
+    goodbye = metrics.goodbye_from(transcript)
+    paired = waits(
+        transcript.stream_opened_ms,
+        heard.replies,
+        heard.speech.agent,
+        heard.end_ms,
+        goodbye_from_ms=goodbye,
+        gaps=gaps,
+        agent_opens=agent_speaks_first,
+    )
+    found[MetricKey.SPEECH] = Metric(value=heard.speech.model_dump(mode="json"))
+    found[MetricKey.RESPONSE_TIME] = Metric(value=Latency.answered(paired).model_dump(mode="json"))
+    found[MetricKey.TURN_TAKING] = metrics.turn_taking(paired)
+    found[MetricKey.SPEAKING] = metrics.speaking(heard.speech, goodbye)
+    return found
 
 
-async def measure(
-    conversation: Conversation, transcript: Transcript
-) -> tuple[speech.Speech, speech.Latency] | None:
-    """Both sides' speech and the response times; None for a call without a recording."""
+def media_gaps(transcript: Transcript, stream_opened_ms: int) -> list[Span]:
+    """Where no media came from the agent's side, from the stream's opening on."""
+    media = transcript.agent_media
+    if media is None:
+        return []
+    late = [Span(start_ms=stream_opened_ms, end_ms=media.first_ms)]
+    return [*late, *media.gaps] if media.first_ms > stream_opened_ms else media.gaps
+
+
+def parsed[T: (CallerSettings, CallerUsage, LineFacts)](
+    model: type[T], stored: dict[str, object] | None
+) -> T | None:
+    return None if stored is None else model.model_validate(stored)
+
+
+async def hear(conversation: Conversation, transcript: Transcript) -> speech.Heard | None:
+    """Both sides' speech; None for a call without a recording or its caller replies."""
     if (
         conversation.recording_path is None
         or transcript.recording_start_ms is None
-        or transcript.stream_opened_ms is None
+        or transcript.caller_replies is None
     ):
         return None
     agent, rate = await asyncio.to_thread(speech.read_mono, Path(conversation.recording_path))
@@ -39,10 +83,5 @@ async def measure(
         if voice_rate != rate:
             raise ValueError(f"the caller voice is at {voice_rate} Hz, the recording at {rate} Hz")
     return await speech.measure(
-        agent,
-        voice,
-        rate,
-        transcript.recording_start_ms,
-        transcript.stream_opened_ms,
-        transcript.caller_replies or [],
+        agent, voice, rate, transcript.recording_start_ms, transcript.caller_replies
     )

@@ -1,9 +1,10 @@
-"""Where each side spoke and how long the agent made the caller wait, from a saved call's
-audio as the live call's voice detector finds it (decision 0019)."""
+"""Where each side spoke, from a saved call's audio, as the live call's voice detector finds
+it (decision 0019)."""
 
 import math
 import wave
 from collections.abc import AsyncIterator, Iterable, Sequence
+from dataclasses import dataclass
 from pathlib import Path
 
 import audioop
@@ -16,10 +17,8 @@ from truman.domain.latency import (
     VAD_START_S,
     VAD_STOP_S,
     CallerReplyWindow,
-    Latency,
     Span,
     Speech,
-    response_times,
 )
 
 VAD = VADParams(confidence=VAD_CONFIDENCE, start_secs=VAD_START_S, stop_secs=VAD_STOP_S)
@@ -39,17 +38,26 @@ def read_mono(path: Path) -> tuple[bytes, int]:
     return audioop.tomono(frames, 2, 1, 0), rate
 
 
+@dataclass(frozen=True)
+class Heard:
+    """What the detector found in a saved call, on the call's clock."""
+
+    speech: Speech
+    replies: list[tuple[int, int | None]]
+    """Each caller reply's start and the end of its speech for the response time."""
+    end_ms: int
+    """Where the recording ends."""
+
+
 async def measure(
     agent: bytes,
     voice: bytes,
     rate: int,
     recording_start_ms: int,
-    stream_opened_ms: int,
     replies: Sequence[CallerReplyWindow],
-) -> tuple[Speech, Latency]:
-    """Both sides' speech on the call's clock and the agent's response times. agent is the
-    recording's agent channel, which starts at recording_start_ms; voice holds each reply's
-    own audio at the place its window names."""
+) -> Heard:
+    """agent is the recording's agent channel, which starts at recording_start_ms; voice holds
+    each reply's own audio at the place its window names."""
     agent_end_ms = bytes_ms(len(agent), rate)
     agent_speech = [shifted(span, recording_start_ms) for span in await speech_in(agent, rate)]
     caller: list[Span] = []
@@ -66,12 +74,11 @@ async def measure(
         )
         caller += spans
         reply_ends.append(last_word_ms)
-    latency = response_times(
-        stream_opened_ms,
-        [(reply.start_ms, end) for reply, end in zip(replies, reply_ends, strict=True)],
-        [span.start_ms for span in agent_speech],
+    return Heard(
+        speech=Speech(agent=agent_speech, caller=caller),
+        replies=[(reply.start_ms, end) for reply, end in zip(replies, reply_ends, strict=True)],
+        end_ms=recording_start_ms + agent_end_ms,
     )
-    return Speech(agent=agent_speech, caller=caller), latency
 
 
 def placed_reply(

@@ -188,10 +188,18 @@ async def test_the_evaluator_measures_a_saved_call_from_its_files(
     evaluation = await run_evaluator(db, settings)
 
     assert evaluation.state is EvaluationState.DONE
-    assert await stored(db, evaluation.id) == {
-        "speech": Metric(value={"agent": [], "caller": []}),
-        "response_time": Metric(value={"replies": [], "p50_ms": None, "p90_ms": None}),
-    }
+    found = await stored(db, evaluation.id)
+    assert set(found) == set(MetricKey)
+    assert found[MetricKey.SPEECH] == Metric(value={"agent": [], "caller": []})
+    assert found[MetricKey.RESPONSE_TIME] == Metric(
+        value={"replies": [], "p50_ms": None, "p90_ms": None}
+    )
+    # Silent audio: the agent answered neither the start of the call nor the caller's reply,
+    # which waited until the recording ended.
+    assert (
+        found[MetricKey.TURN_TAKING].value["longest_wait_ms"],
+        found[MetricKey.TURN_TAKING].flags,
+    ) == (1_500, ["unanswered"])
 
 
 async def test_an_evaluation_that_cannot_read_its_files_is_tried_again_later(
@@ -202,6 +210,7 @@ async def test_an_evaluation_that_cannot_read_its_files_is_tried_again_later(
             "recording_path": tmp_path / "missing.wav",
             "recording_start_ms": 0,
             "stream_opened_ms": 0,
+            "caller_replies": [],
         }
     )
     await saved_call(client, db, outcome)

@@ -156,6 +156,30 @@ func (e EndReason) Valid() bool {
 	}
 }
 
+// Defines values for EvaluationState.
+const (
+	EvaluationStateDone    EvaluationState = "done"
+	EvaluationStateFailed  EvaluationState = "failed"
+	EvaluationStateQueued  EvaluationState = "queued"
+	EvaluationStateRunning EvaluationState = "running"
+)
+
+// Valid indicates whether the value is a known member of the EvaluationState enum.
+func (e EvaluationState) Valid() bool {
+	switch e {
+	case EvaluationStateDone:
+		return true
+	case EvaluationStateFailed:
+		return true
+	case EvaluationStateQueued:
+		return true
+	case EvaluationStateRunning:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for GenerationMode.
 const (
 	GenerationModeAgent         GenerationMode = "agent"
@@ -652,6 +676,13 @@ type ConversationCreate struct {
 	ScenarioId      openapi_types.UUID  `json:"scenario_id"`
 }
 
+// ConversationMetrics defines model for ConversationMetrics.
+type ConversationMetrics struct {
+	Evaluation *EvaluationState  `json:"evaluation"`
+	Failure    *string           `json:"failure"`
+	Metrics    map[string]Metric `json:"metrics"`
+}
+
 // ConversationRead defines model for ConversationRead.
 type ConversationRead struct {
 	AgentCallerId  *string            `json:"agent_caller_id"`
@@ -671,6 +702,7 @@ type ConversationRead struct {
 	Direction        Direction           `json:"direction"`
 	EndReason        *EndReason          `json:"end_reason"`
 	EndedAt          *time.Time          `json:"ended_at"`
+	Evaluation       *EvaluationState    `json:"evaluation"`
 	FailureReason    *string             `json:"failure_reason"`
 	Id               openapi_types.UUID  `json:"id"`
 	Instructions     string              `json:"instructions"`
@@ -727,6 +759,7 @@ type ConversationSummary struct {
 	Direction         Direction           `json:"direction"`
 	EndReason         *EndReason          `json:"end_reason"`
 	EndedAt           *time.Time          `json:"ended_at"`
+	Evaluation        *EvaluationState    `json:"evaluation"`
 	FailureReason     *string             `json:"failure_reason"`
 	Id                openapi_types.UUID  `json:"id"`
 	Language          Language            `json:"language"`
@@ -787,6 +820,9 @@ type DocumentSummary struct {
 
 // EndReason Who or what ended the conversation, as Truman observed it.
 type EndReason string
+
+// EvaluationState defines model for EvaluationState.
+type EvaluationState string
 
 // Fact A value the caller has and gives when the agent asks for it.
 type Fact struct {
@@ -862,6 +898,12 @@ type LatencySummary struct {
 	P90Ms      *int `json:"p90_ms"`
 	Replies    int  `json:"replies"`
 	TalkedOver int  `json:"talked_over"`
+}
+
+// Metric One metric's value and the flags it raised.
+type Metric struct {
+	Flags *[]string              `json:"flags,omitempty"`
+	Value map[string]interface{} `json:"value"`
 }
 
 // NoiseLevel How loud the background is, as the caller's speech level above the noise.
@@ -1783,6 +1825,11 @@ type ClientInterface interface {
 	// Corresponds with GET /api/v1/conversations/{conversation_id}/events (the `StreamEventsApiV1ConversationsConversationIdEventsGet` operationId).
 	StreamEventsApiV1ConversationsConversationIdEventsGet(ctx context.Context, conversationId openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// GetMetricsApiV1ConversationsConversationIdMetricsGet Get Metrics
+	//
+	// Corresponds with GET /api/v1/conversations/{conversation_id}/metrics (the `GetMetricsApiV1ConversationsConversationIdMetricsGet` operationId).
+	GetMetricsApiV1ConversationsConversationIdMetricsGet(ctx context.Context, conversationId openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// GetRecordingApiV1ConversationsConversationIdRecordingGet Get Recording
 	//
 	// Corresponds with GET /api/v1/conversations/{conversation_id}/recording (the `GetRecordingApiV1ConversationsConversationIdRecordingGet` operationId).
@@ -2432,6 +2479,21 @@ func (c *Client) EndConversationApiV1ConversationsConversationIdEndPost(ctx cont
 // Corresponds with GET /api/v1/conversations/{conversation_id}/events (the `StreamEventsApiV1ConversationsConversationIdEventsGet` operationId).
 func (c *Client) StreamEventsApiV1ConversationsConversationIdEventsGet(ctx context.Context, conversationId openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewStreamEventsApiV1ConversationsConversationIdEventsGetRequest(c.Server, conversationId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetMetricsApiV1ConversationsConversationIdMetricsGet Get Metrics
+//
+// Corresponds with GET /api/v1/conversations/{conversation_id}/metrics (the `GetMetricsApiV1ConversationsConversationIdMetricsGet` operationId).
+func (c *Client) GetMetricsApiV1ConversationsConversationIdMetricsGet(ctx context.Context, conversationId openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetMetricsApiV1ConversationsConversationIdMetricsGetRequest(c.Server, conversationId)
 	if err != nil {
 		return nil, err
 	}
@@ -4111,6 +4173,40 @@ func NewStreamEventsApiV1ConversationsConversationIdEventsGetRequest(server stri
 	return req, nil
 }
 
+// NewGetMetricsApiV1ConversationsConversationIdMetricsGetRequest constructs an http.Request for the GetMetricsApiV1ConversationsConversationIdMetricsGet method
+func NewGetMetricsApiV1ConversationsConversationIdMetricsGetRequest(server string, conversationId openapi_types.UUID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "conversation_id", conversationId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/conversations/%s/metrics", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewGetRecordingApiV1ConversationsConversationIdRecordingGetRequest constructs an http.Request for the GetRecordingApiV1ConversationsConversationIdRecordingGet method
 func NewGetRecordingApiV1ConversationsConversationIdRecordingGetRequest(server string, conversationId openapi_types.UUID) (*http.Request, error) {
 	var err error
@@ -5657,6 +5753,13 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with GET /api/v1/conversations/{conversation_id}/events (the `StreamEventsApiV1ConversationsConversationIdEventsGet` operationId).
 	StreamEventsApiV1ConversationsConversationIdEventsGetWithResponse(ctx context.Context, conversationId openapi_types.UUID, reqEditors ...RequestEditorFn) (*StreamEventsApiV1ConversationsConversationIdEventsGetResponse, error)
 
+	// GetMetricsApiV1ConversationsConversationIdMetricsGetWithResponse Get Metrics
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/conversations/{conversation_id}/metrics (the `GetMetricsApiV1ConversationsConversationIdMetricsGet` operationId).
+	GetMetricsApiV1ConversationsConversationIdMetricsGetWithResponse(ctx context.Context, conversationId openapi_types.UUID, reqEditors ...RequestEditorFn) (*GetMetricsApiV1ConversationsConversationIdMetricsGetResponse, error)
+
 	// GetRecordingApiV1ConversationsConversationIdRecordingGetWithResponse Get Recording
 	//
 	// Returns a wrapper object for the known response body format(s).
@@ -6805,6 +6908,54 @@ func (r StreamEventsApiV1ConversationsConversationIdEventsGetResponse) StatusCod
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r StreamEventsApiV1ConversationsConversationIdEventsGetResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetMetricsApiV1ConversationsConversationIdMetricsGetResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *ConversationMetrics
+	// JSON422 the response for an HTTP 422 `application/json` response
+	JSON422 *HTTPValidationError
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetMetricsApiV1ConversationsConversationIdMetricsGetResponse) GetJSON200() *ConversationMetrics {
+	return r.JSON200
+}
+
+// GetJSON422 returns the response for an HTTP 422 `application/json` response
+func (r GetMetricsApiV1ConversationsConversationIdMetricsGetResponse) GetJSON422() *HTTPValidationError {
+	return r.JSON422
+}
+
+// GetBody returns the raw response body bytes
+func (r GetMetricsApiV1ConversationsConversationIdMetricsGetResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetMetricsApiV1ConversationsConversationIdMetricsGetResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetMetricsApiV1ConversationsConversationIdMetricsGetResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetMetricsApiV1ConversationsConversationIdMetricsGetResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -8539,6 +8690,19 @@ func (c *ClientWithResponses) StreamEventsApiV1ConversationsConversationIdEvents
 	return ParseStreamEventsApiV1ConversationsConversationIdEventsGetResponse(rsp)
 }
 
+// GetMetricsApiV1ConversationsConversationIdMetricsGetWithResponse Get Metrics
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/conversations/{conversation_id}/metrics (the `GetMetricsApiV1ConversationsConversationIdMetricsGet` operationId).
+func (c *ClientWithResponses) GetMetricsApiV1ConversationsConversationIdMetricsGetWithResponse(ctx context.Context, conversationId openapi_types.UUID, reqEditors ...RequestEditorFn) (*GetMetricsApiV1ConversationsConversationIdMetricsGetResponse, error) {
+	rsp, err := c.GetMetricsApiV1ConversationsConversationIdMetricsGet(ctx, conversationId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetMetricsApiV1ConversationsConversationIdMetricsGetResponse(rsp)
+}
+
 // GetRecordingApiV1ConversationsConversationIdRecordingGetWithResponse Get Recording
 //
 // Returns a wrapper object for the known response body format(s).
@@ -9632,6 +9796,39 @@ func ParseStreamEventsApiV1ConversationsConversationIdEventsGetResponse(rsp *htt
 	}
 
 	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest HTTPValidationError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetMetricsApiV1ConversationsConversationIdMetricsGetResponse parses an HTTP response from a GetMetricsApiV1ConversationsConversationIdMetricsGetWithResponse call
+func ParseGetMetricsApiV1ConversationsConversationIdMetricsGetResponse(rsp *http.Response) (*GetMetricsApiV1ConversationsConversationIdMetricsGetResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetMetricsApiV1ConversationsConversationIdMetricsGetResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ConversationMetrics
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
 		var dest HTTPValidationError
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {

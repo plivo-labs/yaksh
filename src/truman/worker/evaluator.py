@@ -11,8 +11,9 @@ import uuid
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from truman.config import Settings
-from truman.db.models import Conversation, Evaluation
+from truman.db.models import AgentVersion, Conversation, Evaluation
 from truman.diagnostics import describe_exception
+from truman.domain.agents import AgentConfig
 from truman.evaluation import call, evaluations
 
 log = logging.getLogger(__name__)
@@ -75,7 +76,10 @@ class Evaluator:
         try:
             async with self._sessionmaker() as session:
                 conversation = await session.get_one(Conversation, evaluation.conversation_id)
-            metrics = await call.evaluate(conversation)
+                agent = await session.get_one(AgentVersion, conversation.agent_version_id)
+            metrics = await call.evaluate(
+                conversation, AgentConfig.model_validate(agent.config).agent_speaks_first
+            )
             if not held.is_set():
                 return
             async with self._sessionmaker() as session:

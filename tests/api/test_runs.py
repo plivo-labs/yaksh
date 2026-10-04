@@ -50,7 +50,7 @@ from truman.domain.latency import (
     Latency,
     LoopLag,
     Span,
-    response_times,
+    waits,
 )
 from truman.domain.voices import VoiceProvider, VoiceSettings
 from truman.worker.worker import Worker
@@ -570,14 +570,30 @@ async def test_response_times_reach_the_turns_the_list_and_the_run(
 
     hung_up = CallOutcome(connected=True, end_reason=EndReason.AGENT_HANGUP)
 
+    def response(
+        connected: int, caller_replies: list[tuple[int, int | None]], starts: list[int]
+    ) -> Latency:
+        agent = [Span(start_ms=at, end_ms=at + 300) for at in starts]
+        return Latency.answered(
+            waits(
+                connected,
+                caller_replies,
+                agent,
+                9_000,
+                goodbye_from_ms=None,
+                gaps=[],
+                agent_opens=True,
+            )
+        )
+
     def measured(latency: Latency) -> dict[MetricKey, Metric]:
         return {MetricKey.RESPONSE_TIME: Metric(value=latency.model_dump(mode="json"))}
 
     # The first call answers 200 ms after the caller's reply, then talks over the next reply;
     # its transcript turns start a little later than the recording's speech, as they do live.
-    quick = response_times(0, [(1_000, 2_000), (4_000, 4_800)], [2_200, 4_500])
+    quick = response(0, [(1_000, 2_000), (4_000, 4_800)], [2_200, 4_500])
     await finish(db, first, hung_up, transcript=answered(2_300, 4_600))
-    slow = response_times(0, [(1_000, 2_000)], [3_800])
+    slow = response(0, [(1_000, 2_000)], [3_800])
     await finish(db, second, hung_up, transcript=answered(3_900))
     single = await start(client, run["agent_id"])
     assert await claim(db) == single["id"]

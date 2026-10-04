@@ -21,7 +21,8 @@ async def summaries(session: AsyncSession, rows: list[Run]) -> list[RunSummary]:
     agents = await conversations.pinned_agents(session, (row.agent_version_id for row in rows))
     progress = await runs.progress(session, rows)
     counted = await runs.latest_conversations(session, [row.id for row in rows])
-    measured = await results.latencies(session, (c for ids in counted.values() for c in ids))
+    found = await results.evaluated(session, (c for ids in counted.values() for c in ids))
+    measured = {key: done.latency for key, done in found.items() if done.latency}
     return [
         RunSummary.of(
             row,
