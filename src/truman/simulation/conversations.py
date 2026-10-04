@@ -39,6 +39,7 @@ from truman.domain.conversations import (
     outcome_group,
 )
 from truman.domain.errors import NotFoundError
+from truman.domain.latency import Latency
 from truman.domain.personas import PersonaConfig
 from truman.domain.scenarios import ScenarioConfig
 from truman.domain.triggers import SEND_TIMEOUT_S
@@ -89,9 +90,13 @@ async def create_conversation(
     return conversation
 
 
-SORT_KEYS = {"created_at": Conversation.created_at, "talk_ms": Conversation.talk_ms}
-"""Columns a conversation list sorts on; `-` before a key sorts descending. Calls that never
-connected have no talk time and sort last either way."""
+SORT_KEYS = {
+    "created_at": Conversation.created_at,
+    "talk_ms": Conversation.talk_ms,
+    "response_p90_ms": Conversation.transcript["latency"]["p90_ms"].as_integer(),
+}
+"""Values a conversation list sorts on; `-` before a key sorts descending. Calls with no talk
+time or no response times sort last either way."""
 
 
 async def get_conversation(session: AsyncSession, conversation_id: uuid.UUID) -> Conversation:
@@ -169,6 +174,20 @@ async def list_conversations(
         query.order_by(order.nulls_last(), Conversation.id).offset(offset).limit(limit)
     )
     return list(rows), total or 0
+
+
+async def latencies(
+    session: AsyncSession, conversation_ids: Iterable[uuid.UUID]
+) -> dict[uuid.UUID, Latency]:
+    """The response times of each measured conversation, by id; read on their own, as lists
+    defer the transcript."""
+    found = Conversation.transcript["latency"]
+    rows = await session.execute(
+        select(Conversation.id, found.label("latency")).where(
+            Conversation.id.in_(set(conversation_ids)), found["replies"].is_not(None)
+        )
+    )
+    return {row.id: Latency.model_validate(row.latency) for row in rows}
 
 
 async def pinned_agents(
@@ -577,6 +596,7 @@ async def finalize(
 ) -> bool:
     """Record the terminal state; a run conversation in the error group is queued again, up to
     its run's retries. Returns False when the row was no longer ours to finish."""
+    transcript.latency = outcome.latency
     if outcome.connected:
         transcript.validity = Validity(
             ok=outcome.caller_error is None,

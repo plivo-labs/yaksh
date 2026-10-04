@@ -57,6 +57,34 @@ def response_times(
     )
 
 
+TURN_SLACK_MS = 100
+"""How much earlier than the recording's speech start a transcript turn can start: the live
+detector and the recording's detector can disagree by a few windows."""
+
+
+def place(agent_turn_starts: Sequence[int], replies: Sequence[Reply]) -> list[Reply | None]:
+    """The reply each agent turn starts with, in the order of the turns. A reply goes to the first
+    agent turn that starts no earlier than its speech, less the slack, and before the next
+    reply's speech. The transcript times agent turns when the live pipeline gets to them, so
+    they start late, not early: a turn just before the next reply's speech is a late turn of
+    this reply. A reply whose speech never became a turn goes nowhere."""
+    placed: list[Reply | None] = [None] * len(agent_turn_starts)
+    turn = 0
+    for index, reply in enumerate(replies):
+        following = replies[index + 1].speech_ms if index + 1 < len(replies) else None
+        while (
+            turn < len(agent_turn_starts)
+            and agent_turn_starts[turn] < reply.speech_ms - TURN_SLACK_MS
+        ):
+            turn += 1
+        if turn < len(agent_turn_starts) and (
+            following is None or agent_turn_starts[turn] < following
+        ):
+            placed[turn] = reply
+            turn += 1
+    return placed
+
+
 def nearest_rank(ordered: Sequence[int], fraction: float) -> int | None:
     """The value at that fraction of the sorted values, a value that happened: with fewer than
     ten values, the 90th percentile is the largest."""

@@ -159,6 +159,8 @@ class Transcript(BaseModel):
     turns: list[Turn] = Field(default_factory=list)
     wire_events: list[WireEvent] = Field(default_factory=list)
     validity: Validity | None = None
+    latency: Latency | None = None
+    """The agent's response times; None when the call was not measured."""
 
 
 class ConversationCreate(BaseModel):

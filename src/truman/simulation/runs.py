@@ -22,6 +22,7 @@ from truman.domain.conversations import (
     outcome_group,
 )
 from truman.domain.errors import ConflictError, NotFoundError, ValidationError
+from truman.domain.latency import Reply, nearest_rank
 from truman.domain.runs import (
     RunCreate,
     RunProgress,
@@ -312,6 +313,9 @@ async def progress(session: AsyncSession, runs: Sequence[Run]) -> dict[uuid.UUID
             func.array_agg(Conversation.talk_ms)
             .filter(latest, Conversation.talk_ms.is_not(None))
             .label("talk_ms"),
+            func.array_agg(Conversation.transcript["latency"]["replies"])
+            .filter(latest, Conversation.transcript["latency"]["replies"].is_not(None))
+            .label("replies"),
             func.min(Conversation.started_at).label("started_at"),
             func.max(Conversation.ended_at).label("ended_at"),
         )
@@ -330,11 +334,18 @@ def counted(rows: list[Row[Any]]) -> RunProgress:
     counts = dict.fromkeys(OutcomeGroup, 0)
     end_reasons: dict[EndReason, int] = {}
     talk_ms: list[int] = []
+    waits: list[int] = []
     for row in rows:
         counts[outcome_group(row.status, row.end_reason)] += row.latest
         if row.end_reason is not None and row.latest:
             end_reasons[row.end_reason] = end_reasons.get(row.end_reason, 0) + row.latest
         talk_ms += row.talk_ms or []
+        for replies in row.replies or []:
+            waits += [
+                wait
+                for reply in replies
+                if (wait := Reply.model_validate(reply).response_ms) is not None
+            ]
     active = any(row.latest and row.status in ACTIVE_STATUSES for row in rows)
     started = [row.started_at for row in rows if row.started_at is not None]
     ended = [row.ended_at for row in rows if row.ended_at is not None]
@@ -347,6 +358,8 @@ def counted(rows: list[Row[Any]]) -> RunProgress:
         end_reasons=end_reasons,
         retries=sum(row.retries for row in rows),
         median_talk_ms=round(statistics.median(talk_ms)) if talk_ms else None,
+        response_p50_ms=nearest_rank(sorted(waits), 0.5),
+        response_p90_ms=nearest_rank(sorted(waits), 0.9),
         waiting_reason=waiting_reason(
             queued=counts[OutcomeGroup.WAITING] > 0, full=run.full, waiting=run.waiting
         ),

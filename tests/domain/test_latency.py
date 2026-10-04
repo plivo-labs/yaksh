@@ -1,4 +1,4 @@
-from truman.domain.latency import Reply, nearest_rank, response_times
+from truman.domain.latency import Reply, nearest_rank, place, response_times
 
 
 def test_replies_are_paired_with_the_agent_speech_that_answers_them() -> None:
@@ -33,3 +33,7 @@ def test_replies_are_paired_with_the_agent_speech_that_answers_them() -> None:
     assert (measured.p50_ms, measured.p90_ms) == (600, 1_200)
     assert nearest_rank(list(range(1, 11)), 0.9) == 9
     assert nearest_rank([], 0.5) is None
+    # A transcript turn starts late, so a turn just before the next reply's speech is still the
+    # late turn of this reply; the next reply takes the turn after it.
+    early, late = Reply(start_ms=1_000, speech_ms=1_500), Reply(start_ms=2_000, speech_ms=2_400)
+    assert place([2_350, 2_500], [early, late]) == [early, late]

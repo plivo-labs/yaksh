@@ -235,11 +235,12 @@ async def finish(
     conversation_id: str,
     outcome: CallOutcome,
     worker_id: str = "w1",
+    transcript: Transcript | None = None,
 ) -> bool:
     """Record the outcome of a conversation the worker claimed, as the worker does."""
     async with db() as session:
         return await conversations.finalize(
-            session, uuid.UUID(conversation_id), worker_id, outcome, Transcript(), 0
+            session, uuid.UUID(conversation_id), worker_id, outcome, transcript or Transcript(), 0
         )
 
 
