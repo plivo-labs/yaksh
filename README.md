@@ -121,7 +121,15 @@ The phone provider limits the calls of the whole account that can be on the line
 
 ## CLI
 
-`truman` is a command-line client for this API, for coding agents, CI and people. Each command prints the server's JSON on stdout, and progress, hints and errors on stderr. It exits 0 when the command worked, and 1 otherwise. Until the release builds exist, build it from source with Go:
+`truman` is a command-line client for this API, for coding agents, CI and people. Each command prints the server's JSON on stdout, and progress, hints and errors on stderr. It exits 0 when the command worked, and 1 otherwise.
+
+To set it up through your coding agent, paste this into the agent:
+
+```text
+Install the Truman CLI with curl -fsSL https://raw.githubusercontent.com/plivo-labs/truman/main/install.sh | bash, then run npx skills add plivo-labs/truman -g and follow the truman skill to test my voice agent.
+```
+
+Until the release builds exist, build it from source with Go:
 
 ```sh
 cd cli && go build -o ~/.truman/bin/truman .
