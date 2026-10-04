@@ -582,6 +582,7 @@ async def end_expired(
     )
     if ended:
         await release_numbers(session, [row.id for row in ended], number_rest_s)
+        await evaluations.enqueue(session, [row.id for row in ended])
     return ended
 
 
@@ -660,7 +661,7 @@ async def finalize(
         if run is not None:
             await retry(session, run, [ended])
         if ended.status is not ConversationStatus.CANCELLED:
-            await evaluations.enqueue(session, conversation_id)
+            await evaluations.enqueue(session, [conversation_id])
     await session.commit()
     return ended is not None
 

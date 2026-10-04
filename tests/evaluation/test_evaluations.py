@@ -6,10 +6,10 @@ from pathlib import Path
 from httpx import AsyncClient
 from sqlalchemy import func, select, update
 
-from tests.conftest import Db, claim, eventually, finish, new_run
+from tests.conftest import Db, claim, eventually, expire_leases, finish, new_run, reap
 from truman.config import Settings
-from truman.db.models import Evaluation, MetricValue
-from truman.domain.conversations import CallOutcome, EndReason
+from truman.db.models import Conversation, Evaluation, MetricValue
+from truman.domain.conversations import CallOutcome, EndReason, Transcript, WireEvent, WireEventKind
 from truman.domain.evaluations import EvaluationState, Metric, MetricKey
 from truman.domain.latency import CallerReplyWindow
 from truman.evaluation import evaluations
@@ -24,7 +24,8 @@ async def saved_call(client: AsyncClient, db: Db, outcome: CallOutcome = HUNG_UP
     await new_run(client)
     conversation_id = await claim(db)
     assert conversation_id is not None
-    assert await finish(db, conversation_id, outcome)
+    connected = [WireEvent(kind=WireEventKind.CONNECTED, at_ms=0)] if outcome.connected else []
+    assert await finish(db, conversation_id, outcome, transcript=Transcript(wire_events=connected))
     return conversation_id
 
 
@@ -55,7 +56,7 @@ async def test_a_saved_call_is_queued_once_and_a_cancelled_one_not_at_all(
 ) -> None:
     conversation_id = await saved_call(client, db)
     async with db.begin() as session:
-        await evaluations.enqueue(session, uuid.UUID(conversation_id))
+        await evaluations.enqueue(session, [uuid.UUID(conversation_id)])
     await saved_call(client, db, CallOutcome(connected=False, end_reason=EndReason.USER_REQUEST))
 
     assert [str(e.conversation_id) for e in await queued(db)] == [conversation_id]
@@ -65,10 +66,19 @@ async def test_queueing_keeps_working_on_one_connection(client: AsyncClient, db:
     conversation_id = uuid.UUID(await saved_call(client, db))
     async with db() as session:
         for _ in range(8):
-            await evaluations.enqueue(session, conversation_id)
+            await evaluations.enqueue(session, [conversation_id])
         await session.commit()
 
     assert len(await queued(db)) == 1
+
+
+async def test_a_call_whose_worker_stopped_is_evaluated_too(client: AsyncClient, db: Db) -> None:
+    await new_run(client)
+    conversation_id = await claim(db)
+    await expire_leases(db, Conversation.id == conversation_id)
+
+    assert await reap(db) == 1
+    assert [str(e.conversation_id) for e in await queued(db)] == [conversation_id]
 
 
 async def test_a_late_write_from_an_earlier_claim_changes_nothing(

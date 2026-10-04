@@ -1776,6 +1776,55 @@
         }
       }
     },
+    "/api/v1/runs/{run_id}/metrics": {
+      "get": {
+        "tags": [
+          "runs"
+        ],
+        "summary": "Get Run Metrics",
+        "description": "The numbers over the run's counted conversations: the latest attempt of each repeat,\nunless it was cancelled.",
+        "operationId": "get_run_metrics_api_v1_runs__run_id__metrics_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunMetrics"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/runs/{run_id}/cancel": {
       "post": {
         "tags": [
@@ -3438,6 +3487,22 @@
         "title": "Category",
         "description": "What kind of situation a scenario tests. How the caller talks comes from the persona."
       },
+      "CategoryNumbers": {
+        "properties": {
+          "category": {
+            "$ref": "#/components/schemas/Category"
+          },
+          "numbers": {
+            "$ref": "#/components/schemas/RunNumbers"
+          }
+        },
+        "type": "object",
+        "required": [
+          "category",
+          "numbers"
+        ],
+        "title": "CategoryNumbers"
+      },
       "Channel": {
         "type": "string",
         "enum": [
@@ -4803,6 +4868,22 @@
         "title": "NoiseLevel",
         "description": "How loud the background is, as the caller's speech level above the noise."
       },
+      "NoiseNumbers": {
+        "properties": {
+          "noise": {
+            "$ref": "#/components/schemas/BackgroundNoise"
+          },
+          "numbers": {
+            "$ref": "#/components/schemas/RunNumbers"
+          }
+        },
+        "type": "object",
+        "required": [
+          "noise",
+          "numbers"
+        ],
+        "title": "NoiseNumbers"
+      },
       "NoiseSound": {
         "type": "string",
         "enum": [
@@ -5738,6 +5819,120 @@
         "title": "RunCreate",
         "description": "Limits that an operator sets, such as the most repeats, are checked where the settings\nare known."
       },
+      "RunMetrics": {
+        "properties": {
+          "overall": {
+            "$ref": "#/components/schemas/RunNumbers"
+          },
+          "by_category": {
+            "items": {
+              "$ref": "#/components/schemas/CategoryNumbers"
+            },
+            "type": "array",
+            "title": "By Category"
+          },
+          "by_noise": {
+            "items": {
+              "$ref": "#/components/schemas/NoiseNumbers"
+            },
+            "type": "array",
+            "title": "By Noise"
+          }
+        },
+        "type": "object",
+        "required": [
+          "overall",
+          "by_category",
+          "by_noise"
+        ],
+        "title": "RunMetrics"
+      },
+      "RunNumbers": {
+        "properties": {
+          "conversations": {
+            "type": "integer",
+            "title": "Conversations"
+          },
+          "evaluated": {
+            "type": "integer",
+            "title": "Evaluated"
+          },
+          "pending": {
+            "type": "integer",
+            "title": "Pending"
+          },
+          "failed": {
+            "type": "integer",
+            "title": "Failed"
+          },
+          "connected": {
+            "$ref": "#/components/schemas/Share"
+          },
+          "errors_before_connect": {
+            "type": "integer",
+            "title": "Errors Before Connect"
+          },
+          "response_p50_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Response P50 Ms"
+          },
+          "response_p90_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Response P90 Ms"
+          },
+          "unanswered": {
+            "$ref": "#/components/schemas/Share"
+          },
+          "talked_over": {
+            "$ref": "#/components/schemas/Share"
+          },
+          "long_wait": {
+            "$ref": "#/components/schemas/Share"
+          },
+          "dead_air": {
+            "$ref": "#/components/schemas/Share"
+          },
+          "flags": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Flags"
+          }
+        },
+        "type": "object",
+        "required": [
+          "conversations",
+          "evaluated",
+          "pending",
+          "failed",
+          "connected",
+          "errors_before_connect",
+          "response_p50_ms",
+          "response_p90_ms",
+          "unanswered",
+          "talked_over",
+          "long_wait",
+          "dead_air",
+          "flags"
+        ],
+        "title": "RunNumbers",
+        "description": "What the evaluations found over some of a run's conversations."
+      },
       "RunRead": {
         "properties": {
           "status": {
@@ -6650,6 +6845,49 @@
           "created_at"
         ],
         "title": "ScenarioVersionRead"
+      },
+      "Share": {
+        "properties": {
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "low": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Low"
+          },
+          "high": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "High"
+          }
+        },
+        "type": "object",
+        "required": [
+          "count",
+          "total",
+          "low",
+          "high"
+        ],
+        "title": "Share",
+        "description": "How many of a total, with the 95% Wilson interval of the rate: few calls give a wide\ninterval."
       },
       "TextDocumentCreate": {
         "properties": {

@@ -11,10 +11,10 @@ from truman.evaluation import metrics, speech
 
 
 async def evaluate(conversation: Conversation, agent_speaks_first: bool) -> dict[MetricKey, Metric]:
-    """The metrics of a saved call. A call that never connected has only its usage, and one
-    without a recording or its caller replies has no speech metrics: a missing value, never a
-    zero. agent_speaks_first is the pinned agent's setting: without it, Truman's caller opens
-    the call."""
+    """The metrics of a saved call. A call that never connected has only its usage. One that
+    failed before it was saved in full, or has no recording or caller replies, has no speech
+    metrics: a missing value, never a zero. agent_speaks_first is the pinned agent's setting:
+    without it, Truman's caller opens the call."""
     transcript = Transcript.model_validate(conversation.transcript or {})
     found = {
         MetricKey.USAGE: metrics.usage(
@@ -24,19 +24,23 @@ async def evaluate(conversation: Conversation, agent_speaks_first: bool) -> dict
             parsed(LineFacts, conversation.line_facts),
         )
     }
-    if transcript.stream_opened_ms is None:
+    if not transcript.connected:
         return found
-    gaps = media_gaps(transcript, transcript.stream_opened_ms)
+    found[MetricKey.AGENT_REPETITION] = metrics.agent_repetition(transcript.turns)
+    opened = transcript.stream_opened_ms
+    if opened is None:
+        found[MetricKey.CAPTURE_FAULTS] = metrics.incomplete_record()
+        return found
+    gaps = media_gaps(transcript, opened)
     found[MetricKey.CAPTURE_FAULTS] = metrics.capture_faults(
         transcript, conversation.recording_path is not None, gaps
     )
-    found[MetricKey.AGENT_REPETITION] = metrics.agent_repetition(transcript.turns)
     heard = await hear(conversation, transcript)
     if heard is None:
         return found
     goodbye = metrics.goodbye_from(transcript)
     paired = waits(
-        transcript.stream_opened_ms,
+        opened,
         heard.replies,
         heard.speech.agent,
         heard.end_ms,
@@ -51,13 +55,14 @@ async def evaluate(conversation: Conversation, agent_speaks_first: bool) -> dict
     return found
 
 
-def media_gaps(transcript: Transcript, stream_opened_ms: int) -> list[Span]:
+def media_gaps(transcript: Transcript, stream_opened_ms: int | None) -> list[Span]:
     """Where no media came from the agent's side, from the stream's opening on."""
     media = transcript.agent_media
     if media is None:
         return []
-    late = [Span(start_ms=stream_opened_ms, end_ms=media.first_ms)]
-    return [*late, *media.gaps] if media.first_ms > stream_opened_ms else media.gaps
+    if stream_opened_ms is None or media.first_ms <= stream_opened_ms:
+        return media.gaps
+    return [Span(start_ms=stream_opened_ms, end_ms=media.first_ms), *media.gaps]
 
 
 def parsed[T: (CallerSettings, CallerUsage, LineFacts)](

@@ -174,6 +174,12 @@ class Transcript(BaseModel):
     caller_replies: list[CallerReplyWindow] | None = None
     """Each caller reply, with where its own audio sits in the caller voice file."""
 
+    @property
+    def connected(self) -> bool:
+        """The call's audio started. The event is in the record even when the call later
+        failed, as when its worker stopped."""
+        return any(event.kind is WireEventKind.CONNECTED for event in self.wire_events)
+
 
 class LineFacts(BaseModel):
     """Plivo's hangup report for a call that connected, as Plivo wrote it: who hung up, why,

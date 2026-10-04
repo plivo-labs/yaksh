@@ -663,6 +663,15 @@ type BodyUploadDocumentApiV1DocumentsUploadPost struct {
 // Category What kind of situation a scenario tests. How the caller talks comes from the persona.
 type Category string
 
+// CategoryNumbers defines model for CategoryNumbers.
+type CategoryNumbers struct {
+	// Category What kind of situation a scenario tests. How the caller talks comes from the persona.
+	Category Category `json:"category"`
+
+	// Numbers What the evaluations found over some of a run's conversations.
+	Numbers RunNumbers `json:"numbers"`
+}
+
 // Channel defines model for Channel.
 type Channel string
 
@@ -909,6 +918,15 @@ type Metric struct {
 // NoiseLevel How loud the background is, as the caller's speech level above the noise.
 type NoiseLevel string
 
+// NoiseNumbers defines model for NoiseNumbers.
+type NoiseNumbers struct {
+	// Noise The sound behind the caller.
+	Noise BackgroundNoise `json:"noise"`
+
+	// Numbers What the evaluations found over some of a run's conversations.
+	Numbers RunNumbers `json:"numbers"`
+}
+
 // NoiseSound defines model for NoiseSound.
 type NoiseSound string
 
@@ -1127,6 +1145,46 @@ type RunCreate struct {
 	StartIntervalS  *int                 `json:"start_interval_s,omitempty"`
 }
 
+// RunMetrics defines model for RunMetrics.
+type RunMetrics struct {
+	ByCategory []CategoryNumbers `json:"by_category"`
+	ByNoise    []NoiseNumbers    `json:"by_noise"`
+
+	// Overall What the evaluations found over some of a run's conversations.
+	Overall RunNumbers `json:"overall"`
+}
+
+// RunNumbers What the evaluations found over some of a run's conversations.
+type RunNumbers struct {
+	// Connected How many of a total, with the 95% Wilson interval of the rate: few calls give a wide
+	// interval.
+	Connected     Share `json:"connected"`
+	Conversations int   `json:"conversations"`
+
+	// DeadAir How many of a total, with the 95% Wilson interval of the rate: few calls give a wide
+	// interval.
+	DeadAir             Share          `json:"dead_air"`
+	ErrorsBeforeConnect int            `json:"errors_before_connect"`
+	Evaluated           int            `json:"evaluated"`
+	Failed              int            `json:"failed"`
+	Flags               map[string]int `json:"flags"`
+
+	// LongWait How many of a total, with the 95% Wilson interval of the rate: few calls give a wide
+	// interval.
+	LongWait      Share `json:"long_wait"`
+	Pending       int   `json:"pending"`
+	ResponseP50Ms *int  `json:"response_p50_ms"`
+	ResponseP90Ms *int  `json:"response_p90_ms"`
+
+	// TalkedOver How many of a total, with the 95% Wilson interval of the rate: few calls give a wide
+	// interval.
+	TalkedOver Share `json:"talked_over"`
+
+	// Unanswered How many of a total, with the 95% Wilson interval of the rate: few calls give a wide
+	// interval.
+	Unanswered Share `json:"unanswered"`
+}
+
 // RunRead defines model for RunRead.
 type RunRead struct {
 	AgentId         openapi_types.UUID   `json:"agent_id"`
@@ -1264,6 +1322,15 @@ type ScenarioVersionRead struct {
 	Id         openapi_types.UUID `json:"id"`
 	ScenarioId openapi_types.UUID `json:"scenario_id"`
 	Version    int                `json:"version"`
+}
+
+// Share How many of a total, with the 95% Wilson interval of the rate: few calls give a wide
+// interval.
+type Share struct {
+	Count int      `json:"count"`
+	High  *float32 `json:"high"`
+	Low   *float32 `json:"low"`
+	Total int      `json:"total"`
 }
 
 // TextDocumentCreate defines model for TextDocumentCreate.
@@ -1970,6 +2037,14 @@ type ClientInterface interface {
 	//
 	// Corresponds with POST /api/v1/runs/{run_id}/cancel (the `CancelRunApiV1RunsRunIdCancelPost` operationId).
 	CancelRunApiV1RunsRunIdCancelPost(ctx context.Context, runId openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetRunMetricsApiV1RunsRunIdMetricsGet Get Run Metrics
+	//
+	// The numbers over the run's counted conversations: the latest attempt of each repeat,
+	// unless it was cancelled.
+	//
+	// Corresponds with GET /api/v1/runs/{run_id}/metrics (the `GetRunMetricsApiV1RunsRunIdMetricsGet` operationId).
+	GetRunMetricsApiV1RunsRunIdMetricsGet(ctx context.Context, runId openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// DeleteScenarioApiV1ScenariosScenarioIdDelete Delete Scenario
 	//
@@ -2865,6 +2940,24 @@ func (c *Client) GetRunApiV1RunsRunIdGet(ctx context.Context, runId openapi_type
 // Corresponds with POST /api/v1/runs/{run_id}/cancel (the `CancelRunApiV1RunsRunIdCancelPost` operationId).
 func (c *Client) CancelRunApiV1RunsRunIdCancelPost(ctx context.Context, runId openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCancelRunApiV1RunsRunIdCancelPostRequest(c.Server, runId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetRunMetricsApiV1RunsRunIdMetricsGet Get Run Metrics
+//
+// The numbers over the run's counted conversations: the latest attempt of each repeat,
+// unless it was cancelled.
+//
+// Corresponds with GET /api/v1/runs/{run_id}/metrics (the `GetRunMetricsApiV1RunsRunIdMetricsGet` operationId).
+func (c *Client) GetRunMetricsApiV1RunsRunIdMetricsGet(ctx context.Context, runId openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetRunMetricsApiV1RunsRunIdMetricsGetRequest(c.Server, runId)
 	if err != nil {
 		return nil, err
 	}
@@ -4995,6 +5088,40 @@ func NewCancelRunApiV1RunsRunIdCancelPostRequest(server string, runId openapi_ty
 	return req, nil
 }
 
+// NewGetRunMetricsApiV1RunsRunIdMetricsGetRequest constructs an http.Request for the GetRunMetricsApiV1RunsRunIdMetricsGet method
+func NewGetRunMetricsApiV1RunsRunIdMetricsGetRequest(server string, runId openapi_types.UUID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "run_id", runId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/runs/%s/metrics", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewDeleteScenarioApiV1ScenariosScenarioIdDeleteRequest constructs an http.Request for the DeleteScenarioApiV1ScenariosScenarioIdDelete method
 func NewDeleteScenarioApiV1ScenariosScenarioIdDeleteRequest(server string, scenarioId openapi_types.UUID) (*http.Request, error) {
 	var err error
@@ -5928,6 +6055,16 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with POST /api/v1/runs/{run_id}/cancel (the `CancelRunApiV1RunsRunIdCancelPost` operationId).
 	CancelRunApiV1RunsRunIdCancelPostWithResponse(ctx context.Context, runId openapi_types.UUID, reqEditors ...RequestEditorFn) (*CancelRunApiV1RunsRunIdCancelPostResponse, error)
+
+	// GetRunMetricsApiV1RunsRunIdMetricsGetWithResponse Get Run Metrics
+	//
+	// The numbers over the run's counted conversations: the latest attempt of each repeat,
+	// unless it was cancelled.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/runs/{run_id}/metrics (the `GetRunMetricsApiV1RunsRunIdMetricsGet` operationId).
+	GetRunMetricsApiV1RunsRunIdMetricsGetWithResponse(ctx context.Context, runId openapi_types.UUID, reqEditors ...RequestEditorFn) (*GetRunMetricsApiV1RunsRunIdMetricsGetResponse, error)
 
 	// DeleteScenarioApiV1ScenariosScenarioIdDeleteWithResponse Delete Scenario
 	//
@@ -7839,6 +7976,54 @@ func (r CancelRunApiV1RunsRunIdCancelPostResponse) ContentType() string {
 	return ""
 }
 
+type GetRunMetricsApiV1RunsRunIdMetricsGetResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *RunMetrics
+	// JSON422 the response for an HTTP 422 `application/json` response
+	JSON422 *HTTPValidationError
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetRunMetricsApiV1RunsRunIdMetricsGetResponse) GetJSON200() *RunMetrics {
+	return r.JSON200
+}
+
+// GetJSON422 returns the response for an HTTP 422 `application/json` response
+func (r GetRunMetricsApiV1RunsRunIdMetricsGetResponse) GetJSON422() *HTTPValidationError {
+	return r.JSON422
+}
+
+// GetBody returns the raw response body bytes
+func (r GetRunMetricsApiV1RunsRunIdMetricsGetResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetRunMetricsApiV1RunsRunIdMetricsGetResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetRunMetricsApiV1RunsRunIdMetricsGetResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetRunMetricsApiV1RunsRunIdMetricsGetResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type DeleteScenarioApiV1ScenariosScenarioIdDeleteResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -9008,6 +9193,22 @@ func (c *ClientWithResponses) CancelRunApiV1RunsRunIdCancelPostWithResponse(ctx 
 		return nil, err
 	}
 	return ParseCancelRunApiV1RunsRunIdCancelPostResponse(rsp)
+}
+
+// GetRunMetricsApiV1RunsRunIdMetricsGetWithResponse Get Run Metrics
+//
+// The numbers over the run's counted conversations: the latest attempt of each repeat,
+// unless it was cancelled.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/runs/{run_id}/metrics (the `GetRunMetricsApiV1RunsRunIdMetricsGet` operationId).
+func (c *ClientWithResponses) GetRunMetricsApiV1RunsRunIdMetricsGetWithResponse(ctx context.Context, runId openapi_types.UUID, reqEditors ...RequestEditorFn) (*GetRunMetricsApiV1RunsRunIdMetricsGetResponse, error) {
+	rsp, err := c.GetRunMetricsApiV1RunsRunIdMetricsGet(ctx, runId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetRunMetricsApiV1RunsRunIdMetricsGetResponse(rsp)
 }
 
 // DeleteScenarioApiV1ScenariosScenarioIdDeleteWithResponse Delete Scenario
@@ -10422,6 +10623,39 @@ func ParseCancelRunApiV1RunsRunIdCancelPostResponse(rsp *http.Response) (*Cancel
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest RunRead
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest HTTPValidationError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetRunMetricsApiV1RunsRunIdMetricsGetResponse parses an HTTP response from a GetRunMetricsApiV1RunsRunIdMetricsGetWithResponse call
+func ParseGetRunMetricsApiV1RunsRunIdMetricsGetResponse(rsp *http.Response) (*GetRunMetricsApiV1RunsRunIdMetricsGetResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetRunMetricsApiV1RunsRunIdMetricsGetResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest RunMetrics
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}

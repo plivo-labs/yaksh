@@ -82,8 +82,18 @@ After each call, the evaluator also computes metrics from what the call saved. `
 | `speech` | Where each side spoke. | |
 | `speaking` | Each side's speech time before the caller's goodbye, the agent's share, and the agent's longest speech with no caller speech in it. | `monologue` (45 s) |
 | `agent_repetition` | The same agent answer, given 3 or more times in a row, each time after a caller reply. | `repetition` |
-| `capture_faults` | Faults on Truman's side: a caller error, caller turns that Plivo did not confirm as played before the last reply, a missing recording, no media or gaps in the media from the agent's side, a worker stall over 100 ms. Read the other metrics of such a call with care. | one for each fault |
+| `capture_faults` | Faults on Truman's side: a caller error, caller turns that Plivo did not confirm as played before the last reply, a missing recording, no media or gaps in the media from the agent's side, a worker stall over 100 ms. A call whose worker stopped before it saved the call in full gets only `incomplete_record`. Read the other metrics of such a call with care. | one for each fault |
 | `usage` | The caller's models and what they used, Plivo's billed duration, and the time from the call's start to ringing, answer and stream open. | |
+
+`GET /api/v1/runs/<run id>/metrics` pools the metrics of the run's counted conversations: the latest attempt of each repeat, unless it was cancelled. It gives these numbers for the whole run, for each scenario category and for each background noise:
+
+- How many conversations are evaluated, pending or failed.
+- The connection rate: calls whose audio started, of the calls that connected or did not connect. A call that failed after its audio started counts as connected. Truman's own errors before a call connected are counted on their own.
+- The response time p50 and p90 over all the replies.
+- The share of calls with a reply that the agent did not answer, with a talk-over, with a wait of 5 s or more, and with a wait of 10 s or more. A share counts calls, not replies, because the replies of one call are not independent of each other.
+- How many calls raised each flag.
+
+Each share comes with a 95% Wilson interval, so a run with few calls shows how little it can tell. The category grouping uses each scenario's category as it is now. The run's `response_p50_ms` and `response_p90_ms` use the same counted conversations.
 
 ## Files
 

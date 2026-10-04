@@ -2,7 +2,7 @@
 time under a lease, written back only by the evaluator that holds the latest claim."""
 
 import uuid
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from datetime import timedelta
 
 from sqlalchemy import ColumnElement, and_, func, or_, select, update
@@ -18,14 +18,15 @@ CODE_VERSION = "1"
 """The version of the code metrics; it changes when a metric's definition does."""
 
 
-async def enqueue(session: AsyncSession, conversation_id: uuid.UUID) -> None:
-    """Queue the conversation's evaluation in the caller's transaction; a second call for the
-    same conversation adds nothing."""
+async def enqueue(session: AsyncSession, conversation_ids: Sequence[uuid.UUID]) -> None:
+    """Queue the conversations' evaluations in the caller's transaction; a conversation that
+    has one already keeps it."""
+    if not conversation_ids:
+        return
     await session.execute(
         insert(Evaluation)
         .values(
-            conversation_id=conversation_id,
-            state=EvaluationState.QUEUED,
+            [{"conversation_id": id, "state": EvaluationState.QUEUED} for id in conversation_ids]
         )
         .on_conflict_do_nothing(index_elements=["conversation_id"])
     )

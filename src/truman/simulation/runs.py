@@ -355,13 +355,17 @@ def counted(rows: list[Row[Any]]) -> RunProgress:
     )
 
 
-async def latest_conversations(
+async def counted_conversations(
     session: AsyncSession, run_ids: Sequence[uuid.UUID]
 ) -> dict[uuid.UUID, list[uuid.UUID]]:
-    """The conversations of each run that count: the latest attempt of each repeat."""
+    """The conversations of each run that its numbers count: the latest attempt of each
+    repeat, unless it was cancelled."""
     rows = await session.execute(
         select(Conversation.run_id, Conversation.id).where(
-            Conversation.run_id.in_(run_ids), latest_attempt()
+            Conversation.run_id.in_(run_ids),
+            latest_attempt(),
+            Conversation.status != ConversationStatus.CANCELLED,
+            Conversation.end_reason.is_distinct_from(EndReason.USER_REQUEST),
         )
     )
     found: dict[uuid.UUID, list[uuid.UUID]] = defaultdict(list)

@@ -9,6 +9,7 @@ from truman.api.deps import SessionDep, SettingsDep
 from truman.api.pagination import Page, PageDep
 from truman.api.schemas.runs import RunRead, RunSummary
 from truman.db.models import Run
+from truman.domain.evaluations import RunMetrics
 from truman.domain.latency import pooled
 from truman.domain.runs import RunCreate, RunStatus
 from truman.evaluation import results
@@ -20,7 +21,7 @@ router = APIRouter(prefix="/runs", tags=["runs"], dependencies=[Depends(require_
 async def summaries(session: AsyncSession, rows: list[Run]) -> list[RunSummary]:
     agents = await conversations.pinned_agents(session, (row.agent_version_id for row in rows))
     progress = await runs.progress(session, rows)
-    counted = await runs.latest_conversations(session, [row.id for row in rows])
+    counted = await runs.counted_conversations(session, [row.id for row in rows])
     found = await results.evaluated(session, (c for ids in counted.values() for c in ids))
     measured = {key: done.latency for key, done in found.items() if done.latency}
     return [
@@ -63,6 +64,15 @@ async def list_runs(
 @router.get("/{run_id}")
 async def get_run(run_id: uuid.UUID, session: SessionDep) -> RunRead:
     return await detail(session, await runs.get_run(session, run_id))
+
+
+@router.get("/{run_id}/metrics")
+async def get_run_metrics(run_id: uuid.UUID, session: SessionDep) -> RunMetrics:
+    """The numbers over the run's counted conversations: the latest attempt of each repeat,
+    unless it was cancelled."""
+    run = await runs.get_run(session, run_id)
+    counted = await runs.counted_conversations(session, [run.id])
+    return await results.run_metrics(session, counted.get(run.id, []))
 
 
 @router.post("/{run_id}/cancel")

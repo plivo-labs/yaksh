@@ -219,6 +219,12 @@ def capture_faults(transcript: Transcript, recorded: bool, gaps: Sequence[Span])
     )
 
 
+def incomplete_record() -> Metric:
+    """A connected call whose worker stopped before it saved the call in full: its other
+    faults are unknown, as are its speech metrics."""
+    return Metric(value={"incomplete_record": True}, flags=["incomplete_record"])
+
+
 def usage(
     transcript: Transcript,
     settings: CallerSettings | None,
