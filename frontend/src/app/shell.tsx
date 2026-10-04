@@ -141,7 +141,10 @@ export function Shell() {
             <SidebarTrigger />
             {page && Crumbs && (
               <>
-                <Separator orientation="vertical" className="mr-2 h-4 self-center" />
+                <Separator
+                  orientation="vertical"
+                  className="mr-2 data-vertical:h-4 data-vertical:self-center"
+                />
                 <Crumbs key={page.id} />
               </>
             )}
