@@ -33,8 +33,17 @@ type Loaded struct {
 }
 
 // Load reads the saved file, if there is one, then lets the environment override each value.
+// When the environment sets both values, Load does not read the file at all.
 // getenv is os.Getenv outside tests.
 func Load(getenv func(string) string) (Loaded, error) {
+	server, token := getenv("TRUMAN_URL"), getenv("TRUMAN_API_TOKEN")
+	if server != "" && token != "" {
+		return Loaded{
+			Settings:   Settings{Server: server, Token: token},
+			ServerFrom: FromEnvironment,
+			TokenFrom:  FromEnvironment,
+		}, nil
+	}
 	l := Loaded{ServerFrom: Unset, TokenFrom: Unset}
 	path, err := Path(getenv)
 	if err != nil {
@@ -56,11 +65,11 @@ func Load(getenv func(string) string) (Loaded, error) {
 	if l.Token != "" {
 		l.TokenFrom = FromFile
 	}
-	if v := getenv("TRUMAN_URL"); v != "" {
-		l.Server, l.ServerFrom = v, FromEnvironment
+	if server != "" {
+		l.Server, l.ServerFrom = server, FromEnvironment
 	}
-	if v := getenv("TRUMAN_API_TOKEN"); v != "" {
-		l.Token, l.TokenFrom = v, FromEnvironment
+	if token != "" {
+		l.Token, l.TokenFrom = token, FromEnvironment
 	}
 	return l, nil
 }

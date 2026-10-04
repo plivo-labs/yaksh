@@ -71,6 +71,22 @@ func TestLoadRejectsABrokenFile(t *testing.T) {
 	}
 }
 
+func TestLoadSkipsTheFileWhenTheEnvironmentSetsBoth(t *testing.T) {
+	brokenHome := t.TempDir()
+	writeConfig(t, brokenHome, "{not json")
+	want := Loaded{Settings{"http://localhost:8000", "env-token"}, FromEnvironment, FromEnvironment}
+	for name, home := range map[string]string{"broken file": brokenHome, "no HOME": ""} {
+		t.Run(name, func(t *testing.T) {
+			got, err := Load(env(map[string]string{
+				"HOME": home, "TRUMAN_URL": "http://localhost:8000", "TRUMAN_API_TOKEN": "env-token",
+			}))
+			if err != nil || got != want {
+				t.Fatalf("Load = %+v, %v; want %+v", got, err, want)
+			}
+		})
+	}
+}
+
 func TestSaveThenLoadThenRemove(t *testing.T) {
 	getenv := env(map[string]string{"HOME": t.TempDir()})
 	want := Settings{Server: "https://truman.example.com", Token: "t0k"}
