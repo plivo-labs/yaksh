@@ -23,6 +23,7 @@ dependencies = [
     "python-dotenv>=1.2.3",
     "python-multipart>=0.0.32",
     "pyyaml>=6.0.3",
+    "regex>=2025.9.1",
     "sqlalchemy[asyncio]>=2.0.54",
     "typer>=0.27.2",
     "uvicorn[standard]>=0.53.0",
@@ -51,6 +52,7 @@ dev = [
     "import-linter>=2.15",
     "types-pyyaml>=6.0.12.20260906",
     "types-aiobotocore-s3>=3.9.1",
+    "types-regex>=2026.9.10.20260911",
 ]
 
 [tool.ruff]

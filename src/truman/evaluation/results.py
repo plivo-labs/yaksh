@@ -10,7 +10,7 @@ from typing import Any, NamedTuple
 from sqlalchemy import ColumnElement, and_, case, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from truman.db.models import Conversation, Evaluation, MetricValue, Scenario
+from truman.db.models import Conversation, Evaluation, EvaluationItem, MetricValue, Scenario
 from truman.domain.background_noise import BackgroundNoise, NoiseLevel, NoiseSound
 from truman.domain.conversations import OutcomeGroup, WireEventKind, outcome_group
 from truman.domain.evaluations import (
@@ -57,19 +57,24 @@ async def evaluated(
     }
 
 
-async def metrics(
+async def evaluation(
     session: AsyncSession, conversation_id: uuid.UUID
-) -> tuple[Evaluation | None, dict[str, Metric]]:
-    """The conversation's evaluation, and its metrics by key once it is done."""
-    evaluation = await session.scalar(
+) -> tuple[Evaluation | None, dict[str, Metric], list[EvaluationItem]]:
+    """The conversation's evaluation, and once it is done, its metrics by key and its items in
+    the order they were stored."""
+    found = await session.scalar(
         select(Evaluation).where(Evaluation.conversation_id == conversation_id)
     )
-    if evaluation is None:
-        return None, {}
-    rows = await session.scalars(
-        select(MetricValue).where(MetricValue.evaluation_id == evaluation.id)
+    if found is None:
+        return None, {}, []
+    rows = await session.scalars(select(MetricValue).where(MetricValue.evaluation_id == found.id))
+    items = await session.scalars(
+        select(EvaluationItem)
+        .where(EvaluationItem.evaluation_id == found.id)
+        .order_by(EvaluationItem.created_at, EvaluationItem.id)
     )
-    return evaluation, {row.metric_key: Metric(value=row.value, flags=row.flags) for row in rows}
+    metrics = {row.metric_key: Metric(value=row.value, flags=row.flags) for row in rows}
+    return found, metrics, list(items)
 
 
 def response_p90() -> ColumnElement[int]:

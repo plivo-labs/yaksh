@@ -13,7 +13,7 @@ from truman.domain.conversations import CallOutcome, EndReason, Transcript, Wire
 from truman.domain.evaluations import EvaluationState, Metric, MetricKey
 from truman.domain.latency import CallerReplyWindow
 from truman.evaluation import evaluations
-from truman.evaluation.evaluations import MAX_ATTEMPTS
+from truman.evaluation.evaluations import MAX_ATTEMPTS, Evaluated
 from truman.worker.evaluator import Evaluator
 
 HUNG_UP = CallOutcome(connected=True, end_reason=EndReason.AGENT_HANGUP)
@@ -97,10 +97,16 @@ async def test_a_late_write_from_an_earlier_claim_changes_nothing(
     async with db() as session:
         assert not await evaluations.renew(session, first.id, first.claim_seq, 60)
         assert not await evaluations.finish(
-            session, first.id, first.claim_seq, {MetricKey.SPEECH: Metric(value={})}
+            session,
+            first.id,
+            first.claim_seq,
+            Evaluated(metrics={MetricKey.SPEECH: Metric(value={})}),
         )
         assert await evaluations.finish(
-            session, second.id, second.claim_seq, {MetricKey.RESPONSE_TIME: Metric(value={"n": 1})}
+            session,
+            second.id,
+            second.claim_seq,
+            Evaluated(metrics={MetricKey.RESPONSE_TIME: Metric(value={"n": 1})}),
         )
 
     assert await stored(db, first.id) == {MetricKey.RESPONSE_TIME: Metric(value={"n": 1})}

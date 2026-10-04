@@ -254,17 +254,21 @@ async def plan(model: JsonModel, prepared: Prepared) -> Plan:
         prepared.agent_name, prepared.agent, context, prepared.existing, command.instructions
     )
     if command.mode is GenerationMode.KNOWLEDGE_BASE:
-        answer = await model.complete_json(
-            system=QUESTIONS_SYSTEM, user=user, name="questions", schema=QUESTIONS_SCHEMA
-        )
+        answer = (
+            await model.complete_json(
+                system=QUESTIONS_SYSTEM, user=user, name="questions", schema=QUESTIONS_SCHEMA
+            )
+        ).data
         answered, unanswered = grounded_questions(answer, prepared.documents)
         return Plan(
             question_slots(answered, unanswered, command.count),
             [question.question for question in answered],
         )
-    answer = await model.complete_json(
-        system=CAPABILITIES_SYSTEM, user=user, name="capabilities", schema=CAPABILITIES_SCHEMA
-    )
+    answer = (
+        await model.complete_json(
+            system=CAPABILITIES_SYSTEM, user=user, name="capabilities", schema=CAPABILITIES_SCHEMA
+        )
+    ).data
     capabilities = grounded_capabilities(answer, normalized_text(context))
     return Plan(
         agent_slots(capabilities, command.count),
@@ -381,9 +385,11 @@ class Writer:
             prepared.existing,
             prepared.command.instructions,
         )
-        return await self._model.complete_json(
-            system=SCENARIO_SYSTEM, user=user, name="scenario", schema=SCENARIO_SCHEMA
-        )
+        return (
+            await self._model.complete_json(
+                system=SCENARIO_SYSTEM, user=user, name="scenario", schema=SCENARIO_SCHEMA
+            )
+        ).data
 
     def checked(self, answer: dict[str, Any], slot: Slot, persona_id: uuid.UUID) -> ScenarioCreate:
         """The written scenario as the API would take it, or why it cannot be saved."""

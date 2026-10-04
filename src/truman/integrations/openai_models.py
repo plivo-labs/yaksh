@@ -1,5 +1,5 @@
 """Structured JSON answers from the Responses API of OpenAI or a compatible service, for
-generating test scenarios."""
+generating test scenarios and for judging calls."""
 
 import asyncio
 import json
@@ -7,10 +7,10 @@ import logging
 from typing import Any
 
 import openai
-from openai import AsyncOpenAI
+from openai import AsyncOpenAI, omit
 from openai.types.responses import Response
 
-from truman.domain.errors import UnavailableError
+from truman.domain.language_models import ModelAnswer, ModelCallError
 
 log = logging.getLogger(__name__)
 
@@ -21,10 +21,17 @@ CHECK_TIMEOUT_S = 15.0
 
 
 class OpenAIJsonModel:
-    def __init__(self, client: AsyncOpenAI, model: str, reasoning_effort: str | None) -> None:
+    def __init__(
+        self,
+        client: AsyncOpenAI,
+        model: str,
+        reasoning_effort: str | None,
+        max_output_tokens: int | None = None,
+    ) -> None:
         self._client = client
         self.model = model
         self._reasoning_effort = reasoning_effort
+        self._max_output_tokens = max_output_tokens
         self._reasoning_taken: bool | None = None
         self._reasoning_check = asyncio.Lock()
 
@@ -37,11 +44,13 @@ class OpenAIJsonModel:
         base_url: str | None = None,
         timeout_s: float,
         reasoning_effort: str | None = None,
+        retries: int = RETRIES,
+        max_output_tokens: int | None = None,
     ) -> OpenAIJsonModel:
         client = AsyncOpenAI(
-            api_key=api_key, base_url=base_url, timeout=timeout_s, max_retries=RETRIES
+            api_key=api_key, base_url=base_url, timeout=timeout_s, max_retries=retries
         )
-        return cls(client, model, reasoning_effort)
+        return cls(client, model, reasoning_effort, max_output_tokens)
 
     async def _reasoning(self) -> dict[str, dict[str, str]]:
         """The reasoning effort to send, when the model takes it. Asked on the first call, and on
@@ -58,7 +67,7 @@ class OpenAIJsonModel:
 
     async def complete_json(
         self, *, system: str, user: str, name: str, schema: dict[str, Any]
-    ) -> dict[str, Any]:
+    ) -> ModelAnswer:
         try:
             response = await self._client.responses.create(
                 model=self.model,
@@ -74,15 +83,20 @@ class OpenAIJsonModel:
                 },
                 store=False,
                 extra_body=await self._reasoning(),
+                max_output_tokens=(
+                    omit if self._max_output_tokens is None else self._max_output_tokens
+                ),
             )
         except openai.OpenAIError as error:
-            raise UnavailableError(f"the model call failed: {failure(error)}") from error
+            raise ModelCallError(
+                f"the model call failed: {failure(error)}", temporary=temporary(error)
+            ) from error
         if refusal := refused(response):
-            raise UnavailableError(f"the model refused: {refusal}")
+            raise ModelCallError(f"the model refused: {refusal}", temporary=False)
         if response.status != "completed":
             details = response.incomplete_details
             reason = details.reason if details and details.reason else response.status
-            raise UnavailableError(f"the model's answer was cut short ({reason})")
+            raise ModelCallError(f"the model's answer was cut short ({reason})", temporary=False)
         if response.usage:
             log.info(
                 "model %s answered %s: %d tokens in, %d out",
@@ -94,10 +108,18 @@ class OpenAIJsonModel:
         try:
             answer = json.loads(response.output_text)
         except json.JSONDecodeError as error:
-            raise UnavailableError(f"the model's answer is not JSON: {error}") from error
+            raise ModelCallError(
+                f"the model's answer is not JSON: {error}", temporary=False
+            ) from error
         if not isinstance(answer, dict):
-            raise UnavailableError("the model's answer is not a JSON object")
-        return answer
+            raise ModelCallError("the model's answer is not a JSON object", temporary=False)
+        usage = response.usage
+        return ModelAnswer(
+            data=answer,
+            model=response.model,
+            input_tokens=usage.input_tokens if usage else None,
+            output_tokens=usage.output_tokens if usage else None,
+        )
 
     async def close(self) -> None:
         await self._client.close()
@@ -130,6 +152,16 @@ async def takes_reasoning_effort(client: AsyncOpenAI, model: str, effort: str) -
         return None
     log.info("model %s takes reasoning effort %s", model, effort)
     return True
+
+
+def temporary(error: openai.OpenAIError) -> bool:
+    """A failure that trying again later can cure: no answer in time, no connection, a rate
+    limit or a server error. A rejected request, such as an unknown model, is not."""
+    if isinstance(error, openai.APITimeoutError | openai.APIConnectionError):
+        return True
+    if isinstance(error, openai.APIStatusError):
+        return error.status_code == 429 or error.status_code >= 500
+    return False
 
 
 def failure(error: openai.OpenAIError) -> str:

@@ -7,6 +7,7 @@ from pydantic import BaseModel, ConfigDict
 from truman.db.models import Agent, Document
 from truman.domain.agents import AgentConfig, Direction, Transport
 from truman.domain.languages import Language
+from truman.domain.rules import AgentRules
 from truman.domain.triggers import OutboundConfig
 
 
@@ -45,6 +46,7 @@ class KnowledgeBaseDocument(BaseModel):
 class AgentRead(AgentSummary):
     config: str | None
     knowledge_base: list[KnowledgeBaseDocument]
+    rules: AgentRules
 
     @classmethod
     def of(cls, agent: Agent, documents: Mapping[uuid.UUID, Document]) -> AgentRead:
@@ -63,7 +65,7 @@ class AgentRead(AgentSummary):
                 )
             )
         summary = AgentSummary.model_validate(agent).model_dump()
-        return cls(**summary, config=agent.config, knowledge_base=entries)
+        return cls(**summary, config=agent.config, knowledge_base=entries, rules=agent.rules)
 
 
 class AgentVersionRead(BaseModel):

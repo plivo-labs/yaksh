@@ -37,10 +37,12 @@ from truman.domain.conversations import (
 )
 from truman.domain.errors import UnavailableError
 from truman.domain.evaluations import Metric, MetricKey
+from truman.domain.language_models import ModelAnswer, ModelCallError
 from truman.domain.languages import Language
 from truman.domain.numbers import AccountNumber
 from truman.domain.voices import ProviderVoice, VoiceGender, VoiceProvider, VoiceSettings
 from truman.evaluation import evaluations
+from truman.evaluation.evaluations import Evaluated
 from truman.integrations.elevenlabs import as_wav
 from truman.integrations.plivo_signature import signature, signed_text
 from truman.simulation import conversations, numbers
@@ -263,7 +265,10 @@ async def evaluate_queued(db: Db, metrics: dict[str, dict[MetricKey, Metric]]) -
         conversation_id = str(evaluation.conversation_id)
         async with db() as session:
             assert await evaluations.finish(
-                session, evaluation.id, evaluation.claim_seq, metrics.get(conversation_id, {})
+                session,
+                evaluation.id,
+                evaluation.claim_seq,
+                Evaluated(metrics=metrics.get(conversation_id, {})),
             )
         done.append(conversation_id)
 
@@ -475,15 +480,17 @@ class FakeJsonModel:
 
     async def complete_json(
         self, *, system: str, user: str, name: str, schema: dict[str, Any]
-    ) -> dict[str, Any]:
+    ) -> ModelAnswer:
         self.calls.append((name, user))
         if self.down:
-            raise UnavailableError("the model call failed: timed out")
+            raise ModelCallError("the model call failed: timed out", temporary=True)
         if name == "capabilities":
-            return {"capabilities": self.capabilities}
-        if name == "questions":
-            return self.questions
-        return self.write(user)
+            data = {"capabilities": self.capabilities}
+        elif name == "questions":
+            data = self.questions
+        else:
+            data = self.write(user)
+        return ModelAnswer(data=data, model="fake", input_tokens=None, output_tokens=None)
 
     async def close(self) -> None:
         pass
@@ -645,9 +652,10 @@ async def client(
     async with engine.begin() as connection:
         await connection.execute(
             text(
-                "TRUNCATE phone_numbers, refused_calls, metric_values, evaluations,"
-                " conversations, runs, agent_versions, agents, persona_versions, personas,"
-                " voices, scenario_versions, scenarios, workers, documents, scenario_generations"
+                "TRUNCATE phone_numbers, refused_calls, judge_calls, evaluation_items,"
+                " judge_versions, metric_values, evaluations, conversations, runs,"
+                " agent_versions, agents, persona_versions, personas, voices,"
+                " scenario_versions, scenarios, workers, documents, scenario_generations"
             )
         )
     await engine.dispose()

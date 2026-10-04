@@ -1,16 +1,165 @@
-"""What the evaluator reads from one saved conversation, and the metrics it computes."""
+"""What the evaluator reads from one saved conversation: its code metrics, its judged items and
+its verdicts."""
 
 import asyncio
+import uuid
+from collections.abc import Mapping
+from dataclasses import dataclass
 from pathlib import Path
 
 from truman.db.models import Conversation
-from truman.domain.conversations import CallerSettings, CallerUsage, LineFacts, Transcript
-from truman.domain.evaluations import Metric, MetricKey
+from truman.domain.agents import AgentConfig, Direction
+from truman.domain.conversations import (
+    CallerSettings,
+    CallerUsage,
+    ConversationStatus,
+    EndReason,
+    LineFacts,
+    Transcript,
+    Turn,
+)
+from truman.domain.evaluations import ItemRole, Metric, MetricKey, Outcome, UnsureKind
+from truman.domain.language_models import JsonModel
 from truman.domain.latency import Latency, Span, waits
+from truman.domain.rules import LlmRule, PhraseRule
+from truman.domain.scenarios import ScenarioConfig
 from truman.evaluation import metrics, speech
+from truman.evaluation.criteria import AGENT_RULE, CRITERION, judge_criterion, judge_rule
+from truman.evaluation.evaluations import Evaluated
+from truman.evaluation.evidence import CallView, render
+from truman.evaluation.judging import ItemResult
+from truman.evaluation.rules import gate_open, gated, phrase_item
+from truman.evaluation.verdicts import verdict
 
 
-async def evaluate(conversation: Conversation, agent_speaks_first: bool) -> dict[MetricKey, Metric]:
+@dataclass(frozen=True)
+class Judging:
+    """What judging needs that lives as long as the evaluator: the judge model, the stored
+    judge versions by judge name, and the slots that bound the model calls in flight."""
+
+    model: JsonModel
+    versions: Mapping[str, uuid.UUID]
+    slots: asyncio.Semaphore
+
+
+JUDGES = (CRITERION, AGENT_RULE)
+"""Every judge an evaluation can name; the evaluator stores a version of each at start."""
+
+
+async def evaluate(
+    conversation: Conversation,
+    agent: AgentConfig,
+    scenario: ScenarioConfig,
+    judging: Judging | None,
+    *,
+    retry_later: bool,
+) -> Evaluated:
+    """Code metrics for every call. A call that completed and that no one stopped also gets its
+    agent's phrase rules and, with a judge model, its judges and verdicts; any other call none.
+    retry_later lets a temporary judge failure put the evaluation off; on its last attempt,
+    the failure is the item's error instead. Items come in order: criteria by number, then
+    rules as the agent lists them."""
+    transcript = Transcript.model_validate(conversation.transcript or {})
+    found = await measure_call(conversation, agent.agent_speaks_first)
+    if not judged(conversation):
+        return Evaluated(metrics=found)
+    turns = transcript.turns
+    if judging is None:
+        phrases = [phrase_item(rule, turns) for rule in agent.rules if isinstance(rule, PhraseRule)]
+        return Evaluated(metrics=found, items=phrases)
+    view = render(call_view(conversation, agent, scenario, transcript))
+    async with asyncio.TaskGroup() as group:
+        criteria = [
+            group.create_task(
+                judge_criterion(
+                    judging.model,
+                    view,
+                    turns,
+                    number,
+                    criterion,
+                    slots=judging.slots,
+                    retry_later=retry_later,
+                )
+            )
+            for number, criterion in enumerate(scenario.criteria, 1)
+        ]
+        rules = [
+            group.create_task(
+                judge_rule(
+                    judging.model, view, turns, rule, slots=judging.slots, retry_later=retry_later
+                )
+            )
+            if isinstance(rule, LlmRule) and gate_open(rule, transcript)
+            else rule
+            for rule in agent.rules
+        ]
+    items = [task.result() for task in criteria] + [rule_item(rule, turns) for rule in rules]
+    return Evaluated(
+        metrics=found,
+        items=items,
+        scenario_verdict=verdict(outcomes(items, criteria_only=True)),
+        conversation_verdict=verdict(outcomes(items, criteria_only=False)),
+        judge_versions=judging.versions,
+    )
+
+
+def rule_item(
+    rule: asyncio.Task[ItemResult] | LlmRule | PhraseRule, turns: list[Turn]
+) -> ItemResult:
+    """An agent rule's item: its judge's answer, its phrase check, or its shut gate."""
+    if isinstance(rule, asyncio.Task):
+        return rule.result()
+    if isinstance(rule, PhraseRule):
+        return phrase_item(rule, turns)
+    return gated(rule)
+
+
+def judged(conversation: Conversation) -> bool:
+    return (
+        conversation.status is ConversationStatus.COMPLETED
+        and conversation.end_reason is not EndReason.USER_REQUEST
+    )
+
+
+def outcomes(
+    items: list[ItemResult], *, criteria_only: bool
+) -> list[tuple[Outcome, UnsureKind | None]]:
+    """The outcomes a verdict counts: the criteria, and for the conversation verdict also the
+    agent rules that decide."""
+    return [
+        (item.outcome, item.unsure_kind)
+        for item in items
+        if item.key.startswith("criterion-")
+        or (not criteria_only and item.role is ItemRole.DECIDING)
+    ]
+
+
+def call_view(
+    conversation: Conversation, agent: AgentConfig, scenario: ScenarioConfig, transcript: Transcript
+) -> CallView:
+    line = parsed(LineFacts, conversation.line_facts)
+    return CallView(
+        brief=agent.brief,
+        agent_data=list(scenario.agent_data) if agent.direction is Direction.OUTBOUND else [],
+        goal=scenario.goal,
+        known_facts=list(scenario.known_facts),
+        unknown_facts=list(scenario.unknown_facts),
+        today=conversation.today,
+        time_zone=conversation.time_zone,
+        direction=agent.direction,
+        agent_number=agent.agent_number,
+        truman_number=conversation.caller_number,
+        agent_caller_id=conversation.agent_caller_id,
+        hangup_source=line.hangup_source if line else None,
+        end_reason=conversation.end_reason,
+        talk_ms=conversation.talk_ms,
+        turns=list(transcript.turns),
+    )
+
+
+async def measure_call(
+    conversation: Conversation, agent_speaks_first: bool
+) -> dict[MetricKey, Metric]:
     """The metrics of a saved call. A call that never connected has only its usage. One that
     failed before it was saved in full, or has no recording or caller replies, has no speech
     metrics: a missing value, never a zero. agent_speaks_first is the pinned agent's setting:

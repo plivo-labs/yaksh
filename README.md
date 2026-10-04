@@ -95,6 +95,18 @@ After each call, the evaluator also computes metrics from what the call saved. `
 
 Each share comes with a 95% Wilson interval, so a run with few calls shows how little it can tell. The category grouping uses each scenario's category as it is now. The run's `response_p50_ms` and `response_p90_ms` use the same counted conversations.
 
+## Judging
+
+The evaluator also judges each completed call that no one stopped: one model call for each criterion of the scenario and for each LLM rule of the agent. Each judge reads the same evidence view of the call: the agent's brief, the caller's goal and facts, the date, the call facts and the transcript. A judge quotes the transcript, and code checks each quote in its turn; an answer that fails the checks is asked again once. The verdicts are `pass`, `fail`, `not_applicable` and `unsure` (`hidden_action`, `not_confirmed_played`, `unclear`). A scenario passes when every criterion that applies passes; an `unsure` item that needs a hidden action counts as not applicable.
+
+| Variable | Purpose |
+| --- | --- |
+| `JUDGE_LLM_MODEL` | The judge model, default `gpt-6-luna`. Empty turns the judges off. |
+| `JUDGE_LLM_REASONING_EFFORT` | Default `medium`. |
+| `JUDGE_OPENAI_API_KEY`, `JUDGE_OPENAI_BASE_URL` | The judge's key and address; the caller's `OPENAI_API_KEY` and `OPENAI_BASE_URL` when unset. |
+
+An agent's rules check every judged call of that agent. An LLM rule says when it applies, when it passes and when it fails; its gate, `always` or `agent_spoke`, is checked in code first. A phrase rule is a required or forbidden phrase or regular expression in the agent's lines, checked in code: it matches the line as written or with numbers, dates and times in one written form, and a pattern has 0.5 s for each line. A rule with the role `deciding` counts in the conversation verdict. When the judge model fails for a while, its item waits and asks again; after the evaluator's last attempt, the item ends as an error and the call keeps its code metrics. `GET /api/v1/conversations/<conversation id>/evaluation` returns the verdicts, each item with its judge's answer, and the metrics.
+
 ## Files
 
 Uploaded files (PDF, TXT and MD documents about an agent) are kept in S3-compatible storage. The compose files run [SeaweedFS](https://github.com/seaweedfs/seaweedfs) for this, with its data in the `storage` volume. To use S3, R2 or another S3-compatible service instead, set:

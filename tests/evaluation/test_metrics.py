@@ -195,14 +195,16 @@ async def test_a_call_gets_only_the_metrics_its_facts_support() -> None:
             line_facts=None,
         )
 
-    never_connected = await call.evaluate(saved(Transcript()), agent_speaks_first=True)
+    never_connected = await call.measure_call(saved(Transcript()), agent_speaks_first=True)
     connected = [WireEvent(kind=WireEventKind.CONNECTED, at_ms=900)]
-    no_recording = await call.evaluate(
+    no_recording = await call.measure_call(
         saved(Transcript(stream_opened_ms=900, caller_replies=[], wire_events=connected)),
         agent_speaks_first=True,
     )
     # The worker failed after the call connected, before it saved the stream's opening.
-    crashed = await call.evaluate(saved(Transcript(wire_events=connected)), agent_speaks_first=True)
+    crashed = await call.measure_call(
+        saved(Transcript(wire_events=connected)), agent_speaks_first=True
+    )
 
     assert set(never_connected) == {MetricKey.USAGE}
     assert set(no_recording) == {

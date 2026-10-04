@@ -3,10 +3,10 @@ import type { ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { duration, percent, seconds } from "@/lib/format";
-import { useConversationMetrics } from "@/lib/queries";
+import { useConversationEvaluation } from "@/lib/queries";
 import {
   type CaptureFaults,
-  type ConversationMetrics,
+  type ConversationEvaluation,
   type EvaluationState,
   FLAG_TEXT,
   evaluationPending,
@@ -20,7 +20,7 @@ export function CallMetricsCard({
   conversationId: string;
   evaluation: EvaluationState | null;
 }) {
-  const found = useConversationMetrics(conversationId, evaluation);
+  const found = useConversationEvaluation(conversationId, evaluation);
   if (evaluation === null) return null;
   return (
     <Card>
@@ -43,7 +43,7 @@ export function CallMetricsCard({
   );
 }
 
-function Metrics({ found }: { found: ConversationMetrics }) {
+function Metrics({ found }: { found: ConversationEvaluation }) {
   const { turn_taking, speaking, agent_repetition, capture_faults, usage } = found.metrics;
   const flags = [...new Set(Object.values(found.metrics).flatMap((metric) => metric.flags))];
   const consumed = usage?.value.usage;

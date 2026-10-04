@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -81,6 +82,27 @@ func (e ConversationStatus) Valid() bool {
 	case ConversationStatusQueued:
 		return true
 	case ConversationStatusRunning:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DecidedBy.
+const (
+	DecidedByCode DecidedBy = "code"
+	DecidedByJev  DecidedBy = "jev"
+	DecidedByLlm  DecidedBy = "llm"
+)
+
+// Valid indicates whether the value is a known member of the DecidedBy enum.
+func (e DecidedBy) Valid() bool {
+	switch e {
+	case DecidedByCode:
+		return true
+	case DecidedByJev:
+		return true
+	case DecidedByLlm:
 		return true
 	default:
 		return false
@@ -222,6 +244,24 @@ func (e GenerationStatus) Valid() bool {
 	}
 }
 
+// Defines values for ItemRole.
+const (
+	Deciding  ItemRole = "deciding"
+	Reporting ItemRole = "reporting"
+)
+
+// Valid indicates whether the value is a known member of the ItemRole enum.
+func (e ItemRole) Valid() bool {
+	switch e {
+	case Deciding:
+		return true
+	case Reporting:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for Language.
 const (
 	En       Language = "en"
@@ -234,6 +274,21 @@ func (e Language) Valid() bool {
 	case En:
 		return true
 	case Hinglish:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for LlmRuleKind.
+const (
+	LlmRuleKindLlm LlmRuleKind = "llm"
+)
+
+// Valid indicates whether the value is a known member of the LlmRuleKind enum.
+func (e LlmRuleKind) Valid() bool {
+	switch e {
+	case LlmRuleKindLlm:
 		return true
 	default:
 		return false
@@ -321,6 +376,39 @@ func (e NumberState) Valid() bool {
 	}
 }
 
+// Defines values for Outcome.
+const (
+	OutcomeBlocked       Outcome = "blocked"
+	OutcomeError         Outcome = "error"
+	OutcomeFail          Outcome = "fail"
+	OutcomeNotApplicable Outcome = "not_applicable"
+	OutcomePass          Outcome = "pass"
+	OutcomePending       Outcome = "pending"
+	OutcomeUnsure        Outcome = "unsure"
+)
+
+// Valid indicates whether the value is a known member of the Outcome enum.
+func (e Outcome) Valid() bool {
+	switch e {
+	case OutcomeBlocked:
+		return true
+	case OutcomeError:
+		return true
+	case OutcomeFail:
+		return true
+	case OutcomeNotApplicable:
+		return true
+	case OutcomePass:
+		return true
+	case OutcomePending:
+		return true
+	case OutcomeUnsure:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for OutcomeGroup.
 const (
 	OutcomeGroupCancelled     OutcomeGroup = "cancelled"
@@ -345,6 +433,75 @@ func (e OutcomeGroup) Valid() bool {
 	case OutcomeGroupInProgress:
 		return true
 	case OutcomeGroupWaiting:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PhraseExpectation.
+const (
+	Forbidden PhraseExpectation = "forbidden"
+	Required  PhraseExpectation = "required"
+)
+
+// Valid indicates whether the value is a known member of the PhraseExpectation enum.
+func (e PhraseExpectation) Valid() bool {
+	switch e {
+	case Forbidden:
+		return true
+	case Required:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PhraseMatch.
+const (
+	PhraseMatchPhrase PhraseMatch = "phrase"
+	PhraseMatchRegex  PhraseMatch = "regex"
+)
+
+// Valid indicates whether the value is a known member of the PhraseMatch enum.
+func (e PhraseMatch) Valid() bool {
+	switch e {
+	case PhraseMatchPhrase:
+		return true
+	case PhraseMatchRegex:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PhraseRuleKind.
+const (
+	PhraseRuleKindPhrase PhraseRuleKind = "phrase"
+)
+
+// Valid indicates whether the value is a known member of the PhraseRuleKind enum.
+func (e PhraseRuleKind) Valid() bool {
+	switch e {
+	case PhraseRuleKindPhrase:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PhraseWhere.
+const (
+	AnyAgentTurn   PhraseWhere = "any_agent_turn"
+	FirstAgentTurn PhraseWhere = "first_agent_turn"
+)
+
+// Valid indicates whether the value is a known member of the PhraseWhere enum.
+func (e PhraseWhere) Valid() bool {
+	switch e {
+	case AnyAgentTurn:
+		return true
+	case FirstAgentTurn:
 		return true
 	default:
 		return false
@@ -390,6 +547,24 @@ func (e Role) Valid() bool {
 	}
 }
 
+// Defines values for RuleGate.
+const (
+	AgentSpoke RuleGate = "agent_spoke"
+	Always     RuleGate = "always"
+)
+
+// Valid indicates whether the value is a known member of the RuleGate enum.
+func (e RuleGate) Valid() bool {
+	switch e {
+	case AgentSpoke:
+		return true
+	case Always:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for RunStatus.
 const (
 	RunStatusCancelled  RunStatus = "cancelled"
@@ -426,6 +601,48 @@ const (
 func (e Transport) Valid() bool {
 	switch e {
 	case Phone:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for UnsureKind.
+const (
+	HiddenAction       UnsureKind = "hidden_action"
+	NotConfirmedPlayed UnsureKind = "not_confirmed_played"
+	Unclear            UnsureKind = "unclear"
+)
+
+// Valid indicates whether the value is a known member of the UnsureKind enum.
+func (e UnsureKind) Valid() bool {
+	switch e {
+	case HiddenAction:
+		return true
+	case NotConfirmedPlayed:
+		return true
+	case Unclear:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for Verdict.
+const (
+	VerdictFail      Verdict = "fail"
+	VerdictNotScored Verdict = "not_scored"
+	VerdictPass      Verdict = "pass"
+)
+
+// Valid indicates whether the value is a known member of the Verdict enum.
+func (e Verdict) Valid() bool {
+	switch e {
+	case VerdictFail:
+		return true
+	case VerdictNotScored:
+		return true
+	case VerdictPass:
 		return true
 	default:
 		return false
@@ -548,34 +765,46 @@ func (e WireEventKind) Valid() bool {
 
 // AgentConfig defines model for AgentConfig.
 type AgentConfig struct {
-	AgentNumber      *string               `json:"agent_number,omitempty"`
-	AgentSpeaksFirst *bool                 `json:"agent_speaks_first,omitempty"`
-	Brief            *string               `json:"brief,omitempty"`
-	Config           *string               `json:"config,omitempty"`
-	Direction        *Direction            `json:"direction,omitempty"`
-	KnowledgeBase    *[]KnowledgeBaseEntry `json:"knowledge_base,omitempty"`
-	Language         *Language             `json:"language,omitempty"`
-	Outbound         *OutboundConfig       `json:"outbound,omitempty"`
+	AgentNumber      *string                   `json:"agent_number,omitempty"`
+	AgentSpeaksFirst *bool                     `json:"agent_speaks_first,omitempty"`
+	Brief            *string                   `json:"brief,omitempty"`
+	Config           *string                   `json:"config,omitempty"`
+	Direction        *Direction                `json:"direction,omitempty"`
+	KnowledgeBase    *[]KnowledgeBaseEntry     `json:"knowledge_base,omitempty"`
+	Language         *Language                 `json:"language,omitempty"`
+	Outbound         *OutboundConfig           `json:"outbound,omitempty"`
+	Rules            *[]AgentConfig_Rules_Item `json:"rules,omitempty"`
 
 	// Transport How Truman reaches an agent; phone only today, kept as the seam for other ways.
 	Transport *Transport `json:"transport,omitempty"`
 }
 
+// AgentConfig_Rules_Item defines model for AgentConfig.rules.Item.
+type AgentConfig_Rules_Item struct {
+	union json.RawMessage
+}
+
 // AgentCreate defines model for AgentCreate.
 type AgentCreate struct {
-	AgentNumber      *string               `json:"agent_number,omitempty"`
-	AgentSpeaksFirst *bool                 `json:"agent_speaks_first,omitempty"`
-	Brief            *string               `json:"brief,omitempty"`
-	Config           *string               `json:"config,omitempty"`
-	Direction        *Direction            `json:"direction,omitempty"`
-	ExternalId       *string               `json:"external_id,omitempty"`
-	KnowledgeBase    *[]KnowledgeBaseEntry `json:"knowledge_base,omitempty"`
-	Language         *Language             `json:"language,omitempty"`
-	Name             string                `json:"name"`
-	Outbound         *OutboundConfig       `json:"outbound,omitempty"`
+	AgentNumber      *string                   `json:"agent_number,omitempty"`
+	AgentSpeaksFirst *bool                     `json:"agent_speaks_first,omitempty"`
+	Brief            *string                   `json:"brief,omitempty"`
+	Config           *string                   `json:"config,omitempty"`
+	Direction        *Direction                `json:"direction,omitempty"`
+	ExternalId       *string                   `json:"external_id,omitempty"`
+	KnowledgeBase    *[]KnowledgeBaseEntry     `json:"knowledge_base,omitempty"`
+	Language         *Language                 `json:"language,omitempty"`
+	Name             string                    `json:"name"`
+	Outbound         *OutboundConfig           `json:"outbound,omitempty"`
+	Rules            *[]AgentCreate_Rules_Item `json:"rules,omitempty"`
 
 	// Transport How Truman reaches an agent; phone only today, kept as the seam for other ways.
 	Transport *Transport `json:"transport,omitempty"`
+}
+
+// AgentCreate_Rules_Item defines model for AgentCreate.rules.Item.
+type AgentCreate_Rules_Item struct {
+	union json.RawMessage
 }
 
 // AgentRead defines model for AgentRead.
@@ -593,10 +822,16 @@ type AgentRead struct {
 	Language         Language                `json:"language"`
 	Name             string                  `json:"name"`
 	Outbound         *OutboundConfig         `json:"outbound"`
+	Rules            []AgentRead_Rules_Item  `json:"rules"`
 
 	// Transport How Truman reaches an agent; phone only today, kept as the seam for other ways.
 	Transport Transport `json:"transport"`
 	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// AgentRead_Rules_Item defines model for AgentRead.rules.Item.
+type AgentRead_Rules_Item struct {
+	union json.RawMessage
 }
 
 // AgentSummary An agent without its config and knowledge base, for lists.
@@ -620,17 +855,23 @@ type AgentSummary struct {
 
 // AgentUpdate defines model for AgentUpdate.
 type AgentUpdate struct {
-	AgentNumber      *string               `json:"agent_number,omitempty"`
-	AgentSpeaksFirst *bool                 `json:"agent_speaks_first,omitempty"`
-	Brief            *string               `json:"brief,omitempty"`
-	Config           *string               `json:"config,omitempty"`
-	Direction        *Direction            `json:"direction,omitempty"`
-	ExternalId       *string               `json:"external_id,omitempty"`
-	KnowledgeBase    *[]KnowledgeBaseEntry `json:"knowledge_base,omitempty"`
-	Language         *Language             `json:"language,omitempty"`
-	Name             *string               `json:"name,omitempty"`
-	Outbound         *OutboundConfig       `json:"outbound,omitempty"`
-	Transport        *Transport            `json:"transport,omitempty"`
+	AgentNumber      *string                   `json:"agent_number,omitempty"`
+	AgentSpeaksFirst *bool                     `json:"agent_speaks_first,omitempty"`
+	Brief            *string                   `json:"brief,omitempty"`
+	Config           *string                   `json:"config,omitempty"`
+	Direction        *Direction                `json:"direction,omitempty"`
+	ExternalId       *string                   `json:"external_id,omitempty"`
+	KnowledgeBase    *[]KnowledgeBaseEntry     `json:"knowledge_base,omitempty"`
+	Language         *Language                 `json:"language,omitempty"`
+	Name             *string                   `json:"name,omitempty"`
+	Outbound         *OutboundConfig           `json:"outbound,omitempty"`
+	Rules            *[]AgentUpdate_Rules_Item `json:"rules,omitempty"`
+	Transport        *Transport                `json:"transport,omitempty"`
+}
+
+// AgentUpdate_Rules_Item defines model for AgentUpdate.rules.Item.
+type AgentUpdate_Rules_Item struct {
+	union json.RawMessage
 }
 
 // AgentVersionRead defines model for AgentVersionRead.
@@ -685,11 +926,16 @@ type ConversationCreate struct {
 	ScenarioId      openapi_types.UUID  `json:"scenario_id"`
 }
 
-// ConversationMetrics defines model for ConversationMetrics.
-type ConversationMetrics struct {
-	Evaluation *EvaluationState  `json:"evaluation"`
-	Failure    *string           `json:"failure"`
-	Metrics    map[string]Metric `json:"metrics"`
+// ConversationEvaluation defines model for ConversationEvaluation.
+type ConversationEvaluation struct {
+	ConversationVerdict          *Verdict          `json:"conversation_verdict"`
+	EffectiveConversationVerdict *Verdict          `json:"effective_conversation_verdict"`
+	EffectiveScenarioVerdict     *Verdict          `json:"effective_scenario_verdict"`
+	Evaluation                   *EvaluationState  `json:"evaluation"`
+	Failure                      *string           `json:"failure"`
+	Items                        []ItemRead        `json:"items"`
+	Metrics                      map[string]Metric `json:"metrics"`
+	ScenarioVerdict              *Verdict          `json:"scenario_verdict"`
 }
 
 // ConversationRead defines model for ConversationRead.
@@ -792,6 +1038,9 @@ type ConversationSummary struct {
 	TalkMs            *int                `json:"talk_ms"`
 }
 
+// DecidedBy defines model for DecidedBy.
+type DecidedBy string
+
 // Defaults What the server uses for a field that a request leaves out.
 type Defaults struct {
 	MaxDurationS int `json:"max_duration_s"`
@@ -880,6 +1129,27 @@ type HealthResponse struct {
 	Version string `json:"version"`
 }
 
+// ItemRead defines model for ItemRead.
+type ItemRead struct {
+	Answer    *map[string]interface{} `json:"answer"`
+	DecidedBy DecidedBy               `json:"decided_by"`
+
+	// EffectiveOutcome An item's result: a judge's verdict, or what stopped one.
+	EffectiveOutcome    Outcome     `json:"effective_outcome"`
+	EffectiveUnsureKind *UnsureKind `json:"effective_unsure_kind"`
+	ErrorReason         *string     `json:"error_reason"`
+	ItemKey             string      `json:"item_key"`
+
+	// MachineOutcome An item's result: a judge's verdict, or what stopped one.
+	MachineOutcome Outcome     `json:"machine_outcome"`
+	Role           ItemRole    `json:"role"`
+	Subject        string      `json:"subject"`
+	UnsureKind     *UnsureKind `json:"unsure_kind"`
+}
+
+// ItemRole defines model for ItemRole.
+type ItemRole string
+
 // KnowledgeBaseDocument A knowledge base entry with what the list shows about its document.
 type KnowledgeBaseDocument struct {
 	Characters int                `json:"characters"`
@@ -908,6 +1178,24 @@ type LatencySummary struct {
 	Replies    int  `json:"replies"`
 	TalkedOver int  `json:"talked_over"`
 }
+
+// LlmRule defines model for LlmRule.
+type LlmRule struct {
+	AppliesWhen string `json:"applies_when"`
+	FailWhen    string `json:"fail_when"`
+
+	// Gate When an LLM rule can apply, decided in code before any model call.
+	Gate        *RuleGate    `json:"gate,omitempty"`
+	Key         string       `json:"key"`
+	Kind        *LlmRuleKind `json:"kind,omitempty"`
+	Name        string       `json:"name"`
+	NotAFailure *string      `json:"not_a_failure,omitempty"`
+	PassWhen    string       `json:"pass_when"`
+	Role        *ItemRole    `json:"role,omitempty"`
+}
+
+// LlmRuleKind defines model for LlmRule.Kind.
+type LlmRuleKind string
 
 // Metric One metric's value and the flags it raised.
 type Metric struct {
@@ -941,6 +1229,9 @@ type OutboundConfig struct {
 	// Trigger A POST with a JSON body, sent once for each conversation.
 	Trigger Trigger `json:"trigger"`
 }
+
+// Outcome An item's result: a judge's verdict, or what stopped one.
+type Outcome string
 
 // OutcomeGroup How a conversation went, from its status and end reason only. Before any judge, the
 // groups say what happened, not who is at fault.
@@ -1108,6 +1399,30 @@ type PhoneNumbers struct {
 	RestS           int               `json:"rest_s"`
 }
 
+// PhraseExpectation defines model for PhraseExpectation.
+type PhraseExpectation string
+
+// PhraseMatch defines model for PhraseMatch.
+type PhraseMatch string
+
+// PhraseRule defines model for PhraseRule.
+type PhraseRule struct {
+	Expects PhraseExpectation `json:"expects"`
+	Key     string            `json:"key"`
+	Kind    *PhraseRuleKind   `json:"kind,omitempty"`
+	Match   *PhraseMatch      `json:"match,omitempty"`
+	Name    string            `json:"name"`
+	Role    *ItemRole         `json:"role,omitempty"`
+	Value   string            `json:"value"`
+	Where   *PhraseWhere      `json:"where,omitempty"`
+}
+
+// PhraseRuleKind defines model for PhraseRule.Kind.
+type PhraseRuleKind string
+
+// PhraseWhere defines model for PhraseWhere.
+type PhraseWhere string
+
 // Provenance defines model for Provenance.
 type Provenance string
 
@@ -1129,6 +1444,9 @@ type Reply struct {
 
 // Role defines model for Role.
 type Role string
+
+// RuleGate When an LLM rule can apply, decided in code before any model call.
+type RuleGate string
 
 // RunCreate Limits that an operator sets, such as the most repeats, are checked where the settings
 // are known.
@@ -1361,6 +1679,9 @@ type TurnRead struct {
 	Text        string      `json:"text"`
 }
 
+// UnsureKind defines model for UnsureKind.
+type UnsureKind string
+
 // ValidationError defines model for ValidationError.
 type ValidationError struct {
 	Ctx   *map[string]interface{}    `json:"ctx,omitempty"`
@@ -1386,6 +1707,9 @@ type Validity struct {
 	Ok      bool      `json:"ok"`
 	Reasons *[]string `json:"reasons,omitempty"`
 }
+
+// Verdict defines model for Verdict.
+type Verdict string
 
 // VoiceCreate defines model for VoiceCreate.
 type VoiceCreate struct {
@@ -1591,6 +1915,410 @@ type PreviewVoiceApiV1VoicesPreviewPostJSONRequestBody = VoicePreview
 
 // UpdateVoiceApiV1VoicesVoiceIdPatchJSONRequestBody defines body for UpdateVoiceApiV1VoicesVoiceIdPatch for application/json ContentType.
 type UpdateVoiceApiV1VoicesVoiceIdPatchJSONRequestBody = VoiceUpdate
+
+// AsLlmRule returns the union data inside the AgentConfig_Rules_Item as a LlmRule
+func (t AgentConfig_Rules_Item) AsLlmRule() (LlmRule, error) {
+	var body LlmRule
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromLlmRule overwrites any union data inside the AgentConfig_Rules_Item as the provided LlmRule
+func (t *AgentConfig_Rules_Item) FromLlmRule(v LlmRule) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"kind":"llm"}`))
+	t.union = b
+	return err
+}
+
+// MergeLlmRule performs a merge with any union data inside the AgentConfig_Rules_Item, using the provided LlmRule
+func (t *AgentConfig_Rules_Item) MergeLlmRule(v LlmRule) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"kind":"llm"}`))
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPhraseRule returns the union data inside the AgentConfig_Rules_Item as a PhraseRule
+func (t AgentConfig_Rules_Item) AsPhraseRule() (PhraseRule, error) {
+	var body PhraseRule
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPhraseRule overwrites any union data inside the AgentConfig_Rules_Item as the provided PhraseRule
+func (t *AgentConfig_Rules_Item) FromPhraseRule(v PhraseRule) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"kind":"phrase"}`))
+	t.union = b
+	return err
+}
+
+// MergePhraseRule performs a merge with any union data inside the AgentConfig_Rules_Item, using the provided PhraseRule
+func (t *AgentConfig_Rules_Item) MergePhraseRule(v PhraseRule) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"kind":"phrase"}`))
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t AgentConfig_Rules_Item) Discriminator() (string, error) {
+	var discriminator struct {
+		Discriminator string `json:"kind"`
+	}
+	err := json.Unmarshal(t.union, &discriminator)
+	return discriminator.Discriminator, err
+}
+
+func (t AgentConfig_Rules_Item) ValueByDiscriminator() (interface{}, error) {
+	discriminator, err := t.Discriminator()
+	if err != nil {
+		return nil, err
+	}
+	switch discriminator {
+	case "llm":
+		return t.AsLlmRule()
+	case "phrase":
+		return t.AsPhraseRule()
+	default:
+		return nil, errors.New("unknown discriminator value: " + discriminator)
+	}
+}
+
+func (t AgentConfig_Rules_Item) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *AgentConfig_Rules_Item) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsLlmRule returns the union data inside the AgentCreate_Rules_Item as a LlmRule
+func (t AgentCreate_Rules_Item) AsLlmRule() (LlmRule, error) {
+	var body LlmRule
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromLlmRule overwrites any union data inside the AgentCreate_Rules_Item as the provided LlmRule
+func (t *AgentCreate_Rules_Item) FromLlmRule(v LlmRule) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"kind":"llm"}`))
+	t.union = b
+	return err
+}
+
+// MergeLlmRule performs a merge with any union data inside the AgentCreate_Rules_Item, using the provided LlmRule
+func (t *AgentCreate_Rules_Item) MergeLlmRule(v LlmRule) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"kind":"llm"}`))
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPhraseRule returns the union data inside the AgentCreate_Rules_Item as a PhraseRule
+func (t AgentCreate_Rules_Item) AsPhraseRule() (PhraseRule, error) {
+	var body PhraseRule
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPhraseRule overwrites any union data inside the AgentCreate_Rules_Item as the provided PhraseRule
+func (t *AgentCreate_Rules_Item) FromPhraseRule(v PhraseRule) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"kind":"phrase"}`))
+	t.union = b
+	return err
+}
+
+// MergePhraseRule performs a merge with any union data inside the AgentCreate_Rules_Item, using the provided PhraseRule
+func (t *AgentCreate_Rules_Item) MergePhraseRule(v PhraseRule) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"kind":"phrase"}`))
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t AgentCreate_Rules_Item) Discriminator() (string, error) {
+	var discriminator struct {
+		Discriminator string `json:"kind"`
+	}
+	err := json.Unmarshal(t.union, &discriminator)
+	return discriminator.Discriminator, err
+}
+
+func (t AgentCreate_Rules_Item) ValueByDiscriminator() (interface{}, error) {
+	discriminator, err := t.Discriminator()
+	if err != nil {
+		return nil, err
+	}
+	switch discriminator {
+	case "llm":
+		return t.AsLlmRule()
+	case "phrase":
+		return t.AsPhraseRule()
+	default:
+		return nil, errors.New("unknown discriminator value: " + discriminator)
+	}
+}
+
+func (t AgentCreate_Rules_Item) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *AgentCreate_Rules_Item) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsLlmRule returns the union data inside the AgentRead_Rules_Item as a LlmRule
+func (t AgentRead_Rules_Item) AsLlmRule() (LlmRule, error) {
+	var body LlmRule
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromLlmRule overwrites any union data inside the AgentRead_Rules_Item as the provided LlmRule
+func (t *AgentRead_Rules_Item) FromLlmRule(v LlmRule) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"kind":"llm"}`))
+	t.union = b
+	return err
+}
+
+// MergeLlmRule performs a merge with any union data inside the AgentRead_Rules_Item, using the provided LlmRule
+func (t *AgentRead_Rules_Item) MergeLlmRule(v LlmRule) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"kind":"llm"}`))
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPhraseRule returns the union data inside the AgentRead_Rules_Item as a PhraseRule
+func (t AgentRead_Rules_Item) AsPhraseRule() (PhraseRule, error) {
+	var body PhraseRule
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPhraseRule overwrites any union data inside the AgentRead_Rules_Item as the provided PhraseRule
+func (t *AgentRead_Rules_Item) FromPhraseRule(v PhraseRule) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"kind":"phrase"}`))
+	t.union = b
+	return err
+}
+
+// MergePhraseRule performs a merge with any union data inside the AgentRead_Rules_Item, using the provided PhraseRule
+func (t *AgentRead_Rules_Item) MergePhraseRule(v PhraseRule) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"kind":"phrase"}`))
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t AgentRead_Rules_Item) Discriminator() (string, error) {
+	var discriminator struct {
+		Discriminator string `json:"kind"`
+	}
+	err := json.Unmarshal(t.union, &discriminator)
+	return discriminator.Discriminator, err
+}
+
+func (t AgentRead_Rules_Item) ValueByDiscriminator() (interface{}, error) {
+	discriminator, err := t.Discriminator()
+	if err != nil {
+		return nil, err
+	}
+	switch discriminator {
+	case "llm":
+		return t.AsLlmRule()
+	case "phrase":
+		return t.AsPhraseRule()
+	default:
+		return nil, errors.New("unknown discriminator value: " + discriminator)
+	}
+}
+
+func (t AgentRead_Rules_Item) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *AgentRead_Rules_Item) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsLlmRule returns the union data inside the AgentUpdate_Rules_Item as a LlmRule
+func (t AgentUpdate_Rules_Item) AsLlmRule() (LlmRule, error) {
+	var body LlmRule
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromLlmRule overwrites any union data inside the AgentUpdate_Rules_Item as the provided LlmRule
+func (t *AgentUpdate_Rules_Item) FromLlmRule(v LlmRule) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"kind":"llm"}`))
+	t.union = b
+	return err
+}
+
+// MergeLlmRule performs a merge with any union data inside the AgentUpdate_Rules_Item, using the provided LlmRule
+func (t *AgentUpdate_Rules_Item) MergeLlmRule(v LlmRule) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"kind":"llm"}`))
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPhraseRule returns the union data inside the AgentUpdate_Rules_Item as a PhraseRule
+func (t AgentUpdate_Rules_Item) AsPhraseRule() (PhraseRule, error) {
+	var body PhraseRule
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPhraseRule overwrites any union data inside the AgentUpdate_Rules_Item as the provided PhraseRule
+func (t *AgentUpdate_Rules_Item) FromPhraseRule(v PhraseRule) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"kind":"phrase"}`))
+	t.union = b
+	return err
+}
+
+// MergePhraseRule performs a merge with any union data inside the AgentUpdate_Rules_Item, using the provided PhraseRule
+func (t *AgentUpdate_Rules_Item) MergePhraseRule(v PhraseRule) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"kind":"phrase"}`))
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t AgentUpdate_Rules_Item) Discriminator() (string, error) {
+	var discriminator struct {
+		Discriminator string `json:"kind"`
+	}
+	err := json.Unmarshal(t.union, &discriminator)
+	return discriminator.Discriminator, err
+}
+
+func (t AgentUpdate_Rules_Item) ValueByDiscriminator() (interface{}, error) {
+	discriminator, err := t.Discriminator()
+	if err != nil {
+		return nil, err
+	}
+	switch discriminator {
+	case "llm":
+		return t.AsLlmRule()
+	case "phrase":
+		return t.AsPhraseRule()
+	default:
+		return nil, errors.New("unknown discriminator value: " + discriminator)
+	}
+}
+
+func (t AgentUpdate_Rules_Item) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *AgentUpdate_Rules_Item) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
 
 // AsValidationErrorLoc0 returns the union data inside the ValidationError_Loc_Item as a ValidationErrorLoc0
 func (t ValidationError_Loc_Item) AsValidationErrorLoc0() (ValidationErrorLoc0, error) {
@@ -1887,15 +2615,15 @@ type ClientInterface interface {
 	// Corresponds with POST /api/v1/conversations/{conversation_id}/end (the `EndConversationApiV1ConversationsConversationIdEndPost` operationId).
 	EndConversationApiV1ConversationsConversationIdEndPost(ctx context.Context, conversationId openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// GetEvaluationApiV1ConversationsConversationIdEvaluationGet Get Evaluation
+	//
+	// Corresponds with GET /api/v1/conversations/{conversation_id}/evaluation (the `GetEvaluationApiV1ConversationsConversationIdEvaluationGet` operationId).
+	GetEvaluationApiV1ConversationsConversationIdEvaluationGet(ctx context.Context, conversationId openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// StreamEventsApiV1ConversationsConversationIdEventsGet Stream Events
 	//
 	// Corresponds with GET /api/v1/conversations/{conversation_id}/events (the `StreamEventsApiV1ConversationsConversationIdEventsGet` operationId).
 	StreamEventsApiV1ConversationsConversationIdEventsGet(ctx context.Context, conversationId openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// GetMetricsApiV1ConversationsConversationIdMetricsGet Get Metrics
-	//
-	// Corresponds with GET /api/v1/conversations/{conversation_id}/metrics (the `GetMetricsApiV1ConversationsConversationIdMetricsGet` operationId).
-	GetMetricsApiV1ConversationsConversationIdMetricsGet(ctx context.Context, conversationId openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetRecordingApiV1ConversationsConversationIdRecordingGet Get Recording
 	//
@@ -2549,11 +3277,11 @@ func (c *Client) EndConversationApiV1ConversationsConversationIdEndPost(ctx cont
 	return c.Client.Do(req)
 }
 
-// StreamEventsApiV1ConversationsConversationIdEventsGet Stream Events
+// GetEvaluationApiV1ConversationsConversationIdEvaluationGet Get Evaluation
 //
-// Corresponds with GET /api/v1/conversations/{conversation_id}/events (the `StreamEventsApiV1ConversationsConversationIdEventsGet` operationId).
-func (c *Client) StreamEventsApiV1ConversationsConversationIdEventsGet(ctx context.Context, conversationId openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewStreamEventsApiV1ConversationsConversationIdEventsGetRequest(c.Server, conversationId)
+// Corresponds with GET /api/v1/conversations/{conversation_id}/evaluation (the `GetEvaluationApiV1ConversationsConversationIdEvaluationGet` operationId).
+func (c *Client) GetEvaluationApiV1ConversationsConversationIdEvaluationGet(ctx context.Context, conversationId openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetEvaluationApiV1ConversationsConversationIdEvaluationGetRequest(c.Server, conversationId)
 	if err != nil {
 		return nil, err
 	}
@@ -2564,11 +3292,11 @@ func (c *Client) StreamEventsApiV1ConversationsConversationIdEventsGet(ctx conte
 	return c.Client.Do(req)
 }
 
-// GetMetricsApiV1ConversationsConversationIdMetricsGet Get Metrics
+// StreamEventsApiV1ConversationsConversationIdEventsGet Stream Events
 //
-// Corresponds with GET /api/v1/conversations/{conversation_id}/metrics (the `GetMetricsApiV1ConversationsConversationIdMetricsGet` operationId).
-func (c *Client) GetMetricsApiV1ConversationsConversationIdMetricsGet(ctx context.Context, conversationId openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewGetMetricsApiV1ConversationsConversationIdMetricsGetRequest(c.Server, conversationId)
+// Corresponds with GET /api/v1/conversations/{conversation_id}/events (the `StreamEventsApiV1ConversationsConversationIdEventsGet` operationId).
+func (c *Client) StreamEventsApiV1ConversationsConversationIdEventsGet(ctx context.Context, conversationId openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewStreamEventsApiV1ConversationsConversationIdEventsGetRequest(c.Server, conversationId)
 	if err != nil {
 		return nil, err
 	}
@@ -4232,8 +4960,8 @@ func NewEndConversationApiV1ConversationsConversationIdEndPostRequest(server str
 	return req, nil
 }
 
-// NewStreamEventsApiV1ConversationsConversationIdEventsGetRequest constructs an http.Request for the StreamEventsApiV1ConversationsConversationIdEventsGet method
-func NewStreamEventsApiV1ConversationsConversationIdEventsGetRequest(server string, conversationId openapi_types.UUID) (*http.Request, error) {
+// NewGetEvaluationApiV1ConversationsConversationIdEvaluationGetRequest constructs an http.Request for the GetEvaluationApiV1ConversationsConversationIdEvaluationGet method
+func NewGetEvaluationApiV1ConversationsConversationIdEvaluationGetRequest(server string, conversationId openapi_types.UUID) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -4248,7 +4976,7 @@ func NewStreamEventsApiV1ConversationsConversationIdEventsGetRequest(server stri
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/v1/conversations/%s/events", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/conversations/%s/evaluation", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -4266,8 +4994,8 @@ func NewStreamEventsApiV1ConversationsConversationIdEventsGetRequest(server stri
 	return req, nil
 }
 
-// NewGetMetricsApiV1ConversationsConversationIdMetricsGetRequest constructs an http.Request for the GetMetricsApiV1ConversationsConversationIdMetricsGet method
-func NewGetMetricsApiV1ConversationsConversationIdMetricsGetRequest(server string, conversationId openapi_types.UUID) (*http.Request, error) {
+// NewStreamEventsApiV1ConversationsConversationIdEventsGetRequest constructs an http.Request for the StreamEventsApiV1ConversationsConversationIdEventsGet method
+func NewStreamEventsApiV1ConversationsConversationIdEventsGetRequest(server string, conversationId openapi_types.UUID) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -4282,7 +5010,7 @@ func NewGetMetricsApiV1ConversationsConversationIdMetricsGetRequest(server strin
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/v1/conversations/%s/metrics", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/conversations/%s/events", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -5873,19 +6601,19 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with POST /api/v1/conversations/{conversation_id}/end (the `EndConversationApiV1ConversationsConversationIdEndPost` operationId).
 	EndConversationApiV1ConversationsConversationIdEndPostWithResponse(ctx context.Context, conversationId openapi_types.UUID, reqEditors ...RequestEditorFn) (*EndConversationApiV1ConversationsConversationIdEndPostResponse, error)
 
+	// GetEvaluationApiV1ConversationsConversationIdEvaluationGetWithResponse Get Evaluation
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/conversations/{conversation_id}/evaluation (the `GetEvaluationApiV1ConversationsConversationIdEvaluationGet` operationId).
+	GetEvaluationApiV1ConversationsConversationIdEvaluationGetWithResponse(ctx context.Context, conversationId openapi_types.UUID, reqEditors ...RequestEditorFn) (*GetEvaluationApiV1ConversationsConversationIdEvaluationGetResponse, error)
+
 	// StreamEventsApiV1ConversationsConversationIdEventsGetWithResponse Stream Events
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with GET /api/v1/conversations/{conversation_id}/events (the `StreamEventsApiV1ConversationsConversationIdEventsGet` operationId).
 	StreamEventsApiV1ConversationsConversationIdEventsGetWithResponse(ctx context.Context, conversationId openapi_types.UUID, reqEditors ...RequestEditorFn) (*StreamEventsApiV1ConversationsConversationIdEventsGetResponse, error)
-
-	// GetMetricsApiV1ConversationsConversationIdMetricsGetWithResponse Get Metrics
-	//
-	// Returns a wrapper object for the known response body format(s).
-	//
-	// Corresponds with GET /api/v1/conversations/{conversation_id}/metrics (the `GetMetricsApiV1ConversationsConversationIdMetricsGet` operationId).
-	GetMetricsApiV1ConversationsConversationIdMetricsGetWithResponse(ctx context.Context, conversationId openapi_types.UUID, reqEditors ...RequestEditorFn) (*GetMetricsApiV1ConversationsConversationIdMetricsGetResponse, error)
 
 	// GetRecordingApiV1ConversationsConversationIdRecordingGetWithResponse Get Recording
 	//
@@ -7010,6 +7738,54 @@ func (r EndConversationApiV1ConversationsConversationIdEndPostResponse) ContentT
 	return ""
 }
 
+type GetEvaluationApiV1ConversationsConversationIdEvaluationGetResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *ConversationEvaluation
+	// JSON422 the response for an HTTP 422 `application/json` response
+	JSON422 *HTTPValidationError
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetEvaluationApiV1ConversationsConversationIdEvaluationGetResponse) GetJSON200() *ConversationEvaluation {
+	return r.JSON200
+}
+
+// GetJSON422 returns the response for an HTTP 422 `application/json` response
+func (r GetEvaluationApiV1ConversationsConversationIdEvaluationGetResponse) GetJSON422() *HTTPValidationError {
+	return r.JSON422
+}
+
+// GetBody returns the raw response body bytes
+func (r GetEvaluationApiV1ConversationsConversationIdEvaluationGetResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetEvaluationApiV1ConversationsConversationIdEvaluationGetResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetEvaluationApiV1ConversationsConversationIdEvaluationGetResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetEvaluationApiV1ConversationsConversationIdEvaluationGetResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type StreamEventsApiV1ConversationsConversationIdEventsGetResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -7045,54 +7821,6 @@ func (r StreamEventsApiV1ConversationsConversationIdEventsGetResponse) StatusCod
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r StreamEventsApiV1ConversationsConversationIdEventsGetResponse) ContentType() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Header.Get("Content-Type")
-	}
-	return ""
-}
-
-type GetMetricsApiV1ConversationsConversationIdMetricsGetResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	// JSON200 the response for an HTTP 200 `application/json` response
-	JSON200 *ConversationMetrics
-	// JSON422 the response for an HTTP 422 `application/json` response
-	JSON422 *HTTPValidationError
-}
-
-// GetJSON200 returns the response for an HTTP 200 `application/json` response
-func (r GetMetricsApiV1ConversationsConversationIdMetricsGetResponse) GetJSON200() *ConversationMetrics {
-	return r.JSON200
-}
-
-// GetJSON422 returns the response for an HTTP 422 `application/json` response
-func (r GetMetricsApiV1ConversationsConversationIdMetricsGetResponse) GetJSON422() *HTTPValidationError {
-	return r.JSON422
-}
-
-// GetBody returns the raw response body bytes
-func (r GetMetricsApiV1ConversationsConversationIdMetricsGetResponse) GetBody() []byte {
-	return r.Body
-}
-
-// Status returns HTTPResponse.Status
-func (r GetMetricsApiV1ConversationsConversationIdMetricsGetResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r GetMetricsApiV1ConversationsConversationIdMetricsGetResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r GetMetricsApiV1ConversationsConversationIdMetricsGetResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -8862,6 +9590,19 @@ func (c *ClientWithResponses) EndConversationApiV1ConversationsConversationIdEnd
 	return ParseEndConversationApiV1ConversationsConversationIdEndPostResponse(rsp)
 }
 
+// GetEvaluationApiV1ConversationsConversationIdEvaluationGetWithResponse Get Evaluation
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/conversations/{conversation_id}/evaluation (the `GetEvaluationApiV1ConversationsConversationIdEvaluationGet` operationId).
+func (c *ClientWithResponses) GetEvaluationApiV1ConversationsConversationIdEvaluationGetWithResponse(ctx context.Context, conversationId openapi_types.UUID, reqEditors ...RequestEditorFn) (*GetEvaluationApiV1ConversationsConversationIdEvaluationGetResponse, error) {
+	rsp, err := c.GetEvaluationApiV1ConversationsConversationIdEvaluationGet(ctx, conversationId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetEvaluationApiV1ConversationsConversationIdEvaluationGetResponse(rsp)
+}
+
 // StreamEventsApiV1ConversationsConversationIdEventsGetWithResponse Stream Events
 //
 // Returns a wrapper object for the known response body format(s).
@@ -8873,19 +9614,6 @@ func (c *ClientWithResponses) StreamEventsApiV1ConversationsConversationIdEvents
 		return nil, err
 	}
 	return ParseStreamEventsApiV1ConversationsConversationIdEventsGetResponse(rsp)
-}
-
-// GetMetricsApiV1ConversationsConversationIdMetricsGetWithResponse Get Metrics
-//
-// Returns a wrapper object for the known response body format(s).
-//
-// Corresponds with GET /api/v1/conversations/{conversation_id}/metrics (the `GetMetricsApiV1ConversationsConversationIdMetricsGet` operationId).
-func (c *ClientWithResponses) GetMetricsApiV1ConversationsConversationIdMetricsGetWithResponse(ctx context.Context, conversationId openapi_types.UUID, reqEditors ...RequestEditorFn) (*GetMetricsApiV1ConversationsConversationIdMetricsGetResponse, error) {
-	rsp, err := c.GetMetricsApiV1ConversationsConversationIdMetricsGet(ctx, conversationId, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseGetMetricsApiV1ConversationsConversationIdMetricsGetResponse(rsp)
 }
 
 // GetRecordingApiV1ConversationsConversationIdRecordingGetWithResponse Get Recording
@@ -9983,6 +10711,39 @@ func ParseEndConversationApiV1ConversationsConversationIdEndPostResponse(rsp *ht
 	return response, nil
 }
 
+// ParseGetEvaluationApiV1ConversationsConversationIdEvaluationGetResponse parses an HTTP response from a GetEvaluationApiV1ConversationsConversationIdEvaluationGetWithResponse call
+func ParseGetEvaluationApiV1ConversationsConversationIdEvaluationGetResponse(rsp *http.Response) (*GetEvaluationApiV1ConversationsConversationIdEvaluationGetResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetEvaluationApiV1ConversationsConversationIdEvaluationGetResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ConversationEvaluation
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest HTTPValidationError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseStreamEventsApiV1ConversationsConversationIdEventsGetResponse parses an HTTP response from a StreamEventsApiV1ConversationsConversationIdEventsGetWithResponse call
 func ParseStreamEventsApiV1ConversationsConversationIdEventsGetResponse(rsp *http.Response) (*StreamEventsApiV1ConversationsConversationIdEventsGetResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -9997,39 +10758,6 @@ func ParseStreamEventsApiV1ConversationsConversationIdEventsGetResponse(rsp *htt
 	}
 
 	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
-		var dest HTTPValidationError
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON422 = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParseGetMetricsApiV1ConversationsConversationIdMetricsGetResponse parses an HTTP response from a GetMetricsApiV1ConversationsConversationIdMetricsGetWithResponse call
-func ParseGetMetricsApiV1ConversationsConversationIdMetricsGetResponse(rsp *http.Response) (*GetMetricsApiV1ConversationsConversationIdMetricsGetResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &GetMetricsApiV1ConversationsConversationIdMetricsGetResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest ConversationMetrics
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
 		var dest HTTPValidationError
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {

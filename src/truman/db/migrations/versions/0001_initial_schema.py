@@ -37,6 +37,12 @@ def upgrade() -> None:
             server_default=sa.text("'[]'::jsonb"),
             nullable=False,
         ),
+        sa.Column(
+            "rules",
+            postgresql.JSONB(astext_type=sa.Text()),
+            server_default=sa.text("'[]'::jsonb"),
+            nullable=False,
+        ),
         sa.Column("current_version", sa.Integer(), nullable=False),
         sa.Column(
             "created_at",
@@ -570,6 +576,24 @@ def upgrade() -> None:
         ),
         sa.Column("started_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("ended_at", sa.DateTime(timezone=True), nullable=True),
+        sa.Column(
+            "scenario_verdict", sa.Enum("pass", "fail", "not_scored", name="verdict"), nullable=True
+        ),
+        sa.Column(
+            "conversation_verdict",
+            sa.Enum("pass", "fail", "not_scored", name="verdict"),
+            nullable=True,
+        ),
+        sa.Column(
+            "effective_scenario_verdict",
+            sa.Enum("pass", "fail", "not_scored", name="verdict"),
+            nullable=True,
+        ),
+        sa.Column(
+            "effective_conversation_verdict",
+            sa.Enum("pass", "fail", "not_scored", name="verdict"),
+            nullable=True,
+        ),
         sa.ForeignKeyConstraint(["conversation_id"], ["conversations.id"]),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("conversation_id", name=op.f("uq_evaluations_conversation_id")),
@@ -590,6 +614,116 @@ def upgrade() -> None:
         ),
         sa.ForeignKeyConstraint(["evaluation_id"], ["evaluations.id"]),
         sa.PrimaryKeyConstraint("evaluation_id", "metric_key"),
+    )
+    op.create_table(
+        "judge_versions",
+        sa.Column("id", sa.UUID(), server_default=sa.text("uuidv7()"), nullable=False),
+        sa.Column("judge", sa.Text(), nullable=False),
+        sa.Column("provider", sa.Text(), nullable=False),
+        sa.Column("model", sa.Text(), nullable=False),
+        sa.Column("settings", postgresql.JSONB(astext_type=sa.Text()), nullable=False),
+        sa.Column("prompt_sha256", sa.Text(), nullable=False),
+        sa.Column("schema_sha256", sa.Text(), nullable=False),
+        sa.Column("evidence_view_version", sa.Integer(), nullable=False),
+        sa.Column("code_checks_version", sa.Integer(), nullable=False),
+        sa.Column("content_sha256", sa.Text(), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.PrimaryKeyConstraint("id"),
+        sa.UniqueConstraint("content_sha256", name=op.f("uq_judge_versions_content_sha256")),
+    )
+    op.create_table(
+        "evaluation_items",
+        sa.Column("id", sa.UUID(), server_default=sa.text("uuidv7()"), nullable=False),
+        sa.Column("evaluation_id", sa.UUID(), nullable=False),
+        sa.Column("item_key", sa.Text(), nullable=False),
+        sa.Column("subject", sa.Text(), nullable=False),
+        sa.Column("judge_version_id", sa.UUID(), nullable=True),
+        sa.Column("decided_by", sa.Enum("code", "jev", "llm", name="decided_by"), nullable=False),
+        sa.Column("role", sa.Enum("deciding", "reporting", name="item_role"), nullable=False),
+        sa.Column("answer", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
+        sa.Column(
+            "evidence_checks",
+            postgresql.JSONB(astext_type=sa.Text()),
+            server_default=sa.text("'{}'::jsonb"),
+            nullable=False,
+        ),
+        sa.Column(
+            "machine_outcome",
+            sa.Enum(
+                "pass",
+                "fail",
+                "not_applicable",
+                "unsure",
+                "blocked",
+                "error",
+                "pending",
+                name="outcome",
+            ),
+            nullable=False,
+        ),
+        sa.Column(
+            "unsure_kind",
+            sa.Enum("hidden_action", "not_confirmed_played", "unclear", name="unsure_kind"),
+            nullable=True,
+        ),
+        sa.Column("error_reason", sa.Text(), nullable=True),
+        sa.Column(
+            "effective_outcome",
+            sa.Enum(
+                "pass",
+                "fail",
+                "not_applicable",
+                "unsure",
+                "blocked",
+                "error",
+                "pending",
+                name="outcome",
+            ),
+            nullable=False,
+        ),
+        sa.Column(
+            "effective_unsure_kind",
+            sa.Enum("hidden_action", "not_confirmed_played", "unclear", name="unsure_kind"),
+            nullable=True,
+        ),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.ForeignKeyConstraint(["evaluation_id"], ["evaluations.id"]),
+        sa.ForeignKeyConstraint(["judge_version_id"], ["judge_versions.id"]),
+        sa.PrimaryKeyConstraint("id"),
+        sa.UniqueConstraint(
+            "evaluation_id", "item_key", name=op.f("uq_evaluation_items_evaluation_id_item_key")
+        ),
+    )
+    op.create_table(
+        "judge_calls",
+        sa.Column("id", sa.UUID(), server_default=sa.text("uuidv7()"), nullable=False),
+        sa.Column("item_id", sa.UUID(), nullable=False),
+        sa.Column("attempt", sa.Integer(), nullable=False),
+        sa.Column("request_sha256", sa.Text(), nullable=False),
+        sa.Column("model_returned", sa.Text(), nullable=True),
+        sa.Column("output", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
+        sa.Column("input_tokens", sa.Integer(), nullable=True),
+        sa.Column("output_tokens", sa.Integer(), nullable=True),
+        sa.Column("latency_ms", sa.Integer(), nullable=False),
+        sa.Column("error", sa.Text(), nullable=True),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.ForeignKeyConstraint(["item_id"], ["evaluation_items.id"]),
+        sa.PrimaryKeyConstraint("id"),
     )
     op.create_table(
         "refused_calls",
@@ -670,6 +804,9 @@ def downgrade() -> None:
     op.drop_table("workers")
     op.drop_table("documents")
     op.drop_table("phone_numbers")
+    op.drop_table("judge_calls")
+    op.drop_table("evaluation_items")
+    op.drop_table("judge_versions")
     op.drop_table("metric_values")
     op.drop_table("evaluations")
     op.drop_table("refused_calls")
@@ -698,5 +835,10 @@ def downgrade() -> None:
         "noise_sound",
         "noise_level",
         "evaluation_state",
+        "verdict",
+        "outcome",
+        "unsure_kind",
+        "decided_by",
+        "item_role",
     ):
         op.execute(f"DROP TYPE {enum}")

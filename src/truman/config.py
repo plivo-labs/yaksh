@@ -37,6 +37,8 @@ class Settings(BaseSettings):
     evaluator_poll_interval_s: float = 2.0
     evaluator_lease_s: int = 60
     evaluator_concurrency: int = 2
+    evaluator_judge_concurrency: int = Field(default=8, gt=0)
+    """Judge model calls in flight across one evaluator's evaluations."""
     end_timeout_s: float = 5.0
     deepgram_api_key: SecretStr | None = Field(default=None, validation_alias="DEEPGRAM_API_KEY")
     deepgram_base_url: str = Field(
@@ -66,6 +68,23 @@ class Settings(BaseSettings):
         default=300.0, gt=0, validation_alias="GENERATION_LLM_TIMEOUT_S"
     )
     """One model call while writing scenarios; high reasoning effort takes minutes."""
+    judge_llm_model: str = Field(default="gpt-6-luna", validation_alias="JUDGE_LLM_MODEL")
+    """The model that judges calls; empty turns the judges off."""
+    judge_llm_reasoning_effort: str | None = Field(
+        default="medium", validation_alias="JUDGE_LLM_REASONING_EFFORT"
+    )
+    judge_llm_timeout_s: float = Field(default=60.0, gt=0, validation_alias="JUDGE_LLM_TIMEOUT_S")
+    judge_max_output_tokens: int = Field(
+        default=8000, gt=0, validation_alias="JUDGE_MAX_OUTPUT_TOKENS"
+    )
+    """Reasoning tokens count too."""
+    judge_openai_api_key: SecretStr | None = Field(
+        default=None, validation_alias="JUDGE_OPENAI_API_KEY"
+    )
+    """The judge model's key and address; the caller's OpenAI settings when unset."""
+    judge_openai_base_url: str | None = Field(
+        default=None, validation_alias="JUDGE_OPENAI_BASE_URL"
+    )
     plivo_auth_id: SecretStr | None = Field(default=None, validation_alias="PLIVO_AUTH_ID")
     plivo_auth_token: SecretStr | None = Field(default=None, validation_alias="PLIVO_AUTH_TOKEN")
     plivo_numbers: Annotated[list[E164], NoDecode] = []

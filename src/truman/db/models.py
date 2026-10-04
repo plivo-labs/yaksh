@@ -27,7 +27,14 @@ from truman.db.base import Base
 from truman.domain.agents import Direction, Transport
 from truman.domain.background_noise import NoiseLevel, NoiseSound
 from truman.domain.conversations import Channel, ConversationStatus, EndReason
-from truman.domain.evaluations import EvaluationState
+from truman.domain.evaluations import (
+    DecidedBy,
+    EvaluationState,
+    ItemRole,
+    Outcome,
+    UnsureKind,
+    Verdict,
+)
 from truman.domain.generation import GenerationMode, GenerationStatus
 from truman.domain.languages import Language
 from truman.domain.scenarios import Category
@@ -57,6 +64,9 @@ class Agent(Base):
     brief: Mapped[str | None] = mapped_column(Text)
     config: Mapped[str | None] = mapped_column(Text)
     knowledge_base: Mapped[list[dict[str, Any]]] = mapped_column(
+        JSONB, default=list, server_default=text("'[]'::jsonb")
+    )
+    rules: Mapped[list[dict[str, Any]]] = mapped_column(
         JSONB, default=list, server_default=text("'[]'::jsonb")
     )
     current_version: Mapped[int] = mapped_column(Integer, default=1)
@@ -268,6 +278,15 @@ class Evaluation(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    scenario_verdict: Mapped[Verdict | None] = mapped_column(pg_enum(Verdict, "verdict"))
+    """From the scenario's criteria; None when the call was not judged."""
+    conversation_verdict: Mapped[Verdict | None] = mapped_column(pg_enum(Verdict, "verdict"))
+    """The criteria and the deciding agent rules."""
+    effective_scenario_verdict: Mapped[Verdict | None] = mapped_column(pg_enum(Verdict, "verdict"))
+    """After people's labels; the machine verdict while there are none."""
+    effective_conversation_verdict: Mapped[Verdict | None] = mapped_column(
+        pg_enum(Verdict, "verdict")
+    )
 
     __table_args__ = (Index("ix_evaluations_state_created", "state", "created_at"),)
 
@@ -283,6 +302,73 @@ class MetricValue(Base):
     flags: Mapped[list[str]] = mapped_column(
         ARRAY(Text), default=list, server_default=text("'{}'::text[]")
     )
+
+
+class JudgeVersion(Base):
+    """One frozen judge: its model and settings, the bytes of its prompt and answer schema, and
+    the versions of the evidence view and the code checks. Every verdict names one."""
+
+    __tablename__ = "judge_versions"
+
+    id: Mapped[uuid.UUID] = uuid_primary_key()
+    judge: Mapped[str] = mapped_column(Text)
+    provider: Mapped[str] = mapped_column(Text)
+    model: Mapped[str] = mapped_column(Text)
+    settings: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    prompt_sha256: Mapped[str] = mapped_column(Text)
+    schema_sha256: Mapped[str] = mapped_column(Text)
+    evidence_view_version: Mapped[int] = mapped_column(Integer)
+    code_checks_version: Mapped[int] = mapped_column(Integer)
+    content_sha256: Mapped[str] = mapped_column(Text, unique=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class EvaluationItem(Base):
+    """One judged item of one evaluation: a criterion or an agent rule."""
+
+    __tablename__ = "evaluation_items"
+
+    id: Mapped[uuid.UUID] = uuid_primary_key()
+    evaluation_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("evaluations.id"))
+    item_key: Mapped[str] = mapped_column(Text)
+    subject: Mapped[str] = mapped_column(Text)
+    """The criterion's text or the rule's name, as the pinned versions had it."""
+    judge_version_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("judge_versions.id"))
+    """None for an item code decided alone, such as a phrase rule."""
+    decided_by: Mapped[DecidedBy] = mapped_column(pg_enum(DecidedBy, "decided_by"))
+    role: Mapped[ItemRole] = mapped_column(pg_enum(ItemRole, "item_role"))
+    answer: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    evidence_checks: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, default=dict, server_default=text("'{}'::jsonb")
+    )
+    machine_outcome: Mapped[Outcome] = mapped_column(pg_enum(Outcome, "outcome"))
+    unsure_kind: Mapped[UnsureKind | None] = mapped_column(pg_enum(UnsureKind, "unsure_kind"))
+    error_reason: Mapped[str | None] = mapped_column(Text)
+    effective_outcome: Mapped[Outcome] = mapped_column(pg_enum(Outcome, "outcome"))
+    effective_unsure_kind: Mapped[UnsureKind | None] = mapped_column(
+        pg_enum(UnsureKind, "unsure_kind")
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (UniqueConstraint("evaluation_id", "item_key"),)
+
+
+class JudgeCall(Base):
+    """One answer a model gave for an item: its first answer, or the one after a re-ask."""
+
+    __tablename__ = "judge_calls"
+
+    id: Mapped[uuid.UUID] = uuid_primary_key()
+    item_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("evaluation_items.id"))
+    attempt: Mapped[int] = mapped_column(Integer)
+    request_sha256: Mapped[str] = mapped_column(Text)
+    model_returned: Mapped[str | None] = mapped_column(Text)
+    output: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    input_tokens: Mapped[int | None] = mapped_column(Integer)
+    output_tokens: Mapped[int | None] = mapped_column(Integer)
+    latency_ms: Mapped[int] = mapped_column(Integer)
+    error: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 class Persona(Base):

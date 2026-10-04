@@ -774,13 +774,13 @@
         }
       }
     },
-    "/api/v1/conversations/{conversation_id}/metrics": {
+    "/api/v1/conversations/{conversation_id}/evaluation": {
       "get": {
         "tags": [
           "conversations"
         ],
-        "summary": "Get Metrics",
-        "operationId": "get_metrics_api_v1_conversations__conversation_id__metrics_get",
+        "summary": "Get Evaluation",
+        "operationId": "get_evaluation_api_v1_conversations__conversation_id__evaluation_get",
         "security": [
           {
             "HTTPBearer": []
@@ -804,7 +804,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ConversationMetrics"
+                  "$ref": "#/components/schemas/ConversationEvaluation"
                 }
               }
             }
@@ -2928,6 +2928,29 @@
             "maxItems": 20,
             "title": "Knowledge Base",
             "default": []
+          },
+          "rules": {
+            "items": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/LlmRule"
+                },
+                {
+                  "$ref": "#/components/schemas/PhraseRule"
+                }
+              ],
+              "discriminator": {
+                "propertyName": "kind",
+                "mapping": {
+                  "llm": "#/components/schemas/LlmRule",
+                  "phrase": "#/components/schemas/PhraseRule"
+                }
+              }
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Rules",
+            "default": []
           }
         },
         "additionalProperties": false,
@@ -3006,6 +3029,29 @@
             "type": "array",
             "maxItems": 20,
             "title": "Knowledge Base",
+            "default": []
+          },
+          "rules": {
+            "items": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/LlmRule"
+                },
+                {
+                  "$ref": "#/components/schemas/PhraseRule"
+                }
+              ],
+              "discriminator": {
+                "propertyName": "kind",
+                "mapping": {
+                  "llm": "#/components/schemas/LlmRule",
+                  "phrase": "#/components/schemas/PhraseRule"
+                }
+              }
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Rules",
             "default": []
           },
           "name": {
@@ -3130,6 +3176,28 @@
             },
             "type": "array",
             "title": "Knowledge Base"
+          },
+          "rules": {
+            "items": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/LlmRule"
+                },
+                {
+                  "$ref": "#/components/schemas/PhraseRule"
+                }
+              ],
+              "discriminator": {
+                "propertyName": "kind",
+                "mapping": {
+                  "llm": "#/components/schemas/LlmRule",
+                  "phrase": "#/components/schemas/PhraseRule"
+                }
+              }
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Rules"
           }
         },
         "type": "object",
@@ -3148,7 +3216,8 @@
           "created_at",
           "updated_at",
           "config",
-          "knowledge_base"
+          "knowledge_base",
+          "rules"
         ],
         "title": "AgentRead"
       },
@@ -3379,6 +3448,35 @@
               }
             ],
             "title": "Knowledge Base"
+          },
+          "rules": {
+            "anyOf": [
+              {
+                "items": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/LlmRule"
+                    },
+                    {
+                      "$ref": "#/components/schemas/PhraseRule"
+                    }
+                  ],
+                  "discriminator": {
+                    "propertyName": "kind",
+                    "mapping": {
+                      "llm": "#/components/schemas/LlmRule",
+                      "phrase": "#/components/schemas/PhraseRule"
+                    }
+                  }
+                },
+                "type": "array",
+                "maxItems": 20
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rules"
           }
         },
         "additionalProperties": false,
@@ -3579,7 +3677,7 @@
         ],
         "title": "ConversationCreate"
       },
-      "ConversationMetrics": {
+      "ConversationEvaluation": {
         "properties": {
           "evaluation": {
             "anyOf": [
@@ -3608,15 +3706,67 @@
             },
             "type": "object",
             "title": "Metrics"
+          },
+          "scenario_verdict": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Verdict"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "conversation_verdict": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Verdict"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "effective_scenario_verdict": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Verdict"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "effective_conversation_verdict": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Verdict"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ItemRead"
+            },
+            "type": "array",
+            "title": "Items"
           }
         },
         "type": "object",
         "required": [
           "evaluation",
           "failure",
-          "metrics"
+          "metrics",
+          "scenario_verdict",
+          "conversation_verdict",
+          "effective_scenario_verdict",
+          "effective_conversation_verdict",
+          "items"
         ],
-        "title": "ConversationMetrics"
+        "title": "ConversationEvaluation"
       },
       "ConversationRead": {
         "properties": {
@@ -4292,6 +4442,15 @@
         ],
         "title": "ConversationSummary"
       },
+      "DecidedBy": {
+        "type": "string",
+        "enum": [
+          "code",
+          "jev",
+          "llm"
+        ],
+        "title": "DecidedBy"
+      },
       "Defaults": {
         "properties": {
           "max_duration_s": {
@@ -4690,6 +4849,95 @@
         ],
         "title": "HealthResponse"
       },
+      "ItemRead": {
+        "properties": {
+          "item_key": {
+            "type": "string",
+            "title": "Item Key"
+          },
+          "subject": {
+            "type": "string",
+            "title": "Subject"
+          },
+          "role": {
+            "$ref": "#/components/schemas/ItemRole"
+          },
+          "decided_by": {
+            "$ref": "#/components/schemas/DecidedBy"
+          },
+          "machine_outcome": {
+            "$ref": "#/components/schemas/Outcome"
+          },
+          "unsure_kind": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UnsureKind"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "effective_outcome": {
+            "$ref": "#/components/schemas/Outcome"
+          },
+          "effective_unsure_kind": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UnsureKind"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "answer": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Answer"
+          },
+          "error_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "item_key",
+          "subject",
+          "role",
+          "decided_by",
+          "machine_outcome",
+          "unsure_kind",
+          "effective_outcome",
+          "effective_unsure_kind",
+          "answer",
+          "error_reason"
+        ],
+        "title": "ItemRead"
+      },
+      "ItemRole": {
+        "type": "string",
+        "enum": [
+          "deciding",
+          "reporting"
+        ],
+        "title": "ItemRole"
+      },
       "KnowledgeBaseDocument": {
         "properties": {
           "document_id": {
@@ -4835,6 +5083,76 @@
         "title": "LatencySummary",
         "description": "The agent's response times in one call: nearest-rank percentiles over the measured\nreplies, how many replies there were, and how many of them talked over the caller."
       },
+      "LlmRule": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "llm",
+            "title": "Kind",
+            "default": "llm"
+          },
+          "key": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9_-]{0,62}$",
+            "title": "Key"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "gate": {
+            "$ref": "#/components/schemas/RuleGate",
+            "default": "agent_spoke"
+          },
+          "applies_when": {
+            "type": "string",
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Applies When"
+          },
+          "pass_when": {
+            "type": "string",
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Pass When"
+          },
+          "fail_when": {
+            "type": "string",
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Fail When"
+          },
+          "not_a_failure": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Not A Failure"
+          },
+          "role": {
+            "$ref": "#/components/schemas/ItemRole",
+            "default": "reporting"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "key",
+          "name",
+          "applies_when",
+          "pass_when",
+          "fail_when"
+        ],
+        "title": "LlmRule"
+      },
       "Metric": {
         "properties": {
           "value": {
@@ -4937,6 +5255,20 @@
         ],
         "title": "OutboundConfig",
         "description": "How an outbound agent is made to call Truman, and how its call is recognized."
+      },
+      "Outcome": {
+        "type": "string",
+        "enum": [
+          "pass",
+          "fail",
+          "not_applicable",
+          "unsure",
+          "blocked",
+          "error",
+          "pending"
+        ],
+        "title": "Outcome",
+        "description": "An item's result: a judge's verdict, or what stopped one."
       },
       "OutcomeGroup": {
         "type": "string",
@@ -5618,6 +5950,81 @@
         ],
         "title": "PhoneNumbers"
       },
+      "PhraseExpectation": {
+        "type": "string",
+        "enum": [
+          "required",
+          "forbidden"
+        ],
+        "title": "PhraseExpectation"
+      },
+      "PhraseMatch": {
+        "type": "string",
+        "enum": [
+          "phrase",
+          "regex"
+        ],
+        "title": "PhraseMatch"
+      },
+      "PhraseRule": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "phrase",
+            "title": "Kind",
+            "default": "phrase"
+          },
+          "key": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9_-]{0,62}$",
+            "title": "Key"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "expects": {
+            "$ref": "#/components/schemas/PhraseExpectation"
+          },
+          "match": {
+            "$ref": "#/components/schemas/PhraseMatch",
+            "default": "phrase"
+          },
+          "value": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Value"
+          },
+          "where": {
+            "$ref": "#/components/schemas/PhraseWhere",
+            "default": "any_agent_turn"
+          },
+          "role": {
+            "$ref": "#/components/schemas/ItemRole",
+            "default": "reporting"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "key",
+          "name",
+          "expects",
+          "value"
+        ],
+        "title": "PhraseRule"
+      },
+      "PhraseWhere": {
+        "type": "string",
+        "enum": [
+          "first_agent_turn",
+          "any_agent_turn"
+        ],
+        "title": "PhraseWhere"
+      },
       "Provenance": {
         "type": "string",
         "enum": [
@@ -5701,6 +6108,15 @@
           "caller"
         ],
         "title": "Role"
+      },
+      "RuleGate": {
+        "type": "string",
+        "enum": [
+          "always",
+          "agent_spoke"
+        ],
+        "title": "RuleGate",
+        "description": "When an LLM rule can apply, decided in code before any model call."
       },
       "RunCreate": {
         "properties": {
@@ -7007,6 +7423,15 @@
         ],
         "title": "TurnRead"
       },
+      "UnsureKind": {
+        "type": "string",
+        "enum": [
+          "hidden_action",
+          "not_confirmed_played",
+          "unclear"
+        ],
+        "title": "UnsureKind"
+      },
       "ValidationError": {
         "properties": {
           "loc": {
@@ -7066,6 +7491,15 @@
           "ok"
         ],
         "title": "Validity"
+      },
+      "Verdict": {
+        "type": "string",
+        "enum": [
+          "pass",
+          "fail",
+          "not_scored"
+        ],
+        "title": "Verdict"
       },
       "VoiceCreate": {
         "properties": {

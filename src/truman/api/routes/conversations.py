@@ -12,9 +12,10 @@ from truman.api.auth import require_token
 from truman.api.deps import SessionDep, SettingsDep
 from truman.api.pagination import Page, PageDep
 from truman.api.schemas.conversations import (
-    ConversationMetrics,
+    ConversationEvaluation,
     ConversationRead,
     ConversationSummary,
+    ItemRead,
     LatencySummary,
     TurnRead,
 )
@@ -173,14 +174,21 @@ async def get_conversation(conversation_id: uuid.UUID, session: SessionDep) -> C
     return await detail(session, await conversations.get_conversation(session, conversation_id))
 
 
-@router.get("/{conversation_id}/metrics")
-async def get_metrics(conversation_id: uuid.UUID, session: SessionDep) -> ConversationMetrics:
+@router.get("/{conversation_id}/evaluation")
+async def get_evaluation(conversation_id: uuid.UUID, session: SessionDep) -> ConversationEvaluation:
     await conversations.get_conversation(session, conversation_id)
-    evaluation, found = await results.metrics(session, conversation_id)
-    return ConversationMetrics(
+    evaluation, metrics, items = await results.evaluation(session, conversation_id)
+    return ConversationEvaluation(
         evaluation=evaluation.state if evaluation else None,
         failure=evaluation.failure if evaluation else None,
-        metrics=found,
+        metrics=metrics,
+        scenario_verdict=evaluation.scenario_verdict if evaluation else None,
+        conversation_verdict=evaluation.conversation_verdict if evaluation else None,
+        effective_scenario_verdict=evaluation.effective_scenario_verdict if evaluation else None,
+        effective_conversation_verdict=(
+            evaluation.effective_conversation_verdict if evaluation else None
+        ),
+        items=[ItemRead.model_validate(item) for item in items],
     )
 
 

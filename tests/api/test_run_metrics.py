@@ -20,7 +20,7 @@ from truman.domain.conversations import (
 from truman.domain.evaluations import Metric, MetricKey, Share
 from truman.domain.latency import Latency, Reply
 from truman.evaluation import evaluations
-from truman.evaluation.evaluations import MAX_ATTEMPTS
+from truman.evaluation.evaluations import MAX_ATTEMPTS, Evaluated
 
 CONNECTED = Transcript(wire_events=[WireEvent(kind=WireEventKind.CONNECTED, at_ms=500)])
 
@@ -140,7 +140,9 @@ async def test_run_numbers_count_what_each_call_got_to(client: AsyncClient, db: 
             else:
                 answer = 9_000 if str(evaluation.conversation_id) == crashed else 20_000
                 metrics = {MetricKey.RESPONSE_TIME: responses((1_000, answer))}
-                await evaluations.finish(session, evaluation.id, evaluation.claim_seq, metrics)
+                await evaluations.finish(
+                    session, evaluation.id, evaluation.claim_seq, Evaluated(metrics=metrics)
+                )
 
     found = (await client.get(f"/api/v1/runs/{run['id']}/metrics")).json()
 

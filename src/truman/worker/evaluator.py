@@ -11,10 +11,14 @@ import uuid
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from truman.config import Settings
-from truman.db.models import AgentVersion, Conversation, Evaluation
+from truman.db.models import AgentVersion, Conversation, Evaluation, ScenarioVersion
 from truman.diagnostics import describe_exception
 from truman.domain.agents import AgentConfig
+from truman.domain.language_models import JsonModel, ModelCallError
+from truman.domain.scenarios import ScenarioConfig
 from truman.evaluation import call, evaluations
+from truman.evaluation.call import JUDGES, Judging
+from truman.integrations.openai_models import OpenAIJsonModel
 
 log = logging.getLogger(__name__)
 
@@ -23,16 +27,93 @@ DRAIN_S = 8.0
 Docker gives a container to stop. An evaluation it cancels is claimed again after its lease."""
 
 
+PROBE = {
+    "type": "object",
+    "properties": {"yes": {"type": "boolean"}},
+    "required": ["yes"],
+    "additionalProperties": False,
+}
+"""A first question at start, so a judge model that cannot answer stops the evaluator at once
+instead of failing every item."""
+PROBE_TIMEOUT_S = 20.0
+PROVIDER = "openai_compatible"
+
+
+def judge_model(settings: Settings) -> OpenAIJsonModel | None:
+    """The model that judges calls; None when no model or key is set."""
+    key = settings.judge_openai_api_key or settings.openai_api_key
+    if not settings.judge_llm_model or key is None:
+        return None
+    return OpenAIJsonModel.openai(
+        key.get_secret_value(),
+        settings.judge_llm_model,
+        base_url=settings.judge_openai_base_url or settings.openai_base_url,
+        timeout_s=settings.judge_llm_timeout_s,
+        reasoning_effort=settings.judge_llm_reasoning_effort,
+        retries=3,
+        max_output_tokens=settings.judge_max_output_tokens,
+    )
+
+
 class Evaluator:
-    def __init__(self, sessionmaker: async_sessionmaker[AsyncSession], settings: Settings) -> None:
+    def __init__(
+        self,
+        sessionmaker: async_sessionmaker[AsyncSession],
+        settings: Settings,
+        model: JsonModel | None = None,
+    ) -> None:
+        """model judges calls; None runs the code metrics and phrase rules only."""
         self._sessionmaker = sessionmaker
         self._settings = settings
+        self._model = model
+        self._judging: Judging | None = None
         self.evaluator_id = f"{socket.gethostname()}:{os.getpid()}:{uuid.uuid4().hex[:8]}"
         self._slots = asyncio.Semaphore(settings.evaluator_concurrency)
         self._tasks: set[asyncio.Task[None]] = set()
 
+    async def _prepare_judging(self) -> Judging | None:
+        if self._model is None:
+            log.warning("no judge model is set: calls get code metrics and phrase rules only")
+            return None
+        settings = {
+            "reasoning_effort": self._settings.judge_llm_reasoning_effort,
+            "max_output_tokens": self._settings.judge_max_output_tokens,
+            "timeout_s": self._settings.judge_llm_timeout_s,
+        }
+        model = self._settings.judge_llm_model
+        try:
+            await asyncio.wait_for(
+                self._model.complete_json(
+                    system="Answer the question.",
+                    user="Is this a test?",
+                    name="probe",
+                    schema=PROBE,
+                ),
+                PROBE_TIMEOUT_S,
+            )
+        except TimeoutError:
+            log.warning("the judge model %s did not answer a first check in time", model)
+        except ModelCallError as error:
+            if not error.temporary:
+                raise RuntimeError(
+                    f"the judge model {model} cannot be used ({error}); set JUDGE_LLM_MODEL to "
+                    "a model the judge endpoint has, or to an empty value to turn judging off"
+                ) from error
+            log.warning("the judge model %s did not answer a first check: %s", model, error)
+        async with self._sessionmaker() as session:
+            versions = await evaluations.stored_judge_versions(
+                session, [judge.version(PROVIDER, model, settings) for judge in JUDGES]
+            )
+        log.info("judging with %s", model)
+        return Judging(
+            model=self._model,
+            versions=versions,
+            slots=asyncio.Semaphore(self._settings.evaluator_judge_concurrency),
+        )
+
     async def run(self, stop: asyncio.Event) -> None:
         log.info("evaluator %s started", self.evaluator_id)
+        self._judging = await self._prepare_judging()
         try:
             while not stop.is_set():
                 try:
@@ -77,14 +158,19 @@ class Evaluator:
             async with self._sessionmaker() as session:
                 conversation = await session.get_one(Conversation, evaluation.conversation_id)
                 agent = await session.get_one(AgentVersion, conversation.agent_version_id)
-            metrics = await call.evaluate(
-                conversation, AgentConfig.model_validate(agent.config).agent_speaks_first
+                scenario = await session.get_one(ScenarioVersion, conversation.scenario_version_id)
+            evaluated = await call.evaluate(
+                conversation,
+                AgentConfig.model_validate(agent.config),
+                ScenarioConfig.model_validate(scenario.config),
+                self._judging,
+                retry_later=evaluation.attempts < evaluations.MAX_ATTEMPTS,
             )
             if not held.is_set():
                 return
             async with self._sessionmaker() as session:
                 if not await evaluations.finish(
-                    session, evaluation.id, evaluation.claim_seq, metrics
+                    session, evaluation.id, evaluation.claim_seq, evaluated
                 ):
                     log.warning(
                         "evaluation %s was claimed again; dropped its results", evaluation.id

@@ -20,7 +20,7 @@ import {
   type KnowledgeBaseEntry,
   type Conversation,
   type ConversationInput,
-  type ConversationMetrics,
+  type ConversationEvaluation,
   type EvaluationState,
   evaluationPending,
   type Defaults,
@@ -49,8 +49,8 @@ export const keys = {
   agent: (id: string) => ["agents", id] as const,
   conversations: (filters: Record<string, string>) => ["conversations", filters] as const,
   conversation: (id: string) => ["conversations", "one", id] as const,
-  conversationMetrics: (id: string, evaluation: EvaluationState | null) =>
-    ["conversations", "metrics", id, evaluation ?? "none"] as const,
+  conversationEvaluation: (id: string, evaluation: EvaluationState | null) =>
+    ["conversations", "evaluation", id, evaluation ?? "none"] as const,
   personas: ["personas"] as const,
   scenario: (id: string) => ["scenarios", "one", id] as const,
   scenarios: (agentId: string) => ["agents", agentId, "scenarios"] as const,
@@ -368,10 +368,11 @@ export function useConversation(id: string | undefined) {
 
 /** The metrics of a finished evaluation, or why it failed; read again when the state
  * changes. */
-export function useConversationMetrics(id: string, evaluation: EvaluationState | null) {
+export function useConversationEvaluation(id: string, evaluation: EvaluationState | null) {
   return useQuery({
-    queryKey: keys.conversationMetrics(id, evaluation),
-    queryFn: ({ signal }) => api<ConversationMetrics>(`/conversations/${id}/metrics`, { signal }),
+    queryKey: keys.conversationEvaluation(id, evaluation),
+    queryFn: ({ signal }) =>
+      api<ConversationEvaluation>(`/conversations/${id}/evaluation`, { signal }),
     enabled: evaluation === "done" || evaluation === "failed",
   });
 }

@@ -3,14 +3,17 @@ time under a lease, written back only by the evaluator that holds the latest cla
 
 import uuid
 from collections.abc import Mapping, Sequence
+from dataclasses import asdict, dataclass, field
 from datetime import timedelta
+from typing import Any
 
 from sqlalchemy import ColumnElement, and_, func, or_, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from truman.db.models import Evaluation, MetricValue
-from truman.domain.evaluations import EvaluationState, Metric, MetricKey
+from truman.db.models import Evaluation, EvaluationItem, JudgeCall, JudgeVersion, MetricValue
+from truman.domain.evaluations import EvaluationState, Metric, MetricKey, Verdict
+from truman.evaluation.judging import ItemResult
 
 MAX_ATTEMPTS = 10
 """An evaluation that fails this many times ends failed: it would fail every time."""
@@ -106,14 +109,24 @@ async def renew(
     return renewed is not None
 
 
+@dataclass(frozen=True)
+class Evaluated:
+    """What an evaluation found: code metrics, judged items and, for a judged call, verdicts."""
+
+    metrics: Mapping[MetricKey, Metric]
+    items: Sequence[ItemResult] = ()
+    scenario_verdict: Verdict | None = None
+    conversation_verdict: Verdict | None = None
+    judge_versions: Mapping[str, uuid.UUID] = field(default_factory=dict)
+    """The stored judge version of each judge the items name."""
+
+
 async def finish(
-    session: AsyncSession,
-    evaluation_id: uuid.UUID,
-    claim_seq: int,
-    metrics: Mapping[MetricKey, Metric],
+    session: AsyncSession, evaluation_id: uuid.UUID, claim_seq: int, evaluated: Evaluated
 ) -> bool:
-    """Store the metrics and end the evaluation, in one transaction; False, with nothing
-    written, when another evaluator holds a later claim."""
+    """Store what the evaluation found and end it, in one transaction; False, with nothing
+    written, when another evaluator holds a later claim. Effective results start as the
+    machine's."""
     ended = await session.scalar(
         update(Evaluation)
         .where(held(evaluation_id, claim_seq))
@@ -122,22 +135,69 @@ async def finish(
             code_version=CODE_VERSION,
             ended_at=func.statement_timestamp(),
             failure=None,
+            scenario_verdict=evaluated.scenario_verdict,
+            conversation_verdict=evaluated.conversation_verdict,
+            effective_scenario_verdict=evaluated.scenario_verdict,
+            effective_conversation_verdict=evaluated.conversation_verdict,
         )
         .returning(Evaluation.id)
     )
     if ended is None:
         await session.rollback()
         return False
-    if metrics:
+    if evaluated.metrics:
         await session.execute(
             insert(MetricValue),
             [
                 {"evaluation_id": evaluation_id, "metric_key": key, **metric.model_dump()}
-                for key, metric in metrics.items()
+                for key, metric in evaluated.metrics.items()
             ],
+        )
+    for found in evaluated.items:
+        item = EvaluationItem(
+            evaluation_id=evaluation_id,
+            item_key=found.key,
+            subject=found.subject,
+            judge_version_id=evaluated.judge_versions[found.judge] if found.judge else None,
+            decided_by=found.decided_by,
+            role=found.role,
+            answer=found.answer,
+            evidence_checks={"re_asks": found.re_asks},
+            machine_outcome=found.outcome,
+            unsure_kind=found.unsure_kind,
+            error_reason=found.error_reason,
+            effective_outcome=found.outcome,
+            effective_unsure_kind=found.unsure_kind,
+        )
+        session.add(item)
+        await session.flush()
+        session.add_all(
+            JudgeCall(item_id=item.id, attempt=number, **asdict(attempt))
+            for number, attempt in enumerate(found.attempts, 1)
         )
     await session.commit()
     return True
+
+
+async def stored_judge_versions(
+    session: AsyncSession, versions: Sequence[dict[str, Any]]
+) -> dict[str, uuid.UUID]:
+    """The stored id of each judge version, by judge name; a version not stored yet is
+    stored. Evaluators that start together store each version once."""
+    for fields in versions:
+        await session.execute(
+            insert(JudgeVersion)
+            .values(**fields)
+            .on_conflict_do_nothing(index_elements=["content_sha256"])
+        )
+    rows = await session.execute(
+        select(JudgeVersion.judge, JudgeVersion.id).where(
+            JudgeVersion.content_sha256.in_([fields["content_sha256"] for fields in versions])
+        )
+    )
+    found = {judge: version_id for judge, version_id in rows}
+    await session.commit()
+    return found
 
 
 async def fail(

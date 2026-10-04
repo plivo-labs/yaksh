@@ -21,6 +21,47 @@ class MetricKey(StrEnum):
     SPEAKING = "speaking"
 
 
+class Outcome(StrEnum):
+    """An item's result: a judge's verdict, or what stopped one."""
+
+    PASS = "pass"
+    FAIL = "fail"
+    NOT_APPLICABLE = "not_applicable"
+    UNSURE = "unsure"
+    BLOCKED = "blocked"
+    """The caller, the scenario or the test's limits broke the test for this item."""
+    ERROR = "error"
+    """The judge failed; the item has no verdict."""
+    PENDING = "pending"
+    """Labels disagree, so no effective outcome yet."""
+
+
+class UnsureKind(StrEnum):
+    HIDDEN_ACTION = "hidden_action"
+    """Deciding needs a tool call or a backend state the call cannot show; counts as not
+    applicable."""
+    NOT_CONFIRMED_PLAYED = "not_confirmed_played"
+    UNCLEAR = "unclear"
+
+
+class DecidedBy(StrEnum):
+    CODE = "code"
+    JEV = "jev"
+    LLM = "llm"
+
+
+class ItemRole(StrEnum):
+    DECIDING = "deciding"
+    """Counts in the conversation verdict."""
+    REPORTING = "reporting"
+
+
+class Verdict(StrEnum):
+    PASS = "pass"
+    FAIL = "fail"
+    NOT_SCORED = "not_scored"
+
+
 class EvaluationState(StrEnum):
     QUEUED = "queued"
     RUNNING = "running"

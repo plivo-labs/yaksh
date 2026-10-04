@@ -24,6 +24,7 @@ from truman.db.models import Scenario, ScenarioGeneration
 from truman.db.session import create_engine, create_sessionmaker
 from truman.domain.errors import UnavailableError
 from truman.domain.generation import MAX_PLANNER_CHARS, GenerateScenarios, GenerationStatus
+from truman.domain.language_models import ModelAnswer
 from truman.simulation import generation
 
 BRIEF = "Reschedules missed clinic visits. Never gives medical advice; transfers to a nurse."
@@ -365,10 +366,10 @@ async def test_a_disconnect_during_planning_still_records_the_stop(
     agent = await create_agent(client, brief=BRIEF)
     planning = asyncio.Event()
 
-    async def slow_plan(**_: Any) -> dict[str, Any]:
+    async def slow_plan(**_: Any) -> ModelAnswer:
         planning.set()
         await asyncio.sleep(60)
-        return {"capabilities": []}
+        return ModelAnswer(data={"capabilities": []}, model="fake", input_tokens=0, output_tokens=0)
 
     generation_model.complete_json = slow_plan  # type: ignore[method-assign]
     engine = create_engine(settings.database_url.encoded_string())

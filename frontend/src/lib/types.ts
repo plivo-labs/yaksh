@@ -640,7 +640,33 @@ export interface Usage {
   stream_opened_ms: number | null;
 }
 
-export interface ConversationMetrics {
+export type Outcome =
+  | "pass"
+  | "fail"
+  | "not_applicable"
+  | "unsure"
+  | "blocked"
+  | "error"
+  | "pending";
+export type UnsureKind = "hidden_action" | "not_confirmed_played" | "unclear";
+export type Verdict = "pass" | "fail" | "not_scored";
+
+/** One judged criterion or agent rule. */
+export interface EvaluationItem {
+  item_key: string;
+  /** The criterion's text or the rule's name. */
+  subject: string;
+  role: "deciding" | "reporting";
+  decided_by: "code" | "jev" | "llm";
+  machine_outcome: Outcome;
+  unsure_kind: UnsureKind | null;
+  effective_outcome: Outcome;
+  effective_unsure_kind: UnsureKind | null;
+  answer: Record<string, unknown> | null;
+  error_reason: string | null;
+}
+
+export interface ConversationEvaluation {
   evaluation: EvaluationState | null;
   /** Why the last attempt failed. */
   failure: string | null;
@@ -655,6 +681,12 @@ export interface ConversationMetrics {
     capture_faults: Metric<CaptureFaults>;
     usage: Metric<Usage>;
   }>;
+  /** From the criteria; null when the call was not judged. */
+  scenario_verdict: Verdict | null;
+  conversation_verdict: Verdict | null;
+  effective_scenario_verdict: Verdict | null;
+  effective_conversation_verdict: Verdict | null;
+  items: EvaluationItem[];
 }
 
 export const FLAG_TEXT: Record<string, string> = {
