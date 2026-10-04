@@ -125,6 +125,7 @@ The phone provider limits the calls of the whole account that can be on the line
 
 ```sh
 cd cli && go build -o ~/.truman/bin/truman .
+export PATH="$HOME/.truman/bin:$PATH"                    # add this line to your shell profile too
 truman auth login --server http://localhost:8000         # or set TRUMAN_URL and TRUMAN_API_TOKEN
 truman run start --agent <agent id> --all --wait
 ```
