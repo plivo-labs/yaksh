@@ -3,6 +3,7 @@ import { Fragment, useEffect, useRef, useState } from "react";
 import { useDefaultLayout } from "react-resizable-panels";
 import { Link, useParams, useSearchParams } from "react-router";
 
+import { BackButton } from "@/components/back-button";
 import { type Mark, type PlayerHandle, RecordingPlayer } from "@/components/recording-player";
 import { ResponseTime } from "@/components/response-time";
 import { StatusBadge } from "@/components/status-dot";
@@ -104,6 +105,7 @@ export function ConversationPage() {
 
   return (
     <div className="flex h-full flex-col gap-6">
+      <BackButton fallback={data.run_id ? `/runs/${data.run_id}` : `/agents/${data.agent_id}`} />
       <div className="flex shrink-0 flex-wrap items-start justify-between gap-4">
         <div className="grid gap-1.5">
           <div className="flex items-center gap-3">

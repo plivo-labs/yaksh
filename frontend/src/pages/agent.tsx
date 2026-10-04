@@ -1,8 +1,9 @@
-import { ChevronLeft, ChevronRight, PhoneOutgoing } from "lucide-react";
+import { ChevronRight, PhoneOutgoing } from "lucide-react";
 import { useState } from "react";
 import { Link, useParams } from "react-router";
 import { toast } from "sonner";
 
+import { BackButton } from "@/components/back-button";
 import { CopyId } from "@/components/copy-id";
 import { ConversationList } from "@/components/conversation-list";
 import { Fact, FoldingPanel, Panel, PanelHeader } from "@/components/panel";
@@ -45,13 +46,7 @@ export function AgentPage() {
 
   return (
     <div className="grid gap-6">
-      <Link
-        to="/agents"
-        className="inline-flex w-fit items-center gap-1 rounded-sm text-sm text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
-      >
-        <ChevronLeft className="size-4" />
-        Agents
-      </Link>
+      <BackButton fallback="/agents" />
       {agent.isPending ? (
         <Skeleton className="h-40 w-full rounded-lg" />
       ) : (

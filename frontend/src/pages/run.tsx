@@ -1,8 +1,9 @@
-import { ChevronLeft, Play, Square } from "lucide-react";
+import { Play, Square } from "lucide-react";
 import { useState } from "react";
-import { Link, useParams, useSearchParams } from "react-router";
+import { useParams, useSearchParams } from "react-router";
 import { toast } from "sonner";
 
+import { BackButton } from "@/components/back-button";
 import { ConversationList } from "@/components/conversation-list";
 import { Pager } from "@/components/pager";
 import { Fact, Panel, PanelHeader } from "@/components/panel";
@@ -46,7 +47,6 @@ const FINISHED: OutcomeGroup[] = ["completed", "did_not_connect", "error", "canc
 export function RunPage() {
   const { id = "" } = useParams();
   const run = useRun(id);
-  const agent = useAgent(run.data?.agent_id);
 
   if (run.isError) {
     return (
@@ -61,13 +61,7 @@ export function RunPage() {
 
   return (
     <div className="grid gap-6">
-      <Link
-        to={`/agents/${data.agent_id}`}
-        className="inline-flex w-fit items-center gap-1 rounded-sm text-sm text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
-      >
-        <ChevronLeft className="size-4" />
-        {agent.data?.name ?? data.agent_name}
-      </Link>
+      <BackButton fallback={`/agents/${data.agent_id}`} />
       <Overview run={data} />
       <Conversations run={data} />
     </div>

@@ -1,10 +1,10 @@
 import { cn } from "cn";
-import { ChevronLeft } from "lucide-react";
 import { type ReactNode, type SubmitEvent, useState } from "react";
 import { flushSync } from "react-dom";
 import { Link, useNavigate } from "react-router";
 import { toast } from "sonner";
 
+import { BackButton } from "@/components/back-button";
 import { DeleteConfirm } from "@/components/confirm-dialogs";
 import { Panel, PanelHeader } from "@/components/panel";
 import { Segmented } from "@/components/segmented";
@@ -329,19 +329,13 @@ export function NewAgentPage() {
     const entries = knowledgeBase.documents.map(({ document_id, name }) => ({ document_id, name }));
     save.mutate(
       { ...toInput(form.draft), knowledge_base: entries },
-      { onSuccess: (agent) => navigate(`/agents/${agent.id}`) },
+      { onSuccess: (agent) => navigate(`/agents/${agent.id}`, { replace: true }) },
     );
   };
 
   return (
     <div className="grid gap-6">
-      <Link
-        to="/agents"
-        className="inline-flex w-fit items-center gap-1 rounded-sm text-sm text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
-      >
-        <ChevronLeft className="size-4" />
-        Agents
-      </Link>
+      <BackButton fallback="/agents" />
       <div className="grid gap-1">
         <h1 className="text-2xl font-semibold tracking-[-0.015em]">New agent</h1>
         <p className="text-sm text-muted-foreground">
@@ -451,7 +445,7 @@ export function AgentForm({
             remove.mutate(agent.id, {
               onSuccess: () => {
                 toast.success(`Deleted ${form.draft.name}`);
-                navigate("/agents");
+                navigate("/agents", { replace: true });
               },
               onSettled: close,
             })
