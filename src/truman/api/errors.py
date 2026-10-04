@@ -5,6 +5,7 @@ from fastapi import FastAPI, Request, status
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 from starlette.exceptions import HTTPException
 
 from truman.domain.errors import ConflictError, NotFoundError, UnavailableError, ValidationError
@@ -21,6 +22,51 @@ CODES = {
 }
 
 
+class FieldError(BaseModel):
+    loc: list[str | int]
+    msg: str
+    type: str
+
+
+class ErrorBody(BaseModel):
+    code: str
+    message: str
+    details: list[FieldError] | None = None
+    """Each field that is not valid, when the request failed validation."""
+
+
+class ErrorResponse(BaseModel):
+    """The body of every error response."""
+
+    error: ErrorBody
+
+
+CLIENT_ERRORS: dict[int | str, dict[str, Any]] = {
+    "4XX": {"model": ErrorResponse, "description": "The request failed. The error tells why."}
+}
+UNAVAILABLE: dict[int | str, dict[str, Any]] = {
+    status.HTTP_503_SERVICE_UNAVAILABLE: {
+        "model": ErrorResponse,
+        "description": "An outside service is not set up, or it did not answer.",
+    }
+}
+
+
+def json_errors(
+    responses: Mapping[int | str, Mapping[str, Any]],
+) -> dict[int | str, dict[str, Any]]:
+    """These error responses for a route whose own body is not JSON, such as an event stream: the
+    model shorthand would declare the error body under the route's media type."""
+    schema = {"$ref": f"#/components/schemas/{ErrorResponse.__name__}"}
+    return {
+        code: {
+            "description": response["description"],
+            "content": {"application/json": {"schema": schema}},
+        }
+        for code, response in responses.items()
+    }
+
+
 def error_response(
     status_code: int,
     message: str,
@@ -28,10 +74,12 @@ def error_response(
     details: Any = None,
     headers: Mapping[str, str] | None = None,
 ) -> JSONResponse:
-    error: dict[str, Any] = {"code": CODES.get(status_code, "error"), "message": message}
-    if details is not None:
-        error["details"] = details
-    return JSONResponse({"error": error}, status_code=status_code, headers=headers)
+    body = ErrorResponse.model_validate(
+        {"error": {"code": CODES.get(status_code, "error"), "message": message, "details": details}}
+    )
+    return JSONResponse(
+        body.model_dump(mode="json", exclude_none=True), status_code=status_code, headers=headers
+    )
 
 
 def validation_summary(error: Mapping[str, Any]) -> str:

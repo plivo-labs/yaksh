@@ -52,7 +52,15 @@ async def get_run(run_id: uuid.UUID, session: SessionDep) -> RunRead:
     return await detail(session, await runs.get_run(session, run_id))
 
 
-@router.post("/{run_id}/cancel")
+@router.post(
+    "/{run_id}/cancel",
+    responses={
+        status.HTTP_202_ACCEPTED: {
+            "model": RunRead,
+            "description": "The run is cancelled, and some of its calls are still stopping.",
+        }
+    },
+)
 async def cancel_run(run_id: uuid.UUID, session: SessionDep, response: Response) -> RunRead:
     cancelled = await detail(session, await runs.cancel_run(session, run_id))
     if cancelled.status is RunStatus.CANCELLING:

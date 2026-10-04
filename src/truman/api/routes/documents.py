@@ -7,6 +7,7 @@ from starlette.types import Receive, Scope, Send
 
 from truman.api.auth import require_token
 from truman.api.deps import FileStoreDep, SessionDep
+from truman.api.errors import UNAVAILABLE
 from truman.api.schemas.documents import DocumentRead, DocumentSummary
 from truman.domain.documents import MAX_FILE_BYTES, TextDocumentCreate
 from truman.simulation import documents
@@ -45,7 +46,7 @@ async def create_text_document(command: TextDocumentCreate, session: SessionDep)
     return DocumentSummary.model_validate(await documents.create_text_document(session, command))
 
 
-@router.post("/upload", status_code=status.HTTP_201_CREATED)
+@router.post("/upload", status_code=status.HTTP_201_CREATED, responses=UNAVAILABLE)
 async def upload_document(
     file: UploadFile, session: SessionDep, store: FileStoreDep
 ) -> DocumentSummary:
@@ -60,7 +61,7 @@ async def get_document(document_id: uuid.UUID, session: SessionDep) -> DocumentR
     return DocumentRead.model_validate(await documents.get_document(session, document_id))
 
 
-@router.get("/{document_id}/file", response_class=StreamingResponse)
+@router.get("/{document_id}/file", response_class=StreamingResponse, responses=UNAVAILABLE)
 async def download_document(
     document_id: uuid.UUID, session: SessionDep, store: FileStoreDep
 ) -> StreamingResponse:
