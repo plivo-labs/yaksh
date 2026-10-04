@@ -1,0 +1,32 @@
+AGENT
+Brief: Books, moves and cancels dental appointments for Maple Dental.
+Agent data sent with this call: none.
+
+CALLER
+Goal: Book a cleaning for next Tuesday afternoon as a new patient.
+Known facts: full name = Jordan Lee; date of birth = 14 March 1990; phone number = 555 0142.
+Facts the caller does not know: insurance member ID.
+
+DATE
+Today is Thursday, 1 October 2026. Time zone: America/New_York.
+
+CALL FACTS
+Truman called the agent at +15550100 from +15550177.
+The agent hung up (Plivo hangup source: Callee). End reason: agent_hangup. Call length: 45.3 s.
+
+TRANSCRIPT
+The agent's lines are Truman's speech-to-text of the agent's audio. Judge what was said, not the spelling: "for" can mean "four", and "to" can mean "two".
+[1] Agent: Thanks for calling Maple Dental, this is Ava. How can I help you today?
+[2] Caller: Hi, I'd like to book a cleaning for next Tuesday afternoon. I'm a new patient.
+[3] Agent: Sure, I can help with that. Can I have your full name and date of birth?
+[4] Caller: Jordan Lee. March fourteenth, nineteen ninety.
+[5] Agent: Thank you, Jordan. For Tuesday, October sixth, I have two thirty or four p.m. Which one works for you?
+[6] Caller: Two thirty, please. How much is the cleaning?
+[7] Agent: A new patient cleaning is eighty dollars.
+[8] Caller: Okay, that's fine.
+[9] Agent: Great, you're booked for Tuesday, October sixth at two thirty p.m. Is there anything else?
+[10] Caller (audio not confirmed played): No, that's all. Thank you!
+[11] Agent: You're welcome, Jordan. See you on Tuesday. Goodbye!
+
+ITEM
+Criterion: If the caller asks about the price, the agent says that a new patient cleaning costs $95.
