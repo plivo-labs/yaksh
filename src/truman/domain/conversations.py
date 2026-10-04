@@ -172,6 +172,20 @@ class Transcript(BaseModel):
     first audio, but the stream opened here."""
 
 
+class LineFacts(BaseModel):
+    """Plivo's hangup report for a call that connected, as Plivo wrote it: who hung up, why,
+    and how long the call lasted. The times are Plivo's text; no time zone is assumed."""
+
+    model_config = ConfigDict(frozen=True)
+
+    hangup_source: str | None = None
+    hangup_cause: str | None = None
+    duration_s: int | None = None
+    bill_duration_s: int | None = None
+    answer_time: str | None = None
+    end_time: str | None = None
+
+
 class CallerSettings(BaseModel):
     """What the caller ran: the models behave differently, so a result names them."""
 
@@ -276,6 +290,7 @@ class CallOutcome(BaseModel):
     stream_opened_ms: int | None = None
     caller_settings: CallerSettings | None = None
     caller_usage: CallerUsage | None = None
+    line_facts: LineFacts | None = None
     call_uuid: str | None = None
 
 

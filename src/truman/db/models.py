@@ -182,6 +182,8 @@ class Conversation(Base):
     """The models and voice the caller ran (`CallerSettings`); None before a call connects."""
     caller_usage: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     """What the caller's services consumed (`CallerUsage`)."""
+    line_facts: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    """Plivo's hangup report for a connected call (`LineFacts`): who hung up."""
     claimed_by: Mapped[str | None] = mapped_column(Text)
     lease_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     run_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))

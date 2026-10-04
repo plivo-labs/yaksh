@@ -624,6 +624,7 @@ async def finalize(
                 caller_reason=outcome.caller_reason,
                 caller_settings=dump(outcome.caller_settings),
                 caller_usage=dump(outcome.caller_usage),
+                line_facts=dump(outcome.line_facts),
                 recording_path=str(outcome.recording_path) if outcome.recording_path else None,
                 call_uuid=outcome.call_uuid,
                 agent_caller_id=Conversation.agent_caller_id if outcome.call_uuid else None,

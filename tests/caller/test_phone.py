@@ -26,7 +26,13 @@ from truman.caller.phone import Connected, Dialer, PhoneCaller, Receiver
 from truman.caller.pipeline import CallState
 from truman.caller.plivo_server import PendingStream, PlivoServer, StreamRegistry, create_app
 from truman.domain.agents import AgentConfig
-from truman.domain.conversations import CallOutcome, CallRequest, EndReason, WireEventKind
+from truman.domain.conversations import (
+    CallOutcome,
+    CallRequest,
+    EndReason,
+    LineFacts,
+    WireEventKind,
+)
 from truman.integrations.plivo import PlivoApi
 from truman.integrations.trigger import TriggerOutcome, TriggerResult
 
@@ -270,26 +276,18 @@ async def test_a_hangup_before_the_stream_names_the_side_plivo_reports(
     )
 
 
-async def test_the_end_of_a_stream_is_named_by_the_hangup_report_that_follows(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setattr(phone, "HANGUP_REPORT_WAIT_S", 0.05)
-    reports: asyncio.Queue[dict[str, str]] = asyncio.Queue()
-    reports.put_nowait({"CallStatus": "in-progress"})
-    reports.put_nowait({"CallStatus": "completed", "Event": "Hangup", "HangupSource": "Callee"})
-    agent, unknown, observed = CallState(), CallState(), CallState()
-    agent.end(EndReason.STREAM_ENDED)
-    unknown.end(EndReason.STREAM_ENDED)
+def test_the_end_of_a_stream_is_named_by_the_hangup_report_that_follows() -> None:
+    agent, outbound, unknown, observed = CallState(), CallState(), CallState(), CallState()
+    for state in (agent, outbound, unknown):
+        state.end(EndReason.STREAM_ENDED)
     observed.end(EndReason.CALLER_HANGUP)
+    callee = {"CallStatus": "completed", "Event": "Hangup", "HangupSource": "Callee"}
+    caller = {"CallStatus": "completed", "Event": "Hangup", "HangupSource": "Caller"}
 
-    reports.put_nowait({"CallStatus": "completed", "Event": "Hangup", "HangupSource": "Caller"})
-    outbound = CallState()
-    outbound.end(EndReason.STREAM_ENDED)
-
-    await phone.resolve_stream_end(agent, reports, phone.CALLED_SIDE)
-    await phone.resolve_stream_end(outbound, reports, phone.CALLING_SIDE)
-    await phone.resolve_stream_end(unknown, reports, phone.CALLED_SIDE)
-    await phone.resolve_stream_end(observed, reports, phone.CALLED_SIDE)
+    phone.resolve_stream_end(agent, callee, phone.CALLED_SIDE)
+    phone.resolve_stream_end(outbound, caller, phone.CALLING_SIDE)
+    phone.resolve_stream_end(unknown, None, phone.CALLED_SIDE)
+    phone.resolve_stream_end(observed, callee, phone.CALLED_SIDE)
 
     assert (agent.end_reason, agent.error) == (EndReason.AGENT_HANGUP, None)
     assert (outbound.end_reason, outbound.error) == (EndReason.AGENT_HANGUP, None), (
@@ -298,6 +296,51 @@ async def test_the_end_of_a_stream_is_named_by_the_hangup_report_that_follows(
     assert unknown.end_reason is EndReason.STREAM_ENDED
     assert unknown.error == "the stream ended and Plivo did not say which side ended the call"
     assert (observed.end_reason, observed.error) == (EndReason.CALLER_HANGUP, None)
+
+
+async def test_the_line_hangs_up_once_and_reads_the_report_that_follows() -> None:
+    reports: asyncio.Queue[dict[str, str]] = asyncio.Queue()
+    hung_up: list[str] = []
+    report = {
+        "Event": "Hangup",
+        "HangupSource": "Caller",
+        "HangupCauseName": "Normal Hangup",
+        "Duration": "47",
+        "BillDuration": "60",
+        "AnswerTime": "2026-10-05 10:02:18",
+        "EndTime": "2026-10-05 10:03:05",
+    }
+
+    async def hang_up(call_uuid: str) -> None:
+        hung_up.append(call_uuid)
+        reports.put_nowait({"Event": "StartStream"})
+        reports.put_nowait(report)
+
+    line = phone.Line("call-7", reports, hang_up)
+    got = await line.end()
+    await line.hang_up()
+
+    assert hung_up == ["call-7"]
+    assert got == report
+    assert phone.line_facts(report) == LineFacts(
+        hangup_source="Caller",
+        hangup_cause="Normal Hangup",
+        duration_s=47,
+        bill_duration_s=60,
+        answer_time="2026-10-05 10:02:18",
+        end_time="2026-10-05 10:03:05",
+    )
+
+
+async def test_a_line_whose_report_does_not_come_ends_without_one(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(phone, "HANGUP_REPORT_WAIT_S", 0.05)
+
+    async def hang_up(_call_uuid: str) -> None:
+        return None
+
+    assert await phone.Line("call-8", asyncio.Queue(), hang_up).end() is None
 
 
 async def test_the_phone_caller_reports_an_unanswered_call_and_frees_its_stream_entry(

@@ -36,6 +36,7 @@ from truman.domain.conversations import (
     CallOutcome,
     ConversationStatus,
     EndReason,
+    LineFacts,
     Provenance,
     Role,
     Transcript,
@@ -391,7 +392,7 @@ async def test_a_retry_keeps_the_today_its_caller_was_given(client: AsyncClient,
     assert (row.today, row.time_zone) == (date(2026, 1, 15), "Asia/Kolkata")
 
 
-async def test_a_finished_call_keeps_its_speech_stream_opening_and_caller_settings_and_usage(
+async def test_a_finished_call_keeps_the_facts_its_call_captured(
     client: AsyncClient, db: Db
 ) -> None:
     agent = await create_agent_id(client)
@@ -410,6 +411,7 @@ async def test_a_finished_call_keeps_its_speech_stream_opening_and_caller_settin
         voice=VoiceSettings(provider=VoiceProvider.ELEVENLABS, id="voice-1"),
     )
     usage = CallerUsage(llm_prompt_tokens=900, tts_characters=140)
+    line = LineFacts(hangup_source="Callee", hangup_cause="Normal Hangup", duration_s=46)
     outcome = CallOutcome(
         connected=True,
         end_reason=EndReason.AGENT_HANGUP,
@@ -417,6 +419,7 @@ async def test_a_finished_call_keeps_its_speech_stream_opening_and_caller_settin
         stream_opened_ms=120,
         caller_settings=settings,
         caller_usage=usage,
+        line_facts=line,
     )
     assert await finish(db, conversation["id"], outcome)
 
@@ -427,6 +430,7 @@ async def test_a_finished_call_keeps_its_speech_stream_opening_and_caller_settin
     assert (stored.speech, stored.stream_opened_ms) == (speech, 120)
     assert CallerSettings.model_validate(row.caller_settings) == settings
     assert CallerUsage.model_validate(row.caller_usage) == usage
+    assert LineFacts.model_validate(row.line_facts) == line
 
 
 async def test_counts_take_the_latest_attempt_and_the_list_can_leave_out_retried_ones(
