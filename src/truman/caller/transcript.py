@@ -1,7 +1,7 @@
 """Turns as judges should read them: what the agent said, and what it actually heard."""
 
 from collections import deque
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Iterable
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -9,6 +9,7 @@ from pipecat.frames.frames import (
     CancelFrame,
     EndFrame,
     Frame,
+    FunctionCallsStartedFrame,
     InterruptionFrame,
     LLMContextFrame,
     LLMFullResponseEndFrame,
@@ -108,6 +109,8 @@ class TranscriptBuilder:
         self._closed: Playout | None = None
         self.agent_speaking = False
         self.agent_spoke = False
+        self._generated_words = False
+        self._called_after_words: dict[str, bool] = {}
 
     @property
     def quiet(self) -> bool:
@@ -161,10 +164,20 @@ class TranscriptBuilder:
 
     def generation_started(self) -> None:
         self._generating = []
+        self._generated_words = False
 
     def generated(self, text: str) -> None:
         if self._generating is not None:
             self._generating.append(text)
+            self._generated_words = self._generated_words or bool(text.strip())
+
+    def calls_started(self, tool_call_ids: Iterable[str]) -> None:
+        """The reply being generated calls tools; each call keeps whether the reply had words."""
+        for tool_call_id in tool_call_ids:
+            self._called_after_words[tool_call_id] = self._generated_words
+
+    def called_after_words(self, tool_call_id: str) -> bool:
+        return self._called_after_words.pop(tool_call_id, False)
 
     def generation_ended(self) -> None:
         if self._generating is None:
@@ -312,6 +325,8 @@ class GeneratedTap(FrameProcessor):
                 self._transcript.generation_started()
             elif isinstance(frame, LLMTextFrame):
                 self._transcript.generated(frame.text)
+            elif isinstance(frame, FunctionCallsStartedFrame):
+                self._transcript.calls_started(call.tool_call_id for call in frame.function_calls)
             elif isinstance(frame, LLMFullResponseEndFrame | InterruptionFrame):
                 self._transcript.generation_ended()
         await self.push_frame(frame, direction)
