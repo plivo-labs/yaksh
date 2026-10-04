@@ -3,6 +3,8 @@ import { type ReactNode, type SubmitEvent, useState } from "react";
 
 import { BackgroundNoiseField } from "@/components/background-noise-field";
 import { DeleteConfirm, DiscardConfirm } from "@/components/confirm-dialogs";
+import { CopyId } from "@/components/copy-id";
+import { Fact } from "@/components/panel";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -193,6 +195,13 @@ export function PersonaDialog({
           className="min-h-0 flex-1 overflow-y-auto px-6 py-1"
         >
           <FieldGroup className="pb-6">
+            {id && (
+              <dl>
+                <Fact label="Persona id">
+                  <CopyId id={id} label="persona id" />
+                </Fact>
+              </dl>
+            )}
             <div className="grid gap-4 sm:grid-cols-[1fr_12rem]">
               <Field>
                 <FieldLabel htmlFor="name">Name</FieldLabel>

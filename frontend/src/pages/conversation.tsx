@@ -5,6 +5,7 @@ import { Link, useParams, useSearchParams } from "react-router";
 
 import { BackButton } from "@/components/back-button";
 import { EndCallDialog } from "@/components/confirm-dialogs";
+import { CopyId } from "@/components/copy-id";
 import { Fact } from "@/components/panel";
 import { type Mark, type PlayerHandle, RecordingPlayer } from "@/components/recording-player";
 import { ResponseTime } from "@/components/response-time";
@@ -114,7 +115,9 @@ export function ConversationPage() {
               <BackButton
                 fallback={data.run_id ? `/runs/${data.run_id}` : `/agents/${data.agent_id}`}
               />
-              <h1 className="truncate text-h3-500">{data.scenario_name}</h1>
+              <h1 className="truncate text-h3-500" title={data.scenario_name}>
+                {data.scenario_name}
+              </h1>
             </div>
             <p className="truncate text-s-400 text-muted-foreground">
               <Link
@@ -172,12 +175,6 @@ export function ConversationPage() {
                   <CardDescription>
                     {LANGUAGE_NAMES[data.language]}, <CallerLine conversation={data} />, up to{" "}
                     {data.max_turns} turns and {data.max_duration_s}s once connected
-                    {data.call_uuid && (
-                      <>
-                        {" · Plivo call "}
-                        <span className="font-mono">{data.call_uuid}</span>
-                      </>
-                    )}
                   </CardDescription>
                   {noiseLabel(data.background_noise) && (
                     <CardDescription>
@@ -286,6 +283,14 @@ function ConversationFacts({ conversation }: { conversation: Conversation }) {
       <Fact className={arrived} label="Agent version">
         <span className="font-mono">{conversation.agent_version}</span>
       </Fact>
+      <Fact label="Conversation id">
+        <CopyId id={conversation.id} label="conversation id" />
+      </Fact>
+      {conversation.call_uuid && (
+        <Fact label="Plivo call">
+          <CopyId id={conversation.call_uuid} label="Plivo call id" />
+        </Fact>
+      )}
     </dl>
   );
 }

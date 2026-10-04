@@ -3,6 +3,8 @@ import { type SubmitEvent, useState } from "react";
 import { toast } from "sonner";
 
 import { DeleteConfirm, DiscardConfirm } from "@/components/confirm-dialogs";
+import { CopyId } from "@/components/copy-id";
+import { Fact } from "@/components/panel";
 import { PersonaSelect } from "@/components/persona-select";
 import { Button } from "@/components/ui/button";
 import {
@@ -39,7 +41,7 @@ import {
   type AgentSummary,
   CATEGORY_ITEMS,
   type Category,
-  type Fact,
+  type Fact as ScenarioFact,
   type Scenario,
   type ScenarioInput,
 } from "@/lib/types";
@@ -70,7 +72,7 @@ function toDraft(scenario: Scenario): ScenarioInput {
   };
 }
 
-function trimFacts(facts: Fact[]): Fact[] {
+function trimFacts(facts: ScenarioFact[]): ScenarioFact[] {
   return facts
     .map((fact) => ({ name: fact.name.trim(), value: fact.value.trim() }))
     .filter((fact) => fact.name || fact.value);
@@ -124,11 +126,11 @@ function FactRows({
   onChange,
 }: {
   label: string;
-  facts: Fact[];
+  facts: ScenarioFact[];
   submitted: boolean;
-  onChange: (facts: Fact[]) => void;
+  onChange: (facts: ScenarioFact[]) => void;
 }) {
-  const set = (index: number, next: Partial<Fact>) =>
+  const set = (index: number, next: Partial<ScenarioFact>) =>
     onChange(facts.map((fact, at) => (at === index ? { ...fact, ...next } : fact)));
 
   return (
@@ -211,7 +213,7 @@ export function ScenarioDialog({
     save.reset();
     setDraft((current) => ({ ...current, ...next(current) }));
   };
-  const setFacts = (key: FactKey, facts: Fact[]) => change(() => ({ [key]: facts }));
+  const setFacts = (key: FactKey, facts: ScenarioFact[]) => change(() => ({ [key]: facts }));
   const addListItem = (key: "unknown_facts" | "criteria") =>
     change((current) => ({ [key]: [...current[key], ""] }));
   const setListItem = (key: "unknown_facts" | "criteria", index: number, value: string) =>
@@ -220,7 +222,7 @@ export function ScenarioDialog({
     change((current) => ({ [key]: current[key].filter((_, at) => at !== index) }));
 
   const outbound = agent.direction === "outbound";
-  const halfFact = (facts: Fact[]) => facts.some((fact) => !fact.name || !fact.value);
+  const halfFact = (facts: ScenarioFact[]) => facts.some((fact) => !fact.name || !fact.value);
   const halfKnown = halfFact(input.known_facts);
   const halfAgentData = outbound && halfFact(input.agent_data);
 
@@ -261,6 +263,13 @@ export function ScenarioDialog({
           className="min-h-0 flex-1 overflow-y-auto px-6 py-1"
         >
           <FieldGroup className="pb-6">
+            {id && (
+              <dl>
+                <Fact label="Scenario id">
+                  <CopyId id={id} label="scenario id" />
+                </Fact>
+              </dl>
+            )}
             <Field>
               <FieldLabel htmlFor="scenario-name">Name</FieldLabel>
               <Input

@@ -84,7 +84,9 @@ function Designation({ agent }: { agent: Agent }) {
         <div className="grid min-w-0 flex-1 basis-72 gap-1">
           <div className="flex min-w-0 items-center gap-2">
             <BackButton fallback="/agents" />
-            <h1 className="truncate text-h3-500">{agent.name}</h1>
+            <h1 className="truncate text-h3-500" title={agent.name}>
+              {agent.name}
+            </h1>
           </div>
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-s-400">
             <span className="text-muted-foreground">{reach(agent)}</span>

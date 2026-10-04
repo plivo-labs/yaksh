@@ -5,6 +5,7 @@ import { toast } from "sonner";
 
 import { BackButton } from "@/components/back-button";
 import { ConversationList } from "@/components/conversation-list";
+import { CopyId } from "@/components/copy-id";
 import { Pager } from "@/components/pager";
 import { Fact, Panel, PanelHeader } from "@/components/panel";
 import { RunStatusLabel } from "@/components/status-label";
@@ -84,7 +85,9 @@ function Overview({ run }: { run: Run }) {
         <div className="grid min-w-0 flex-1 basis-72 gap-1">
           <div className="flex min-w-0 items-center gap-2">
             <BackButton fallback={`/agents/${run.agent_id}`} />
-            <h1 className="truncate text-h3-500">{runTitle(run)}</h1>
+            <h1 className="truncate text-h3-500" title={runTitle(run)}>
+              {runTitle(run)}
+            </h1>
             <RunStatusLabel status={run.status} />
           </div>
           <p className="text-s-400 text-muted-foreground">
@@ -146,7 +149,10 @@ function Overview({ run }: { run: Run }) {
             ? "None yet"
             : `${seconds(run.response_p50_ms)} / ${seconds(run.response_p90_ms)}`}
         </Fact>
-        <div className="col-span-2 grid min-w-0 gap-0.5 sm:col-span-3 lg:col-span-9">
+        <Fact label="Run id">
+          <CopyId id={run.id} label="run id" />
+        </Fact>
+        <div className="col-span-2 grid min-w-0 gap-0.5 sm:col-span-2 lg:col-span-8">
           <dt className="text-xs-400 text-muted-foreground">End reasons</dt>
           <dd className="text-s-400">
             {endReasons.length === 0

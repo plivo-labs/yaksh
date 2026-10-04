@@ -157,6 +157,7 @@ function AgentRow({ agent }: { agent: AgentSummary }) {
         <div className="grid min-w-0 gap-0.5">
           <Link
             to={`/agents/${agent.id}`}
+            title={agent.name}
             className="truncate text-s-500 outline-none after:absolute after:inset-0 transition-colors group-hover:text-brand-text"
           >
             {agent.name}
@@ -184,6 +185,7 @@ function AgentRow({ agent }: { agent: AgentSummary }) {
           <>
             <Link
               to={`/conversations/${call.id}`}
+              title={call.scenario_name}
               className="relative z-10 w-fit max-w-full truncate rounded-sm underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring/50"
             >
               {call.scenario_name}

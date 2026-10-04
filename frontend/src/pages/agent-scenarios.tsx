@@ -332,6 +332,7 @@ export function AgentScenarios({ agent }: { agent: Agent }) {
                   <button
                     type="button"
                     data-slot="scenario-open"
+                    title={`${item.name}\n${item.description ?? item.goal}`}
                     onClick={() => setEditing(item)}
                     className="flex min-w-0 flex-1 items-center gap-6 py-3.5 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-inset"
                   >

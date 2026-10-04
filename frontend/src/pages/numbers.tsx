@@ -2,7 +2,7 @@ import { StatusLabel } from "@/components/status-label";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { phone } from "@/lib/format";
+import { phone, region } from "@/lib/format";
 import { usePhoneNumbers } from "@/lib/queries";
 import type { PhoneNumber } from "@/lib/types";
 
@@ -79,10 +79,19 @@ function NumberRow({ item }: { item: PhoneNumber }) {
   return (
     <li className={`${ROW} py-3.5 text-s-400`}>
       <span className="font-mono text-xs-400">{phone(item.number)}</span>
-      <span className="truncate">{item.alias}</span>
-      <span className="truncate">{item.region}</span>
+      <span className="truncate" title={item.alias ?? undefined}>
+        {item.alias}
+      </span>
+      <span className="truncate" title={item.region ? region(item.region) : undefined}>
+        {item.region && region(item.region)}
+      </span>
       <span className="flex min-w-0 flex-wrap items-center gap-2">
-        <span className="truncate">{item.application_name ?? item.application_id}</span>
+        <span
+          className="truncate"
+          title={item.application_name ?? item.application_id ?? undefined}
+        >
+          {item.application_name ?? item.application_id}
+        </span>
         {item.on_outbound_application && <Badge>Outbound application</Badge>}
       </span>
       <span>

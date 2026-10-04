@@ -39,6 +39,7 @@ export function AgentRuns({ agent }: { agent: Agent }) {
             <li key={run.id}>
               <Link
                 to={`/runs/${run.id}`}
+                title={runTitle(run)}
                 className="grid grid-cols-[6.5rem_minmax(0,1fr)_auto] group items-center gap-x-4 px-5 py-3.5 outline-none transition-colors duration-150 hover:bg-muted/60 active:bg-muted focus-visible:bg-muted focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-inset"
               >
                 <span className="text-sm">

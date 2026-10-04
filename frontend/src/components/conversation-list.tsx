@@ -181,6 +181,9 @@ function ConversationRow({
           <Link
             to={`/conversations/${conversation.id}`}
             aria-label={name}
+            title={[conversation.scenario_name, conversation.failure_reason]
+              .filter(Boolean)
+              .join("\n")}
             className="truncate text-s-500 outline-none transition-colors after:absolute after:inset-0 group-hover:text-brand-text"
           >
             {conversation.scenario_name}
@@ -209,6 +212,7 @@ function ConversationRow({
         <div className="col-span-2 min-w-0 text-s-400 @3xl/conversations:col-span-1">
           <Link
             to={`/agents/${conversation.agent_id}`}
+            title={conversation.agent_name}
             className="relative z-10 block w-fit max-w-full truncate rounded-sm underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring/50"
           >
             {conversation.agent_name}
@@ -218,9 +222,7 @@ function ConversationRow({
       <div className="hidden min-w-0 gap-0.5 text-s-400 @3xl/conversations:grid">
         <span className="truncate">{end}</span>
         {conversation.failure_reason && (
-          <span className="truncate text-destructive" title={conversation.failure_reason}>
-            {conversation.failure_reason}
-          </span>
+          <span className="truncate text-destructive">{conversation.failure_reason}</span>
         )}
       </div>
       <div className="hidden font-mono text-xs-400 tabular-nums @3xl/conversations:block">
