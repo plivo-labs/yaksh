@@ -100,11 +100,6 @@ class Stamper:
             frame.metadata[PLAYOUT] = self.arriving
 
 
-type Track = tuple[int, int | None, bytes | None]
-"""A caller reply as the detector process gets it: its audio start and end on the call's clock,
-and the reply's own audio when the TTS finished it."""
-
-
 @dataclass
 class CallerReply:
     """One reply of the persona: when its audio started and stopped going out, and, when the
@@ -115,11 +110,6 @@ class CallerReply:
     playout: Playout | None = None
     finished: bool = False
     """The TTS finished the reply: its playout holds all of it."""
-
-    def track(self) -> Track:
-        if not self.finished or self.end_ms is None or self.playout is None:
-            return self.start_ms, self.end_ms, None
-        return self.start_ms, self.end_ms, bytes(self.playout.audio)
 
 
 def save_caller_voice(replies: Sequence[CallerReply], path: Path) -> list[CallerReplyWindow]:

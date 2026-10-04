@@ -9,7 +9,9 @@ from truman.api.deps import SessionDep, SettingsDep
 from truman.api.pagination import Page, PageDep
 from truman.api.schemas.runs import RunRead, RunSummary
 from truman.db.models import Run
+from truman.domain.latency import pooled
 from truman.domain.runs import RunCreate, RunStatus
+from truman.evaluation import results
 from truman.simulation import conversations, runs
 
 router = APIRouter(prefix="/runs", tags=["runs"], dependencies=[Depends(require_token)])
@@ -18,7 +20,17 @@ router = APIRouter(prefix="/runs", tags=["runs"], dependencies=[Depends(require_
 async def summaries(session: AsyncSession, rows: list[Run]) -> list[RunSummary]:
     agents = await conversations.pinned_agents(session, (row.agent_version_id for row in rows))
     progress = await runs.progress(session, rows)
-    return [RunSummary.of(row, agents[row.agent_version_id], progress[row.id]) for row in rows]
+    counted = await runs.latest_conversations(session, [row.id for row in rows])
+    measured = await results.latencies(session, (c for ids in counted.values() for c in ids))
+    return [
+        RunSummary.of(
+            row,
+            agents[row.agent_version_id],
+            progress[row.id],
+            pooled([measured[c] for c in counted.get(row.id, []) if c in measured]),
+        )
+        for row in rows
+    ]
 
 
 async def detail(session: AsyncSession, run: Run) -> RunRead:

@@ -5,6 +5,12 @@ from collections.abc import Sequence
 
 from pydantic import BaseModel, ConfigDict
 
+VAD_CONFIDENCE = 0.5
+VAD_START_S = 0.1
+VAD_STOP_S = 0.6
+"""The voice detector's settings, shared by the live caller and the measurement after the call,
+so both find speech the same way."""
+
 
 class Span(BaseModel):
     """A stretch of a call, in ms on the call's clock."""
@@ -17,8 +23,7 @@ class Span(BaseModel):
 
 class Speech(BaseModel):
     """Where each side spoke, as the voice detector found it after the call. The caller's
-    speech comes from its replies' own audio, before any background noise; a reply cut off
-    before its TTS finished counts from its first audio to its last."""
+    speech comes from its replies' own audio, before any background noise."""
 
     model_config = ConfigDict(frozen=True)
 
@@ -91,6 +96,13 @@ class Latency(BaseModel):
     p50_ms: int | None
     p90_ms: int | None
 
+    @classmethod
+    def of(cls, replies: list[Reply]) -> Latency:
+        waits = sorted(r.response_ms for r in replies if r.response_ms is not None)
+        return cls(
+            replies=replies, p50_ms=nearest_rank(waits, 0.5), p90_ms=nearest_rank(waits, 0.9)
+        )
+
 
 def response_times(
     connected_ms: int,
@@ -120,10 +132,12 @@ def response_times(
         under_way = began is None and answer is not None and answer <= connected_ms
         if answer is not None and ended is not None and not under_way:
             replies.append(Reply(start_ms=ended, speech_ms=answer))
-    waits = sorted(r.response_ms for r in replies if r.response_ms is not None)
-    return Latency(
-        replies=replies, p50_ms=nearest_rank(waits, 0.5), p90_ms=nearest_rank(waits, 0.9)
-    )
+    return Latency.of(replies)
+
+
+def pooled(calls: Sequence[Latency]) -> Latency:
+    """Several calls' replies as one set, with its percentiles."""
+    return Latency.of([reply for call in calls for reply in call.replies])
 
 
 TURN_SLACK_MS = 100

@@ -71,6 +71,31 @@ def worker() -> None:
         raise SystemExit(1) from None
 
 
+@cli.command()
+def evaluator() -> None:
+    """Measure and judge saved conversations, in a process of its own."""
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
+    settings = Settings()
+    upgrade_to_head(str(settings.database_url))
+    asyncio.run(run_evaluator(settings))
+
+
+async def run_evaluator(settings: Settings) -> None:
+    from truman.worker.evaluator import Evaluator
+
+    engine = create_engine(str(settings.database_url))
+    stop = asyncio.Event()
+    loop = asyncio.get_running_loop()
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        loop.add_signal_handler(sig, stop.set)
+    try:
+        await Evaluator(create_sessionmaker(engine), settings).run(stop)
+    finally:
+        if not await bounded_dispose(engine, settings.end_timeout_s):
+            logging.shutdown()
+            os._exit(1)
+
+
 def plivo_api(settings: Settings) -> PlivoApi | None:
     if settings.plivo_auth_id is None or settings.plivo_auth_token is None:
         return None
@@ -87,9 +112,7 @@ def callers(settings: Settings, registry: StreamRegistry, api: PlivoApi | None) 
     elif settings.public_url is None:
         reason = "phone calls are off: set TRUMAN_PUBLIC_URL to the address Plivo can reach"
     else:
-        phone = PhoneCaller(settings, registry, api)
-        phone.start_detector()
-        return phone
+        return PhoneCaller(settings, registry, api)
     logging.warning(reason)
     return UnavailableCaller(reason)
 

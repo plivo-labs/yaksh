@@ -59,6 +59,7 @@ from truman.domain.conversations import (
     WireEventKind,
 )
 from truman.domain.languages import Language
+from truman.domain.latency import VAD_CONFIDENCE, VAD_START_S, VAD_STOP_S
 from truman.integrations import elevenlabs
 
 log = logging.getLogger(__name__)
@@ -71,7 +72,7 @@ CLOSING_QUIET_S = 8.0
 CLOSING_LIMIT_S = 30.0
 """The longest a close lasts, for a reply that Plivo never reports played."""
 QUIET_POLL_S = 0.25
-VAD = VADParams(confidence=0.5, start_secs=0.1, stop_secs=0.6)
+VAD = VADParams(confidence=VAD_CONFIDENCE, start_secs=VAD_START_S, stop_secs=VAD_STOP_S)
 IDLE_S = 15.0
 IDLE_NUDGES = 2
 # Deepgram language per agent language: Truman hears the agent in the language the agent

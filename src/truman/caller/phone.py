@@ -44,7 +44,6 @@ from truman.caller.audio import (
     save_caller_voice,
 )
 from truman.caller.lag import LagSampler
-from truman.caller.latency import Detector
 from truman.caller.pipeline import (
     CallState,
     Persona,
@@ -689,11 +688,6 @@ class PhoneCaller:
         self._api = api
         self._dialer = Dialer(api, settings.public_url, settings.ring_timeout_s)
         self._receiver = Receiver()
-        self._detector = Detector()
-
-    def start_detector(self) -> None:
-        """Start the voice detector's process now rather than at the first call's end."""
-        self._detector.start()
 
     async def run(
         self, request: CallRequest, observer: CallObserver, stop: asyncio.Event
@@ -770,7 +764,7 @@ class PhoneCaller:
         finally:
             loop_lag = lag.stop()
         ended_ms = clock.ms()
-        # The line hangs up now; its report comes while the recording is saved and measured. A
+        # The line hangs up now; its report comes while the call's audio is saved. A
         # stopped call has a deadline to finish, so it takes the report only if it already came.
         ending = asyncio.ensure_future(line.end(0 if stop.is_set() else HANGUP_REPORT_WAIT_S))
         try:
@@ -785,12 +779,6 @@ class PhoneCaller:
             caller_replies = await asyncio.to_thread(
                 save_caller_voice, spoken.marks.replies, caller_voice_path
             )
-            measured = await self._detector.measure(
-                spoken.recording.agent_track(started_ms),
-                started_ms,
-                connected_ms,
-                spoken.marks.replies,
-            )
             report = await ending
         finally:
             ending.cancel()
@@ -804,8 +792,6 @@ class PhoneCaller:
             caller_reason=spoken.state.caller_reason,
             talk_ms=talk_ms,
             recording_path=recording_path,
-            latency=measured.latency if measured else None,
-            speech=measured.speech if measured else None,
             stream_opened_ms=connected_ms,
             recording_start_ms=started_ms,
             agent_media=spoken.recording.agent_media(started_ms),

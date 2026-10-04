@@ -3,6 +3,7 @@ from datetime import datetime
 
 from truman.db.models import Run
 from truman.domain.background_noise import BackgroundNoise
+from truman.domain.latency import Latency
 from truman.domain.runs import RunProgress
 
 
@@ -22,9 +23,14 @@ class RunSummary(RunProgress):
     background_noise: BackgroundNoise | None
     """None: each conversation plays its persona's own setting."""
     created_at: datetime
+    response_p50_ms: int | None
+    response_p90_ms: int | None
+    """Nearest rank over every measured reply of the latest attempts, pooled."""
 
     @classmethod
-    def of(cls, run: Run, agent: tuple[int, str], progress: RunProgress) -> RunSummary:
+    def of(
+        cls, run: Run, agent: tuple[int, str], progress: RunProgress, response: Latency
+    ) -> RunSummary:
         """The run's own columns and its pinned agent; status and cancelled_at come only from
         the progress, read in one statement."""
         agent_version, agent_name = agent
@@ -49,6 +55,8 @@ class RunSummary(RunProgress):
                 )
             ),
             created_at=run.created_at,
+            response_p50_ms=response.p50_ms,
+            response_p90_ms=response.p90_ms,
             **progress.model_dump(),
         )
 

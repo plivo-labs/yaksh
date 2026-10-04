@@ -42,10 +42,10 @@ from truman.domain.conversations import (
     outcome_group,
 )
 from truman.domain.errors import NotFoundError
-from truman.domain.latency import Latency
 from truman.domain.personas import PersonaConfig
 from truman.domain.scenarios import ScenarioConfig
 from truman.domain.triggers import SEND_TIMEOUT_S
+from truman.evaluation import evaluations, results
 from truman.simulation.agents import get_agent
 from truman.simulation.background_noise import noise_mix
 from truman.simulation.languages import LANGUAGES
@@ -96,7 +96,7 @@ async def create_conversation(
 SORT_KEYS = {
     "created_at": Conversation.created_at,
     "talk_ms": Conversation.talk_ms,
-    "response_p90_ms": Conversation.transcript["latency"]["p90_ms"].as_integer(),
+    "response_p90_ms": results.response_p90(),
 }
 """Values a conversation list sorts on; `-` before a key sorts descending. Calls with no talk
 time or no response times sort last either way."""
@@ -177,20 +177,6 @@ async def list_conversations(
         query.order_by(order.nulls_last(), Conversation.id).offset(offset).limit(limit)
     )
     return list(rows), total or 0
-
-
-async def latencies(
-    session: AsyncSession, conversation_ids: Iterable[uuid.UUID]
-) -> dict[uuid.UUID, Latency]:
-    """The response times of each measured conversation, by id; read on their own, as lists
-    defer the transcript."""
-    found = Conversation.transcript["latency"]
-    rows = await session.execute(
-        select(Conversation.id, found.label("latency")).where(
-            Conversation.id.in_(set(conversation_ids)), found["replies"].is_not(None)
-        )
-    )
-    return {row.id: Latency.model_validate(row.latency) for row in rows}
 
 
 async def pinned_agents(
@@ -628,9 +614,9 @@ async def finalize(
     number_rest_s: int,
 ) -> bool:
     """Record the terminal state; a run conversation in the error group is queued again, up to
-    its run's retries. Returns False when the row was no longer ours to finish."""
-    transcript.latency = outcome.latency
-    transcript.speech = outcome.speech
+    its run's retries. A call that was not cancelled is queued for evaluation in the same
+    transaction, so it is evaluated exactly when it is saved. Returns False when the row was no
+    longer ours to finish."""
     transcript.stream_opened_ms = outcome.stream_opened_ms
     transcript.loop_lag = outcome.loop_lag
     transcript.recording_start_ms = outcome.recording_start_ms
@@ -673,6 +659,8 @@ async def finalize(
         await release_numbers(session, [conversation_id], number_rest_s)
         if run is not None:
             await retry(session, run, [ended])
+        if ended.status is not ConversationStatus.CANCELLED:
+            await evaluations.enqueue(session, conversation_id)
     await session.commit()
     return ended is not None
 

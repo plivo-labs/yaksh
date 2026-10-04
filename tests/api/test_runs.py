@@ -18,6 +18,7 @@ from tests.conftest import (
     create_agent_id,
     create_persona,
     create_scenario,
+    evaluate_queued,
     finish,
     make_settings,
     new_run,
@@ -42,13 +43,13 @@ from truman.domain.conversations import (
     Transcript,
     Turn,
 )
+from truman.domain.evaluations import Metric, MetricKey
 from truman.domain.latency import (
     AgentMedia,
     CallerReplyWindow,
     Latency,
     LoopLag,
     Span,
-    Speech,
     response_times,
 )
 from truman.domain.voices import VoiceProvider, VoiceSettings
@@ -406,9 +407,6 @@ async def test_a_finished_call_keeps_the_facts_its_call_captured(
     agent = await create_agent_id(client)
     conversation = await start(client, agent)
     assert await claim(db) == conversation["id"]
-    speech = Speech(
-        agent=[Span(start_ms=300, end_ms=2_100)], caller=[Span(start_ms=2_600, end_ms=3_900)]
-    )
     media = AgentMedia(first_ms=120, last_ms=9_000, gaps=[Span(start_ms=5_000, end_ms=5_400)])
     replies = [
         CallerReplyWindow(
@@ -427,7 +425,6 @@ async def test_a_finished_call_keeps_the_facts_its_call_captured(
     outcome = CallOutcome(
         connected=True,
         end_reason=EndReason.AGENT_HANGUP,
-        speech=speech,
         stream_opened_ms=120,
         caller_settings=settings,
         caller_usage=usage,
@@ -444,7 +441,7 @@ async def test_a_finished_call_keeps_the_facts_its_call_captured(
         row = await session.get_one(Conversation, uuid.UUID(conversation["id"]))
     stored = Transcript.model_validate(row.transcript)
 
-    assert (stored.speech, stored.stream_opened_ms) == (speech, 120)
+    assert stored.stream_opened_ms == 120
     assert stored.loop_lag == LoopLag(max_ms=31, max_at_ms=900, p99_ms=12, samples=2_400)
     assert (stored.recording_start_ms, stored.agent_media, stored.caller_replies) == (
         100,
@@ -571,18 +568,21 @@ async def test_response_times_reach_the_turns_the_list_and_the_run(
         ]
         return Transcript(turns=[asked, *agent_turns])
 
-    def outcome(latency: Latency | None) -> CallOutcome:
-        return CallOutcome(connected=True, end_reason=EndReason.AGENT_HANGUP, latency=latency)
+    hung_up = CallOutcome(connected=True, end_reason=EndReason.AGENT_HANGUP)
+
+    def measured(latency: Latency) -> dict[MetricKey, Metric]:
+        return {MetricKey.RESPONSE_TIME: Metric(value=latency.model_dump(mode="json"))}
 
     # The first call answers 200 ms after the caller's reply, then talks over the next reply;
     # its transcript turns start a little later than the recording's speech, as they do live.
     quick = response_times(0, [(1_000, 2_000), (4_000, 4_800)], [2_200, 4_500])
-    await finish(db, first, outcome(quick), transcript=answered(2_300, 4_600))
+    await finish(db, first, hung_up, transcript=answered(2_300, 4_600))
     slow = response_times(0, [(1_000, 2_000)], [3_800])
-    await finish(db, second, outcome(slow), transcript=answered(3_900))
+    await finish(db, second, hung_up, transcript=answered(3_900))
     single = await start(client, run["agent_id"])
     assert await claim(db) == single["id"]
-    await finish(db, single["id"], outcome(None))
+    await finish(db, single["id"], hung_up)
+    await evaluate_queued(db, {first: measured(quick), second: measured(slow)})
 
     detail = (await client.get(f"/api/v1/conversations/{first}")).json()
     assert [(t["role"], t["response_ms"], t["talked_over"]) for t in detail["transcript"]] == [

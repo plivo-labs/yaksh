@@ -547,6 +547,51 @@ def upgrade() -> None:
     )
     op.create_index("ix_conversations_retry_of", "conversations", ["retry_of"], unique=False)
     op.create_table(
+        "evaluations",
+        sa.Column("id", sa.UUID(), server_default=sa.text("uuidv7()"), nullable=False),
+        sa.Column("conversation_id", sa.UUID(), nullable=False),
+        sa.Column(
+            "state",
+            sa.Enum("queued", "running", "done", "failed", name="evaluation_state"),
+            nullable=False,
+        ),
+        sa.Column("code_version", sa.Text(), nullable=True),
+        sa.Column("claimed_by", sa.Text(), nullable=True),
+        sa.Column("claim_seq", sa.Integer(), server_default=sa.text("0"), nullable=False),
+        sa.Column("lease_expires_at", sa.DateTime(timezone=True), nullable=True),
+        sa.Column("attempts", sa.Integer(), server_default=sa.text("0"), nullable=False),
+        sa.Column("not_before", sa.DateTime(timezone=True), nullable=True),
+        sa.Column("failure", sa.Text(), nullable=True),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.Column("started_at", sa.DateTime(timezone=True), nullable=True),
+        sa.Column("ended_at", sa.DateTime(timezone=True), nullable=True),
+        sa.ForeignKeyConstraint(["conversation_id"], ["conversations.id"]),
+        sa.PrimaryKeyConstraint("id"),
+        sa.UniqueConstraint("conversation_id", name=op.f("uq_evaluations_conversation_id")),
+    )
+    op.create_index(
+        "ix_evaluations_state_created", "evaluations", ["state", "created_at"], unique=False
+    )
+    op.create_table(
+        "metric_values",
+        sa.Column("evaluation_id", sa.UUID(), nullable=False),
+        sa.Column("metric_key", sa.Text(), nullable=False),
+        sa.Column("value", postgresql.JSONB(astext_type=sa.Text()), nullable=False),
+        sa.Column(
+            "flags",
+            postgresql.ARRAY(sa.Text()),
+            server_default=sa.text("'{}'::text[]"),
+            nullable=False,
+        ),
+        sa.ForeignKeyConstraint(["evaluation_id"], ["evaluations.id"]),
+        sa.PrimaryKeyConstraint("evaluation_id", "metric_key"),
+    )
+    op.create_table(
         "refused_calls",
         sa.Column("id", sa.UUID(), server_default=sa.text("uuidv7()"), nullable=False),
         sa.Column("call_uuid", sa.Text(), nullable=False),
@@ -625,6 +670,8 @@ def downgrade() -> None:
     op.drop_table("workers")
     op.drop_table("documents")
     op.drop_table("phone_numbers")
+    op.drop_table("metric_values")
+    op.drop_table("evaluations")
     op.drop_table("refused_calls")
     op.drop_table("conversations")
     op.drop_table("runs")
@@ -650,5 +697,6 @@ def downgrade() -> None:
         "generation_status",
         "noise_sound",
         "noise_level",
+        "evaluation_state",
     ):
         op.execute(f"DROP TYPE {enum}")

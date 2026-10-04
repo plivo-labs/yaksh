@@ -27,6 +27,7 @@ from truman.db.base import Base
 from truman.domain.agents import Direction, Transport
 from truman.domain.background_noise import NoiseLevel, NoiseSound
 from truman.domain.conversations import Channel, ConversationStatus, EndReason
+from truman.domain.evaluations import EvaluationState
 from truman.domain.generation import GenerationMode, GenerationStatus
 from truman.domain.languages import Language
 from truman.domain.scenarios import Category
@@ -241,6 +242,47 @@ class RefusedCall(Base):
     conversation_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("conversations.id"))
     """The conversation that held the number, when one did."""
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class Evaluation(Base):
+    """The job that measures and judges one saved conversation."""
+
+    __tablename__ = "evaluations"
+
+    id: Mapped[uuid.UUID] = uuid_primary_key()
+    conversation_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("conversations.id"), unique=True)
+    state: Mapped[EvaluationState] = mapped_column(
+        pg_enum(EvaluationState, "evaluation_state"), default=EvaluationState.QUEUED
+    )
+    code_version: Mapped[str | None] = mapped_column(Text)
+    """The version of the code that computed the metrics; None until done."""
+    claimed_by: Mapped[str | None] = mapped_column(Text)
+    claim_seq: Mapped[int] = mapped_column(Integer, default=0, server_default=text("0"))
+    """Grows with each claim; a write carries the number its evaluator claimed with, so one
+    from an evaluator that lost the evaluation changes nothing."""
+    lease_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    attempts: Mapped[int] = mapped_column(Integer, default=0, server_default=text("0"))
+    not_before: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    """A failed attempt waits until this time before the next one."""
+    failure: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    __table_args__ = (Index("ix_evaluations_state_created", "state", "created_at"),)
+
+
+class MetricValue(Base):
+    """One metric of one evaluation."""
+
+    __tablename__ = "metric_values"
+
+    evaluation_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("evaluations.id"), primary_key=True)
+    metric_key: Mapped[str] = mapped_column(Text, primary_key=True)
+    value: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    flags: Mapped[list[str]] = mapped_column(
+        ARRAY(Text), default=list, server_default=text("'{}'::text[]")
+    )
 
 
 class Persona(Base):

@@ -28,6 +28,7 @@ from truman.domain.conversations import (
     Transcript,
 )
 from truman.domain.latency import Latency, place
+from truman.evaluation import results
 from truman.simulation import conversations
 
 SORT_PATTERN = f"^-?({'|'.join(conversations.SORT_KEYS)})$"
@@ -50,8 +51,7 @@ async def summaries(
     rows: list[Conversation],
     measured: Mapping[uuid.UUID, Latency] | None = None,
 ) -> list[ConversationSummary]:
-    """`measured` holds response times already read with the rows; the rest are read here, as
-    lists defer the transcript."""
+    """`measured` holds response times already read; the rest are read here."""
     agents = await conversations.pinned_agents(session, (row.agent_version_id for row in rows))
     personas = await conversations.pinned_personas(
         session, (row.persona_version_id for row in rows)
@@ -60,7 +60,7 @@ async def summaries(
         session, (row.scenario_version_id for row in rows)
     )
     if measured is None:
-        measured = await conversations.latencies(session, (row.id for row in rows))
+        measured = await results.latencies(session, (row.id for row in rows))
     items = []
     for row in rows:
         data = {
@@ -89,9 +89,9 @@ async def summary(
     return (await summaries(session, [conversation], measured))[0]
 
 
-def turns_with_replies(transcript: Transcript) -> list[TurnRead]:
+def turns_with_replies(transcript: Transcript, latency: Latency | None) -> list[TurnRead]:
     """The turns, each agent turn with the reply it starts with."""
-    replies = transcript.latency.replies if transcript.latency else []
+    replies = latency.replies if latency else []
     agent = [index for index, turn in enumerate(transcript.turns) if turn.role is Role.AGENT]
     starts = [transcript.turns[index].started_at_ms for index in agent]
     placed = dict(zip(agent, place(starts, replies), strict=True))
@@ -110,14 +110,15 @@ def turns_with_replies(transcript: Transcript) -> list[TurnRead]:
 
 async def detail(session: AsyncSession, conversation: Conversation) -> ConversationRead:
     transcript = conversations.transcript_of(conversation)
-    measured = {conversation.id: transcript.latency} if transcript.latency else {}
+    measured = await results.latencies(session, [conversation.id])
+    latency = measured.get(conversation.id)
     base = await summary(session, conversation, measured)
     return ConversationRead(
         **base.model_dump(),
         instructions=conversation.instructions,
         scenario=await conversations.pinned_scenario_config(session, conversation),
-        transcript=turns_with_replies(transcript),
-        replies=transcript.latency.replies if transcript.latency else [],
+        transcript=turns_with_replies(transcript, latency),
+        replies=latency.replies if latency else [],
         wire_events=transcript.wire_events,
         validity=transcript.validity,
         retried_as=await conversations.retried_as(session, conversation),

@@ -34,6 +34,9 @@ class Settings(BaseSettings):
     worker_poll_interval_s: float = 0.5
     worker_heartbeat_s: float = 1.0
     worker_lease_s: int = 30
+    evaluator_poll_interval_s: float = 2.0
+    evaluator_lease_s: int = 60
+    evaluator_concurrency: int = 2
     end_timeout_s: float = 5.0
     deepgram_api_key: SecretStr | None = Field(default=None, validation_alias="DEEPGRAM_API_KEY")
     deepgram_base_url: str = Field(

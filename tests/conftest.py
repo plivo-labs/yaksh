@@ -36,9 +36,11 @@ from truman.domain.conversations import (
     WireEventKind,
 )
 from truman.domain.errors import UnavailableError
+from truman.domain.evaluations import Metric, MetricKey
 from truman.domain.languages import Language
 from truman.domain.numbers import AccountNumber
 from truman.domain.voices import ProviderVoice, VoiceGender, VoiceProvider, VoiceSettings
+from truman.evaluation import evaluations
 from truman.integrations.elevenlabs import as_wav
 from truman.integrations.plivo_signature import signature, signed_text
 from truman.simulation import conversations, numbers
@@ -240,8 +242,30 @@ async def finish(
     """Record the outcome of a conversation the worker claimed, as the worker does."""
     async with db() as session:
         return await conversations.finalize(
-            session, uuid.UUID(conversation_id), worker_id, outcome, transcript or Transcript(), 0
+            session,
+            uuid.UUID(conversation_id),
+            worker_id,
+            outcome,
+            transcript or Transcript(),
+            0,
         )
+
+
+async def evaluate_queued(db: Db, metrics: dict[str, dict[MetricKey, Metric]]) -> list[str]:
+    """Finish every queued evaluation as an evaluator would, with the metrics given for its
+    conversation (none for the others); return the conversations it evaluated."""
+    done = []
+    while True:
+        async with db() as session:
+            evaluation = await evaluations.claim(session, "e1", 60)
+        if evaluation is None:
+            return done
+        conversation_id = str(evaluation.conversation_id)
+        async with db() as session:
+            assert await evaluations.finish(
+                session, evaluation.id, evaluation.claim_seq, metrics.get(conversation_id, {})
+            )
+        done.append(conversation_id)
 
 
 async def expire_leases(db: Db, which: ColumnElement[bool]) -> None:
@@ -621,9 +645,9 @@ async def client(
     async with engine.begin() as connection:
         await connection.execute(
             text(
-                "TRUNCATE phone_numbers, refused_calls, conversations, runs, agent_versions,"
-                " agents, persona_versions, personas, voices, scenario_versions, scenarios,"
-                " workers, documents, scenario_generations"
+                "TRUNCATE phone_numbers, refused_calls, metric_values, evaluations,"
+                " conversations, runs, agent_versions, agents, persona_versions, personas,"
+                " voices, scenario_versions, scenarios, workers, documents, scenario_generations"
             )
         )
     await engine.dispose()
