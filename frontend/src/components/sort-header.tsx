@@ -26,7 +26,7 @@ export function SortHeader({
       onClick={() => onSort(next)}
       aria-label={`Sort by ${label.toLowerCase()}`}
       aria-pressed={active}
-      className={`-mx-1 inline-flex w-fit items-center gap-1 rounded-sm px-1 outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 ${active ? "text-foreground" : ""}`}
+      className={`-mx-1 inline-flex w-fit items-center gap-1 rounded-sm px-1 whitespace-nowrap uppercase outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 ${active ? "text-foreground" : ""}`}
     >
       {label}
       <Icon className={`size-3.5 ${active ? "" : "opacity-50"}`} />

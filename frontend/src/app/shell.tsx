@@ -8,9 +8,9 @@ import {
   SunMedium,
   UserRound,
 } from "lucide-react";
-import { type CSSProperties, useLayoutEffect, useState } from "react";
+import { type ComponentType, type CSSProperties, useLayoutEffect, useState } from "react";
 import { flushSync } from "react-dom";
-import { NavLink, Outlet, useLocation } from "react-router";
+import { NavLink, Outlet, useLocation, useMatches } from "react-router";
 import { Toaster } from "sonner";
 
 import { TokenGate } from "@/app/token";
@@ -30,6 +30,7 @@ import {
   SidebarRail,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
+import { Separator } from "@/components/ui/separator";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
 const THEME_KEY = "truman.theme";
@@ -60,8 +61,9 @@ function useDarkMode(): [boolean, () => void] {
   return [dark, toggle];
 }
 
-const links = [
-  { to: "/agents", label: "Agents", icon: Bot },
+const links: { to: string; label: string; icon: typeof Bot; under?: string[] }[] = [
+  /* A run belongs to an agent, so a run page keeps Agents active. */
+  { to: "/agents", label: "Agents", icon: Bot, under: ["/runs"] },
   { to: "/conversations", label: "Conversations", icon: PhoneCall },
   { to: "/personas", label: "Personas", icon: UserRound },
   { to: "/voices", label: "Voices", icon: AudioLines },
@@ -74,13 +76,16 @@ export function Shell() {
   const [token, setToken] = useToken();
   const [dark, toggleDark] = useDarkMode();
   const { pathname } = useLocation();
+  /** The page's trail, from the `crumbs` component on its route. */
+  const page = useMatches().at(-1);
+  const Crumbs = (page?.handle as { crumbs?: ComponentType } | undefined)?.crumbs;
   if (!token) return <TokenGate onToken={setToken} />;
   const theme = dark ? "Light theme" : "Dark theme";
   return (
     <TooltipProvider delay={500}>
       <SidebarProvider
         defaultOpen={sidebarOpen()}
-        style={{ "--sidebar-width": "12rem" } as CSSProperties}
+        style={{ "--sidebar-width": "15rem" } as CSSProperties}
       >
         <Sidebar collapsible="icon">
           <SidebarHeader>
@@ -88,7 +93,7 @@ export function Shell() {
               <SidebarMenuItem>
                 <SidebarMenuButton size="lg" render={<NavLink to="/agents" />}>
                   <img src="/favicon.svg" alt="" className="size-8 shrink-0" />
-                  <span className="text-base font-semibold tracking-tight">Truman</span>
+                  <span className="text-h4-500">Truman</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>
@@ -97,10 +102,10 @@ export function Shell() {
             <SidebarGroup>
               <SidebarGroupContent>
                 <SidebarMenu>
-                  {links.map(({ to, label, icon: Icon }) => (
+                  {links.map(({ to, label, icon: Icon, under = [] }) => (
                     <SidebarMenuItem key={to}>
                       <SidebarMenuButton
-                        isActive={pathname.startsWith(to)}
+                        isActive={[to, ...under].some((path) => pathname.startsWith(path))}
                         tooltip={label}
                         render={<NavLink to={to} />}
                       >
@@ -113,7 +118,7 @@ export function Shell() {
               </SidebarGroupContent>
             </SidebarGroup>
           </SidebarContent>
-          <SidebarFooter>
+          <SidebarFooter className="border-t border-sidebar-border">
             <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarMenuButton tooltip={theme} onClick={toggleDark}>
@@ -132,10 +137,19 @@ export function Shell() {
           <SidebarRail />
         </Sidebar>
         <SidebarInset className="h-svh max-h-svh overflow-hidden">
-          <header className="flex h-12 shrink-0 items-center gap-2 border-b px-4">
+          <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4">
             <SidebarTrigger />
+            {page && Crumbs && (
+              <>
+                <Separator
+                  orientation="vertical"
+                  className="mr-2 data-vertical:h-4 data-vertical:self-center"
+                />
+                <Crumbs key={page.id} />
+              </>
+            )}
           </header>
-          <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 md:px-8 md:py-6">
+          <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
             <Outlet />
           </div>
         </SidebarInset>

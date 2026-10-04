@@ -29,19 +29,19 @@ export function Segmented<T extends string | number>({
   };
   return (
     <div className="grid gap-1.5">
-      <span className="text-xs text-muted-foreground">{label}</span>
+      <span className="text-s-500">{label}</span>
       <div
         role="radiogroup"
         aria-label={label}
         onKeyDown={key}
-        className="relative grid w-fit auto-cols-fr grid-flow-col rounded-md bg-muted p-0.5"
+        className="relative grid w-fit auto-cols-fr grid-flow-col rounded-full border bg-muted p-[3px]"
       >
         {index >= 0 && (
           <span
             aria-hidden
-            className="absolute inset-y-0.5 left-0.5 rounded-[5px] bg-background shadow-sm transition-transform duration-200 ease-out motion-reduce:transition-none"
+            className="absolute inset-y-[3px] left-[3px] rounded-full border border-border bg-card shadow-sm transition-transform duration-200 ease-out motion-reduce:transition-none"
             style={{
-              width: `calc((100% - 0.25rem) / ${options.length})`,
+              width: `calc((100% - 6px) / ${options.length})`,
               transform: `translateX(${index * 100}%)`,
             }}
           />
@@ -57,7 +57,7 @@ export function Segmented<T extends string | number>({
               tabIndex={checked ? 0 : -1}
               data-value={option.value}
               onClick={() => onChange(option.value)}
-              className={`relative rounded-[5px] px-2.5 py-1 text-sm whitespace-nowrap tabular-nums outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-ring/50 ${checked ? "text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+              className={`relative rounded-full px-4 py-1.5 text-s-500 whitespace-nowrap tabular-nums outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-ring/50 ${checked ? "text-foreground" : "text-placeholder hover:text-muted-foreground"}`}
             >
               {option.label}
             </button>

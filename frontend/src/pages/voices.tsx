@@ -13,7 +13,14 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Empty, EmptyContent, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { useVoicePreview } from "@/hooks/use-voice-preview";
@@ -30,9 +37,9 @@ export function VoicesPage() {
 
   return (
     <div className="grid gap-6">
-      <div className="flex items-start justify-between gap-4">
-        <h1 className="font-heading text-2xl font-semibold tracking-tight">Voices</h1>
-        <Button onClick={() => setEditing("new")}>
+      <div className="flex min-h-[30px] flex-wrap items-center gap-x-2 gap-y-4">
+        <h1 className="mr-auto text-h3-500">Voices</h1>
+        <Button size="sm" onClick={() => setEditing("new")}>
           <Plus />
           Add voice
         </Button>
@@ -55,10 +62,14 @@ export function VoicesPage() {
               <AudioLines />
             </EmptyMedia>
             <EmptyTitle>No voices</EmptyTitle>
+            <EmptyDescription>
+              Add an ElevenLabs voice so that a persona can speak with it.
+            </EmptyDescription>
           </EmptyHeader>
           <EmptyContent>
-            <Button variant="outline" onClick={() => setEditing("new")}>
-              Add a voice
+            <Button onClick={() => setEditing("new")}>
+              <Plus />
+              Add voice
             </Button>
           </EmptyContent>
         </Empty>
@@ -73,9 +84,9 @@ export function VoicesPage() {
             };
             return (
               <li key={item.id}>
-                <Card className="relative h-full transition-colors has-[[data-slot=card-link]:focus-visible]:ring-2 has-[[data-slot=card-link]:focus-visible]:ring-ring/50 hover:bg-muted/40">
+                <Card className="relative h-full transition-colors has-[[data-slot=card-link]:focus-visible]:ring-2 has-[[data-slot=card-link]:focus-visible]:ring-ring/50 hover:bg-muted/40 has-[[data-slot=card-link]:active]:bg-muted/70">
                   <CardHeader>
-                    <CardTitle className="flex flex-wrap items-center gap-2">
+                    <CardTitle>
                       <button
                         type="button"
                         data-slot="card-link"
@@ -84,12 +95,12 @@ export function VoicesPage() {
                       >
                         {item.name}
                       </button>
-                      {item.gender && <GenderBadge gender={item.gender} />}
-                      {item.builtin && <Badge variant="secondary">Built-in</Badge>}
                     </CardTitle>
-                    {item.accent && (
-                      <CardDescription className="capitalize">{item.accent}</CardDescription>
-                    )}
+                    <CardDescription className="flex flex-wrap items-center gap-1.5">
+                      {item.accent && <span className="mr-1 capitalize">{item.accent}</span>}
+                      {item.gender && <GenderBadge gender={item.gender} />}
+                      {item.builtin && <Badge>Built-in</Badge>}
+                    </CardDescription>
                     <CardAction>
                       <Button
                         type="button"
@@ -114,9 +125,7 @@ export function VoicesPage() {
                   </CardHeader>
                   <CardContent className="flex flex-wrap gap-1.5">
                     {item.languages.map((language) => (
-                      <Badge key={language} variant="outline">
-                        {LANGUAGE_NAMES[language]}
-                      </Badge>
+                      <Badge key={language}>{LANGUAGE_NAMES[language]}</Badge>
                     ))}
                   </CardContent>
                   {preview.error(item.id) && (

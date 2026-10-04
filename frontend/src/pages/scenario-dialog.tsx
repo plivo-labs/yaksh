@@ -3,6 +3,8 @@ import { type SubmitEvent, useState } from "react";
 import { toast } from "sonner";
 
 import { DeleteConfirm, DiscardConfirm } from "@/components/confirm-dialogs";
+import { CopyId } from "@/components/copy-id";
+import { Fact } from "@/components/panel";
 import { PersonaSelect } from "@/components/persona-select";
 import { Button } from "@/components/ui/button";
 import {
@@ -33,17 +35,16 @@ import {
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { useCloseGuard } from "@/hooks/use-close-guard";
+import { revealErrors } from "@/lib/forms";
 import { useDeleteScenario, usePersonas, useSaveScenario } from "@/lib/queries";
 import {
   type AgentSummary,
   CATEGORY_ITEMS,
   type Category,
-  type Fact,
+  type Fact as ScenarioFact,
   type Scenario,
   type ScenarioInput,
 } from "@/lib/types";
-
-const APPEAR = "transition-opacity duration-150 ease-out starting:opacity-0";
 
 const EMPTY: ScenarioInput = {
   name: "",
@@ -71,7 +72,7 @@ function toDraft(scenario: Scenario): ScenarioInput {
   };
 }
 
-function trimFacts(facts: Fact[]): Fact[] {
+function trimFacts(facts: ScenarioFact[]): ScenarioFact[] {
   return facts
     .map((fact) => ({ name: fact.name.trim(), value: fact.value.trim() }))
     .filter((fact) => fact.name || fact.value);
@@ -125,11 +126,11 @@ function FactRows({
   onChange,
 }: {
   label: string;
-  facts: Fact[];
+  facts: ScenarioFact[];
   submitted: boolean;
-  onChange: (facts: Fact[]) => void;
+  onChange: (facts: ScenarioFact[]) => void;
 }) {
-  const set = (index: number, next: Partial<Fact>) =>
+  const set = (index: number, next: Partial<ScenarioFact>) =>
     onChange(facts.map((fact, at) => (at === index ? { ...fact, ...next } : fact)));
 
   return (
@@ -212,7 +213,7 @@ export function ScenarioDialog({
     save.reset();
     setDraft((current) => ({ ...current, ...next(current) }));
   };
-  const setFacts = (key: FactKey, facts: Fact[]) => change(() => ({ [key]: facts }));
+  const setFacts = (key: FactKey, facts: ScenarioFact[]) => change(() => ({ [key]: facts }));
   const addListItem = (key: "unknown_facts" | "criteria") =>
     change((current) => ({ [key]: [...current[key], ""] }));
   const setListItem = (key: "unknown_facts" | "criteria", index: number, value: string) =>
@@ -221,23 +222,20 @@ export function ScenarioDialog({
     change((current) => ({ [key]: current[key].filter((_, at) => at !== index) }));
 
   const outbound = agent.direction === "outbound";
-  const halfFact = (facts: Fact[]) => facts.some((fact) => !fact.name || !fact.value);
+  const halfFact = (facts: ScenarioFact[]) => facts.some((fact) => !fact.name || !fact.value);
   const halfKnown = halfFact(input.known_facts);
   const halfAgentData = outbound && halfFact(input.agent_data);
 
-  const submit = (event: SubmitEvent) => {
+  const submit = (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setSubmitted(true);
-    if (
-      !input.name ||
-      !input.persona_id ||
-      !input.goal ||
-      input.criteria.length === 0 ||
-      halfKnown ||
-      halfAgentData
-    ) {
-      return;
-    }
+    const valid =
+      Boolean(input.name) &&
+      Boolean(input.persona_id) &&
+      Boolean(input.goal) &&
+      input.criteria.length > 0 &&
+      !halfKnown &&
+      !halfAgentData;
+    if (!revealErrors(event.currentTarget, () => setSubmitted(true), valid)) return;
     save.mutate(input, {
       onSuccess: (saved) => {
         toast.success(id ? "Scenario saved" : `Added ${saved.name}`);
@@ -265,6 +263,13 @@ export function ScenarioDialog({
           className="min-h-0 flex-1 overflow-y-auto px-6 py-1"
         >
           <FieldGroup className="pb-6">
+            {id && (
+              <dl>
+                <Fact label="Scenario id">
+                  <CopyId id={id} label="scenario id" />
+                </Fact>
+              </dl>
+            )}
             <Field>
               <FieldLabel htmlFor="scenario-name">Name</FieldLabel>
               <Input
@@ -275,9 +280,7 @@ export function ScenarioDialog({
                 value={draft.name}
                 onChange={(e) => change(() => ({ name: e.target.value }))}
               />
-              {submitted && !input.name && (
-                <FieldError className={APPEAR}>Enter a name.</FieldError>
-              )}
+              {submitted && !input.name && <FieldError>Enter a name.</FieldError>}
             </Field>
 
             <Field>
@@ -315,7 +318,7 @@ export function ScenarioDialog({
               />
               <FieldDescription>How the caller talks: style, language and voice.</FieldDescription>
               {submitted && personas.data?.length === 0 && (
-                <FieldError className={APPEAR}>Create a persona first.</FieldError>
+                <FieldError>Create a persona first.</FieldError>
               )}
             </Field>
 
@@ -345,9 +348,7 @@ export function ScenarioDialog({
                 onChange={(e) => change(() => ({ goal: e.target.value }))}
               />
               <FieldDescription>Put names, numbers and dates in the facts below.</FieldDescription>
-              {submitted && !input.goal && (
-                <FieldError className={APPEAR}>Describe what the caller wants.</FieldError>
-              )}
+              {submitted && !input.goal && <FieldError>Describe what the caller wants.</FieldError>}
             </Field>
 
             <FieldSet>
@@ -362,7 +363,7 @@ export function ScenarioDialog({
                 onChange={(facts) => setFacts("known_facts", facts)}
               />
               {submitted && halfKnown && (
-                <FieldError className={APPEAR}>Give each fact a name and a value.</FieldError>
+                <FieldError>Give each fact a name and a value.</FieldError>
               )}
             </FieldSet>
 
@@ -380,7 +381,7 @@ export function ScenarioDialog({
                   onChange={(facts) => setFacts("agent_data", facts)}
                 />
                 {submitted && halfAgentData && (
-                  <FieldError className={APPEAR}>Give each item a name and a value.</FieldError>
+                  <FieldError>Give each item a name and a value.</FieldError>
                 )}
               </FieldSet>
             )}
@@ -449,7 +450,7 @@ export function ScenarioDialog({
                 ))}
               </div>
               {submitted && input.criteria.length === 0 && (
-                <FieldError className={APPEAR}>Add at least one criterion.</FieldError>
+                <FieldError>Add at least one criterion.</FieldError>
               )}
               <AddRow
                 count={draft.criteria.length}
@@ -463,9 +464,7 @@ export function ScenarioDialog({
         </form>
 
         {(save.error || remove.error) && (
-          <FieldError className={`px-6 pb-3 ${APPEAR}`}>
-            {(save.error ?? remove.error)?.message}
-          </FieldError>
+          <FieldError className="px-6 pb-3">{(save.error ?? remove.error)?.message}</FieldError>
         )}
 
         <DialogFooter className="border-t px-6 py-4">

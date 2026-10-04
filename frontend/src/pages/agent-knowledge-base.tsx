@@ -3,7 +3,7 @@ import { type DragEvent, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { DeleteConfirm, DiscardConfirm } from "@/components/confirm-dialogs";
-import { FoldingPanel } from "@/components/panel";
+import { ActionPanel } from "@/components/panel";
 import { Button } from "@/components/ui/button";
 import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -21,6 +21,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useCloseGuard } from "@/hooks/use-close-guard";
 import { textSize } from "@/lib/format";
 import { type KnowledgeBaseSource, useSavedKnowledgeBase } from "@/hooks/use-knowledge-base";
+import { APPEAR } from "@/lib/motion";
 import { createTextDocument, downloadDocument, uploadDocument, useDocument } from "@/lib/queries";
 import type {
   Agent,
@@ -82,7 +83,14 @@ export function AgentKnowledgeBase({ agent }: { agent: Agent }) {
   return <KnowledgeBasePanel source={useSavedKnowledgeBase(agent)} />;
 }
 
-export function KnowledgeBasePanel({ source }: { source: KnowledgeBaseSource }) {
+/** `title` names the panel where no tab does. */
+export function KnowledgeBasePanel({
+  source,
+  title,
+}: {
+  source: KnowledgeBaseSource;
+  title?: string;
+}) {
   const files = useRef<HTMLInputElement>(null);
   const [open, setOpen] = useState<KnowledgeBaseDocument | "new" | null>(null);
   const { documents, progress, setProgress } = source;
@@ -234,10 +242,17 @@ export function KnowledgeBasePanel({ source }: { source: KnowledgeBaseSource }) 
           e.target.value = "";
         }}
       />
-      <FoldingPanel
-        name="knowledge-base"
-        title="Knowledge base"
-        count={documents.length}
+      <ActionPanel
+        title={
+          title && (
+            <>
+              {title}{" "}
+              <span className="font-normal text-muted-foreground tabular-nums">
+                {documents.length}
+              </span>
+            </>
+          )
+        }
         action={addButtons}
         notice={
           progress && (
@@ -267,15 +282,18 @@ export function KnowledgeBasePanel({ source }: { source: KnowledgeBaseSource }) 
         ) : (
           <ul className="divide-y">
             {documents.map((document) => (
-              <li key={document.document_id} className="flex items-center gap-3 px-5 py-3">
+              <li
+                key={document.document_id}
+                className="flex items-center gap-3 px-5 py-3.5 transition-colors duration-150 hover:bg-muted/60 has-[>button:active]:bg-muted"
+              >
                 <FileText className="size-4 shrink-0 text-muted-foreground" />
                 <button
                   type="button"
                   onClick={() => setOpen(document)}
                   className="grid min-w-0 flex-1 gap-0.5 rounded-sm text-left outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
                 >
-                  <span className="truncate text-sm font-medium">{document.name}</span>
-                  <span className="truncate text-xs text-muted-foreground tabular-nums">
+                  <span className="truncate text-s-500">{document.name}</span>
+                  <span className="truncate text-xs-400 text-muted-foreground tabular-nums">
                     {details(document)}
                   </span>
                   {Boolean(document.empty_pages) && (
@@ -329,7 +347,7 @@ export function KnowledgeBasePanel({ source }: { source: KnowledgeBaseSource }) 
             </p>
           </div>
         )}
-      </FoldingPanel>
+      </ActionPanel>
       {open !== null && (
         <DocumentSheet
           key={open === "new" ? "new" : open.document_id}
@@ -412,7 +430,7 @@ function DocumentSheet({
             {document ? details(document) : "Paste text the agent answers from."}
           </SheetDescription>
         </SheetHeader>
-        <div className="grid min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)] gap-4 px-4">
+        <div className="grid min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)] gap-4 px-6">
           <Field>
             <FieldLabel htmlFor="document-name">Name</FieldLabel>
             <Input
@@ -449,7 +467,7 @@ function DocumentSheet({
             ) : (
               document?.media_type &&
               text !== null && (
-                <FieldDescription>
+                <FieldDescription className={APPEAR}>
                   Edited text is saved as pasted text, and the original file is no longer linked.
                 </FieldDescription>
               )

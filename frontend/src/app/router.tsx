@@ -1,5 +1,16 @@
 import { Navigate, createBrowserRouter } from "react-router";
 
+import {
+  AgentCrumbs,
+  AgentsCrumbs,
+  ConversationCrumbs,
+  ConversationsCrumbs,
+  NewAgentCrumbs,
+  NumbersCrumbs,
+  PersonasCrumbs,
+  RunCrumbs,
+  VoicesCrumbs,
+} from "@/app/crumbs";
 import { RouteError } from "@/app/route-error";
 import { Shell } from "@/app/shell";
 import { AgentPage } from "@/pages/agent";
@@ -20,15 +31,23 @@ export const router = createBrowserRouter([
     errorElement: <RouteError />,
     children: [
       { index: true, element: <Navigate to="/agents" replace /> },
-      { path: "conversations", element: <ConversationsPage /> },
-      { path: "conversations/:id", element: <ConversationPage /> },
-      { path: "personas", element: <PersonasPage /> },
-      { path: "voices", element: <VoicesPage /> },
-      { path: "agents", element: <AgentsPage /> },
-      { path: "agents/new", element: <NewAgentPage /> },
-      { path: "agents/:id", element: <AgentPage /> },
-      { path: "numbers", element: <NumbersPage /> },
-      { path: "runs/:id", element: <RunPage /> },
+      {
+        path: "conversations",
+        element: <ConversationsPage />,
+        handle: { crumbs: ConversationsCrumbs },
+      },
+      {
+        path: "conversations/:id",
+        element: <ConversationPage />,
+        handle: { crumbs: ConversationCrumbs },
+      },
+      { path: "personas", element: <PersonasPage />, handle: { crumbs: PersonasCrumbs } },
+      { path: "voices", element: <VoicesPage />, handle: { crumbs: VoicesCrumbs } },
+      { path: "agents", element: <AgentsPage />, handle: { crumbs: AgentsCrumbs } },
+      { path: "agents/new", element: <NewAgentPage />, handle: { crumbs: NewAgentCrumbs } },
+      { path: "agents/:id", element: <AgentPage />, handle: { crumbs: AgentCrumbs } },
+      { path: "numbers", element: <NumbersPage />, handle: { crumbs: NumbersCrumbs } },
+      { path: "runs/:id", element: <RunPage />, handle: { crumbs: RunCrumbs } },
       { path: "*", element: <NotFoundPage /> },
     ],
   },

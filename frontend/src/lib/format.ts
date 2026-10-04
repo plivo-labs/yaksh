@@ -125,3 +125,15 @@ export function responseBand(ms: number): ResponseBand {
   if (ms < 1000) return "good";
   return ms <= 2000 ? "slow" : "bad";
 }
+
+/** A number's region with the country in title case: Plivo sends it in capitals, as in
+ * "Illinois, UNITED STATES". */
+export function region(text: string): string {
+  const parts = text.split(", ");
+  const country = parts[parts.length - 1];
+  if (country !== country.toUpperCase()) return text;
+  parts[parts.length - 1] = country
+    .toLowerCase()
+    .replace(/(^|\s)\p{L}/gu, (start) => start.toUpperCase());
+  return parts.join(", ");
+}

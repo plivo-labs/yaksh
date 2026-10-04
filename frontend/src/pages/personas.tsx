@@ -13,7 +13,14 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Empty, EmptyContent, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { useVoicePreview } from "@/hooks/use-voice-preview";
@@ -31,9 +38,9 @@ export function PersonasPage() {
 
   return (
     <div className="grid gap-6">
-      <div className="flex items-start justify-between gap-4">
-        <h1 className="font-heading text-2xl font-semibold tracking-tight">Personas</h1>
-        <Button onClick={() => setEditing("new")}>
+      <div className="flex min-h-[30px] flex-wrap items-center gap-x-2 gap-y-4">
+        <h1 className="mr-auto text-h3-500">Personas</h1>
+        <Button size="sm" onClick={() => setEditing("new")}>
           <Plus />
           New persona
         </Button>
@@ -56,10 +63,14 @@ export function PersonasPage() {
               <UserRound />
             </EmptyMedia>
             <EmptyTitle>No personas</EmptyTitle>
+            <EmptyDescription>
+              A persona is the caller that Truman plays: how it behaves and which voice it uses.
+            </EmptyDescription>
           </EmptyHeader>
           <EmptyContent>
-            <Button variant="outline" onClick={() => setEditing("new")}>
-              Create a persona
+            <Button onClick={() => setEditing("new")}>
+              <Plus />
+              New persona
             </Button>
           </EmptyContent>
         </Empty>
@@ -67,9 +78,9 @@ export function PersonasPage() {
         <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {personas.data.map((item) => (
             <li key={item.id}>
-              <Card className="relative h-full transition-colors has-[[data-slot=card-link]:focus-visible]:ring-2 has-[[data-slot=card-link]:focus-visible]:ring-ring/50 hover:bg-muted/40">
+              <Card className="relative h-full transition-colors has-[[data-slot=card-link]:focus-visible]:ring-2 has-[[data-slot=card-link]:focus-visible]:ring-ring/50 hover:bg-muted/40 has-[[data-slot=card-link]:active]:bg-muted/70">
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
+                  <CardTitle>
                     <button
                       type="button"
                       data-slot="card-link"
@@ -78,13 +89,15 @@ export function PersonasPage() {
                     >
                       {item.name}
                     </button>
-                    {item.voice_gender && <GenderBadge gender={item.voice_gender} />}
-                    {item.builtin_key && <Badge variant="secondary">Built-in</Badge>}
-                    {noiseLabel(item.background_noise) && (
-                      <Badge variant="outline">{noiseLabel(item.background_noise)}</Badge>
-                    )}
                   </CardTitle>
-                  <CardDescription>{LANGUAGE_NAMES[item.language]}</CardDescription>
+                  <CardDescription className="flex flex-wrap items-center gap-1.5">
+                    <span className="mr-1">{LANGUAGE_NAMES[item.language]}</span>
+                    {item.voice_gender && <GenderBadge gender={item.voice_gender} />}
+                    {item.builtin_key && <Badge>Built-in</Badge>}
+                    {noiseLabel(item.background_noise) && (
+                      <Badge>{noiseLabel(item.background_noise)}</Badge>
+                    )}
+                  </CardDescription>
                   <CardAction>
                     <Button
                       type="button"

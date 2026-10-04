@@ -1,4 +1,3 @@
-import { cn } from "cn";
 import {
   Download,
   Link2,
@@ -36,6 +35,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { copyText } from "@/lib/clipboard";
 import { clock, stamp } from "@/lib/format";
 import { type Recording, useRecording } from "@/lib/queries";
+import { cn } from "@/lib/utils";
 
 const RATES = [0.75, 1, 1.25, 1.5, 2, 3];
 const STEP_S = 5;

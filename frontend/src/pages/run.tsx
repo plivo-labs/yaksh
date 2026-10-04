@@ -1,12 +1,14 @@
-import { ChevronLeft, Play, Square } from "lucide-react";
+import { Play, Square } from "lucide-react";
 import { useState } from "react";
-import { Link, useParams, useSearchParams } from "react-router";
+import { useParams, useSearchParams } from "react-router";
 import { toast } from "sonner";
 
+import { BackButton } from "@/components/back-button";
 import { ConversationList } from "@/components/conversation-list";
+import { CopyId } from "@/components/copy-id";
 import { Pager } from "@/components/pager";
 import { Fact, Panel, PanelHeader } from "@/components/panel";
-import { RunStatusBadge } from "@/components/status-dot";
+import { RunStatusLabel } from "@/components/status-label";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   AlertDialog,
@@ -17,10 +19,10 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Spinner } from "@/components/ui/spinner";
 import { usePageParam } from "@/hooks/use-page-param";
 import { duration, noiseLabel, runTitle, runTotal, seconds, when } from "@/lib/format";
 import {
@@ -46,7 +48,6 @@ const FINISHED: OutcomeGroup[] = ["completed", "did_not_connect", "error", "canc
 export function RunPage() {
   const { id = "" } = useParams();
   const run = useRun(id);
-  const agent = useAgent(run.data?.agent_id);
 
   if (run.isError) {
     return (
@@ -56,18 +57,18 @@ export function RunPage() {
       </Alert>
     );
   }
-  if (run.isPending) return <Skeleton className="h-96 w-full rounded-lg" />;
+  if (run.isPending) {
+    return (
+      <div className="grid gap-6">
+        <Skeleton className="h-56 w-full rounded-lg" />
+        <Skeleton className="h-64 w-full rounded-lg" />
+      </div>
+    );
+  }
   const data = run.data;
 
   return (
     <div className="grid gap-6">
-      <Link
-        to={`/agents/${data.agent_id}`}
-        className="inline-flex w-fit items-center gap-1 rounded-sm text-sm text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
-      >
-        <ChevronLeft className="size-4" />
-        {agent.data?.name ?? data.agent_name}
-      </Link>
       <Overview run={data} />
       <Conversations run={data} />
     </div>
@@ -82,17 +83,20 @@ function Overview({ run }: { run: Run }) {
     <Panel>
       <div className="flex flex-wrap items-start gap-x-6 gap-y-4 px-5 pt-5 pb-4">
         <div className="grid min-w-0 flex-1 basis-72 gap-1">
-          <div className="flex items-center gap-3">
-            <h1 className="truncate text-2xl font-semibold tracking-[-0.015em]">{runTitle(run)}</h1>
-            <RunStatusBadge status={run.status} />
+          <div className="flex min-w-0 items-center gap-2">
+            <BackButton fallback={`/agents/${run.agent_id}`} />
+            <h1 className="truncate text-h3-500" title={runTitle(run)}>
+              {runTitle(run)}
+            </h1>
+            <RunStatusLabel status={run.status} />
           </div>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-s-400 text-muted-foreground">
             {run.agent_name}, version {run.agent_version}
             {run.started_at && `, started ${when(run.started_at)}`}
             {run.ended_at && `, ended ${when(run.ended_at)}`}
           </p>
           {run.waiting_reason && (
-            <p className="text-sm text-muted-foreground">
+            <p className="text-s-400 text-muted-foreground">
               Waiting: {WAITING_REASON_TEXT[run.waiting_reason]}
             </p>
           )}
@@ -145,9 +149,12 @@ function Overview({ run }: { run: Run }) {
             ? "None yet"
             : `${seconds(run.response_p50_ms)} / ${seconds(run.response_p90_ms)}`}
         </Fact>
-        <div className="col-span-2 grid min-w-0 gap-0.5 sm:col-span-3 lg:col-span-9">
-          <dt className="text-xs text-muted-foreground">End reasons</dt>
-          <dd className="text-sm font-medium">
+        <Fact label="Run id">
+          <CopyId id={run.id} label="run id" />
+        </Fact>
+        <div className="col-span-2 grid min-w-0 gap-0.5 sm:col-span-2 lg:col-span-8">
+          <dt className="text-xs-400 text-muted-foreground">End reasons</dt>
+          <dd className="text-s-400">
             {endReasons.length === 0
               ? "None yet"
               : endReasons
@@ -163,42 +170,47 @@ function Overview({ run }: { run: Run }) {
 function RunActions({ run }: { run: Run }) {
   const cancel = useCancelRun(run.id);
   const [again, setAgain] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
   const agent = useAgent(run.agent_id);
   const active = ACTIVE_RUN_STATUSES.includes(run.status);
   return (
     <div className="grid justify-items-end gap-2">
       <div className="flex gap-2">
         {active && run.status !== "cancelling" && (
-          <AlertDialog>
-            <AlertDialogTrigger render={<Button variant="outline" />}>
-              <Square />
-              Cancel run
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Cancel this run?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  Conversations that have not started are cancelled. Calls on the line end, and what
-                  was said so far is kept. No conversation is tried again.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Keep running</AlertDialogCancel>
-                <AlertDialogAction
-                  onClick={() =>
-                    cancel.mutate(undefined, {
-                      onError: (error) =>
-                        toast.error("Could not cancel the run", { description: error.message }),
-                    })
-                  }
-                >
-                  Cancel run
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
+          <Button variant="outline" size="sm" onClick={() => setCancelling(true)}>
+            <Square />
+            Cancel run
+          </Button>
         )}
-        <Button variant="outline" disabled={!agent.data} onClick={() => setAgain(true)}>
+        <AlertDialog open={cancelling} onOpenChange={setCancelling}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Cancel this run?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Conversations that have not started are cancelled. Calls on the line end, and what
+                was said so far is kept. No conversation is tried again.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Keep running</AlertDialogCancel>
+              <AlertDialogAction
+                variant="destructive"
+                disabled={cancel.isPending}
+                onClick={() =>
+                  cancel.mutate(undefined, {
+                    onSuccess: () => setCancelling(false),
+                    onError: (error) =>
+                      toast.error("Could not cancel the run", { description: error.message }),
+                  })
+                }
+              >
+                {cancel.isPending && <Spinner />}
+                Cancel run
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+        <Button variant="outline" size="sm" disabled={!agent.data} onClick={() => setAgain(true)}>
           <Play />
           Run again
         </Button>

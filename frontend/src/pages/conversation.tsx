@@ -1,24 +1,15 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { Fragment, useEffect, useRef, useState } from "react";
+import { Fragment, type RefObject, useEffect, useRef, useState } from "react";
 import { useDefaultLayout } from "react-resizable-panels";
 import { Link, useParams, useSearchParams } from "react-router";
 
+import { BackButton } from "@/components/back-button";
+import { EndCallDialog } from "@/components/confirm-dialogs";
+import { CopyId } from "@/components/copy-id";
+import { Fact } from "@/components/panel";
 import { type Mark, type PlayerHandle, RecordingPlayer } from "@/components/recording-player";
 import { ResponseTime } from "@/components/response-time";
-import { StatusBadge } from "@/components/status-dot";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
-import { cn } from "cn";
-
+import { ConversationStatusLabel } from "@/components/status-label";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Bubble, BubbleContent } from "@/components/ui/bubble";
@@ -50,7 +41,6 @@ import {
   BAND_FILL,
   BAND_TEXT,
   clock,
-  counted,
   duration,
   noiseLabel,
   phone,
@@ -61,14 +51,16 @@ import {
 } from "@/lib/format";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useStoredBoolean } from "@/hooks/use-stored-boolean";
-import { keys, useAgent, useConversation, useEndConversation } from "@/lib/queries";
+import { APPEAR, REVEAL, RISE } from "@/lib/motion";
+import { keys, useAgent, useConversation } from "@/lib/queries";
 import { subscribe } from "@/lib/sse";
 import { storage } from "@/lib/storage";
+import { cn } from "@/lib/utils";
 import {
   END_REASON_LABELS,
   ACTIVE_STATUSES,
   type Conversation,
-  type Fact,
+  type Fact as ScenarioFact,
   LANGUAGE_NAMES,
   type Reply,
   type ScenarioConfig,
@@ -82,7 +74,8 @@ export function ConversationPage() {
   const [params] = useSearchParams();
   const conversation = useConversation(id);
   const agent = useAgent(conversation.data?.agent_id);
-  const end = useEndConversation(id);
+  const [ending, setEnding] = useState(false);
+  const player = useRef<PlayerHandle>(null);
   const layout = useDefaultLayout({
     id: "truman.conversation",
     storage,
@@ -90,7 +83,17 @@ export function ConversationPage() {
   });
   useLiveUpdates(id, conversation.data?.status);
 
-  if (conversation.isPending) return <Skeleton className="h-96 w-full" />;
+  if (conversation.isPending) {
+    return (
+      <div className="flex h-full flex-col gap-6">
+        <Skeleton className="h-28 w-full" />
+        <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_320px] gap-4">
+          <Skeleton className="h-full" />
+          <Skeleton className="h-full" />
+        </div>
+      </div>
+    );
+  }
   if (conversation.isError) {
     return (
       <Alert variant="destructive">
@@ -101,80 +104,49 @@ export function ConversationPage() {
   }
   const data = conversation.data;
   const active = ACTIVE_STATUSES.includes(data.status);
+  const connectedMs = connectedAt(data);
 
   return (
     <div className="flex h-full flex-col gap-6">
-      <div className="flex shrink-0 flex-wrap items-start justify-between gap-4">
-        <div className="grid gap-1.5">
-          <div className="flex items-center gap-3">
-            <h1 className="font-heading text-2xl font-semibold tracking-tight">
-              {agent.data ? (
-                <Link to={`/agents/${agent.data.id}`} className="hover:underline">
-                  {agent.data.name}
-                </Link>
-              ) : (
-                "Conversation"
-              )}
-            </h1>
-            <StatusBadge status={data.status} />
-          </div>
-          <p className="text-sm text-muted-foreground">
-            Version {data.agent_version}
-            {data.started_at && ` · started ${when(data.started_at)}`}
-            {data.talk_ms !== null && ` · ${duration(data.talk_ms)} connected`}
-            {data.end_reason && ` · ${END_REASON_LABELS[data.end_reason]}`}
-          </p>
-          <LatencyLine conversation={data} />
-          {data.failure_reason && (
-            <p className="text-sm text-status-danger">{data.failure_reason}</p>
-          )}
-          {data.run_id && (
-            <p className="flex flex-wrap gap-x-3 text-sm text-muted-foreground">
-              <Link to={`/runs/${data.run_id}`} className="underline-offset-4 hover:underline">
-                Repeat {data.repeat} of a run
+      <div className="grid shrink-0 gap-4">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="grid min-w-0 gap-1">
+            <div className="flex min-w-0 items-center gap-2">
+              <BackButton
+                fallback={data.run_id ? `/runs/${data.run_id}` : `/agents/${data.agent_id}`}
+              />
+              <h1 className="truncate text-h3-500" title={data.scenario_name}>
+                {data.scenario_name}
+              </h1>
+            </div>
+            <p className="truncate text-s-400 text-muted-foreground">
+              <Link
+                to={`/agents/${data.agent_id}`}
+                className="underline-offset-4 hover:text-foreground hover:underline"
+              >
+                {agent.data?.name ?? data.agent_name}
               </Link>
-              {data.retry_of && (
-                <Link
-                  to={`/conversations/${data.retry_of}`}
-                  className="underline-offset-4 hover:underline"
-                >
-                  Attempt {data.attempt}, retry of attempt {data.attempt - 1}
-                </Link>
-              )}
-              {data.retried_as && (
-                <Link
-                  to={`/conversations/${data.retried_as}`}
-                  className="underline-offset-4 hover:underline"
-                >
-                  Retried as attempt {data.attempt + 1}
-                </Link>
-              )}
+              , {data.persona_name}
             </p>
-          )}
-          {data.caller_reason && (
-            <p className="text-sm text-muted-foreground">
-              Why the caller hung up: {data.caller_reason}
-            </p>
-          )}
+          </div>
+          <div className="flex items-center gap-4">
+            <ConversationStatusLabel status={data.status} />
+            {active && (
+              <Button variant="outline" size="sm" onClick={() => setEnding(true)}>
+                End call
+              </Button>
+            )}
+            <EndCallDialog conversation={data} open={ending} onOpenChange={setEnding} />
+          </div>
         </div>
-        {active && (
-          <AlertDialog>
-            <AlertDialogTrigger render={<Button variant="outline" />}>End call</AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>End this conversation?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  {data.status === "queued"
-                    ? "It has not connected yet, so it will be cancelled."
-                    : "The caller hangs up and what was said so far is kept."}
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Keep going</AlertDialogCancel>
-                <AlertDialogAction onClick={() => end.mutate()}>End call</AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
+        <ConversationFacts key={data.id} conversation={data} />
+        {data.failure_reason && (
+          <p className="text-s-400 text-status-danger">{data.failure_reason}</p>
+        )}
+        {data.caller_reason && (
+          <p className="text-s-400 text-muted-foreground">
+            Why the caller hung up: {data.caller_reason}
+          </p>
         )}
       </div>
 
@@ -185,7 +157,12 @@ export function ConversationPage() {
         onLayoutChanged={layout.onLayoutChanged}
       >
         <ResizablePanel id="call" minSize="35%">
-          <CallPane key={data.id} conversation={data} start={Number(params.get("t")) || 0} />
+          <CallPane
+            key={data.id}
+            conversation={data}
+            player={player}
+            start={Number(params.get("t")) || 0}
+          />
         </ResizablePanel>
         <ResizableHandle withHandle />
         <ResizablePanel id="details" defaultSize={320} minSize={260} maxSize="50%">
@@ -198,12 +175,6 @@ export function ConversationPage() {
                   <CardDescription>
                     {LANGUAGE_NAMES[data.language]}, <CallerLine conversation={data} />, up to{" "}
                     {data.max_turns} turns and {data.max_duration_s}s once connected
-                    {data.call_uuid && (
-                      <>
-                        {" · Plivo call "}
-                        <span className="font-mono">{data.call_uuid}</span>
-                      </>
-                    )}
                   </CardDescription>
                   {noiseLabel(data.background_noise) && (
                     <CardDescription>
@@ -215,7 +186,15 @@ export function ConversationPage() {
                   <CallerPrompt instructions={data.instructions} />
                 </CardContent>
               </Card>
-              <WireEvents events={data.wire_events} validity={data.validity} />
+              <WireEvents
+                events={data.wire_events}
+                validity={data.validity}
+                onPlay={
+                  data.recording_url && connectedMs !== undefined
+                    ? (atMs) => player.current?.playFrom(Math.max(0, atMs - connectedMs) / 1000)
+                    : undefined
+                }
+              />
             </div>
           </ScrollArea>
         </ResizablePanel>
@@ -226,27 +205,93 @@ export function ConversationPage() {
 
 /** The recording and the transcript. Keyed by the conversation, so the turn that was playing
  * does not carry over to the next conversation. */
-/** The agent's response times, under the title; nothing during the call or for a call that did
- * not connect. */
-function LatencyLine({ conversation }: { conversation: Conversation }) {
+/** What is known about the call, as label and value pairs. A value that does not exist yet is
+ * left out, not shown as empty. */
+function ConversationFacts({ conversation }: { conversation: Conversation }) {
   const { latency } = conversation;
-  if (latency === null) {
-    if (conversation.talk_ms === null || ACTIVE_STATUSES.includes(conversation.status)) return null;
-    return <p className="text-sm text-muted-foreground">Latency not measured</p>;
-  }
+  const finished = !ACTIVE_STATUSES.includes(conversation.status);
+  const [initial] = useState(conversation.status);
+  const arrived = conversation.status === initial ? undefined : APPEAR;
   return (
-    <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-muted-foreground">
-      {latency.p90_ms !== null && latency.p50_ms !== null && (
-        <>
-          Response p90 <ResponseTime ms={latency.p90_ms} /> · p50{" "}
-          <ResponseTime ms={latency.p50_ms} /> ·
-        </>
+    <dl className="flex flex-wrap gap-x-10 gap-y-3">
+      {conversation.started_at && (
+        <Fact className={arrived} label="Started">
+          <span className="font-mono">{when(conversation.started_at)}</span>
+        </Fact>
       )}
-      <span>
-        {counted(latency.replies, "reply", "replies")}
-        {latency.talked_over > 0 && ` · ${counted(latency.talked_over, "talk-over", "talk-overs")}`}
-      </span>
-    </p>
+      {conversation.talk_ms !== null && (
+        <Fact className={arrived} label="Connected">
+          <span className="font-mono">{duration(conversation.talk_ms)}</span>
+        </Fact>
+      )}
+      {conversation.end_reason && (
+        <Fact className={arrived} label="End">
+          {END_REASON_LABELS[conversation.end_reason]}
+        </Fact>
+      )}
+      {latency?.p90_ms != null && (
+        <Fact className={arrived} label="Response p90">
+          <ResponseTime ms={latency.p90_ms} />
+        </Fact>
+      )}
+      {latency?.p50_ms != null && (
+        <Fact className={arrived} label="Response p50">
+          <ResponseTime ms={latency.p50_ms} />
+        </Fact>
+      )}
+      {latency && (
+        <Fact className={arrived} label="Replies">
+          <span className="font-mono">{latency.replies}</span>
+          {latency.talked_over > 0 && `, ${latency.talked_over} talked over`}
+        </Fact>
+      )}
+      {latency === null && finished && conversation.talk_ms !== null && (
+        <Fact className={arrived} label="Response time">
+          Not measured
+        </Fact>
+      )}
+      {conversation.run_id && (
+        <Fact className={arrived} label="Run">
+          <Link to={`/runs/${conversation.run_id}`} className="underline-offset-4 hover:underline">
+            Repeat {conversation.repeat}
+          </Link>
+        </Fact>
+      )}
+      {(conversation.retry_of || conversation.retried_as) && (
+        <Fact className={arrived} label="Attempt">
+          <span className="flex gap-3">
+            <span className="font-mono">{conversation.attempt}</span>
+            {conversation.retry_of && (
+              <Link
+                to={`/conversations/${conversation.retry_of}`}
+                className="underline-offset-4 hover:underline"
+              >
+                Previous attempt
+              </Link>
+            )}
+            {conversation.retried_as && (
+              <Link
+                to={`/conversations/${conversation.retried_as}`}
+                className="underline-offset-4 hover:underline"
+              >
+                Next attempt
+              </Link>
+            )}
+          </span>
+        </Fact>
+      )}
+      <Fact className={arrived} label="Agent version">
+        <span className="font-mono">{conversation.agent_version}</span>
+      </Fact>
+      <Fact label="Conversation id">
+        <CopyId id={conversation.id} label="conversation id" />
+      </Fact>
+      {conversation.call_uuid && (
+        <Fact label="Plivo call">
+          <CopyId id={conversation.call_uuid} label="Plivo call id" />
+        </Fact>
+      )}
+    </dl>
   );
 }
 
@@ -276,15 +321,27 @@ function replyMark(reply: Reply, connectedMs: number): Mark {
   };
 }
 
-function CallPane({ conversation, start }: { conversation: Conversation; start: number }) {
-  const player = useRef<PlayerHandle>(null);
+/** When the call connected, counted from the dial. The recording starts here; turn and wire
+ * times count from the dial. */
+function connectedAt(conversation: Conversation): number | undefined {
+  return conversation.wire_events.find((event) => event.kind === "connected")?.at_ms;
+}
+
+function CallPane({
+  conversation,
+  player,
+  start,
+}: {
+  conversation: Conversation;
+  player: RefObject<PlayerHandle | null>;
+  start: number;
+}) {
   const [heard, setHeard] = useState<number | null>(null);
-  /** The recording starts when the call connects; turn times count from the dial. */
-  const connectedMs = conversation.wire_events.find((event) => event.kind === "connected")?.at_ms;
+  const connectedMs = connectedAt(conversation);
   return (
     <div className="flex h-full flex-col gap-6 p-px pr-3">
       <Card className="shrink-0">
-        <CardHeader>
+        <CardHeader className="border-b">
           <CardTitle>Recording</CardTitle>
         </CardHeader>
         <CardContent>
@@ -383,7 +440,7 @@ function ScenarioCard({ name, scenario }: { name: string; scenario: ScenarioConf
   );
 }
 
-function Facts({ label, facts }: { label: string; facts: Fact[] }) {
+function Facts({ label, facts }: { label: string; facts: ScenarioFact[] }) {
   if (facts.length === 0) return null;
   return (
     <div className="grid gap-1">
@@ -414,7 +471,9 @@ function CallerPrompt({ instructions }: { instructions: string }) {
         {shown ? "Hide prompt" : "Show prompt"}
       </Button>
       {shown && (
-        <pre className="whitespace-pre-wrap rounded-md bg-muted p-3 font-mono text-xs transition-[opacity,translate] duration-200 ease-out starting:-translate-y-1 starting:opacity-0 motion-reduce:starting:translate-y-0">
+        <pre
+          className={cn("whitespace-pre-wrap rounded-md bg-muted p-3 font-mono text-xs", REVEAL)}
+        >
           {instructions}
         </pre>
       )}
@@ -553,7 +612,7 @@ function Transcript({
   const [follow, setFollow] = useStoredBoolean("truman.transcript.follow", true);
   return (
     <Card className="min-h-0">
-      <CardHeader className="shrink-0">
+      <CardHeader className="shrink-0 border-b">
         <CardTitle>Transcript</CardTitle>
         {onPlay && (
           <CardAction>
@@ -581,7 +640,7 @@ function Transcript({
                       <MessageScrollerItem
                         key={index}
                         messageId={String(index)}
-                        className="transition-[opacity,translate] duration-200 ease-out starting:translate-y-1 starting:opacity-0 motion-reduce:starting:translate-y-0"
+                        className={active ? RISE : undefined}
                       >
                         <Message align={turn.role === "caller" ? "end" : "start"}>
                           <MessageContent>
@@ -591,16 +650,14 @@ function Transcript({
                               {typeof turn.response_ms === "number" && (
                                 <ResponseTime ms={turn.response_ms} />
                               )}
-                              {turn.talked_over && <Badge variant="outline">talked over</Badge>}
-                              {turn.scripted && <Badge variant="secondary">fixed nudge</Badge>}
-                              {turn.provenance === "cut" && (
-                                <Badge variant="outline">cut off</Badge>
-                              )}
+                              {turn.talked_over && <Badge>talked over</Badge>}
+                              {turn.scripted && <Badge>fixed nudge</Badge>}
+                              {turn.provenance === "cut" && <Badge>cut off</Badge>}
                               {turn.provenance === "unconfirmed" && (
-                                <Badge variant="outline">not confirmed played</Badge>
+                                <Badge>not confirmed played</Badge>
                               )}
                             </MessageHeader>
-                            <Bubble variant={turn.role === "caller" ? "default" : "outline"}>
+                            <Bubble variant={turn.role}>
                               <BubbleContent
                                 render={
                                   onPlay && (
@@ -646,13 +703,17 @@ function Transcript({
 function WireEvents({
   events,
   validity,
+  onPlay,
 }: {
   events: WireEvent[];
   validity: Conversation["validity"];
+  /** Plays the recording from that time, counted from the dial; absent while there is no
+   * recording. An event before the connect plays from the start. */
+  onPlay?: (atMs: number) => void;
 }) {
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="border-b">
         <CardTitle>On the wire</CardTitle>
         <CardDescription>
           Times count from the start of the call. The recording and the transcript start at
@@ -683,7 +744,18 @@ function WireEvents({
                     </TooltipTrigger>
                     <TooltipContent side="left">{WIRE_EVENT_HELP[event.kind]}</TooltipContent>
                   </Tooltip>
-                  <span className="text-muted-foreground">{clock(event.at_ms)}</span>
+                  {onPlay ? (
+                    <button
+                      type="button"
+                      title="Play from here"
+                      onClick={() => onPlay(event.at_ms)}
+                      className="rounded-sm text-muted-foreground underline-offset-2 outline-none transition-colors hover:text-foreground hover:underline focus-visible:ring-2 focus-visible:ring-ring/50"
+                    >
+                      {clock(event.at_ms)}
+                    </button>
+                  ) : (
+                    <span className="text-muted-foreground">{clock(event.at_ms)}</span>
+                  )}
                 </div>
                 {event.detail && <p className="break-all text-muted-foreground">{event.detail}</p>}
               </li>

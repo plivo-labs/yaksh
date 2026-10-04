@@ -1,11 +1,9 @@
-import { cn } from "cn";
-import { ChevronLeft } from "lucide-react";
 import { type ReactNode, type SubmitEvent, useState } from "react";
-import { flushSync } from "react-dom";
 import { Link, useNavigate } from "react-router";
 import { toast } from "sonner";
 
-import { DeleteConfirm } from "@/components/confirm-dialogs";
+import { BackButton } from "@/components/back-button";
+import { DeleteConfirm, DiscardConfirm } from "@/components/confirm-dialogs";
 import { Panel, PanelHeader } from "@/components/panel";
 import { Segmented } from "@/components/segmented";
 import { Button } from "@/components/ui/button";
@@ -28,10 +26,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Spinner } from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { useCloseGuard } from "@/hooks/use-close-guard";
 import { useDraftKnowledgeBase } from "@/hooks/use-knowledge-base";
+import { revealErrors } from "@/lib/forms";
+import { APPEAR } from "@/lib/motion";
 import { useDeleteAgent, useSaveAgent } from "@/lib/queries";
 import {
   EMPTY_OUTBOUND,
@@ -49,11 +51,10 @@ import {
   LANGUAGE_ITEMS,
   type Language,
 } from "@/lib/types";
+import { cn } from "@/lib/utils";
 import { ConfigField, MAX_CONFIG_CHARS } from "@/pages/agent-config-field";
 import { KnowledgeBasePanel } from "@/pages/agent-knowledge-base";
 import { OutboundFields } from "@/pages/agent-outbound-fields";
-
-const APPEAR = "transition-opacity duration-150 ease-out starting:opacity-0";
 
 interface Draft {
   name: string;
@@ -125,7 +126,8 @@ function toInput(draft: Draft): AgentInput {
 /** An agent being added or edited: the draft, what it still needs, and a check that shows the
  * problems and moves focus to the first one. */
 function useAgentDraft(agent?: Agent) {
-  const [draft, setDraft] = useState<Draft>(() => (agent ? toDraft(agent) : EMPTY));
+  const [initial] = useState<Draft>(() => (agent ? toDraft(agent) : EMPTY));
+  const [draft, setDraft] = useState(initial);
   const [submitted, setSubmitted] = useState(false);
   const [switched, setSwitched] = useState(false);
   const set = <K extends keyof Draft>(key: K, value: Draft[K]) => {
@@ -141,14 +143,12 @@ function useAgentDraft(agent?: Agent) {
     config: draft.config.length > MAX_CONFIG_CHARS,
   };
   const ready = !needs.name && !needs.reach && !needs.config;
-  const check = (element: HTMLFormElement) => {
-    flushSync(() => setSubmitted(true));
-    if (!ready) element.querySelector<HTMLElement>("[aria-invalid=true]")?.focus();
-    return ready;
-  };
+  const check = (element: HTMLFormElement) =>
+    revealErrors(element, () => setSubmitted(true), ready);
   /** Who calls changed, so fields that swap with it may fade in; the first render stays still. */
   const swap = switched ? APPEAR : undefined;
-  return { draft, set, submitted, outbound, needs, check, swap };
+  const dirty = JSON.stringify(draft) !== JSON.stringify(initial);
+  return { draft, set, submitted, outbound, needs, check, swap, dirty };
 }
 
 type AgentDraft = ReturnType<typeof useAgentDraft>;
@@ -168,11 +168,7 @@ function BasicsFields({ form }: { form: AgentDraft }) {
           value={draft.name}
           onChange={(e) => set("name", e.target.value)}
         />
-        {submitted && needs.name && (
-          <FieldError id="name-error" className={APPEAR}>
-            Enter a name.
-          </FieldError>
-        )}
+        {submitted && needs.name && <FieldError id="name-error">Enter a name.</FieldError>}
       </Field>
       <div className="grid gap-7 @md/field-group:grid-cols-2">
         <Field>
@@ -240,7 +236,7 @@ function ReachFields({ form }: { form: AgentDraft }) {
             onChange={(e) => set("agent_number", e.target.value)}
           />
           {numberProblem && (
-            <FieldError id="agent_number-error" className={APPEAR}>
+            <FieldError id="agent_number-error">
               Use the international format, like +14155550100.
             </FieldError>
           )}
@@ -250,7 +246,9 @@ function ReachFields({ form }: { form: AgentDraft }) {
         <FieldContent>
           <FieldLabel htmlFor="agent_speaks_first">Agent speaks first</FieldLabel>
           {outbound && (
-            <FieldDescription>When off, the caller says a short hello on pickup.</FieldDescription>
+            <FieldDescription className={swap}>
+              When off, the caller says a short hello on pickup.
+            </FieldDescription>
           )}
         </FieldContent>
         <Switch
@@ -329,21 +327,17 @@ export function NewAgentPage() {
     const entries = knowledgeBase.documents.map(({ document_id, name }) => ({ document_id, name }));
     save.mutate(
       { ...toInput(form.draft), knowledge_base: entries },
-      { onSuccess: (agent) => navigate(`/agents/${agent.id}`) },
+      { onSuccess: (agent) => navigate(`/agents/${agent.id}`, { replace: true }) },
     );
   };
 
   return (
     <div className="grid gap-6">
-      <Link
-        to="/agents"
-        className="inline-flex w-fit items-center gap-1 rounded-sm text-sm text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
-      >
-        <ChevronLeft className="size-4" />
-        Agents
-      </Link>
       <div className="grid gap-1">
-        <h1 className="text-2xl font-semibold tracking-[-0.015em]">New agent</h1>
+        <div className="flex items-center gap-2">
+          <BackButton fallback="/agents" />
+          <h1 className="text-h3-500">New agent</h1>
+        </div>
         <p className="text-sm text-muted-foreground">
           Tell Truman how to reach the agent and what it does.
         </p>
@@ -371,12 +365,10 @@ export function NewAgentPage() {
           >
             <ContextFields form={form} />
           </Section>
-          <KnowledgeBasePanel source={knowledgeBase} />
+          <KnowledgeBasePanel source={knowledgeBase} title="Knowledge base" />
         </div>
         <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-2">
-          {save.error && (
-            <FieldError className={`mr-auto ${APPEAR}`}>{save.error.message}</FieldError>
-          )}
+          {save.error && <FieldError className="mr-auto">{save.error.message}</FieldError>}
           {uploading && (
             <FieldDescription className={`mr-auto ${APPEAR}`}>
               Wait for the documents to finish uploading.
@@ -396,17 +388,54 @@ export function NewAgentPage() {
 }
 
 /** Edits an agent. Its knowledge base is edited in its own panel, which saves at once. */
-export function AgentForm({
+/** The agent's settings in a sheet. It asks before it throws away unsaved changes, and calls
+ * `onClosed` once it has closed. */
+export function EditAgentSheet({ agent, onClosed }: { agent: Agent; onClosed: () => void }) {
+  const form = useAgentDraft(agent);
+  const guard = useCloseGuard(form.dirty);
+  return (
+    <Sheet
+      open={guard.open}
+      onOpenChange={(next) => !next && guard.requestClose()}
+      onOpenChangeComplete={(next) => !next && onClosed()}
+    >
+      <SheetContent size="lg" className="overflow-y-auto">
+        <SheetHeader>
+          <SheetTitle>Edit {agent.name}</SheetTitle>
+        </SheetHeader>
+        <div className="px-6 pb-6">
+          <AgentForm
+            agent={agent}
+            form={form}
+            onSaved={() => {
+              guard.close();
+              toast.success("Settings saved");
+            }}
+            cancel={
+              <Button type="button" variant="ghost" onClick={guard.requestClose}>
+                Cancel
+              </Button>
+            }
+          />
+        </div>
+      </SheetContent>
+      <DiscardConfirm subject="agent" {...guard.discard} />
+    </Sheet>
+  );
+}
+
+function AgentForm({
   agent,
+  form,
   onSaved,
   cancel,
 }: {
   agent: Agent;
+  form: AgentDraft;
   onSaved: (agent: Agent) => void;
   cancel: ReactNode;
 }) {
   const navigate = useNavigate();
-  const form = useAgentDraft(agent);
   const save = useSaveAgent(agent.id);
   const remove = useDeleteAgent();
 
@@ -439,7 +468,7 @@ export function AgentForm({
       </FieldSet>
 
       {(save.error || remove.error) && (
-        <FieldError className={APPEAR}>{(save.error ?? remove.error)?.message}</FieldError>
+        <FieldError>{(save.error ?? remove.error)?.message}</FieldError>
       )}
 
       <div className="flex flex-wrap items-center justify-end gap-2">
@@ -451,7 +480,7 @@ export function AgentForm({
             remove.mutate(agent.id, {
               onSuccess: () => {
                 toast.success(`Deleted ${form.draft.name}`);
-                navigate("/agents");
+                navigate("/agents", { replace: true });
               },
               onSettled: close,
             })

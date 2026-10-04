@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { toast } from "sonner";
 
 import {
   AlertDialog,
@@ -12,6 +13,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
+import { useEndConversation } from "@/lib/queries";
+import type { ConversationStatus } from "@/lib/types";
 
 /** Asks before a delete. `onDelete` gets `close`, to call when the request ends; a failure
  * shows `error` in the dialog so the reason is not lost. */
@@ -42,7 +45,11 @@ export function DeleteDialog({
         {error && <p className="text-sm text-destructive">{error}</p>}
         <AlertDialogFooter>
           <AlertDialogCancel>Keep</AlertDialogCancel>
-          <AlertDialogAction disabled={pending} onClick={() => onDelete(() => onOpenChange(false))}>
+          <AlertDialogAction
+            variant="destructive"
+            disabled={pending}
+            onClick={() => onDelete(() => onOpenChange(false))}
+          >
             {pending && <Spinner />}
             Delete
           </AlertDialogAction>
@@ -112,7 +119,56 @@ export function DiscardConfirm({
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>Keep editing</AlertDialogCancel>
-          <AlertDialogAction onClick={onDiscard}>Discard</AlertDialogAction>
+          <AlertDialogAction variant="destructive" onClick={onDiscard}>
+            Discard
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+
+/** Asks before ending a call. It closes once the request is accepted; a failure shows a toast. */
+export function EndCallDialog({
+  conversation,
+  open,
+  onOpenChange,
+}: {
+  conversation: { id: string; status: ConversationStatus };
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const end = useEndConversation(conversation.id);
+  return (
+    <AlertDialog open={open} onOpenChange={onOpenChange}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>End this call?</AlertDialogTitle>
+          <AlertDialogDescription>
+            {conversation.status === "queued"
+              ? "It has not connected yet, so it will be cancelled."
+              : "The caller hangs up and what was said so far is kept."}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Keep going</AlertDialogCancel>
+          <AlertDialogAction
+            variant="destructive"
+            disabled={end.isPending}
+            onClick={() =>
+              end.mutate(undefined, {
+                onSuccess: () => {
+                  onOpenChange(false);
+                  toast.success("Ending the call");
+                },
+                onError: (error) =>
+                  toast.error("Could not end the call", { description: error.message }),
+              })
+            }
+          >
+            {end.isPending && <Spinner />}
+            End call
+          </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>

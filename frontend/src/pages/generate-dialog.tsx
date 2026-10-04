@@ -30,10 +30,10 @@ import {
 } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
+import { revealErrors } from "@/lib/forms";
+import { APPEAR } from "@/lib/motion";
 import { usePersonas } from "@/lib/queries";
 import { type Agent, type GenerateInput, type GenerationMode, MAX_GENERATED } from "@/lib/types";
-
-const APPEAR = "transition-opacity duration-150 ease-out starting:opacity-0";
 
 const MODES: { value: GenerationMode; label: string; hint: string }[] = [
   {
@@ -95,10 +95,10 @@ export function GenerateDialog({
       on ? [...current, id] : current.filter((documentId) => documentId !== id),
     );
 
-  const submit = async (event: SubmitEvent) => {
+  const submit = async (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setSubmitted(true);
-    if (!countValid || !documentsValid || !personasValid) return;
+    const valid = countValid && documentsValid && personasValid;
+    if (!revealErrors(event.currentTarget, () => setSubmitted(true), valid)) return;
     setPending(true);
     setError(null);
     try {
@@ -189,7 +189,7 @@ export function GenerateDialog({
                   ))}
                 </ul>
                 {submitted && !documentsValid && (
-                  <FieldError className={APPEAR}>Pick at least one document.</FieldError>
+                  <FieldError>Pick at least one document.</FieldError>
                 )}
               </FieldSet>
             )}
@@ -223,7 +223,7 @@ export function GenerateDialog({
                 ))}
               </ul>
               {submitted && personas.isSuccess && !personasValid && (
-                <FieldError className={APPEAR}>
+                <FieldError>
                   {personaList.length === 0
                     ? "Create a persona first."
                     : personaIds.length === 0
@@ -250,9 +250,7 @@ export function GenerateDialog({
                 Up to {MAX_GENERATED}. A short brief can give fewer, so no two are the same.
               </FieldDescription>
               {submitted && !countValid && (
-                <FieldError className={APPEAR}>
-                  Enter a whole number from 1 to {MAX_GENERATED}.
-                </FieldError>
+                <FieldError>Enter a whole number from 1 to {MAX_GENERATED}.</FieldError>
               )}
             </Field>
 
@@ -271,7 +269,7 @@ export function GenerateDialog({
           </FieldGroup>
         </form>
 
-        {error && <FieldError className={`px-6 pb-3 ${APPEAR}`}>{error}</FieldError>}
+        {error && <FieldError className="px-6 pb-3">{error}</FieldError>}
 
         <DialogFooter className="border-t px-6 py-4">
           <Button type="button" variant="ghost" disabled={pending} onClick={() => setOpen(false)}>
