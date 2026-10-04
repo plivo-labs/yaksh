@@ -317,7 +317,7 @@ async def test_the_line_hangs_up_once_and_reads_the_report_that_follows() -> Non
         reports.put_nowait(report)
 
     line = phone.Line("call-7", reports, hang_up)
-    got = await line.end()
+    got = await line.end(phone.HANGUP_REPORT_WAIT_S)
     await line.hang_up()
 
     assert hung_up == ["call-7"]
@@ -332,15 +332,43 @@ async def test_the_line_hangs_up_once_and_reads_the_report_that_follows() -> Non
     )
 
 
-async def test_a_line_whose_report_does_not_come_ends_without_one(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setattr(phone, "HANGUP_REPORT_WAIT_S", 0.05)
+async def test_a_line_whose_report_does_not_come_ends_without_one() -> None:
+    async def hang_up(_call_uuid: str) -> None:
+        return None
+
+    assert await phone.Line("call-8", asyncio.Queue(), hang_up).end(0.05) is None
+
+
+async def test_a_stopped_call_takes_only_a_report_that_already_came() -> None:
+    report = {"Event": "Hangup", "HangupSource": "Callee"}
+    came: asyncio.Queue[dict[str, str]] = asyncio.Queue()
+    came.put_nowait(report)
 
     async def hang_up(_call_uuid: str) -> None:
         return None
 
-    assert await phone.Line("call-8", asyncio.Queue(), hang_up).end() is None
+    assert await phone.Line("call-9", came, hang_up).end(0) == report
+    assert await phone.Line("call-10", asyncio.Queue(), hang_up).end(0) is None
+
+
+async def test_a_hang_up_survives_the_cancelled_call_that_started_it() -> None:
+    release = asyncio.Event()
+    done: list[str] = []
+
+    async def hang_up(call_uuid: str) -> None:
+        await release.wait()
+        done.append(call_uuid)
+
+    line = phone.Line("call-11", asyncio.Queue(), hang_up)
+    first = asyncio.create_task(line.hang_up())
+    await asyncio.sleep(0)
+    first.cancel()
+    retry = asyncio.create_task(line.hang_up())
+    await asyncio.sleep(0)
+    release.set()
+    await retry
+
+    assert first.cancelled() and done == ["call-11"]
 
 
 async def test_the_phone_caller_reports_an_unanswered_call_and_frees_its_stream_entry(

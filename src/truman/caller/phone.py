@@ -312,17 +312,20 @@ class Line:
         self._call_uuid = call_uuid
         self._callbacks = callbacks
         self._hang_up = hang_up
-        self._hung_up = False
+        self._hanging_up: asyncio.Future[None] | None = None
 
     async def hang_up(self) -> None:
-        if not self._hung_up:
-            self._hung_up = True
-            await self._hang_up(self._call_uuid)
+        """The request runs on a task of its own: a caller cancelled while it waits does not
+        cancel the hang-up, and the next call waits for the same request."""
+        if self._hanging_up is None:
+            self._hanging_up = asyncio.ensure_future(self._hang_up(self._call_uuid))
+        await asyncio.shield(self._hanging_up)
 
-    async def end(self) -> dict[str, str] | None:
-        """Hang up, then wait for Plivo's hangup report; None when it does not come in time."""
+    async def end(self, wait_s: float) -> dict[str, str] | None:
+        """Hang up, then wait up to wait_s for Plivo's hangup report; a report that already
+        came is taken at once. None when it does not come in time."""
         await self.hang_up()
-        return await hangup_report(self._callbacks, HANGUP_REPORT_WAIT_S)
+        return await hangup_report(self._callbacks, wait_s)
 
 
 async def give_back(report: asyncio.Future[dict[str, str]], callbacks: asyncio.Queue) -> None:
@@ -761,8 +764,9 @@ class PhoneCaller:
         finally:
             loop_lag = lag.stop()
         ended_ms = clock.ms()
-        # The line hangs up now; its report comes while the recording is saved and measured.
-        ending = asyncio.ensure_future(line.end())
+        # The line hangs up now; its report comes while the recording is saved and measured. A
+        # stopped call has a deadline to finish, so it takes the report only if it already came.
+        ending = asyncio.ensure_future(line.end(0 if stop.is_set() else HANGUP_REPORT_WAIT_S))
         try:
             started_ms = spoken.recording.start_ms(connected_ms)
             if started_ms < connected_ms:
