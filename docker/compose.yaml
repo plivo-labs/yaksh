@@ -35,7 +35,7 @@ services:
   worker:
     <<: *truman
     command:
-      - truman
+      - truman-server
       - worker
     ports:
       - "8770:8770"
