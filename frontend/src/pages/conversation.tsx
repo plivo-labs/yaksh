@@ -259,13 +259,21 @@ function replyMark(reply: Reply, connectedMs: number): Mark {
       from,
       to,
       label: "talked over",
+      title: `Agent started ${seconds(reply.start_ms - reply.speech_ms)} before the caller finished`,
       fill: "bg-foreground/10",
       text: "text-muted-foreground",
     };
   }
   const wait = reply.speech_ms - reply.start_ms;
   const band = responseBand(wait);
-  return { from, to, label: seconds(wait), fill: BAND_FILL[band], text: BAND_TEXT[band] };
+  return {
+    from,
+    to,
+    label: seconds(wait),
+    title: `Agent answered after ${seconds(wait)}`,
+    fill: BAND_FILL[band],
+    text: BAND_TEXT[band],
+  };
 }
 
 function CallPane({ conversation, start }: { conversation: Conversation; start: number }) {

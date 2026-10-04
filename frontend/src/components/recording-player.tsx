@@ -20,6 +20,7 @@ import {
   type Ref,
   useCallback,
   useImperativeHandle,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -50,18 +51,9 @@ const GAP_PX = 8;
 const SCROLLBAR_PX = 14;
 /** Wheel or pinch travel, in pixels, for one zoom step. */
 const WHEEL_STEP = 60;
-/** Distance from a view edge, in pixels, at which the hover time turns inward. */
-const EDGE_PX = 32;
 
 type Listen = "both" | "agent" | "caller";
 type Output = "mono" | "stereo";
-type Align = "start" | "center" | "end";
-
-const ALIGN: Record<Align, string> = {
-  start: "",
-  center: "-translate-x-1/2",
-  end: "-translate-x-full",
-};
 
 const PREFERENCES_KEY = "truman.player";
 
@@ -152,14 +144,24 @@ export interface PlayerHandle {
 
 /** The call recording as one waveform lane per channel: the agent on the left channel, the
  * caller on the right. `start` opens it at that second, for links to a moment. */
-/** A stretch of the call to mark on the waveform, in seconds of the recording, with a short
- * label for the ruler and the classes that colour the band and the label. */
+/** A stretch of the call to mark on the waveform, in seconds of the recording: a short label
+ * for the ruler, a sentence for the hover time, and the classes that colour band and label. */
 export interface Mark {
   from: number;
   to: number;
   label: string;
+  title: string;
   fill: string;
   text: string;
+}
+
+/** How near a band, in pixels, the pointer counts as on it: a short wait is a narrow band. */
+const MARK_REACH_PX = 4;
+
+/** Centres a label on a point at `fraction` of the timeline, moved inward where it would pass
+ * an end: past the right end it would widen the scroll area that times are measured on. */
+function inside(fraction: number): string {
+  return `clamp(${-fraction * 100}cqw, -50%, calc(${(1 - fraction) * 100}cqw - 100%))`;
 }
 
 export function RecordingPlayer({
@@ -234,7 +236,9 @@ function Player({
   const [listen, setListen] = useState<Listen>("both");
   const [output, setOutput] = useState<Output>(initial.output);
   const [volume, setVolume] = useState(initial.volume);
-  const [hover, setHover] = useState<{ fraction: number; align: Align } | null>(null);
+  const [hover, setHover] = useState<{ fraction: number; mark?: Mark } | null>(null);
+  const [shift, setShift] = useState(0);
+  const hint = useRef<HTMLSpanElement | null>(null);
   const [zoom, setZoom] = useState(1);
   const [first, setFirst] = useState(0);
 
@@ -259,6 +263,7 @@ function Player({
       );
       zoomLevel.current = next;
       flushSync(() => {
+        setHover(null);
         setZoom(next);
         setFirst(Math.floor(left / width));
       });
@@ -356,19 +361,22 @@ function Player({
   };
   const move = (event: PointerEvent<HTMLDivElement>) => {
     const fraction = at(event);
-    const box = viewport.current?.getBoundingClientRect();
-    const align: Align = !box
-      ? "center"
-      : event.clientX - box.left < EDGE_PX
-        ? "start"
-        : box.right - event.clientX < EDGE_PX
-          ? "end"
-          : "center";
-    setHover({ fraction, align });
+    const width = event.currentTarget.getBoundingClientRect().width;
+    const distance = (mark: Mark) =>
+      Math.max(mark.from / duration - fraction, fraction - mark.to / duration, 0) * width;
+    const nearest = marks.reduce<Mark | undefined>(
+      (best, mark) => (best && distance(best) <= distance(mark) ? best : mark),
+      undefined,
+    );
+    setHover({
+      fraction,
+      mark: nearest && distance(nearest) <= MARK_REACH_PX ? nearest : undefined,
+    });
     if (!scrub.current) return;
     seek(fraction * duration);
     // Dragging past either edge of a zoomed view scrolls it along.
     const view = viewport.current;
+    const box = view?.getBoundingClientRect();
     if (view && box && event.clientX > box.right) view.scrollLeft += event.clientX - box.right;
     else if (view && box && event.clientX < box.left) view.scrollLeft -= box.left - event.clientX;
   };
@@ -421,6 +429,17 @@ function Player({
     link.searchParams.set("t", String(Math.floor(time)));
     void copyText(link.toString(), `Link to ${clock(Math.floor(time) * 1000)} copied`);
   };
+
+  // The hover time sits centred on the pointer, and moves inward where an edge of the view
+  // would cut it off.
+  useLayoutEffect(() => {
+    const view = viewport.current;
+    const label = hint.current;
+    if (!hover || !view || !label) return;
+    const x = hover.fraction * view.scrollWidth - view.scrollLeft;
+    const width = label.offsetWidth;
+    setShift(Math.max(-x, Math.min(-width / 2, view.clientWidth - x - width)));
+  }, [hover]);
 
   const fraction = duration > 0 ? time / duration : 0;
   const tiles: number[] = [];
@@ -481,7 +500,7 @@ function Player({
             onPointerCancel={release}
             onPointerLeave={() => setHover(null)}
             onKeyDown={key}
-            className="relative cursor-pointer touch-none rounded-sm outline-none select-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-inset"
+            className="@container relative cursor-pointer touch-none rounded-sm outline-none select-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-inset"
             style={{ width: `${zoom * 100}%`, height: contentPx }}
           >
             {tiles.map((index) => (
@@ -499,7 +518,7 @@ function Player({
               <span
                 key={`${mark.from}-${mark.to}`}
                 aria-hidden
-                className="@container/mark pointer-events-none absolute inset-y-0"
+                className="pointer-events-none absolute inset-y-0"
                 style={{
                   left: `${(mark.from / duration) * 100}%`,
                   width: `${(Math.max(mark.to - mark.from, 0) / duration) * 100}%`,
@@ -511,10 +530,10 @@ function Player({
                 />
                 <span
                   className={cn(
-                    "absolute top-0.5 left-1/2 hidden -translate-x-1/2 rounded-sm bg-card px-0.5 font-mono text-[11px] leading-4 whitespace-nowrap tabular-nums",
-                    mark.label.length > 6 ? "@min-[5.5rem]/mark:block" : "@min-[2.5rem]/mark:block",
+                    "absolute top-0.5 left-1/2 rounded-sm bg-card px-0.5 font-mono text-[11px] leading-4 whitespace-nowrap tabular-nums",
                     mark.text,
                   )}
+                  style={{ translate: inside((mark.from + mark.to) / 2 / duration) }}
                 >
                   {mark.label}
                 </span>
@@ -528,9 +547,12 @@ function Player({
               >
                 <span className="absolute inset-y-0 left-0 w-px bg-foreground/25" />
                 <span
-                  className={`absolute top-0 left-0 z-10 rounded-sm bg-popover px-1.5 py-0.5 text-[11px] leading-none tabular-nums shadow-sm ring-1 ring-border ${ALIGN[hover.align]}`}
+                  ref={hint}
+                  className="absolute top-0 left-0 z-10 rounded-sm bg-popover px-1.5 py-0.5 text-[11px] leading-none whitespace-nowrap tabular-nums shadow-sm ring-1 ring-border"
+                  style={{ translate: `${shift}px` }}
                 >
                   {clock(hover.fraction * duration * 1000)}
+                  {hover.mark && ` · ${hover.mark.title}`}
                 </span>
               </span>
             )}
