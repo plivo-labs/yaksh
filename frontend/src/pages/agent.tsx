@@ -1,16 +1,17 @@
 import { ChevronRight, PhoneOutgoing } from "lucide-react";
 import { useState } from "react";
-import { Link, useParams } from "react-router";
+import { Link, useParams, useSearchParams } from "react-router";
 
 import { BackButton } from "@/components/back-button";
 import { CopyId } from "@/components/copy-id";
 import { ConversationList } from "@/components/conversation-list";
-import { Fact, FoldingPanel, Panel, PanelHeader } from "@/components/panel";
+import { ActionPanel, Fact, Panel, PanelHeader } from "@/components/panel";
 import { Settle } from "@/components/settle";
 import { StatusLabel } from "@/components/status-label";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { phone, reach, since, textSize, when } from "@/lib/format";
 import { useAgent, useAgents, useConversations, useLastCall } from "@/lib/queries";
 import { CONVERSATION_TONE } from "@/lib/status";
@@ -50,21 +51,14 @@ export function AgentPage() {
         <Designation agent={agent.data} />
       )}
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_21rem]">
-        <div className="grid gap-6">
-          {agent.data ? (
-            <>
-              <AgentScenarios agent={agent.data} />
-              <AgentRuns agent={agent.data} />
-              <AgentKnowledgeBase agent={agent.data} />
-              <Calls agent={agent.data} />
-            </>
-          ) : (
-            <>
-              <Skeleton className="h-14 rounded-lg" />
-              <Skeleton className="h-14 rounded-lg" />
-            </>
-          )}
-        </div>
+        {agent.data ? (
+          <AgentTabs agent={agent.data} />
+        ) : (
+          <div className="grid gap-6">
+            <Skeleton className="h-9 rounded-lg" />
+            <Skeleton className="h-64 rounded-lg" />
+          </div>
+        )}
         {agent.data ? (
           <Settings key={agent.data.id} agent={agent.data} />
         ) : (
@@ -72,6 +66,50 @@ export function AgentPage() {
         )}
       </div>
     </div>
+  );
+}
+
+const TABS = [
+  { value: "scenarios", label: "Scenarios" },
+  { value: "runs", label: "Runs" },
+  { value: "calls", label: "Calls" },
+  { value: "knowledge-base", label: "Knowledge base" },
+] as const;
+
+type Tab = (typeof TABS)[number]["value"];
+
+/** The agent's work, one panel per tab. The tab is in the address, so a link or a reload keeps it.
+ * Every tab stays mounted: a scenario generation or an upload goes on while another tab is open. */
+function AgentTabs({ agent }: { agent: Agent }) {
+  const [params, setParams] = useSearchParams();
+  const tab: Tab = TABS.find((item) => item.value === params.get("tab"))?.value ?? "scenarios";
+  const show = (next: Tab) => {
+    const target = new URLSearchParams(params);
+    target.set("tab", next);
+    setParams(target, { replace: true });
+  };
+  return (
+    <Tabs value={tab} onValueChange={(next) => show(next as Tab)} className="min-w-0 gap-4">
+      <TabsList variant="line">
+        {TABS.map((item) => (
+          <TabsTrigger key={item.value} value={item.value}>
+            {item.label}
+          </TabsTrigger>
+        ))}
+      </TabsList>
+      <TabsContent keepMounted value="scenarios">
+        <AgentScenarios agent={agent} />
+      </TabsContent>
+      <TabsContent keepMounted value="runs">
+        <AgentRuns agent={agent} />
+      </TabsContent>
+      <TabsContent keepMounted value="calls">
+        <Calls agent={agent} />
+      </TabsContent>
+      <TabsContent keepMounted value="knowledge-base">
+        <AgentKnowledgeBase agent={agent} />
+      </TabsContent>
+    </Tabs>
   );
 }
 
@@ -155,10 +193,7 @@ function Calls({ agent }: { agent: Agent }) {
   const calls = useConversations({ agent_id: agent.id }, 1, { pageSize: CALLS_SHOWN });
   const total = calls.data?.total ?? 0;
   return (
-    <FoldingPanel
-      name="calls"
-      title="Calls"
-      count={calls.data?.total}
+    <ActionPanel
       action={
         total > CALLS_SHOWN && (
           <Button
@@ -177,9 +212,9 @@ function Calls({ agent }: { agent: Agent }) {
         query={calls}
         place="panel"
         agentVersion={agent.current_version}
-        empty="No calls yet. Ring a scenario above to place the first one."
+        empty="No calls yet. Ring a scenario on the Scenarios tab to place the first one."
       />
-    </FoldingPanel>
+    </ActionPanel>
   );
 }
 

@@ -3,7 +3,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { DeleteConfirm } from "@/components/confirm-dialogs";
-import { FoldingPanel } from "@/components/panel";
+import { ActionPanel } from "@/components/panel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -188,10 +188,7 @@ export function AgentScenarios({ agent }: { agent: Agent }) {
 
   return (
     <>
-      <FoldingPanel
-        name="scenarios"
-        title="Scenarios"
-        count={scenarios.data ? items.length : undefined}
+      <ActionPanel
         action={
           <div className="flex gap-2">
             {generateButton(scenarios.data && items.length === 0 ? "default" : "outline")}
@@ -378,7 +375,7 @@ export function AgentScenarios({ agent }: { agent: Agent }) {
             </ul>
           </>
         )}
-      </FoldingPanel>
+      </ActionPanel>
 
       {editing !== null && (
         <ScenarioDialog

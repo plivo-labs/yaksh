@@ -1,7 +1,7 @@
 import { Link } from "react-router";
 
 import { Pager } from "@/components/pager";
-import { FoldingPanel } from "@/components/panel";
+import { ActionPanel } from "@/components/panel";
 import { RelativeTime } from "@/components/relative-time";
 import { RunStatusLabel } from "@/components/status-label";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -20,7 +20,7 @@ function progress(run: RunSummary): string {
 export function AgentRuns({ agent }: { agent: Agent }) {
   const runs = useRuns(agent.id, usePageParam());
   return (
-    <FoldingPanel name="runs" title="Runs" count={runs.data?.total}>
+    <ActionPanel>
       {runs.isPending ? (
         <div className="grid gap-3 p-5">
           <Skeleton className="h-10" />
@@ -31,7 +31,7 @@ export function AgentRuns({ agent }: { agent: Agent }) {
         </p>
       ) : runs.data.items.length === 0 ? (
         <p className="px-5 py-6 text-sm text-muted-foreground">
-          No runs yet. Select scenarios above and click Run.
+          No runs yet. Select scenarios on the Scenarios tab and click Run.
         </p>
       ) : (
         <ul className="divide-y">
@@ -60,6 +60,6 @@ export function AgentRuns({ agent }: { agent: Agent }) {
         </ul>
       )}
       <Pager className="border-t px-5 py-3" query={runs} pageSize={RUNS_PAGE} />
-    </FoldingPanel>
+    </ActionPanel>
   );
 }

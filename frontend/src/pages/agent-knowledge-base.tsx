@@ -3,7 +3,7 @@ import { type DragEvent, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { DeleteConfirm, DiscardConfirm } from "@/components/confirm-dialogs";
-import { FoldingPanel } from "@/components/panel";
+import { ActionPanel } from "@/components/panel";
 import { Button } from "@/components/ui/button";
 import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -83,7 +83,14 @@ export function AgentKnowledgeBase({ agent }: { agent: Agent }) {
   return <KnowledgeBasePanel source={useSavedKnowledgeBase(agent)} />;
 }
 
-export function KnowledgeBasePanel({ source }: { source: KnowledgeBaseSource }) {
+/** `title` names the panel where no tab does. */
+export function KnowledgeBasePanel({
+  source,
+  title,
+}: {
+  source: KnowledgeBaseSource;
+  title?: string;
+}) {
   const files = useRef<HTMLInputElement>(null);
   const [open, setOpen] = useState<KnowledgeBaseDocument | "new" | null>(null);
   const { documents, progress, setProgress } = source;
@@ -235,10 +242,17 @@ export function KnowledgeBasePanel({ source }: { source: KnowledgeBaseSource }) 
           e.target.value = "";
         }}
       />
-      <FoldingPanel
-        name="knowledge-base"
-        title="Knowledge base"
-        count={documents.length}
+      <ActionPanel
+        title={
+          title && (
+            <>
+              {title}{" "}
+              <span className="font-normal text-muted-foreground tabular-nums">
+                {documents.length}
+              </span>
+            </>
+          )
+        }
         action={addButtons}
         notice={
           progress && (
@@ -333,7 +347,7 @@ export function KnowledgeBasePanel({ source }: { source: KnowledgeBaseSource }) 
             </p>
           </div>
         )}
-      </FoldingPanel>
+      </ActionPanel>
       {open !== null && (
         <DocumentSheet
           key={open === "new" ? "new" : open.document_id}
