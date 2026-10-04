@@ -669,6 +669,7 @@ type ConversationRead struct {
 	Id               openapi_types.UUID  `json:"id"`
 	Instructions     string              `json:"instructions"`
 	Language         Language            `json:"language"`
+	Latency          *LatencySummary     `json:"latency"`
 	MaxDurationS     int                 `json:"max_duration_s"`
 	MaxTurns         int                 `json:"max_turns"`
 	PersonaId        openapi_types.UUID  `json:"persona_id"`
@@ -677,6 +678,7 @@ type ConversationRead struct {
 	PersonaVersionId openapi_types.UUID  `json:"persona_version_id"`
 	RecordingUrl     *string             `json:"recording_url"`
 	Repeat           *int                `json:"repeat"`
+	Replies          []Reply             `json:"replies"`
 	RetriedAs        *openapi_types.UUID `json:"retried_as"`
 	RetryOf          *openapi_types.UUID `json:"retry_of"`
 	RunId            *openapi_types.UUID `json:"run_id"`
@@ -692,7 +694,7 @@ type ConversationRead struct {
 	StartedAt         *time.Time         `json:"started_at"`
 	Status            ConversationStatus `json:"status"`
 	TalkMs            *int               `json:"talk_ms"`
-	Transcript        []Turn             `json:"transcript"`
+	Transcript        []TurnRead         `json:"transcript"`
 	Validity          *Validity          `json:"validity"`
 	WireEvents        []WireEvent        `json:"wire_events"`
 }
@@ -722,6 +724,7 @@ type ConversationSummary struct {
 	FailureReason     *string             `json:"failure_reason"`
 	Id                openapi_types.UUID  `json:"id"`
 	Language          Language            `json:"language"`
+	Latency           *LatencySummary     `json:"latency"`
 	MaxDurationS      int                 `json:"max_duration_s"`
 	MaxTurns          int                 `json:"max_turns"`
 	PersonaId         openapi_types.UUID  `json:"persona_id"`
@@ -845,6 +848,15 @@ type KnowledgeBaseEntry struct {
 
 // Language defines model for Language.
 type Language string
+
+// LatencySummary The agent's response times in one call: nearest-rank percentiles over the measured
+// replies, how many replies there were, and how many of them talked over the caller.
+type LatencySummary struct {
+	P50Ms      *int `json:"p50_ms"`
+	P90Ms      *int `json:"p90_ms"`
+	Replies    int  `json:"replies"`
+	TalkedOver int  `json:"talked_over"`
+}
 
 // NoiseLevel How loud the background is, as the caller's speech level above the noise.
 type NoiseLevel string
@@ -1043,6 +1055,12 @@ type ProviderVoice struct {
 	Name            string       `json:"name"`
 }
 
+// Reply The agent's answer to one caller reply, or to the start of the call.
+type Reply struct {
+	SpeechMs int `json:"speech_ms"`
+	StartMs  int `json:"start_ms"`
+}
+
 // Role defines model for Role.
 type Role string
 
@@ -1081,6 +1099,8 @@ type RunRead struct {
 	MedianTalkMs    *int                 `json:"median_talk_ms"`
 	Name            *string              `json:"name"`
 	Repeats         int                  `json:"repeats"`
+	ResponseP50Ms   *int                 `json:"response_p50_ms"`
+	ResponseP90Ms   *int                 `json:"response_p90_ms"`
 	Retries         int                  `json:"retries"`
 	ScenarioIds     []openapi_types.UUID `json:"scenario_ids"`
 	StartIntervalS  *int                 `json:"start_interval_s"`
@@ -1112,6 +1132,8 @@ type RunSummary struct {
 	MedianTalkMs    *int               `json:"median_talk_ms"`
 	Name            *string            `json:"name"`
 	Repeats         int                `json:"repeats"`
+	ResponseP50Ms   *int               `json:"response_p50_ms"`
+	ResponseP90Ms   *int               `json:"response_p90_ms"`
 	Retries         int                `json:"retries"`
 	StartIntervalS  *int               `json:"start_interval_s"`
 	StartedAt       *time.Time         `json:"started_at"`
@@ -1212,13 +1234,15 @@ type Trigger struct {
 	Url     string                 `json:"url"`
 }
 
-// Turn defines model for Turn.
-type Turn struct {
+// TurnRead defines model for TurnRead.
+type TurnRead struct {
 	EndedAtMs   int         `json:"ended_at_ms"`
 	Provenance  *Provenance `json:"provenance,omitempty"`
+	ResponseMs  *int        `json:"response_ms,omitempty"`
 	Role        Role        `json:"role"`
 	Scripted    *bool       `json:"scripted,omitempty"`
 	StartedAtMs int         `json:"started_at_ms"`
+	TalkedOver  *bool       `json:"talked_over,omitempty"`
 	Text        string      `json:"text"`
 }
 

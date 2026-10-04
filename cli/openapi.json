@@ -673,7 +673,7 @@
             "required": false,
             "schema": {
               "type": "string",
-              "pattern": "^-?(created_at|talk_ms)$",
+              "pattern": "^-?(created_at|talk_ms|response_p90_ms)$",
               "default": "-created_at",
               "title": "Sort"
             }
@@ -3639,6 +3639,16 @@
             ],
             "title": "Talk Ms"
           },
+          "latency": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LatencySummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "recording_url": {
             "anyOf": [
               {
@@ -3714,10 +3724,17 @@
           },
           "transcript": {
             "items": {
-              "$ref": "#/components/schemas/Turn"
+              "$ref": "#/components/schemas/TurnRead"
             },
             "type": "array",
             "title": "Transcript"
+          },
+          "replies": {
+            "items": {
+              "$ref": "#/components/schemas/Reply"
+            },
+            "type": "array",
+            "title": "Replies"
           },
           "wire_events": {
             "items": {
@@ -3779,6 +3796,7 @@
           "started_at",
           "ended_at",
           "talk_ms",
+          "latency",
           "recording_url",
           "caller_reason",
           "run_id",
@@ -3789,6 +3807,7 @@
           "instructions",
           "scenario",
           "transcript",
+          "replies",
           "wire_events",
           "validity",
           "retried_as"
@@ -3981,6 +4000,16 @@
             ],
             "title": "Talk Ms"
           },
+          "latency": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LatencySummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "recording_url": {
             "anyOf": [
               {
@@ -4078,6 +4107,7 @@
           "started_at",
           "ended_at",
           "talk_ms",
+          "latency",
           "recording_url",
           "caller_reason",
           "run_id",
@@ -4577,6 +4607,49 @@
           "hinglish"
         ],
         "title": "Language"
+      },
+      "LatencySummary": {
+        "properties": {
+          "p50_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "P50 Ms"
+          },
+          "p90_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "P90 Ms"
+          },
+          "replies": {
+            "type": "integer",
+            "title": "Replies"
+          },
+          "talked_over": {
+            "type": "integer",
+            "title": "Talked Over"
+          }
+        },
+        "type": "object",
+        "required": [
+          "p50_ms",
+          "p90_ms",
+          "replies",
+          "talked_over"
+        ],
+        "title": "LatencySummary",
+        "description": "The agent's response times in one call: nearest-rank percentiles over the measured\nreplies, how many replies there were, and how many of them talked over the caller."
       },
       "NoiseLevel": {
         "type": "string",
@@ -5379,6 +5452,25 @@
         "title": "ProviderVoice",
         "description": "A voice as its provider describes it. `listed_languages` are the languages the provider\nlists for the voice in any model; the model decides what the voice can really speak."
       },
+      "Reply": {
+        "properties": {
+          "start_ms": {
+            "type": "integer",
+            "title": "Start Ms"
+          },
+          "speech_ms": {
+            "type": "integer",
+            "title": "Speech Ms"
+          }
+        },
+        "type": "object",
+        "required": [
+          "start_ms",
+          "speech_ms"
+        ],
+        "title": "Reply",
+        "description": "The agent's answer to one caller reply, or to the start of the call."
+      },
       "Role": {
         "type": "string",
         "enum": [
@@ -5556,6 +5648,28 @@
             ],
             "title": "Median Talk Ms"
           },
+          "response_p50_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Response P50 Ms"
+          },
+          "response_p90_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Response P90 Ms"
+          },
           "waiting_reason": {
             "anyOf": [
               {
@@ -5694,6 +5808,8 @@
           "end_reasons",
           "retries",
           "median_talk_ms",
+          "response_p50_ms",
+          "response_p90_ms",
           "waiting_reason",
           "started_at",
           "ended_at",
@@ -5777,6 +5893,28 @@
               }
             ],
             "title": "Median Talk Ms"
+          },
+          "response_p50_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Response P50 Ms"
+          },
+          "response_p90_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Response P90 Ms"
           },
           "waiting_reason": {
             "anyOf": [
@@ -5908,6 +6046,8 @@
           "end_reasons",
           "retries",
           "median_talk_ms",
+          "response_p50_ms",
+          "response_p90_ms",
           "waiting_reason",
           "started_at",
           "ended_at",
@@ -6429,7 +6569,7 @@
         "title": "Trigger",
         "description": "A POST with a JSON body, sent once for each conversation."
       },
-      "Turn": {
+      "TurnRead": {
         "properties": {
           "role": {
             "$ref": "#/components/schemas/Role"
@@ -6460,6 +6600,22 @@
             "type": "boolean",
             "title": "Scripted",
             "default": false
+          },
+          "response_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Response Ms"
+          },
+          "talked_over": {
+            "type": "boolean",
+            "title": "Talked Over",
+            "default": false
           }
         },
         "type": "object",
@@ -6469,7 +6625,7 @@
           "started_at_ms",
           "ended_at_ms"
         ],
-        "title": "Turn"
+        "title": "TurnRead"
       },
       "ValidationError": {
         "properties": {
