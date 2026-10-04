@@ -100,3 +100,28 @@ export function runTitle(run: { name: string | null; created_at: string }): stri
 export function runTotal(run: { counts: Record<OutcomeGroup, number> }): number {
   return Object.values(run.counts).reduce((sum, count) => sum + count, 0);
 }
+
+/** A wait with one decimal: 2.1s. */
+export function seconds(ms: number): string {
+  return `${(ms / 1000).toFixed(1)}s`;
+}
+
+export type ResponseBand = "good" | "slow" | "bad";
+
+export const BAND_TEXT: Record<ResponseBand, string> = {
+  good: "text-status-success-text",
+  slow: "text-status-warning-text",
+  bad: "text-status-danger-text",
+};
+
+export const BAND_FILL: Record<ResponseBand, string> = {
+  good: "bg-status-success/15",
+  slow: "bg-status-warning/15",
+  bad: "bg-status-danger/15",
+};
+
+/** Under 1 s, 1 to 2 s, over 2 s. */
+export function responseBand(ms: number): ResponseBand {
+  if (ms < 1000) return "good";
+  return ms <= 2000 ? "slow" : "bad";
+}

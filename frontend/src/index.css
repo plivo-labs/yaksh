@@ -48,6 +48,9 @@
   --color-status-success: var(--status-success);
   --color-status-warning: var(--status-warning);
   --color-status-danger: var(--status-danger);
+  --color-status-success-text: var(--status-success-text);
+  --color-status-warning-text: var(--status-warning-text);
+  --color-status-danger-text: var(--status-danger-text);
   --color-status-progress: var(--status-progress);
   --color-status-neutral: var(--status-neutral);
   --color-status-idle: var(--status-idle);
@@ -130,6 +133,10 @@
   --status-success: hsl(142 72% 38%);
   --status-warning: hsl(36 96% 42%);
   --status-danger: hsl(0 74% 48%);
+  /* Darker for small text on a light tint: 4.5:1 or more. */
+  --status-success-text: hsl(142 72% 27%);
+  --status-warning-text: hsl(36 96% 30%);
+  --status-danger-text: hsl(0 74% 44%);
   --status-progress: hsl(205 90% 43%);
   --status-neutral: hsl(215 16% 60%);
   --chart-1: hsl(205 90% 43%);
@@ -174,6 +181,9 @@
   --status-success: hsl(142 69% 52%);
   --status-warning: hsl(42 96% 58%);
   --status-danger: hsl(0 91% 69%);
+  --status-success-text: var(--status-success);
+  --status-warning-text: var(--status-warning);
+  --status-danger-text: var(--status-danger);
   --status-progress: hsl(204 94% 63%);
   --status-neutral: hsl(220 9% 58%);
   --chart-1: hsl(204 94% 63%);

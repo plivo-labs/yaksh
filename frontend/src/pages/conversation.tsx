@@ -3,7 +3,8 @@ import { Fragment, useEffect, useRef, useState } from "react";
 import { useDefaultLayout } from "react-resizable-panels";
 import { Link, useParams, useSearchParams } from "react-router";
 
-import { type PlayerHandle, RecordingPlayer } from "@/components/recording-player";
+import { type Mark, type PlayerHandle, RecordingPlayer } from "@/components/recording-player";
+import { ResponseTime } from "@/components/response-time";
 import { StatusBadge } from "@/components/status-dot";
 import {
   AlertDialog,
@@ -45,7 +46,19 @@ import { Switch } from "@/components/ui/switch";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
-import { clock, duration, noiseLabel, phone, when, words } from "@/lib/format";
+import {
+  BAND_FILL,
+  BAND_TEXT,
+  clock,
+  counted,
+  duration,
+  noiseLabel,
+  phone,
+  responseBand,
+  seconds,
+  when,
+  words,
+} from "@/lib/format";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useStoredBoolean } from "@/hooks/use-stored-boolean";
 import { keys, useAgent, useConversation, useEndConversation } from "@/lib/queries";
@@ -57,6 +70,7 @@ import {
   type Conversation,
   type Fact,
   LANGUAGE_NAMES,
+  type Reply,
   type ScenarioConfig,
   type Turn,
   WIRE_EVENT_HELP,
@@ -110,6 +124,7 @@ export function ConversationPage() {
             {data.talk_ms !== null && ` · ${duration(data.talk_ms)} connected`}
             {data.end_reason && ` · ${END_REASON_LABELS[data.end_reason]}`}
           </p>
+          <LatencyLine conversation={data} />
           {data.failure_reason && (
             <p className="text-sm text-status-danger">{data.failure_reason}</p>
           )}
@@ -211,6 +226,48 @@ export function ConversationPage() {
 
 /** The recording and the transcript. Keyed by the conversation, so the turn that was playing
  * does not carry over to the next conversation. */
+/** The agent's response times, under the title; nothing during the call or for a call that did
+ * not connect. */
+function LatencyLine({ conversation }: { conversation: Conversation }) {
+  const { latency } = conversation;
+  if (latency === null) {
+    if (conversation.talk_ms === null || ACTIVE_STATUSES.includes(conversation.status)) return null;
+    return <p className="text-sm text-muted-foreground">Latency not measured</p>;
+  }
+  return (
+    <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-muted-foreground">
+      {latency.p90_ms !== null && latency.p50_ms !== null && (
+        <>
+          Response p90 <ResponseTime ms={latency.p90_ms} /> · p50{" "}
+          <ResponseTime ms={latency.p50_ms} /> ·
+        </>
+      )}
+      <span>
+        {counted(latency.replies, "reply", "replies")}
+        {latency.talked_over > 0 && ` · ${counted(latency.talked_over, "talk-over", "talk-overs")}`}
+      </span>
+    </p>
+  );
+}
+
+/** One reply as a band on the waveform: the wait in its colour, or the overlap of a talk-over. */
+function replyMark(reply: Reply, connectedMs: number): Mark {
+  const from = (Math.min(reply.start_ms, reply.speech_ms) - connectedMs) / 1000;
+  const to = (Math.max(reply.start_ms, reply.speech_ms) - connectedMs) / 1000;
+  if (reply.speech_ms < reply.start_ms) {
+    return {
+      from,
+      to,
+      label: "talked over",
+      fill: "bg-foreground/10",
+      text: "text-muted-foreground",
+    };
+  }
+  const wait = reply.speech_ms - reply.start_ms;
+  const band = responseBand(wait);
+  return { from, to, label: seconds(wait), fill: BAND_FILL[band], text: BAND_TEXT[band] };
+}
+
 function CallPane({ conversation, start }: { conversation: Conversation; start: number }) {
   const player = useRef<PlayerHandle>(null);
   const [heard, setHeard] = useState<number | null>(null);
@@ -230,6 +287,11 @@ function CallPane({ conversation, start }: { conversation: Conversation; start: 
             start={start}
             onTime={(seconds) =>
               setHeard(turnAt(conversation.transcript, connectedMs ?? 0, seconds))
+            }
+            marks={
+              connectedMs === undefined
+                ? []
+                : conversation.replies.map((reply) => replyMark(reply, connectedMs))
             }
           />
         </CardContent>
@@ -518,6 +580,10 @@ function Transcript({
                             <MessageHeader className="gap-2 font-mono">
                               <span>{turn.role === "agent" ? "Agent" : "Caller"}</span>
                               <span>{clock(at)}</span>
+                              {typeof turn.response_ms === "number" && (
+                                <ResponseTime ms={turn.response_ms} />
+                              )}
+                              {turn.talked_over && <Badge variant="outline">talked over</Badge>}
                               {turn.scripted && <Badge variant="secondary">fixed nudge</Badge>}
                               {turn.provenance === "cut" && (
                                 <Badge variant="outline">cut off</Badge>

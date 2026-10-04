@@ -1,3 +1,4 @@
+import { cn } from "cn";
 import {
   Download,
   Link2,
@@ -151,12 +152,23 @@ export interface PlayerHandle {
 
 /** The call recording as one waveform lane per channel: the agent on the left channel, the
  * caller on the right. `start` opens it at that second, for links to a moment. */
+/** A stretch of the call to mark on the waveform, in seconds of the recording, with a short
+ * label for the ruler and the classes that colour the band and the label. */
+export interface Mark {
+  from: number;
+  to: number;
+  label: string;
+  fill: string;
+  text: string;
+}
+
 export function RecordingPlayer({
   url,
   name,
   start = 0,
   ref,
   onTime,
+  marks = [],
 }: {
   url: string | null;
   name: string;
@@ -164,6 +176,7 @@ export function RecordingPlayer({
   ref?: Ref<PlayerHandle>;
   /** Hears where playback is, a few times a second and on each seek. */
   onTime?: (seconds: number) => void;
+  marks?: Mark[];
 }) {
   const recording = useRecording(url);
   if (url === null) {
@@ -181,6 +194,7 @@ export function RecordingPlayer({
       start={start}
       ref={ref}
       onTime={onTime}
+      marks={marks}
     />
   );
 }
@@ -191,12 +205,14 @@ function Player({
   start,
   ref,
   onTime,
+  marks,
 }: {
   recording: Recording;
   name: string;
   start: number;
   ref?: Ref<PlayerHandle>;
   onTime?: (seconds: number) => void;
+  marks: Mark[];
 }) {
   const { src, duration, lanes } = recording;
   const stereo = lanes.length > 1;
@@ -478,6 +494,31 @@ function Player({
                 listen={listen}
                 played={Math.min(Math.max(fraction * zoom - index, 0), 1) * 100}
               />
+            ))}
+            {marks.map((mark) => (
+              <span
+                key={`${mark.from}-${mark.to}`}
+                aria-hidden
+                className="@container/mark pointer-events-none absolute inset-y-0"
+                style={{
+                  left: `${(mark.from / duration) * 100}%`,
+                  width: `${(Math.max(mark.to - mark.from, 0) / duration) * 100}%`,
+                }}
+              >
+                <span
+                  className={cn("absolute inset-x-0 bottom-0", mark.fill)}
+                  style={{ top: RULER_PX }}
+                />
+                <span
+                  className={cn(
+                    "absolute top-0.5 left-1/2 hidden -translate-x-1/2 rounded-sm bg-card px-0.5 font-mono text-[11px] leading-4 whitespace-nowrap tabular-nums",
+                    mark.label.length > 6 ? "@min-[5.5rem]/mark:block" : "@min-[2.5rem]/mark:block",
+                    mark.text,
+                  )}
+                >
+                  {mark.label}
+                </span>
+              </span>
             ))}
             {hover && (
               <span

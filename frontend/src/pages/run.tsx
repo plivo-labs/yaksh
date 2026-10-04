@@ -22,7 +22,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { usePageParam } from "@/hooks/use-page-param";
-import { duration, noiseLabel, runTitle, runTotal, when } from "@/lib/format";
+import { duration, noiseLabel, runTitle, runTotal, seconds, when } from "@/lib/format";
 import {
   CONVERSATIONS_PAGE,
   useAgent,
@@ -125,7 +125,7 @@ function Overview({ run }: { run: Run }) {
         </div>
         <GroupFilter run={run} />
       </div>
-      <dl className="grid grid-cols-2 gap-4 border-t px-5 py-4 sm:grid-cols-3 lg:grid-cols-8">
+      <dl className="grid grid-cols-2 gap-4 border-t px-5 py-4 sm:grid-cols-3 lg:grid-cols-9">
         <Fact label="Repeats">{run.repeats}</Fact>
         <Fact label="Time limit">{run.max_duration_s} seconds</Fact>
         <Fact label="Turn limit">{run.max_turns} turns</Fact>
@@ -140,7 +140,12 @@ function Overview({ run }: { run: Run }) {
         </Fact>
         <Fact label="Retries">Up to {run.max_retries}</Fact>
         <Fact label="Median talk time">{duration(run.median_talk_ms) || "None yet"}</Fact>
-        <div className="col-span-2 grid min-w-0 gap-0.5 sm:col-span-3 lg:col-span-8">
+        <Fact label="Response p50 / p90">
+          {run.response_p50_ms === null || run.response_p90_ms === null
+            ? "None yet"
+            : `${seconds(run.response_p50_ms)} / ${seconds(run.response_p90_ms)}`}
+        </Fact>
+        <div className="col-span-2 grid min-w-0 gap-0.5 sm:col-span-3 lg:col-span-9">
           <dt className="text-xs text-muted-foreground">End reasons</dt>
           <dd className="text-sm font-medium">
             {endReasons.length === 0
@@ -213,8 +218,13 @@ function RunActions({ run }: { run: Run }) {
 function GroupFilter({ run }: { run: Run }) {
   const [params, setParams] = useSearchParams();
   const chosen = params.get("group");
-  const choose = (group: OutcomeGroup) =>
-    setParams(chosen === group ? {} : { group }, { replace: true });
+  const choose = (group: OutcomeGroup) => {
+    const next = new URLSearchParams(params);
+    if (chosen === group) next.delete("group");
+    else next.set("group", group);
+    next.delete("page");
+    setParams(next, { replace: true });
+  };
   return (
     <div className="flex flex-wrap gap-2" role="group" aria-label="Show conversations by outcome">
       {OUTCOME_GROUPS.map((group) => (
@@ -236,13 +246,20 @@ function GroupFilter({ run }: { run: Run }) {
 }
 
 function Conversations({ run }: { run: Run }) {
-  const [params] = useSearchParams();
+  const [params, setParams] = useSearchParams();
   const group = params.get("group");
+  const sort = params.get("sort") ?? "created_at";
+  const sortBy = (next: string) => {
+    const changed = new URLSearchParams(params);
+    changed.set("sort", next);
+    changed.delete("page");
+    setParams(changed, { replace: true });
+  };
   const conversations = useConversations(
     {
       run_id: run.id,
       latest_attempts: "true",
-      sort: "created_at",
+      sort,
       ...(group ? { group } : {}),
     },
     usePageParam(),
@@ -263,6 +280,7 @@ function Conversations({ run }: { run: Run }) {
         query={conversations}
         place="panel"
         empty="No conversations in this group."
+        sort={{ value: sort, onSort: sortBy }}
       />
       <Pager className="border-t px-5 py-3" query={conversations} pageSize={CONVERSATIONS_PAGE} />
     </Panel>

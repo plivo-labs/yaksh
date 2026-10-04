@@ -5,6 +5,7 @@ import { Link } from "react-router";
 import { toast } from "sonner";
 
 import { RelativeTime } from "@/components/relative-time";
+import { ResponseTime } from "@/components/response-time";
 import { SortHeader } from "@/components/sort-header";
 import { StatusBadge } from "@/components/status-dot";
 import {
@@ -41,9 +42,9 @@ import {
  * and in a narrow panel. */
 const COLUMNS = {
   withAgent:
-    "grid grid-cols-[minmax(0,1fr)_2rem] items-center gap-x-4 gap-y-1 @3xl/conversations:grid-cols-[7rem_minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,1fr)_5rem_8rem_2rem]",
+    "grid grid-cols-[minmax(0,1fr)_2rem] items-center gap-x-4 gap-y-1 @3xl/conversations:grid-cols-[7rem_minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,1fr)_5rem_7rem_8rem_2rem]",
   withoutAgent:
-    "grid grid-cols-[minmax(0,1fr)_2rem] items-center gap-x-4 gap-y-1 @3xl/conversations:grid-cols-[7rem_minmax(0,1.4fr)_minmax(0,1fr)_5rem_8rem_2rem]",
+    "grid grid-cols-[minmax(0,1fr)_2rem] items-center gap-x-4 gap-y-1 @3xl/conversations:grid-cols-[7rem_minmax(0,1.4fr)_minmax(0,1fr)_5rem_7rem_8rem_2rem]",
 };
 const GUTTER = { page: "px-3", panel: "px-5" };
 
@@ -106,6 +107,17 @@ export function ConversationList({
           />
         ) : (
           <span>Talk time</span>
+        )}
+        {sort ? (
+          <SortHeader
+            label="Response p90"
+            field="response_p90_ms"
+            sort={sort.value}
+            descendingFirst
+            onSort={sort.onSort}
+          />
+        ) : (
+          <span>Response p90</span>
         )}
         {sort ? (
           <SortHeader
@@ -231,6 +243,13 @@ function ConversationRow({
       </div>
       <div className="hidden text-sm tabular-nums @3xl/conversations:block">
         {duration(conversation.talk_ms) || <span className="text-muted-foreground">None</span>}
+      </div>
+      <div className="hidden text-sm @3xl/conversations:block">
+        {typeof conversation.latency?.p90_ms === "number" ? (
+          <ResponseTime ms={conversation.latency.p90_ms} />
+        ) : (
+          <span className="text-muted-foreground">None</span>
+        )}
       </div>
       <div className="hidden text-sm text-muted-foreground @3xl/conversations:block">{started}</div>
       <ConversationMenu conversation={conversation} name={name} />
