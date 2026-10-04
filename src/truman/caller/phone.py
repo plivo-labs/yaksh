@@ -801,6 +801,8 @@ class PhoneCaller:
             latency=measured.latency if measured else None,
             speech=measured.speech if measured else None,
             stream_opened_ms=connected_ms,
+            caller_settings=persona.settings,
+            caller_usage=persona.usage.usage(),
             call_uuid=dialed.call_uuid,
         )
 

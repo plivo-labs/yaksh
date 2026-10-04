@@ -5,6 +5,7 @@ from dataclasses import asdict
 from datetime import timedelta
 from typing import Any
 
+from pydantic import BaseModel
 from sqlalchemy import ColumnElement, Row, String, and_, cast, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from sqlalchemy.orm import defer
@@ -582,6 +583,10 @@ def resolve_status(outcome: CallOutcome) -> ConversationStatus:
     return ConversationStatus.COMPLETED
 
 
+def dump(value: BaseModel | None) -> dict[str, Any] | None:
+    return None if value is None else value.model_dump(mode="json")
+
+
 def failure_reason(outcome: CallOutcome) -> str | None:
     return FAILURE_TEXT.get(outcome.end_reason, outcome.caller_error)
 
@@ -617,6 +622,8 @@ async def finalize(
                 talk_ms=outcome.talk_ms,
                 transcript=transcript.model_dump(mode="json"),
                 caller_reason=outcome.caller_reason,
+                caller_settings=dump(outcome.caller_settings),
+                caller_usage=dump(outcome.caller_usage),
                 recording_path=str(outcome.recording_path) if outcome.recording_path else None,
                 call_uuid=outcome.call_uuid,
                 agent_caller_id=Conversation.agent_caller_id if outcome.call_uuid else None,

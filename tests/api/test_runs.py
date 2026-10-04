@@ -31,6 +31,8 @@ from truman.api import create_app
 from truman.config import Settings
 from truman.db.models import Conversation, Persona, Scenario
 from truman.domain.conversations import (
+    CallerSettings,
+    CallerUsage,
     CallOutcome,
     ConversationStatus,
     EndReason,
@@ -40,6 +42,7 @@ from truman.domain.conversations import (
     Turn,
 )
 from truman.domain.latency import Latency, Span, Speech, response_times
+from truman.domain.voices import VoiceProvider, VoiceSettings
 from truman.worker.worker import Worker
 
 NO_OUTCOMES = dict.fromkeys(
@@ -388,7 +391,7 @@ async def test_a_retry_keeps_the_today_its_caller_was_given(client: AsyncClient,
     assert (row.today, row.time_zone) == (date(2026, 1, 15), "Asia/Kolkata")
 
 
-async def test_a_finished_call_keeps_where_each_side_spoke_and_when_its_stream_opened(
+async def test_a_finished_call_keeps_its_speech_stream_opening_and_caller_settings_and_usage(
     client: AsyncClient, db: Db
 ) -> None:
     agent = await create_agent_id(client)
@@ -399,8 +402,21 @@ async def test_a_finished_call_keeps_where_each_side_spoke_and_when_its_stream_o
         caller=[Span(start_ms=2_600, end_ms=3_900)],
         agent_gaps=[Span(start_ms=5_000, end_ms=5_400)],
     )
+    settings = CallerSettings(
+        llm_model="gpt-4.1",
+        reasoning_effort=None,
+        stt_model="nova-3",
+        tts_model="eleven_flash_v2_5",
+        voice=VoiceSettings(provider=VoiceProvider.ELEVENLABS, id="voice-1"),
+    )
+    usage = CallerUsage(llm_prompt_tokens=900, tts_characters=140)
     outcome = CallOutcome(
-        connected=True, end_reason=EndReason.AGENT_HANGUP, speech=speech, stream_opened_ms=120
+        connected=True,
+        end_reason=EndReason.AGENT_HANGUP,
+        speech=speech,
+        stream_opened_ms=120,
+        caller_settings=settings,
+        caller_usage=usage,
     )
     assert await finish(db, conversation["id"], outcome)
 
@@ -409,6 +425,8 @@ async def test_a_finished_call_keeps_where_each_side_spoke_and_when_its_stream_o
     stored = Transcript.model_validate(row.transcript)
 
     assert (stored.speech, stored.stream_opened_ms) == (speech, 120)
+    assert CallerSettings.model_validate(row.caller_settings) == settings
+    assert CallerUsage.model_validate(row.caller_usage) == usage
 
 
 async def test_counts_take_the_latest_attempt_and_the_list_can_leave_out_retried_ones(

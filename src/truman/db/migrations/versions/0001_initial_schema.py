@@ -466,6 +466,8 @@ def upgrade() -> None:
         sa.Column("recording_path", sa.Text(), nullable=True),
         sa.Column("transcript", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
         sa.Column("caller_reason", sa.Text(), nullable=True),
+        sa.Column("caller_settings", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
+        sa.Column("caller_usage", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
         sa.Column("claimed_by", sa.Text(), nullable=True),
         sa.Column("lease_expires_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("run_id", sa.UUID(), nullable=True),

@@ -172,6 +172,35 @@ class Transcript(BaseModel):
     first audio, but the stream opened here."""
 
 
+class CallerSettings(BaseModel):
+    """What the caller ran: the models behave differently, so a result names them."""
+
+    model_config = ConfigDict(frozen=True)
+
+    llm_model: str
+    reasoning_effort: str | None
+    """The effort configured for the caller's model; None leaves it to Pipecat, which asks a
+    reasoning model that accepts it for none."""
+    stt_model: str
+    tts_model: str
+    voice: VoiceSettings
+
+
+class CallerUsage(BaseModel):
+    """What the caller's services consumed, as they reported it. A service that reported
+    nothing leaves its fields None: unknown, not zero."""
+
+    model_config = ConfigDict(frozen=True)
+
+    llm_prompt_tokens: int | None = None
+    llm_completion_tokens: int | None = None
+    llm_reasoning_tokens: int | None = None
+    llm_cache_read_tokens: int | None = None
+    llm_cache_creation_tokens: int | None = None
+    stt_audio_seconds: float | None = None
+    tts_characters: int | None = None
+
+
 class ConversationCreate(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -245,6 +274,8 @@ class CallOutcome(BaseModel):
     """The agent's response times; None when the call was not measured."""
     speech: Speech | None = None
     stream_opened_ms: int | None = None
+    caller_settings: CallerSettings | None = None
+    caller_usage: CallerUsage | None = None
     call_uuid: str | None = None
 
 

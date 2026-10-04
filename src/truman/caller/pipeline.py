@@ -21,6 +21,7 @@ from pipecat.frames.frames import (
     LLMRunFrame,
     TTSSpeakFrame,
 )
+from pipecat.observers.service_metrics_observer import ServiceMetricsObserver
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.worker import PipelineParams, PipelineWorker
 from pipecat.processors.aggregators.llm_context import LLMContext
@@ -46,9 +47,11 @@ from truman.caller.transcript import (
     TranscriptBuilder,
     last_user_message,
 )
+from truman.caller.usage import UsageMeter
 from truman.config import Settings
 from truman.diagnostics import describe_exception
 from truman.domain.conversations import (
+    CallerSettings,
     CallObserver,
     CallRequest,
     EndReason,
@@ -304,6 +307,15 @@ class Persona:
         before_output: Sequence[FrameProcessor] = (),
     ) -> None:
         self.llm = llm_service(settings, keys, request.instructions)
+        self.settings = CallerSettings(
+            llm_model=settings.persona_llm_model,
+            reasoning_effort=settings.persona_llm_reasoning_effort,
+            stt_model=settings.deepgram_model,
+            tts_model=elevenlabs.MODEL,
+            voice=request.voice,
+        )
+        metrics = ServiceMetricsObserver()
+        self.usage = UsageMeter(metrics)
         self.stt = DeepgramSTTService(
             api_key=keys["DEEPGRAM_API_KEY"],
             base_url=settings.deepgram_base_url,
@@ -356,8 +368,11 @@ class Persona:
         self.worker = PipelineWorker(
             pipeline,
             params=PipelineParams(
-                audio_in_sample_rate=SAMPLE_RATE, audio_out_sample_rate=SAMPLE_RATE
+                audio_in_sample_rate=SAMPLE_RATE,
+                audio_out_sample_rate=SAMPLE_RATE,
+                enable_usage_metrics=True,
             ),
+            observers=[metrics],
             idle_timeout_secs=None,
             cancel_timeout_secs=END_GRACE_S,
             enable_rtvi=False,

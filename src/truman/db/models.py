@@ -178,6 +178,10 @@ class Conversation(Base):
     transcript: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     caller_reason: Mapped[str | None] = mapped_column(Text)
     """Why the caller ended the call, in its own words: not a verdict."""
+    caller_settings: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    """The models and voice the caller ran (`CallerSettings`); None before a call connects."""
+    caller_usage: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    """What the caller's services consumed (`CallerUsage`)."""
     claimed_by: Mapped[str | None] = mapped_column(Text)
     lease_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     run_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
