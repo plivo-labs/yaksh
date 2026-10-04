@@ -93,6 +93,10 @@ END_CALL = FunctionSchema(
     },
     required=["reason"],
 )
+SILENT_END = (
+    "The call did not end, because you said nothing. Answer the agent's latest turn aloud. To "
+    "end the call, say a short goodbye in the same reply that calls end_call."
+)
 
 
 def provider_keys(settings: Settings) -> dict[str, str]:
@@ -112,7 +116,7 @@ def llm_service(
 ) -> OpenAIResponsesHttpLLMService:
     """The persona's model over the Responses API. With no effort configured, Pipecat asks a
     reasoning model that accepts it for effort none, for the fastest first word; other models
-    get no effort."""
+    get no effort. A reply calls at most one tool, so it can end the call only once."""
     effort = settings.persona_llm_reasoning_effort
     return OpenAIResponsesHttpLLMService(
         api_key=keys["OPENAI_API_KEY"],
@@ -123,6 +127,7 @@ def llm_service(
             reasoning=OpenAIResponsesHttpLLMService.ReasoningConfig(effort=effort)
             if effort
             else None,
+            extra={"parallel_tool_calls": False},
         ),
     )
 
@@ -299,12 +304,33 @@ class Persona:
             enable_rtvi=False,
         )
 
+        retried_silent_end = False
+
         async def end_call(params: FunctionCallParams) -> None:
+            """A reply that ends the call without a word would leave the agent's last turn
+            unanswered: the model gets one more reply to speak in, and after that Truman says
+            the goodbye itself. The handler runs on its own task, when a later reply can have
+            started, so the generated tap notes the words when the tool calls start."""
+            nonlocal retried_silent_end
             reason = str(params.arguments.get("reason") or "")
+            silent = not transcript.called_after_words(params.tool_call_id)
+            if silent and not retried_silent_end and state.end_reason is None:
+                retried_silent_end = True
+                log.info(
+                    "caller tried to end conversation %s without a word: %s",
+                    request.conversation_id,
+                    reason,
+                )
+                await params.result_callback(
+                    {"status": SILENT_END}, properties=FunctionCallResultProperties(run_llm=True)
+                )
+                return
             log.info("caller ended conversation %s: %s", request.conversation_id, reason)
             await params.result_callback(
                 {"status": "call ended"}, properties=FunctionCallResultProperties(run_llm=False)
             )
+            if silent and state.end_reason is None:
+                await self.say(request.goodbye)
             if state.end_reason is None:
                 state.caller_reason = reason
             state.end(EndReason.CALLER_HANGUP)
