@@ -1,0 +1,76 @@
+---
+title: Runs
+description: Start one or more scenarios of one agent together. Start each scenario one or more times.
+---
+
+A run starts one or more scenarios of one agent together. It starts each scenario one or more times. Each conversation uses the persona of its scenario.
+
+To start a run in the console:
+
+1. Open the agent.
+2. On the **Scenarios** tab, select the scenarios.
+3. Click **Run**. The button also shows the number of selected scenarios, for example **Run 2**.
+4. In the dialog, click **Start run**.
+
+To start a run with the API, send this request:
+
+```sh
+curl -X POST localhost:8000/api/v1/runs \
+  -H "Authorization: Bearer $TRUMAN_API_TOKEN" \
+  -H 'Content-Type: application/json' \
+  -H 'Idempotency-Key: nightly-2026-10-01' \
+  -d '{
+    "agent_id": "<agent id>",
+    "scenario_ids": ["<scenario id 1>", "<scenario id 2>"],
+    "repeats": 3,
+    "max_parallel": 2,
+    "start_interval_s": 10
+  }'
+```
+
+The run makes one conversation for each repeat of each scenario. It makes all of them or none. Each conversation uses the versions of the agent, the scenario and the persona at the time when Truman made the run. Put each scenario only one time in `scenario_ids`. To start a scenario more than one time, use `repeats`.
+
+## Fields
+
+| Field | Description |
+| --- | --- |
+| `repeats` | How many conversations the run makes for each scenario. The default is 1. |
+| `max_parallel` | The maximum number of conversations of the run that can be in progress at the same time. A conversation is in progress from the time when a worker gets it until it stops. This includes the time while the phone rings, and the time while Truman waits for the call of an outbound agent. |
+| `start_interval_s` | The minimum time between the starts of two conversations. |
+| `max_duration_s` | The time limit of each call, 10 to 1800 seconds. The default is the value of `TRUMAN_DEFAULT_MAX_DURATION_S` (300). |
+| `max_turns` | How many agent turns the caller answers, 1 to 100. The default is the value of `TRUMAN_DEFAULT_MAX_TURNS` (20). |
+| `background_noise` | One background noise setting for all conversations of the run, for example `{"sound": "none"}` for no noise. Use this field to compare a run with noise and a run without noise. If you do not set it, each conversation uses the setting of its persona. |
+| `max_retries` | The maximum number of retries for a conversation that stops with an error in Truman or in the phone connection. The default is 1, or 0 if `TRUMAN_MAX_RUN_RETRIES` is 0. To prevent retries, set this field to 0. |
+| `name` | This field is optional. It is a name for the run, 1 to 80 characters. |
+
+## Start of a conversation
+
+A conversation starts when a worker gets it. If Truman calls the agent, the call starts some seconds after the conversation starts. If the agent calls Truman, Truman sends the trigger when the conversation starts. The call can come during the [dial window](/docs/outbound-agents#trigger) of the agent. A conversation that is not in a run starts before the queued conversations of runs.
+
+Without `max_parallel` and `start_interval_s`, the run sets no limit and no minimum time between the starts of two conversations. A conversation also waits until a worker and a number are available. The two fields protect the agent of the run.
+
+## Stop of a call
+
+At the turn after `max_turns`, the caller tells the agent goodbye and then does not speak again. The end reason of the conversation is `turn_limit`. Before this limit, the caller stops a call only when it completes its goal. Thus, this limit stops the calls in which the caller does not complete its goal.
+
+If the caller tries to stop the call without words, the call does not stop. The caller gets one more reply to answer the agent and to say goodbye. This occurs only one time in each call. If the caller tries again to stop the call without words, Truman says the goodbye for the caller. Then Truman stops the call.
+
+When the caller stops the call, Truman waits until the caller and the agent do not speak for 8 seconds. The maximum wait is 30 seconds. Then Truman disconnects the call. This lets the agent complete its last turn. Truman also waits in this way after the goodbye at the turn limit.
+
+Truman makes no retries for the conversations in the `did_not_connect` outcome group. Each retry is a new conversation, with `attempt` and `retry_of`.
+
+## Run operations
+
+- `GET /api/v1/defaults` returns the values that the server uses when a request does not set these fields: `max_duration_s`, `max_turns`, and `max_retries` of a run. The console fills its forms with these values.
+- The same `Idempotency-Key` with the same body returns the first run. Thus, a client can safely send a request again. The same key with a different body gets an error.
+- `POST /api/v1/runs/<run id>/cancel` cancels the queued conversations and tells the workers to stop the calls that are in progress. The run shows `cancelling` until those calls stop.
+- `GET /api/v1/runs/<run id>` counts the conversations by outcome group: `waiting`, `in_progress`, `completed`, `did_not_connect`, `error` and `cancelled`. For a conversation that has retries, it counts only the last retry. These counts are facts about the calls. They are not results for the agent. The run also has `response_p50_ms` and `response_p90_ms`. Refer to [Response time](/docs/response-time).
+- `GET /api/v1/conversations?run_id=<run id>&latest_attempts=true` lists the conversations of the run without the conversations that a retry replaced.
+
+## Calls at the same time
+
+Plivo has a limit for the number of calls of an account that can be in progress at the same time. Keep the sum of `TRUMAN_MAX_ACTIVE_CONVERSATIONS` of all workers, plus all other calls of the account, less than that limit. The `max_parallel` of a run does not protect the account, because two runs can each use their full `max_parallel`.
+
+If the sum is more than that limit, Plivo rejects the calls that are more than the limit. It rejects the call request (HTTP 403, "Concurrency Limit Breached"), or it stops the call with hangup cause 5030. If Truman calls the agent, the conversation stops with an error. If the agent calls Truman, the conversation is in the `did_not_connect` outcome group.
+
+For the limits of runs, refer to [Configuration](/docs/configuration#limits).

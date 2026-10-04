@@ -1,0 +1,14 @@
+{
+  "pages": [
+    "index",
+    "quickstart",
+    "configuration",
+    "outbound-agents",
+    "runs",
+    "background-noise",
+    "response-time",
+    "cli",
+    "development",
+    "api"
+  ]
+}

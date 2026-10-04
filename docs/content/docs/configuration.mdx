@@ -1,0 +1,90 @@
+---
+title: Configuration
+description: The main environment variables of Truman.
+---
+
+Truman reads its settings from environment variables. With Docker Compose, put them in `docker/.env`. Without Docker, set them in the environment, or put them in `.env` in the folder where you start Truman.
+
+Truman reads its secrets, for example API keys and tokens, only from environment variables. It does not keep them in the database. Do not put the value of a secret in a trigger. Truman keeps the headers and the body of a trigger in the database. Use `{{env.TRUMAN_TRIGGER_<NAME>}}` for the secret.
+
+The API and the worker read the variables when they start. After you change `docker/.env`, make the containers again. Use these commands from the root of the repository:
+
+```sh
+docker compose -f docker/compose.yaml create --force-recreate
+docker compose -f docker/compose.yaml start
+```
+
+For development, use `docker/compose.dev.yaml` in these commands.
+
+## Server
+
+| Variable | Description |
+| --- | --- |
+| `TRUMAN_API_TOKEN` | The bearer token of the API. Truman does not start without it. |
+| `TRUMAN_DATABASE_URL` | The URL of the Postgres database. Truman does not start without it. The URL must start with `postgresql+asyncpg://`. The database must be PostgreSQL 18 or later. Docker Compose sets this variable to its `postgres` service, and a value in `docker/.env` has no effect. |
+| `TRUMAN_TIMEZONE` | The IANA time zone that sets the "today" of the caller when Truman makes a conversation or its run. The default is `UTC`. A retry keeps the "today" of the conversation that it replaces. |
+
+## Caller
+
+For phone calls, the worker must have `DEEPGRAM_API_KEY`, `ELEVENLABS_API_KEY` and `OPENAI_API_KEY`. The worker does not start if you set `PLIVO_AUTH_ID`, `PLIVO_AUTH_TOKEN` and `TRUMAN_PUBLIC_URL`, and one of these keys has no value. Its log shows `the caller needs` and the names of the keys that have no value.
+
+| Variable | Description |
+| --- | --- |
+| `DEEPGRAM_API_KEY` | Speech to text. |
+| `DEEPGRAM_BASE_URL` | A different Deepgram host, for example a self-hosted one. The default is `https://api.deepgram.com`. |
+| `ELEVENLABS_API_KEY` | Text to speech. The API also uses it to find a voice when you add the voice, and to play previews. Each persona uses a voice from the voices list. |
+| `OPENAI_API_KEY` | The key for the persona model and for the model that writes scenarios. Without it, Truman cannot write scenarios. |
+| `OPENAI_BASE_URL` | An API that has the OpenAI Responses endpoint, for example an Azure OpenAI resource at `https://<resource>.openai.azure.com/openai/v1/`. The default is `https://api.openai.com/v1`. |
+| `PERSONA_LLM_MODEL` | The persona model. For Azure, use the name of the deployment. Give the deployment the name of its model. The default is `gpt-4.1`. If a reasoning model accepts the reasoning effort `none`, Truman sends `none`. Thus, the caller answers quickly. |
+| `PERSONA_LLM_REASONING_EFFORT` | This variable is optional. It is the reasoning effort of each reply of the caller, for example `low`. If you do not set it, a reasoning model that accepts `none` gets `none`, and other models get no effort. A model without reasoning rejects all values. Thus, do not set it for `gpt-4.1`. |
+| `GENERATION_LLM_MODEL` | The model that writes scenarios. The default is the persona model. |
+| `GENERATION_LLM_REASONING_EFFORT` | The reasoning effort when the model writes scenarios. The default is `max`. Truman sends it only if the model accepts it. |
+| `GENERATION_LLM_TIMEOUT_S` | The maximum time of one model request when the model writes scenarios. The default is 300. If a request has a timeout or an error at the provider, Truman sends it one more time. At `xhigh`, one scenario uses approximately 90 seconds. |
+
+## Phone
+
+| Variable | Description |
+| --- | --- |
+| `PLIVO_AUTH_ID`, `PLIVO_AUTH_TOKEN` | The Plivo account that has the numbers and makes the calls. |
+| `TRUMAN_PLIVO_NUMBERS` | This variable is optional. It is a comma-separated list of E.164 numbers. If you do not set it, the worker calls from all voice numbers of the account. Each number in the list must be in the account. If not, the worker does not start. |
+| `TRUMAN_PUBLIC_URL` | The public `https://` URL that goes to port 8770 of the worker. The API and the worker read it. Truman cannot make phone calls without it. |
+| `TRUMAN_RING_TIMEOUT_S` | How long the phone of the agent rings before the call stops with the end reason `no_answer`. The default is 30. |
+
+Each phone conversation uses one number until the conversation stops. Thus, the maximum number of phone calls at the same time is equal to the number of phone numbers. The worker reads the numbers of the account when it starts. After you add a number in Plivo, start the worker again with `docker compose -f docker/compose.yaml restart worker`.
+
+## Outbound agents
+
+Refer to [Outbound agents](/docs/outbound-agents).
+
+| Variable | Description |
+| --- | --- |
+| `TRUMAN_PLIVO_APP_ID` | The Plivo Application for outbound tests. The API and the worker read it. Outbound tests are off without it. |
+| `TRUMAN_TRIGGER_<NAME>` | Secrets for triggers, for example API keys. `<NAME>` has only uppercase letters, digits and underscores. |
+| `TRUMAN_WEBHOOK_SIGNING_KEY` | This variable is optional. It is the key that signs each trigger. Refer to [Signed triggers](/docs/outbound-agents#signed-triggers). |
+| `TRUMAN_ALLOW_PRIVATE_TRIGGERS` | This variable is optional. It lets trigger URLs use `http` and private addresses, for agents on your own network. The default is off. |
+| `TRUMAN_NUMBER_REST_S` | How long a number waits after a test before it gets the next outbound call. The default is 300. |
+
+## Limits
+
+Refer to [Runs](/docs/runs).
+
+| Variable | Description |
+| --- | --- |
+| `TRUMAN_DEFAULT_MAX_DURATION_S` | The time limit of each call when the request does not set one. The default is 300. |
+| `TRUMAN_DEFAULT_MAX_TURNS` | How many agent turns the caller answers when the request does not set a number. The default is 20. |
+| `TRUMAN_MAX_ACTIVE_CONVERSATIONS` | The maximum number of conversations on one worker at the same time. The default is 4. |
+| `TRUMAN_MAX_RUN_CONVERSATIONS` | The maximum number of conversations that one run makes. A run makes one conversation for each repeat of each scenario. Truman does not count retries. The default is 200. It is also the maximum `max_parallel` of a run. |
+| `TRUMAN_MAX_RUN_REPEATS` | The maximum `repeats` of a run. The default is 10. |
+| `TRUMAN_MAX_RUN_RETRIES` | The maximum `max_retries` of a run. The default is 3. If it is 0, runs have no retries by default. |
+| `TRUMAN_MAX_RUN_START_INTERVAL_S` | The maximum `start_interval_s` of a run. The default is 600. |
+
+## File storage
+
+Truman keeps uploaded files (PDF, TXT and MD documents about an agent) in S3-compatible storage. The Docker Compose files operate [SeaweedFS](https://github.com/seaweedfs/seaweedfs) for this. Its data is in the `storage` volume. To use S3, R2 or a different S3-compatible service, set these variables:
+
+| Variable | Description |
+| --- | --- |
+| `TRUMAN_S3_ENDPOINT` | The URL of the storage. File uploads are off if this variable, `TRUMAN_S3_ACCESS_KEY` or `TRUMAN_S3_SECRET_KEY` has no value. Pasted text continues to operate. |
+| `TRUMAN_S3_BUCKET` | The bucket. Make it before you start Truman. The default is `truman`. |
+| `TRUMAN_S3_ACCESS_KEY`, `TRUMAN_S3_SECRET_KEY` | The credentials. |
+| `TRUMAN_S3_REGION` | The default is `us-east-1`. |

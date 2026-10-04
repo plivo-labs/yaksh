@@ -1,0 +1,48 @@
+---
+title: CLI
+description: The truman CLI is a command-line client for coding agents, CI and persons.
+---
+
+`truman` is a command-line client for the Truman API. Coding agents, CI and persons use the same commands. The `agent`, `scenario`, `persona`, `run` and `conversation` commands write the JSON of the server to stdout. With `--wait`, `truman conversation start` writes one line of JSON for each event of the call, and then a last line with the conversation.
+
+`truman auth status` and `truman version` write JSON that the CLI makes. `truman guide` writes Markdown. `truman auth login` and `truman auth logout` do not write to stdout. Each command writes progress, hints and errors to stderr. Each command exits with 0 if it has no error, and with 1 if it has an error.
+
+## Install
+
+Until the first release, build the CLI from the source code. Clone the repository (refer to [Quickstart](/docs/quickstart)). Then, at the root of the clone, build the CLI with Go 1.27 or later:
+
+```sh
+cd cli && go build -o ~/.truman/bin/truman .
+export PATH="$HOME/.truman/bin:$PATH"   # also add this line to your shell profile
+```
+
+After the first release, you can give this text to your coding agent. It installs the CLI and its skill:
+
+```text
+Install the Truman CLI with
+curl -fsSL https://raw.githubusercontent.com/plivo-labs/truman/main/install.sh | bash,
+then run npx skills add plivo-labs/truman -g
+and follow the truman skill to test my voice agent.
+```
+
+## Log in
+
+```sh
+truman auth login --server http://localhost:8000
+```
+
+The command asks for the API token: the value of `TRUMAN_API_TOKEN` on the server. It does a check of the server and the token. Then it saves them. Without a terminal, send the token on stdin with `--with-token`. `truman auth status` shows the server. It also shows if the server accepts the token.
+
+You can also set two variables and not use `truman auth login`, for example in CI. Set `TRUMAN_URL` to the URL of the server without `/api/v1`, for example `http://localhost:8000`. Set `TRUMAN_API_TOKEN` to the token. If you set `TRUMAN_URL` or `TRUMAN_API_TOKEN`, the CLI uses that variable and not the saved value.
+
+## Do a test of an agent
+
+```sh
+truman run start --agent <agent id> --all --wait
+```
+
+This command starts a run of all scenarios of the agent and waits until the run stops. With `--wait`, the command exits with 1 if a conversation of the run did not complete, for example if its call did not connect. For a conversation that has retries, only the last retry counts. Exit 0 does not tell you that the agent did its tasks correctly. If you stop the command with Ctrl-C, the CLI cancels the run. `truman agent list` shows the IDs of the agents.
+
+`truman guide` shows how a coding agent uses the CLI to do tests of a voice agent. The same text is the skill in `cli/skill/SKILL.md`. To add the skill for all your projects, use `npx skills add plivo-labs/truman -g`. Without `-g`, the skill goes only into the project in the current folder.
+
+`truman --help` and `truman <command> --help` show all commands and flags.
