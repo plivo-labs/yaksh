@@ -26,7 +26,7 @@ tests/          automated tests and fixtures
 
 ## How a test flows
 
-Two stages, each a separate job, each retryable on its own. The worker saves the conversation and queues its evaluation in the same transaction; the evaluator service claims the evaluation under a lease and stores the metrics (docs/decisions/0021). Imported calls are planned.
+Two stages, each a separate job, each retryable on its own. The worker saves the conversation and queues its evaluation in the same transaction; the evaluator service claims the evaluation under a lease and stores the metrics (docs/decisions/0022). Imported calls are planned.
 
 ```
 Simulated test:   api -> worker -> simulation -> caller -> saved conversation, queued evaluation

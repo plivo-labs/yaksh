@@ -5,7 +5,7 @@ Status: accepted
 
 ## Decision
 
-After each call is saved, the evaluator (decision 0021) measures how long the agent made the caller wait:
+After each call is saved, the evaluator (decision 0022) measures how long the agent made the caller wait:
 
 - Each caller reply gets the first agent speech that starts after the reply began and before the next reply begins. The response time runs from the end of the caller's speech to the start of that speech. Before the caller has spoken, the call's start counts as a reply that ended when Truman's stream opened. The agent's first speech answers it. Speech that started by then was under way: it gets no value, as its true start is unknown.
 - When that speech starts before the caller's reply ended, the agent spoke over the caller. The reply has no response time and counts as a talk-over. A reply that the end of the call cut off has no end, so it has no response time either.
