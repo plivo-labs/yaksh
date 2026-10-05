@@ -57,7 +57,7 @@ export function Segmented<T extends string | number>({
               tabIndex={checked ? 0 : -1}
               data-value={option.value}
               onClick={() => onChange(option.value)}
-              className={`relative rounded-md px-4 py-1.5 text-s-500 whitespace-nowrap tabular-nums outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-ring/50 ${checked ? "text-foreground" : "text-muted-foreground hover:text-muted-foreground"}`}
+              className={`relative rounded-md px-4 py-1.5 text-s-500 whitespace-nowrap tabular-nums outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-ring/50 ${checked ? "text-foreground" : "text-muted-foreground hover:text-secondary"}`}
             >
               {option.label}
             </button>

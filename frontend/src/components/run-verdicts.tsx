@@ -291,9 +291,9 @@ function ScenarioRow({
             </span>
             <span className="flex flex-wrap items-center gap-x-2 text-xs-400 text-muted-foreground">
               <span>{CATEGORY_LABELS[scenario.category]}</span>
-              {mixed && <span className="text-warning-foreground">Passed and failed</span>}
+              {mixed && <span className="text-status-warning-text">Passed and failed</span>}
               {failing.length > 0 && (
-                <span className="text-danger-foreground">
+                <span className="text-status-danger-text">
                   {failing.length} {failing.length === 1 ? "criterion" : "criteria"} failed
                 </span>
               )}
@@ -495,7 +495,7 @@ function HowJudged({
                   <span className="text-s-400">{caller.persona}</span>
                   <span className="text-xs-400 text-muted-foreground tabular-nums">
                     <span
-                      className={cn(caller.likely > 0 && "font-medium text-warning-foreground")}
+                      className={cn(caller.likely > 0 && "font-medium text-status-warning-text")}
                     >
                       {caller.likely} likely
                     </span>

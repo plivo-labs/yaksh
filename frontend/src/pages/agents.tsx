@@ -151,7 +151,7 @@ function AgentRow({ agent }: { agent: AgentSummary }) {
   const call = last.data;
   return (
     <li
-      className={`${ROW} group relative py-3.5 transition-colors duration-150 hover:bg-hv1 has-[a:active]:bg-hv2 has-[a:focus-visible]:bg-hv1 has-[a:focus-visible]:ring-2 has-[a:focus-visible]:ring-ring/50 has-[a:focus-visible]:ring-inset`}
+      className={`${ROW} group relative py-3.5 transition-colors duration-150 hover:bg-hv1 has-[a:active]:bg-st2 has-[a:focus-visible]:bg-hv1 has-[a:focus-visible]:ring-2 has-[a:focus-visible]:ring-ring/50 has-[a:focus-visible]:ring-inset`}
     >
       <div className="min-w-0">
         <div className="grid min-w-0 gap-0.5">
