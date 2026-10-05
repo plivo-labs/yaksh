@@ -39,7 +39,7 @@ from truman.evaluation.sources import (
     judge_hallucination,
     judge_instructions,
 )
-from truman.evaluation.verdicts import verdict
+from truman.evaluation.verdicts import counted, verdict
 
 
 @dataclass(frozen=True)
@@ -252,8 +252,7 @@ def outcomes(
     return [
         (item.outcome, item.unsure_kind)
         for item in items
-        if item.key.startswith("criterion-")
-        or (not criteria_only and item.role is ItemRole.DECIDING)
+        if counted(item.key, item.role, criteria_only=criteria_only)
     ]
 
 

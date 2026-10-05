@@ -92,6 +92,10 @@ class Settings(BaseSettings):
     )
     """The most text one judge request holds: the call with the agent's instructions or its
     documents. Larger sources make that judge's item an error."""
+    audit_sample_rate: float = Field(default=0.1, ge=0, le=1, validation_alias="AUDIT_SAMPLE_RATE")
+    """The share of judged calls in the audit lane, chosen by a hash of the conversation id."""
+    audit_weekly_budget: int = Field(default=30, ge=0, validation_alias="AUDIT_WEEKLY_BUDGET")
+    """The most audit conversations the review queue offers for one week of calls."""
     judge_openai_api_key: SecretStr | None = Field(
         default=None, validation_alias="JUDGE_OPENAI_API_KEY"
     )

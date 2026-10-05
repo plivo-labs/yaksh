@@ -123,11 +123,16 @@ class Evaluated:
 
 
 async def finish(
-    session: AsyncSession, evaluation_id: uuid.UUID, claim_seq: int, evaluated: Evaluated
+    session: AsyncSession,
+    evaluation_id: uuid.UUID,
+    claim_seq: int,
+    evaluated: Evaluated,
+    *,
+    audit: bool,
 ) -> bool:
     """Store what the evaluation found and end it, in one transaction; False, with nothing
     written, when another evaluator holds a later claim. Effective results start as the
-    machine's."""
+    machine's. `audit` puts a judged call in the audit sample."""
     ended = await session.scalar(
         update(Evaluation)
         .where(held(evaluation_id, claim_seq))
@@ -141,6 +146,7 @@ async def finish(
             effective_scenario_verdict=evaluated.scenario_verdict,
             effective_conversation_verdict=evaluated.conversation_verdict,
             jev_usage=evaluated.jev_usage,
+            audit=audit and evaluated.scenario_verdict is not None,
         )
         .returning(Evaluation.id)
     )

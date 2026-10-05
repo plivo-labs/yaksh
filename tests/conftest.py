@@ -269,6 +269,7 @@ async def evaluate_queued(db: Db, metrics: dict[str, dict[MetricKey, Metric]]) -
                 evaluation.id,
                 evaluation.claim_seq,
                 Evaluated(metrics=metrics.get(conversation_id, {})),
+                audit=False,
             )
         done.append(conversation_id)
 
@@ -672,9 +673,9 @@ async def client(
     async with engine.begin() as connection:
         await connection.execute(
             text(
-                "TRUNCATE phone_numbers, refused_calls, judge_calls, evaluation_items,"
-                " judge_versions, metric_values, evaluations, conversations, runs,"
-                " agent_versions, agents, persona_versions, personas, voices,"
+                "TRUNCATE phone_numbers, refused_calls, labels, labelers, judge_calls,"
+                " evaluation_items, judge_versions, metric_values, evaluations, conversations,"
+                " runs, agent_versions, agents, persona_versions, personas, voices,"
                 " scenario_versions, scenarios, workers, documents, scenario_generations"
             )
         )

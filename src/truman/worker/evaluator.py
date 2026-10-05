@@ -19,7 +19,7 @@ from truman.diagnostics import describe_exception
 from truman.domain.agents import AgentConfig
 from truman.domain.language_models import JsonModel, ModelCallError
 from truman.domain.scenarios import ScenarioConfig
-from truman.evaluation import call, evaluations
+from truman.evaluation import call, evaluations, labels
 from truman.evaluation.call import JUDGES, SOURCE_JUDGES, Judging
 from truman.evaluation.jev import JEV, JEV_MODEL, Jev
 from truman.evaluation.sources import Document
@@ -228,8 +228,12 @@ class Evaluator:
             if not held.is_set():
                 return
             async with self._sessionmaker() as session:
+                audit = (
+                    labels.hash_fraction(evaluation.conversation_id)
+                    < self._settings.audit_sample_rate
+                )
                 if not await evaluations.finish(
-                    session, evaluation.id, evaluation.claim_seq, evaluated
+                    session, evaluation.id, evaluation.claim_seq, evaluated, audit=audit
                 ):
                     log.warning(
                         "evaluation %s was claimed again; dropped its results", evaluation.id

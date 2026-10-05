@@ -595,6 +595,7 @@ def upgrade() -> None:
             nullable=True,
         ),
         sa.Column("jev_usage", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
+        sa.Column("audit", sa.Boolean(), server_default=sa.text("false"), nullable=False),
         sa.ForeignKeyConstraint(["conversation_id"], ["conversations.id"]),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("conversation_id", name=op.f("uq_evaluations_conversation_id")),
@@ -711,6 +712,79 @@ def upgrade() -> None:
         ),
     )
     op.create_table(
+        "labelers",
+        sa.Column("id", sa.UUID(), server_default=sa.text("uuidv7()"), nullable=False),
+        sa.Column("name", sa.Text(), nullable=False),
+        sa.Column("token_sha256", sa.Text(), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.Column("revoked_at", sa.DateTime(timezone=True), nullable=True),
+        sa.PrimaryKeyConstraint("id", name=op.f("pk_labelers")),
+        sa.UniqueConstraint("name", name=op.f("uq_labelers_name")),
+        sa.UniqueConstraint("token_sha256", name=op.f("uq_labelers_token_sha256")),
+    )
+    op.create_table(
+        "labels",
+        sa.Column("id", sa.UUID(), server_default=sa.text("uuidv7()"), nullable=False),
+        sa.Column("item_id", sa.UUID(), nullable=False),
+        sa.Column("labeler_id", sa.UUID(), nullable=False),
+        sa.Column("lane", sa.Enum("audit", "ad_hoc", name="lane"), nullable=False),
+        sa.Column("blind", sa.Boolean(), nullable=False),
+        sa.Column(
+            "answer",
+            sa.Enum(
+                "pass", "fail", "not_applicable", "cannot_tell", "blocked", name="label_answer"
+            ),
+            nullable=False,
+        ),
+        sa.Column(
+            "reason",
+            sa.Enum(
+                "agent_error",
+                "applicability",
+                "transcript_error",
+                "spoken_form",
+                "date_or_time",
+                "read_back",
+                "window_or_order",
+                "exact_value",
+                "hidden_action",
+                "evidence_misread",
+                "criterion_ambiguous",
+                "caller_error",
+                "scenario_error",
+                "test_settings_error",
+                "line_or_audio",
+                "other",
+                name="label_reason",
+            ),
+            nullable=False,
+        ),
+        sa.Column("note", sa.Text(), nullable=True),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.CheckConstraint(
+            "reason <> 'other' OR btrim(coalesce(note, '')) <> ''",
+            name=op.f("ck_labels_other_has_note"),
+        ),
+        sa.ForeignKeyConstraint(
+            ["item_id"], ["evaluation_items.id"], name=op.f("fk_labels_item_id_evaluation_items")
+        ),
+        sa.ForeignKeyConstraint(
+            ["labeler_id"], ["labelers.id"], name=op.f("fk_labels_labeler_id_labelers")
+        ),
+        sa.PrimaryKeyConstraint("id", name=op.f("pk_labels")),
+    )
+    op.create_index("ix_labels_item_id", "labels", ["item_id"], unique=False)
+    op.create_table(
         "judge_calls",
         sa.Column("id", sa.UUID(), server_default=sa.text("uuidv7()"), nullable=False),
         sa.Column("item_id", sa.UUID(), nullable=False),
@@ -810,6 +884,8 @@ def downgrade() -> None:
     op.drop_table("workers")
     op.drop_table("documents")
     op.drop_table("phone_numbers")
+    op.drop_table("labels")
+    op.drop_table("labelers")
     op.drop_table("judge_calls")
     op.drop_table("evaluation_items")
     op.drop_table("judge_versions")
@@ -846,5 +922,8 @@ def downgrade() -> None:
         "unsure_kind",
         "decided_by",
         "item_role",
+        "lane",
+        "label_answer",
+        "label_reason",
     ):
         op.execute(f"DROP TYPE {enum}")

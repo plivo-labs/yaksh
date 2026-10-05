@@ -31,6 +31,9 @@ from truman.domain.evaluations import (
     DecidedBy,
     EvaluationState,
     ItemRole,
+    LabelAnswer,
+    LabelReason,
+    Lane,
     Outcome,
     UnsureKind,
     Verdict,
@@ -289,6 +292,8 @@ class Evaluation(Base):
     )
     jev_usage: Mapped[dict[str, int] | None] = mapped_column(JSONB)
     """The tokens of the evaluation's Jev request, when it made one."""
+    audit: Mapped[bool] = mapped_column(Boolean, default=False, server_default=text("false"))
+    """A judged call in the random audit sample, set when the evaluation ends."""
 
     __table_args__ = (Index("ix_evaluations_state_created", "state", "created_at"),)
 
@@ -359,6 +364,44 @@ class EvaluationItem(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     __table_args__ = (UniqueConstraint("evaluation_id", "item_key"),)
+
+
+class Labeler(Base):
+    """A person who labels items, with a token that opens only the review routes."""
+
+    __tablename__ = "labelers"
+
+    id: Mapped[uuid.UUID] = uuid_primary_key()
+    name: Mapped[str] = mapped_column(Text, unique=True)
+    token_sha256: Mapped[str] = mapped_column(Text, unique=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    """Set when an admin revoked the token; the labels stay."""
+
+
+class Label(Base):
+    """A labeler's answer for one item. A later label of the same labeler replaces the earlier
+    one in the effective outcome; both stay."""
+
+    __tablename__ = "labels"
+
+    id: Mapped[uuid.UUID] = uuid_primary_key()
+    item_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("evaluation_items.id"))
+    labeler_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("labelers.id"))
+    lane: Mapped[Lane] = mapped_column(pg_enum(Lane, "lane"))
+    blind: Mapped[bool] = mapped_column(Boolean)
+    """The labeler had not seen the machine result: only blind audit labels measure a judge."""
+    answer: Mapped[LabelAnswer] = mapped_column(pg_enum(LabelAnswer, "label_answer"))
+    reason: Mapped[LabelReason] = mapped_column(pg_enum(LabelReason, "label_reason"))
+    note: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        CheckConstraint(
+            "reason <> 'other' OR btrim(coalesce(note, '')) <> ''", name="other_has_note"
+        ),
+        Index("ix_labels_item_id", "item_id"),
+    )
 
 
 class JudgeCall(Base):

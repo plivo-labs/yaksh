@@ -1183,6 +1183,199 @@
         }
       }
     },
+    "/api/v1/judges/agreement": {
+      "get": {
+        "tags": [
+          "judges"
+        ],
+        "summary": "Get Agreement",
+        "description": "How often blind audit labels agree with each judge version and with the machine's\nscenario verdicts, how often labelers agree, and how much of the offered set is labeled.",
+        "operationId": "get_agreement_api_v1_judges_agreement_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JudgeAgreement"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/labelers": {
+      "get": {
+        "tags": [
+          "labelers"
+        ],
+        "summary": "List Labelers",
+        "operationId": "list_labelers_api_v1_labelers_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/LabelerRead"
+                  },
+                  "type": "array",
+                  "title": "Response List Labelers Api V1 Labelers Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "labelers"
+        ],
+        "summary": "Create Labeler",
+        "description": "A labeler and the token it labels with, shown only in this answer.",
+        "operationId": "create_labeler_api_v1_labelers_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LabelerCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LabelerCreated"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/labelers/{labeler_id}": {
+      "delete": {
+        "tags": [
+          "labelers"
+        ],
+        "summary": "Revoke Labeler",
+        "description": "The labeler's token stops working; its labels stay.",
+        "operationId": "revoke_labeler_api_v1_labelers__labeler_id__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "labeler_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Labeler Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/labelers/{labeler_id}/token": {
+      "post": {
+        "tags": [
+          "labelers"
+        ],
+        "summary": "Renew Token",
+        "description": "A new token for the labeler, shown only in this answer; the old one stops working, and a\nrevoked labeler works again.",
+        "operationId": "renew_token_api_v1_labelers__labeler_id__token_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "labeler_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Labeler Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LabelerCreated"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/personas": {
       "post": {
         "tags": [
@@ -1584,6 +1777,191 @@
             "HTTPBearer": []
           }
         ]
+      }
+    },
+    "/api/v1/review/queue": {
+      "get": {
+        "tags": [
+          "review"
+        ],
+        "summary": "Get Queue",
+        "description": "The audit calls this labeler still has items to label in.",
+        "operationId": "get_queue_api_v1_review_queue_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/QueuedReview"
+                  },
+                  "type": "array",
+                  "title": "Response Get Queue Api V1 Review Queue Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/review/conversations/{conversation_id}": {
+      "get": {
+        "tags": [
+          "review"
+        ],
+        "summary": "Get Review",
+        "description": "A judged call to label. Any judged call takes labels; only the calls the queue offers\nhide the machine results, and only their labels measure the judges.",
+        "operationId": "get_review_api_v1_review_conversations__conversation_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Conversation Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewConversation"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/review/conversations/{conversation_id}/recording": {
+      "get": {
+        "tags": [
+          "review"
+        ],
+        "summary": "Get Recording",
+        "operationId": "get_recording_api_v1_review_conversations__conversation_id__recording_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Conversation Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/review/items/{item_id}/labels": {
+      "post": {
+        "tags": [
+          "review"
+        ],
+        "summary": "Label Item",
+        "description": "Label one item; the call comes back with what the label reveals.",
+        "operationId": "label_item_api_v1_review_items__item_id__labels_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Item Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LabelCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewConversation"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/runs": {
@@ -5080,6 +5458,35 @@
         ],
         "title": "ItemRole"
       },
+      "JudgeAgreement": {
+        "properties": {
+          "versions": {
+            "items": {
+              "$ref": "#/components/schemas/VersionAgreement"
+            },
+            "type": "array",
+            "title": "Versions"
+          },
+          "conversations": {
+            "$ref": "#/components/schemas/Share"
+          },
+          "labelers": {
+            "$ref": "#/components/schemas/Share"
+          },
+          "offered_calls": {
+            "$ref": "#/components/schemas/Share"
+          }
+        },
+        "type": "object",
+        "required": [
+          "versions",
+          "conversations",
+          "labelers",
+          "offered_calls"
+        ],
+        "title": "JudgeAgreement",
+        "description": "How often blind audit labels agree with the machine. A judge version with no such labels\nis not listed: it is not yet measured on your agents."
+      },
       "JudgeVersionUsed": {
         "properties": {
           "judge": {
@@ -5201,6 +5608,197 @@
         ],
         "title": "KnowledgeBaseEntry",
         "description": "A document the agent answers from, under the name the agent shows for it."
+      },
+      "LabelAnswer": {
+        "type": "string",
+        "enum": [
+          "pass",
+          "fail",
+          "not_applicable",
+          "cannot_tell",
+          "blocked"
+        ],
+        "title": "LabelAnswer"
+      },
+      "LabelCreate": {
+        "properties": {
+          "answer": {
+            "$ref": "#/components/schemas/LabelAnswer"
+          },
+          "reason": {
+            "$ref": "#/components/schemas/LabelReason"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "answer",
+          "reason"
+        ],
+        "title": "LabelCreate"
+      },
+      "LabelRead": {
+        "properties": {
+          "answer": {
+            "$ref": "#/components/schemas/LabelAnswer"
+          },
+          "reason": {
+            "$ref": "#/components/schemas/LabelReason"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "lane": {
+            "$ref": "#/components/schemas/Lane"
+          },
+          "blind": {
+            "type": "boolean",
+            "title": "Blind"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "answer",
+          "reason",
+          "note",
+          "lane",
+          "blind",
+          "created_at"
+        ],
+        "title": "LabelRead"
+      },
+      "LabelReason": {
+        "type": "string",
+        "enum": [
+          "agent_error",
+          "applicability",
+          "transcript_error",
+          "spoken_form",
+          "date_or_time",
+          "read_back",
+          "window_or_order",
+          "exact_value",
+          "hidden_action",
+          "evidence_misread",
+          "criterion_ambiguous",
+          "caller_error",
+          "scenario_error",
+          "test_settings_error",
+          "line_or_audio",
+          "other"
+        ],
+        "title": "LabelReason",
+        "description": "Why the labeler answered so. No reason names a cause inside the agent."
+      },
+      "LabelerCreate": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "LabelerCreate"
+      },
+      "LabelerCreated": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "token": {
+            "type": "string",
+            "title": "Token"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "token"
+        ],
+        "title": "LabelerCreated"
+      },
+      "LabelerRead": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "revoked_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revoked At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "created_at",
+          "revoked_at"
+        ],
+        "title": "LabelerRead"
+      },
+      "Lane": {
+        "type": "string",
+        "enum": [
+          "audit",
+          "ad_hoc"
+        ],
+        "title": "Lane"
       },
       "Language": {
         "type": "string",
@@ -6252,6 +6850,41 @@
         "title": "ProviderVoice",
         "description": "A voice as its provider describes it. `listed_languages` are the languages the provider\nlists for the voice in any model; the model decides what the voice can really speak."
       },
+      "QueuedReview": {
+        "properties": {
+          "conversation_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Conversation Id"
+          },
+          "scenario_name": {
+            "type": "string",
+            "title": "Scenario Name"
+          },
+          "ended_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Ended At"
+          },
+          "items": {
+            "type": "integer",
+            "title": "Items"
+          },
+          "labeled": {
+            "type": "integer",
+            "title": "Labeled"
+          }
+        },
+        "type": "object",
+        "required": [
+          "conversation_id",
+          "scenario_name",
+          "ended_at",
+          "items",
+          "labeled"
+        ],
+        "title": "QueuedReview"
+      },
       "Reply": {
         "properties": {
           "start_ms": {
@@ -6270,6 +6903,148 @@
         ],
         "title": "Reply",
         "description": "The agent's answer to one caller reply, or to the start of the call."
+      },
+      "ReviewConversation": {
+        "properties": {
+          "conversation": {
+            "$ref": "#/components/schemas/ConversationRead"
+          },
+          "lane": {
+            "$ref": "#/components/schemas/Lane"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ReviewItem"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "verdicts": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReviewVerdicts"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "conversation",
+          "lane",
+          "items",
+          "verdicts"
+        ],
+        "title": "ReviewConversation"
+      },
+      "ReviewItem": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "item_key": {
+            "type": "string",
+            "title": "Item Key"
+          },
+          "subject": {
+            "type": "string",
+            "title": "Subject"
+          },
+          "role": {
+            "$ref": "#/components/schemas/ItemRole"
+          },
+          "blind": {
+            "type": "boolean",
+            "title": "Blind"
+          },
+          "machine": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ItemRead"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "label": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LabelRead"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "item_key",
+          "subject",
+          "role",
+          "blind",
+          "machine",
+          "label"
+        ],
+        "title": "ReviewItem"
+      },
+      "ReviewVerdicts": {
+        "properties": {
+          "scenario_verdict": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Verdict"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "conversation_verdict": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Verdict"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "effective_scenario_verdict": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Verdict"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "effective_conversation_verdict": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Verdict"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "scenario_verdict",
+          "conversation_verdict",
+          "effective_scenario_verdict",
+          "effective_conversation_verdict"
+        ],
+        "title": "ReviewVerdicts"
       },
       "Role": {
         "type": "string",
@@ -7880,6 +8655,33 @@
           "not_scored"
         ],
         "title": "Verdict"
+      },
+      "VersionAgreement": {
+        "properties": {
+          "judge": {
+            "type": "string",
+            "title": "Judge"
+          },
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version"
+          },
+          "items": {
+            "$ref": "#/components/schemas/Share"
+          }
+        },
+        "type": "object",
+        "required": [
+          "judge",
+          "model",
+          "version",
+          "items"
+        ],
+        "title": "VersionAgreement"
       },
       "VoiceCreate": {
         "properties": {

@@ -2,6 +2,7 @@
 
 import math
 import uuid
+from datetime import datetime
 from enum import StrEnum
 from statistics import NormalDist
 from typing import Any
@@ -61,6 +62,43 @@ class Verdict(StrEnum):
     PASS = "pass"
     FAIL = "fail"
     NOT_SCORED = "not_scored"
+
+
+class LabelAnswer(StrEnum):
+    PASS = "pass"
+    FAIL = "fail"
+    NOT_APPLICABLE = "not_applicable"
+    CANNOT_TELL = "cannot_tell"
+    BLOCKED = "blocked"
+
+
+class LabelReason(StrEnum):
+    """Why the labeler answered so. No reason names a cause inside the agent."""
+
+    AGENT_ERROR = "agent_error"
+    APPLICABILITY = "applicability"
+    TRANSCRIPT_ERROR = "transcript_error"
+    SPOKEN_FORM = "spoken_form"
+    DATE_OR_TIME = "date_or_time"
+    READ_BACK = "read_back"
+    WINDOW_OR_ORDER = "window_or_order"
+    EXACT_VALUE = "exact_value"
+    HIDDEN_ACTION = "hidden_action"
+    EVIDENCE_MISREAD = "evidence_misread"
+    CRITERION_AMBIGUOUS = "criterion_ambiguous"
+    CALLER_ERROR = "caller_error"
+    SCENARIO_ERROR = "scenario_error"
+    TEST_SETTINGS_ERROR = "test_settings_error"
+    LINE_OR_AUDIO = "line_or_audio"
+    OTHER = "other"
+    """Needs a note."""
+
+
+class Lane(StrEnum):
+    AUDIT = "audit"
+    """The random sample: its blind labels measure the judges."""
+    AD_HOC = "ad_hoc"
+    """Items people picked: their labels change verdicts but never measure a judge."""
 
 
 class EvaluationState(StrEnum):
@@ -242,3 +280,36 @@ class RunMetrics(BaseModel):
     by_category: list[CategoryNumbers]
     by_noise: list[NoiseNumbers]
     verdicts: RunVerdicts
+
+
+class VersionAgreement(BaseModel):
+    judge: str
+    model: str
+    version: str
+    """The start of the version's content hash."""
+    items: Share
+    """The items this version decided whose first blind audit label agrees with it."""
+
+
+class JudgeAgreement(BaseModel):
+    """How often blind audit labels agree with the machine. A judge version with no such labels
+    is not listed: it is not yet measured on your agents."""
+
+    versions: list[VersionAgreement]
+    conversations: Share
+    """Calls whose criteria all have a blind label, where the scenario verdict of those labels
+    agrees with the machine's."""
+    labelers: Share
+    """Items with blind labels from two labelers, where the first two agree."""
+    offered_calls: Share
+    """The audit calls the queue offers that have a label on every auditable item: a low share
+    means the measure leaves calls out."""
+
+
+class QueuedReview(BaseModel):
+    conversation_id: uuid.UUID
+    scenario_name: str
+    ended_at: datetime
+    items: int
+    labeled: int
+    """The items this labeler labeled."""

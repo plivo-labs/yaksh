@@ -101,12 +101,14 @@ async def test_a_late_write_from_an_earlier_claim_changes_nothing(
             first.id,
             first.claim_seq,
             Evaluated(metrics={MetricKey.SPEECH: Metric(value={})}),
+            audit=False,
         )
         assert await evaluations.finish(
             session,
             second.id,
             second.claim_seq,
             Evaluated(metrics={MetricKey.RESPONSE_TIME: Metric(value={"n": 1})}),
+            audit=False,
         )
 
     assert await stored(db, first.id) == {MetricKey.RESPONSE_TIME: Metric(value={"n": 1})}

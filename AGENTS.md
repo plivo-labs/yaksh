@@ -44,7 +44,7 @@ Imported call:    api -> queued evaluation -> evaluator -> evaluation -> saved m
 - Default prompts and starter personas ship inside the package. User edits live in the database and are never overwritten by upgrades.
 - Process settings come from environment variables via `config.py`; per-record choices (voice, model) are fields on the record. Secrets exist only in the environment.
 - Runtime output goes to configurable storage, default `data/`, gitignored.
-- Locks are taken in one order: an agent, then its scenarios, then personas, each set in id order; a run before its conversations; a conversation before phone numbers. Starting conversations share-locks the scenarios and personas, so transactions that only reference them do not wait.
+- Locks are taken in one order: an agent, then its scenarios, then personas, each set in id order; a run before its conversations; a conversation before phone numbers; an evaluation before its items. Starting conversations share-locks the scenarios and personas, so transactions that only reference them do not wait.
 - A time that is written or compared after a possible lock wait uses `statement_timestamp()`. Creation times keep `now()`, the time of the transaction, so the rows one transaction creates share one time.
 
 ## Conventions

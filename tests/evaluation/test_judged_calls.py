@@ -137,7 +137,8 @@ async def test_a_completed_call_is_judged_and_a_stopped_one_gets_only_code_check
     )
     judge = Judge()
     stop = asyncio.Event()
-    evaluator = asyncio.create_task(Evaluator(db, settings, judge).run(stop))
+    every_call = settings.model_copy(update={"audit_sample_rate": 1.0})
+    evaluator = asyncio.create_task(Evaluator(db, every_call, judge).run(stop))
 
     async def evaluations() -> list[Evaluation]:
         async with db() as session:
@@ -162,6 +163,7 @@ async def test_a_completed_call_is_judged_and_a_stopped_one_gets_only_code_check
     judged, plain = by_call[completed], by_call[stopped]
     assert (judged.scenario_verdict, judged.conversation_verdict) == (Verdict.PASS, Verdict.FAIL)
     assert (judged.effective_scenario_verdict, plain.scenario_verdict) == (Verdict.PASS, None)
+    assert (judged.audit, plain.audit) == (True, False)
     assert [key for (evaluation, key) in items if evaluation == str(judged.id)] == [
         "criterion-1",
         "rule-no-promises",

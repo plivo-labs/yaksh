@@ -30,8 +30,8 @@ from truman.domain.evaluations import (
     UnsureKind,
 )
 from truman.evaluation import numbers
+from truman.evaluation.verdicts import CRITERION
 
-CRITERION = "criterion-"
 DECIDED = (CRITERION, "rule-")
 """The keys of the items a verdict counts: the criteria and the agent rules."""
 FINISHED = frozenset({EvaluationState.DONE, EvaluationState.FAILED})

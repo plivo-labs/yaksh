@@ -156,7 +156,11 @@ async def test_run_numbers_count_what_each_call_got_to(client: AsyncClient, db: 
                 answer = 9_000 if str(evaluation.conversation_id) == crashed else 20_000
                 metrics = {MetricKey.RESPONSE_TIME: responses((1_000, answer))}
                 await evaluations.finish(
-                    session, evaluation.id, evaluation.claim_seq, Evaluated(metrics=metrics)
+                    session,
+                    evaluation.id,
+                    evaluation.claim_seq,
+                    Evaluated(metrics=metrics),
+                    audit=False,
                 )
 
     found = (await client.get(f"/api/v1/runs/{run['id']}/metrics")).json()
@@ -253,6 +257,7 @@ async def test_run_verdicts_pool_judged_calls_by_scenario(client: AsyncClient, d
                     conversation_verdict=verdict,
                     judge_versions=versions,
                 ),
+                audit=False,
             )
     # Make the edge scenario pass once, so it is the inconsistent one.
     async with db.begin() as session:
@@ -316,8 +321,11 @@ async def test_run_verdicts_leave_out_calls_with_no_verdict_yet(
                 scenario_verdict=Verdict.PASS,
                 conversation_verdict=Verdict.PASS,
             ),
+            audit=False,
         )
-        await evaluations.finish(session, no_judge.id, no_judge.claim_seq, Evaluated(metrics={}))
+        await evaluations.finish(
+            session, no_judge.id, no_judge.claim_seq, Evaluated(metrics={}), audit=False
+        )
         assert await evaluations.claim(session, "e1", 60) is not None
     async with db.begin() as session:
         await session.execute(
