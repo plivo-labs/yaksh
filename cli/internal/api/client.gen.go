@@ -901,6 +901,21 @@ type BodyUploadDocumentApiV1DocumentsUploadPost struct {
 	File openapi_types.File `json:"file"`
 }
 
+// CallVerdict defines model for CallVerdict.
+type CallVerdict struct {
+	ConversationId openapi_types.UUID `json:"conversation_id"`
+	Repeat         int                `json:"repeat"`
+	Verdict        *Verdict           `json:"verdict"`
+}
+
+// CallerFidelity defines model for CallerFidelity.
+type CallerFidelity struct {
+	Calls    int    `json:"calls"`
+	Likely   int    `json:"likely"`
+	Persona  string `json:"persona"`
+	Possible int    `json:"possible"`
+}
+
 // Category What kind of situation a scenario tests. How the caller talks comes from the persona.
 type Category string
 
@@ -1038,6 +1053,15 @@ type ConversationSummary struct {
 	TalkMs            *int                `json:"talk_ms"`
 }
 
+// CriterionCounts defines model for CriterionCounts.
+type CriterionCounts struct {
+	Counts     map[string]int     `json:"counts"`
+	Number     int                `json:"number"`
+	Rate       *float32           `json:"rate"`
+	ScenarioId openapi_types.UUID `json:"scenario_id"`
+	Text       string             `json:"text"`
+}
+
 // DecidedBy defines model for DecidedBy.
 type DecidedBy string
 
@@ -1152,6 +1176,14 @@ type ItemRead struct {
 
 // ItemRole defines model for ItemRole.
 type ItemRole string
+
+// JudgeVersionUsed defines model for JudgeVersionUsed.
+type JudgeVersionUsed struct {
+	Items   int    `json:"items"`
+	Judge   string `json:"judge"`
+	Model   string `json:"model"`
+	Version string `json:"version"`
+}
 
 // KnowledgeBaseDocument A knowledge base entry with what the list shows about its document.
 type KnowledgeBaseDocument struct {
@@ -1473,6 +1505,10 @@ type RunMetrics struct {
 
 	// Overall What the evaluations found over some of a run's conversations.
 	Overall RunNumbers `json:"overall"`
+
+	// Verdicts The run's verdict numbers over its judged calls: completed calls that no one stopped,
+	// whose evaluation gave a verdict or failed.
+	Verdicts RunVerdicts `json:"verdicts"`
 }
 
 // RunNumbers What the evaluations found over some of a run's conversations.
@@ -1568,6 +1604,28 @@ type RunSummary struct {
 	WaitingReason   *WaitingReason     `json:"waiting_reason"`
 }
 
+// RunVerdicts The run's verdict numbers over its judged calls: completed calls that no one stopped,
+// whose evaluation gave a verdict or failed.
+type RunVerdicts struct {
+	Best              *float32             `json:"best"`
+	Callers           []CallerFidelity     `json:"callers"`
+	Coverage          *float32             `json:"coverage"`
+	Criteria          []CriterionCounts    `json:"criteria"`
+	DecidedBy         map[string]int       `json:"decided_by"`
+	Errors            int                  `json:"errors"`
+	Inconsistent      []openapi_types.UUID `json:"inconsistent"`
+	IntervalHigh      *float32             `json:"interval_high"`
+	IntervalLow       *float32             `json:"interval_low"`
+	JudgeVersions     []JudgeVersionUsed   `json:"judge_versions"`
+	NotJudged         int                  `json:"not_judged"`
+	PassHat2          *float32             `json:"pass_hat_2"`
+	PassHat2Scenarios int                  `json:"pass_hat_2_scenarios"`
+	PassRate          *float32             `json:"pass_rate"`
+	Pending           int                  `json:"pending"`
+	Scenarios         []ScenarioVerdicts   `json:"scenarios"`
+	Worst             *float32             `json:"worst"`
+}
+
 // ScenarioConfig What a scenario version pins. The goal and the facts go to the caller. The criteria never
 // do: they are what the agent must say or do on the call. Agent data goes only to the agent,
 // in an outbound agent's trigger.
@@ -1631,6 +1689,18 @@ type ScenarioUpdate struct {
 	Name         *string             `json:"name,omitempty"`
 	PersonaId    *openapi_types.UUID `json:"persona_id,omitempty"`
 	UnknownFacts *[]string           `json:"unknown_facts,omitempty"`
+}
+
+// ScenarioVerdicts defines model for ScenarioVerdicts.
+type ScenarioVerdicts struct {
+	Calls []CallVerdict `json:"calls"`
+
+	// Category What kind of situation a scenario tests. How the caller talks comes from the persona.
+	Category   Category           `json:"category"`
+	Name       string             `json:"name"`
+	Passes     int                `json:"passes"`
+	ScenarioId openapi_types.UUID `json:"scenario_id"`
+	Scored     int                `json:"scored"`
 }
 
 // ScenarioVersionRead defines model for ScenarioVersionRead.

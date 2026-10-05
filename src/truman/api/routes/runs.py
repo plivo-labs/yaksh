@@ -72,7 +72,12 @@ async def get_run_metrics(run_id: uuid.UUID, session: SessionDep) -> RunMetrics:
     unless it was cancelled."""
     run = await runs.get_run(session, run_id)
     counted = await runs.counted_conversations(session, [run.id])
-    return await results.run_metrics(session, counted.get(run.id, []))
+    return await results.run_metrics(
+        session,
+        counted.get(run.id, []),
+        await runs.scenario_ids(session, run),
+        seed=run.id.int,
+    )
 
 
 @router.post("/{run_id}/cancel")

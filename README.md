@@ -93,7 +93,9 @@ After each call, the evaluator also computes metrics from what the call saved. `
 - The share of calls with a reply that the agent did not answer, with a talk-over, with a wait of 5 s or more, and with a wait of 10 s or more. A share counts calls, not replies, because the replies of one call are not independent of each other.
 - How many calls raised each flag.
 
-Each share comes with a 95% Wilson interval, so a run with few calls shows how little it can tell. The category grouping uses each scenario's category as it is now. The run's `response_p50_ms` and `response_p90_ms` use the same counted conversations.
+Each share comes with a 95% Wilson interval, so a run with few calls shows how little it can tell.
+
+The same endpoint gives the run's verdict numbers in `verdicts`, over its judged calls: the counted calls that completed, that no one stopped, and whose evaluation gave a verdict or failed. A failed evaluation counts as unscored. Calls still in evaluation (`pending`) and calls evaluated with no judge model (`not_judged`) are left out and counted. The pass rate is the mean over scenarios of each scenario's passes over its scored calls, so a scenario with more calls does not count more. Coverage is the scored calls over the judged calls; below 0.95, read the worst-to-best range (unscored calls counted as fails, then as passes) as the main number. With five or more scenarios, a "this suite" 95% interval comes from random draws of each scenario's results, seeded by the run, so the same run always gives the same interval. `pass_hat_2` is the chance that two repeats of a scenario both pass. The numbers also list each criterion's outcomes, the scenarios that both passed and failed, how many criteria and agent rules code, Jev and the judge model decided and how many no judge could decide, each persona's caller check results, and the judge versions the run used, with how many items each judged. The category grouping uses each scenario's category as it is now. The run's `response_p50_ms` and `response_p90_ms` use the same counted conversations.
 
 ## Judging
 

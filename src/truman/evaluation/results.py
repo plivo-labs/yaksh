@@ -25,6 +25,7 @@ from truman.domain.evaluations import (
 )
 from truman.domain.latency import Latency, pooled
 from truman.domain.scenarios import Category
+from truman.evaluation.run_verdicts import run_verdicts
 
 
 class Evaluated(NamedTuple):
@@ -108,9 +109,15 @@ SUMMED = (MetricKey.TURN_TAKING, MetricKey.RESPONSE_TIME)
 """The metrics whose values run numbers read; of the others, only the flags."""
 
 
-async def run_metrics(session: AsyncSession, conversation_ids: Sequence[uuid.UUID]) -> RunMetrics:
+async def run_metrics(
+    session: AsyncSession,
+    conversation_ids: Sequence[uuid.UUID],
+    scenario_order: Sequence[uuid.UUID],
+    seed: int,
+) -> RunMetrics:
     """The run numbers over these conversations, overall, by scenario category and by
-    background noise."""
+    background noise, and the verdict numbers of the judged ones, by scenario in the run's
+    order. seed, the run's, fixes the verdicts' interval."""
     ids = set(conversation_ids)
     values = await session.execute(
         select(
@@ -172,6 +179,7 @@ async def run_metrics(session: AsyncSession, conversation_ids: Sequence[uuid.UUI
             NoiseNumbers(noise=noise, numbers=numbers(group))
             for noise, group in grouped(calls, lambda call: call.noise, noise_order)
         ],
+        verdicts=await run_verdicts(session, conversation_ids, scenario_order, seed),
     )
 
 

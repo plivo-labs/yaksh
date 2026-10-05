@@ -3575,6 +3575,64 @@
         ],
         "title": "Body_upload_document_api_v1_documents_upload_post"
       },
+      "CallVerdict": {
+        "properties": {
+          "conversation_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Conversation Id"
+          },
+          "repeat": {
+            "type": "integer",
+            "title": "Repeat"
+          },
+          "verdict": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Verdict"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "conversation_id",
+          "repeat",
+          "verdict"
+        ],
+        "title": "CallVerdict"
+      },
+      "CallerFidelity": {
+        "properties": {
+          "persona": {
+            "type": "string",
+            "title": "Persona"
+          },
+          "calls": {
+            "type": "integer",
+            "title": "Calls"
+          },
+          "likely": {
+            "type": "integer",
+            "title": "Likely"
+          },
+          "possible": {
+            "type": "integer",
+            "title": "Possible"
+          }
+        },
+        "type": "object",
+        "required": [
+          "persona",
+          "calls",
+          "likely",
+          "possible"
+        ],
+        "title": "CallerFidelity"
+      },
       "Category": {
         "type": "string",
         "enum": [
@@ -4442,6 +4500,50 @@
         ],
         "title": "ConversationSummary"
       },
+      "CriterionCounts": {
+        "properties": {
+          "scenario_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Scenario Id"
+          },
+          "number": {
+            "type": "integer",
+            "title": "Number"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Counts"
+          },
+          "rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rate"
+          }
+        },
+        "type": "object",
+        "required": [
+          "scenario_id",
+          "number",
+          "text",
+          "counts",
+          "rate"
+        ],
+        "title": "CriterionCounts"
+      },
       "DecidedBy": {
         "type": "string",
         "enum": [
@@ -4977,6 +5079,34 @@
           "reporting"
         ],
         "title": "ItemRole"
+      },
+      "JudgeVersionUsed": {
+        "properties": {
+          "judge": {
+            "type": "string",
+            "title": "Judge"
+          },
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version"
+          },
+          "items": {
+            "type": "integer",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "judge",
+          "model",
+          "version",
+          "items"
+        ],
+        "title": "JudgeVersionUsed"
       },
       "KnowledgeBaseDocument": {
         "properties": {
@@ -6293,13 +6423,17 @@
             },
             "type": "array",
             "title": "By Noise"
+          },
+          "verdicts": {
+            "$ref": "#/components/schemas/RunVerdicts"
           }
         },
         "type": "object",
         "required": [
           "overall",
           "by_category",
-          "by_noise"
+          "by_noise",
+          "verdicts"
         ],
         "title": "RunMetrics"
       },
@@ -6861,6 +6995,171 @@
         ],
         "title": "RunSummary"
       },
+      "RunVerdicts": {
+        "properties": {
+          "pending": {
+            "type": "integer",
+            "title": "Pending"
+          },
+          "not_judged": {
+            "type": "integer",
+            "title": "Not Judged"
+          },
+          "pass_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pass Rate"
+          },
+          "coverage": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Coverage"
+          },
+          "worst": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Worst"
+          },
+          "best": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Best"
+          },
+          "interval_low": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Interval Low"
+          },
+          "interval_high": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Interval High"
+          },
+          "pass_hat_2": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pass Hat 2"
+          },
+          "pass_hat_2_scenarios": {
+            "type": "integer",
+            "title": "Pass Hat 2 Scenarios"
+          },
+          "scenarios": {
+            "items": {
+              "$ref": "#/components/schemas/ScenarioVerdicts"
+            },
+            "type": "array",
+            "title": "Scenarios"
+          },
+          "inconsistent": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Inconsistent"
+          },
+          "criteria": {
+            "items": {
+              "$ref": "#/components/schemas/CriterionCounts"
+            },
+            "type": "array",
+            "title": "Criteria"
+          },
+          "decided_by": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "propertyNames": {
+              "$ref": "#/components/schemas/DecidedBy"
+            },
+            "type": "object",
+            "title": "Decided By"
+          },
+          "errors": {
+            "type": "integer",
+            "title": "Errors"
+          },
+          "callers": {
+            "items": {
+              "$ref": "#/components/schemas/CallerFidelity"
+            },
+            "type": "array",
+            "title": "Callers"
+          },
+          "judge_versions": {
+            "items": {
+              "$ref": "#/components/schemas/JudgeVersionUsed"
+            },
+            "type": "array",
+            "title": "Judge Versions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "pending",
+          "not_judged",
+          "pass_rate",
+          "coverage",
+          "worst",
+          "best",
+          "interval_low",
+          "interval_high",
+          "pass_hat_2",
+          "pass_hat_2_scenarios",
+          "scenarios",
+          "inconsistent",
+          "criteria",
+          "decided_by",
+          "errors",
+          "callers",
+          "judge_versions"
+        ],
+        "title": "RunVerdicts",
+        "description": "The run's verdict numbers over its judged calls: completed calls that no one stopped,\nwhose evaluation gave a verdict or failed."
+      },
       "ScenarioConfig": {
         "properties": {
           "goal": {
@@ -7266,6 +7565,47 @@
         "type": "object",
         "title": "ScenarioUpdate",
         "description": "A partial change; lists replace the stored list as a whole."
+      },
+      "ScenarioVerdicts": {
+        "properties": {
+          "scenario_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Scenario Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "category": {
+            "$ref": "#/components/schemas/Category"
+          },
+          "calls": {
+            "items": {
+              "$ref": "#/components/schemas/CallVerdict"
+            },
+            "type": "array",
+            "title": "Calls"
+          },
+          "passes": {
+            "type": "integer",
+            "title": "Passes"
+          },
+          "scored": {
+            "type": "integer",
+            "title": "Scored"
+          }
+        },
+        "type": "object",
+        "required": [
+          "scenario_id",
+          "name",
+          "category",
+          "calls",
+          "passes",
+          "scored"
+        ],
+        "title": "ScenarioVerdicts"
       },
       "ScenarioVersionRead": {
         "properties": {

@@ -738,9 +738,51 @@ export interface RunNumbers {
   flags: Record<string, number>;
 }
 
+export interface RunVerdicts {
+  /** Calls whose evaluation is queued or running. */
+  pending: number;
+  /** Calls evaluated with no judge model: metrics, no verdict. */
+  not_judged: number;
+  /** The mean over scenarios of each one's passes over its scored calls. */
+  pass_rate: number | null;
+  /** Scored calls over judged calls; below 0.95 the worst-to-best range is the main number. */
+  coverage: number | null;
+  worst: number | null;
+  best: number | null;
+  interval_low: number | null;
+  interval_high: number | null;
+  pass_hat_2: number | null;
+  pass_hat_2_scenarios: number;
+  /** In the run's order. */
+  scenarios: {
+    scenario_id: string;
+    name: string;
+    category: Category;
+    /** In repeat order; a null verdict means the evaluation failed. */
+    calls: { conversation_id: string; repeat: number; verdict: Verdict | null }[];
+    passes: number;
+    scored: number;
+  }[];
+  inconsistent: string[];
+  criteria: {
+    scenario_id: string;
+    number: number;
+    text: string;
+    counts: Record<string, number>;
+    rate: number | null;
+  }[];
+  /** Criteria and agent rules by who decided them. */
+  decided_by: Partial<Record<"code" | "jev" | "llm", number>>;
+  /** Criteria and agent rules no judge could decide. */
+  errors: number;
+  callers: { persona: string; calls: number; likely: number; possible: number }[];
+  judge_versions: { judge: string; model: string; version: string; items: number }[];
+}
+
 export interface RunMetrics {
   overall: RunNumbers;
   /** By the scenario's category as it is now; a category is not versioned. */
   by_category: { category: Category; numbers: RunNumbers }[];
   by_noise: { noise: BackgroundNoise; numbers: RunNumbers }[];
+  verdicts: RunVerdicts;
 }

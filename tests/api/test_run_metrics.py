@@ -1,4 +1,7 @@
+import uuid
+
 from httpx import AsyncClient
+from sqlalchemy import update
 
 from tests.conftest import (
     Db,
@@ -10,6 +13,7 @@ from tests.conftest import (
     finish,
     start_run,
 )
+from truman.db.models import Evaluation as EvaluationRow
 from truman.domain.conversations import (
     CallOutcome,
     EndReason,
@@ -17,10 +21,21 @@ from truman.domain.conversations import (
     WireEvent,
     WireEventKind,
 )
-from truman.domain.evaluations import Metric, MetricKey, Share
+from truman.domain.evaluations import (
+    DecidedBy,
+    EvaluationState,
+    ItemRole,
+    Metric,
+    MetricKey,
+    Outcome,
+    Share,
+    Verdict,
+)
 from truman.domain.latency import Latency, Reply
 from truman.evaluation import evaluations
+from truman.evaluation.criteria import AGENT_RULE, CRITERION
 from truman.evaluation.evaluations import MAX_ATTEMPTS, Evaluated
+from truman.evaluation.judging import ItemResult
 
 CONNECTED = Transcript(wire_events=[WireEvent(kind=WireEventKind.CONNECTED, at_ms=500)])
 
@@ -163,3 +178,165 @@ async def test_run_numbers_count_what_each_call_got_to(client: AsyncClient, db: 
     # The call stopped by the user is not counted, so its slow response is not either.
     run_read = (await client.get(f"/api/v1/runs/{run['id']}")).json()
     assert (overall["response_p90_ms"], run_read["response_p90_ms"]) == (8_000, 8_000)
+
+
+async def test_run_verdicts_pool_judged_calls_by_scenario(client: AsyncClient, db: Db) -> None:
+    agent = await create_agent_id(client, name="Shop")
+    usual = await create_scenario(client, agent, name="Usual", criteria=["Greets."])
+    edge = await create_scenario(client, agent, name="Edge", criteria=["Refuses."])
+    run = (
+        await start_run(client, agent, [usual["id"], edge["id"]], repeats=2, max_retries=0)
+    ).json()
+    ids = [str(await claim(db)) for _ in range(4)]
+    for conversation in ids:
+        await finish(
+            db, conversation, CallOutcome(connected=True, end_reason=EndReason.AGENT_HANGUP)
+        )
+    async with db() as session:
+        versions = await evaluations.stored_judge_versions(
+            session,
+            [
+                CRITERION.version("openai_compatible", "judge-1", {}),
+                AGENT_RULE.version("openai_compatible", "judge-1", {}),
+            ],
+        )
+    # Claims follow the run's order: usual, edge, usual, edge.
+    outcomes = {
+        ids[0]: Outcome.PASS,
+        ids[1]: Outcome.FAIL,
+        ids[2]: Outcome.PASS,
+        ids[3]: Outcome.FAIL,
+    }
+    async with db() as session:
+        while (evaluation := await evaluations.claim(session, "e1", 60)) is not None:
+            outcome = outcomes[str(evaluation.conversation_id)]
+            items = [
+                ItemResult(
+                    key="criterion-1",
+                    subject="Greets."
+                    if str(evaluation.conversation_id) in ids[::2]
+                    else "Refuses.",
+                    judge="criterion",
+                    decided_by=DecidedBy.LLM,
+                    role=ItemRole.DECIDING,
+                    outcome=outcome,
+                ),
+                ItemResult(
+                    key="caller_check",
+                    subject="Truman's caller kept to its test",
+                    judge=None,
+                    decided_by=DecidedBy.LLM,
+                    role=ItemRole.REPORTING,
+                    outcome=Outcome.PASS,
+                    answer={"findings": [], "impact": [], "blame_risk": "possible"},
+                ),
+                ItemResult(
+                    key="rule-polite",
+                    subject="Polite.",
+                    judge="agent_rule",
+                    decided_by=DecidedBy.LLM,
+                    role=ItemRole.DECIDING,
+                    outcome=Outcome.ERROR
+                    if str(evaluation.conversation_id) == ids[0]
+                    else Outcome.PASS,
+                ),
+            ]
+            verdict = Verdict.PASS if outcome is Outcome.PASS else Verdict.FAIL
+            await evaluations.finish(
+                session,
+                evaluation.id,
+                evaluation.claim_seq,
+                Evaluated(
+                    metrics={},
+                    items=items,
+                    scenario_verdict=verdict,
+                    conversation_verdict=verdict,
+                    judge_versions=versions,
+                ),
+            )
+    # Make the edge scenario pass once, so it is the inconsistent one.
+    async with db.begin() as session:
+        await session.execute(
+            update(EvaluationRow)
+            .where(EvaluationRow.conversation_id == uuid.UUID(ids[3]))
+            .values(effective_scenario_verdict=Verdict.PASS)
+        )
+
+    found = (await client.get(f"/api/v1/runs/{run['id']}/metrics")).json()["verdicts"]
+
+    assert (found["pass_rate"], found["coverage"], found["pass_hat_2"]) == (0.75, 1.0, 0.5)
+    assert (found["worst"], found["best"], found["interval_low"]) == (0.75, 0.75, None)
+    assert (found["pending"], found["not_judged"]) == (0, 0)
+    assert [
+        (s["name"], [(c["repeat"], c["verdict"]) for c in s["calls"]]) for s in found["scenarios"]
+    ] == [("Usual", [(1, "pass"), (2, "pass")]), ("Edge", [(1, "fail"), (2, "pass")])]
+    assert found["inconsistent"] == [edge["id"]]
+    assert [(c["text"], c["counts"], c["rate"]) for c in found["criteria"]] == [
+        ("Greets.", {"pass": 2}, 1.0),
+        ("Refuses.", {"fail": 2}, 0.0),
+    ]
+    assert (found["decided_by"], found["errors"]) == ({"llm": 7}, 1)
+    assert [(c["calls"], c["possible"], c["likely"]) for c in found["callers"]] == [(2, 2, 0)] * 2
+    assert [(v["judge"], v["items"]) for v in found["judge_versions"]] == [
+        ("agent_rule", 4),
+        ("criterion", 4),
+    ]
+
+
+async def test_run_verdicts_leave_out_calls_with_no_verdict_yet(
+    client: AsyncClient, db: Db
+) -> None:
+    agent = await create_agent_id(client, name="Shop")
+    scenario = await create_scenario(client, agent, name="Usual", criteria=["Greets."])
+    run = (await start_run(client, agent, [scenario["id"]], repeats=4, max_retries=0)).json()
+    ids = [str(await claim(db)) for _ in range(4)]
+    for conversation in ids:
+        await finish(
+            db, conversation, CallOutcome(connected=True, end_reason=EndReason.AGENT_HANGUP)
+        )
+    errored_check = ItemResult(
+        key="caller_check",
+        subject="Truman's caller kept to its test",
+        judge=None,
+        decided_by=DecidedBy.LLM,
+        role=ItemRole.REPORTING,
+        outcome=Outcome.ERROR,
+    )
+    async with db() as session:
+        judged = await evaluations.claim(session, "e1", 60)
+        no_judge = await evaluations.claim(session, "e1", 60)
+        assert judged is not None and no_judge is not None
+        await evaluations.finish(
+            session,
+            judged.id,
+            judged.claim_seq,
+            Evaluated(
+                metrics={},
+                items=[errored_check],
+                scenario_verdict=Verdict.PASS,
+                conversation_verdict=Verdict.PASS,
+            ),
+        )
+        await evaluations.finish(session, no_judge.id, no_judge.claim_seq, Evaluated(metrics={}))
+        assert await evaluations.claim(session, "e1", 60) is not None
+    async with db.begin() as session:
+        await session.execute(
+            update(EvaluationRow)
+            .where(EvaluationRow.conversation_id == uuid.UUID(ids[3]))
+            .values(state=EvaluationState.FAILED)
+        )
+
+    found = (await client.get(f"/api/v1/runs/{run['id']}/metrics")).json()["verdicts"]
+
+    assert (found["pending"], found["not_judged"]) == (1, 1)
+    assert [(c["repeat"], c["verdict"]) for c in found["scenarios"][0]["calls"]] == [
+        (1, "pass"),
+        (4, None),
+    ]
+    assert (found["pass_rate"], found["coverage"], found["worst"], found["best"]) == (
+        1.0,
+        0.5,
+        0.5,
+        1.0,
+    )
+    assert found["callers"] == []

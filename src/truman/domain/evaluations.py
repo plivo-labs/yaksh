@@ -1,6 +1,7 @@
 """Evaluations: measuring and judging a saved conversation, and what they produce."""
 
 import math
+import uuid
 from enum import StrEnum
 from statistics import NormalDist
 from typing import Any
@@ -153,9 +154,91 @@ class NoiseNumbers(BaseModel):
     numbers: RunNumbers
 
 
+class CallVerdict(BaseModel):
+    conversation_id: uuid.UUID
+    repeat: int
+    verdict: Verdict | None
+    """The scenario verdict after labels; None when the evaluation failed."""
+
+
+class ScenarioVerdicts(BaseModel):
+    scenario_id: uuid.UUID
+    name: str
+    category: Category
+    calls: list[CallVerdict]
+    """The scenario's judged calls, in repeat order."""
+    passes: int
+    scored: int
+
+
+class CriterionCounts(BaseModel):
+    scenario_id: uuid.UUID
+    number: int
+    text: str
+    counts: dict[str, int]
+    """By outcome after labels; an unsure item that needs a hidden action counts as
+    "not_testable"."""
+    rate: float | None
+    """Passes over passes and fails."""
+
+
+class CallerFidelity(BaseModel):
+    persona: str
+    calls: int
+    """Judged calls whose caller check answered."""
+    likely: int
+    possible: int
+
+
+class JudgeVersionUsed(BaseModel):
+    judge: str
+    model: str
+    version: str
+    """The start of the version's content hash."""
+    items: int
+    """The run's items this version judged."""
+
+
+class RunVerdicts(BaseModel):
+    """The run's verdict numbers over its judged calls: completed calls that no one stopped,
+    whose evaluation gave a verdict or failed."""
+
+    pending: int
+    """Calls whose evaluation is queued or running."""
+    not_judged: int
+    """Calls evaluated with no judge model: they have metrics but no verdict."""
+    pass_rate: float | None
+    """The mean over scenarios of each one's passes over its scored calls."""
+    coverage: float | None
+    """Scored calls over judged calls; a failed evaluation counts as unscored. Below 0.95, the
+    worst-to-best range is the main number."""
+    worst: float | None
+    best: float | None
+    interval_low: float | None
+    interval_high: float | None
+    """The "this suite" 95% interval; none below five scenarios."""
+    pass_hat_2: float | None
+    """The chance that two repeats of a scenario both pass, over the scenarios with two scored
+    calls."""
+    pass_hat_2_scenarios: int
+    scenarios: list[ScenarioVerdicts]
+    """In the run's order."""
+    inconsistent: list[uuid.UUID]
+    """Scenarios that both passed and failed across repeats. No cause is named: repeats mix the
+    agent, the caller and the line."""
+    criteria: list[CriterionCounts]
+    decided_by: dict[DecidedBy, int]
+    """The criteria and agent rules that code, Jev or the judge model decided."""
+    errors: int
+    """The criteria and agent rules that no judge could decide."""
+    callers: list[CallerFidelity]
+    judge_versions: list[JudgeVersionUsed]
+
+
 class RunMetrics(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     overall: RunNumbers
     by_category: list[CategoryNumbers]
     by_noise: list[NoiseNumbers]
+    verdicts: RunVerdicts
