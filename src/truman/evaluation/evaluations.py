@@ -166,6 +166,7 @@ async def finish(
             machine_outcome=found.outcome,
             unsure_kind=found.unsure_kind,
             error_reason=found.error_reason,
+            caller_effect=found.caller_effect,
             effective_outcome=found.outcome,
             effective_unsure_kind=found.unsure_kind,
         )

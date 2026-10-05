@@ -126,6 +126,8 @@ class ItemRead(BaseModel):
     answer: dict[str, Any] | None
     """The judge's answer: its evidence with turn numbers, its reasoning and its verdict."""
     error_reason: str | None
+    caller_effect: dict[str, Any] | None
+    """How Truman's caller affected this criterion, by the caller check."""
 
 
 class ConversationEvaluation(BaseModel):

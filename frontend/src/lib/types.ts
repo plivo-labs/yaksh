@@ -664,6 +664,8 @@ export interface EvaluationItem {
   effective_unsure_kind: UnsureKind | null;
   answer: Record<string, unknown> | null;
   error_reason: string | null;
+  /** How Truman's caller affected this criterion, by the caller check. */
+  caller_effect: { owner: string; effect: string; blame: string | null } | null;
 }
 
 export interface ConversationEvaluation {

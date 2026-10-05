@@ -24,6 +24,7 @@ from truman.domain.latency import Latency, Span, waits
 from truman.domain.rules import LlmRule, PhraseRule
 from truman.domain.scenarios import ScenarioConfig
 from truman.evaluation import metrics, speech
+from truman.evaluation.caller_check import CALLER_CHECK, applied, check_caller
 from truman.evaluation.criteria import AGENT_RULE, CRITERION, judge_criterion, judge_rule
 from truman.evaluation.evaluations import Evaluated
 from truman.evaluation.evidence import CallView, render
@@ -56,7 +57,7 @@ class Judging:
 
 SOURCE_JUDGES = (INSTRUCTIONS, HALLUCINATION)
 """The judges that read the agent's whole instructions or documents, with the sources model."""
-JUDGES = (CRITERION, AGENT_RULE, *SOURCE_JUDGES)
+JUDGES = (CRITERION, AGENT_RULE, CALLER_CHECK, *SOURCE_JUDGES)
 """Every judge an evaluation can name; the evaluator stores a version of each at start."""
 
 
@@ -73,8 +74,9 @@ async def evaluate(
     agent's phrase rules and, with a judge model, its judges and verdicts; any other call none.
     retry_later lets a temporary judge failure put the evaluation off; on its last attempt,
     the failure is the item's error instead. Items come in order: criteria by number, rules as
-    the agent lists them, then instruction adherence when the agent has its instructions and
-    hallucination when it has knowledge-base documents."""
+    the agent lists them, instruction adherence when the agent has its instructions,
+    hallucination when it has knowledge-base documents, and last the caller check, whose
+    findings can block criteria."""
     transcript = Transcript.model_validate(conversation.transcript or {})
     found = await measure_call(conversation, agent.agent_speaks_first)
     if not judged(conversation):
@@ -99,6 +101,19 @@ async def evaluate(
             )
             for number, criterion in enumerate(scenario.criteria, 1)
         ]
+        caller = group.create_task(
+            check_caller(
+                judging.model,
+                view,
+                transcript,
+                conversation.instructions,
+                scenario.criteria,
+                conversation.end_reason,
+                conversation.language,
+                slots=judging.slots,
+                retry_later=retry_later,
+            )
+        )
         rules = [
             group.create_task(
                 judge_rule(
@@ -137,10 +152,12 @@ async def evaluate(
                     )
                 )
             )
+    checked = caller.result()
     items = (
-        [task.result() for task in criteria]
+        applied([task.result() for task in criteria], checked, conversation.end_reason)
         + [rule_item(rule, turns) for rule in rules]
         + [task.result() for task in sources]
+        + [checked]
     )
     return Evaluated(
         metrics=found,

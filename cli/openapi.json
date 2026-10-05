@@ -4913,6 +4913,18 @@
               }
             ],
             "title": "Error Reason"
+          },
+          "caller_effect": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Caller Effect"
           }
         },
         "type": "object",
@@ -4926,7 +4938,8 @@
           "effective_outcome",
           "effective_unsure_kind",
           "answer",
-          "error_reason"
+          "error_reason",
+          "caller_effect"
         ],
         "title": "ItemRead"
       },

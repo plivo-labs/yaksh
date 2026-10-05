@@ -78,6 +78,8 @@ class ItemResult:
     error_reason: str | None = None
     re_asks: int = 0
     attempts: list[Attempt] = field(default_factory=list)
+    caller_effect: dict[str, Any] | None = None
+    """How the caller check says Truman's caller affected a criterion: owner, effect, blame."""
 
 
 class JudgeUnavailable(Exception):

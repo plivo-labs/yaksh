@@ -672,6 +672,7 @@ def upgrade() -> None:
             nullable=True,
         ),
         sa.Column("error_reason", sa.Text(), nullable=True),
+        sa.Column("caller_effect", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
         sa.Column(
             "effective_outcome",
             sa.Enum(

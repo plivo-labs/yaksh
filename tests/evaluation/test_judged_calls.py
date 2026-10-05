@@ -81,6 +81,9 @@ class Judge:
             }
             data = {"objective": followed, "procedure": broken, "boundary": followed}
             return ModelAnswer(data=data, model="judge-1", input_tokens=900, output_tokens=60)
+        if name == "caller_check":
+            data = {"findings": [], "impact": [], "blame_risk": "none"}
+            return ModelAnswer(data=data, model="judge-1", input_tokens=900, output_tokens=60)
         if name == "hallucination":
             contradiction = {
                 "call_quote": {"turn": 3, "quote": "four p.m."},
@@ -165,6 +168,7 @@ async def test_a_completed_call_is_judged_and_a_stopped_one_gets_only_code_check
         "rule-greets",
         "instructions",
         "hallucination",
+        "caller_check",
     ]
     assert {key for (evaluation, key) in items if evaluation == str(plain.id)} == set()
     criterion = items[str(judged.id), "criterion-1"]
@@ -177,13 +181,14 @@ async def test_a_completed_call_is_judged_and_a_stopped_one_gets_only_code_check
     assert items[str(judged.id), "rule-greets"].decided_by is DecidedBy.CODE
     assert sorted(judge.asked) == [
         "agent_rule",
+        "caller_check",
         "criterion",
         "hallucination",
         "instructions",
         "probe",
     ]
     assert {(call.input_tokens, call.model_returned) for call in calls} == {(900, "judge-1")}
-    assert len(calls) == 4
+    assert len(calls) == 5
     stored_rules = (await client.get(f"/api/v1/agents/{agent}")).json()["rules"]
     assert [rule["key"] for rule in stored_rules] == ["no-promises", "greets"]
     shown = (await client.get(f"/api/v1/conversations/{completed}/evaluation")).json()
@@ -194,6 +199,7 @@ async def test_a_completed_call_is_judged_and_a_stopped_one_gets_only_code_check
         "rule-greets": "pass",
         "instructions": "fail",
         "hallucination": "fail",
+        "caller_check": "pass",
     }
 
 
@@ -262,7 +268,10 @@ async def test_a_busy_judge_puts_the_evaluation_off_and_its_last_attempt_keeps_t
     )
     assert (last.state, last.scenario_verdict) == (EvaluationState.DONE, Verdict.NOT_SCORED)
     async with db() as session:
-        [item] = await session.scalars(select(EvaluationItem))
+        items = list(await session.scalars(select(EvaluationItem)))
         metric_keys = set(await session.scalars(select(MetricValue.metric_key)))
-    assert (item.machine_outcome, item.error_reason) == (Outcome.ERROR, "judge_unavailable")
+    assert {(item.item_key, item.machine_outcome, item.error_reason) for item in items} == {
+        ("criterion-1", Outcome.ERROR, "judge_unavailable"),
+        ("caller_check", Outcome.ERROR, "judge_unavailable"),
+    }
     assert MetricKey.USAGE in metric_keys

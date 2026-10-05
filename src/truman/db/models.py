@@ -344,6 +344,8 @@ class EvaluationItem(Base):
     machine_outcome: Mapped[Outcome] = mapped_column(pg_enum(Outcome, "outcome"))
     unsure_kind: Mapped[UnsureKind | None] = mapped_column(pg_enum(UnsureKind, "unsure_kind"))
     error_reason: Mapped[str | None] = mapped_column(Text)
+    caller_effect: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    """How the caller check says Truman's caller affected this criterion."""
     effective_outcome: Mapped[Outcome] = mapped_column(pg_enum(Outcome, "outcome"))
     effective_unsure_kind: Mapped[UnsureKind | None] = mapped_column(
         pg_enum(UnsureKind, "unsure_kind")

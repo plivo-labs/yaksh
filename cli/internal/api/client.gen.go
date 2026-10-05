@@ -1131,8 +1131,9 @@ type HealthResponse struct {
 
 // ItemRead defines model for ItemRead.
 type ItemRead struct {
-	Answer    *map[string]interface{} `json:"answer"`
-	DecidedBy DecidedBy               `json:"decided_by"`
+	Answer       *map[string]interface{} `json:"answer"`
+	CallerEffect *map[string]interface{} `json:"caller_effect"`
+	DecidedBy    DecidedBy               `json:"decided_by"`
 
 	// EffectiveOutcome An item's result: a judge's verdict, or what stopped one.
 	EffectiveOutcome    Outcome     `json:"effective_outcome"`
