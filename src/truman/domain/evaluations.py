@@ -72,8 +72,14 @@ class LabelAnswer(StrEnum):
     BLOCKED = "blocked"
 
 
+NEEDS_REASON = frozenset({LabelAnswer.FAIL, LabelAnswer.CANNOT_TELL, LabelAnswer.BLOCKED})
+"""Answers that name a problem, so they say which one; a pass or not applicable may give a
+reason too, such as why the judge was wrong."""
+
+
 class LabelReason(StrEnum):
-    """Why the labeler answered so. No reason names a cause inside the agent."""
+    """What went wrong, or why the judge was wrong. No reason names a cause inside the
+    agent."""
 
     AGENT_ERROR = "agent_error"
     APPLICABILITY = "applicability"

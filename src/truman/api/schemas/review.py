@@ -5,7 +5,14 @@ from typing import Annotated, Self
 from pydantic import BaseModel, ConfigDict, StringConstraints, model_validator
 
 from truman.api.schemas.conversations import ConversationRead, ItemRead
-from truman.domain.evaluations import ItemRole, LabelAnswer, LabelReason, Lane, Verdict
+from truman.domain.evaluations import (
+    NEEDS_REASON,
+    ItemRole,
+    LabelAnswer,
+    LabelReason,
+    Lane,
+    Verdict,
+)
 
 Note = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=2000)]
 
@@ -32,11 +39,17 @@ class LabelerCreated(BaseModel):
 
 class LabelCreate(BaseModel):
     answer: LabelAnswer
-    reason: LabelReason
+    reason: LabelReason | None = None
+    """Needed for a fail, can't tell or blocked."""
     note: Note | None = None
+    seen: bool = False
+    """The labeler saw the machine's results first, as from the conversation page: the label
+    is then ad hoc, whatever the call."""
 
     @model_validator(mode="after")
-    def other_has_note(self) -> Self:
+    def reason_given(self) -> Self:
+        if self.answer in NEEDS_REASON and self.reason is None:
+            raise ValueError("a fail, can't tell or blocked label needs a reason")
         if self.reason is LabelReason.OTHER and self.note is None:
             raise ValueError("the reason other needs a note")
         return self
@@ -46,7 +59,7 @@ class LabelRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     answer: LabelAnswer
-    reason: LabelReason
+    reason: LabelReason | None
     note: str | None
     lane: Lane
     blind: bool

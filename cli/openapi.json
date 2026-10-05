@@ -1816,7 +1816,7 @@
           "review"
         ],
         "summary": "Get Review",
-        "description": "A judged call to label. Any judged call takes labels; only the calls the queue offers\nhide the machine results, and only their labels measure the judges.",
+        "description": "A judged call to label. Any judged call takes labels; only the calls the queue offers\nhide the machine results, and only their labels measure the judges. `seen`: the labeler\ncame from the machine's results, so the call is ad hoc.",
         "operationId": "get_review_api_v1_review_conversations__conversation_id__get",
         "security": [
           {
@@ -1832,6 +1832,16 @@
               "type": "string",
               "format": "uuid",
               "title": "Conversation Id"
+            }
+          },
+          {
+            "name": "seen",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Seen"
             }
           }
         ],
@@ -5626,7 +5636,14 @@
             "$ref": "#/components/schemas/LabelAnswer"
           },
           "reason": {
-            "$ref": "#/components/schemas/LabelReason"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LabelReason"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "note": {
             "anyOf": [
@@ -5640,12 +5657,16 @@
               }
             ],
             "title": "Note"
+          },
+          "seen": {
+            "type": "boolean",
+            "title": "Seen",
+            "default": false
           }
         },
         "type": "object",
         "required": [
-          "answer",
-          "reason"
+          "answer"
         ],
         "title": "LabelCreate"
       },
@@ -5655,7 +5676,14 @@
             "$ref": "#/components/schemas/LabelAnswer"
           },
           "reason": {
-            "$ref": "#/components/schemas/LabelReason"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LabelReason"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "note": {
             "anyOf": [
@@ -5713,7 +5741,7 @@
           "other"
         ],
         "title": "LabelReason",
-        "description": "Why the labeler answered so. No reason names a cause inside the agent."
+        "description": "What went wrong, or why the judge was wrong. No reason names a cause inside the\nagent."
       },
       "LabelerCreate": {
         "properties": {

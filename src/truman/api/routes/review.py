@@ -26,9 +26,9 @@ router = APIRouter(prefix="/review", tags=["review"])
 
 
 async def reviewed(
-    session: AsyncSession, conversation_id: uuid.UUID, labeler: Labeler, budget: int
+    session: AsyncSession, conversation_id: uuid.UUID, labeler: Labeler, budget: int, *, seen: bool
 ) -> ReviewConversation:
-    found = await labels.review(session, conversation_id, labeler.id, budget)
+    found = await labels.review(session, conversation_id, labeler.id, budget, seen=seen)
     base = await detail(session, await conversations.get_conversation(session, conversation_id))
     evaluation = found.evaluation
     return ReviewConversation(
@@ -82,18 +82,28 @@ async def get_queue(
 
 @router.get("/conversations/{conversation_id}")
 async def get_review(
-    conversation_id: uuid.UUID, labeler: LabelerDep, session: SessionDep, settings: SettingsDep
+    conversation_id: uuid.UUID,
+    labeler: LabelerDep,
+    session: SessionDep,
+    settings: SettingsDep,
+    seen: bool = False,
 ) -> ReviewConversation:
     """A judged call to label. Any judged call takes labels; only the calls the queue offers
-    hide the machine results, and only their labels measure the judges."""
-    return await reviewed(session, conversation_id, labeler, settings.audit_weekly_budget)
+    hide the machine results, and only their labels measure the judges. `seen`: the labeler
+    came from the machine's results, so the call is ad hoc."""
+    return await reviewed(
+        session, conversation_id, labeler, settings.audit_weekly_budget, seen=seen
+    )
 
 
 @router.get("/conversations/{conversation_id}/recording")
 async def get_recording(
     conversation_id: uuid.UUID, labeler: LabelerDep, session: SessionDep, settings: SettingsDep
 ) -> FileResponse:
-    await labels.review(session, conversation_id, labeler.id, settings.audit_weekly_budget)
+    # Only checks that the call is judged: what a labeler may see does not depend on the audio.
+    await labels.review(
+        session, conversation_id, labeler.id, settings.audit_weekly_budget, seen=True
+    )
     conversation = await conversations.get_conversation(session, conversation_id)
     if conversation.recording_path is None or not Path(conversation.recording_path).is_file():
         raise HTTPException(status.HTTP_404_NOT_FOUND, "no recording yet")
@@ -111,6 +121,13 @@ async def label_item(
     """Label one item; the call comes back with what the label reveals."""
     budget = settings.audit_weekly_budget
     conversation_id = await labels.add_label(
-        session, item_id, labeler.id, command.answer, command.reason, command.note, budget
+        session,
+        item_id,
+        labeler.id,
+        command.answer,
+        command.reason,
+        command.note,
+        budget,
+        seen=command.seen,
     )
-    return await reviewed(session, conversation_id, labeler, budget)
+    return await reviewed(session, conversation_id, labeler, budget, seen=command.seen)

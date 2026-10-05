@@ -762,7 +762,7 @@ def upgrade() -> None:
                 "other",
                 name="label_reason",
             ),
-            nullable=False,
+            nullable=True,
         ),
         sa.Column("note", sa.Text(), nullable=True),
         sa.Column(
@@ -774,6 +774,10 @@ def upgrade() -> None:
         sa.CheckConstraint(
             "reason <> 'other' OR btrim(coalesce(note, '')) <> ''",
             name=op.f("ck_labels_other_has_note"),
+        ),
+        sa.CheckConstraint(
+            "answer IN ('pass', 'not_applicable') OR reason IS NOT NULL",
+            name=op.f("ck_labels_problem_has_reason"),
         ),
         sa.ForeignKeyConstraint(
             ["item_id"], ["evaluation_items.id"], name=op.f("fk_labels_item_id_evaluation_items")

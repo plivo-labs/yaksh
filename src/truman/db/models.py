@@ -392,13 +392,16 @@ class Label(Base):
     blind: Mapped[bool] = mapped_column(Boolean)
     """The labeler had not seen the machine result: only blind audit labels measure a judge."""
     answer: Mapped[LabelAnswer] = mapped_column(pg_enum(LabelAnswer, "label_answer"))
-    reason: Mapped[LabelReason] = mapped_column(pg_enum(LabelReason, "label_reason"))
+    reason: Mapped[LabelReason | None] = mapped_column(pg_enum(LabelReason, "label_reason"))
     note: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     __table_args__ = (
         CheckConstraint(
             "reason <> 'other' OR btrim(coalesce(note, '')) <> ''", name="other_has_note"
+        ),
+        CheckConstraint(
+            "answer IN ('pass', 'not_applicable') OR reason IS NOT NULL", name="problem_has_reason"
         ),
         Index("ix_labels_item_id", "item_id"),
     )

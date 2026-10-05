@@ -1329,26 +1329,24 @@ type LabelAnswer string
 
 // LabelCreate defines model for LabelCreate.
 type LabelCreate struct {
-	Answer LabelAnswer `json:"answer"`
-	Note   *string     `json:"note,omitempty"`
-
-	// Reason Why the labeler answered so. No reason names a cause inside the agent.
-	Reason LabelReason `json:"reason"`
+	Answer LabelAnswer  `json:"answer"`
+	Note   *string      `json:"note,omitempty"`
+	Reason *LabelReason `json:"reason,omitempty"`
+	Seen   *bool        `json:"seen,omitempty"`
 }
 
 // LabelRead defines model for LabelRead.
 type LabelRead struct {
-	Answer    LabelAnswer `json:"answer"`
-	Blind     bool        `json:"blind"`
-	CreatedAt time.Time   `json:"created_at"`
-	Lane      Lane        `json:"lane"`
-	Note      *string     `json:"note"`
-
-	// Reason Why the labeler answered so. No reason names a cause inside the agent.
-	Reason LabelReason `json:"reason"`
+	Answer    LabelAnswer  `json:"answer"`
+	Blind     bool         `json:"blind"`
+	CreatedAt time.Time    `json:"created_at"`
+	Lane      Lane         `json:"lane"`
+	Note      *string      `json:"note"`
+	Reason    *LabelReason `json:"reason"`
 }
 
-// LabelReason Why the labeler answered so. No reason names a cause inside the agent.
+// LabelReason What went wrong, or why the judge was wrong. No reason names a cause inside the
+// agent.
 type LabelReason string
 
 // LabelerCreate defines model for LabelerCreate.
@@ -2126,6 +2124,11 @@ type ListPersonasApiV1PersonasGetParams struct {
 type ListVersionsApiV1PersonasPersonaIdVersionsGetParams struct {
 	Page     *int `form:"page,omitempty" json:"page,omitempty"`
 	PageSize *int `form:"page_size,omitempty" json:"page_size,omitempty"`
+}
+
+// GetReviewApiV1ReviewConversationsConversationIdGetParams defines parameters for GetReviewApiV1ReviewConversationsConversationIdGet.
+type GetReviewApiV1ReviewConversationsConversationIdGetParams struct {
+	Seen *bool `form:"seen,omitempty" json:"seen,omitempty"`
 }
 
 // ListRunsApiV1RunsGetParams defines parameters for ListRunsApiV1RunsGet.
@@ -3083,10 +3086,11 @@ type ClientInterface interface {
 	// GetReviewApiV1ReviewConversationsConversationIdGet Get Review
 	//
 	// A judged call to label. Any judged call takes labels; only the calls the queue offers
-	// hide the machine results, and only their labels measure the judges.
+	// hide the machine results, and only their labels measure the judges. `seen`: the labeler
+	// came from the machine's results, so the call is ad hoc.
 	//
 	// Corresponds with GET /api/v1/review/conversations/{conversation_id} (the `GetReviewApiV1ReviewConversationsConversationIdGet` operationId).
-	GetReviewApiV1ReviewConversationsConversationIdGet(ctx context.Context, conversationId openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error)
+	GetReviewApiV1ReviewConversationsConversationIdGet(ctx context.Context, conversationId openapi_types.UUID, params *GetReviewApiV1ReviewConversationsConversationIdGetParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetRecordingApiV1ReviewConversationsConversationIdRecordingGet Get Recording
 	//
@@ -4089,11 +4093,12 @@ func (c *Client) ListPhoneNumbersApiV1PhoneNumbersGet(ctx context.Context, reqEd
 // GetReviewApiV1ReviewConversationsConversationIdGet Get Review
 //
 // A judged call to label. Any judged call takes labels; only the calls the queue offers
-// hide the machine results, and only their labels measure the judges.
+// hide the machine results, and only their labels measure the judges. `seen`: the labeler
+// came from the machine's results, so the call is ad hoc.
 //
 // Corresponds with GET /api/v1/review/conversations/{conversation_id} (the `GetReviewApiV1ReviewConversationsConversationIdGet` operationId).
-func (c *Client) GetReviewApiV1ReviewConversationsConversationIdGet(ctx context.Context, conversationId openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewGetReviewApiV1ReviewConversationsConversationIdGetRequest(c.Server, conversationId)
+func (c *Client) GetReviewApiV1ReviewConversationsConversationIdGet(ctx context.Context, conversationId openapi_types.UUID, params *GetReviewApiV1ReviewConversationsConversationIdGetParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetReviewApiV1ReviewConversationsConversationIdGetRequest(c.Server, conversationId, params)
 	if err != nil {
 		return nil, err
 	}
@@ -6353,7 +6358,7 @@ func NewListPhoneNumbersApiV1PhoneNumbersGetRequest(server string) (*http.Reques
 }
 
 // NewGetReviewApiV1ReviewConversationsConversationIdGetRequest constructs an http.Request for the GetReviewApiV1ReviewConversationsConversationIdGet method
-func NewGetReviewApiV1ReviewConversationsConversationIdGetRequest(server string, conversationId openapi_types.UUID) (*http.Request, error) {
+func NewGetReviewApiV1ReviewConversationsConversationIdGetRequest(server string, conversationId openapi_types.UUID, params *GetReviewApiV1ReviewConversationsConversationIdGetParams) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -6376,6 +6381,33 @@ func NewGetReviewApiV1ReviewConversationsConversationIdGetRequest(server string,
 	queryURL, err := serverURL.Parse(operationPath)
 	if err != nil {
 		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Seen != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "seen", *params.Seen, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "boolean", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
 	}
 
 	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
@@ -7685,12 +7717,13 @@ type ClientWithResponsesInterface interface {
 	// GetReviewApiV1ReviewConversationsConversationIdGetWithResponse Get Review
 	//
 	// A judged call to label. Any judged call takes labels; only the calls the queue offers
-	// hide the machine results, and only their labels measure the judges.
+	// hide the machine results, and only their labels measure the judges. `seen`: the labeler
+	// came from the machine's results, so the call is ad hoc.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with GET /api/v1/review/conversations/{conversation_id} (the `GetReviewApiV1ReviewConversationsConversationIdGet` operationId).
-	GetReviewApiV1ReviewConversationsConversationIdGetWithResponse(ctx context.Context, conversationId openapi_types.UUID, reqEditors ...RequestEditorFn) (*GetReviewApiV1ReviewConversationsConversationIdGetResponse, error)
+	GetReviewApiV1ReviewConversationsConversationIdGetWithResponse(ctx context.Context, conversationId openapi_types.UUID, params *GetReviewApiV1ReviewConversationsConversationIdGetParams, reqEditors ...RequestEditorFn) (*GetReviewApiV1ReviewConversationsConversationIdGetResponse, error)
 
 	// GetRecordingApiV1ReviewConversationsConversationIdRecordingGetWithResponse Get Recording
 	//
@@ -11332,13 +11365,14 @@ func (c *ClientWithResponses) ListPhoneNumbersApiV1PhoneNumbersGetWithResponse(c
 // GetReviewApiV1ReviewConversationsConversationIdGetWithResponse Get Review
 //
 // A judged call to label. Any judged call takes labels; only the calls the queue offers
-// hide the machine results, and only their labels measure the judges.
+// hide the machine results, and only their labels measure the judges. `seen`: the labeler
+// came from the machine's results, so the call is ad hoc.
 //
 // Returns a wrapper object for the known response body format(s).
 //
 // Corresponds with GET /api/v1/review/conversations/{conversation_id} (the `GetReviewApiV1ReviewConversationsConversationIdGet` operationId).
-func (c *ClientWithResponses) GetReviewApiV1ReviewConversationsConversationIdGetWithResponse(ctx context.Context, conversationId openapi_types.UUID, reqEditors ...RequestEditorFn) (*GetReviewApiV1ReviewConversationsConversationIdGetResponse, error) {
-	rsp, err := c.GetReviewApiV1ReviewConversationsConversationIdGet(ctx, conversationId, reqEditors...)
+func (c *ClientWithResponses) GetReviewApiV1ReviewConversationsConversationIdGetWithResponse(ctx context.Context, conversationId openapi_types.UUID, params *GetReviewApiV1ReviewConversationsConversationIdGetParams, reqEditors ...RequestEditorFn) (*GetReviewApiV1ReviewConversationsConversationIdGetResponse, error) {
+	rsp, err := c.GetReviewApiV1ReviewConversationsConversationIdGet(ctx, conversationId, params, reqEditors...)
 	if err != nil {
 		return nil, err
 	}

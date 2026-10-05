@@ -205,6 +205,64 @@ async def test_a_sampled_call_beyond_the_weekly_budget_takes_only_ad_hoc_labels(
     assert (measured["versions"], measured["offered_calls"]["total"]) == ([], 1)
 
 
+async def test_a_labeler_who_saw_the_machine_results_first_gives_ad_hoc_labels(
+    client: AsyncClient, db: Db
+) -> None:
+    [call] = await judged_calls(client, db, 1, audit=True)
+    dana = await labeler(client, "dana")
+
+    seen = await client.get(f"/api/v1/review/conversations/{call}?seen=true", headers=dana)
+    greets = seen.json()["items"][0]["id"]
+    labeled = await client.post(
+        f"/api/v1/review/items/{greets}/labels", json={"answer": "pass", "seen": True}, headers=dana
+    )
+
+    assert seen.json()["lane"] == "ad_hoc"
+    assert all(item["machine"] for item in seen.json()["items"])
+    found = labeled.json()["items"][0]["label"]
+    assert (found["lane"], found["blind"]) == ("ad_hoc", False)
+    assert (await agreement(client))["versions"] == []
+
+
+async def test_a_label_that_overturns_the_answer_in_view_says_why(
+    client: AsyncClient, db: Db
+) -> None:
+    [shown_call] = await judged_calls(
+        client, db, 1, audit=False, outcomes=(Outcome.FAIL, Outcome.PASS)
+    )
+    [blind_call] = await judged_calls(
+        client, db, 1, audit=True, outcomes=(Outcome.FAIL, Outcome.PASS)
+    )
+    dana = await labeler(client, "dana")
+    in_view = (await shown(client, dana, shown_call))["items"][0]["id"]
+    blind = (await shown(client, dana, blind_call))["items"][0]["id"]
+
+    def post(item: str, body: dict[str, str]) -> Any:
+        return client.post(f"/api/v1/review/items/{item}/labels", json=body, headers=dana)
+
+    bare = await post(in_view, {"answer": "pass"})
+    why = await post(in_view, {"answer": "pass", "reason": "evidence_misread"})
+    blind_bare = await post(blind, {"answer": "pass"})
+
+    assert (bare.status_code, why.status_code, blind_bare.status_code) == (422, 201, 201)
+
+
+async def test_a_label_on_a_hidden_item_needs_no_reason_so_it_reveals_nothing(
+    client: AsyncClient, db: Db
+) -> None:
+    [call] = await judged_calls(client, db, 1, audit=True)
+    dana = await labeler(client, "dana")
+    phrase = (await shown(client, dana, call))["items"][2]
+
+    labeled = await client.post(
+        f"/api/v1/review/items/{phrase['id']}/labels",
+        json={"answer": "not_applicable"},
+        headers=dana,
+    )
+
+    assert (phrase["machine"], labeled.status_code) == (None, 201)
+
+
 async def test_ad_hoc_labels_change_verdicts_and_disagreeing_labelers_leave_the_item_pending(
     client: AsyncClient, db: Db
 ) -> None:
@@ -255,22 +313,23 @@ async def test_a_labeler_token_opens_only_the_review_routes_until_revoked(
     assert (await client.get(review, headers=dana)).status_code == 401
 
 
-async def test_the_reason_other_needs_a_note(client: AsyncClient, db: Db) -> None:
+async def test_a_label_that_names_a_problem_needs_a_reason_and_other_needs_a_note(
+    client: AsyncClient, db: Db
+) -> None:
     [call] = await judged_calls(client, db, 1, audit=False)
     dana = await labeler(client, "dana")
     path = f"/api/v1/review/items/{(await shown(client, dana, call))['items'][0]['id']}/labels"
 
-    bare = await client.post(path, json={"answer": "fail", "reason": "other"}, headers=dana)
-    blank = await client.post(
-        path, json={"answer": "fail", "reason": "other", "note": "  "}, headers=dana
-    )
-    noted = await client.post(
-        path,
-        json={"answer": "fail", "reason": "other", "note": "The agent spoke Spanish."},
-        headers=dana,
-    )
+    sent = [
+        {"answer": "pass"},
+        {"answer": "fail"},
+        {"answer": "fail", "reason": "other"},
+        {"answer": "fail", "reason": "other", "note": "  "},
+        {"answer": "fail", "reason": "other", "note": "The agent spoke Spanish."},
+    ]
+    found = [(await client.post(path, json=body, headers=dana)).status_code for body in sent]
 
-    assert (bare.status_code, blank.status_code, noted.status_code) == (422, 422, 201)
+    assert found == [201, 422, 422, 422, 201]
 
 
 async def test_the_queue_offers_each_weeks_budget_in_hash_order(

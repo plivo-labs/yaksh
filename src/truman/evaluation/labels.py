@@ -29,7 +29,7 @@ from truman.db.models import (
     Labeler,
     Scenario,
 )
-from truman.domain.errors import ConflictError, NotFoundError
+from truman.domain.errors import ConflictError, NotFoundError, ValidationError
 from truman.domain.evaluations import (
     DecidedBy,
     EvaluationState,
@@ -179,7 +179,7 @@ async def in_audit_lane(session: AsyncSession, evaluation: Evaluation, budget: i
 class GivenLabel:
     labeler_id: uuid.UUID
     answer: LabelAnswer
-    reason: LabelReason
+    reason: LabelReason | None
 
 
 OUTCOMES = {
@@ -191,7 +191,9 @@ OUTCOMES = {
 }
 
 
-def outcome_of(answer: LabelAnswer, reason: LabelReason) -> tuple[Outcome, UnsureKind | None]:
+def outcome_of(
+    answer: LabelAnswer, reason: LabelReason | None
+) -> tuple[Outcome, UnsureKind | None]:
     """A label as an item outcome. "Can't tell" with the reason hidden_action counts like the
     machine's hidden action."""
     if answer is not LabelAnswer.CANNOT_TELL:
@@ -222,13 +224,17 @@ async def add_label(
     item_id: uuid.UUID,
     labeler_id: uuid.UUID,
     answer: LabelAnswer,
-    reason: LabelReason,
+    reason: LabelReason | None,
     note: str | None,
     budget: int,
+    *,
+    seen: bool,
 ) -> uuid.UUID:
     """Store the label and the item's and the evaluation's new effective results, in one
     transaction; return the conversation's id. The evaluation's lock orders labels of the same
-    call, so each recomputation reads the effective outcomes the earlier ones wrote."""
+    call, so each recomputation reads the effective outcomes the earlier ones wrote. `seen`: the
+    labeler saw the machine's results first, as from the conversation page, so the label is ad
+    hoc. A label given with the machine's answer in view says why when it differs."""
     evaluation_id = await session.scalar(
         select(EvaluationItem.evaluation_id).where(EvaluationItem.id == item_id)
     )
@@ -245,18 +251,18 @@ async def add_label(
         )
     ).all()
     item = next(item for item in items if item.id == item_id)
-    audited = auditable(item.decided_by, item.machine_outcome, item.item_key) and (
-        await in_audit_lane(session, evaluation, budget)
+    view = await viewed(session, evaluation, list(items), labeler_id, budget, seen=seen)
+    differs = scored_as(*outcome_of(answer, reason)) is not scored_as(
+        item.machine_outcome, item.unsure_kind
     )
-    labeled_before = await session.scalar(
-        select(exists().where(Label.item_id == item_id, Label.labeler_id == labeler_id))
-    )
+    if not view.hidden(item) and differs and reason is None:
+        raise ValidationError("a label that differs from the machine's answer needs a reason")
     session.add(
         Label(
             item_id=item_id,
             labeler_id=labeler_id,
-            lane=Lane.AUDIT if audited else Lane.AD_HOC,
-            blind=audited and not labeled_before,
+            lane=Lane.AUDIT if view.auditable(item) else Lane.AD_HOC,
+            blind=view.blind(item),
             answer=answer,
             reason=reason,
             note=note,
@@ -317,8 +323,15 @@ class Review:
 
 
 async def review(
-    session: AsyncSession, conversation_id: uuid.UUID, labeler_id: uuid.UUID, budget: int
+    session: AsyncSession,
+    conversation_id: uuid.UUID,
+    labeler_id: uuid.UUID,
+    budget: int,
+    *,
+    seen: bool,
 ) -> Review:
+    """`seen`: the labeler saw the machine's results first, so nothing is hidden and the call
+    takes only ad hoc labels."""
     evaluation = await session.scalar(
         select(Evaluation).where(
             Evaluation.conversation_id == conversation_id,
@@ -334,6 +347,19 @@ async def review(
             .order_by(EvaluationItem.created_at, EvaluationItem.id)
         )
     ).all()
+    return await viewed(session, evaluation, list(items), labeler_id, budget, seen=seen)
+
+
+async def viewed(
+    session: AsyncSession,
+    evaluation: Evaluation,
+    items: list[EvaluationItem],
+    labeler_id: uuid.UUID,
+    budget: int,
+    *,
+    seen: bool,
+) -> Review:
+    """The call as the labeler sees it now, from its labels so far."""
     labels = await session.scalars(
         select(Label)
         .where(Label.item_id.in_([item.id for item in items]), Label.labeler_id == labeler_id)
@@ -341,8 +367,8 @@ async def review(
     )
     return Review(
         evaluation=evaluation,
-        audit=await in_audit_lane(session, evaluation, budget),
-        items=list(items),
+        audit=not seen and await in_audit_lane(session, evaluation, budget),
+        items=items,
         labels={label.item_id: label for label in labels},
     )
 
