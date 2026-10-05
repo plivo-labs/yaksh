@@ -131,6 +131,17 @@ A share of the judged calls, `AUDIT_SAMPLE_RATE` (default 0.1), is chosen for au
 
 `GET /api/v1/judges/agreement` counts each item once, by its first blind audit label. For each judge version it gives how often that label agrees with the version's answer, leaving out items the caller check blocked or the judge failed; for calls with a blind label on every criterion, how often the labels' scenario verdict agrees with the machine's; how often two labelers agree on an item; and how many offered calls are labeled in full. Each comes with a 95% Wilson interval. A judge version with no blind labels is not listed: it is not yet measured on your agents.
 
+## Listen to a live call
+
+On the page of a live call, **Listen** in the **Audio** card plays the call in stereo: the agent on the left, the caller on the right, with the caller's background noise. The audio is about half a second behind the call. While it plays, the card draws it in the same lanes as the recording, from the first audio after Listen. **Stop listening** removes the drawing. After the call, the recording takes its place. It stops when the call ends, on a second click, or when you leave the page. Several people can listen to one call.
+
+- The worker takes the audio inside its Pipecat pipeline with an observer, so it does not depend on Plivo, and a slow listener cannot slow the call.
+- The worker sends a call's audio to the API with Postgres `NOTIFY`, only while someone listens: the API asks for it every 5 seconds while a listener stays.
+- `GET /api/v1/conversations/<id>/listen` streams the audio while the call is `running` or `ending`, and answers 404 for any other call. The route's description in the API reference gives the format of its messages.
+- Each running call holds one more Postgres connection, and so does each listener on the API. `LISTEN` needs a session-level connection, so a pooler in transaction mode cannot carry these connections.
+
+See `docs/decisions/0021-listen-to-a-running-call.md`.
+
 ## Files
 
 Uploaded files (PDF, TXT and MD documents about an agent) are kept in S3-compatible storage. The compose files run [SeaweedFS](https://github.com/seaweedfs/seaweedfs) for this, with its data in the `storage` volume. To use S3, R2 or another S3-compatible service instead, set:

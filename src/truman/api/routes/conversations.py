@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.sse import EventSourceResponse, ServerSentEvent
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -23,6 +23,7 @@ from truman.db.models import Conversation
 from truman.domain.background_noise import BackgroundNoise
 from truman.domain.conversations import (
     ACTIVE_STATUSES,
+    LIVE_STATUSES,
     ConversationCreate,
     ConversationStatus,
     OutcomeGroup,
@@ -32,6 +33,7 @@ from truman.domain.conversations import (
 from truman.domain.latency import Latency, place
 from truman.evaluation import results
 from truman.simulation import conversations
+from truman.simulation.listen import live_audio
 
 SORT_PATTERN = f"^-?({'|'.join(conversations.SORT_KEYS)})$"
 
@@ -228,3 +230,30 @@ async def stream_events(
     )
     async for event, data in events:
         yield ServerSentEvent(data=data, event=event)
+
+
+async def conversation_live(conversation_id: uuid.UUID, request: Request) -> None:
+    async with request.app.state.sessionmaker() as session:
+        conversation = await conversations.get_conversation(session, conversation_id)
+    if conversation.status not in LIVE_STATUSES:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "the conversation is not live")
+
+
+class AudioStream(StreamingResponse):
+    media_type = "application/octet-stream"
+
+
+@router.get(
+    "/{conversation_id}/listen",
+    response_class=AudioStream,
+    dependencies=[Depends(conversation_live)],
+)
+async def listen(
+    conversation_id: uuid.UUID, request: Request, settings: SettingsDep
+) -> AudioStream:
+    """Both sides of a live call's audio as the worker sends it, until the call ends. Each
+    message has its length as a little-endian u32 in front, then the side (0 the agent, 1 the
+    caller) as a byte, the time on the call's pipeline clock in ms as a little-endian double,
+    and 8 kHz PCM16 mono audio."""
+    audio = live_audio(request.app.state.sessionmaker, str(settings.database_url), conversation_id)
+    return AudioStream(audio, headers={"Cache-Control": "no-store"})

@@ -82,6 +82,9 @@ export const WIRE_EVENT_HELP: Record<WireEventKind, string> = {
 
 export const ACTIVE_STATUSES: ConversationStatus[] = ["queued", "running", "ending"];
 
+/** Calls with audio on the line: what the Listen button can play. */
+export const LIVE_STATUSES: ConversationStatus[] = ["running", "ending"];
+
 /** How a conversation went, from its status and end reason only: what happened, not who is at
  * fault. */
 export type OutcomeGroup =

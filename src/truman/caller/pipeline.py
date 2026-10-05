@@ -21,6 +21,7 @@ from pipecat.frames.frames import (
     LLMRunFrame,
     TTSSpeakFrame,
 )
+from pipecat.observers.base_observer import BaseObserver
 from pipecat.observers.service_metrics_observer import ServiceMetricsObserver
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.worker import PipelineParams, PipelineWorker
@@ -306,6 +307,7 @@ class Persona:
         after_output: Sequence[FrameProcessor],
         state: CallState,
         before_output: Sequence[FrameProcessor] = (),
+        observers: Sequence[BaseObserver] = (),
     ) -> None:
         self.llm = llm_service(settings, keys, request.instructions)
         self.settings = CallerSettings(
@@ -376,10 +378,10 @@ class Persona:
                 audio_out_sample_rate=SAMPLE_RATE,
                 enable_usage_metrics=True,
             ),
-            observers=[metrics],
             idle_timeout_secs=None,
             cancel_timeout_secs=END_GRACE_S,
             enable_rtvi=False,
+            observers=[metrics, *observers],
         )
 
         self.llm.register_function(

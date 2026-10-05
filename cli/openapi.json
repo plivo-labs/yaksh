@@ -979,6 +979,55 @@
         }
       }
     },
+    "/api/v1/conversations/{conversation_id}/listen": {
+      "get": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Listen",
+        "description": "Both sides of a live call's audio as the worker sends it, until the call ends. Each\nmessage has its length as a little-endian u32 in front, then the side (0 the agent, 1 the\ncaller) as a byte, the time on the call's pipeline clock in ms as a little-endian double,\nand 8 kHz PCM16 mono audio.",
+        "operationId": "listen_api_v1_conversations__conversation_id__listen_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Conversation Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/defaults": {
       "get": {
         "tags": [

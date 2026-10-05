@@ -9,6 +9,7 @@
     "scenario-generation",
     "background-noise",
     "response-time",
+    "listen",
     "cli",
     "troubleshooting",
     "development",

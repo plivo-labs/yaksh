@@ -44,6 +44,7 @@ from truman.caller.audio import (
     save_caller_voice,
 )
 from truman.caller.lag import LagSampler
+from truman.caller.listen import AudioTap, LiveAudio
 from truman.caller.pipeline import (
     CallState,
     Persona,
@@ -696,6 +697,7 @@ class PhoneCaller:
         observer.wire_event(WireEvent(kind=WireEventKind.CONNECT_STARTED, at_ms=clock.ms()))
         entry = self._registry.expect(request.conversation_id)
         trigger: asyncio.Future[TriggerOutcome] | None = None
+        live = LiveAudio(str(self._settings.database_url), request.conversation_id)
         try:
             if request.agent.outbound is None:
                 dialed = await self._dialer.dial(request, entry, observer, clock.ms, stop)
@@ -710,10 +712,11 @@ class PhoneCaller:
                 return dialed
             line = Line(dialed.call_uuid, entry.callbacks, self._hang_up)
             try:
-                return await self._talk(request, observer, stop, clock, dialed, line)
+                return await self._talk(request, observer, stop, clock, dialed, line, live)
             finally:
                 await line.hang_up()
         finally:
+            await live.close()
             self._registry.forget(request.conversation_id)
             if trigger is not None:
                 trigger.cancel()
@@ -755,12 +758,13 @@ class PhoneCaller:
         clock: Clock,
         dialed: Connected,
         line: Line,
+        live: LiveAudio,
     ) -> CallOutcome:
         connected_ms = clock.ms()
         observer.wire_event(WireEvent(kind=WireEventKind.CONNECTED, at_ms=connected_ms))
         lag = LagSampler(clock.ms)
         try:
-            spoken = await self._converse(request, observer, stop, clock, dialed)
+            spoken = await self._converse(request, observer, stop, clock, dialed, live)
         finally:
             loop_lag = lag.stop()
         ended_ms = clock.ms()
@@ -811,6 +815,7 @@ class PhoneCaller:
         stop: asyncio.Event,
         clock: Clock,
         dialed: Connected,
+        live: LiveAudio,
     ) -> Spoken:
         """Build the caller around the stream and hold the conversation until it ends."""
         log.info(
@@ -855,6 +860,7 @@ class PhoneCaller:
             before_output=[checkpoints],
             after_output=[marks, WireTap(transcript, settled)],
             state=state,
+            observers=[AudioTap(transport.input(), transport.output(), live)],
         )
 
         @transport.event_handler("on_client_connected")
@@ -883,6 +889,7 @@ class PhoneCaller:
         finally:
             if greeting is not None:
                 greeting.cancel()
+            await live.close()
         return Spoken(state, persona, recording, marks, serializer)
 
     async def _hang_up(self, call_id: str) -> None:

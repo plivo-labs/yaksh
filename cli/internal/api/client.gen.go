@@ -2925,6 +2925,16 @@ type ClientInterface interface {
 	// Corresponds with GET /api/v1/conversations/{conversation_id}/events (the `StreamEventsApiV1ConversationsConversationIdEventsGet` operationId).
 	StreamEventsApiV1ConversationsConversationIdEventsGet(ctx context.Context, conversationId openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// ListenApiV1ConversationsConversationIdListenGet Listen
+	//
+	// Both sides of a live call's audio as the worker sends it, until the call ends. Each
+	// message has its length as a little-endian u32 in front, then the side (0 the agent, 1 the
+	// caller) as a byte, the time on the call's pipeline clock in ms as a little-endian double,
+	// and 8 kHz PCM16 mono audio.
+	//
+	// Corresponds with GET /api/v1/conversations/{conversation_id}/listen (the `ListenApiV1ConversationsConversationIdListenGet` operationId).
+	ListenApiV1ConversationsConversationIdListenGet(ctx context.Context, conversationId openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// GetRecordingApiV1ConversationsConversationIdRecordingGet Get Recording
 	//
 	// Corresponds with GET /api/v1/conversations/{conversation_id}/recording (the `GetRecordingApiV1ConversationsConversationIdRecordingGet` operationId).
@@ -3682,6 +3692,26 @@ func (c *Client) GetEvaluationApiV1ConversationsConversationIdEvaluationGet(ctx 
 // Corresponds with GET /api/v1/conversations/{conversation_id}/events (the `StreamEventsApiV1ConversationsConversationIdEventsGet` operationId).
 func (c *Client) StreamEventsApiV1ConversationsConversationIdEventsGet(ctx context.Context, conversationId openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewStreamEventsApiV1ConversationsConversationIdEventsGetRequest(c.Server, conversationId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListenApiV1ConversationsConversationIdListenGet Listen
+//
+// Both sides of a live call's audio as the worker sends it, until the call ends. Each
+// message has its length as a little-endian u32 in front, then the side (0 the agent, 1 the
+// caller) as a byte, the time on the call's pipeline clock in ms as a little-endian double,
+// and 8 kHz PCM16 mono audio.
+//
+// Corresponds with GET /api/v1/conversations/{conversation_id}/listen (the `ListenApiV1ConversationsConversationIdListenGet` operationId).
+func (c *Client) ListenApiV1ConversationsConversationIdListenGet(ctx context.Context, conversationId openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListenApiV1ConversationsConversationIdListenGetRequest(c.Server, conversationId)
 	if err != nil {
 		return nil, err
 	}
@@ -5591,6 +5621,40 @@ func NewStreamEventsApiV1ConversationsConversationIdEventsGetRequest(server stri
 	}
 
 	operationPath := fmt.Sprintf("/api/v1/conversations/%s/events", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewListenApiV1ConversationsConversationIdListenGetRequest constructs an http.Request for the ListenApiV1ConversationsConversationIdListenGet method
+func NewListenApiV1ConversationsConversationIdListenGetRequest(server string, conversationId openapi_types.UUID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "conversation_id", conversationId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/conversations/%s/listen", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -7526,6 +7590,18 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with GET /api/v1/conversations/{conversation_id}/events (the `StreamEventsApiV1ConversationsConversationIdEventsGet` operationId).
 	StreamEventsApiV1ConversationsConversationIdEventsGetWithResponse(ctx context.Context, conversationId openapi_types.UUID, reqEditors ...RequestEditorFn) (*StreamEventsApiV1ConversationsConversationIdEventsGetResponse, error)
 
+	// ListenApiV1ConversationsConversationIdListenGetWithResponse Listen
+	//
+	// Both sides of a live call's audio as the worker sends it, until the call ends. Each
+	// message has its length as a little-endian u32 in front, then the side (0 the agent, 1 the
+	// caller) as a byte, the time on the call's pipeline clock in ms as a little-endian double,
+	// and 8 kHz PCM16 mono audio.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/conversations/{conversation_id}/listen (the `ListenApiV1ConversationsConversationIdListenGet` operationId).
+	ListenApiV1ConversationsConversationIdListenGetWithResponse(ctx context.Context, conversationId openapi_types.UUID, reqEditors ...RequestEditorFn) (*ListenApiV1ConversationsConversationIdListenGetResponse, error)
+
 	// GetRecordingApiV1ConversationsConversationIdRecordingGetWithResponse Get Recording
 	//
 	// Returns a wrapper object for the known response body format(s).
@@ -8831,6 +8907,47 @@ func (r StreamEventsApiV1ConversationsConversationIdEventsGetResponse) StatusCod
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r StreamEventsApiV1ConversationsConversationIdEventsGetResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type ListenApiV1ConversationsConversationIdListenGetResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON422 the response for an HTTP 422 `application/json` response
+	JSON422 *HTTPValidationError
+}
+
+// GetJSON422 returns the response for an HTTP 422 `application/json` response
+func (r ListenApiV1ConversationsConversationIdListenGetResponse) GetJSON422() *HTTPValidationError {
+	return r.JSON422
+}
+
+// GetBody returns the raw response body bytes
+func (r ListenApiV1ConversationsConversationIdListenGetResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListenApiV1ConversationsConversationIdListenGetResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListenApiV1ConversationsConversationIdListenGetResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListenApiV1ConversationsConversationIdListenGetResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -11030,6 +11147,24 @@ func (c *ClientWithResponses) StreamEventsApiV1ConversationsConversationIdEvents
 	return ParseStreamEventsApiV1ConversationsConversationIdEventsGetResponse(rsp)
 }
 
+// ListenApiV1ConversationsConversationIdListenGetWithResponse Listen
+//
+// Both sides of a live call's audio as the worker sends it, until the call ends. Each
+// message has its length as a little-endian u32 in front, then the side (0 the agent, 1 the
+// caller) as a byte, the time on the call's pipeline clock in ms as a little-endian double,
+// and 8 kHz PCM16 mono audio.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/conversations/{conversation_id}/listen (the `ListenApiV1ConversationsConversationIdListenGet` operationId).
+func (c *ClientWithResponses) ListenApiV1ConversationsConversationIdListenGetWithResponse(ctx context.Context, conversationId openapi_types.UUID, reqEditors ...RequestEditorFn) (*ListenApiV1ConversationsConversationIdListenGetResponse, error) {
+	rsp, err := c.ListenApiV1ConversationsConversationIdListenGet(ctx, conversationId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListenApiV1ConversationsConversationIdListenGetResponse(rsp)
+}
+
 // GetRecordingApiV1ConversationsConversationIdRecordingGetWithResponse Get Recording
 //
 // Returns a wrapper object for the known response body format(s).
@@ -12332,6 +12467,32 @@ func ParseStreamEventsApiV1ConversationsConversationIdEventsGetResponse(rsp *htt
 	}
 
 	response := &StreamEventsApiV1ConversationsConversationIdEventsGetResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest HTTPValidationError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListenApiV1ConversationsConversationIdListenGetResponse parses an HTTP response from a ListenApiV1ConversationsConversationIdListenGetWithResponse call
+func ParseListenApiV1ConversationsConversationIdListenGetResponse(rsp *http.Response) (*ListenApiV1ConversationsConversationIdListenGetResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListenApiV1ConversationsConversationIdListenGetResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
