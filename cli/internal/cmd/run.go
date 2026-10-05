@@ -17,6 +17,19 @@ import (
 // cancelTimeout bounds the cancel request that follows Ctrl-C or SIGTERM.
 const cancelTimeout = 30 * time.Second
 
+// judgeTimeout bounds the wait for the judges when no --timeout is set. They normally answer
+// within a minute of a call's end. A stopped evaluator never does, and a failing judge model
+// retries for longer than this before its evaluation fails.
+const judgeTimeout = 10 * time.Minute
+
+// withTimeout ends ctx with wait.ErrTimeout after d. With no d, only the parent ends it.
+func withTimeout(ctx context.Context, d time.Duration) (context.Context, context.CancelFunc) {
+	if d <= 0 {
+		return context.WithCancel(ctx)
+	}
+	return context.WithTimeoutCause(ctx, d, wait.ErrTimeout)
+}
+
 // maxPageSize is the largest page the API serves.
 const maxPageSize = 100
 
@@ -25,7 +38,7 @@ func (a *app) runCmd() *cobra.Command {
 		Use:   "run",
 		Short: "Runs: test calls of an agent's scenarios, started together",
 	}
-	run.AddCommand(a.runStartCmd(), a.runWaitCmd(), a.runViewCmd(), a.runListCmd(), a.runCancelCmd())
+	run.AddCommand(a.runStartCmd(), a.runWaitCmd(), a.runViewCmd(), a.runMetricsCmd(), a.runListCmd(), a.runCancelCmd())
 	return run
 }
 
@@ -42,7 +55,7 @@ func (a *app) runStartCmd() *cobra.Command {
 	var f runStartFlags
 	cmd := &cobra.Command{
 		Use:   "start --agent <id> (--scenario <id>... | --all)",
-		Short: "Start a run; with --wait, wait for it and fail unless every call completed",
+		Short: "Start a run; with --wait, wait for it and its verdicts, and fail unless every call completed and the judges passed every call",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return a.startRun(cmd, f)
@@ -62,7 +75,7 @@ func (a *app) runStartCmd() *cobra.Command {
 	fl.StringVar(&f.noiseLevel, "noise-level", "", "the noise level: light, busy or loud")
 	fl.StringVar(&f.name, "name", "", "a name for the run")
 	fl.StringVar(&f.idempotencyKey, "idempotency-key", "", "the same key and body return the first run instead of a new one")
-	fl.BoolVar(&f.wait, "wait", false, "wait for the run to end; Ctrl-C or SIGTERM then cancels the run")
+	fl.BoolVar(&f.wait, "wait", false, "wait for the run to end and for its verdicts; Ctrl-C or SIGTERM then cancels a run that is still going")
 	fl.DurationVar(&f.timeout, "timeout", 0, "with --wait, stop waiting after this long, for example 30m")
 	cmd.MarkFlagRequired("agent")
 	cmd.MarkFlagsOneRequired("scenario", "all")
@@ -173,39 +186,64 @@ func allScenarios(ctx context.Context, c *api.Client, agentID uuid.UUID) ([]uuid
 	return ids, nil
 }
 
-// waitForRun waits for the run, prints it, and fails unless every call completed. With
-// cancelOnStop, Ctrl-C or SIGTERM cancels the run.
+// waitForRun waits for the run to end, prints it, waits for the judges' verdicts, and fails
+// unless every call completed and the judges passed every call. One timeout covers both waits;
+// without one, the judges get judgeTimeout. With cancelOnStop, Ctrl-C or SIGTERM cancels a run
+// that is still going.
 func (a *app) waitForRun(cmd *cobra.Command, c *api.Client, id uuid.UUID, timeout time.Duration, cancelOnStop bool) error {
+	ctx, cancel := withTimeout(cmd.Context(), timeout)
+	defer cancel()
 	stderr := cmd.ErrOrStderr()
-	r, err := wait.Run(cmd.Context(), c, id, wait.Options{
-		Timeout:  timeout,
-		Interval: a.pollInterval,
-		Progress: stderr,
-		Live:     isTerminal(stderr),
-	})
+	opts := wait.Options{Interval: a.pollInterval, Progress: stderr, Live: isTerminal(stderr)}
+	again := "truman run wait " + id.String()
+	r, err := wait.Run(ctx, c, id, opts)
 	switch {
 	case errors.Is(err, wait.ErrTimeout):
 		what := fmt.Sprintf("run %s did not end within %s", id, timeout)
 		if r.Run.Status != "" {
 			what += "; it is " + r.Progress()
 		}
-		return &nextStep{what, "truman run wait " + id.String()}
+		return &nextStep{what, again}
 	case errors.Is(err, context.Canceled) && cancelOnStop:
 		return cancelAfterStop(cmd.Context(), c, id)
 	case errors.Is(err, context.Canceled):
-		return &nextStep{"stopped waiting; the run goes on", "truman run wait " + id.String()}
+		return &nextStep{"stopped waiting; the run goes on", again}
 	case err != nil:
-		return &nextStep{fmt.Sprintf("could not read run %s (%s); the run goes on", id, describe(err)),
-			"truman run wait " + id.String()}
+		return &nextStep{fmt.Sprintf("could not read run %s (%s); the run goes on", id, describe(err)), again}
 	}
 	if err := printJSON(cmd.OutOrStdout(), r.Body); err != nil {
 		return err
 	}
-	if !r.Passed() {
-		return &nextStep{r.Summary(), fmt.Sprintf(
-			"truman conversation list --run %s --latest-attempts --group error,did_not_connect", id)}
+	var v wait.Verdicts
+	if r.Passed() {
+		limit := timeout
+		if limit <= 0 {
+			limit = judgeTimeout
+		}
+		judging, stop := withTimeout(ctx, limit)
+		defer stop()
+		v, err = wait.RunVerdicts(judging, c, id, opts)
+		switch {
+		case errors.Is(err, wait.ErrTimeout):
+			return &nextStep{fmt.Sprintf("run %s ended, but the judges were not done before the %s time limit", id, limit), again}
+		case errors.Is(err, context.Canceled):
+			return &nextStep{"stopped waiting for the judges; the run has ended", again}
+		case err != nil:
+			return &nextStep{fmt.Sprintf("could not read the verdicts of run %s (%s)", id, describe(err)), again}
+		}
 	}
-	fmt.Fprintln(stderr, r.Summary())
+	summary := r.Summary()
+	if s := v.Summary(); s != "" {
+		summary += "; " + s
+	}
+	switch {
+	case !r.Passed():
+		return &nextStep{summary, fmt.Sprintf(
+			"truman conversation list --run %s --latest-attempts --group error,did_not_connect", id)}
+	case !v.Passed():
+		return &nextStep{summary, "truman run metrics " + id.String()}
+	}
+	fmt.Fprintln(stderr, summary)
 	return nil
 }
 
@@ -226,7 +264,7 @@ func (a *app) runWaitCmd() *cobra.Command {
 	var timeout time.Duration
 	cmd := &cobra.Command{
 		Use:   "wait <id>",
-		Short: "Wait for a run to end; fail unless every call completed. Stopping it leaves the run alone",
+		Short: "Wait for a run to end and for its verdicts; fail unless every call completed and the judges passed every call. Stopping it leaves the run alone",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			id, err := parseID("run", args[0])
@@ -259,6 +297,29 @@ func (a *app) runViewCmd() *cobra.Command {
 				return err
 			}
 			body, err := api.Body(c.GetRunApiV1RunsRunIdGet(cmd.Context(), id))
+			if err != nil {
+				return err
+			}
+			return printJSON(cmd.OutOrStdout(), body)
+		},
+	}
+}
+
+func (a *app) runMetricsCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "metrics <id>",
+		Short: "Show a run's verdicts and metrics: pass rate, coverage, pass^2, each scenario's calls, and each criterion's counts",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			id, err := parseID("run", args[0])
+			if err != nil {
+				return err
+			}
+			c, err := a.client()
+			if err != nil {
+				return err
+			}
+			body, err := api.Body(c.GetRunMetricsApiV1RunsRunIdMetricsGet(cmd.Context(), id))
 			if err != nil {
 				return err
 			}

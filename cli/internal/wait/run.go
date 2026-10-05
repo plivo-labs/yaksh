@@ -1,4 +1,5 @@
-// Package wait waits for Truman's long work: a run until it ends, and the event stream of a call.
+// Package wait waits for Truman's long work: a run until it ends, the judges' verdicts, and the
+// event stream of a call.
 package wait
 
 import (
@@ -16,14 +17,13 @@ import (
 	"github.com/plivo-labs/truman/cli/internal/api"
 )
 
-// ErrTimeout ends a wait that ran past Options.Timeout.
+// ErrTimeout is the cause to give a context whose time limit ends a wait, so that the wait
+// returns it.
 var ErrTimeout = errors.New("the wait timed out")
 
-// Options control Run.
+// Options control a wait.
 type Options struct {
-	// Timeout stops the wait with ErrTimeout. Zero waits until the run ends.
-	Timeout time.Duration
-	// Interval is the time between two reads of the run.
+	// Interval is the time between two reads.
 	Interval time.Duration
 	// Progress gets one line each time the counts change, or nothing when it is nil. With
 	// Live, the line is rewritten in place, for a terminal.
@@ -114,33 +114,36 @@ func groups(counts map[string]int, skip string) string {
 	return strings.Join(parts, ", ")
 }
 
-// Run reads the run every Interval until it ends, the timeout passes, or ctx is done. When it
-// stops early it returns the last read with ErrTimeout or the cause of ctx. Stopping the wait
-// never touches the run.
+// Run reads the run every Interval until it ends or ctx is done. When it stops early it returns
+// the last read with the cause of ctx. Stopping the wait never touches the run.
 func Run(ctx context.Context, c *api.Client, id uuid.UUID, opts Options) (Result, error) {
-	if opts.Timeout > 0 {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeoutCause(ctx, opts.Timeout, ErrTimeout)
-		defer cancel()
-	}
+	return poll(ctx, opts, func(ctx context.Context) (Result, error) { return read(ctx, c, id) },
+		Result.Ended, Result.Progress)
+}
+
+// poll calls read every opts.Interval until done accepts its value or ctx is done. When it stops
+// early it returns the last value with the cause of ctx. Progress gets line(value) each time the
+// line changes.
+func poll[T any](ctx context.Context, opts Options, read func(context.Context) (T, error),
+	done func(T) bool, line func(T) string) (T, error) {
 	p := &progress{w: opts.Progress, live: opts.Live}
 	defer p.end()
 	ticker := time.NewTicker(opts.Interval)
 	defer ticker.Stop()
-	var last Result
+	var last T
 	for {
-		r, err := read(ctx, c, id)
+		v, err := read(ctx)
 		if err != nil {
 			if ctx.Err() != nil {
 				return last, context.Cause(ctx)
 			}
 			return last, err
 		}
-		last = r
-		if r.Ended() {
-			return r, nil
+		last = v
+		if done(v) {
+			return v, nil
 		}
-		p.show(r.Progress())
+		p.show(line(v))
 		select {
 		case <-ctx.Done():
 			return last, context.Cause(ctx)

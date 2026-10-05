@@ -69,7 +69,9 @@ func TestRunWaitsUntilTheRunEnds(t *testing.T) {
 func TestRunStopsAtTheTimeoutWithTheLastRead(t *testing.T) {
 	c := runs(t, runJSON("running", `"in_progress":1`))
 
-	r, err := Run(context.Background(), c, runID, Options{Timeout: 20 * time.Millisecond, Interval: time.Millisecond})
+	ctx, cancel := context.WithTimeoutCause(context.Background(), 20*time.Millisecond, ErrTimeout)
+	defer cancel()
+	r, err := Run(ctx, c, runID, Options{Interval: time.Millisecond})
 
 	if !errors.Is(err, ErrTimeout) || r.Run.Status != api.RunStatusRunning {
 		t.Fatalf("Run = %+v, %v; want the running run and ErrTimeout", r.Run, err)

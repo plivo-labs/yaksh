@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/spf13/cobra"
@@ -19,7 +20,7 @@ func (a *app) conversationCmd() *cobra.Command {
 		Use:   "conversation",
 		Short: "Conversations: single test calls, and the calls of runs",
 	}
-	conversation.AddCommand(a.conversationStartCmd(), a.conversationViewCmd(), a.conversationListCmd())
+	conversation.AddCommand(a.conversationStartCmd(), a.conversationViewCmd(), a.conversationEvaluationCmd(), a.conversationListCmd())
 	return conversation
 }
 
@@ -28,6 +29,7 @@ func (a *app) conversationStartCmd() *cobra.Command {
 		agent, scenario, persona, noiseSound, noiseLevel string
 		maxDurationS, maxTurns                           int
 		follow                                           bool
+		timeout                                          time.Duration
 	)
 	cmd := &cobra.Command{
 		Use:   "start --agent <id> --scenario <id>",
@@ -76,7 +78,7 @@ func (a *app) conversationStartCmd() *cobra.Command {
 				return printJSON(cmd.OutOrStdout(), created)
 			}
 			fmt.Fprintf(cmd.ErrOrStderr(), "conversation %s started\n", id)
-			return followConversation(cmd.Context(), c, id, cmd.OutOrStdout(), cmd.ErrOrStderr())
+			return a.followConversation(cmd.Context(), c, id, timeout, cmd.OutOrStdout(), cmd.ErrOrStderr())
 		},
 	}
 	fl := cmd.Flags()
@@ -87,21 +89,27 @@ func (a *app) conversationStartCmd() *cobra.Command {
 	fl.IntVar(&maxTurns, "max-turns", 0, "how many agent turns the caller answers")
 	fl.StringVar(&noiseSound, "noise-sound", "", "background noise, for example cafe; none turns it off")
 	fl.StringVar(&noiseLevel, "noise-level", "", "the noise level: light, busy or loud")
-	fl.BoolVar(&follow, "wait", false, "print each event as one JSON line as it happens, then the conversation")
+	fl.BoolVar(&follow, "wait", false, "print each event as one JSON line as it happens, then the conversation, then the evaluation of a completed call")
+	fl.DurationVar(&timeout, "timeout", 0, "with --wait, stop waiting after this long, for example 8m; the call goes on")
 	cmd.MarkFlagRequired("agent")
 	cmd.MarkFlagRequired("scenario")
 	return cmd
 }
 
 // followConversation prints the call's events as JSON lines until the call ends, then the
-// conversation itself as the last line. It fails unless the call completed. Stopping it leaves
-// the call alone.
-func followConversation(ctx context.Context, c *api.Client, id uuid.UUID, stdout, stderr io.Writer) error {
+// conversation itself, then its evaluation once the judges are done. It fails unless the call
+// completed and the judges passed it or are off. One timeout covers both waits; without one, the
+// judges get judgeTimeout. Stopping it leaves the call alone.
+func (a *app) followConversation(ctx context.Context, c *api.Client, id uuid.UUID, timeout time.Duration, stdout, stderr io.Writer) error {
+	ctx, cancel := withTimeout(ctx, timeout)
+	defer cancel()
 	view := "truman conversation view " + id.String()
 	err := wait.Conversation(ctx, c, id, func(e wait.Event) error {
 		return writeLine(stdout, e)
 	})
 	switch {
+	case errors.Is(err, wait.ErrTimeout):
+		return &nextStep{fmt.Sprintf("the call did not end within %s; it goes on", timeout), view}
 	case errors.Is(err, context.Canceled):
 		return &nextStep{"stopped following; the call goes on", view}
 	case err != nil:
@@ -116,7 +124,7 @@ func followConversation(ctx context.Context, c *api.Client, id uuid.UUID, stdout
 	}
 	var outcome struct {
 		Status    api.ConversationStatus `json:"status"`
-		EndReason *string                `json:"end_reason"`
+		EndReason *api.EndReason         `json:"end_reason"`
 	}
 	if err := json.Unmarshal(body, &outcome); err != nil {
 		return fmt.Errorf("read the conversation's outcome: %w", err)
@@ -126,11 +134,42 @@ func followConversation(ctx context.Context, c *api.Client, id uuid.UUID, stdout
 		return &nextStep{fmt.Sprintf("the event stream ended before the call; the call is %s", outcome.Status), view}
 	}
 	what := fmt.Sprintf("conversation %s %s", id, outcome.Status)
+	stopped := outcome.EndReason != nil && *outcome.EndReason == api.EndReasonUserRequest
 	if outcome.EndReason != nil {
-		what += ", " + *outcome.EndReason
+		what += ", " + string(*outcome.EndReason)
 	}
-	if outcome.Status != api.ConversationStatusCompleted {
+	// The judges skip a call that someone stopped, and a run counts it as cancelled.
+	if outcome.Status != api.ConversationStatusCompleted || stopped {
 		return &nextStep{what, view}
+	}
+	evaluation := "truman conversation evaluation " + id.String()
+	limit := timeout
+	if limit <= 0 {
+		limit = judgeTimeout
+	}
+	judging, stop := withTimeout(ctx, limit)
+	defer stop()
+	e, err := wait.CallEvaluation(judging, c, id, wait.Options{
+		Interval: a.pollInterval, Progress: stderr, Live: isTerminal(stderr),
+	})
+	switch {
+	case errors.Is(err, wait.ErrTimeout):
+		return &nextStep{fmt.Sprintf("%s; the judges were not done before the %s time limit", what, limit), evaluation}
+	case errors.Is(err, context.Canceled):
+		return &nextStep{what + "; stopped waiting for the judges", evaluation}
+	case err != nil:
+		return &nextStep{fmt.Sprintf("%s; could not read the evaluation (%s)", what, describe(err)), evaluation}
+	}
+	if e.Result.Evaluation != nil {
+		if err := writeLine(stdout, wait.Event{Name: "evaluation", Data: e.Body}); err != nil {
+			return err
+		}
+	}
+	if s := e.Summary(); s != "" {
+		what += "; " + s
+	}
+	if !e.Passed() {
+		return &nextStep{what, evaluation}
 	}
 	fmt.Fprintln(stderr, what)
 	return nil
@@ -161,6 +200,29 @@ func (a *app) conversationViewCmd() *cobra.Command {
 				return err
 			}
 			body, err := api.Body(c.GetConversationApiV1ConversationsConversationIdGet(cmd.Context(), id))
+			if err != nil {
+				return err
+			}
+			return printJSON(cmd.OutOrStdout(), body)
+		},
+	}
+}
+
+func (a *app) conversationEvaluationCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "evaluation <id>",
+		Short: "Show what the judges decided about a call: its verdicts, and each criterion and rule with its quotes and reasoning",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			id, err := parseID("conversation", args[0])
+			if err != nil {
+				return err
+			}
+			c, err := a.client()
+			if err != nil {
+				return err
+			}
+			body, err := api.Body(c.GetEvaluationApiV1ConversationsConversationIdEvaluationGet(cmd.Context(), id))
 			if err != nil {
 				return err
 			}
@@ -228,7 +290,7 @@ func (a *app) conversationListCmd() *cobra.Command {
 	fl.StringSliceVar(&groups, "group", nil, "only these outcome groups, for example error,did_not_connect")
 	fl.BoolVar(&latestAttempts, "latest-attempts", false, "leave out the attempts that a retry replaced")
 	fl.StringVar(&q, "q", "", "search the agent, scenario or persona name, or the ID")
-	fl.StringVar(&sort, "sort", "", "created_at or talk_ms; a leading - sorts descending")
+	fl.StringVar(&sort, "sort", "", "created_at, talk_ms or response_p90_ms; a leading - sorts descending")
 	addPageFlags(cmd, &page, &pageSize)
 	return cmd
 }
