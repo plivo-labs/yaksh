@@ -254,7 +254,7 @@ function ReachFields({ form }: { form: AgentDraft }) {
           <FieldLabel htmlFor="agent_speaks_first">Agent speaks first</FieldLabel>
           {outbound && (
             <FieldDescription className={swap}>
-              When off, the caller says a short hello on pickup.
+              When off, the caller speaks first, from its goal.
             </FieldDescription>
           )}
         </FieldContent>

@@ -771,6 +771,7 @@ class PhoneCaller:
         # The line hangs up now; its report comes while the call's audio is saved. A
         # stopped call has a deadline to finish, so it takes the report only if it already came.
         ending = asyncio.ensure_future(line.end(0 if stop.is_set() else HANGUP_REPORT_WAIT_S))
+        await live.close()
         try:
             started_ms = spoken.recording.start_ms(connected_ms)
             if started_ms < connected_ms:
@@ -889,7 +890,6 @@ class PhoneCaller:
         finally:
             if greeting is not None:
                 greeting.cancel()
-            await live.close()
         return Spoken(state, persona, recording, marks, serializer)
 
     async def _hang_up(self, call_id: str) -> None:

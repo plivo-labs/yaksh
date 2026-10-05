@@ -766,7 +766,7 @@ function Transcript({
                                 <ResponseTime ms={turn.response_ms} />
                               )}
                               {turn.talked_over && <Badge>talked over</Badge>}
-                              {turn.scripted && <Badge>fixed nudge</Badge>}
+                              {turn.scripted && <Badge>fixed line</Badge>}
                               {turn.provenance === "cut" && <Badge>cut off</Badge>}
                               {turn.provenance === "unconfirmed" && (
                                 <Badge>not confirmed played</Badge>
