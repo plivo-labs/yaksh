@@ -1,4 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
+import { Copy } from "lucide-react";
 import { Fragment, type RefObject, useEffect, useRef, useState } from "react";
 import { useDefaultLayout } from "react-resizable-panels";
 import { Link, useParams, useSearchParams } from "react-router";
@@ -44,6 +45,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
+import { copyText } from "@/lib/clipboard";
 import {
   BAND_TEXT,
   BAND_WASH,
@@ -778,6 +780,15 @@ function Transcript({
                               {turn.provenance === "unconfirmed" && (
                                 <Badge>Not confirmed played</Badge>
                               )}
+                              <button
+                                type="button"
+                                title={`Copy turn ${index + 1}`}
+                                aria-label={`Copy turn ${index + 1}`}
+                                onClick={() => void copyText(turn.text, "Message copied")}
+                                className="-m-0.5 rounded-sm p-0.5 opacity-0 outline-none transition-[color,opacity] group-hover/message:opacity-100 group-data-[align=end]/message:order-first hover:text-foreground focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-inset"
+                              >
+                                <Copy className="size-3.5" />
+                              </button>
                             </MessageHeader>
                             <Bubble variant={turn.role}>
                               <BubbleContent
