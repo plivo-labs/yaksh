@@ -5,10 +5,14 @@ import { Link, useParams, useSearchParams } from "react-router";
 
 import { BackButton } from "@/components/back-button";
 import { EndCallDialog } from "@/components/confirm-dialogs";
-import { LiveListen } from "@/components/live-listen";
 import { CopyId } from "@/components/copy-id";
 import { Fact } from "@/components/panel";
-import { type Mark, type PlayerHandle, RecordingPlayer } from "@/components/recording-player";
+import {
+  LiveWaveform,
+  type Mark,
+  type PlayerHandle,
+  RecordingPlayer,
+} from "@/components/recording-player";
 import { ResponseTime } from "@/components/response-time";
 import { ConversationStatusLabel } from "@/components/status-label";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -51,6 +55,7 @@ import {
   words,
 } from "@/lib/format";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { useLiveListen } from "@/hooks/use-live-listen";
 import { useStoredBoolean } from "@/hooks/use-stored-boolean";
 import { APPEAR, REVEAL, RISE } from "@/lib/motion";
 import { keys, useAgent, useConversation } from "@/lib/queries";
@@ -133,9 +138,6 @@ export function ConversationPage() {
           </div>
           <div className="flex items-center gap-4">
             <ConversationStatusLabel status={data.status} />
-            {LIVE_STATUSES.includes(data.status) && (
-              <LiveListen key={data.id} conversationId={data.id} />
-            )}
             {active && (
               <Button variant="outline" size="sm" onClick={() => setEnding(true)}>
                 End call
@@ -332,6 +334,66 @@ function connectedAt(conversation: Conversation): number | undefined {
 
 /** The recording and the transcript. Keyed by the conversation, so the turn that was playing
  * does not carry over to the next conversation. */
+/** The call's audio: while the call is live, a Listen button that plays it and draws it as it
+ * plays; after the call, the recording. It holds the listening, so only this card redraws as
+ * the audio plays. */
+function AudioCard({
+  conversation,
+  player,
+  start,
+  onTime,
+}: {
+  conversation: Conversation;
+  player: RefObject<PlayerHandle | null>;
+  start: number;
+  onTime: (seconds: number) => void;
+}) {
+  const live = useLiveListen(conversation.id);
+  const isLive = LIVE_STATUSES.includes(conversation.status);
+  const connectedMs = connectedAt(conversation);
+  let content;
+  if (live.view) content = <LiveWaveform view={live.view} />;
+  else if (live.listening) {
+    content = <p className="text-sm text-muted-foreground">Waiting for the call's audio.</p>;
+  } else if (isLive) {
+    content = (
+      <p className="text-sm text-muted-foreground">
+        Listen plays the call while it runs. The recording comes when the call ends.
+      </p>
+    );
+  } else {
+    content = (
+      <RecordingPlayer
+        ref={player}
+        url={conversation.recording_url}
+        name={`truman-${conversation.id}`}
+        start={start}
+        onTime={onTime}
+        marks={
+          connectedMs === undefined
+            ? []
+            : conversation.replies.map((reply) => replyMark(reply, connectedMs))
+        }
+      />
+    );
+  }
+  return (
+    <Card className="shrink-0">
+      <CardHeader className="border-b">
+        <CardTitle>Audio</CardTitle>
+        {(isLive || live.listening) && (
+          <CardAction>
+            <Button variant="outline" size="sm" onClick={live.toggle}>
+              {live.listening ? "Stop listening" : "Listen"}
+            </Button>
+          </CardAction>
+        )}
+      </CardHeader>
+      <CardContent>{content}</CardContent>
+    </Card>
+  );
+}
+
 function CallPane({
   conversation,
   player,
@@ -345,27 +407,12 @@ function CallPane({
   const connectedMs = connectedAt(conversation);
   return (
     <div className="flex h-full flex-col gap-6 p-px pr-3">
-      <Card className="shrink-0">
-        <CardHeader className="border-b">
-          <CardTitle>Recording</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <RecordingPlayer
-            ref={player}
-            url={conversation.recording_url}
-            name={`truman-${conversation.id}`}
-            start={start}
-            onTime={(seconds) =>
-              setHeard(turnAt(conversation.transcript, connectedMs ?? 0, seconds))
-            }
-            marks={
-              connectedMs === undefined
-                ? []
-                : conversation.replies.map((reply) => replyMark(reply, connectedMs))
-            }
-          />
-        </CardContent>
-      </Card>
+      <AudioCard
+        conversation={conversation}
+        player={player}
+        start={start}
+        onTime={(seconds) => setHeard(turnAt(conversation.transcript, connectedMs ?? 0, seconds))}
+      />
       <Transcript
         turns={conversation.transcript}
         active={ACTIVE_STATUSES.includes(conversation.status)}

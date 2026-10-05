@@ -99,14 +99,72 @@ function until(seconds: number, signal: AbortSignal): Promise<void> {
   });
 }
 
-/** Plays the call until it ends or the signal aborts. The page must call this from a click,
- * because browsers start audio only after a user gesture. */
-export async function listen(conversationId: string, signal: AbortSignal): Promise<void> {
+/** The audio scheduled so far, drawn as the recording is: one peak for each 10 ms of each side,
+ * from the first piece scheduled after Listen. The lanes cover a fixed span, so the drawing grows
+ * from the left, and the scale changes only when the span doubles. */
+export interface LiveView {
+  lanes: Float32Array[];
+  /** Seconds that the lanes cover. */
+  span: number;
+  /** Seconds already played. */
+  played: number;
+}
+
+const BUCKET_S = 0.01;
+const VIEW_S = 0.1;
+
+class Peaks {
+  private lanes = [new Float32Array(6000), new Float32Array(6000)];
+
+  add(side: number, startS: number, samples: Float32Array): void {
+    const per = RATE * BUCKET_S;
+    const first = Math.round(startS / BUCKET_S);
+    const count = Math.ceil(samples.length / per);
+    if (first + count > this.lanes[0].length) {
+      this.lanes = this.lanes.map((lane) => {
+        const grown = new Float32Array(Math.max(lane.length * 2, first + count));
+        grown.set(lane);
+        return grown;
+      });
+    }
+    const lane = this.lanes[side];
+    for (let bucket = 0; bucket < count; bucket++) {
+      let peak = lane[first + bucket];
+      for (let i = bucket * per; i < Math.min((bucket + 1) * per, samples.length); i++) {
+        peak = Math.max(peak, Math.abs(samples[i]));
+      }
+      lane[first + bucket] = peak;
+    }
+  }
+
+  /** New views each time, so that a memo of them recomputes. */
+  view(): Float32Array[] {
+    return this.lanes.map((lane) => lane.subarray(0));
+  }
+}
+
+/** Plays the call until it ends or the signal aborts, and reports what it has played about ten
+ * times a second. The page must call this from a click, because browsers start audio only after
+ * a user gesture. */
+export async function listen(
+  conversationId: string,
+  signal: AbortSignal,
+  onView: (view: LiveView) => void,
+): Promise<void> {
   const context = new AudioContext({ sampleRate: RATE });
   const merger = context.createChannelMerger(2);
   merger.connect(context.destination);
   const timeline = new Timeline();
+  const peaks = new Peaks();
+  let firstSound: number | null = null;
   let playedUntil = 0;
+  const report = setInterval(() => {
+    if (firstSound === null) return;
+    const lanes = peaks.view();
+    const span = lanes[0].length * BUCKET_S;
+    const played = Math.min(Math.max(context.currentTime - firstSound, 0), span);
+    onView({ lanes, span, played });
+  }, VIEW_S * 1000);
   try {
     await context.resume();
     const response = await openStream(`/conversations/${conversationId}/listen`, signal);
@@ -134,10 +192,13 @@ export async function listen(conversationId: string, signal: AbortSignal): Promi
         source.buffer = buffer;
         source.connect(merger, 0, chunk.side);
         source.start(when);
+        firstSound ??= when;
+        peaks.add(chunk.side, when - firstSound, chunk.samples);
         playedUntil = Math.max(playedUntil, when + chunk.samples.length / RATE);
       }
     }
   } finally {
+    clearInterval(report);
     await context.close();
   }
 }

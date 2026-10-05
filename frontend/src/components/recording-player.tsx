@@ -33,6 +33,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Slider } from "@/components/ui/slider";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { copyText } from "@/lib/clipboard";
+import type { LiveView } from "@/lib/listen";
 import { clock, stamp } from "@/lib/format";
 import { type Recording, useRecording } from "@/lib/queries";
 import { cn } from "@/lib/utils";
@@ -134,6 +135,48 @@ function slice(lane: Float32Array, from: number, to: number): number[] {
     for (let i = start; i < Math.min(end, lane.length); i++) peak = Math.max(peak, lane[i]);
     return peak;
   });
+}
+
+/** A live call as it plays: the same lanes as the recording, filling from the left, with the
+ * played part darker. */
+export function LiveWaveform({ view }: { view: LiveView }) {
+  const { lanes, span, played } = view;
+  const contentPx = RULER_PX + lanes.length * LANE_PX + (lanes.length - 1) * GAP_PX;
+  const fraction = played / span;
+  return (
+    <div className="grid gap-3">
+      <div className="grid grid-cols-[3rem_minmax(0,1fr)] gap-x-2">
+        <div className="grid content-start gap-2 pt-5 text-xs text-muted-foreground">
+          {LANES.map((lane) => (
+            <span key={lane} className="flex h-10 items-center">
+              {lane}
+            </span>
+          ))}
+        </div>
+        <div
+          role="img"
+          aria-label={`Live audio of the call, ${clock(played * 1000)} heard`}
+          className="relative"
+          style={{ height: contentPx }}
+        >
+          <Tile
+            index={0}
+            zoom={1}
+            lanes={lanes}
+            duration={span}
+            listen="both"
+            played={fraction * 100}
+          />
+          <span
+            aria-hidden
+            className="pointer-events-none absolute inset-y-0 w-px bg-foreground/70"
+            style={{ left: `${fraction * 100}%` }}
+          />
+        </div>
+      </div>
+      <p className="text-sm text-muted-foreground tabular-nums">Live, {clock(played * 1000)}</p>
+    </div>
+  );
 }
 
 /** What a page can ask of a loaded recording. */

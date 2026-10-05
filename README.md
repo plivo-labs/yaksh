@@ -75,7 +75,7 @@ The conversation page shows the p90 and the p50 (nearest rank), the number of re
 
 ## Listen to a live call
 
-On the page of a live call, **Listen** plays the call in stereo: the agent on the left, the caller on the right, with the caller's background noise. The audio is about half a second behind the call. It stops when the call ends, on a second click, or when you leave the page. Several people can listen to one call.
+On the page of a live call, **Listen** in the **Audio** card plays the call in stereo: the agent on the left, the caller on the right, with the caller's background noise. The audio is about half a second behind the call. While it plays, the card draws it in the same lanes as the recording, from the first audio after Listen. **Stop listening** removes the drawing. After the call, the recording takes its place. It stops when the call ends, on a second click, or when you leave the page. Several people can listen to one call.
 
 - The worker takes the audio inside its Pipecat pipeline with an observer, so it does not depend on Plivo, and a slow listener cannot slow the call.
 - The worker sends a call's audio to the API with Postgres `NOTIFY`, only while someone listens: the API asks for it every 5 seconds while a listener stays.
