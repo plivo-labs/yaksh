@@ -205,6 +205,60 @@ async def test_a_completed_call_is_judged_and_a_stopped_one_gets_only_code_check
     }
 
 
+async def test_rule_results_count_only_the_calls_that_ran_the_rule_as_written(
+    client: AsyncClient, db: Db, settings: Settings
+) -> None:
+    agent = await create_agent_id(client, name="Clinic", rules=RULES)
+    scenario = await create_scenario(client, agent, criteria=["The agent reads the new time back."])
+
+    async def judge_calls(repeats: int, judge: Judge | None) -> tuple[str, list[str]]:
+        run = (await start_run(client, agent, [scenario["id"]], repeats=repeats)).json()
+        ids = [str(await claim(db)) for _ in range(repeats)]
+        for conversation in ids:
+            outcome = CallOutcome(connected=True, end_reason=EndReason.AGENT_HANGUP)
+            await finish(db, conversation, outcome, transcript=CALL)
+        stop = asyncio.Event()
+        evaluator = asyncio.create_task(Evaluator(db, settings, judge).run(stop))
+
+        async def states() -> list[EvaluationState]:
+            async with db() as session:
+                return list(await session.scalars(select(Evaluation.state)))
+
+        try:
+            await eventually(states, lambda found: all(s is EvaluationState.DONE for s in found))
+        finally:
+            stop.set()
+            await evaluator
+        return run["id"], ids
+
+    first_run, _ = await judge_calls(2, Judge())
+    edited = [
+        RULES[0] | {"name": "Promises nothing it cannot keep"},
+        RULES[1] | {"name": "Greets the caller as Ava", "role": "deciding"},
+    ]
+    assert (
+        await client.patch(f"/api/v1/agents/{agent}", json={"rules": edited})
+    ).status_code == 200
+    _, later = await judge_calls(2, Judge())
+    await judge_calls(1, None)
+
+    results = (await client.get(f"/api/v1/agents/{agent}/rule-results")).json()
+    verdicts = (await client.get(f"/api/v1/runs/{first_run}/metrics")).json()["verdicts"]
+
+    assert [(r["key"], r["counts"]) for r in results] == [
+        ("no-promises", {"fail": 2}),
+        ("greets", {"pass": 4}),
+    ]
+    assert [f["conversation_id"] for f in results[0]["failures"]] == later[::-1]
+    assert results[1]["failures"] == []
+    assert [(r["name"], r["role"], r["counts"]) for r in verdicts["rules"]] == [
+        ("Greets as Ava", "reporting", {"pass": 2}),
+        ("Makes no promises it cannot keep", "deciding", {"fail": 2}),
+    ]
+    missing = await client.get("/api/v1/agents/01a10000-0000-7000-8000-000000000000/rule-results")
+    assert missing.status_code == 404
+
+
 class Busy:
     """Answers the first check at start, then is rate limited on every judge call."""
 

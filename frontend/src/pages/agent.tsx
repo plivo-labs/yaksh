@@ -33,6 +33,7 @@ import {
 } from "@/lib/types";
 import { EditAgentSheet } from "@/pages/agent-form";
 import { AgentKnowledgeBase } from "@/pages/agent-knowledge-base";
+import { AgentRules } from "@/pages/agent-rules";
 import { AgentScenarios } from "@/pages/agent-scenarios";
 import { StartCallDialog } from "@/pages/start-call-dialog";
 
@@ -82,12 +83,14 @@ const TABS = [
   { value: "runs", label: "Runs" },
   { value: "calls", label: "Calls" },
   { value: "knowledge-base", label: "Knowledge base" },
+  { value: "rules", label: "Rules" },
 ] as const;
 
 type Tab = (typeof TABS)[number]["value"];
 
 /** The agent's work, one panel per tab. The tab is in the address, so a link or a reload keeps it.
- * Every tab stays mounted: a scenario generation or an upload goes on while another tab is open. */
+ * Every tab but Rules stays mounted: a scenario generation or an upload goes on while another tab
+ * is open. Rules loads its results again each time it opens. */
 function AgentTabs({ agent }: { agent: Agent }) {
   const [params, setParams] = useSearchParams();
   const tab: Tab = TABS.find((item) => item.value === params.get("tab"))?.value ?? "scenarios";
@@ -116,6 +119,9 @@ function AgentTabs({ agent }: { agent: Agent }) {
       </TabsContent>
       <TabsContent keepMounted value="knowledge-base">
         <AgentKnowledgeBase agent={agent} />
+      </TabsContent>
+      <TabsContent value="rules">
+        <AgentRules agent={agent} />
       </TabsContent>
     </Tabs>
   );
@@ -264,13 +270,6 @@ function Settings({ agent }: { agent: Agent }) {
         <Fact label="Config">
           {agent.config ? (
             textSize(agent.config.length)
-          ) : (
-            <span className="font-normal text-muted-foreground">None</span>
-          )}
-        </Fact>
-        <Fact label="Rules">
-          {agent.rules.length > 0 ? (
-            agent.rules.map((rule) => rule.name).join(", ")
           ) : (
             <span className="font-normal text-muted-foreground">None</span>
           )}

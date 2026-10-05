@@ -25,14 +25,15 @@ from truman.domain.evaluations import (
     EvaluationState,
     JudgeVersionUsed,
     Outcome,
+    RuleCounts,
     RunVerdicts,
     ScenarioVerdicts,
     UnsureKind,
 )
 from truman.evaluation import numbers
-from truman.evaluation.verdicts import CRITERION
+from truman.evaluation.verdicts import CRITERION, RULE
 
-DECIDED = (CRITERION, "rule-")
+DECIDED = (CRITERION, RULE)
 """The keys of the items a verdict counts: the criteria and the agent rules."""
 FINISHED = frozenset({EvaluationState.DONE, EvaluationState.FAILED})
 
@@ -77,6 +78,7 @@ async def run_verdicts(
                 EvaluationItem.evaluation_id,
                 EvaluationItem.item_key,
                 EvaluationItem.subject,
+                EvaluationItem.role,
                 EvaluationItem.decided_by,
                 EvaluationItem.machine_outcome,
                 EvaluationItem.effective_outcome,
@@ -130,6 +132,7 @@ async def run_verdicts(
         scenarios=scenarios,
         inconsistent=[scenarios[index].scenario_id for index in numbers.inconsistent(results)],
         criteria=criterion_counts(list(grouped), judged, items),
+        rules=rule_counts(items),
         decided_by=dict(
             Counter(
                 item.decided_by for item in decided if item.machine_outcome is not Outcome.ERROR
@@ -180,6 +183,26 @@ def criterion_counts(
             )
         )
     return found
+
+
+def rule_counts(items: Sequence[Row[Any]]) -> list[RuleCounts]:
+    """Each agent rule the judged calls ran, by name."""
+    counts: dict[str, Counter[str]] = defaultdict(Counter)
+    named: dict[str, Row[Any]] = {}
+    for item in items:
+        if item.item_key.startswith(RULE):
+            counts[item.item_key][outcome_name(item)] += 1
+            named[item.item_key] = item
+    found = [
+        RuleCounts(
+            key=key.removeprefix(RULE),
+            name=named[key].subject,
+            role=named[key].role,
+            counts=dict(counted),
+        )
+        for key, counted in counts.items()
+    ]
+    return sorted(found, key=lambda rule: rule.name.casefold())
 
 
 def caller_fidelity(rows: Sequence[Row[Any]], items: Sequence[Row[Any]]) -> list[CallerFidelity]:

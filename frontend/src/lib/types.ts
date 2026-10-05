@@ -257,6 +257,15 @@ export interface PhraseRule {
 
 export type AgentRule = LlmRule | PhraseRule;
 
+/** One of the agent's current rules over the judged calls that ran it as it is written now. */
+export interface RuleResults {
+  key: string;
+  /** By outcome after labels; "not_testable" is an unsure item that needs a hidden action. */
+  counts: Record<string, number>;
+  /** The latest failed calls, newest first. */
+  failures: { conversation_id: string; scenario_name: string; ended_at: string | null }[];
+}
+
 export interface DocumentSummary {
   id: string;
   name: string;
@@ -285,7 +294,6 @@ export interface AgentInput {
   config: string | null;
   /** Sent only when the agent is added; later changes go through the knowledge base panel. */
   knowledge_base?: KnowledgeBaseEntry[];
-  rules: AgentRule[];
 }
 
 export interface PhoneNumber {
@@ -803,6 +811,13 @@ export interface RunVerdicts {
     text: string;
     counts: Record<string, number>;
     rate: number | null;
+  }[];
+  /** The agent rules the run's calls ran, by name. */
+  rules: {
+    key: string;
+    name: string;
+    role: AgentRule["role"];
+    counts: Record<string, number>;
   }[];
   /** Criteria and agent rules by who decided them. */
   decided_by: Partial<Record<"code" | "jev" | "llm", number>>;

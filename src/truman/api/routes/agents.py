@@ -9,6 +9,8 @@ from truman.api.pagination import Page, PageDep
 from truman.api.schemas.agents import AgentRead, AgentSummary, AgentVersionRead
 from truman.db.models import Agent
 from truman.domain.agents import AgentCreate, AgentUpdate, Direction
+from truman.domain.evaluations import RuleResults
+from truman.evaluation import rule_results
 from truman.simulation import agents
 
 SORT_PATTERN = f"^-?({'|'.join(agents.SORT_KEYS)})$"
@@ -65,6 +67,13 @@ async def duplicate_agent(agent_id: uuid.UUID, session: SessionDep) -> AgentRead
 @router.delete("/{agent_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_agent(agent_id: uuid.UUID, session: SessionDep) -> None:
     await agents.delete_agent(session, agent_id)
+
+
+@router.get("/{agent_id}/rule-results")
+async def get_rule_results(agent_id: uuid.UUID, session: SessionDep) -> list[RuleResults]:
+    """Each current rule over the judged calls that ran it as it is written now."""
+    agent = await agents.get_agent(session, agent_id)
+    return await rule_results.rule_results(session, agent_id, agents.config_of(agent).rules)
 
 
 @router.get("/{agent_id}/versions")

@@ -8,11 +8,13 @@ import {
 } from "@tanstack/react-query";
 
 import { ApiError, api, apiBlob } from "@/lib/api";
+import { toRules } from "@/lib/rules";
 import {
   ACTIVE_RUN_STATUSES,
   ACTIVE_STATUSES,
   type Agent,
   type AgentInput,
+  type AgentRule,
   type AgentSummary,
   type BackgroundNoise,
   type DocumentRead,
@@ -42,6 +44,7 @@ import {
   type RunMetrics,
   type RunStatus,
   type RunSummary,
+  type RuleResults,
   type Scenario,
   type ScenarioInput,
   type Voice,
@@ -53,6 +56,7 @@ import {
 export const keys = {
   agents: ["agents"] as const,
   agent: (id: string) => ["agents", id] as const,
+  ruleResults: (id: string) => ["agents", id, "rule-results"] as const,
   conversations: (filters: Record<string, string>) => ["conversations", filters] as const,
   conversation: (id: string) => ["conversations", "one", id] as const,
   conversationEvaluation: (id: string, evaluation: EvaluationState | null) =>
@@ -319,6 +323,37 @@ export function useSaveAgent(id?: string) {
   });
 }
 
+/** The agent as the page shows it, for a change made to its latest saved state. */
+function cachedAgent(client: QueryClient, agentId: string): Agent {
+  const agent = client.getQueryData<Agent>(keys.agent(agentId));
+  if (!agent) throw new Error("The agent is not loaded. Reload the page and try again.");
+  return agent;
+}
+
+export function useRuleResults(agentId: string) {
+  return useQuery({
+    queryKey: keys.ruleResults(agentId),
+    queryFn: () => api<RuleResults[]>(`/agents/${agentId}/rule-results`),
+  });
+}
+
+/** Saves a change to an agent's rules, applied to the list as it is when the save starts. */
+export function useSaveRules(agentId: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (change: (current: AgentRule[]) => AgentRule[]) => {
+      return api<Agent>(`/agents/${agentId}`, {
+        method: "PATCH",
+        json: { rules: toRules(change(cachedAgent(client, agentId).rules)) },
+      });
+    },
+    onSuccess: (agent) => {
+      client.setQueryData(keys.agent(agentId), agent);
+      return client.invalidateQueries({ queryKey: keys.agents });
+    },
+  });
+}
+
 export function useDuplicateAgent() {
   const client = useQueryClient();
   return useMutation({
@@ -574,8 +609,7 @@ export function useSaveKnowledgeBase(agentId: string) {
   const client = useQueryClient();
   return useMutation({
     mutationFn: (change: (current: KnowledgeBaseEntry[]) => KnowledgeBaseEntry[]) => {
-      const agent = client.getQueryData<Agent>(keys.agent(agentId));
-      const current = (agent?.knowledge_base ?? []).map(({ document_id, name }) => ({
+      const current = cachedAgent(client, agentId).knowledge_base.map(({ document_id, name }) => ({
         document_id,
         name,
       }));
