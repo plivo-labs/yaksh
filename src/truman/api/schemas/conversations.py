@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
@@ -12,6 +13,15 @@ from truman.domain.conversations import (
     Turn,
     Validity,
     WireEvent,
+)
+from truman.domain.evaluations import (
+    DecidedBy,
+    EvaluationState,
+    ItemRole,
+    Metric,
+    Outcome,
+    UnsureKind,
+    Verdict,
 )
 from truman.domain.languages import Language
 from truman.domain.latency import Latency, Reply
@@ -77,6 +87,9 @@ class ConversationSummary(BaseModel):
     talk_ms: int | None
     latency: LatencySummary | None
     """None when the call was not measured, or when the agent never spoke."""
+    evaluation: EvaluationState | None
+    """None for a conversation with no evaluation: one not ended yet, or cancelled before its
+    call connected."""
     recording_url: str | None
     caller_reason: str | None
     run_id: uuid.UUID | None
@@ -95,3 +108,42 @@ class ConversationRead(ConversationSummary):
     wire_events: list[WireEvent]
     validity: Validity | None
     retried_as: uuid.UUID | None
+
+
+class ItemRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    item_key: str
+    subject: str
+    """The criterion's text or the rule's name."""
+    role: ItemRole
+    decided_by: DecidedBy
+    machine_outcome: Outcome
+    unsure_kind: UnsureKind | None
+    effective_outcome: Outcome
+    """After people's labels; the machine outcome while there are none."""
+    effective_unsure_kind: UnsureKind | None
+    answer: dict[str, Any] | None
+    """The judge's answer: its evidence with turn numbers, its reasoning and its verdict."""
+    error_reason: str | None
+    caller_effect: dict[str, Any] | None
+    """How Truman's caller affected this criterion, by the caller check."""
+    jev_choice: str | None
+    """What Jev chose when it answered the item first; a Jev pass has no other answer."""
+    jev_probabilities: dict[str, float] | None
+
+
+class ConversationEvaluation(BaseModel):
+    evaluation: EvaluationState | None
+    """None for a conversation with no evaluation."""
+    failure: str | None
+    """Why the last attempt failed, while it is tried again and after it ended failed."""
+    metrics: dict[str, Metric]
+    """By metric key; empty until the evaluation is done."""
+    scenario_verdict: Verdict | None
+    """From the criteria; None when the call was not judged."""
+    conversation_verdict: Verdict | None
+    """The criteria and the deciding agent rules."""
+    effective_scenario_verdict: Verdict | None
+    effective_conversation_verdict: Verdict | None
+    items: list[ItemRead]

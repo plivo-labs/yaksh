@@ -5,7 +5,9 @@ from dataclasses import asdict
 from datetime import timedelta
 from typing import Any
 
+from pydantic import BaseModel
 from sqlalchemy import ColumnElement, Row, String, and_, cast, func, or_, select, update
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from sqlalchemy.orm import defer
 
@@ -17,6 +19,7 @@ from truman.db.models import (
     Persona,
     PersonaVersion,
     PhoneNumber,
+    RefusedCall,
     Run,
     Scenario,
     ScenarioVersion,
@@ -39,10 +42,10 @@ from truman.domain.conversations import (
     outcome_group,
 )
 from truman.domain.errors import NotFoundError
-from truman.domain.latency import Latency
 from truman.domain.personas import PersonaConfig
 from truman.domain.scenarios import ScenarioConfig
 from truman.domain.triggers import SEND_TIMEOUT_S
+from truman.evaluation import evaluations, results
 from truman.simulation.agents import get_agent
 from truman.simulation.background_noise import noise_mix
 from truman.simulation.languages import LANGUAGES
@@ -93,7 +96,7 @@ async def create_conversation(
 SORT_KEYS = {
     "created_at": Conversation.created_at,
     "talk_ms": Conversation.talk_ms,
-    "response_p90_ms": Conversation.transcript["latency"]["p90_ms"].as_integer(),
+    "response_p90_ms": results.response_p90(),
 }
 """Values a conversation list sorts on; `-` before a key sorts descending. Calls with no talk
 time or no response times sort last either way."""
@@ -174,20 +177,6 @@ async def list_conversations(
         query.order_by(order.nulls_last(), Conversation.id).offset(offset).limit(limit)
     )
     return list(rows), total or 0
-
-
-async def latencies(
-    session: AsyncSession, conversation_ids: Iterable[uuid.UUID]
-) -> dict[uuid.UUID, Latency]:
-    """The response times of each measured conversation, by id; read on their own, as lists
-    defer the transcript."""
-    found = Conversation.transcript["latency"]
-    rows = await session.execute(
-        select(Conversation.id, found.label("latency")).where(
-            Conversation.id.in_(set(conversation_ids)), found["replies"].is_not(None)
-        )
-    )
-    return {row.id: Latency.model_validate(row.latency) for row in rows}
 
 
 async def pinned_agents(
@@ -416,7 +405,6 @@ async def call_request(
         max_turns=conversation.max_turns,
         goodbye=LANGUAGES[conversation.language].goodbye,
         agent_data=ScenarioConfig.model_validate(scenario_version.config).agent_data,
-        pickup=LANGUAGES[conversation.language].pickup,
         accept_calls_until=conversation.dial_deadline_at,
         output_dir=settings.data_dir / str(conversation.id),
     )
@@ -486,34 +474,60 @@ async def accept_incoming_call(
         .with_for_update(of=Conversation)
     )
     if conversation is None:
-        return "no conversation holds this number"
+        return await refuse(session, call, "no conversation holds this number")
     now = (await session.execute(select(func.clock_timestamp()))).scalar_one()
     if conversation.dial_deadline_at is None:
-        return "the number is on an inbound test"
+        return await refuse(session, call, "the number is on an inbound test", conversation.id)
     if not (
         conversation.claimed_by == worker_id
         and conversation.status is ConversationStatus.RUNNING
         and conversation.lease_expires_at is not None
         and conversation.lease_expires_at > now
     ):
-        return "the conversation is not running on this worker"
+        return await refuse(
+            session, call, "the conversation is not running on this worker", conversation.id
+        )
     admission = Admission(
         conversation_id=conversation.id, max_duration_s=conversation.max_duration_s
     )
     if conversation.call_uuid == call.call_uuid:
         return admission
     if conversation.call_uuid is not None:
-        return "the conversation already has a call"
+        return await refuse(session, call, "the conversation already has a call", conversation.id)
     if now >= conversation.dial_deadline_at:
-        return "the dial window has closed"
+        return await refuse(session, call, "the dial window has closed", conversation.id)
     agent_version = await session.get_one(AgentVersion, conversation.agent_version_id)
     outbound = AgentConfig.model_validate(agent_version.config).outbound
     if outbound and outbound.calling_numbers and call.from_number not in outbound.calling_numbers:
-        return f"{call.from_number} is not one of the agent's calling numbers"
+        reason = f"{call.from_number} is not one of the agent's calling numbers"
+        return await refuse(session, call, reason, conversation.id)
     conversation.call_uuid = call.call_uuid
     conversation.agent_caller_id = call.from_number
     await session.commit()
     return admission
+
+
+async def refuse(
+    session: AsyncSession,
+    call: IncomingCall,
+    reason: str,
+    conversation_id: uuid.UUID | None = None,
+) -> str:
+    """Record that Truman turned the call away, once per call, since Plivo retries its answer
+    webhook, and give the reason. The record is committed before the refusal is answered."""
+    await session.execute(
+        insert(RefusedCall)
+        .values(
+            call_uuid=call.call_uuid,
+            to_number=call.to_number,
+            from_number=call.from_number,
+            reason=reason,
+            conversation_id=conversation_id,
+        )
+        .on_conflict_do_nothing(index_elements=["call_uuid"])
+    )
+    await session.commit()
+    return reason
 
 
 def expired() -> ColumnElement[bool]:
@@ -567,6 +581,7 @@ async def end_expired(
     )
     if ended:
         await release_numbers(session, [row.id for row in ended], number_rest_s)
+        await evaluations.enqueue(session, [row.id for row in ended])
     return ended
 
 
@@ -582,6 +597,10 @@ def resolve_status(outcome: CallOutcome) -> ConversationStatus:
     return ConversationStatus.COMPLETED
 
 
+def dump(value: BaseModel | None) -> dict[str, Any] | None:
+    return None if value is None else value.model_dump(mode="json")
+
+
 def failure_reason(outcome: CallOutcome) -> str | None:
     return FAILURE_TEXT.get(outcome.end_reason, outcome.caller_error)
 
@@ -595,8 +614,14 @@ async def finalize(
     number_rest_s: int,
 ) -> bool:
     """Record the terminal state; a run conversation in the error group is queued again, up to
-    its run's retries. Returns False when the row was no longer ours to finish."""
-    transcript.latency = outcome.latency
+    its run's retries. A call that was not cancelled is queued for evaluation in the same
+    transaction, so it is evaluated exactly when it is saved. Returns False when the row was no
+    longer ours to finish."""
+    transcript.stream_opened_ms = outcome.stream_opened_ms
+    transcript.loop_lag = outcome.loop_lag
+    transcript.recording_start_ms = outcome.recording_start_ms
+    transcript.agent_media = outcome.agent_media
+    transcript.caller_replies = outcome.caller_replies
     if outcome.connected:
         transcript.validity = Validity(
             ok=outcome.caller_error is None,
@@ -615,7 +640,13 @@ async def finalize(
                 talk_ms=outcome.talk_ms,
                 transcript=transcript.model_dump(mode="json"),
                 caller_reason=outcome.caller_reason,
+                caller_settings=dump(outcome.caller_settings),
+                caller_usage=dump(outcome.caller_usage),
+                line_facts=dump(outcome.line_facts),
                 recording_path=str(outcome.recording_path) if outcome.recording_path else None,
+                caller_voice_path=(
+                    str(outcome.caller_voice_path) if outcome.caller_voice_path else None
+                ),
                 call_uuid=outcome.call_uuid,
                 agent_caller_id=Conversation.agent_caller_id if outcome.call_uuid else None,
                 claimed_by=None,
@@ -628,6 +659,8 @@ async def finalize(
         await release_numbers(session, [conversation_id], number_rest_s)
         if run is not None:
             await retry(session, run, [ended])
+        if ended.status is not ConversationStatus.CANCELLED:
+            await evaluations.enqueue(session, [conversation_id])
     await session.commit()
     return ended is not None
 

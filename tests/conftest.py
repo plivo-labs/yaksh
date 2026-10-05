@@ -36,9 +36,13 @@ from truman.domain.conversations import (
     WireEventKind,
 )
 from truman.domain.errors import UnavailableError
+from truman.domain.evaluations import Metric, MetricKey
+from truman.domain.language_models import ModelAnswer, ModelCallError
 from truman.domain.languages import Language
 from truman.domain.numbers import AccountNumber
 from truman.domain.voices import ProviderVoice, VoiceGender, VoiceProvider, VoiceSettings
+from truman.evaluation import evaluations
+from truman.evaluation.evaluations import Evaluated
 from truman.integrations.elevenlabs import as_wav
 from truman.integrations.plivo_signature import signature, signed_text
 from truman.simulation import conversations, numbers
@@ -240,8 +244,34 @@ async def finish(
     """Record the outcome of a conversation the worker claimed, as the worker does."""
     async with db() as session:
         return await conversations.finalize(
-            session, uuid.UUID(conversation_id), worker_id, outcome, transcript or Transcript(), 0
+            session,
+            uuid.UUID(conversation_id),
+            worker_id,
+            outcome,
+            transcript or Transcript(),
+            0,
         )
+
+
+async def evaluate_queued(db: Db, metrics: dict[str, dict[MetricKey, Metric]]) -> list[str]:
+    """Finish every queued evaluation as an evaluator would, with the metrics given for its
+    conversation (none for the others); return the conversations it evaluated."""
+    done = []
+    while True:
+        async with db() as session:
+            evaluation = await evaluations.claim(session, "e1", 60)
+        if evaluation is None:
+            return done
+        conversation_id = str(evaluation.conversation_id)
+        async with db() as session:
+            assert await evaluations.finish(
+                session,
+                evaluation.id,
+                evaluation.claim_seq,
+                Evaluated(metrics=metrics.get(conversation_id, {})),
+                audit=False,
+            )
+        done.append(conversation_id)
 
 
 async def expire_leases(db: Db, which: ColumnElement[bool]) -> None:
@@ -451,15 +481,37 @@ class FakeJsonModel:
 
     async def complete_json(
         self, *, system: str, user: str, name: str, schema: dict[str, Any]
-    ) -> dict[str, Any]:
+    ) -> ModelAnswer:
         self.calls.append((name, user))
         if self.down:
-            raise UnavailableError("the model call failed: timed out")
+            raise ModelCallError("the model call failed: timed out", temporary=True)
         if name == "capabilities":
-            return {"capabilities": self.capabilities}
-        if name == "questions":
-            return self.questions
-        return self.write(user)
+            data = {"capabilities": self.capabilities}
+        elif name == "questions":
+            data = self.questions
+        else:
+            data = self.write(user)
+        return ModelAnswer(data=data, model="fake", input_tokens=None, output_tokens=None)
+
+    async def close(self) -> None:
+        pass
+
+
+class Scripted:
+    """A judge model that gives its answers in order, or raises the error in their place."""
+
+    def __init__(self, *answers: dict[str, Any] | Exception) -> None:
+        self.answers = list(answers)
+        self.requests: list[str] = []
+
+    async def complete_json(
+        self, *, system: str, user: str, name: str, schema: dict[str, Any]
+    ) -> ModelAnswer:
+        self.requests.append(user)
+        found = self.answers.pop(0)
+        if isinstance(found, Exception):
+            raise found
+        return ModelAnswer(data=found, model="judge-1", input_tokens=100, output_tokens=20)
 
     async def close(self) -> None:
         pass
@@ -621,9 +673,10 @@ async def client(
     async with engine.begin() as connection:
         await connection.execute(
             text(
-                "TRUNCATE phone_numbers, conversations, runs, agent_versions, agents,"
-                " persona_versions, personas, voices, scenario_versions, scenarios, workers,"
-                " documents, scenario_generations"
+                "TRUNCATE phone_numbers, refused_calls, labels, labelers, judge_calls,"
+                " evaluation_items, judge_versions, metric_values, evaluations, conversations,"
+                " runs, agent_versions, agents, persona_versions, personas, voices,"
+                " scenario_versions, scenarios, workers, documents, scenario_generations"
             )
         )
     await engine.dispose()

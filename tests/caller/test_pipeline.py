@@ -1,5 +1,6 @@
 import asyncio
 from pathlib import Path
+from types import SimpleNamespace
 from typing import cast
 
 import pytest
@@ -18,15 +19,25 @@ from pipecat.processors.aggregators.llm_response_universal import (
     LLMUserAggregator,
     LLMUserAggregatorParams,
 )
+from pipecat.services.llm_service import FunctionCallParams
 from pipecat.tests.utils import SleepFrame, run_test
 from pipecat.turns.user_stop import SpeechTimeoutUserTurnStopStrategy
 from pipecat.turns.user_turn_strategies import UserTurnStrategies
 
 from tests.conftest import FakeProvider, make_settings
 from truman.caller import pipeline
-from truman.caller.pipeline import CallState, Persona, TurnLimit, llm_service, watch_silence
+from truman.caller.audio import Clock
+from truman.caller.pipeline import (
+    CallState,
+    Ending,
+    Persona,
+    TurnLimit,
+    llm_service,
+    watch_silence,
+)
+from truman.caller.transcript import TranscriptBuilder
 from truman.config import Settings
-from truman.domain.conversations import EndReason
+from truman.domain.conversations import CallObserver, CallRequest, EndReason, WireEvent
 
 KEYS = ("deepgram_api_key", "elevenlabs_api_key", "openai_api_key")
 
@@ -233,3 +244,94 @@ async def test_an_agent_that_hangs_up_during_the_close_ends_it_and_the_callers_r
 
     assert 0.2 <= loop.time() - started < 5.0
     assert state.end_reason is EndReason.TURN_LIMIT
+
+
+class Recorder:
+    """The parts of a call that an Ending touches, recording what it does in order."""
+
+    def __init__(self, *, spoke: bool) -> None:
+        self.log: list[str] = []
+        self.results: list[dict] = []
+        self.spoke = spoke
+        self.state = CallState()
+        self.request = cast(CallRequest, SimpleNamespace(conversation_id="c-1", goodbye="Bye now."))
+
+    def wire_event(self, event: WireEvent) -> None:
+        self.log.append(f"{event.kind}@{event.at_ms}:{event.detail}")
+
+    def ms(self) -> int:
+        return 4200
+
+    def called_after_words(self, _tool_call_id: str) -> bool:
+        return self.spoke
+
+    async def say(self, text: str) -> None:
+        self.log.append(f"say:{text}")
+
+    def ending(self) -> Ending:
+        return Ending(
+            self.request,
+            self.state,
+            cast(TranscriptBuilder, self),
+            cast(CallObserver, self),
+            cast(Clock, self),
+            self.say,
+        )
+
+    def params(self, reason: str) -> FunctionCallParams:
+        async def result_callback(result: dict, **_: object) -> None:
+            self.results.append(result)
+
+        return cast(
+            FunctionCallParams,
+            SimpleNamespace(
+                arguments={"reason": reason}, tool_call_id="t-1", result_callback=result_callback
+            ),
+        )
+
+
+async def test_the_turn_limit_goodbye_is_marked_before_the_caller_says_it() -> None:
+    line = Recorder(spoke=True)
+
+    await line.ending().goodbye()
+
+    assert line.log == ["turn_limit@4200:None", "say:Bye now."]
+    assert line.state.end_reason is EndReason.TURN_LIMIT
+
+
+async def test_ending_the_call_after_speaking_is_marked_with_the_callers_reason() -> None:
+    line = Recorder(spoke=True)
+
+    await line.ending().end_call(line.params("the table is booked"))
+
+    assert line.log == ["end_call@4200:the table is booked"]
+    assert line.results == [{"status": "call ended"}]
+    assert (line.state.end_reason, line.state.caller_reason) == (
+        EndReason.CALLER_HANGUP,
+        "the table is booked",
+    )
+
+
+async def test_a_silent_end_gets_one_more_reply_and_only_the_real_end_is_marked() -> None:
+    line = Recorder(spoke=False)
+    ending = line.ending()
+
+    await ending.end_call(line.params("done"))
+    assert line.log == [] and line.state.end_reason is None
+    await ending.end_call(line.params("done"))
+
+    assert line.results == [{"status": pipeline.SILENT_END}, {"status": "call ended"}]
+    assert line.log == ["end_call@4200:done", "say:Bye now."]
+    assert line.state.end_reason is EndReason.CALLER_HANGUP
+
+
+async def test_a_call_that_already_ended_records_no_second_end() -> None:
+    line = Recorder(spoke=True)
+    line.state.end(EndReason.AGENT_HANGUP)
+    ending = line.ending()
+
+    await ending.end_call(line.params("done"))
+    await ending.goodbye()
+
+    assert line.log == ["say:Bye now."]
+    assert (line.state.end_reason, line.state.caller_reason) == (EndReason.AGENT_HANGUP, None)

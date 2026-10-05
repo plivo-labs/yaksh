@@ -13,9 +13,9 @@ src/truman/
   caller/       runs the simulated caller and connects to the customer's agent
   integrations/ clients for outside services: Plivo, ElevenLabs
   simulation/   defines scenarios and personas and orchestrates test conversations
-  evaluation/   runs judges and computes scores (planned, empty today)
+  evaluation/   the evaluation queue, and the metrics, judges and labels of saved conversations
   api/          HTTP endpoints for the UI and integrations
-  worker/       claims queued conversations from Postgres and runs them under a lease
+  worker/       claims queued conversations from Postgres and runs them under a lease; evaluator.py does the same for evaluations
   db/           database models and migrations
 frontend/       React UI
 cli/            Go command-line client for the API, its own module; skill/SKILL.md is the guide for coding agents
@@ -26,12 +26,12 @@ tests/          automated tests and fixtures
 
 ## How a test flows
 
-Two stages, each a separate job, each retryable on its own. Today the simulated test runs up to the saved conversation; the evaluation stage and imported calls are planned.
+Two stages, each a separate job, each retryable on its own. The worker saves the conversation and queues its evaluation in the same transaction; the evaluator service claims the evaluation under a lease and stores the metrics (docs/decisions/0022). Imported calls are planned.
 
 ```
-Simulated test:   api -> worker -> simulation -> caller -> saved conversation
-                                -> evaluation -> saved results
-Imported call:    api -> worker -> evaluation -> saved results
+Simulated test:   api -> worker -> simulation -> caller -> saved conversation, queued evaluation
+                  evaluator -> evaluation -> saved metrics and verdicts
+Imported call:    api -> queued evaluation -> evaluator -> evaluation -> saved metrics and verdicts
 ```
 
 `simulation/` turns each scenario and persona into a prompt and a goal and calls the `Caller` interface once per conversation. A run creates one conversation for each repeat of each scenario; a retry is a new conversation (attempt + 1, `retry_of`) that copies the inputs of the one it replaces (docs/decisions/0012). `caller/` has one conversation at a time and returns transcript, recording and timing; the conversation is saved before anything is judged. `evaluation/` starts from a saved conversation, whoever produced it: one result per conversation per judge, then reliability (pass@k, pass^k) across repeats. Only the latest attempt of each repeat of each scenario counts: a conversation that another one's `retry_of` points to is not a sample. `worker/` only sequences the stages. A conversation freezes its inputs when it is created: the pinned agent, scenario and persona versions and the finished caller prompt; how the caller maps them to provider settings follows the running code. A run creates its conversations at once with the same versions and the same "today"; a retry keeps the prompt, and so the "today", of the attempt it replaces. With evaluation, a run will also freeze its rubric and judge prompt versions.
@@ -44,7 +44,7 @@ Imported call:    api -> worker -> evaluation -> saved results
 - Default prompts and starter personas ship inside the package. User edits live in the database and are never overwritten by upgrades.
 - Process settings come from environment variables via `config.py`; per-record choices (voice, model) are fields on the record. Secrets exist only in the environment.
 - Runtime output goes to configurable storage, default `data/`, gitignored.
-- Locks are taken in one order: an agent, then its scenarios, then personas, each set in id order; a run before its conversations; a conversation before phone numbers. Starting conversations share-locks the scenarios and personas, so transactions that only reference them do not wait.
+- Locks are taken in one order: an agent, then its scenarios, then personas, each set in id order; a run before its conversations; a conversation before phone numbers; an evaluation before its items. Starting conversations share-locks the scenarios and personas, so transactions that only reference them do not wait.
 - A time that is written or compared after a possible lock wait uses `statement_timestamp()`. Creation times keep `now()`, the time of the transaction, so the rows one transaction creates share one time.
 
 ## Conventions

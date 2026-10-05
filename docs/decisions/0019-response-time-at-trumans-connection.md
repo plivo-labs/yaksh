@@ -5,15 +5,18 @@ Status: accepted
 
 ## Decision
 
-Right after each call, Truman measures how long the agent made the caller wait:
+After each call is saved, the evaluator (decision 0022) measures how long the agent made the caller wait:
 
 - Each caller reply gets the first agent speech that starts after the reply began and before the next reply begins. The response time runs from the end of the caller's speech to the start of that speech. Before the caller has spoken, the call's start counts as a reply that ended when Truman's stream opened. The agent's first speech answers it. Speech that started by then was under way: it gets no value, as its true start is unknown.
 - When that speech starts before the caller's reply ended, the agent spoke over the caller. The reply has no response time and counts as a talk-over. A reply that the end of the call cut off has no end, so it has no response time either.
 - A caller reply that the agent did not answer before the caller spoke again has no response time. The percentiles leave that wait out; the transcript shows it as the caller's next turn, often the idle nudge.
+- A wait that overlaps a gap in the agent's media gets no value. In a gap, no audio came from the line, so the line and not the agent can have made the wait longer.
+- When the agent was still speaking after the caller's speech ended, the wait starts where that speech ends: until then, the caller did not wait in silence.
+- Only replies that expect an answer get a value: not the caller's goodbye, and not the start of a call that Truman's caller opens.
 - The caller's reply starts at Pipecat's `BotStartedSpeakingFrame`, the `caller_audio_start` wire event. Its speech ends where Pipecat's `SileroVADAnalyzer`, with the live pipeline's settings, last finds speech in the reply's own TTS audio, before Truman mixes in background noise. Truman counts that point back from the `BotStoppedSpeakingFrame`, the `caller_audio_end` wire event, when the last audio went out. A reply cut off before its TTS finished keeps the `caller_audio_end` time.
 - The agent's speech starts where the same analyzer turns to speaking on the agent channel of the recording, less the windows it needs to decide. The recording places the agent's audio by Plivo's timestamps (decision 0015).
 - Each analyzer first hears 0.4 s of silence. Pipecat's volume reads 0 until it holds 0.4 s of audio, so without that silence the analyzer cannot hear the first 0.4 s. Before its first sample, each channel held nothing.
-- A call keeps each reply's two times and its p50 and p90, nearest rank, in its transcript. A run pools the replies of its latest attempts.
+- A call keeps each reply's two times and its p50 and p90, nearest rank, in its `response_time` metric. A run pools the replies of its latest attempts.
 
 ## Why
 
@@ -32,10 +35,11 @@ Right after each call, Truman measures how long the agent made the caller wait:
 - In a phone call where the agent speaks first, its speech usually starts before Truman's stream opens, so the call's start gets no value. Truman cannot see when the agent heard the call.
 - At the start of a channel, Pipecat's volume needs about 0.16 s to rise from 0. Speech in the first 0.2 s of the agent channel starts that much late. This matters only for an agent that starts to speak within 0.2 s of the stream opening, with no frames before it.
 - A reply cut off before its TTS finished keeps the time its last audio went out, so its value reads short by the TTS's quiet tail.
-- Truman keeps the TTS audio of each reply until the call ends: 16 kB for each second of speech.
+- Truman keeps the TTS audio of each reply until the call ends, then saves it next to the recording: 16 kB for each second of speech.
 - A spoken filler such as "hmm" counts as the agent's first speech. Hold music with a voice would too.
 - An agent that does not answer leaves no value, so a silent agent does not raise the p90. Its silence shows in the transcript as the caller's idle nudge.
 - Silero takes about 0.65 s of CPU for a 3-minute call.
+- Pipecat's detector resets Silero's state every 5 s of clock time. Live, that is every 5 s of audio. The evaluator analyzes a call much faster than real time, so the state resets about once for each call.
 - Pipecat's detector treats a window it cannot analyze as silence and logs the error.
 
 ## Other options

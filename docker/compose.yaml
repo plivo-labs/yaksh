@@ -45,6 +45,14 @@ services:
     healthcheck:
       disable: true
 
+  evaluator:
+    <<: *truman
+    command:
+      - truman-server
+      - evaluator
+    healthcheck:
+      disable: true
+
   storage:
     image: chrislusf/seaweedfs:4.48
     command:

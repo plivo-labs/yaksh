@@ -1,18 +1,32 @@
-export const TOKEN_KEY = "truman.token";
-export const UNAUTHORIZED_EVENT = "truman:unauthorized";
+/** Where a token is kept, and the event that clears it when the server refuses it. The API
+ * token opens every route but the review routes, which take a labeler's token. */
+export interface Credential {
+  key: string;
+  refused: string;
+}
 
-export function getToken(): string {
+export const API_TOKEN: Credential = { key: "truman.token", refused: "truman:unauthorized" };
+export const LABELER_TOKEN: Credential = {
+  key: "truman.labeler",
+  refused: "truman:labeler-unauthorized",
+};
+
+function credentialFor(path: string): Credential {
+  return path === "/review" || path.startsWith("/review/") ? LABELER_TOKEN : API_TOKEN;
+}
+
+export function getToken(credential: Credential): string {
   try {
-    return localStorage.getItem(TOKEN_KEY) ?? "";
+    return localStorage.getItem(credential.key) ?? "";
   } catch {
     return "";
   }
 }
 
-export function setToken(token: string): void {
+export function setToken(credential: Credential, token: string): void {
   try {
-    if (token) localStorage.setItem(TOKEN_KEY, token);
-    else localStorage.removeItem(TOKEN_KEY);
+    if (token) localStorage.setItem(credential.key, token);
+    else localStorage.removeItem(credential.key);
   } catch {
     // storage unavailable: the token lives for this page only
   }
@@ -29,10 +43,6 @@ export class ApiError extends Error {
   }
 }
 
-export function authHeaders(): HeadersInit {
-  return { Authorization: `Bearer ${getToken()}` };
-}
-
 type ApiInit = {
   method?: string;
   json?: unknown;
@@ -42,8 +52,9 @@ type ApiInit = {
 };
 
 export async function request(path: string, init: ApiInit): Promise<Response> {
+  const credential = credentialFor(path);
   const headers: Record<string, string> = {
-    ...(authHeaders() as Record<string, string>),
+    Authorization: `Bearer ${getToken(credential)}`,
     ...init.headers,
   };
   if (init.json !== undefined) headers["Content-Type"] = "application/json";
@@ -54,7 +65,7 @@ export async function request(path: string, init: ApiInit): Promise<Response> {
     signal: init.signal,
   });
   if (response.status === 401) {
-    window.dispatchEvent(new Event(UNAUTHORIZED_EVENT));
+    window.dispatchEvent(new Event(credential.refused));
   }
   if (!response.ok) {
     const body = await response.json().catch(() => null);

@@ -16,6 +16,7 @@ from pydantic import (
 from truman.domain.documents import DocumentName
 from truman.domain.languages import Language
 from truman.domain.numbers import E164
+from truman.domain.rules import AgentRules
 from truman.domain.triggers import OutboundConfig
 
 
@@ -84,6 +85,8 @@ class AgentConfig(BaseModel):
     config: ConfigText | None = None
     """The agent's full configuration as text, in any format: a prompt, a flow, an export."""
     knowledge_base: Annotated[KnowledgeBase, AfterValidator(distinct_entries)] = []
+    rules: AgentRules = []
+    """Checks for every call of the agent, beside each scenario's criteria."""
 
     @model_validator(mode="after")
     def fits_direction(self) -> AgentConfig:
@@ -125,8 +128,9 @@ class AgentUpdate(BaseModel):
     brief: Brief | None = None
     config: ConfigText | None = None
     knowledge_base: Annotated[KnowledgeBase, AfterValidator(distinct_entries)] | None = None
+    rules: AgentRules | None = None
 
-    @field_validator("name", "language", "knowledge_base")
+    @field_validator("name", "language", "knowledge_base", "rules")
     @classmethod
     def cannot_be_cleared(cls, value: Any, info: ValidationInfo) -> Any:
         if value is None:

@@ -1,11 +1,12 @@
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from enum import StrEnum
 from typing import Any
 
 from sqlalchemy import (
     Boolean,
     CheckConstraint,
+    Date,
     DateTime,
     Enum,
     Float,
@@ -26,6 +27,17 @@ from truman.db.base import Base
 from truman.domain.agents import Direction, Transport
 from truman.domain.background_noise import NoiseLevel, NoiseSound
 from truman.domain.conversations import Channel, ConversationStatus, EndReason
+from truman.domain.evaluations import (
+    DecidedBy,
+    EvaluationState,
+    ItemRole,
+    LabelAnswer,
+    LabelReason,
+    Lane,
+    Outcome,
+    UnsureKind,
+    Verdict,
+)
 from truman.domain.generation import GenerationMode, GenerationStatus
 from truman.domain.languages import Language
 from truman.domain.scenarios import Category
@@ -55,6 +67,9 @@ class Agent(Base):
     brief: Mapped[str | None] = mapped_column(Text)
     config: Mapped[str | None] = mapped_column(Text)
     knowledge_base: Mapped[list[dict[str, Any]]] = mapped_column(
+        JSONB, default=list, server_default=text("'[]'::jsonb")
+    )
+    rules: Mapped[list[dict[str, Any]]] = mapped_column(
         JSONB, default=list, server_default=text("'[]'::jsonb")
     )
     current_version: Mapped[int] = mapped_column(Integer, default=1)
@@ -152,6 +167,9 @@ class Conversation(Base):
     language: Mapped[Language] = mapped_column(pg_enum(Language, "language"))
     instructions: Mapped[str] = mapped_column(Text)
     nudge: Mapped[str] = mapped_column(Text)
+    today: Mapped[date] = mapped_column(Date)
+    """The date the caller is told is today, in time_zone."""
+    time_zone: Mapped[str] = mapped_column(Text)
     caller_number: Mapped[str | None] = mapped_column(Text)
     call_uuid: Mapped[str | None] = mapped_column(Text)
     dial_deadline_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -171,9 +189,17 @@ class Conversation(Base):
     ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     talk_ms: Mapped[int | None] = mapped_column(Integer)
     recording_path: Mapped[str | None] = mapped_column(Text)
+    caller_voice_path: Mapped[str | None] = mapped_column(Text)
+    """The caller's own voice, each reply back to back (see the transcript's caller replies)."""
     transcript: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     caller_reason: Mapped[str | None] = mapped_column(Text)
     """Why the caller ended the call, in its own words: not a verdict."""
+    caller_settings: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    """The models and voice the caller ran (`CallerSettings`); None before a call connects."""
+    caller_usage: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    """What the caller's services consumed (`CallerUsage`)."""
+    line_facts: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    """Plivo's hangup report for a connected call (`LineFacts`): who hung up."""
     claimed_by: Mapped[str | None] = mapped_column(Text)
     lease_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     run_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
@@ -213,6 +239,190 @@ class Conversation(Base):
         Index("ix_conversations_run_started", "run_id", "started_at"),
         Index("ix_conversations_retry_of", "retry_of"),
     )
+
+
+class RefusedCall(Base):
+    """A call to one of Truman's numbers that Truman did not take, and why. "No call came" can
+    then be told from a call that Truman turned away."""
+
+    __tablename__ = "refused_calls"
+
+    id: Mapped[uuid.UUID] = uuid_primary_key()
+    call_uuid: Mapped[str] = mapped_column(Text, unique=True)
+    to_number: Mapped[str] = mapped_column(Text)
+    from_number: Mapped[str] = mapped_column(Text)
+    reason: Mapped[str] = mapped_column(Text)
+    conversation_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("conversations.id"))
+    """The conversation that held the number, when one did."""
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class Evaluation(Base):
+    """The job that measures and judges one saved conversation."""
+
+    __tablename__ = "evaluations"
+
+    id: Mapped[uuid.UUID] = uuid_primary_key()
+    conversation_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("conversations.id"), unique=True)
+    state: Mapped[EvaluationState] = mapped_column(
+        pg_enum(EvaluationState, "evaluation_state"), default=EvaluationState.QUEUED
+    )
+    code_version: Mapped[str | None] = mapped_column(Text)
+    """The version of the code that computed the metrics; None until done."""
+    claimed_by: Mapped[str | None] = mapped_column(Text)
+    claim_seq: Mapped[int] = mapped_column(Integer, default=0, server_default=text("0"))
+    """Grows with each claim; a write carries the number its evaluator claimed with, so one
+    from an evaluator that lost the evaluation changes nothing."""
+    lease_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    attempts: Mapped[int] = mapped_column(Integer, default=0, server_default=text("0"))
+    not_before: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    """A failed attempt waits until this time before the next one."""
+    failure: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    scenario_verdict: Mapped[Verdict | None] = mapped_column(pg_enum(Verdict, "verdict"))
+    """From the scenario's criteria; None when the call was not judged."""
+    conversation_verdict: Mapped[Verdict | None] = mapped_column(pg_enum(Verdict, "verdict"))
+    """The criteria and the deciding agent rules."""
+    effective_scenario_verdict: Mapped[Verdict | None] = mapped_column(pg_enum(Verdict, "verdict"))
+    """After people's labels; the machine verdict while there are none."""
+    effective_conversation_verdict: Mapped[Verdict | None] = mapped_column(
+        pg_enum(Verdict, "verdict")
+    )
+    jev_usage: Mapped[dict[str, int] | None] = mapped_column(JSONB)
+    """The tokens of the evaluation's Jev request, when it made one."""
+    audit: Mapped[bool] = mapped_column(Boolean, default=False, server_default=text("false"))
+    """A judged call in the random audit sample, set when the evaluation ends."""
+
+    __table_args__ = (Index("ix_evaluations_state_created", "state", "created_at"),)
+
+
+class MetricValue(Base):
+    """One metric of one evaluation."""
+
+    __tablename__ = "metric_values"
+
+    evaluation_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("evaluations.id"), primary_key=True)
+    metric_key: Mapped[str] = mapped_column(Text, primary_key=True)
+    value: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    flags: Mapped[list[str]] = mapped_column(
+        ARRAY(Text), default=list, server_default=text("'{}'::text[]")
+    )
+
+
+class JudgeVersion(Base):
+    """One frozen judge: its model and settings, the bytes of its prompt and answer schema, and
+    the versions of the evidence view and the code checks. Every verdict names one."""
+
+    __tablename__ = "judge_versions"
+
+    id: Mapped[uuid.UUID] = uuid_primary_key()
+    judge: Mapped[str] = mapped_column(Text)
+    provider: Mapped[str] = mapped_column(Text)
+    model: Mapped[str] = mapped_column(Text)
+    settings: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    prompt_sha256: Mapped[str] = mapped_column(Text)
+    schema_sha256: Mapped[str] = mapped_column(Text)
+    evidence_view_version: Mapped[int] = mapped_column(Integer)
+    code_checks_version: Mapped[int] = mapped_column(Integer)
+    content_sha256: Mapped[str] = mapped_column(Text, unique=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class EvaluationItem(Base):
+    """One judged item of one evaluation: a criterion or an agent rule."""
+
+    __tablename__ = "evaluation_items"
+
+    id: Mapped[uuid.UUID] = uuid_primary_key()
+    evaluation_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("evaluations.id"))
+    item_key: Mapped[str] = mapped_column(Text)
+    subject: Mapped[str] = mapped_column(Text)
+    """The criterion's text or the rule's name, as the pinned versions had it."""
+    judge_version_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("judge_versions.id"))
+    """None for an item code decided alone, such as a phrase rule."""
+    decided_by: Mapped[DecidedBy] = mapped_column(pg_enum(DecidedBy, "decided_by"))
+    role: Mapped[ItemRole] = mapped_column(pg_enum(ItemRole, "item_role"))
+    answer: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    evidence_checks: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, default=dict, server_default=text("'{}'::jsonb")
+    )
+    machine_outcome: Mapped[Outcome] = mapped_column(pg_enum(Outcome, "outcome"))
+    unsure_kind: Mapped[UnsureKind | None] = mapped_column(pg_enum(UnsureKind, "unsure_kind"))
+    error_reason: Mapped[str | None] = mapped_column(Text)
+    caller_effect: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    """How the caller check says Truman's caller affected this criterion."""
+    jev_version_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("judge_versions.id"))
+    """The Jev version that answered the item first, when it did."""
+    jev_choice: Mapped[str | None] = mapped_column(Text)
+    jev_probabilities: Mapped[dict[str, float] | None] = mapped_column(JSONB)
+    effective_outcome: Mapped[Outcome] = mapped_column(pg_enum(Outcome, "outcome"))
+    effective_unsure_kind: Mapped[UnsureKind | None] = mapped_column(
+        pg_enum(UnsureKind, "unsure_kind")
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (UniqueConstraint("evaluation_id", "item_key"),)
+
+
+class Labeler(Base):
+    """A person who labels items, with a token that opens only the review routes."""
+
+    __tablename__ = "labelers"
+
+    id: Mapped[uuid.UUID] = uuid_primary_key()
+    name: Mapped[str] = mapped_column(Text, unique=True)
+    token_sha256: Mapped[str] = mapped_column(Text, unique=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    """Set when an admin revoked the token; the labels stay."""
+
+
+class Label(Base):
+    """A labeler's answer for one item. A later label of the same labeler replaces the earlier
+    one in the effective outcome; both stay."""
+
+    __tablename__ = "labels"
+
+    id: Mapped[uuid.UUID] = uuid_primary_key()
+    item_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("evaluation_items.id"))
+    labeler_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("labelers.id"))
+    lane: Mapped[Lane] = mapped_column(pg_enum(Lane, "lane"))
+    blind: Mapped[bool] = mapped_column(Boolean)
+    """The labeler had not seen the machine result: only blind audit labels measure a judge."""
+    answer: Mapped[LabelAnswer] = mapped_column(pg_enum(LabelAnswer, "label_answer"))
+    reason: Mapped[LabelReason | None] = mapped_column(pg_enum(LabelReason, "label_reason"))
+    note: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        CheckConstraint(
+            "reason <> 'other' OR btrim(coalesce(note, '')) <> ''", name="other_has_note"
+        ),
+        CheckConstraint(
+            "answer IN ('pass', 'not_applicable') OR reason IS NOT NULL", name="problem_has_reason"
+        ),
+        Index("ix_labels_item_id", "item_id"),
+    )
+
+
+class JudgeCall(Base):
+    """One answer a model gave for an item: its first answer, or the one after a re-ask."""
+
+    __tablename__ = "judge_calls"
+
+    id: Mapped[uuid.UUID] = uuid_primary_key()
+    item_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("evaluation_items.id"))
+    attempt: Mapped[int] = mapped_column(Integer)
+    request_sha256: Mapped[str] = mapped_column(Text)
+    model_returned: Mapped[str | None] = mapped_column(Text)
+    output: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    input_tokens: Mapped[int | None] = mapped_column(Integer)
+    output_tokens: Mapped[int | None] = mapped_column(Integer)
+    latency_ms: Mapped[int] = mapped_column(Integer)
+    error: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 class Persona(Base):

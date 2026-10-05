@@ -7,6 +7,7 @@ from tests.conftest import FakeProvider, response_body
 from truman.api.app import generation_model
 from truman.config import Settings
 from truman.domain.errors import UnavailableError
+from truman.domain.language_models import ModelCallError
 from truman.integrations.openai_models import OpenAIJsonModel
 
 SCHEMA = {
@@ -19,9 +20,11 @@ SCHEMA = {
 
 async def ask(model: OpenAIJsonModel) -> dict[str, Any]:
     try:
-        return await model.complete_json(
-            system="Be brief.", user="Ready?", name="reply", schema=SCHEMA
-        )
+        return (
+            await model.complete_json(
+                system="Be brief.", user="Ready?", name="reply", schema=SCHEMA
+            )
+        ).data
     finally:
         await model.close()
 
@@ -133,7 +136,11 @@ async def test_the_reasoning_effort_goes_with_every_call_only_when_the_model_tak
 
     try:
         answers = [
-            await model.complete_json(system="Be brief.", user=user, name="reply", schema=SCHEMA)
+            (
+                await model.complete_json(
+                    system="Be brief.", user=user, name="reply", schema=SCHEMA
+                )
+            ).data
             for user in ("Ready?", "Still ready?")
         ]
     finally:
@@ -163,3 +170,31 @@ async def test_a_reasoning_check_that_fails_is_asked_again_on_the_next_call(
         await model.close()
 
     assert fake.efforts() == ["xhigh", None, "xhigh", "xhigh"]
+
+
+async def test_an_answer_names_its_model_and_tokens_and_a_failure_says_if_it_can_pass(
+    provider: tuple[str, FakeProvider],
+) -> None:
+    base, fake = provider
+
+    def model() -> OpenAIJsonModel:
+        return OpenAIJsonModel.openai(
+            "sk-test", "gpt-4.1", base_url=f"{base}/v1", timeout_s=30, retries=0
+        )
+
+    first = model()
+    try:
+        answer = await first.complete_json(
+            system="Be brief.", user="Ready?", name="reply", schema=SCHEMA
+        )
+    finally:
+        await first.close()
+    temporary = {}
+    for status in (429, 503, 404, 400):
+        fake.reply = (status, {"error": {"message": "no", "type": "x"}})
+        with pytest.raises(ModelCallError) as raised:
+            await ask(model())
+        temporary[status] = raised.value.temporary
+
+    assert (answer.model, answer.input_tokens, answer.output_tokens) == ("gpt-4.1", 12, 3)
+    assert temporary == {429: True, 503: True, 404: False, 400: False}

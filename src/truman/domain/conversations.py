@@ -10,7 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from truman.domain.agents import AgentConfig
 from truman.domain.background_noise import BackgroundNoise, NoiseMix
 from truman.domain.languages import Language
-from truman.domain.latency import Latency
+from truman.domain.latency import AgentMedia, CallerReplyWindow, LoopLag
 from truman.domain.scenarios import Fact
 from truman.domain.voices import VoiceSettings
 
@@ -123,6 +123,10 @@ class WireEventKind(StrEnum):
     SILENCE_GREETING = "silence_greeting"
     STOP = "stop"
     CALLER_ERROR = "caller_error"
+    END_CALL = "end_call"
+    """The caller's model ended the call; the detail is its reason."""
+    TURN_LIMIT = "turn_limit"
+    """The caller answered its most agent turns and starts the goodbye."""
     TRIGGER_SENT = "trigger_sent"
     """Truman sent the outbound agent's trigger; the detail holds the result."""
     WAITING_FOR_CALL = "waiting_for_call"
@@ -159,8 +163,65 @@ class Transcript(BaseModel):
     turns: list[Turn] = Field(default_factory=list)
     wire_events: list[WireEvent] = Field(default_factory=list)
     validity: Validity | None = None
-    latency: Latency | None = None
-    """The agent's response times; None when the call was not measured."""
+    stream_opened_ms: int | None = None
+    """When Truman's stream opened. A `connected` event can move earlier, to the agent's
+    first audio, but the stream opened here."""
+    loop_lag: LoopLag | None = None
+    """How late the worker's event loop ran while the call was live."""
+    recording_start_ms: int | None = None
+    """Where the recording and the agent's channel start on the call's clock."""
+    agent_media: AgentMedia | None = None
+    caller_replies: list[CallerReplyWindow] | None = None
+    """Each caller reply, with where its own audio sits in the caller voice file."""
+
+    @property
+    def connected(self) -> bool:
+        """The call's audio started. The event is in the record even when the call later
+        failed, as when its worker stopped."""
+        return any(event.kind is WireEventKind.CONNECTED for event in self.wire_events)
+
+
+class LineFacts(BaseModel):
+    """Plivo's hangup report for a call that connected, as Plivo wrote it: who hung up, why,
+    and how long the call lasted. The times are Plivo's text; no time zone is assumed."""
+
+    model_config = ConfigDict(frozen=True)
+
+    hangup_source: str | None = None
+    hangup_cause: str | None = None
+    duration_s: int | None = None
+    bill_duration_s: int | None = None
+    answer_time: str | None = None
+    end_time: str | None = None
+
+
+class CallerSettings(BaseModel):
+    """What the caller ran: the models behave differently, so a result names them."""
+
+    model_config = ConfigDict(frozen=True)
+
+    llm_model: str
+    reasoning_effort: str | None
+    """The effort configured for the caller's model; None leaves it to Pipecat, which asks a
+    reasoning model that accepts it for none."""
+    stt_model: str
+    tts_model: str
+    voice: VoiceSettings
+
+
+class CallerUsage(BaseModel):
+    """What the caller's services consumed, as they reported it. A service that reported
+    nothing leaves its fields None: unknown, not zero."""
+
+    model_config = ConfigDict(frozen=True)
+
+    llm_prompt_tokens: int | None = None
+    llm_completion_tokens: int | None = None
+    llm_reasoning_tokens: int | None = None
+    llm_cache_read_tokens: int | None = None
+    llm_cache_creation_tokens: int | None = None
+    stt_audio_seconds: float | None = None
+    tts_characters: int | None = None
 
 
 class ConversationCreate(BaseModel):
@@ -213,8 +274,6 @@ class CallRequest(BaseModel):
     up."""
     goodbye: str
     agent_data: list[Fact] = []
-    pickup: str = "Hello?"
-    """What the caller says on answering an outbound agent that waits for the callee."""
     accept_calls_until: datetime | None = None
     """Outbound: when the window for the agent's call closes."""
     output_dir: Path
@@ -232,8 +291,15 @@ class CallOutcome(BaseModel):
     talk_ms: int | None = None
     """From the moment the call connected until the conversation ended, on the caller's clock."""
     recording_path: Path | None = None
-    latency: Latency | None = None
-    """The agent's response times; None when the call was not measured."""
+    stream_opened_ms: int | None = None
+    caller_settings: CallerSettings | None = None
+    caller_usage: CallerUsage | None = None
+    line_facts: LineFacts | None = None
+    loop_lag: LoopLag | None = None
+    recording_start_ms: int | None = None
+    agent_media: AgentMedia | None = None
+    caller_replies: list[CallerReplyWindow] | None = None
+    caller_voice_path: Path | None = None
     call_uuid: str | None = None
 
 

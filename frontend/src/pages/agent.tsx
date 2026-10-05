@@ -2,18 +2,27 @@ import { ChevronRight, PhoneOutgoing } from "lucide-react";
 import { useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router";
 
-import { BackButton } from "@/components/back-button";
 import { CopyId } from "@/components/copy-id";
 import { ConversationList } from "@/components/conversation-list";
 import { ActionPanel, Fact, Panel, PanelHeader } from "@/components/panel";
+import { Pager } from "@/components/pager";
+import { RunList } from "@/components/run-list";
 import { Settle } from "@/components/settle";
 import { StatusLabel } from "@/components/status-label";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { usePageParam } from "@/hooks/use-page-param";
 import { phone, reach, since, textSize, when } from "@/lib/format";
-import { useAgent, useAgents, useConversations, useLastCall } from "@/lib/queries";
+import {
+  RUNS_PAGE,
+  useAgent,
+  useAgents,
+  useConversations,
+  useLastCall,
+  useRuns,
+} from "@/lib/queries";
 import { CONVERSATION_TONE } from "@/lib/status";
 import {
   ACTIVE_STATUSES,
@@ -24,7 +33,6 @@ import {
 } from "@/lib/types";
 import { EditAgentSheet } from "@/pages/agent-form";
 import { AgentKnowledgeBase } from "@/pages/agent-knowledge-base";
-import { AgentRuns } from "@/pages/agent-runs";
 import { AgentScenarios } from "@/pages/agent-scenarios";
 import { StartCallDialog } from "@/pages/start-call-dialog";
 
@@ -101,7 +109,7 @@ function AgentTabs({ agent }: { agent: Agent }) {
         <AgentScenarios agent={agent} />
       </TabsContent>
       <TabsContent keepMounted value="runs">
-        <AgentRuns agent={agent} />
+        <Runs agent={agent} />
       </TabsContent>
       <TabsContent keepMounted value="calls">
         <Calls agent={agent} />
@@ -120,12 +128,9 @@ function Designation({ agent }: { agent: Agent }) {
     <Panel>
       <div className="flex flex-wrap items-center gap-x-6 gap-y-4 px-5 pt-5 pb-4">
         <div className="grid min-w-0 flex-1 basis-72 gap-1">
-          <div className="flex min-w-0 items-center gap-2">
-            <BackButton fallback="/agents" />
-            <h1 className="truncate text-h3-500" title={agent.name}>
-              {agent.name}
-            </h1>
-          </div>
+          <h1 className="truncate text-h3-500" title={agent.name}>
+            {agent.name}
+          </h1>
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-s-400">
             <span className="text-muted-foreground">{reach(agent)}</span>
             <LineState call={last.data} pending={last.isPending} />
@@ -189,6 +194,20 @@ function LineState({
   );
 }
 
+function Runs({ agent }: { agent: Agent }) {
+  const runs = useRuns(agent.id, usePageParam());
+  return (
+    <ActionPanel>
+      <RunList
+        query={runs}
+        place="panel"
+        empty="No runs yet. Select scenarios on the Scenarios tab and click Run."
+      />
+      <Pager className="border-t px-5 py-3" query={runs} pageSize={RUNS_PAGE} />
+    </ActionPanel>
+  );
+}
+
 function Calls({ agent }: { agent: Agent }) {
   const calls = useConversations({ agent_id: agent.id }, 1, { pageSize: CALLS_SHOWN });
   const total = calls.data?.total ?? 0;
@@ -245,6 +264,13 @@ function Settings({ agent }: { agent: Agent }) {
         <Fact label="Config">
           {agent.config ? (
             textSize(agent.config.length)
+          ) : (
+            <span className="font-normal text-muted-foreground">None</span>
+          )}
+        </Fact>
+        <Fact label="Rules">
+          {agent.rules.length > 0 ? (
+            agent.rules.map((rule) => rule.name).join(", ")
           ) : (
             <span className="font-normal text-muted-foreground">None</span>
           )}

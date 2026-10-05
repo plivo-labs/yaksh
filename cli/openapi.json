@@ -774,6 +774,54 @@
         }
       }
     },
+    "/api/v1/conversations/{conversation_id}/evaluation": {
+      "get": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Get Evaluation",
+        "operationId": "get_evaluation_api_v1_conversations__conversation_id__evaluation_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Conversation Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationEvaluation"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/conversations/{conversation_id}/recording": {
       "get": {
         "tags": [
@@ -1170,6 +1218,199 @@
         "responses": {
           "200": {
             "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/judges/agreement": {
+      "get": {
+        "tags": [
+          "judges"
+        ],
+        "summary": "Get Agreement",
+        "description": "How often blind audit labels agree with each judge version and with the machine's\nscenario verdicts, how often labelers agree, and how much of the offered set is labeled.",
+        "operationId": "get_agreement_api_v1_judges_agreement_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JudgeAgreement"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/labelers": {
+      "get": {
+        "tags": [
+          "labelers"
+        ],
+        "summary": "List Labelers",
+        "operationId": "list_labelers_api_v1_labelers_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/LabelerRead"
+                  },
+                  "type": "array",
+                  "title": "Response List Labelers Api V1 Labelers Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "labelers"
+        ],
+        "summary": "Create Labeler",
+        "description": "A labeler and the token it labels with, shown only in this answer.",
+        "operationId": "create_labeler_api_v1_labelers_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LabelerCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LabelerCreated"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/labelers/{labeler_id}": {
+      "delete": {
+        "tags": [
+          "labelers"
+        ],
+        "summary": "Revoke Labeler",
+        "description": "The labeler's token stops working; its labels stay.",
+        "operationId": "revoke_labeler_api_v1_labelers__labeler_id__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "labeler_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Labeler Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/labelers/{labeler_id}/token": {
+      "post": {
+        "tags": [
+          "labelers"
+        ],
+        "summary": "Renew Token",
+        "description": "A new token for the labeler, shown only in this answer; the old one stops working, and a\nrevoked labeler works again.",
+        "operationId": "renew_token_api_v1_labelers__labeler_id__token_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "labeler_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Labeler Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LabelerCreated"
+                }
+              }
+            }
           },
           "422": {
             "description": "Validation Error",
@@ -1587,6 +1828,201 @@
         ]
       }
     },
+    "/api/v1/review/queue": {
+      "get": {
+        "tags": [
+          "review"
+        ],
+        "summary": "Get Queue",
+        "description": "The audit calls this labeler still has items to label in.",
+        "operationId": "get_queue_api_v1_review_queue_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/QueuedReview"
+                  },
+                  "type": "array",
+                  "title": "Response Get Queue Api V1 Review Queue Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/review/conversations/{conversation_id}": {
+      "get": {
+        "tags": [
+          "review"
+        ],
+        "summary": "Get Review",
+        "description": "A judged call to label. Any judged call takes labels; only the calls the queue offers\nhide the machine results, and only their labels measure the judges. `seen`: the labeler\ncame from the machine's results, so the call is ad hoc.",
+        "operationId": "get_review_api_v1_review_conversations__conversation_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Conversation Id"
+            }
+          },
+          {
+            "name": "seen",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Seen"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewConversation"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/review/conversations/{conversation_id}/recording": {
+      "get": {
+        "tags": [
+          "review"
+        ],
+        "summary": "Get Recording",
+        "operationId": "get_recording_api_v1_review_conversations__conversation_id__recording_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Conversation Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/review/items/{item_id}/labels": {
+      "post": {
+        "tags": [
+          "review"
+        ],
+        "summary": "Label Item",
+        "description": "Label one item; the call comes back with what the label reveals.",
+        "operationId": "label_item_api_v1_review_items__item_id__labels_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Item Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LabelCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewConversation"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/runs": {
       "post": {
         "tags": [
@@ -1760,6 +2196,55 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/RunRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/runs/{run_id}/metrics": {
+      "get": {
+        "tags": [
+          "runs"
+        ],
+        "summary": "Get Run Metrics",
+        "description": "The numbers over the run's counted conversations: the latest attempt of each repeat,\nunless it was cancelled.",
+        "operationId": "get_run_metrics_api_v1_runs__run_id__metrics_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunMetrics"
                 }
               }
             }
@@ -2880,6 +3365,29 @@
             "maxItems": 20,
             "title": "Knowledge Base",
             "default": []
+          },
+          "rules": {
+            "items": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/LlmRule"
+                },
+                {
+                  "$ref": "#/components/schemas/PhraseRule"
+                }
+              ],
+              "discriminator": {
+                "propertyName": "kind",
+                "mapping": {
+                  "llm": "#/components/schemas/LlmRule",
+                  "phrase": "#/components/schemas/PhraseRule"
+                }
+              }
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Rules",
+            "default": []
           }
         },
         "additionalProperties": false,
@@ -2958,6 +3466,29 @@
             "type": "array",
             "maxItems": 20,
             "title": "Knowledge Base",
+            "default": []
+          },
+          "rules": {
+            "items": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/LlmRule"
+                },
+                {
+                  "$ref": "#/components/schemas/PhraseRule"
+                }
+              ],
+              "discriminator": {
+                "propertyName": "kind",
+                "mapping": {
+                  "llm": "#/components/schemas/LlmRule",
+                  "phrase": "#/components/schemas/PhraseRule"
+                }
+              }
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Rules",
             "default": []
           },
           "name": {
@@ -3082,6 +3613,28 @@
             },
             "type": "array",
             "title": "Knowledge Base"
+          },
+          "rules": {
+            "items": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/LlmRule"
+                },
+                {
+                  "$ref": "#/components/schemas/PhraseRule"
+                }
+              ],
+              "discriminator": {
+                "propertyName": "kind",
+                "mapping": {
+                  "llm": "#/components/schemas/LlmRule",
+                  "phrase": "#/components/schemas/PhraseRule"
+                }
+              }
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Rules"
           }
         },
         "type": "object",
@@ -3100,7 +3653,8 @@
           "created_at",
           "updated_at",
           "config",
-          "knowledge_base"
+          "knowledge_base",
+          "rules"
         ],
         "title": "AgentRead"
       },
@@ -3331,6 +3885,35 @@
               }
             ],
             "title": "Knowledge Base"
+          },
+          "rules": {
+            "anyOf": [
+              {
+                "items": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/LlmRule"
+                    },
+                    {
+                      "$ref": "#/components/schemas/PhraseRule"
+                    }
+                  ],
+                  "discriminator": {
+                    "propertyName": "kind",
+                    "mapping": {
+                      "llm": "#/components/schemas/LlmRule",
+                      "phrase": "#/components/schemas/PhraseRule"
+                    }
+                  }
+                },
+                "type": "array",
+                "maxItems": 20
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rules"
           }
         },
         "additionalProperties": false,
@@ -3429,6 +4012,64 @@
         ],
         "title": "Body_upload_document_api_v1_documents_upload_post"
       },
+      "CallVerdict": {
+        "properties": {
+          "conversation_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Conversation Id"
+          },
+          "repeat": {
+            "type": "integer",
+            "title": "Repeat"
+          },
+          "verdict": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Verdict"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "conversation_id",
+          "repeat",
+          "verdict"
+        ],
+        "title": "CallVerdict"
+      },
+      "CallerFidelity": {
+        "properties": {
+          "persona": {
+            "type": "string",
+            "title": "Persona"
+          },
+          "calls": {
+            "type": "integer",
+            "title": "Calls"
+          },
+          "likely": {
+            "type": "integer",
+            "title": "Likely"
+          },
+          "possible": {
+            "type": "integer",
+            "title": "Possible"
+          }
+        },
+        "type": "object",
+        "required": [
+          "persona",
+          "calls",
+          "likely",
+          "possible"
+        ],
+        "title": "CallerFidelity"
+      },
       "Category": {
         "type": "string",
         "enum": [
@@ -3438,6 +4079,22 @@
         ],
         "title": "Category",
         "description": "What kind of situation a scenario tests. How the caller talks comes from the persona."
+      },
+      "CategoryNumbers": {
+        "properties": {
+          "category": {
+            "$ref": "#/components/schemas/Category"
+          },
+          "numbers": {
+            "$ref": "#/components/schemas/RunNumbers"
+          }
+        },
+        "type": "object",
+        "required": [
+          "category",
+          "numbers"
+        ],
+        "title": "CategoryNumbers"
       },
       "Channel": {
         "type": "string",
@@ -3514,6 +4171,97 @@
           "scenario_id"
         ],
         "title": "ConversationCreate"
+      },
+      "ConversationEvaluation": {
+        "properties": {
+          "evaluation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EvaluationState"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "failure": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Failure"
+          },
+          "metrics": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/Metric"
+            },
+            "type": "object",
+            "title": "Metrics"
+          },
+          "scenario_verdict": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Verdict"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "conversation_verdict": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Verdict"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "effective_scenario_verdict": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Verdict"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "effective_conversation_verdict": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Verdict"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ItemRead"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "evaluation",
+          "failure",
+          "metrics",
+          "scenario_verdict",
+          "conversation_verdict",
+          "effective_scenario_verdict",
+          "effective_conversation_verdict",
+          "items"
+        ],
+        "title": "ConversationEvaluation"
       },
       "ConversationRead": {
         "properties": {
@@ -3698,6 +4446,16 @@
               }
             ]
           },
+          "evaluation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EvaluationState"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "recording_url": {
             "anyOf": [
               {
@@ -3846,6 +4604,7 @@
           "ended_at",
           "talk_ms",
           "latency",
+          "evaluation",
           "recording_url",
           "caller_reason",
           "run_id",
@@ -4059,6 +4818,16 @@
               }
             ]
           },
+          "evaluation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EvaluationState"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "recording_url": {
             "anyOf": [
               {
@@ -4157,6 +4926,7 @@
           "ended_at",
           "talk_ms",
           "latency",
+          "evaluation",
           "recording_url",
           "caller_reason",
           "run_id",
@@ -4166,6 +4936,59 @@
           "created_at"
         ],
         "title": "ConversationSummary"
+      },
+      "CriterionCounts": {
+        "properties": {
+          "scenario_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Scenario Id"
+          },
+          "number": {
+            "type": "integer",
+            "title": "Number"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Counts"
+          },
+          "rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rate"
+          }
+        },
+        "type": "object",
+        "required": [
+          "scenario_id",
+          "number",
+          "text",
+          "counts",
+          "rate"
+        ],
+        "title": "CriterionCounts"
+      },
+      "DecidedBy": {
+        "type": "string",
+        "enum": [
+          "code",
+          "jev",
+          "llm"
+        ],
+        "title": "DecidedBy"
       },
       "Defaults": {
         "properties": {
@@ -4381,6 +5204,16 @@
         "title": "EndReason",
         "description": "Who or what ended the conversation, as Truman observed it."
       },
+      "EvaluationState": {
+        "type": "string",
+        "enum": [
+          "queued",
+          "running",
+          "done",
+          "failed"
+        ],
+        "title": "EvaluationState"
+      },
       "Fact": {
         "properties": {
           "name": {
@@ -4555,6 +5388,192 @@
         ],
         "title": "HealthResponse"
       },
+      "ItemRead": {
+        "properties": {
+          "item_key": {
+            "type": "string",
+            "title": "Item Key"
+          },
+          "subject": {
+            "type": "string",
+            "title": "Subject"
+          },
+          "role": {
+            "$ref": "#/components/schemas/ItemRole"
+          },
+          "decided_by": {
+            "$ref": "#/components/schemas/DecidedBy"
+          },
+          "machine_outcome": {
+            "$ref": "#/components/schemas/Outcome"
+          },
+          "unsure_kind": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UnsureKind"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "effective_outcome": {
+            "$ref": "#/components/schemas/Outcome"
+          },
+          "effective_unsure_kind": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UnsureKind"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "answer": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Answer"
+          },
+          "error_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Reason"
+          },
+          "caller_effect": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Caller Effect"
+          },
+          "jev_choice": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Jev Choice"
+          },
+          "jev_probabilities": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "number"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Jev Probabilities"
+          }
+        },
+        "type": "object",
+        "required": [
+          "item_key",
+          "subject",
+          "role",
+          "decided_by",
+          "machine_outcome",
+          "unsure_kind",
+          "effective_outcome",
+          "effective_unsure_kind",
+          "answer",
+          "error_reason",
+          "caller_effect",
+          "jev_choice",
+          "jev_probabilities"
+        ],
+        "title": "ItemRead"
+      },
+      "ItemRole": {
+        "type": "string",
+        "enum": [
+          "deciding",
+          "reporting"
+        ],
+        "title": "ItemRole"
+      },
+      "JudgeAgreement": {
+        "properties": {
+          "versions": {
+            "items": {
+              "$ref": "#/components/schemas/VersionAgreement"
+            },
+            "type": "array",
+            "title": "Versions"
+          },
+          "conversations": {
+            "$ref": "#/components/schemas/Share"
+          },
+          "labelers": {
+            "$ref": "#/components/schemas/Share"
+          },
+          "offered_calls": {
+            "$ref": "#/components/schemas/Share"
+          }
+        },
+        "type": "object",
+        "required": [
+          "versions",
+          "conversations",
+          "labelers",
+          "offered_calls"
+        ],
+        "title": "JudgeAgreement",
+        "description": "How often blind audit labels agree with the machine. A judge version with no such labels\nis not listed: it is not yet measured on your agents."
+      },
+      "JudgeVersionUsed": {
+        "properties": {
+          "judge": {
+            "type": "string",
+            "title": "Judge"
+          },
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version"
+          },
+          "items": {
+            "type": "integer",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "judge",
+          "model",
+          "version",
+          "items"
+        ],
+        "title": "JudgeVersionUsed"
+      },
       "KnowledgeBaseDocument": {
         "properties": {
           "document_id": {
@@ -4649,6 +5668,215 @@
         "title": "KnowledgeBaseEntry",
         "description": "A document the agent answers from, under the name the agent shows for it."
       },
+      "LabelAnswer": {
+        "type": "string",
+        "enum": [
+          "pass",
+          "fail",
+          "not_applicable",
+          "cannot_tell",
+          "blocked"
+        ],
+        "title": "LabelAnswer"
+      },
+      "LabelCreate": {
+        "properties": {
+          "answer": {
+            "$ref": "#/components/schemas/LabelAnswer"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LabelReason"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "seen": {
+            "type": "boolean",
+            "title": "Seen",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "answer"
+        ],
+        "title": "LabelCreate"
+      },
+      "LabelRead": {
+        "properties": {
+          "answer": {
+            "$ref": "#/components/schemas/LabelAnswer"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LabelReason"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "lane": {
+            "$ref": "#/components/schemas/Lane"
+          },
+          "blind": {
+            "type": "boolean",
+            "title": "Blind"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "answer",
+          "reason",
+          "note",
+          "lane",
+          "blind",
+          "created_at"
+        ],
+        "title": "LabelRead"
+      },
+      "LabelReason": {
+        "type": "string",
+        "enum": [
+          "agent_error",
+          "applicability",
+          "transcript_error",
+          "spoken_form",
+          "date_or_time",
+          "read_back",
+          "window_or_order",
+          "exact_value",
+          "hidden_action",
+          "evidence_misread",
+          "criterion_ambiguous",
+          "caller_error",
+          "scenario_error",
+          "test_settings_error",
+          "line_or_audio",
+          "other"
+        ],
+        "title": "LabelReason",
+        "description": "What went wrong, or why the judge was wrong. No reason names a cause inside the\nagent."
+      },
+      "LabelerCreate": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "LabelerCreate"
+      },
+      "LabelerCreated": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "token": {
+            "type": "string",
+            "title": "Token"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "token"
+        ],
+        "title": "LabelerCreated"
+      },
+      "LabelerRead": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "revoked_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revoked At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "created_at",
+          "revoked_at"
+        ],
+        "title": "LabelerRead"
+      },
+      "Lane": {
+        "type": "string",
+        "enum": [
+          "audit",
+          "ad_hoc"
+        ],
+        "title": "Lane"
+      },
       "Language": {
         "type": "string",
         "enum": [
@@ -4700,6 +5928,99 @@
         "title": "LatencySummary",
         "description": "The agent's response times in one call: nearest-rank percentiles over the measured\nreplies, how many replies there were, and how many of them talked over the caller."
       },
+      "LlmRule": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "llm",
+            "title": "Kind",
+            "default": "llm"
+          },
+          "key": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9_-]{0,62}$",
+            "title": "Key"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "gate": {
+            "$ref": "#/components/schemas/RuleGate",
+            "default": "agent_spoke"
+          },
+          "applies_when": {
+            "type": "string",
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Applies When"
+          },
+          "pass_when": {
+            "type": "string",
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Pass When"
+          },
+          "fail_when": {
+            "type": "string",
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Fail When"
+          },
+          "not_a_failure": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Not A Failure"
+          },
+          "role": {
+            "$ref": "#/components/schemas/ItemRole",
+            "default": "reporting"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "key",
+          "name",
+          "applies_when",
+          "pass_when",
+          "fail_when"
+        ],
+        "title": "LlmRule"
+      },
+      "Metric": {
+        "properties": {
+          "value": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Value"
+          },
+          "flags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Flags",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "value"
+        ],
+        "title": "Metric",
+        "description": "One metric's value and the flags it raised."
+      },
       "NoiseLevel": {
         "type": "string",
         "enum": [
@@ -4709,6 +6030,22 @@
         ],
         "title": "NoiseLevel",
         "description": "How loud the background is, as the caller's speech level above the noise."
+      },
+      "NoiseNumbers": {
+        "properties": {
+          "noise": {
+            "$ref": "#/components/schemas/BackgroundNoise"
+          },
+          "numbers": {
+            "$ref": "#/components/schemas/RunNumbers"
+          }
+        },
+        "type": "object",
+        "required": [
+          "noise",
+          "numbers"
+        ],
+        "title": "NoiseNumbers"
       },
       "NoiseSound": {
         "type": "string",
@@ -4763,6 +6100,20 @@
         ],
         "title": "OutboundConfig",
         "description": "How an outbound agent is made to call Truman, and how its call is recognized."
+      },
+      "Outcome": {
+        "type": "string",
+        "enum": [
+          "pass",
+          "fail",
+          "not_applicable",
+          "unsure",
+          "blocked",
+          "error",
+          "pending"
+        ],
+        "title": "Outcome",
+        "description": "An item's result: a judge's verdict, or what stopped one."
       },
       "OutcomeGroup": {
         "type": "string",
@@ -5444,6 +6795,81 @@
         ],
         "title": "PhoneNumbers"
       },
+      "PhraseExpectation": {
+        "type": "string",
+        "enum": [
+          "required",
+          "forbidden"
+        ],
+        "title": "PhraseExpectation"
+      },
+      "PhraseMatch": {
+        "type": "string",
+        "enum": [
+          "phrase",
+          "regex"
+        ],
+        "title": "PhraseMatch"
+      },
+      "PhraseRule": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "phrase",
+            "title": "Kind",
+            "default": "phrase"
+          },
+          "key": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9_-]{0,62}$",
+            "title": "Key"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "expects": {
+            "$ref": "#/components/schemas/PhraseExpectation"
+          },
+          "match": {
+            "$ref": "#/components/schemas/PhraseMatch",
+            "default": "phrase"
+          },
+          "value": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Value"
+          },
+          "where": {
+            "$ref": "#/components/schemas/PhraseWhere",
+            "default": "any_agent_turn"
+          },
+          "role": {
+            "$ref": "#/components/schemas/ItemRole",
+            "default": "reporting"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "key",
+          "name",
+          "expects",
+          "value"
+        ],
+        "title": "PhraseRule"
+      },
+      "PhraseWhere": {
+        "type": "string",
+        "enum": [
+          "first_agent_turn",
+          "any_agent_turn"
+        ],
+        "title": "PhraseWhere"
+      },
       "Provenance": {
         "type": "string",
         "enum": [
@@ -5501,6 +6927,41 @@
         "title": "ProviderVoice",
         "description": "A voice as its provider describes it. `listed_languages` are the languages the provider\nlists for the voice in any model; the model decides what the voice can really speak."
       },
+      "QueuedReview": {
+        "properties": {
+          "conversation_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Conversation Id"
+          },
+          "scenario_name": {
+            "type": "string",
+            "title": "Scenario Name"
+          },
+          "ended_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Ended At"
+          },
+          "items": {
+            "type": "integer",
+            "title": "Items"
+          },
+          "labeled": {
+            "type": "integer",
+            "title": "Labeled"
+          }
+        },
+        "type": "object",
+        "required": [
+          "conversation_id",
+          "scenario_name",
+          "ended_at",
+          "items",
+          "labeled"
+        ],
+        "title": "QueuedReview"
+      },
       "Reply": {
         "properties": {
           "start_ms": {
@@ -5520,6 +6981,148 @@
         "title": "Reply",
         "description": "The agent's answer to one caller reply, or to the start of the call."
       },
+      "ReviewConversation": {
+        "properties": {
+          "conversation": {
+            "$ref": "#/components/schemas/ConversationRead"
+          },
+          "lane": {
+            "$ref": "#/components/schemas/Lane"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ReviewItem"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "verdicts": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReviewVerdicts"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "conversation",
+          "lane",
+          "items",
+          "verdicts"
+        ],
+        "title": "ReviewConversation"
+      },
+      "ReviewItem": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "item_key": {
+            "type": "string",
+            "title": "Item Key"
+          },
+          "subject": {
+            "type": "string",
+            "title": "Subject"
+          },
+          "role": {
+            "$ref": "#/components/schemas/ItemRole"
+          },
+          "blind": {
+            "type": "boolean",
+            "title": "Blind"
+          },
+          "machine": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ItemRead"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "label": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LabelRead"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "item_key",
+          "subject",
+          "role",
+          "blind",
+          "machine",
+          "label"
+        ],
+        "title": "ReviewItem"
+      },
+      "ReviewVerdicts": {
+        "properties": {
+          "scenario_verdict": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Verdict"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "conversation_verdict": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Verdict"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "effective_scenario_verdict": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Verdict"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "effective_conversation_verdict": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Verdict"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "scenario_verdict",
+          "conversation_verdict",
+          "effective_scenario_verdict",
+          "effective_conversation_verdict"
+        ],
+        "title": "ReviewVerdicts"
+      },
       "Role": {
         "type": "string",
         "enum": [
@@ -5527,6 +7130,15 @@
           "caller"
         ],
         "title": "Role"
+      },
+      "RuleGate": {
+        "type": "string",
+        "enum": [
+          "always",
+          "agent_spoke"
+        ],
+        "title": "RuleGate",
+        "description": "When an LLM rule can apply, decided in code before any model call."
       },
       "RunCreate": {
         "properties": {
@@ -5645,6 +7257,124 @@
         "title": "RunCreate",
         "description": "Limits that an operator sets, such as the most repeats, are checked where the settings\nare known."
       },
+      "RunMetrics": {
+        "properties": {
+          "overall": {
+            "$ref": "#/components/schemas/RunNumbers"
+          },
+          "by_category": {
+            "items": {
+              "$ref": "#/components/schemas/CategoryNumbers"
+            },
+            "type": "array",
+            "title": "By Category"
+          },
+          "by_noise": {
+            "items": {
+              "$ref": "#/components/schemas/NoiseNumbers"
+            },
+            "type": "array",
+            "title": "By Noise"
+          },
+          "verdicts": {
+            "$ref": "#/components/schemas/RunVerdicts"
+          }
+        },
+        "type": "object",
+        "required": [
+          "overall",
+          "by_category",
+          "by_noise",
+          "verdicts"
+        ],
+        "title": "RunMetrics"
+      },
+      "RunNumbers": {
+        "properties": {
+          "conversations": {
+            "type": "integer",
+            "title": "Conversations"
+          },
+          "evaluated": {
+            "type": "integer",
+            "title": "Evaluated"
+          },
+          "pending": {
+            "type": "integer",
+            "title": "Pending"
+          },
+          "failed": {
+            "type": "integer",
+            "title": "Failed"
+          },
+          "connected": {
+            "$ref": "#/components/schemas/Share"
+          },
+          "errors_before_connect": {
+            "type": "integer",
+            "title": "Errors Before Connect"
+          },
+          "response_p50_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Response P50 Ms"
+          },
+          "response_p90_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Response P90 Ms"
+          },
+          "unanswered": {
+            "$ref": "#/components/schemas/Share"
+          },
+          "talked_over": {
+            "$ref": "#/components/schemas/Share"
+          },
+          "long_wait": {
+            "$ref": "#/components/schemas/Share"
+          },
+          "dead_air": {
+            "$ref": "#/components/schemas/Share"
+          },
+          "flags": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Flags"
+          }
+        },
+        "type": "object",
+        "required": [
+          "conversations",
+          "evaluated",
+          "pending",
+          "failed",
+          "connected",
+          "errors_before_connect",
+          "response_p50_ms",
+          "response_p90_ms",
+          "unanswered",
+          "talked_over",
+          "long_wait",
+          "dead_air",
+          "flags"
+        ],
+        "title": "RunNumbers",
+        "description": "What the evaluations found over some of a run's conversations."
+      },
       "RunRead": {
         "properties": {
           "status": {
@@ -5696,28 +7426,6 @@
               }
             ],
             "title": "Median Talk Ms"
-          },
-          "response_p50_ms": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Response P50 Ms"
-          },
-          "response_p90_ms": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Response P90 Ms"
           },
           "waiting_reason": {
             "anyOf": [
@@ -5840,6 +7548,28 @@
             "format": "date-time",
             "title": "Created At"
           },
+          "response_p50_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Response P50 Ms"
+          },
+          "response_p90_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Response P90 Ms"
+          },
           "scenario_ids": {
             "items": {
               "type": "string",
@@ -5857,8 +7587,6 @@
           "end_reasons",
           "retries",
           "median_talk_ms",
-          "response_p50_ms",
-          "response_p90_ms",
           "waiting_reason",
           "started_at",
           "ended_at",
@@ -5876,6 +7604,8 @@
           "max_retries",
           "background_noise",
           "created_at",
+          "response_p50_ms",
+          "response_p90_ms",
           "scenario_ids"
         ],
         "title": "RunRead"
@@ -5943,28 +7673,6 @@
             ],
             "title": "Median Talk Ms"
           },
-          "response_p50_ms": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Response P50 Ms"
-          },
-          "response_p90_ms": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Response P90 Ms"
-          },
           "waiting_reason": {
             "anyOf": [
               {
@@ -6085,6 +7793,28 @@
             "type": "string",
             "format": "date-time",
             "title": "Created At"
+          },
+          "response_p50_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Response P50 Ms"
+          },
+          "response_p90_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Response P90 Ms"
           }
         },
         "type": "object",
@@ -6095,8 +7825,6 @@
           "end_reasons",
           "retries",
           "median_talk_ms",
-          "response_p50_ms",
-          "response_p90_ms",
           "waiting_reason",
           "started_at",
           "ended_at",
@@ -6113,9 +7841,176 @@
           "start_interval_s",
           "max_retries",
           "background_noise",
-          "created_at"
+          "created_at",
+          "response_p50_ms",
+          "response_p90_ms"
         ],
         "title": "RunSummary"
+      },
+      "RunVerdicts": {
+        "properties": {
+          "pending": {
+            "type": "integer",
+            "title": "Pending"
+          },
+          "not_judged": {
+            "type": "integer",
+            "title": "Not Judged"
+          },
+          "pass_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pass Rate"
+          },
+          "coverage": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Coverage"
+          },
+          "worst": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Worst"
+          },
+          "best": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Best"
+          },
+          "interval_low": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Interval Low"
+          },
+          "interval_high": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Interval High"
+          },
+          "pass_hat_2": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pass Hat 2"
+          },
+          "pass_hat_2_scenarios": {
+            "type": "integer",
+            "title": "Pass Hat 2 Scenarios"
+          },
+          "scenarios": {
+            "items": {
+              "$ref": "#/components/schemas/ScenarioVerdicts"
+            },
+            "type": "array",
+            "title": "Scenarios"
+          },
+          "inconsistent": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Inconsistent"
+          },
+          "criteria": {
+            "items": {
+              "$ref": "#/components/schemas/CriterionCounts"
+            },
+            "type": "array",
+            "title": "Criteria"
+          },
+          "decided_by": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "propertyNames": {
+              "$ref": "#/components/schemas/DecidedBy"
+            },
+            "type": "object",
+            "title": "Decided By"
+          },
+          "errors": {
+            "type": "integer",
+            "title": "Errors"
+          },
+          "callers": {
+            "items": {
+              "$ref": "#/components/schemas/CallerFidelity"
+            },
+            "type": "array",
+            "title": "Callers"
+          },
+          "judge_versions": {
+            "items": {
+              "$ref": "#/components/schemas/JudgeVersionUsed"
+            },
+            "type": "array",
+            "title": "Judge Versions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "pending",
+          "not_judged",
+          "pass_rate",
+          "coverage",
+          "worst",
+          "best",
+          "interval_low",
+          "interval_high",
+          "pass_hat_2",
+          "pass_hat_2_scenarios",
+          "scenarios",
+          "inconsistent",
+          "criteria",
+          "decided_by",
+          "errors",
+          "callers",
+          "judge_versions"
+        ],
+        "title": "RunVerdicts",
+        "description": "The run's verdict numbers over its judged calls: completed calls that no one stopped,\nwhose evaluation gave a verdict or failed."
       },
       "ScenarioConfig": {
         "properties": {
@@ -6523,6 +8418,47 @@
         "title": "ScenarioUpdate",
         "description": "A partial change; lists replace the stored list as a whole."
       },
+      "ScenarioVerdicts": {
+        "properties": {
+          "scenario_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Scenario Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "category": {
+            "$ref": "#/components/schemas/Category"
+          },
+          "calls": {
+            "items": {
+              "$ref": "#/components/schemas/CallVerdict"
+            },
+            "type": "array",
+            "title": "Calls"
+          },
+          "passes": {
+            "type": "integer",
+            "title": "Passes"
+          },
+          "scored": {
+            "type": "integer",
+            "title": "Scored"
+          }
+        },
+        "type": "object",
+        "required": [
+          "scenario_id",
+          "name",
+          "category",
+          "calls",
+          "passes",
+          "scored"
+        ],
+        "title": "ScenarioVerdicts"
+      },
       "ScenarioVersionRead": {
         "properties": {
           "id": {
@@ -6557,6 +8493,49 @@
           "created_at"
         ],
         "title": "ScenarioVersionRead"
+      },
+      "Share": {
+        "properties": {
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "low": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Low"
+          },
+          "high": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "High"
+          }
+        },
+        "type": "object",
+        "required": [
+          "count",
+          "total",
+          "low",
+          "high"
+        ],
+        "title": "Share",
+        "description": "How many of a total, with the 95% Wilson interval of the rate: few calls give a wide\ninterval."
       },
       "TextDocumentCreate": {
         "properties": {
@@ -6676,6 +8655,15 @@
         ],
         "title": "TurnRead"
       },
+      "UnsureKind": {
+        "type": "string",
+        "enum": [
+          "hidden_action",
+          "not_confirmed_played",
+          "unclear"
+        ],
+        "title": "UnsureKind"
+      },
       "ValidationError": {
         "properties": {
           "loc": {
@@ -6735,6 +8723,42 @@
           "ok"
         ],
         "title": "Validity"
+      },
+      "Verdict": {
+        "type": "string",
+        "enum": [
+          "pass",
+          "fail",
+          "not_scored"
+        ],
+        "title": "Verdict"
+      },
+      "VersionAgreement": {
+        "properties": {
+          "judge": {
+            "type": "string",
+            "title": "Judge"
+          },
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version"
+          },
+          "items": {
+            "$ref": "#/components/schemas/Share"
+          }
+        },
+        "type": "object",
+        "required": [
+          "judge",
+          "model",
+          "version",
+          "items"
+        ],
+        "title": "VersionAgreement"
       },
       "VoiceCreate": {
         "properties": {
@@ -7027,6 +9051,8 @@
           "silence_greeting",
           "stop",
           "caller_error",
+          "end_call",
+          "turn_limit",
           "trigger_sent",
           "waiting_for_call"
         ],

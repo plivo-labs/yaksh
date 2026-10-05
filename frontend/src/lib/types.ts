@@ -226,7 +226,36 @@ export interface KnowledgeBaseDocument extends KnowledgeBaseEntry {
 export interface Agent extends AgentSummary {
   config: string | null;
   knowledge_base: KnowledgeBaseDocument[];
+  rules: AgentRule[];
 }
+
+/** A check on every judged call of the agent, judged like a criterion. Its gate is decided in
+ * code before any model call. */
+export interface LlmRule {
+  kind: "llm";
+  key: string;
+  name: string;
+  gate: "always" | "agent_spoke";
+  applies_when: string;
+  pass_when: string;
+  fail_when: string;
+  not_a_failure: string | null;
+  role: "deciding" | "reporting";
+}
+
+/** A phrase or pattern that code looks for in the agent's lines. */
+export interface PhraseRule {
+  kind: "phrase";
+  key: string;
+  name: string;
+  expects: "required" | "forbidden";
+  match: "phrase" | "regex";
+  value: string;
+  where: "first_agent_turn" | "any_agent_turn";
+  role: "deciding" | "reporting";
+}
+
+export type AgentRule = LlmRule | PhraseRule;
 
 export interface DocumentSummary {
   id: string;
@@ -256,6 +285,7 @@ export interface AgentInput {
   config: string | null;
   /** Sent only when the agent is added; later changes go through the knowledge base panel. */
   knowledge_base?: KnowledgeBaseEntry[];
+  rules: AgentRule[];
 }
 
 export interface PhoneNumber {
@@ -458,6 +488,9 @@ export interface ConversationSummary {
   ended_at: string | null;
   talk_ms: number | null;
   latency: LatencySummary | null;
+  /** Null for a conversation with no evaluation: one not ended yet, or cancelled before its
+   * call connected. */
+  evaluation: EvaluationState | null;
   recording_url: string | null;
   /** Why the caller ended the call, in its own words: not a verdict. */
   caller_reason: string | null;
@@ -581,3 +614,415 @@ export interface Generation {
   /** Its scenarios that are not deleted. */
   scenarios: number;
 }
+
+export type EvaluationState = "queued" | "running" | "done" | "failed";
+
+/** The evaluation is still to come: queued, or running now. */
+export function evaluationPending(state: EvaluationState | null): boolean {
+  return state === "queued" || state === "running";
+}
+
+export interface Metric<T> {
+  value: T;
+  flags: string[];
+}
+
+export interface TurnTaking {
+  expected: number;
+  unanswered: number;
+  talked_over: number;
+  /** Waits of at least each length, by the length in ms. */
+  at_least_ms: Record<string, number>;
+  longest_wait_ms: number | null;
+}
+
+export interface Speaking {
+  agent_ms: number;
+  caller_ms: number;
+  agent_share: number | null;
+  longest_monologue_ms: number;
+}
+
+export interface AgentRepetition {
+  runs: { text: string; count: number; at_ms: number }[];
+}
+
+/** The faults of a call saved in full, or, for a call whose worker stopped before that,
+ * only that its record is incomplete. */
+export type CaptureFaults =
+  | {
+      caller_error: string[];
+      unconfirmed_caller_turns: number;
+      media_gaps: number;
+      media_gap_ms: number;
+      worker_stall: { max_ms: number; at_ms: number } | null;
+    }
+  | { incomplete_record: true };
+
+export interface Usage {
+  settings: { llm_model: string; stt_model: string; tts_model: string } | null;
+  usage: {
+    llm_prompt_tokens: number | null;
+    llm_completion_tokens: number | null;
+    stt_audio_seconds: number | null;
+    tts_characters: number | null;
+  } | null;
+  bill_duration_s: number | null;
+  ringing_ms: number | null;
+  answered_ms: number | null;
+  stream_opened_ms: number | null;
+}
+
+export type Outcome =
+  | "pass"
+  | "fail"
+  | "not_applicable"
+  | "unsure"
+  | "blocked"
+  | "error"
+  | "pending";
+export type UnsureKind = "hidden_action" | "not_confirmed_played" | "unclear";
+export type Verdict = "pass" | "fail" | "not_scored";
+
+/** One judged criterion or agent rule. */
+export interface EvaluationItem {
+  item_key: string;
+  /** The criterion's text or the rule's name. */
+  subject: string;
+  role: "deciding" | "reporting";
+  decided_by: "code" | "jev" | "llm";
+  machine_outcome: Outcome;
+  unsure_kind: UnsureKind | null;
+  effective_outcome: Outcome;
+  effective_unsure_kind: UnsureKind | null;
+  answer: Record<string, unknown> | null;
+  error_reason: string | null;
+  /** How Truman's caller affected this criterion, by the caller check. */
+  caller_effect: { owner: string; effect: string; blame: string | null } | null;
+  /** What Jev chose when it answered the item first; a Jev pass has no other answer. */
+  jev_choice: string | null;
+  jev_probabilities: Record<string, number> | null;
+}
+
+export interface ConversationEvaluation {
+  evaluation: EvaluationState | null;
+  /** Why the last attempt failed. */
+  failure: string | null;
+  /** By metric key; empty until the evaluation is done. A call gets only the metrics its
+   * facts support. */
+  metrics: Partial<{
+    speech: Metric<Record<"agent" | "caller", { start_ms: number; end_ms: number }[]>>;
+    response_time: Metric<Record<string, unknown>>;
+    turn_taking: Metric<TurnTaking>;
+    speaking: Metric<Speaking>;
+    agent_repetition: Metric<AgentRepetition>;
+    capture_faults: Metric<CaptureFaults>;
+    usage: Metric<Usage>;
+  }>;
+  /** From the criteria; null when the call was not judged. */
+  scenario_verdict: Verdict | null;
+  conversation_verdict: Verdict | null;
+  effective_scenario_verdict: Verdict | null;
+  effective_conversation_verdict: Verdict | null;
+  items: EvaluationItem[];
+}
+
+export const FLAG_TEXT: Record<string, string> = {
+  unanswered: "Unanswered reply",
+  long_wait: "Wait of 5s or more",
+  dead_air: "Silence of 10s or more",
+  media_gap: "Gap in the agent's media",
+  monologue: "Monologue of 45s or more",
+  repetition: "Repeated answer",
+  caller_error: "Caller error",
+  unconfirmed_caller_turns: "Unconfirmed caller turns",
+  missing_recording: "No recording",
+  no_agent_media: "No media from the agent",
+  worker_stall: "Truman worker paused",
+  incomplete_record: "Call record not saved in full",
+};
+
+/** How many of a total, with the 95% Wilson interval of the rate. */
+export interface Share {
+  count: number;
+  total: number;
+  low: number | null;
+  high: number | null;
+}
+
+export interface RunNumbers {
+  conversations: number;
+  evaluated: number;
+  pending: number;
+  failed: number;
+  connected: Share;
+  errors_before_connect: number;
+  response_p50_ms: number | null;
+  response_p90_ms: number | null;
+  /** Calls with a reply the agent did not answer, of the calls with turn taking. */
+  unanswered: Share;
+  /** Calls where the agent talked over a reply. */
+  talked_over: Share;
+  /** Calls with a wait of 5s or more. */
+  long_wait: Share;
+  /** Calls with a wait of 10s or more. */
+  dead_air: Share;
+  /** How many calls raised each flag. */
+  flags: Record<string, number>;
+}
+
+export interface RunVerdicts {
+  /** Calls whose evaluation is queued or running. */
+  pending: number;
+  /** Calls evaluated with no judge model: metrics, no verdict. */
+  not_judged: number;
+  /** The mean over scenarios of each one's passes over its scored calls. */
+  pass_rate: number | null;
+  /** Scored calls over judged calls; below 0.95 the worst-to-best range is the main number. */
+  coverage: number | null;
+  worst: number | null;
+  best: number | null;
+  interval_low: number | null;
+  interval_high: number | null;
+  pass_hat_2: number | null;
+  pass_hat_2_scenarios: number;
+  /** In the run's order. */
+  scenarios: {
+    scenario_id: string;
+    name: string;
+    category: Category;
+    /** In repeat order; a null verdict means the evaluation failed. */
+    calls: { conversation_id: string; repeat: number; verdict: Verdict | null }[];
+    passes: number;
+    scored: number;
+  }[];
+  inconsistent: string[];
+  criteria: {
+    scenario_id: string;
+    number: number;
+    text: string;
+    counts: Record<string, number>;
+    rate: number | null;
+  }[];
+  /** Criteria and agent rules by who decided them. */
+  decided_by: Partial<Record<"code" | "jev" | "llm", number>>;
+  /** Criteria and agent rules no judge could decide. */
+  errors: number;
+  callers: { persona: string; calls: number; likely: number; possible: number }[];
+  judge_versions: { judge: string; model: string; version: string; items: number }[];
+}
+
+export interface RunMetrics {
+  overall: RunNumbers;
+  /** By the scenario's category as it is now; a category is not versioned. */
+  by_category: { category: Category; numbers: RunNumbers }[];
+  by_noise: { noise: BackgroundNoise; numbers: RunNumbers }[];
+  verdicts: RunVerdicts;
+}
+
+export type LabelAnswer = "pass" | "fail" | "not_applicable" | "cannot_tell" | "blocked";
+export type LabelReason =
+  | "agent_error"
+  | "applicability"
+  | "transcript_error"
+  | "spoken_form"
+  | "date_or_time"
+  | "read_back"
+  | "window_or_order"
+  | "exact_value"
+  | "hidden_action"
+  | "evidence_misread"
+  | "criterion_ambiguous"
+  | "caller_error"
+  | "scenario_error"
+  | "test_settings_error"
+  | "line_or_audio"
+  | "other";
+export type Lane = "audit" | "ad_hoc";
+
+export interface LabelRead {
+  answer: LabelAnswer;
+  /** Needed for a fail, can't tell or blocked. */
+  reason: LabelReason | null;
+  note: string | null;
+  lane: Lane;
+  /** Given before the labeler saw the machine result. */
+  blind: boolean;
+  created_at: string;
+}
+
+export interface ReviewItem {
+  id: string;
+  item_key: string;
+  subject: string;
+  role: "deciding" | "reporting";
+  /** The machine result stays hidden until this labeler labels the item. */
+  blind: boolean;
+  machine: EvaluationItem | null;
+  /** This labeler's latest label. */
+  label: LabelRead | null;
+}
+
+export interface ReviewConversation {
+  conversation: Conversation;
+  lane: Lane;
+  items: ReviewItem[];
+  /** Null until this labeler has labeled every blind item. */
+  verdicts: {
+    scenario_verdict: Verdict | null;
+    conversation_verdict: Verdict | null;
+    effective_scenario_verdict: Verdict | null;
+    effective_conversation_verdict: Verdict | null;
+  } | null;
+}
+
+export interface QueuedReview {
+  conversation_id: string;
+  scenario_name: string;
+  ended_at: string;
+  items: number;
+  labeled: number;
+}
+
+export interface JudgeAgreement {
+  /** Each item counts once, by its first blind audit label. A judge version with no such label
+   * is not listed: it is not yet measured. */
+  versions: { judge: string; model: string; version: string; items: Share }[];
+  /** Calls with a blind label on every criterion whose labels give the machine's verdict. */
+  conversations: Share;
+  /** Items with blind labels from two labelers where the two agree. */
+  labelers: Share;
+  /** Offered audit calls labeled in full. */
+  offered_calls: Share;
+}
+
+export const OUTCOME_TEXT: Record<Outcome, string> = {
+  pass: "Pass",
+  fail: "Fail",
+  not_applicable: "Not applicable",
+  unsure: "Unsure",
+  blocked: "Blocked",
+  error: "Error",
+  pending: "Labels disagree",
+};
+
+export const VERDICT_TEXT: Record<Verdict, string> = {
+  pass: "Pass",
+  fail: "Fail",
+  not_scored: "Not scored",
+};
+
+export const DECIDED_BY_TEXT: Record<EvaluationItem["decided_by"], string> = {
+  code: "Code",
+  jev: "Jev",
+  llm: "Judge model",
+};
+
+export const JUDGE_TEXT: Record<string, string> = {
+  criterion: "Criterion",
+  agent_rule: "Agent rule",
+  instructions: "Instruction adherence",
+  hallucination: "Hallucination",
+  caller_check: "Caller check",
+  jev: "Jev",
+};
+
+export const UNSURE_TEXT: Record<UnsureKind, string> = {
+  hidden_action: "needs an action the call cannot show, so it counts as not applicable",
+  not_confirmed_played: "the caller's audio is not confirmed as played",
+  unclear: "the call does not show enough",
+};
+
+export const ERROR_TEXT: Record<string, string> = {
+  judge_unavailable: "The judge model was not available.",
+  judge_failed: "The judge model refused, rejected the request or stopped before its answer ended.",
+  invalid_evidence: "The judge's quotes did not match the call, twice.",
+  sources_too_large: "The config or the documents are too large for one request.",
+  pattern_timeout: "The pattern ran past its time limit.",
+};
+
+/** Answers that name a problem, so they say which one. */
+export const NEEDS_REASON: LabelAnswer[] = ["fail", "cannot_tell", "blocked"];
+
+export const LABEL_ANSWERS: { value: LabelAnswer; label: string }[] = [
+  { value: "pass", label: "Pass" },
+  { value: "fail", label: "Fail" },
+  { value: "not_applicable", label: "Not applicable" },
+  { value: "cannot_tell", label: "Can't tell" },
+  { value: "blocked", label: "Blocked" },
+];
+
+export const LABEL_REASONS: { value: LabelReason; label: string; example: string }[] = [
+  {
+    value: "agent_error",
+    label: "Agent error",
+    example: "The agent quoted $80; the criterion says $95.",
+  },
+  {
+    value: "applicability",
+    label: "Applicability",
+    example: "The judge said not applicable, but the caller asked about the price.",
+  },
+  {
+    value: "transcript_error",
+    label: "Transcript error",
+    example: 'The text says "eighty"; the recording says "ninety-five".',
+  },
+  {
+    value: "spoken_form",
+    label: "Spoken form",
+    example: 'The agent said "two thirty p.m."; the judge wanted "2:30 PM".',
+  },
+  {
+    value: "date_or_time",
+    label: "Date or time",
+    example: '"Next Tuesday" is a different day from the one the judge took.',
+  },
+  {
+    value: "read_back",
+    label: "Read-back",
+    example: "The agent read back the time but not the date.",
+  },
+  {
+    value: "window_or_order",
+    label: "Window or order",
+    example: "The agent asked for the date of birth after it booked.",
+  },
+  {
+    value: "exact_value",
+    label: "Exact value",
+    example: '"Ninety-five" without "dollars", which the criterion allows.',
+  },
+  {
+    value: "hidden_action",
+    label: "Hidden action",
+    example: "Only the clinic's calendar can show this.",
+  },
+  {
+    value: "evidence_misread",
+    label: "Evidence misread",
+    example: "The judge quoted the caller's words as the agent's.",
+  },
+  {
+    value: "criterion_ambiguous",
+    label: "Criterion ambiguous",
+    example: '"Confirms the booking" can mean a read-back or a question.',
+  },
+  {
+    value: "caller_error",
+    label: "Caller error",
+    example: "The caller gave the wrong date of birth.",
+  },
+  {
+    value: "scenario_error",
+    label: "Scenario error",
+    example: "The scenario asks for a Sunday slot; the clinic is closed on Sunday.",
+  },
+  {
+    value: "test_settings_error",
+    label: "Test settings error",
+    example: "The turn limit ended the call before the booking.",
+  },
+  { value: "line_or_audio", label: "Line or audio", example: "The agent's audio dropped for 3s." },
+  { value: "other", label: "Other", example: "Needs a note." },
+];

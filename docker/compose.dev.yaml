@@ -43,6 +43,12 @@ services:
     # cancel wait plus bounded_dispose, about 120 s at the default end timeout.
     stop_grace_period: 150s
 
+  evaluator:
+    <<: *truman
+    command:
+      - truman-server
+      - evaluator
+
   web:
     image: oven/bun:1.3.9-slim
     working_dir: /app

@@ -1,0 +1,49 @@
+---
+title: Judges
+description: What each judge reads, where the text goes, and what it answers.
+---
+
+After a call, the evaluator measures it in code and then judges it. This page lists each judge: what it reads, where that text goes, and what it answers.
+
+Only completed calls that no one stopped are judged, and only while `JUDGE_LLM_MODEL` is not empty and the judge model has a key. Every judge's text goes to the judge model at `JUDGE_OPENAI_BASE_URL` (or `OPENAI_BASE_URL`). With `TYPESAFE_API_KEY`, the transcript also goes to TypeSafe for the Jev first pass.
+
+## Settings
+
+| Variable | Purpose |
+| --- | --- |
+| `JUDGE_LLM_MODEL` | The judge model, default `gpt-6-luna`. Empty turns the judges off. |
+| `JUDGE_LLM_REASONING_EFFORT` | Default `medium`. |
+| `JUDGE_OPENAI_API_KEY`, `JUDGE_OPENAI_BASE_URL` | The judge's key and address; the caller's `OPENAI_API_KEY` and `OPENAI_BASE_URL` when unset. |
+| `JUDGE_MAX_INPUT_CHARS` | The most text one judge request holds, default 400,000 characters. |
+| `TYPESAFE_API_KEY` | Optional. Makes judging cheaper: Jev, TypeSafe's classifier, answers each criterion and LLM rule first. Call transcripts are sent to TypeSafe. Most accurate in English. |
+| `JEV_PASS_BAR` | How sure Jev must be that an item is met to publish it as a pass, default 0.95. |
+| `JUDGE_SOURCES_TIMEOUT_S` | How long one request of the instruction adherence and hallucination judges may take, default 180 s. They get one try; a failure is their item's error. |
+
+## What each judge reads
+
+All judges read the same evidence view of the call: the agent's brief, the data sent to an agent that places the call, the caller's goal and the facts it knows and does not have, today's date and time zone, the numbers, who hung up and why, the call length, and the numbered transcript. A caller turn whose audio is not confirmed as played, or that the agent spoke over, is marked. The view never holds the caller's own reason for ending the call, the noise setting or Truman's prompts.
+
+| Judge | Reads, beside the evidence view | Requests per call | Answers |
+| --- | --- | --- | --- |
+| Criterion | One criterion | One per criterion | Quotes with turn numbers, an absence claim, reasoning, then pass, fail, not applicable or unsure with a kind |
+| LLM rule | One LLM rule: when it applies, passes and fails | One per LLM rule whose gate is open | The same as a criterion, and whether the rule applies |
+| Phrase rule | Nothing: code checks the agent's lines | None | The turns that match |
+| Instruction adherence | The agent's `config` | One, when the agent has a config | The goal, the steps and the limits of the instructions: each kept or not, with a quote from the call and from the config |
+| Hallucination | The agent's knowledge-base documents | One, when the agent has documents | Each agent statement that a document contradicts, with both quotes |
+| Caller check | The caller's instructions, the criteria and facts that code found | One | Where Truman's caller broke its test, which criteria that changed, and the risk that it changed a result |
+
+Code checks each quote against its turn, and an answer that fails the checks is asked again once. A second failure makes the item an error, `invalid_evidence`. Instruction adherence, hallucination and the caller check only report: they do not change the scenario verdict, but a caller check can block a criterion that Truman's caller likely broke, or that the test's turn or time limit cut off.
+
+## Jev
+
+Optional TypeSafe AI key. Makes judging cheaper. Call transcripts are sent to TypeSafe. Most accurate in English.
+
+With the key, Jev, TypeSafe's classifier, answers every criterion and LLM rule of a call in one request, before the judge model. Each item is one choice: meets, fails, not applicable or cannot tell. Jev publishes only a pass, when it chooses meets with a probability of at least `JEV_PASS_BAR` (default 0.95); that pass has no reason and costs no model call. Every other item goes to the judge model, which does not see Jev's answer. Jev's model is pinned, since the pass bar was chosen for it.
+
+## Judge versions
+
+Each judge's prompt, answer schema, model and settings are hashed into a judge version, and every item names the version that decided it. A run's verdict panel lists the versions its calls used, with how often blind labels from the audit lane agree with each one. A version with no such labels shows "not yet measured on your agents". See "Labels and review" in the README.
+
+## Writing criteria
+
+The judges decide criteria as written. See [Writing criteria](/docs/writing-criteria) for what a judge can and cannot see, and for examples.

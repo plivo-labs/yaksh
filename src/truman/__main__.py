@@ -71,6 +71,37 @@ def worker() -> None:
         raise SystemExit(1) from None
 
 
+@cli.command()
+def evaluator() -> None:
+    """Measure and judge saved conversations, in a process of its own."""
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
+    settings = Settings()
+    upgrade_to_head(str(settings.database_url))
+    asyncio.run(run_evaluator(settings))
+
+
+async def run_evaluator(settings: Settings) -> None:
+    from truman.worker.evaluator import Evaluator, jev_first_pass, judge_model
+
+    engine = create_engine(str(settings.database_url))
+    model = judge_model(settings)
+    sources_model = judge_model(settings, sources=True)
+    jev = jev_first_pass(settings)
+    stop = asyncio.Event()
+    loop = asyncio.get_running_loop()
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        loop.add_signal_handler(sig, stop.set)
+    try:
+        await Evaluator(create_sessionmaker(engine), settings, model, sources_model, jev).run(stop)
+    finally:
+        for client in (model, sources_model, jev):
+            if client is not None:
+                await client.close()
+        if not await bounded_dispose(engine, settings.end_timeout_s):
+            logging.shutdown()
+            os._exit(1)
+
+
 def plivo_api(settings: Settings) -> PlivoApi | None:
     if settings.plivo_auth_id is None or settings.plivo_auth_token is None:
         return None

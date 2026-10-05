@@ -40,7 +40,7 @@ With [Sign in with ChatGPT](https://developers.openai.com/siwc/token-sharing-ope
 - Limits: a run can make hundreds of persona turns, so a plan limit can stop a run in the middle.
 - Shared servers: a team server uses one person's plan for the runs of everyone. OpenAI does not say if this is allowed.
 - Preview: the rules can change. The docs do not say if `json_schema` output and reasoning effort work, and scenario generation needs `json_schema`.
-- Models: the plan may not offer the default persona model, `gpt-4.1`.
+- Models: the plan may not offer the default persona model, `gpt-6-luna`.
 
 ## Open questions
 

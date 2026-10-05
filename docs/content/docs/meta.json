@@ -6,6 +6,8 @@
     "outbound-agents",
     "runs",
     "results",
+    "judges",
+    "writing-criteria",
     "scenario-generation",
     "background-noise",
     "response-time",

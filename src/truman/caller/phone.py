@@ -5,7 +5,7 @@ import base64
 import json
 import logging
 import os
-from collections.abc import Callable, Mapping
+from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
@@ -25,6 +25,7 @@ from pipecat.frames.frames import (
     TTSAudioRawFrame,
     TTSStartedFrame,
     TTSStoppedFrame,
+    TTSTextFrame,
 )
 from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
 from pipecat.serializers.base_serializer import FrameSerializer
@@ -35,12 +36,14 @@ from truman.caller.audio import (
     LOUD_PEAK,
     PLAYOUT,
     SAMPLE_RATE,
+    CallerReply,
     CallRecording,
     Clock,
     Playout,
     Stamper,
+    save_caller_voice,
 )
-from truman.caller.latency import CallerReply, measure
+from truman.caller.lag import LagSampler
 from truman.caller.listen import AudioTap, LiveAudio
 from truman.caller.pipeline import (
     CallState,
@@ -62,6 +65,7 @@ from truman.domain.conversations import (
     CallOutcome,
     CallRequest,
     EndReason,
+    LineFacts,
     WireEvent,
     WireEventKind,
 )
@@ -260,18 +264,71 @@ async def hangup_report(
     return report
 
 
-async def resolve_stream_end(
-    state: CallState, callbacks: asyncio.Queue[dict[str, str]], agent_side: str
-) -> None:
+def resolve_stream_end(state: CallState, report: Mapping[str, str] | None, agent_side: str) -> None:
     """A stream that stopped on its own is named by Plivo's hangup report; without one the
     call cannot count as clean, since nobody knows which side ended it."""
     if state.end_reason is not EndReason.STREAM_ENDED:
         return
-    reason, error = ended_by(await hangup_report(callbacks, HANGUP_REPORT_WAIT_S), agent_side)
+    reason, error = ended_by(report, agent_side)
     state.end_reason = reason
     if reason is EndReason.STREAM_ENDED:
         error = "the stream ended and Plivo did not say which side ended the call"
     state.blame(error)
+
+
+def line_facts(report: Mapping[str, str]) -> LineFacts:
+    def number(name: str) -> int | None:
+        value = report.get(name)
+        return int(value) if value and value.isdigit() else None
+
+    return LineFacts(
+        hangup_source=report.get("HangupSource"),
+        hangup_cause=report.get("HangupCauseName") or report.get("HangupCause"),
+        duration_s=number("Duration"),
+        bill_duration_s=number("BillDuration"),
+        answer_time=report.get("AnswerTime"),
+        end_time=report.get("EndTime"),
+    )
+
+
+@dataclass(frozen=True)
+class Spoken:
+    """What a finished conversation leaves for the work after it."""
+
+    state: CallState
+    persona: Persona
+    recording: CallRecording
+    marks: AudioMarks
+    serializer: StreamSerializer
+
+
+class Line:
+    """The phone leg of a connected call. It is hung up once, as soon as the conversation is
+    over, and its one hangup report is read after that."""
+
+    def __init__(
+        self,
+        call_uuid: str,
+        callbacks: asyncio.Queue[dict[str, str]],
+        hang_up: Callable[[str], Awaitable[None]],
+    ) -> None:
+        self._call_uuid = call_uuid
+        self._callbacks = callbacks
+        self._hang_up = hang_up
+        self._hanging_up: asyncio.Future[None] | None = None
+
+    async def hang_up(self) -> None:
+        """The request runs on a task of its own: a caller cancelled while it waits does not
+        cancel the hang-up, and the next call waits for the same request."""
+        if self._hanging_up is None:
+            self._hanging_up = asyncio.ensure_future(self._hang_up(self._call_uuid))
+        await asyncio.shield(self._hanging_up)
+
+    async def end(self, wait_s: float) -> dict[str, str] | None:
+        """Hang up, then wait up to wait_s for Plivo's hangup report; a report that already
+        came is taken at once. None when it does not come in time."""
+        await self.hang_up()
+        return await hangup_report(self._callbacks, wait_s)
 
 
 async def give_back(report: asyncio.Future[dict[str, str]], callbacks: asyncio.Queue) -> None:
@@ -458,9 +515,9 @@ class StreamSerializer(FrameSerializer):
 
 class AudioMarks(FrameProcessor):
     """After the transport output: when the persona's audio starts and stops going out. It
-    keeps each reply for the response times. A reply that the TTS finished stops when the
-    output handles its TTSStoppedFrame, which then follows the stop at once; that frame carries
-    the reply's playout. A reply that the call or a barge-in cut off has no such frame."""
+    keeps each reply with its playout, which its spoken words carry. A reply that the TTS
+    finished stops when the output handles its TTSStoppedFrame, which then follows the stop at
+    once. A reply that the call or a barge-in cut off has no such frame."""
 
     def __init__(self, clock: Clock, observer: CallObserver) -> None:
         super().__init__(enable_direct_mode=True)
@@ -480,8 +537,11 @@ class AudioMarks(FrameProcessor):
                 if self.replies and self.replies[-1].end_ms is None:
                     self.replies[-1].end_ms = ended
                     self._just_stopped = True
+            elif isinstance(frame, TTSTextFrame) and self.replies and not self.replies[-1].playout:
+                self.replies[-1].playout = frame.metadata.get(PLAYOUT)
             elif isinstance(frame, TTSStoppedFrame) and just_stopped:
                 self.replies[-1].playout = frame.metadata.get(PLAYOUT)
+                self.replies[-1].finished = True
         await self.push_frame(frame, direction)
 
     def _mark(self, kind: WireEventKind) -> int:
@@ -650,10 +710,11 @@ class PhoneCaller:
                     await self._hang_up(dialed.call_uuid)
             if isinstance(dialed, CallOutcome):
                 return dialed
+            line = Line(dialed.call_uuid, entry.callbacks, self._hang_up)
             try:
-                return await self._talk(request, observer, stop, clock, dialed, entry, live)
+                return await self._talk(request, observer, stop, clock, dialed, line, live)
             finally:
-                await self._hang_up(dialed.call_uuid)
+                await line.hang_up()
         finally:
             await live.close()
             self._registry.forget(request.conversation_id)
@@ -696,11 +757,68 @@ class PhoneCaller:
         stop: asyncio.Event,
         clock: Clock,
         dialed: Connected,
-        entry: PendingStream,
+        line: Line,
         live: LiveAudio,
     ) -> CallOutcome:
         connected_ms = clock.ms()
         observer.wire_event(WireEvent(kind=WireEventKind.CONNECTED, at_ms=connected_ms))
+        lag = LagSampler(clock.ms)
+        try:
+            spoken = await self._converse(request, observer, stop, clock, dialed, live)
+        finally:
+            loop_lag = lag.stop()
+        ended_ms = clock.ms()
+        # The line hangs up now; its report comes while the call's audio is saved. A
+        # stopped call has a deadline to finish, so it takes the report only if it already came.
+        ending = asyncio.ensure_future(line.end(0 if stop.is_set() else HANGUP_REPORT_WAIT_S))
+        await live.close()
+        try:
+            started_ms = spoken.recording.start_ms(connected_ms)
+            if started_ms < connected_ms:
+                observer.wire_event(WireEvent(kind=WireEventKind.CONNECTED, at_ms=started_ms))
+            talk_ms = ended_ms - started_ms
+            recording_path = await asyncio.to_thread(
+                spoken.recording.save, request.output_dir / "recording.wav", started_ms
+            )
+            caller_voice_path = request.output_dir / "caller-voice.wav"
+            caller_replies = await asyncio.to_thread(
+                save_caller_voice, spoken.marks.replies, caller_voice_path
+            )
+            report = await ending
+        finally:
+            ending.cancel()
+        agent_side = CALLED_SIDE if request.agent.outbound is None else CALLING_SIDE
+        resolve_stream_end(spoken.state, report, agent_side)
+        spoken.state.blame(spoken.serializer.failure)
+        return CallOutcome(
+            connected=True,
+            end_reason=spoken.state.end_reason or EndReason.ERROR,
+            caller_error=spoken.state.error,
+            caller_reason=spoken.state.caller_reason,
+            talk_ms=talk_ms,
+            recording_path=recording_path,
+            stream_opened_ms=connected_ms,
+            recording_start_ms=started_ms,
+            agent_media=spoken.recording.agent_media(started_ms),
+            caller_replies=caller_replies,
+            caller_voice_path=caller_voice_path if caller_voice_path.is_file() else None,
+            caller_settings=spoken.persona.settings,
+            caller_usage=spoken.persona.usage.usage(),
+            line_facts=line_facts(report) if report else None,
+            loop_lag=loop_lag,
+            call_uuid=dialed.call_uuid,
+        )
+
+    async def _converse(
+        self,
+        request: CallRequest,
+        observer: CallObserver,
+        stop: asyncio.Event,
+        clock: Clock,
+        dialed: Connected,
+        live: LiveAudio,
+    ) -> Spoken:
+        """Build the caller around the stream and hold the conversation until it ends."""
         log.info(
             "stream %s for conversation %s, call %s, %s",
             dialed.stream_id,
@@ -748,12 +866,8 @@ class PhoneCaller:
 
         @transport.event_handler("on_client_connected")
         async def on_connected(_transport: Any, _socket: Any) -> None:
-            if request.agent.agent_speaks_first:
-                return
-            if request.agent.outbound is None:
+            if not request.agent.agent_speaks_first:
                 await persona.speak_first()
-            else:
-                await persona.say(request.pickup)
 
         @transport.event_handler("on_client_disconnected")
         async def on_disconnected(_transport: Any, _socket: Any) -> None:
@@ -776,31 +890,7 @@ class PhoneCaller:
         finally:
             if greeting is not None:
                 greeting.cancel()
-            await live.close()
-        ended_ms = clock.ms()
-        started_ms = recording.start_ms(connected_ms)
-        if started_ms < connected_ms:
-            observer.wire_event(WireEvent(kind=WireEventKind.CONNECTED, at_ms=started_ms))
-        talk_ms = ended_ms - started_ms
-        recording_path = await asyncio.to_thread(
-            recording.save, request.output_dir / "recording.wav", started_ms
-        )
-        latency = await measure(
-            recording.agent_track(started_ms), started_ms, connected_ms, marks.replies
-        )
-        agent_side = CALLED_SIDE if request.agent.outbound is None else CALLING_SIDE
-        await resolve_stream_end(state, entry.callbacks, agent_side)
-        state.blame(serializer.failure)
-        return CallOutcome(
-            connected=True,
-            end_reason=state.end_reason or EndReason.ERROR,
-            caller_error=state.error,
-            caller_reason=state.caller_reason,
-            talk_ms=talk_ms,
-            recording_path=recording_path,
-            latency=latency,
-            call_uuid=dialed.call_uuid,
-        )
+        return Spoken(state, persona, recording, marks, serializer)
 
     async def _hang_up(self, call_id: str) -> None:
         try:

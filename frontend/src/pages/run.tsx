@@ -1,13 +1,14 @@
 import { Play, Square } from "lucide-react";
-import { useState } from "react";
-import { useParams, useSearchParams } from "react-router";
+import { type ReactNode, useState } from "react";
+import { Link, useParams, useSearchParams } from "react-router";
 import { toast } from "sonner";
 
-import { BackButton } from "@/components/back-button";
 import { ConversationList } from "@/components/conversation-list";
 import { CopyId } from "@/components/copy-id";
 import { Pager } from "@/components/pager";
-import { Fact, Panel, PanelHeader } from "@/components/panel";
+import { Panel, PanelHeader } from "@/components/panel";
+import { RunMetricsPanel } from "@/components/run-metrics";
+import { RunVerdictsPanel } from "@/components/run-verdicts";
 import { RunStatusLabel } from "@/components/status-label";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
@@ -20,11 +21,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { usePageParam } from "@/hooks/use-page-param";
-import { duration, noiseLabel, runTitle, runTotal, seconds, when } from "@/lib/format";
+import { duration, noiseLabel, runFinished, runTitle, runTotal, when } from "@/lib/format";
 import {
   CONVERSATIONS_PAGE,
   useAgent,
@@ -42,8 +44,6 @@ import {
   WAITING_REASON_TEXT,
 } from "@/lib/types";
 import { RunDialog } from "@/pages/run-dialog";
-
-const FINISHED: OutcomeGroup[] = ["completed", "did_not_connect", "error", "cancelled"];
 
 export function RunPage() {
   const { id = "" } = useParams();
@@ -70,6 +70,8 @@ export function RunPage() {
   return (
     <div className="grid gap-6">
       <Overview run={data} />
+      <RunVerdictsPanel runId={data.id} active={ACTIVE_RUN_STATUSES.includes(data.status)} />
+      <RunMetricsPanel runId={data.id} active={ACTIVE_RUN_STATUSES.includes(data.status)} />
       <Conversations run={data} />
     </div>
   );
@@ -77,21 +79,28 @@ export function RunPage() {
 
 function Overview({ run }: { run: Run }) {
   const total = runTotal(run);
-  const finished = FINISHED.reduce((sum, group) => sum + run.counts[group], 0);
+  const finished = runFinished(run);
+  const running = run.counts.in_progress;
+  const share = (count: number) => `${total ? (count / total) * 100 : 0}%`;
   const endReasons = Object.entries(run.end_reasons) as [EndReason, number][];
   return (
     <Panel>
       <div className="flex flex-wrap items-start gap-x-6 gap-y-4 px-5 pt-5 pb-4">
         <div className="grid min-w-0 flex-1 basis-72 gap-1">
           <div className="flex min-w-0 items-center gap-2">
-            <BackButton fallback={`/agents/${run.agent_id}`} />
             <h1 className="truncate text-h3-500" title={runTitle(run)}>
               {runTitle(run)}
             </h1>
             <RunStatusLabel status={run.status} />
           </div>
           <p className="text-s-400 text-muted-foreground">
-            {run.agent_name}, version {run.agent_version}
+            <Link
+              to={`/agents/${run.agent_id}`}
+              className="rounded-sm underline decoration-muted-foreground/40 underline-offset-4 outline-none hover:text-foreground hover:decoration-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
+            >
+              {run.agent_name}
+            </Link>
+            , version {run.agent_version}
             {run.started_at && `, started ${when(run.started_at)}`}
             {run.ended_at && `, ended ${when(run.ended_at)}`}
           </p>
@@ -105,8 +114,11 @@ function Overview({ run }: { run: Run }) {
       </div>
       <div className="grid gap-3 border-t px-5 py-4">
         <div className="flex items-baseline justify-between text-sm">
-          <span className="font-medium tabular-nums">
-            {finished} of {total} finished
+          <span className="tabular-nums">
+            <span className="font-medium">
+              {finished} of {total} finished
+            </span>
+            {running > 0 && <span className="text-muted-foreground">, {running} in progress</span>}
           </span>
           {run.retries > 0 && (
             <span className="text-muted-foreground tabular-nums">
@@ -120,50 +132,61 @@ function Overview({ run }: { run: Run }) {
           aria-valuemin={0}
           aria-valuemax={total}
           aria-valuenow={finished}
-          className="h-1.5 overflow-hidden rounded-full bg-muted"
+          className="flex h-1.5 overflow-hidden rounded-full bg-muted"
         >
           <div
-            className="h-full rounded-full bg-primary transition-[width] duration-300 ease-out"
-            style={{ width: `${total ? (finished / total) * 100 : 0}%` }}
+            className="h-full bg-primary transition-[width] duration-300 ease-out"
+            style={{ width: share(finished) }}
           />
+          {running > 0 && (
+            <div
+              className="h-full bar-shimmer transition-[width] duration-300 ease-out"
+              style={{ width: share(running) }}
+            />
+          )}
         </div>
         <GroupFilter run={run} />
+        {endReasons.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1.5 text-xs-400">
+            <span className="mr-1 text-muted-foreground">How calls ended</span>
+            {endReasons.map(([reason, count]) => (
+              <Badge key={reason} variant="tag">
+                {END_REASON_LABELS[reason]} · {count}
+              </Badge>
+            ))}
+          </div>
+        )}
       </div>
-      <dl className="grid grid-cols-2 gap-4 border-t px-5 py-4 sm:grid-cols-3 lg:grid-cols-9">
-        <Fact label="Repeats">{run.repeats}</Fact>
-        <Fact label="Time limit">{run.max_duration_s} seconds</Fact>
-        <Fact label="Turn limit">{run.max_turns} turns</Fact>
-        <Fact label="Background noise">
+      <dl className="flex flex-wrap items-center gap-x-6 gap-y-2 border-t px-5 py-3 text-xs-400">
+        <Setting label="Repeats">{run.repeats}</Setting>
+        <Setting label="Limits">
+          {run.max_duration_s} s, {run.max_turns} turns
+        </Setting>
+        <Setting label="At once">{run.max_parallel ?? "No run limit"}</Setting>
+        <Setting label="Delay">
+          {run.start_interval_s === null ? "None" : `${run.start_interval_s} s`}
+        </Setting>
+        <Setting label="Retries">Up to {run.max_retries}</Setting>
+        <Setting label="Noise">
           {run.background_noise
             ? (noiseLabel(run.background_noise) ?? "None")
             : "Each persona's setting"}
-        </Fact>
-        <Fact label="Max parallel">{run.max_parallel ?? "No run limit"}</Fact>
-        <Fact label="Delay between calls">
-          {run.start_interval_s === null ? "None" : `${run.start_interval_s} seconds`}
-        </Fact>
-        <Fact label="Retries">Up to {run.max_retries}</Fact>
-        <Fact label="Median talk time">{duration(run.median_talk_ms) || "None yet"}</Fact>
-        <Fact label="Response p50 / p90">
-          {run.response_p50_ms === null || run.response_p90_ms === null
-            ? "None yet"
-            : `${seconds(run.response_p50_ms)} / ${seconds(run.response_p90_ms)}`}
-        </Fact>
-        <Fact label="Run id">
+        </Setting>
+        <Setting label="Median talk">{duration(run.median_talk_ms) || "None yet"}</Setting>
+        <Setting label="Run id">
           <CopyId id={run.id} label="run id" />
-        </Fact>
-        <div className="col-span-2 grid min-w-0 gap-0.5 sm:col-span-2 lg:col-span-8">
-          <dt className="text-xs-400 text-muted-foreground">End reasons</dt>
-          <dd className="text-s-400">
-            {endReasons.length === 0
-              ? "None yet"
-              : endReasons
-                  .map(([reason, count]) => `${END_REASON_LABELS[reason]} ${count}`)
-                  .join(", ")}
-          </dd>
-        </div>
+        </Setting>
       </dl>
     </Panel>
+  );
+}
+
+function Setting({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="flex items-baseline gap-1.5">
+      <dt className="text-muted-foreground">{label}</dt>
+      <dd className="font-medium">{children}</dd>
+    </div>
   );
 }
 

@@ -281,6 +281,23 @@
   --status-idle: hsl(220 9% 40%);
 }
 
+/* A bar segment that marks live work: the same band sweeps across it. Still under reduced
+ * motion. */
+@utility bar-shimmer {
+  background-image: linear-gradient(
+    90deg,
+    color-mix(in oklab, var(--primary) 25%, transparent) 30%,
+    color-mix(in oklab, var(--primary) 55%, transparent) 50%,
+    color-mix(in oklab, var(--primary) 25%, transparent) 70%
+  );
+  background-size: 200% 100%;
+  animation: var(--animate-shimmer);
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
 /* Text that marks live work: a light band sweeps across it. Still under reduced motion. */
 @utility text-shimmer {
   color: transparent;

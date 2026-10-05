@@ -1,20 +1,23 @@
 import {
   AudioLines,
   Bot,
+  ClipboardCheck,
   Hash,
   KeyRound,
+  ListChecks,
   MoonStar,
   PhoneCall,
   SunMedium,
   UserRound,
 } from "lucide-react";
-import { type ComponentType, type CSSProperties, useLayoutEffect, useState } from "react";
-import { flushSync } from "react-dom";
+import type { ComponentType, CSSProperties } from "react";
 import { NavLink, Outlet, useLocation, useMatches } from "react-router";
 import { Toaster } from "sonner";
 
 import { TokenGate } from "@/app/token";
+import { useDarkMode } from "@/app/use-dark-mode";
 import { useToken } from "@/app/use-token";
+import { API_TOKEN } from "@/lib/api";
 import {
   Sidebar,
   SidebarContent,
@@ -33,47 +36,21 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
-const THEME_KEY = "truman.theme";
-
-function useDarkMode(): [boolean, () => void] {
-  const [dark, setDark] = useState(() => {
-    try {
-      const saved = localStorage.getItem(THEME_KEY);
-      if (saved) return saved === "dark";
-    } catch {
-      // storage unavailable
-    }
-    return window.matchMedia("(prefers-color-scheme: dark)").matches;
-  });
-  useLayoutEffect(() => {
-    document.documentElement.classList.toggle("dark", dark);
-    try {
-      localStorage.setItem(THEME_KEY, dark ? "dark" : "light");
-    } catch {
-      // storage unavailable
-    }
-  }, [dark]);
-  const toggle = () => {
-    const flip = () => flushSync(() => setDark((value) => !value));
-    if (document.startViewTransition) document.startViewTransition(flip);
-    else flip();
-  };
-  return [dark, toggle];
-}
-
-const links: { to: string; label: string; icon: typeof Bot; under?: string[] }[] = [
-  /* A run belongs to an agent, so a run page keeps Agents active. */
-  { to: "/agents", label: "Agents", icon: Bot, under: ["/runs"] },
+const links: { to: string; label: string; icon: typeof Bot }[] = [
+  { to: "/agents", label: "Agents", icon: Bot },
+  { to: "/runs", label: "Runs", icon: ListChecks },
   { to: "/conversations", label: "Conversations", icon: PhoneCall },
   { to: "/personas", label: "Personas", icon: UserRound },
   { to: "/voices", label: "Voices", icon: AudioLines },
   { to: "/numbers", label: "Numbers", icon: Hash },
+  /* The review screen stands outside the console: it holds a labeler's token. */
+  { to: "/review", label: "Review", icon: ClipboardCheck },
 ];
 
 const sidebarOpen = () => !document.cookie.split("; ").includes("sidebar_state=false");
 
 export function Shell() {
-  const [token, setToken] = useToken();
+  const [token, setToken] = useToken(API_TOKEN);
   const [dark, toggleDark] = useDarkMode();
   const { pathname } = useLocation();
   /** The page's trail, from the `crumbs` component on its route. */
@@ -85,7 +62,7 @@ export function Shell() {
     <TooltipProvider delay={500}>
       <SidebarProvider
         defaultOpen={sidebarOpen()}
-        style={{ "--sidebar-width": "15rem" } as CSSProperties}
+        style={{ "--sidebar-width": "12rem" } as CSSProperties}
       >
         <Sidebar collapsible="icon">
           <SidebarHeader>
@@ -102,10 +79,10 @@ export function Shell() {
             <SidebarGroup>
               <SidebarGroupContent>
                 <SidebarMenu>
-                  {links.map(({ to, label, icon: Icon, under = [] }) => (
+                  {links.map(({ to, label, icon: Icon }) => (
                     <SidebarMenuItem key={to}>
                       <SidebarMenuButton
-                        isActive={[to, ...under].some((path) => pathname.startsWith(path))}
+                        isActive={pathname.startsWith(to)}
                         tooltip={label}
                         render={<NavLink to={to} />}
                       >

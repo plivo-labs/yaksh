@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -87,6 +88,27 @@ func (e ConversationStatus) Valid() bool {
 	}
 }
 
+// Defines values for DecidedBy.
+const (
+	DecidedByCode DecidedBy = "code"
+	DecidedByJev  DecidedBy = "jev"
+	DecidedByLlm  DecidedBy = "llm"
+)
+
+// Valid indicates whether the value is a known member of the DecidedBy enum.
+func (e DecidedBy) Valid() bool {
+	switch e {
+	case DecidedByCode:
+		return true
+	case DecidedByJev:
+		return true
+	case DecidedByLlm:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for Direction.
 const (
 	Inbound  Direction = "inbound"
@@ -156,6 +178,30 @@ func (e EndReason) Valid() bool {
 	}
 }
 
+// Defines values for EvaluationState.
+const (
+	EvaluationStateDone    EvaluationState = "done"
+	EvaluationStateFailed  EvaluationState = "failed"
+	EvaluationStateQueued  EvaluationState = "queued"
+	EvaluationStateRunning EvaluationState = "running"
+)
+
+// Valid indicates whether the value is a known member of the EvaluationState enum.
+func (e EvaluationState) Valid() bool {
+	switch e {
+	case EvaluationStateDone:
+		return true
+	case EvaluationStateFailed:
+		return true
+	case EvaluationStateQueued:
+		return true
+	case EvaluationStateRunning:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for GenerationMode.
 const (
 	GenerationModeAgent         GenerationMode = "agent"
@@ -198,6 +244,129 @@ func (e GenerationStatus) Valid() bool {
 	}
 }
 
+// Defines values for ItemRole.
+const (
+	Deciding  ItemRole = "deciding"
+	Reporting ItemRole = "reporting"
+)
+
+// Valid indicates whether the value is a known member of the ItemRole enum.
+func (e ItemRole) Valid() bool {
+	switch e {
+	case Deciding:
+		return true
+	case Reporting:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for LabelAnswer.
+const (
+	LabelAnswerBlocked       LabelAnswer = "blocked"
+	LabelAnswerCannotTell    LabelAnswer = "cannot_tell"
+	LabelAnswerFail          LabelAnswer = "fail"
+	LabelAnswerNotApplicable LabelAnswer = "not_applicable"
+	LabelAnswerPass          LabelAnswer = "pass"
+)
+
+// Valid indicates whether the value is a known member of the LabelAnswer enum.
+func (e LabelAnswer) Valid() bool {
+	switch e {
+	case LabelAnswerBlocked:
+		return true
+	case LabelAnswerCannotTell:
+		return true
+	case LabelAnswerFail:
+		return true
+	case LabelAnswerNotApplicable:
+		return true
+	case LabelAnswerPass:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for LabelReason.
+const (
+	LabelReasonAgentError         LabelReason = "agent_error"
+	LabelReasonApplicability      LabelReason = "applicability"
+	LabelReasonCallerError        LabelReason = "caller_error"
+	LabelReasonCriterionAmbiguous LabelReason = "criterion_ambiguous"
+	LabelReasonDateOrTime         LabelReason = "date_or_time"
+	LabelReasonEvidenceMisread    LabelReason = "evidence_misread"
+	LabelReasonExactValue         LabelReason = "exact_value"
+	LabelReasonHiddenAction       LabelReason = "hidden_action"
+	LabelReasonLineOrAudio        LabelReason = "line_or_audio"
+	LabelReasonOther              LabelReason = "other"
+	LabelReasonReadBack           LabelReason = "read_back"
+	LabelReasonScenarioError      LabelReason = "scenario_error"
+	LabelReasonSpokenForm         LabelReason = "spoken_form"
+	LabelReasonTestSettingsError  LabelReason = "test_settings_error"
+	LabelReasonTranscriptError    LabelReason = "transcript_error"
+	LabelReasonWindowOrOrder      LabelReason = "window_or_order"
+)
+
+// Valid indicates whether the value is a known member of the LabelReason enum.
+func (e LabelReason) Valid() bool {
+	switch e {
+	case LabelReasonAgentError:
+		return true
+	case LabelReasonApplicability:
+		return true
+	case LabelReasonCallerError:
+		return true
+	case LabelReasonCriterionAmbiguous:
+		return true
+	case LabelReasonDateOrTime:
+		return true
+	case LabelReasonEvidenceMisread:
+		return true
+	case LabelReasonExactValue:
+		return true
+	case LabelReasonHiddenAction:
+		return true
+	case LabelReasonLineOrAudio:
+		return true
+	case LabelReasonOther:
+		return true
+	case LabelReasonReadBack:
+		return true
+	case LabelReasonScenarioError:
+		return true
+	case LabelReasonSpokenForm:
+		return true
+	case LabelReasonTestSettingsError:
+		return true
+	case LabelReasonTranscriptError:
+		return true
+	case LabelReasonWindowOrOrder:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for Lane.
+const (
+	AdHoc Lane = "ad_hoc"
+	Audit Lane = "audit"
+)
+
+// Valid indicates whether the value is a known member of the Lane enum.
+func (e Lane) Valid() bool {
+	switch e {
+	case AdHoc:
+		return true
+	case Audit:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for Language.
 const (
 	En       Language = "en"
@@ -210,6 +379,21 @@ func (e Language) Valid() bool {
 	case En:
 		return true
 	case Hinglish:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for LlmRuleKind.
+const (
+	LlmRuleKindLlm LlmRuleKind = "llm"
+)
+
+// Valid indicates whether the value is a known member of the LlmRuleKind enum.
+func (e LlmRuleKind) Valid() bool {
+	switch e {
+	case LlmRuleKindLlm:
 		return true
 	default:
 		return false
@@ -297,6 +481,39 @@ func (e NumberState) Valid() bool {
 	}
 }
 
+// Defines values for Outcome.
+const (
+	OutcomeBlocked       Outcome = "blocked"
+	OutcomeError         Outcome = "error"
+	OutcomeFail          Outcome = "fail"
+	OutcomeNotApplicable Outcome = "not_applicable"
+	OutcomePass          Outcome = "pass"
+	OutcomePending       Outcome = "pending"
+	OutcomeUnsure        Outcome = "unsure"
+)
+
+// Valid indicates whether the value is a known member of the Outcome enum.
+func (e Outcome) Valid() bool {
+	switch e {
+	case OutcomeBlocked:
+		return true
+	case OutcomeError:
+		return true
+	case OutcomeFail:
+		return true
+	case OutcomeNotApplicable:
+		return true
+	case OutcomePass:
+		return true
+	case OutcomePending:
+		return true
+	case OutcomeUnsure:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for OutcomeGroup.
 const (
 	OutcomeGroupCancelled     OutcomeGroup = "cancelled"
@@ -321,6 +538,75 @@ func (e OutcomeGroup) Valid() bool {
 	case OutcomeGroupInProgress:
 		return true
 	case OutcomeGroupWaiting:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PhraseExpectation.
+const (
+	Forbidden PhraseExpectation = "forbidden"
+	Required  PhraseExpectation = "required"
+)
+
+// Valid indicates whether the value is a known member of the PhraseExpectation enum.
+func (e PhraseExpectation) Valid() bool {
+	switch e {
+	case Forbidden:
+		return true
+	case Required:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PhraseMatch.
+const (
+	PhraseMatchPhrase PhraseMatch = "phrase"
+	PhraseMatchRegex  PhraseMatch = "regex"
+)
+
+// Valid indicates whether the value is a known member of the PhraseMatch enum.
+func (e PhraseMatch) Valid() bool {
+	switch e {
+	case PhraseMatchPhrase:
+		return true
+	case PhraseMatchRegex:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PhraseRuleKind.
+const (
+	PhraseRuleKindPhrase PhraseRuleKind = "phrase"
+)
+
+// Valid indicates whether the value is a known member of the PhraseRuleKind enum.
+func (e PhraseRuleKind) Valid() bool {
+	switch e {
+	case PhraseRuleKindPhrase:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PhraseWhere.
+const (
+	AnyAgentTurn   PhraseWhere = "any_agent_turn"
+	FirstAgentTurn PhraseWhere = "first_agent_turn"
+)
+
+// Valid indicates whether the value is a known member of the PhraseWhere enum.
+func (e PhraseWhere) Valid() bool {
+	switch e {
+	case AnyAgentTurn:
+		return true
+	case FirstAgentTurn:
 		return true
 	default:
 		return false
@@ -366,6 +652,24 @@ func (e Role) Valid() bool {
 	}
 }
 
+// Defines values for RuleGate.
+const (
+	AgentSpoke RuleGate = "agent_spoke"
+	Always     RuleGate = "always"
+)
+
+// Valid indicates whether the value is a known member of the RuleGate enum.
+func (e RuleGate) Valid() bool {
+	switch e {
+	case AgentSpoke:
+		return true
+	case Always:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for RunStatus.
 const (
 	RunStatusCancelled  RunStatus = "cancelled"
@@ -402,6 +706,48 @@ const (
 func (e Transport) Valid() bool {
 	switch e {
 	case Phone:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for UnsureKind.
+const (
+	UnsureKindHiddenAction       UnsureKind = "hidden_action"
+	UnsureKindNotConfirmedPlayed UnsureKind = "not_confirmed_played"
+	UnsureKindUnclear            UnsureKind = "unclear"
+)
+
+// Valid indicates whether the value is a known member of the UnsureKind enum.
+func (e UnsureKind) Valid() bool {
+	switch e {
+	case UnsureKindHiddenAction:
+		return true
+	case UnsureKindNotConfirmedPlayed:
+		return true
+	case UnsureKindUnclear:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for Verdict.
+const (
+	VerdictFail      Verdict = "fail"
+	VerdictNotScored Verdict = "not_scored"
+	VerdictPass      Verdict = "pass"
+)
+
+// Valid indicates whether the value is a known member of the Verdict enum.
+func (e Verdict) Valid() bool {
+	switch e {
+	case VerdictFail:
+		return true
+	case VerdictNotScored:
+		return true
+	case VerdictPass:
 		return true
 	default:
 		return false
@@ -467,49 +813,55 @@ func (e WaitingReason) Valid() bool {
 
 // Defines values for WireEventKind.
 const (
-	AgentAudio       WireEventKind = "agent_audio"
-	Answered         WireEventKind = "answered"
-	CallerAudioEnd   WireEventKind = "caller_audio_end"
-	CallerAudioStart WireEventKind = "caller_audio_start"
-	CallerError      WireEventKind = "caller_error"
-	ClearAudio       WireEventKind = "clear_audio"
-	ConnectStarted   WireEventKind = "connect_started"
-	Connected        WireEventKind = "connected"
-	Ringing          WireEventKind = "ringing"
-	SilenceGreeting  WireEventKind = "silence_greeting"
-	Stop             WireEventKind = "stop"
-	TriggerSent      WireEventKind = "trigger_sent"
-	WaitingForCall   WireEventKind = "waiting_for_call"
+	WireEventKindAgentAudio       WireEventKind = "agent_audio"
+	WireEventKindAnswered         WireEventKind = "answered"
+	WireEventKindCallerAudioEnd   WireEventKind = "caller_audio_end"
+	WireEventKindCallerAudioStart WireEventKind = "caller_audio_start"
+	WireEventKindCallerError      WireEventKind = "caller_error"
+	WireEventKindClearAudio       WireEventKind = "clear_audio"
+	WireEventKindConnectStarted   WireEventKind = "connect_started"
+	WireEventKindConnected        WireEventKind = "connected"
+	WireEventKindEndCall          WireEventKind = "end_call"
+	WireEventKindRinging          WireEventKind = "ringing"
+	WireEventKindSilenceGreeting  WireEventKind = "silence_greeting"
+	WireEventKindStop             WireEventKind = "stop"
+	WireEventKindTriggerSent      WireEventKind = "trigger_sent"
+	WireEventKindTurnLimit        WireEventKind = "turn_limit"
+	WireEventKindWaitingForCall   WireEventKind = "waiting_for_call"
 )
 
 // Valid indicates whether the value is a known member of the WireEventKind enum.
 func (e WireEventKind) Valid() bool {
 	switch e {
-	case AgentAudio:
+	case WireEventKindAgentAudio:
 		return true
-	case Answered:
+	case WireEventKindAnswered:
 		return true
-	case CallerAudioEnd:
+	case WireEventKindCallerAudioEnd:
 		return true
-	case CallerAudioStart:
+	case WireEventKindCallerAudioStart:
 		return true
-	case CallerError:
+	case WireEventKindCallerError:
 		return true
-	case ClearAudio:
+	case WireEventKindClearAudio:
 		return true
-	case ConnectStarted:
+	case WireEventKindConnectStarted:
 		return true
-	case Connected:
+	case WireEventKindConnected:
 		return true
-	case Ringing:
+	case WireEventKindEndCall:
 		return true
-	case SilenceGreeting:
+	case WireEventKindRinging:
 		return true
-	case Stop:
+	case WireEventKindSilenceGreeting:
 		return true
-	case TriggerSent:
+	case WireEventKindStop:
 		return true
-	case WaitingForCall:
+	case WireEventKindTriggerSent:
+		return true
+	case WireEventKindTurnLimit:
+		return true
+	case WireEventKindWaitingForCall:
 		return true
 	default:
 		return false
@@ -518,34 +870,46 @@ func (e WireEventKind) Valid() bool {
 
 // AgentConfig defines model for AgentConfig.
 type AgentConfig struct {
-	AgentNumber      *string               `json:"agent_number,omitempty"`
-	AgentSpeaksFirst *bool                 `json:"agent_speaks_first,omitempty"`
-	Brief            *string               `json:"brief,omitempty"`
-	Config           *string               `json:"config,omitempty"`
-	Direction        *Direction            `json:"direction,omitempty"`
-	KnowledgeBase    *[]KnowledgeBaseEntry `json:"knowledge_base,omitempty"`
-	Language         *Language             `json:"language,omitempty"`
-	Outbound         *OutboundConfig       `json:"outbound,omitempty"`
+	AgentNumber      *string                   `json:"agent_number,omitempty"`
+	AgentSpeaksFirst *bool                     `json:"agent_speaks_first,omitempty"`
+	Brief            *string                   `json:"brief,omitempty"`
+	Config           *string                   `json:"config,omitempty"`
+	Direction        *Direction                `json:"direction,omitempty"`
+	KnowledgeBase    *[]KnowledgeBaseEntry     `json:"knowledge_base,omitempty"`
+	Language         *Language                 `json:"language,omitempty"`
+	Outbound         *OutboundConfig           `json:"outbound,omitempty"`
+	Rules            *[]AgentConfig_Rules_Item `json:"rules,omitempty"`
 
 	// Transport How Truman reaches an agent; phone only today, kept as the seam for other ways.
 	Transport *Transport `json:"transport,omitempty"`
 }
 
+// AgentConfig_Rules_Item defines model for AgentConfig.rules.Item.
+type AgentConfig_Rules_Item struct {
+	union json.RawMessage
+}
+
 // AgentCreate defines model for AgentCreate.
 type AgentCreate struct {
-	AgentNumber      *string               `json:"agent_number,omitempty"`
-	AgentSpeaksFirst *bool                 `json:"agent_speaks_first,omitempty"`
-	Brief            *string               `json:"brief,omitempty"`
-	Config           *string               `json:"config,omitempty"`
-	Direction        *Direction            `json:"direction,omitempty"`
-	ExternalId       *string               `json:"external_id,omitempty"`
-	KnowledgeBase    *[]KnowledgeBaseEntry `json:"knowledge_base,omitempty"`
-	Language         *Language             `json:"language,omitempty"`
-	Name             string                `json:"name"`
-	Outbound         *OutboundConfig       `json:"outbound,omitempty"`
+	AgentNumber      *string                   `json:"agent_number,omitempty"`
+	AgentSpeaksFirst *bool                     `json:"agent_speaks_first,omitempty"`
+	Brief            *string                   `json:"brief,omitempty"`
+	Config           *string                   `json:"config,omitempty"`
+	Direction        *Direction                `json:"direction,omitempty"`
+	ExternalId       *string                   `json:"external_id,omitempty"`
+	KnowledgeBase    *[]KnowledgeBaseEntry     `json:"knowledge_base,omitempty"`
+	Language         *Language                 `json:"language,omitempty"`
+	Name             string                    `json:"name"`
+	Outbound         *OutboundConfig           `json:"outbound,omitempty"`
+	Rules            *[]AgentCreate_Rules_Item `json:"rules,omitempty"`
 
 	// Transport How Truman reaches an agent; phone only today, kept as the seam for other ways.
 	Transport *Transport `json:"transport,omitempty"`
+}
+
+// AgentCreate_Rules_Item defines model for AgentCreate.rules.Item.
+type AgentCreate_Rules_Item struct {
+	union json.RawMessage
 }
 
 // AgentRead defines model for AgentRead.
@@ -563,10 +927,16 @@ type AgentRead struct {
 	Language         Language                `json:"language"`
 	Name             string                  `json:"name"`
 	Outbound         *OutboundConfig         `json:"outbound"`
+	Rules            []AgentRead_Rules_Item  `json:"rules"`
 
 	// Transport How Truman reaches an agent; phone only today, kept as the seam for other ways.
 	Transport Transport `json:"transport"`
 	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// AgentRead_Rules_Item defines model for AgentRead.rules.Item.
+type AgentRead_Rules_Item struct {
+	union json.RawMessage
 }
 
 // AgentSummary An agent without its config and knowledge base, for lists.
@@ -590,17 +960,23 @@ type AgentSummary struct {
 
 // AgentUpdate defines model for AgentUpdate.
 type AgentUpdate struct {
-	AgentNumber      *string               `json:"agent_number,omitempty"`
-	AgentSpeaksFirst *bool                 `json:"agent_speaks_first,omitempty"`
-	Brief            *string               `json:"brief,omitempty"`
-	Config           *string               `json:"config,omitempty"`
-	Direction        *Direction            `json:"direction,omitempty"`
-	ExternalId       *string               `json:"external_id,omitempty"`
-	KnowledgeBase    *[]KnowledgeBaseEntry `json:"knowledge_base,omitempty"`
-	Language         *Language             `json:"language,omitempty"`
-	Name             *string               `json:"name,omitempty"`
-	Outbound         *OutboundConfig       `json:"outbound,omitempty"`
-	Transport        *Transport            `json:"transport,omitempty"`
+	AgentNumber      *string                   `json:"agent_number,omitempty"`
+	AgentSpeaksFirst *bool                     `json:"agent_speaks_first,omitempty"`
+	Brief            *string                   `json:"brief,omitempty"`
+	Config           *string                   `json:"config,omitempty"`
+	Direction        *Direction                `json:"direction,omitempty"`
+	ExternalId       *string                   `json:"external_id,omitempty"`
+	KnowledgeBase    *[]KnowledgeBaseEntry     `json:"knowledge_base,omitempty"`
+	Language         *Language                 `json:"language,omitempty"`
+	Name             *string                   `json:"name,omitempty"`
+	Outbound         *OutboundConfig           `json:"outbound,omitempty"`
+	Rules            *[]AgentUpdate_Rules_Item `json:"rules,omitempty"`
+	Transport        *Transport                `json:"transport,omitempty"`
+}
+
+// AgentUpdate_Rules_Item defines model for AgentUpdate.rules.Item.
+type AgentUpdate_Rules_Item struct {
+	union json.RawMessage
 }
 
 // AgentVersionRead defines model for AgentVersionRead.
@@ -630,8 +1006,32 @@ type BodyUploadDocumentApiV1DocumentsUploadPost struct {
 	File openapi_types.File `json:"file"`
 }
 
+// CallVerdict defines model for CallVerdict.
+type CallVerdict struct {
+	ConversationId openapi_types.UUID `json:"conversation_id"`
+	Repeat         int                `json:"repeat"`
+	Verdict        *Verdict           `json:"verdict"`
+}
+
+// CallerFidelity defines model for CallerFidelity.
+type CallerFidelity struct {
+	Calls    int    `json:"calls"`
+	Likely   int    `json:"likely"`
+	Persona  string `json:"persona"`
+	Possible int    `json:"possible"`
+}
+
 // Category What kind of situation a scenario tests. How the caller talks comes from the persona.
 type Category string
+
+// CategoryNumbers defines model for CategoryNumbers.
+type CategoryNumbers struct {
+	// Category What kind of situation a scenario tests. How the caller talks comes from the persona.
+	Category Category `json:"category"`
+
+	// Numbers What the evaluations found over some of a run's conversations.
+	Numbers RunNumbers `json:"numbers"`
+}
 
 // Channel defines model for Channel.
 type Channel string
@@ -644,6 +1044,18 @@ type ConversationCreate struct {
 	MaxTurns        *int                `json:"max_turns,omitempty"`
 	PersonaId       *openapi_types.UUID `json:"persona_id,omitempty"`
 	ScenarioId      openapi_types.UUID  `json:"scenario_id"`
+}
+
+// ConversationEvaluation defines model for ConversationEvaluation.
+type ConversationEvaluation struct {
+	ConversationVerdict          *Verdict          `json:"conversation_verdict"`
+	EffectiveConversationVerdict *Verdict          `json:"effective_conversation_verdict"`
+	EffectiveScenarioVerdict     *Verdict          `json:"effective_scenario_verdict"`
+	Evaluation                   *EvaluationState  `json:"evaluation"`
+	Failure                      *string           `json:"failure"`
+	Items                        []ItemRead        `json:"items"`
+	Metrics                      map[string]Metric `json:"metrics"`
+	ScenarioVerdict              *Verdict          `json:"scenario_verdict"`
 }
 
 // ConversationRead defines model for ConversationRead.
@@ -665,6 +1077,7 @@ type ConversationRead struct {
 	Direction        Direction           `json:"direction"`
 	EndReason        *EndReason          `json:"end_reason"`
 	EndedAt          *time.Time          `json:"ended_at"`
+	Evaluation       *EvaluationState    `json:"evaluation"`
 	FailureReason    *string             `json:"failure_reason"`
 	Id               openapi_types.UUID  `json:"id"`
 	Instructions     string              `json:"instructions"`
@@ -721,6 +1134,7 @@ type ConversationSummary struct {
 	Direction         Direction           `json:"direction"`
 	EndReason         *EndReason          `json:"end_reason"`
 	EndedAt           *time.Time          `json:"ended_at"`
+	Evaluation        *EvaluationState    `json:"evaluation"`
 	FailureReason     *string             `json:"failure_reason"`
 	Id                openapi_types.UUID  `json:"id"`
 	Language          Language            `json:"language"`
@@ -743,6 +1157,18 @@ type ConversationSummary struct {
 	Status            ConversationStatus  `json:"status"`
 	TalkMs            *int                `json:"talk_ms"`
 }
+
+// CriterionCounts defines model for CriterionCounts.
+type CriterionCounts struct {
+	Counts     map[string]int     `json:"counts"`
+	Number     int                `json:"number"`
+	Rate       *float32           `json:"rate"`
+	ScenarioId openapi_types.UUID `json:"scenario_id"`
+	Text       string             `json:"text"`
+}
+
+// DecidedBy defines model for DecidedBy.
+type DecidedBy string
 
 // Defaults What the server uses for a field that a request leaves out.
 type Defaults struct {
@@ -781,6 +1207,9 @@ type DocumentSummary struct {
 
 // EndReason Who or what ended the conversation, as Truman observed it.
 type EndReason string
+
+// EvaluationState defines model for EvaluationState.
+type EvaluationState string
 
 // Fact A value the caller has and gives when the agent asks for it.
 type Fact struct {
@@ -829,6 +1258,55 @@ type HealthResponse struct {
 	Version string `json:"version"`
 }
 
+// ItemRead defines model for ItemRead.
+type ItemRead struct {
+	Answer       *map[string]interface{} `json:"answer"`
+	CallerEffect *map[string]interface{} `json:"caller_effect"`
+	DecidedBy    DecidedBy               `json:"decided_by"`
+
+	// EffectiveOutcome An item's result: a judge's verdict, or what stopped one.
+	EffectiveOutcome    Outcome             `json:"effective_outcome"`
+	EffectiveUnsureKind *UnsureKind         `json:"effective_unsure_kind"`
+	ErrorReason         *string             `json:"error_reason"`
+	ItemKey             string              `json:"item_key"`
+	JevChoice           *string             `json:"jev_choice"`
+	JevProbabilities    *map[string]float32 `json:"jev_probabilities"`
+
+	// MachineOutcome An item's result: a judge's verdict, or what stopped one.
+	MachineOutcome Outcome     `json:"machine_outcome"`
+	Role           ItemRole    `json:"role"`
+	Subject        string      `json:"subject"`
+	UnsureKind     *UnsureKind `json:"unsure_kind"`
+}
+
+// ItemRole defines model for ItemRole.
+type ItemRole string
+
+// JudgeAgreement How often blind audit labels agree with the machine. A judge version with no such labels
+// is not listed: it is not yet measured on your agents.
+type JudgeAgreement struct {
+	// Conversations How many of a total, with the 95% Wilson interval of the rate: few calls give a wide
+	// interval.
+	Conversations Share `json:"conversations"`
+
+	// Labelers How many of a total, with the 95% Wilson interval of the rate: few calls give a wide
+	// interval.
+	Labelers Share `json:"labelers"`
+
+	// OfferedCalls How many of a total, with the 95% Wilson interval of the rate: few calls give a wide
+	// interval.
+	OfferedCalls Share              `json:"offered_calls"`
+	Versions     []VersionAgreement `json:"versions"`
+}
+
+// JudgeVersionUsed defines model for JudgeVersionUsed.
+type JudgeVersionUsed struct {
+	Items   int    `json:"items"`
+	Judge   string `json:"judge"`
+	Model   string `json:"model"`
+	Version string `json:"version"`
+}
+
 // KnowledgeBaseDocument A knowledge base entry with what the list shows about its document.
 type KnowledgeBaseDocument struct {
 	Characters int                `json:"characters"`
@@ -846,6 +1324,54 @@ type KnowledgeBaseEntry struct {
 	Name       string             `json:"name"`
 }
 
+// LabelAnswer defines model for LabelAnswer.
+type LabelAnswer string
+
+// LabelCreate defines model for LabelCreate.
+type LabelCreate struct {
+	Answer LabelAnswer  `json:"answer"`
+	Note   *string      `json:"note,omitempty"`
+	Reason *LabelReason `json:"reason,omitempty"`
+	Seen   *bool        `json:"seen,omitempty"`
+}
+
+// LabelRead defines model for LabelRead.
+type LabelRead struct {
+	Answer    LabelAnswer  `json:"answer"`
+	Blind     bool         `json:"blind"`
+	CreatedAt time.Time    `json:"created_at"`
+	Lane      Lane         `json:"lane"`
+	Note      *string      `json:"note"`
+	Reason    *LabelReason `json:"reason"`
+}
+
+// LabelReason What went wrong, or why the judge was wrong. No reason names a cause inside the
+// agent.
+type LabelReason string
+
+// LabelerCreate defines model for LabelerCreate.
+type LabelerCreate struct {
+	Name string `json:"name"`
+}
+
+// LabelerCreated defines model for LabelerCreated.
+type LabelerCreated struct {
+	Id    openapi_types.UUID `json:"id"`
+	Name  string             `json:"name"`
+	Token string             `json:"token"`
+}
+
+// LabelerRead defines model for LabelerRead.
+type LabelerRead struct {
+	CreatedAt time.Time          `json:"created_at"`
+	Id        openapi_types.UUID `json:"id"`
+	Name      string             `json:"name"`
+	RevokedAt *time.Time         `json:"revoked_at"`
+}
+
+// Lane defines model for Lane.
+type Lane string
+
 // Language defines model for Language.
 type Language string
 
@@ -858,8 +1384,41 @@ type LatencySummary struct {
 	TalkedOver int  `json:"talked_over"`
 }
 
+// LlmRule defines model for LlmRule.
+type LlmRule struct {
+	AppliesWhen string `json:"applies_when"`
+	FailWhen    string `json:"fail_when"`
+
+	// Gate When an LLM rule can apply, decided in code before any model call.
+	Gate        *RuleGate    `json:"gate,omitempty"`
+	Key         string       `json:"key"`
+	Kind        *LlmRuleKind `json:"kind,omitempty"`
+	Name        string       `json:"name"`
+	NotAFailure *string      `json:"not_a_failure,omitempty"`
+	PassWhen    string       `json:"pass_when"`
+	Role        *ItemRole    `json:"role,omitempty"`
+}
+
+// LlmRuleKind defines model for LlmRule.Kind.
+type LlmRuleKind string
+
+// Metric One metric's value and the flags it raised.
+type Metric struct {
+	Flags *[]string              `json:"flags,omitempty"`
+	Value map[string]interface{} `json:"value"`
+}
+
 // NoiseLevel How loud the background is, as the caller's speech level above the noise.
 type NoiseLevel string
+
+// NoiseNumbers defines model for NoiseNumbers.
+type NoiseNumbers struct {
+	// Noise The sound behind the caller.
+	Noise BackgroundNoise `json:"noise"`
+
+	// Numbers What the evaluations found over some of a run's conversations.
+	Numbers RunNumbers `json:"numbers"`
+}
 
 // NoiseSound defines model for NoiseSound.
 type NoiseSound string
@@ -875,6 +1434,9 @@ type OutboundConfig struct {
 	// Trigger A POST with a JSON body, sent once for each conversation.
 	Trigger Trigger `json:"trigger"`
 }
+
+// Outcome An item's result: a judge's verdict, or what stopped one.
+type Outcome string
 
 // OutcomeGroup How a conversation went, from its status and end reason only. Before any judge, the
 // groups say what happened, not who is at fault.
@@ -1042,6 +1604,30 @@ type PhoneNumbers struct {
 	RestS           int               `json:"rest_s"`
 }
 
+// PhraseExpectation defines model for PhraseExpectation.
+type PhraseExpectation string
+
+// PhraseMatch defines model for PhraseMatch.
+type PhraseMatch string
+
+// PhraseRule defines model for PhraseRule.
+type PhraseRule struct {
+	Expects PhraseExpectation `json:"expects"`
+	Key     string            `json:"key"`
+	Kind    *PhraseRuleKind   `json:"kind,omitempty"`
+	Match   *PhraseMatch      `json:"match,omitempty"`
+	Name    string            `json:"name"`
+	Role    *ItemRole         `json:"role,omitempty"`
+	Value   string            `json:"value"`
+	Where   *PhraseWhere      `json:"where,omitempty"`
+}
+
+// PhraseRuleKind defines model for PhraseRule.Kind.
+type PhraseRuleKind string
+
+// PhraseWhere defines model for PhraseWhere.
+type PhraseWhere string
+
 // Provenance defines model for Provenance.
 type Provenance string
 
@@ -1055,14 +1641,53 @@ type ProviderVoice struct {
 	Name            string       `json:"name"`
 }
 
+// QueuedReview defines model for QueuedReview.
+type QueuedReview struct {
+	ConversationId openapi_types.UUID `json:"conversation_id"`
+	EndedAt        time.Time          `json:"ended_at"`
+	Items          int                `json:"items"`
+	Labeled        int                `json:"labeled"`
+	ScenarioName   string             `json:"scenario_name"`
+}
+
 // Reply The agent's answer to one caller reply, or to the start of the call.
 type Reply struct {
 	SpeechMs int `json:"speech_ms"`
 	StartMs  int `json:"start_ms"`
 }
 
+// ReviewConversation defines model for ReviewConversation.
+type ReviewConversation struct {
+	Conversation ConversationRead `json:"conversation"`
+	Items        []ReviewItem     `json:"items"`
+	Lane         Lane             `json:"lane"`
+	Verdicts     *ReviewVerdicts  `json:"verdicts"`
+}
+
+// ReviewItem defines model for ReviewItem.
+type ReviewItem struct {
+	Blind   bool               `json:"blind"`
+	Id      openapi_types.UUID `json:"id"`
+	ItemKey string             `json:"item_key"`
+	Label   *LabelRead         `json:"label"`
+	Machine *ItemRead          `json:"machine"`
+	Role    ItemRole           `json:"role"`
+	Subject string             `json:"subject"`
+}
+
+// ReviewVerdicts defines model for ReviewVerdicts.
+type ReviewVerdicts struct {
+	ConversationVerdict          *Verdict `json:"conversation_verdict"`
+	EffectiveConversationVerdict *Verdict `json:"effective_conversation_verdict"`
+	EffectiveScenarioVerdict     *Verdict `json:"effective_scenario_verdict"`
+	ScenarioVerdict              *Verdict `json:"scenario_verdict"`
+}
+
 // Role defines model for Role.
 type Role string
+
+// RuleGate When an LLM rule can apply, decided in code before any model call.
+type RuleGate string
 
 // RunCreate Limits that an operator sets, such as the most repeats, are checked where the settings
 // are known.
@@ -1077,6 +1702,50 @@ type RunCreate struct {
 	Repeats         *int                 `json:"repeats,omitempty"`
 	ScenarioIds     []openapi_types.UUID `json:"scenario_ids"`
 	StartIntervalS  *int                 `json:"start_interval_s,omitempty"`
+}
+
+// RunMetrics defines model for RunMetrics.
+type RunMetrics struct {
+	ByCategory []CategoryNumbers `json:"by_category"`
+	ByNoise    []NoiseNumbers    `json:"by_noise"`
+
+	// Overall What the evaluations found over some of a run's conversations.
+	Overall RunNumbers `json:"overall"`
+
+	// Verdicts The run's verdict numbers over its judged calls: completed calls that no one stopped,
+	// whose evaluation gave a verdict or failed.
+	Verdicts RunVerdicts `json:"verdicts"`
+}
+
+// RunNumbers What the evaluations found over some of a run's conversations.
+type RunNumbers struct {
+	// Connected How many of a total, with the 95% Wilson interval of the rate: few calls give a wide
+	// interval.
+	Connected     Share `json:"connected"`
+	Conversations int   `json:"conversations"`
+
+	// DeadAir How many of a total, with the 95% Wilson interval of the rate: few calls give a wide
+	// interval.
+	DeadAir             Share          `json:"dead_air"`
+	ErrorsBeforeConnect int            `json:"errors_before_connect"`
+	Evaluated           int            `json:"evaluated"`
+	Failed              int            `json:"failed"`
+	Flags               map[string]int `json:"flags"`
+
+	// LongWait How many of a total, with the 95% Wilson interval of the rate: few calls give a wide
+	// interval.
+	LongWait      Share `json:"long_wait"`
+	Pending       int   `json:"pending"`
+	ResponseP50Ms *int  `json:"response_p50_ms"`
+	ResponseP90Ms *int  `json:"response_p90_ms"`
+
+	// TalkedOver How many of a total, with the 95% Wilson interval of the rate: few calls give a wide
+	// interval.
+	TalkedOver Share `json:"talked_over"`
+
+	// Unanswered How many of a total, with the 95% Wilson interval of the rate: few calls give a wide
+	// interval.
+	Unanswered Share `json:"unanswered"`
 }
 
 // RunRead defines model for RunRead.
@@ -1139,6 +1808,28 @@ type RunSummary struct {
 	StartedAt       *time.Time         `json:"started_at"`
 	Status          RunStatus          `json:"status"`
 	WaitingReason   *WaitingReason     `json:"waiting_reason"`
+}
+
+// RunVerdicts The run's verdict numbers over its judged calls: completed calls that no one stopped,
+// whose evaluation gave a verdict or failed.
+type RunVerdicts struct {
+	Best              *float32             `json:"best"`
+	Callers           []CallerFidelity     `json:"callers"`
+	Coverage          *float32             `json:"coverage"`
+	Criteria          []CriterionCounts    `json:"criteria"`
+	DecidedBy         map[string]int       `json:"decided_by"`
+	Errors            int                  `json:"errors"`
+	Inconsistent      []openapi_types.UUID `json:"inconsistent"`
+	IntervalHigh      *float32             `json:"interval_high"`
+	IntervalLow       *float32             `json:"interval_low"`
+	JudgeVersions     []JudgeVersionUsed   `json:"judge_versions"`
+	NotJudged         int                  `json:"not_judged"`
+	PassHat2          *float32             `json:"pass_hat_2"`
+	PassHat2Scenarios int                  `json:"pass_hat_2_scenarios"`
+	PassRate          *float32             `json:"pass_rate"`
+	Pending           int                  `json:"pending"`
+	Scenarios         []ScenarioVerdicts   `json:"scenarios"`
+	Worst             *float32             `json:"worst"`
 }
 
 // ScenarioConfig What a scenario version pins. The goal and the facts go to the caller. The criteria never
@@ -1206,6 +1897,18 @@ type ScenarioUpdate struct {
 	UnknownFacts *[]string           `json:"unknown_facts,omitempty"`
 }
 
+// ScenarioVerdicts defines model for ScenarioVerdicts.
+type ScenarioVerdicts struct {
+	Calls []CallVerdict `json:"calls"`
+
+	// Category What kind of situation a scenario tests. How the caller talks comes from the persona.
+	Category   Category           `json:"category"`
+	Name       string             `json:"name"`
+	Passes     int                `json:"passes"`
+	ScenarioId openapi_types.UUID `json:"scenario_id"`
+	Scored     int                `json:"scored"`
+}
+
 // ScenarioVersionRead defines model for ScenarioVersionRead.
 type ScenarioVersionRead struct {
 	// Config What a scenario version pins. The goal and the facts go to the caller. The criteria never
@@ -1216,6 +1919,15 @@ type ScenarioVersionRead struct {
 	Id         openapi_types.UUID `json:"id"`
 	ScenarioId openapi_types.UUID `json:"scenario_id"`
 	Version    int                `json:"version"`
+}
+
+// Share How many of a total, with the 95% Wilson interval of the rate: few calls give a wide
+// interval.
+type Share struct {
+	Count int      `json:"count"`
+	High  *float32 `json:"high"`
+	Low   *float32 `json:"low"`
+	Total int      `json:"total"`
 }
 
 // TextDocumentCreate defines model for TextDocumentCreate.
@@ -1246,6 +1958,9 @@ type TurnRead struct {
 	Text        string      `json:"text"`
 }
 
+// UnsureKind defines model for UnsureKind.
+type UnsureKind string
+
 // ValidationError defines model for ValidationError.
 type ValidationError struct {
 	Ctx   *map[string]interface{}    `json:"ctx,omitempty"`
@@ -1270,6 +1985,19 @@ type ValidationError_Loc_Item struct {
 type Validity struct {
 	Ok      bool      `json:"ok"`
 	Reasons *[]string `json:"reasons,omitempty"`
+}
+
+// Verdict defines model for Verdict.
+type Verdict string
+
+// VersionAgreement defines model for VersionAgreement.
+type VersionAgreement struct {
+	// Items How many of a total, with the 95% Wilson interval of the rate: few calls give a wide
+	// interval.
+	Items   Share  `json:"items"`
+	Judge   string `json:"judge"`
+	Model   string `json:"model"`
+	Version string `json:"version"`
 }
 
 // VoiceCreate defines model for VoiceCreate.
@@ -1398,6 +2126,11 @@ type ListVersionsApiV1PersonasPersonaIdVersionsGetParams struct {
 	PageSize *int `form:"page_size,omitempty" json:"page_size,omitempty"`
 }
 
+// GetReviewApiV1ReviewConversationsConversationIdGetParams defines parameters for GetReviewApiV1ReviewConversationsConversationIdGet.
+type GetReviewApiV1ReviewConversationsConversationIdGetParams struct {
+	Seen *bool `form:"seen,omitempty" json:"seen,omitempty"`
+}
+
 // ListRunsApiV1RunsGetParams defines parameters for ListRunsApiV1RunsGet.
 type ListRunsApiV1RunsGetParams struct {
 	AgentId  *openapi_types.UUID `form:"agent_id,omitempty" json:"agent_id,omitempty"`
@@ -1456,11 +2189,17 @@ type CreateTextDocumentApiV1DocumentsPostJSONRequestBody = TextDocumentCreate
 // UploadDocumentApiV1DocumentsUploadPostMultipartRequestBody defines body for UploadDocumentApiV1DocumentsUploadPost for multipart/form-data ContentType.
 type UploadDocumentApiV1DocumentsUploadPostMultipartRequestBody = BodyUploadDocumentApiV1DocumentsUploadPost
 
+// CreateLabelerApiV1LabelersPostJSONRequestBody defines body for CreateLabelerApiV1LabelersPost for application/json ContentType.
+type CreateLabelerApiV1LabelersPostJSONRequestBody = LabelerCreate
+
 // CreatePersonaApiV1PersonasPostJSONRequestBody defines body for CreatePersonaApiV1PersonasPost for application/json ContentType.
 type CreatePersonaApiV1PersonasPostJSONRequestBody = PersonaCreate
 
 // UpdatePersonaApiV1PersonasPersonaIdPatchJSONRequestBody defines body for UpdatePersonaApiV1PersonasPersonaIdPatch for application/json ContentType.
 type UpdatePersonaApiV1PersonasPersonaIdPatchJSONRequestBody = PersonaUpdate
+
+// LabelItemApiV1ReviewItemsItemIdLabelsPostJSONRequestBody defines body for LabelItemApiV1ReviewItemsItemIdLabelsPost for application/json ContentType.
+type LabelItemApiV1ReviewItemsItemIdLabelsPostJSONRequestBody = LabelCreate
 
 // CreateRunApiV1RunsPostJSONRequestBody defines body for CreateRunApiV1RunsPost for application/json ContentType.
 type CreateRunApiV1RunsPostJSONRequestBody = RunCreate
@@ -1476,6 +2215,410 @@ type PreviewVoiceApiV1VoicesPreviewPostJSONRequestBody = VoicePreview
 
 // UpdateVoiceApiV1VoicesVoiceIdPatchJSONRequestBody defines body for UpdateVoiceApiV1VoicesVoiceIdPatch for application/json ContentType.
 type UpdateVoiceApiV1VoicesVoiceIdPatchJSONRequestBody = VoiceUpdate
+
+// AsLlmRule returns the union data inside the AgentConfig_Rules_Item as a LlmRule
+func (t AgentConfig_Rules_Item) AsLlmRule() (LlmRule, error) {
+	var body LlmRule
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromLlmRule overwrites any union data inside the AgentConfig_Rules_Item as the provided LlmRule
+func (t *AgentConfig_Rules_Item) FromLlmRule(v LlmRule) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"kind":"llm"}`))
+	t.union = b
+	return err
+}
+
+// MergeLlmRule performs a merge with any union data inside the AgentConfig_Rules_Item, using the provided LlmRule
+func (t *AgentConfig_Rules_Item) MergeLlmRule(v LlmRule) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"kind":"llm"}`))
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPhraseRule returns the union data inside the AgentConfig_Rules_Item as a PhraseRule
+func (t AgentConfig_Rules_Item) AsPhraseRule() (PhraseRule, error) {
+	var body PhraseRule
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPhraseRule overwrites any union data inside the AgentConfig_Rules_Item as the provided PhraseRule
+func (t *AgentConfig_Rules_Item) FromPhraseRule(v PhraseRule) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"kind":"phrase"}`))
+	t.union = b
+	return err
+}
+
+// MergePhraseRule performs a merge with any union data inside the AgentConfig_Rules_Item, using the provided PhraseRule
+func (t *AgentConfig_Rules_Item) MergePhraseRule(v PhraseRule) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"kind":"phrase"}`))
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t AgentConfig_Rules_Item) Discriminator() (string, error) {
+	var discriminator struct {
+		Discriminator string `json:"kind"`
+	}
+	err := json.Unmarshal(t.union, &discriminator)
+	return discriminator.Discriminator, err
+}
+
+func (t AgentConfig_Rules_Item) ValueByDiscriminator() (interface{}, error) {
+	discriminator, err := t.Discriminator()
+	if err != nil {
+		return nil, err
+	}
+	switch discriminator {
+	case "llm":
+		return t.AsLlmRule()
+	case "phrase":
+		return t.AsPhraseRule()
+	default:
+		return nil, errors.New("unknown discriminator value: " + discriminator)
+	}
+}
+
+func (t AgentConfig_Rules_Item) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *AgentConfig_Rules_Item) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsLlmRule returns the union data inside the AgentCreate_Rules_Item as a LlmRule
+func (t AgentCreate_Rules_Item) AsLlmRule() (LlmRule, error) {
+	var body LlmRule
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromLlmRule overwrites any union data inside the AgentCreate_Rules_Item as the provided LlmRule
+func (t *AgentCreate_Rules_Item) FromLlmRule(v LlmRule) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"kind":"llm"}`))
+	t.union = b
+	return err
+}
+
+// MergeLlmRule performs a merge with any union data inside the AgentCreate_Rules_Item, using the provided LlmRule
+func (t *AgentCreate_Rules_Item) MergeLlmRule(v LlmRule) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"kind":"llm"}`))
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPhraseRule returns the union data inside the AgentCreate_Rules_Item as a PhraseRule
+func (t AgentCreate_Rules_Item) AsPhraseRule() (PhraseRule, error) {
+	var body PhraseRule
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPhraseRule overwrites any union data inside the AgentCreate_Rules_Item as the provided PhraseRule
+func (t *AgentCreate_Rules_Item) FromPhraseRule(v PhraseRule) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"kind":"phrase"}`))
+	t.union = b
+	return err
+}
+
+// MergePhraseRule performs a merge with any union data inside the AgentCreate_Rules_Item, using the provided PhraseRule
+func (t *AgentCreate_Rules_Item) MergePhraseRule(v PhraseRule) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"kind":"phrase"}`))
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t AgentCreate_Rules_Item) Discriminator() (string, error) {
+	var discriminator struct {
+		Discriminator string `json:"kind"`
+	}
+	err := json.Unmarshal(t.union, &discriminator)
+	return discriminator.Discriminator, err
+}
+
+func (t AgentCreate_Rules_Item) ValueByDiscriminator() (interface{}, error) {
+	discriminator, err := t.Discriminator()
+	if err != nil {
+		return nil, err
+	}
+	switch discriminator {
+	case "llm":
+		return t.AsLlmRule()
+	case "phrase":
+		return t.AsPhraseRule()
+	default:
+		return nil, errors.New("unknown discriminator value: " + discriminator)
+	}
+}
+
+func (t AgentCreate_Rules_Item) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *AgentCreate_Rules_Item) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsLlmRule returns the union data inside the AgentRead_Rules_Item as a LlmRule
+func (t AgentRead_Rules_Item) AsLlmRule() (LlmRule, error) {
+	var body LlmRule
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromLlmRule overwrites any union data inside the AgentRead_Rules_Item as the provided LlmRule
+func (t *AgentRead_Rules_Item) FromLlmRule(v LlmRule) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"kind":"llm"}`))
+	t.union = b
+	return err
+}
+
+// MergeLlmRule performs a merge with any union data inside the AgentRead_Rules_Item, using the provided LlmRule
+func (t *AgentRead_Rules_Item) MergeLlmRule(v LlmRule) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"kind":"llm"}`))
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPhraseRule returns the union data inside the AgentRead_Rules_Item as a PhraseRule
+func (t AgentRead_Rules_Item) AsPhraseRule() (PhraseRule, error) {
+	var body PhraseRule
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPhraseRule overwrites any union data inside the AgentRead_Rules_Item as the provided PhraseRule
+func (t *AgentRead_Rules_Item) FromPhraseRule(v PhraseRule) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"kind":"phrase"}`))
+	t.union = b
+	return err
+}
+
+// MergePhraseRule performs a merge with any union data inside the AgentRead_Rules_Item, using the provided PhraseRule
+func (t *AgentRead_Rules_Item) MergePhraseRule(v PhraseRule) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"kind":"phrase"}`))
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t AgentRead_Rules_Item) Discriminator() (string, error) {
+	var discriminator struct {
+		Discriminator string `json:"kind"`
+	}
+	err := json.Unmarshal(t.union, &discriminator)
+	return discriminator.Discriminator, err
+}
+
+func (t AgentRead_Rules_Item) ValueByDiscriminator() (interface{}, error) {
+	discriminator, err := t.Discriminator()
+	if err != nil {
+		return nil, err
+	}
+	switch discriminator {
+	case "llm":
+		return t.AsLlmRule()
+	case "phrase":
+		return t.AsPhraseRule()
+	default:
+		return nil, errors.New("unknown discriminator value: " + discriminator)
+	}
+}
+
+func (t AgentRead_Rules_Item) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *AgentRead_Rules_Item) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsLlmRule returns the union data inside the AgentUpdate_Rules_Item as a LlmRule
+func (t AgentUpdate_Rules_Item) AsLlmRule() (LlmRule, error) {
+	var body LlmRule
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromLlmRule overwrites any union data inside the AgentUpdate_Rules_Item as the provided LlmRule
+func (t *AgentUpdate_Rules_Item) FromLlmRule(v LlmRule) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"kind":"llm"}`))
+	t.union = b
+	return err
+}
+
+// MergeLlmRule performs a merge with any union data inside the AgentUpdate_Rules_Item, using the provided LlmRule
+func (t *AgentUpdate_Rules_Item) MergeLlmRule(v LlmRule) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"kind":"llm"}`))
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPhraseRule returns the union data inside the AgentUpdate_Rules_Item as a PhraseRule
+func (t AgentUpdate_Rules_Item) AsPhraseRule() (PhraseRule, error) {
+	var body PhraseRule
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPhraseRule overwrites any union data inside the AgentUpdate_Rules_Item as the provided PhraseRule
+func (t *AgentUpdate_Rules_Item) FromPhraseRule(v PhraseRule) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"kind":"phrase"}`))
+	t.union = b
+	return err
+}
+
+// MergePhraseRule performs a merge with any union data inside the AgentUpdate_Rules_Item, using the provided PhraseRule
+func (t *AgentUpdate_Rules_Item) MergePhraseRule(v PhraseRule) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	b, err = runtime.JSONMerge(b, []byte(`{"kind":"phrase"}`))
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t AgentUpdate_Rules_Item) Discriminator() (string, error) {
+	var discriminator struct {
+		Discriminator string `json:"kind"`
+	}
+	err := json.Unmarshal(t.union, &discriminator)
+	return discriminator.Discriminator, err
+}
+
+func (t AgentUpdate_Rules_Item) ValueByDiscriminator() (interface{}, error) {
+	discriminator, err := t.Discriminator()
+	if err != nil {
+		return nil, err
+	}
+	switch discriminator {
+	case "llm":
+		return t.AsLlmRule()
+	case "phrase":
+		return t.AsPhraseRule()
+	default:
+		return nil, errors.New("unknown discriminator value: " + discriminator)
+	}
+}
+
+func (t AgentUpdate_Rules_Item) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *AgentUpdate_Rules_Item) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
 
 // AsValidationErrorLoc0 returns the union data inside the ValidationError_Loc_Item as a ValidationErrorLoc0
 func (t ValidationError_Loc_Item) AsValidationErrorLoc0() (ValidationErrorLoc0, error) {
@@ -1772,6 +2915,11 @@ type ClientInterface interface {
 	// Corresponds with POST /api/v1/conversations/{conversation_id}/end (the `EndConversationApiV1ConversationsConversationIdEndPost` operationId).
 	EndConversationApiV1ConversationsConversationIdEndPost(ctx context.Context, conversationId openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// GetEvaluationApiV1ConversationsConversationIdEvaluationGet Get Evaluation
+	//
+	// Corresponds with GET /api/v1/conversations/{conversation_id}/evaluation (the `GetEvaluationApiV1ConversationsConversationIdEvaluationGet` operationId).
+	GetEvaluationApiV1ConversationsConversationIdEvaluationGet(ctx context.Context, conversationId openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// StreamEventsApiV1ConversationsConversationIdEventsGet Stream Events
 	//
 	// Corresponds with GET /api/v1/conversations/{conversation_id}/events (the `StreamEventsApiV1ConversationsConversationIdEventsGet` operationId).
@@ -1839,6 +2987,52 @@ type ClientInterface interface {
 	// Corresponds with GET /api/v1/health (the `HealthApiV1HealthGet` operationId).
 	HealthApiV1HealthGet(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// GetAgreementApiV1JudgesAgreementGet Get Agreement
+	//
+	// How often blind audit labels agree with each judge version and with the machine's
+	// scenario verdicts, how often labelers agree, and how much of the offered set is labeled.
+	//
+	// Corresponds with GET /api/v1/judges/agreement (the `GetAgreementApiV1JudgesAgreementGet` operationId).
+	GetAgreementApiV1JudgesAgreementGet(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListLabelersApiV1LabelersGet List Labelers
+	//
+	// Corresponds with GET /api/v1/labelers (the `ListLabelersApiV1LabelersGet` operationId).
+	ListLabelersApiV1LabelersGet(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateLabelerApiV1LabelersPostWithBody Create Labeler
+	//
+	// A labeler and the token it labels with, shown only in this answer.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /api/v1/labelers (the `CreateLabelerApiV1LabelersPost` operationId).
+	CreateLabelerApiV1LabelersPostWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateLabelerApiV1LabelersPost Create Labeler
+	//
+	// A labeler and the token it labels with, shown only in this answer.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /api/v1/labelers (the `CreateLabelerApiV1LabelersPost` operationId).
+	CreateLabelerApiV1LabelersPost(ctx context.Context, body CreateLabelerApiV1LabelersPostJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RevokeLabelerApiV1LabelersLabelerIdDelete Revoke Labeler
+	//
+	// The labeler's token stops working; its labels stay.
+	//
+	// Corresponds with DELETE /api/v1/labelers/{labeler_id} (the `RevokeLabelerApiV1LabelersLabelerIdDelete` operationId).
+	RevokeLabelerApiV1LabelersLabelerIdDelete(ctx context.Context, labelerId openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RenewTokenApiV1LabelersLabelerIdTokenPost Renew Token
+	//
+	// A new token for the labeler, shown only in this answer; the old one stops working, and a
+	// revoked labeler works again.
+	//
+	// Corresponds with POST /api/v1/labelers/{labeler_id}/token (the `RenewTokenApiV1LabelersLabelerIdTokenPost` operationId).
+	RenewTokenApiV1LabelersLabelerIdTokenPost(ctx context.Context, labelerId openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// ListPersonasApiV1PersonasGet List Personas
 	//
 	// Corresponds with GET /api/v1/personas (the `ListPersonasApiV1PersonasGet` operationId).
@@ -1899,6 +3093,45 @@ type ClientInterface interface {
 	// Corresponds with GET /api/v1/phone-numbers (the `ListPhoneNumbersApiV1PhoneNumbersGet` operationId).
 	ListPhoneNumbersApiV1PhoneNumbersGet(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// GetReviewApiV1ReviewConversationsConversationIdGet Get Review
+	//
+	// A judged call to label. Any judged call takes labels; only the calls the queue offers
+	// hide the machine results, and only their labels measure the judges. `seen`: the labeler
+	// came from the machine's results, so the call is ad hoc.
+	//
+	// Corresponds with GET /api/v1/review/conversations/{conversation_id} (the `GetReviewApiV1ReviewConversationsConversationIdGet` operationId).
+	GetReviewApiV1ReviewConversationsConversationIdGet(ctx context.Context, conversationId openapi_types.UUID, params *GetReviewApiV1ReviewConversationsConversationIdGetParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetRecordingApiV1ReviewConversationsConversationIdRecordingGet Get Recording
+	//
+	// Corresponds with GET /api/v1/review/conversations/{conversation_id}/recording (the `GetRecordingApiV1ReviewConversationsConversationIdRecordingGet` operationId).
+	GetRecordingApiV1ReviewConversationsConversationIdRecordingGet(ctx context.Context, conversationId openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// LabelItemApiV1ReviewItemsItemIdLabelsPostWithBody Label Item
+	//
+	// Label one item; the call comes back with what the label reveals.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /api/v1/review/items/{item_id}/labels (the `LabelItemApiV1ReviewItemsItemIdLabelsPost` operationId).
+	LabelItemApiV1ReviewItemsItemIdLabelsPostWithBody(ctx context.Context, itemId openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// LabelItemApiV1ReviewItemsItemIdLabelsPost Label Item
+	//
+	// Label one item; the call comes back with what the label reveals.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /api/v1/review/items/{item_id}/labels (the `LabelItemApiV1ReviewItemsItemIdLabelsPost` operationId).
+	LabelItemApiV1ReviewItemsItemIdLabelsPost(ctx context.Context, itemId openapi_types.UUID, body LabelItemApiV1ReviewItemsItemIdLabelsPostJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetQueueApiV1ReviewQueueGet Get Queue
+	//
+	// The audit calls this labeler still has items to label in.
+	//
+	// Corresponds with GET /api/v1/review/queue (the `GetQueueApiV1ReviewQueueGet` operationId).
+	GetQueueApiV1ReviewQueueGet(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// ListRunsApiV1RunsGet List Runs
 	//
 	// Corresponds with GET /api/v1/runs (the `ListRunsApiV1RunsGet` operationId).
@@ -1927,6 +3160,14 @@ type ClientInterface interface {
 	//
 	// Corresponds with POST /api/v1/runs/{run_id}/cancel (the `CancelRunApiV1RunsRunIdCancelPost` operationId).
 	CancelRunApiV1RunsRunIdCancelPost(ctx context.Context, runId openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetRunMetricsApiV1RunsRunIdMetricsGet Get Run Metrics
+	//
+	// The numbers over the run's counted conversations: the latest attempt of each repeat,
+	// unless it was cancelled.
+	//
+	// Corresponds with GET /api/v1/runs/{run_id}/metrics (the `GetRunMetricsApiV1RunsRunIdMetricsGet` operationId).
+	GetRunMetricsApiV1RunsRunIdMetricsGet(ctx context.Context, runId openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// DeleteScenarioApiV1ScenariosScenarioIdDelete Delete Scenario
 	//
@@ -2431,6 +3672,21 @@ func (c *Client) EndConversationApiV1ConversationsConversationIdEndPost(ctx cont
 	return c.Client.Do(req)
 }
 
+// GetEvaluationApiV1ConversationsConversationIdEvaluationGet Get Evaluation
+//
+// Corresponds with GET /api/v1/conversations/{conversation_id}/evaluation (the `GetEvaluationApiV1ConversationsConversationIdEvaluationGet` operationId).
+func (c *Client) GetEvaluationApiV1ConversationsConversationIdEvaluationGet(ctx context.Context, conversationId openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetEvaluationApiV1ConversationsConversationIdEvaluationGetRequest(c.Server, conversationId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // StreamEventsApiV1ConversationsConversationIdEventsGet Stream Events
 //
 // Corresponds with GET /api/v1/conversations/{conversation_id}/events (the `StreamEventsApiV1ConversationsConversationIdEventsGet` operationId).
@@ -2588,6 +3844,112 @@ func (c *Client) DownloadDocumentApiV1DocumentsDocumentIdFileGet(ctx context.Con
 // Corresponds with GET /api/v1/health (the `HealthApiV1HealthGet` operationId).
 func (c *Client) HealthApiV1HealthGet(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewHealthApiV1HealthGetRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetAgreementApiV1JudgesAgreementGet Get Agreement
+//
+// How often blind audit labels agree with each judge version and with the machine's
+// scenario verdicts, how often labelers agree, and how much of the offered set is labeled.
+//
+// Corresponds with GET /api/v1/judges/agreement (the `GetAgreementApiV1JudgesAgreementGet` operationId).
+func (c *Client) GetAgreementApiV1JudgesAgreementGet(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetAgreementApiV1JudgesAgreementGetRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListLabelersApiV1LabelersGet List Labelers
+//
+// Corresponds with GET /api/v1/labelers (the `ListLabelersApiV1LabelersGet` operationId).
+func (c *Client) ListLabelersApiV1LabelersGet(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListLabelersApiV1LabelersGetRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreateLabelerApiV1LabelersPostWithBody Create Labeler
+//
+// A labeler and the token it labels with, shown only in this answer.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /api/v1/labelers (the `CreateLabelerApiV1LabelersPost` operationId).
+func (c *Client) CreateLabelerApiV1LabelersPostWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateLabelerApiV1LabelersPostRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreateLabelerApiV1LabelersPost Create Labeler
+//
+// A labeler and the token it labels with, shown only in this answer.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /api/v1/labelers (the `CreateLabelerApiV1LabelersPost` operationId).
+func (c *Client) CreateLabelerApiV1LabelersPost(ctx context.Context, body CreateLabelerApiV1LabelersPostJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateLabelerApiV1LabelersPostRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// RevokeLabelerApiV1LabelersLabelerIdDelete Revoke Labeler
+//
+// The labeler's token stops working; its labels stay.
+//
+// Corresponds with DELETE /api/v1/labelers/{labeler_id} (the `RevokeLabelerApiV1LabelersLabelerIdDelete` operationId).
+func (c *Client) RevokeLabelerApiV1LabelersLabelerIdDelete(ctx context.Context, labelerId openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRevokeLabelerApiV1LabelersLabelerIdDeleteRequest(c.Server, labelerId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// RenewTokenApiV1LabelersLabelerIdTokenPost Renew Token
+//
+// A new token for the labeler, shown only in this answer; the old one stops working, and a
+// revoked labeler works again.
+//
+// Corresponds with POST /api/v1/labelers/{labeler_id}/token (the `RenewTokenApiV1LabelersLabelerIdTokenPost` operationId).
+func (c *Client) RenewTokenApiV1LabelersLabelerIdTokenPost(ctx context.Context, labelerId openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRenewTokenApiV1LabelersLabelerIdTokenPostRequest(c.Server, labelerId)
 	if err != nil {
 		return nil, err
 	}
@@ -2758,6 +4120,95 @@ func (c *Client) ListPhoneNumbersApiV1PhoneNumbersGet(ctx context.Context, reqEd
 	return c.Client.Do(req)
 }
 
+// GetReviewApiV1ReviewConversationsConversationIdGet Get Review
+//
+// A judged call to label. Any judged call takes labels; only the calls the queue offers
+// hide the machine results, and only their labels measure the judges. `seen`: the labeler
+// came from the machine's results, so the call is ad hoc.
+//
+// Corresponds with GET /api/v1/review/conversations/{conversation_id} (the `GetReviewApiV1ReviewConversationsConversationIdGet` operationId).
+func (c *Client) GetReviewApiV1ReviewConversationsConversationIdGet(ctx context.Context, conversationId openapi_types.UUID, params *GetReviewApiV1ReviewConversationsConversationIdGetParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetReviewApiV1ReviewConversationsConversationIdGetRequest(c.Server, conversationId, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetRecordingApiV1ReviewConversationsConversationIdRecordingGet Get Recording
+//
+// Corresponds with GET /api/v1/review/conversations/{conversation_id}/recording (the `GetRecordingApiV1ReviewConversationsConversationIdRecordingGet` operationId).
+func (c *Client) GetRecordingApiV1ReviewConversationsConversationIdRecordingGet(ctx context.Context, conversationId openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetRecordingApiV1ReviewConversationsConversationIdRecordingGetRequest(c.Server, conversationId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// LabelItemApiV1ReviewItemsItemIdLabelsPostWithBody Label Item
+//
+// Label one item; the call comes back with what the label reveals.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /api/v1/review/items/{item_id}/labels (the `LabelItemApiV1ReviewItemsItemIdLabelsPost` operationId).
+func (c *Client) LabelItemApiV1ReviewItemsItemIdLabelsPostWithBody(ctx context.Context, itemId openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewLabelItemApiV1ReviewItemsItemIdLabelsPostRequestWithBody(c.Server, itemId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// LabelItemApiV1ReviewItemsItemIdLabelsPost Label Item
+//
+// Label one item; the call comes back with what the label reveals.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /api/v1/review/items/{item_id}/labels (the `LabelItemApiV1ReviewItemsItemIdLabelsPost` operationId).
+func (c *Client) LabelItemApiV1ReviewItemsItemIdLabelsPost(ctx context.Context, itemId openapi_types.UUID, body LabelItemApiV1ReviewItemsItemIdLabelsPostJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewLabelItemApiV1ReviewItemsItemIdLabelsPostRequest(c.Server, itemId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetQueueApiV1ReviewQueueGet Get Queue
+//
+// The audit calls this labeler still has items to label in.
+//
+// Corresponds with GET /api/v1/review/queue (the `GetQueueApiV1ReviewQueueGet` operationId).
+func (c *Client) GetQueueApiV1ReviewQueueGet(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetQueueApiV1ReviewQueueGetRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // ListRunsApiV1RunsGet List Runs
 //
 // Corresponds with GET /api/v1/runs (the `ListRunsApiV1RunsGet` operationId).
@@ -2827,6 +4278,24 @@ func (c *Client) GetRunApiV1RunsRunIdGet(ctx context.Context, runId openapi_type
 // Corresponds with POST /api/v1/runs/{run_id}/cancel (the `CancelRunApiV1RunsRunIdCancelPost` operationId).
 func (c *Client) CancelRunApiV1RunsRunIdCancelPost(ctx context.Context, runId openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCancelRunApiV1RunsRunIdCancelPostRequest(c.Server, runId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetRunMetricsApiV1RunsRunIdMetricsGet Get Run Metrics
+//
+// The numbers over the run's counted conversations: the latest attempt of each repeat,
+// unless it was cancelled.
+//
+// Corresponds with GET /api/v1/runs/{run_id}/metrics (the `GetRunMetricsApiV1RunsRunIdMetricsGet` operationId).
+func (c *Client) GetRunMetricsApiV1RunsRunIdMetricsGet(ctx context.Context, runId openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetRunMetricsApiV1RunsRunIdMetricsGetRequest(c.Server, runId)
 	if err != nil {
 		return nil, err
 	}
@@ -4101,6 +5570,40 @@ func NewEndConversationApiV1ConversationsConversationIdEndPostRequest(server str
 	return req, nil
 }
 
+// NewGetEvaluationApiV1ConversationsConversationIdEvaluationGetRequest constructs an http.Request for the GetEvaluationApiV1ConversationsConversationIdEvaluationGet method
+func NewGetEvaluationApiV1ConversationsConversationIdEvaluationGetRequest(server string, conversationId openapi_types.UUID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "conversation_id", conversationId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/conversations/%s/evaluation", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewStreamEventsApiV1ConversationsConversationIdEventsGetRequest constructs an http.Request for the StreamEventsApiV1ConversationsConversationIdEventsGet method
 func NewStreamEventsApiV1ConversationsConversationIdEventsGetRequest(server string, conversationId openapi_types.UUID) (*http.Request, error) {
 	var err error
@@ -4387,6 +5890,168 @@ func NewHealthApiV1HealthGetRequest(server string) (*http.Request, error) {
 	}
 
 	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetAgreementApiV1JudgesAgreementGetRequest constructs an http.Request for the GetAgreementApiV1JudgesAgreementGet method
+func NewGetAgreementApiV1JudgesAgreementGetRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/judges/agreement")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewListLabelersApiV1LabelersGetRequest constructs an http.Request for the ListLabelersApiV1LabelersGet method
+func NewListLabelersApiV1LabelersGetRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/labelers")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewCreateLabelerApiV1LabelersPostRequest calls the generic CreateLabelerApiV1LabelersPost builder with application/json body
+func NewCreateLabelerApiV1LabelersPostRequest(server string, body CreateLabelerApiV1LabelersPostJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreateLabelerApiV1LabelersPostRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewCreateLabelerApiV1LabelersPostRequestWithBody constructs an http.Request for the CreateLabelerApiV1LabelersPost method, with any body, and a specified content type
+func NewCreateLabelerApiV1LabelersPostRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/labelers")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewRevokeLabelerApiV1LabelersLabelerIdDeleteRequest constructs an http.Request for the RevokeLabelerApiV1LabelersLabelerIdDelete method
+func NewRevokeLabelerApiV1LabelersLabelerIdDeleteRequest(server string, labelerId openapi_types.UUID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "labeler_id", labelerId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/labelers/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewRenewTokenApiV1LabelersLabelerIdTokenPostRequest constructs an http.Request for the RenewTokenApiV1LabelersLabelerIdTokenPost method
+func NewRenewTokenApiV1LabelersLabelerIdTokenPostRequest(server string, labelerId openapi_types.UUID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "labeler_id", labelerId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/labelers/%s/token", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -4756,6 +6421,175 @@ func NewListPhoneNumbersApiV1PhoneNumbersGetRequest(server string) (*http.Reques
 	return req, nil
 }
 
+// NewGetReviewApiV1ReviewConversationsConversationIdGetRequest constructs an http.Request for the GetReviewApiV1ReviewConversationsConversationIdGet method
+func NewGetReviewApiV1ReviewConversationsConversationIdGetRequest(server string, conversationId openapi_types.UUID, params *GetReviewApiV1ReviewConversationsConversationIdGetParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "conversation_id", conversationId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/review/conversations/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Seen != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "seen", *params.Seen, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "boolean", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetRecordingApiV1ReviewConversationsConversationIdRecordingGetRequest constructs an http.Request for the GetRecordingApiV1ReviewConversationsConversationIdRecordingGet method
+func NewGetRecordingApiV1ReviewConversationsConversationIdRecordingGetRequest(server string, conversationId openapi_types.UUID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "conversation_id", conversationId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/review/conversations/%s/recording", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewLabelItemApiV1ReviewItemsItemIdLabelsPostRequest calls the generic LabelItemApiV1ReviewItemsItemIdLabelsPost builder with application/json body
+func NewLabelItemApiV1ReviewItemsItemIdLabelsPostRequest(server string, itemId openapi_types.UUID, body LabelItemApiV1ReviewItemsItemIdLabelsPostJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewLabelItemApiV1ReviewItemsItemIdLabelsPostRequestWithBody(server, itemId, "application/json", bodyReader)
+}
+
+// NewLabelItemApiV1ReviewItemsItemIdLabelsPostRequestWithBody constructs an http.Request for the LabelItemApiV1ReviewItemsItemIdLabelsPost method, with any body, and a specified content type
+func NewLabelItemApiV1ReviewItemsItemIdLabelsPostRequestWithBody(server string, itemId openapi_types.UUID, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "item_id", itemId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/review/items/%s/labels", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewGetQueueApiV1ReviewQueueGetRequest constructs an http.Request for the GetQueueApiV1ReviewQueueGet method
+func NewGetQueueApiV1ReviewQueueGetRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/review/queue")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewListRunsApiV1RunsGetRequest constructs an http.Request for the ListRunsApiV1RunsGet method
 func NewListRunsApiV1RunsGetRequest(server string, params *ListRunsApiV1RunsGetParams) (*http.Request, error) {
 	var err error
@@ -4950,6 +6784,40 @@ func NewCancelRunApiV1RunsRunIdCancelPostRequest(server string, runId openapi_ty
 	}
 
 	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetRunMetricsApiV1RunsRunIdMetricsGetRequest constructs an http.Request for the GetRunMetricsApiV1RunsRunIdMetricsGet method
+func NewGetRunMetricsApiV1RunsRunIdMetricsGetRequest(server string, runId openapi_types.UUID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "run_id", runId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/runs/%s/metrics", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -5708,6 +7576,13 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with POST /api/v1/conversations/{conversation_id}/end (the `EndConversationApiV1ConversationsConversationIdEndPost` operationId).
 	EndConversationApiV1ConversationsConversationIdEndPostWithResponse(ctx context.Context, conversationId openapi_types.UUID, reqEditors ...RequestEditorFn) (*EndConversationApiV1ConversationsConversationIdEndPostResponse, error)
 
+	// GetEvaluationApiV1ConversationsConversationIdEvaluationGetWithResponse Get Evaluation
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/conversations/{conversation_id}/evaluation (the `GetEvaluationApiV1ConversationsConversationIdEvaluationGet` operationId).
+	GetEvaluationApiV1ConversationsConversationIdEvaluationGetWithResponse(ctx context.Context, conversationId openapi_types.UUID, reqEditors ...RequestEditorFn) (*GetEvaluationApiV1ConversationsConversationIdEvaluationGetResponse, error)
+
 	// StreamEventsApiV1ConversationsConversationIdEventsGetWithResponse Stream Events
 	//
 	// Returns a wrapper object for the known response body format(s).
@@ -5789,6 +7664,60 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with GET /api/v1/health (the `HealthApiV1HealthGet` operationId).
 	HealthApiV1HealthGetWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*HealthApiV1HealthGetResponse, error)
 
+	// GetAgreementApiV1JudgesAgreementGetWithResponse Get Agreement
+	//
+	// How often blind audit labels agree with each judge version and with the machine's
+	// scenario verdicts, how often labelers agree, and how much of the offered set is labeled.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/judges/agreement (the `GetAgreementApiV1JudgesAgreementGet` operationId).
+	GetAgreementApiV1JudgesAgreementGetWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetAgreementApiV1JudgesAgreementGetResponse, error)
+
+	// ListLabelersApiV1LabelersGetWithResponse List Labelers
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/labelers (the `ListLabelersApiV1LabelersGet` operationId).
+	ListLabelersApiV1LabelersGetWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListLabelersApiV1LabelersGetResponse, error)
+
+	// CreateLabelerApiV1LabelersPostWithBodyWithResponse Create Labeler
+	//
+	// A labeler and the token it labels with, shown only in this answer.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/labelers (the `CreateLabelerApiV1LabelersPost` operationId).
+	CreateLabelerApiV1LabelersPostWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateLabelerApiV1LabelersPostResponse, error)
+
+	// CreateLabelerApiV1LabelersPostWithResponse Create Labeler
+	//
+	// A labeler and the token it labels with, shown only in this answer.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/labelers (the `CreateLabelerApiV1LabelersPost` operationId).
+	CreateLabelerApiV1LabelersPostWithResponse(ctx context.Context, body CreateLabelerApiV1LabelersPostJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateLabelerApiV1LabelersPostResponse, error)
+
+	// RevokeLabelerApiV1LabelersLabelerIdDeleteWithResponse Revoke Labeler
+	//
+	// The labeler's token stops working; its labels stay.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with DELETE /api/v1/labelers/{labeler_id} (the `RevokeLabelerApiV1LabelersLabelerIdDelete` operationId).
+	RevokeLabelerApiV1LabelersLabelerIdDeleteWithResponse(ctx context.Context, labelerId openapi_types.UUID, reqEditors ...RequestEditorFn) (*RevokeLabelerApiV1LabelersLabelerIdDeleteResponse, error)
+
+	// RenewTokenApiV1LabelersLabelerIdTokenPostWithResponse Renew Token
+	//
+	// A new token for the labeler, shown only in this answer; the old one stops working, and a
+	// revoked labeler works again.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/labelers/{labeler_id}/token (the `RenewTokenApiV1LabelersLabelerIdTokenPost` operationId).
+	RenewTokenApiV1LabelersLabelerIdTokenPostWithResponse(ctx context.Context, labelerId openapi_types.UUID, reqEditors ...RequestEditorFn) (*RenewTokenApiV1LabelersLabelerIdTokenPostResponse, error)
+
 	// ListPersonasApiV1PersonasGetWithResponse List Personas
 	//
 	// Returns a wrapper object for the known response body format(s).
@@ -5861,6 +7790,51 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with GET /api/v1/phone-numbers (the `ListPhoneNumbersApiV1PhoneNumbersGet` operationId).
 	ListPhoneNumbersApiV1PhoneNumbersGetWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListPhoneNumbersApiV1PhoneNumbersGetResponse, error)
 
+	// GetReviewApiV1ReviewConversationsConversationIdGetWithResponse Get Review
+	//
+	// A judged call to label. Any judged call takes labels; only the calls the queue offers
+	// hide the machine results, and only their labels measure the judges. `seen`: the labeler
+	// came from the machine's results, so the call is ad hoc.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/review/conversations/{conversation_id} (the `GetReviewApiV1ReviewConversationsConversationIdGet` operationId).
+	GetReviewApiV1ReviewConversationsConversationIdGetWithResponse(ctx context.Context, conversationId openapi_types.UUID, params *GetReviewApiV1ReviewConversationsConversationIdGetParams, reqEditors ...RequestEditorFn) (*GetReviewApiV1ReviewConversationsConversationIdGetResponse, error)
+
+	// GetRecordingApiV1ReviewConversationsConversationIdRecordingGetWithResponse Get Recording
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/review/conversations/{conversation_id}/recording (the `GetRecordingApiV1ReviewConversationsConversationIdRecordingGet` operationId).
+	GetRecordingApiV1ReviewConversationsConversationIdRecordingGetWithResponse(ctx context.Context, conversationId openapi_types.UUID, reqEditors ...RequestEditorFn) (*GetRecordingApiV1ReviewConversationsConversationIdRecordingGetResponse, error)
+
+	// LabelItemApiV1ReviewItemsItemIdLabelsPostWithBodyWithResponse Label Item
+	//
+	// Label one item; the call comes back with what the label reveals.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/review/items/{item_id}/labels (the `LabelItemApiV1ReviewItemsItemIdLabelsPost` operationId).
+	LabelItemApiV1ReviewItemsItemIdLabelsPostWithBodyWithResponse(ctx context.Context, itemId openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*LabelItemApiV1ReviewItemsItemIdLabelsPostResponse, error)
+
+	// LabelItemApiV1ReviewItemsItemIdLabelsPostWithResponse Label Item
+	//
+	// Label one item; the call comes back with what the label reveals.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/review/items/{item_id}/labels (the `LabelItemApiV1ReviewItemsItemIdLabelsPost` operationId).
+	LabelItemApiV1ReviewItemsItemIdLabelsPostWithResponse(ctx context.Context, itemId openapi_types.UUID, body LabelItemApiV1ReviewItemsItemIdLabelsPostJSONRequestBody, reqEditors ...RequestEditorFn) (*LabelItemApiV1ReviewItemsItemIdLabelsPostResponse, error)
+
+	// GetQueueApiV1ReviewQueueGetWithResponse Get Queue
+	//
+	// The audit calls this labeler still has items to label in.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/review/queue (the `GetQueueApiV1ReviewQueueGet` operationId).
+	GetQueueApiV1ReviewQueueGetWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetQueueApiV1ReviewQueueGetResponse, error)
+
 	// ListRunsApiV1RunsGetWithResponse List Runs
 	//
 	// Returns a wrapper object for the known response body format(s).
@@ -5895,6 +7869,16 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with POST /api/v1/runs/{run_id}/cancel (the `CancelRunApiV1RunsRunIdCancelPost` operationId).
 	CancelRunApiV1RunsRunIdCancelPostWithResponse(ctx context.Context, runId openapi_types.UUID, reqEditors ...RequestEditorFn) (*CancelRunApiV1RunsRunIdCancelPostResponse, error)
+
+	// GetRunMetricsApiV1RunsRunIdMetricsGetWithResponse Get Run Metrics
+	//
+	// The numbers over the run's counted conversations: the latest attempt of each repeat,
+	// unless it was cancelled.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/runs/{run_id}/metrics (the `GetRunMetricsApiV1RunsRunIdMetricsGet` operationId).
+	GetRunMetricsApiV1RunsRunIdMetricsGetWithResponse(ctx context.Context, runId openapi_types.UUID, reqEditors ...RequestEditorFn) (*GetRunMetricsApiV1RunsRunIdMetricsGetResponse, error)
 
 	// DeleteScenarioApiV1ScenariosScenarioIdDeleteWithResponse Delete Scenario
 	//
@@ -6840,6 +8824,54 @@ func (r EndConversationApiV1ConversationsConversationIdEndPostResponse) ContentT
 	return ""
 }
 
+type GetEvaluationApiV1ConversationsConversationIdEvaluationGetResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *ConversationEvaluation
+	// JSON422 the response for an HTTP 422 `application/json` response
+	JSON422 *HTTPValidationError
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetEvaluationApiV1ConversationsConversationIdEvaluationGetResponse) GetJSON200() *ConversationEvaluation {
+	return r.JSON200
+}
+
+// GetJSON422 returns the response for an HTTP 422 `application/json` response
+func (r GetEvaluationApiV1ConversationsConversationIdEvaluationGetResponse) GetJSON422() *HTTPValidationError {
+	return r.JSON422
+}
+
+// GetBody returns the raw response body bytes
+func (r GetEvaluationApiV1ConversationsConversationIdEvaluationGetResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetEvaluationApiV1ConversationsConversationIdEvaluationGetResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetEvaluationApiV1ConversationsConversationIdEvaluationGetResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetEvaluationApiV1ConversationsConversationIdEvaluationGetResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type StreamEventsApiV1ConversationsConversationIdEventsGetResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -7237,6 +9269,225 @@ func (r HealthApiV1HealthGetResponse) ContentType() string {
 	return ""
 }
 
+type GetAgreementApiV1JudgesAgreementGetResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *JudgeAgreement
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetAgreementApiV1JudgesAgreementGetResponse) GetJSON200() *JudgeAgreement {
+	return r.JSON200
+}
+
+// GetBody returns the raw response body bytes
+func (r GetAgreementApiV1JudgesAgreementGetResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetAgreementApiV1JudgesAgreementGetResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetAgreementApiV1JudgesAgreementGetResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetAgreementApiV1JudgesAgreementGetResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type ListLabelersApiV1LabelersGetResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *[]LabelerRead
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListLabelersApiV1LabelersGetResponse) GetJSON200() *[]LabelerRead {
+	return r.JSON200
+}
+
+// GetBody returns the raw response body bytes
+func (r ListLabelersApiV1LabelersGetResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListLabelersApiV1LabelersGetResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListLabelersApiV1LabelersGetResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListLabelersApiV1LabelersGetResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type CreateLabelerApiV1LabelersPostResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON201 the response for an HTTP 201 `application/json` response
+	JSON201 *LabelerCreated
+	// JSON422 the response for an HTTP 422 `application/json` response
+	JSON422 *HTTPValidationError
+}
+
+// GetJSON201 returns the response for an HTTP 201 `application/json` response
+func (r CreateLabelerApiV1LabelersPostResponse) GetJSON201() *LabelerCreated {
+	return r.JSON201
+}
+
+// GetJSON422 returns the response for an HTTP 422 `application/json` response
+func (r CreateLabelerApiV1LabelersPostResponse) GetJSON422() *HTTPValidationError {
+	return r.JSON422
+}
+
+// GetBody returns the raw response body bytes
+func (r CreateLabelerApiV1LabelersPostResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r CreateLabelerApiV1LabelersPostResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CreateLabelerApiV1LabelersPostResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r CreateLabelerApiV1LabelersPostResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type RevokeLabelerApiV1LabelersLabelerIdDeleteResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON422 the response for an HTTP 422 `application/json` response
+	JSON422 *HTTPValidationError
+}
+
+// GetJSON422 returns the response for an HTTP 422 `application/json` response
+func (r RevokeLabelerApiV1LabelersLabelerIdDeleteResponse) GetJSON422() *HTTPValidationError {
+	return r.JSON422
+}
+
+// GetBody returns the raw response body bytes
+func (r RevokeLabelerApiV1LabelersLabelerIdDeleteResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r RevokeLabelerApiV1LabelersLabelerIdDeleteResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r RevokeLabelerApiV1LabelersLabelerIdDeleteResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r RevokeLabelerApiV1LabelersLabelerIdDeleteResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type RenewTokenApiV1LabelersLabelerIdTokenPostResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *LabelerCreated
+	// JSON422 the response for an HTTP 422 `application/json` response
+	JSON422 *HTTPValidationError
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r RenewTokenApiV1LabelersLabelerIdTokenPostResponse) GetJSON200() *LabelerCreated {
+	return r.JSON200
+}
+
+// GetJSON422 returns the response for an HTTP 422 `application/json` response
+func (r RenewTokenApiV1LabelersLabelerIdTokenPostResponse) GetJSON422() *HTTPValidationError {
+	return r.JSON422
+}
+
+// GetBody returns the raw response body bytes
+func (r RenewTokenApiV1LabelersLabelerIdTokenPostResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r RenewTokenApiV1LabelersLabelerIdTokenPostResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r RenewTokenApiV1LabelersLabelerIdTokenPostResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r RenewTokenApiV1LabelersLabelerIdTokenPostResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type ListPersonasApiV1PersonasGetResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -7607,6 +9858,191 @@ func (r ListPhoneNumbersApiV1PhoneNumbersGetResponse) ContentType() string {
 	return ""
 }
 
+type GetReviewApiV1ReviewConversationsConversationIdGetResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *ReviewConversation
+	// JSON422 the response for an HTTP 422 `application/json` response
+	JSON422 *HTTPValidationError
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetReviewApiV1ReviewConversationsConversationIdGetResponse) GetJSON200() *ReviewConversation {
+	return r.JSON200
+}
+
+// GetJSON422 returns the response for an HTTP 422 `application/json` response
+func (r GetReviewApiV1ReviewConversationsConversationIdGetResponse) GetJSON422() *HTTPValidationError {
+	return r.JSON422
+}
+
+// GetBody returns the raw response body bytes
+func (r GetReviewApiV1ReviewConversationsConversationIdGetResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetReviewApiV1ReviewConversationsConversationIdGetResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetReviewApiV1ReviewConversationsConversationIdGetResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetReviewApiV1ReviewConversationsConversationIdGetResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetRecordingApiV1ReviewConversationsConversationIdRecordingGetResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *interface{}
+	// JSON422 the response for an HTTP 422 `application/json` response
+	JSON422 *HTTPValidationError
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetRecordingApiV1ReviewConversationsConversationIdRecordingGetResponse) GetJSON200() *interface{} {
+	return r.JSON200
+}
+
+// GetJSON422 returns the response for an HTTP 422 `application/json` response
+func (r GetRecordingApiV1ReviewConversationsConversationIdRecordingGetResponse) GetJSON422() *HTTPValidationError {
+	return r.JSON422
+}
+
+// GetBody returns the raw response body bytes
+func (r GetRecordingApiV1ReviewConversationsConversationIdRecordingGetResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetRecordingApiV1ReviewConversationsConversationIdRecordingGetResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetRecordingApiV1ReviewConversationsConversationIdRecordingGetResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetRecordingApiV1ReviewConversationsConversationIdRecordingGetResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type LabelItemApiV1ReviewItemsItemIdLabelsPostResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON201 the response for an HTTP 201 `application/json` response
+	JSON201 *ReviewConversation
+	// JSON422 the response for an HTTP 422 `application/json` response
+	JSON422 *HTTPValidationError
+}
+
+// GetJSON201 returns the response for an HTTP 201 `application/json` response
+func (r LabelItemApiV1ReviewItemsItemIdLabelsPostResponse) GetJSON201() *ReviewConversation {
+	return r.JSON201
+}
+
+// GetJSON422 returns the response for an HTTP 422 `application/json` response
+func (r LabelItemApiV1ReviewItemsItemIdLabelsPostResponse) GetJSON422() *HTTPValidationError {
+	return r.JSON422
+}
+
+// GetBody returns the raw response body bytes
+func (r LabelItemApiV1ReviewItemsItemIdLabelsPostResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r LabelItemApiV1ReviewItemsItemIdLabelsPostResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r LabelItemApiV1ReviewItemsItemIdLabelsPostResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r LabelItemApiV1ReviewItemsItemIdLabelsPostResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetQueueApiV1ReviewQueueGetResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *[]QueuedReview
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetQueueApiV1ReviewQueueGetResponse) GetJSON200() *[]QueuedReview {
+	return r.JSON200
+}
+
+// GetBody returns the raw response body bytes
+func (r GetQueueApiV1ReviewQueueGetResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetQueueApiV1ReviewQueueGetResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetQueueApiV1ReviewQueueGetResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetQueueApiV1ReviewQueueGetResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type ListRunsApiV1RunsGetResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -7793,6 +10229,54 @@ func (r CancelRunApiV1RunsRunIdCancelPostResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r CancelRunApiV1RunsRunIdCancelPostResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetRunMetricsApiV1RunsRunIdMetricsGetResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *RunMetrics
+	// JSON422 the response for an HTTP 422 `application/json` response
+	JSON422 *HTTPValidationError
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetRunMetricsApiV1RunsRunIdMetricsGetResponse) GetJSON200() *RunMetrics {
+	return r.JSON200
+}
+
+// GetJSON422 returns the response for an HTTP 422 `application/json` response
+func (r GetRunMetricsApiV1RunsRunIdMetricsGetResponse) GetJSON422() *HTTPValidationError {
+	return r.JSON422
+}
+
+// GetBody returns the raw response body bytes
+func (r GetRunMetricsApiV1RunsRunIdMetricsGetResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetRunMetricsApiV1RunsRunIdMetricsGetResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetRunMetricsApiV1RunsRunIdMetricsGetResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetRunMetricsApiV1RunsRunIdMetricsGetResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -8637,6 +11121,19 @@ func (c *ClientWithResponses) EndConversationApiV1ConversationsConversationIdEnd
 	return ParseEndConversationApiV1ConversationsConversationIdEndPostResponse(rsp)
 }
 
+// GetEvaluationApiV1ConversationsConversationIdEvaluationGetWithResponse Get Evaluation
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/conversations/{conversation_id}/evaluation (the `GetEvaluationApiV1ConversationsConversationIdEvaluationGet` operationId).
+func (c *ClientWithResponses) GetEvaluationApiV1ConversationsConversationIdEvaluationGetWithResponse(ctx context.Context, conversationId openapi_types.UUID, reqEditors ...RequestEditorFn) (*GetEvaluationApiV1ConversationsConversationIdEvaluationGetResponse, error) {
+	rsp, err := c.GetEvaluationApiV1ConversationsConversationIdEvaluationGet(ctx, conversationId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetEvaluationApiV1ConversationsConversationIdEvaluationGetResponse(rsp)
+}
+
 // StreamEventsApiV1ConversationsConversationIdEventsGetWithResponse Stream Events
 //
 // Returns a wrapper object for the known response body format(s).
@@ -8778,6 +11275,96 @@ func (c *ClientWithResponses) HealthApiV1HealthGetWithResponse(ctx context.Conte
 	return ParseHealthApiV1HealthGetResponse(rsp)
 }
 
+// GetAgreementApiV1JudgesAgreementGetWithResponse Get Agreement
+//
+// How often blind audit labels agree with each judge version and with the machine's
+// scenario verdicts, how often labelers agree, and how much of the offered set is labeled.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/judges/agreement (the `GetAgreementApiV1JudgesAgreementGet` operationId).
+func (c *ClientWithResponses) GetAgreementApiV1JudgesAgreementGetWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetAgreementApiV1JudgesAgreementGetResponse, error) {
+	rsp, err := c.GetAgreementApiV1JudgesAgreementGet(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetAgreementApiV1JudgesAgreementGetResponse(rsp)
+}
+
+// ListLabelersApiV1LabelersGetWithResponse List Labelers
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/labelers (the `ListLabelersApiV1LabelersGet` operationId).
+func (c *ClientWithResponses) ListLabelersApiV1LabelersGetWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListLabelersApiV1LabelersGetResponse, error) {
+	rsp, err := c.ListLabelersApiV1LabelersGet(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListLabelersApiV1LabelersGetResponse(rsp)
+}
+
+// CreateLabelerApiV1LabelersPostWithBodyWithResponse Create Labeler
+//
+// A labeler and the token it labels with, shown only in this answer.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/labelers (the `CreateLabelerApiV1LabelersPost` operationId).
+func (c *ClientWithResponses) CreateLabelerApiV1LabelersPostWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateLabelerApiV1LabelersPostResponse, error) {
+	rsp, err := c.CreateLabelerApiV1LabelersPostWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateLabelerApiV1LabelersPostResponse(rsp)
+}
+
+// CreateLabelerApiV1LabelersPostWithResponse Create Labeler
+//
+// A labeler and the token it labels with, shown only in this answer.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/labelers (the `CreateLabelerApiV1LabelersPost` operationId).
+func (c *ClientWithResponses) CreateLabelerApiV1LabelersPostWithResponse(ctx context.Context, body CreateLabelerApiV1LabelersPostJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateLabelerApiV1LabelersPostResponse, error) {
+	rsp, err := c.CreateLabelerApiV1LabelersPost(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateLabelerApiV1LabelersPostResponse(rsp)
+}
+
+// RevokeLabelerApiV1LabelersLabelerIdDeleteWithResponse Revoke Labeler
+//
+// The labeler's token stops working; its labels stay.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /api/v1/labelers/{labeler_id} (the `RevokeLabelerApiV1LabelersLabelerIdDelete` operationId).
+func (c *ClientWithResponses) RevokeLabelerApiV1LabelersLabelerIdDeleteWithResponse(ctx context.Context, labelerId openapi_types.UUID, reqEditors ...RequestEditorFn) (*RevokeLabelerApiV1LabelersLabelerIdDeleteResponse, error) {
+	rsp, err := c.RevokeLabelerApiV1LabelersLabelerIdDelete(ctx, labelerId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseRevokeLabelerApiV1LabelersLabelerIdDeleteResponse(rsp)
+}
+
+// RenewTokenApiV1LabelersLabelerIdTokenPostWithResponse Renew Token
+//
+// A new token for the labeler, shown only in this answer; the old one stops working, and a
+// revoked labeler works again.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/labelers/{labeler_id}/token (the `RenewTokenApiV1LabelersLabelerIdTokenPost` operationId).
+func (c *ClientWithResponses) RenewTokenApiV1LabelersLabelerIdTokenPostWithResponse(ctx context.Context, labelerId openapi_types.UUID, reqEditors ...RequestEditorFn) (*RenewTokenApiV1LabelersLabelerIdTokenPostResponse, error) {
+	rsp, err := c.RenewTokenApiV1LabelersLabelerIdTokenPost(ctx, labelerId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseRenewTokenApiV1LabelersLabelerIdTokenPostResponse(rsp)
+}
+
 // ListPersonasApiV1PersonasGetWithResponse List Personas
 //
 // Returns a wrapper object for the known response body format(s).
@@ -8910,6 +11497,81 @@ func (c *ClientWithResponses) ListPhoneNumbersApiV1PhoneNumbersGetWithResponse(c
 	return ParseListPhoneNumbersApiV1PhoneNumbersGetResponse(rsp)
 }
 
+// GetReviewApiV1ReviewConversationsConversationIdGetWithResponse Get Review
+//
+// A judged call to label. Any judged call takes labels; only the calls the queue offers
+// hide the machine results, and only their labels measure the judges. `seen`: the labeler
+// came from the machine's results, so the call is ad hoc.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/review/conversations/{conversation_id} (the `GetReviewApiV1ReviewConversationsConversationIdGet` operationId).
+func (c *ClientWithResponses) GetReviewApiV1ReviewConversationsConversationIdGetWithResponse(ctx context.Context, conversationId openapi_types.UUID, params *GetReviewApiV1ReviewConversationsConversationIdGetParams, reqEditors ...RequestEditorFn) (*GetReviewApiV1ReviewConversationsConversationIdGetResponse, error) {
+	rsp, err := c.GetReviewApiV1ReviewConversationsConversationIdGet(ctx, conversationId, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetReviewApiV1ReviewConversationsConversationIdGetResponse(rsp)
+}
+
+// GetRecordingApiV1ReviewConversationsConversationIdRecordingGetWithResponse Get Recording
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/review/conversations/{conversation_id}/recording (the `GetRecordingApiV1ReviewConversationsConversationIdRecordingGet` operationId).
+func (c *ClientWithResponses) GetRecordingApiV1ReviewConversationsConversationIdRecordingGetWithResponse(ctx context.Context, conversationId openapi_types.UUID, reqEditors ...RequestEditorFn) (*GetRecordingApiV1ReviewConversationsConversationIdRecordingGetResponse, error) {
+	rsp, err := c.GetRecordingApiV1ReviewConversationsConversationIdRecordingGet(ctx, conversationId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetRecordingApiV1ReviewConversationsConversationIdRecordingGetResponse(rsp)
+}
+
+// LabelItemApiV1ReviewItemsItemIdLabelsPostWithBodyWithResponse Label Item
+//
+// Label one item; the call comes back with what the label reveals.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/review/items/{item_id}/labels (the `LabelItemApiV1ReviewItemsItemIdLabelsPost` operationId).
+func (c *ClientWithResponses) LabelItemApiV1ReviewItemsItemIdLabelsPostWithBodyWithResponse(ctx context.Context, itemId openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*LabelItemApiV1ReviewItemsItemIdLabelsPostResponse, error) {
+	rsp, err := c.LabelItemApiV1ReviewItemsItemIdLabelsPostWithBody(ctx, itemId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseLabelItemApiV1ReviewItemsItemIdLabelsPostResponse(rsp)
+}
+
+// LabelItemApiV1ReviewItemsItemIdLabelsPostWithResponse Label Item
+//
+// Label one item; the call comes back with what the label reveals.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/review/items/{item_id}/labels (the `LabelItemApiV1ReviewItemsItemIdLabelsPost` operationId).
+func (c *ClientWithResponses) LabelItemApiV1ReviewItemsItemIdLabelsPostWithResponse(ctx context.Context, itemId openapi_types.UUID, body LabelItemApiV1ReviewItemsItemIdLabelsPostJSONRequestBody, reqEditors ...RequestEditorFn) (*LabelItemApiV1ReviewItemsItemIdLabelsPostResponse, error) {
+	rsp, err := c.LabelItemApiV1ReviewItemsItemIdLabelsPost(ctx, itemId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseLabelItemApiV1ReviewItemsItemIdLabelsPostResponse(rsp)
+}
+
+// GetQueueApiV1ReviewQueueGetWithResponse Get Queue
+//
+// The audit calls this labeler still has items to label in.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/review/queue (the `GetQueueApiV1ReviewQueueGet` operationId).
+func (c *ClientWithResponses) GetQueueApiV1ReviewQueueGetWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetQueueApiV1ReviewQueueGetResponse, error) {
+	rsp, err := c.GetQueueApiV1ReviewQueueGet(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetQueueApiV1ReviewQueueGetResponse(rsp)
+}
+
 // ListRunsApiV1RunsGetWithResponse List Runs
 //
 // Returns a wrapper object for the known response body format(s).
@@ -8973,6 +11635,22 @@ func (c *ClientWithResponses) CancelRunApiV1RunsRunIdCancelPostWithResponse(ctx 
 		return nil, err
 	}
 	return ParseCancelRunApiV1RunsRunIdCancelPostResponse(rsp)
+}
+
+// GetRunMetricsApiV1RunsRunIdMetricsGetWithResponse Get Run Metrics
+//
+// The numbers over the run's counted conversations: the latest attempt of each repeat,
+// unless it was cancelled.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/runs/{run_id}/metrics (the `GetRunMetricsApiV1RunsRunIdMetricsGet` operationId).
+func (c *ClientWithResponses) GetRunMetricsApiV1RunsRunIdMetricsGetWithResponse(ctx context.Context, runId openapi_types.UUID, reqEditors ...RequestEditorFn) (*GetRunMetricsApiV1RunsRunIdMetricsGetResponse, error) {
+	rsp, err := c.GetRunMetricsApiV1RunsRunIdMetricsGet(ctx, runId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetRunMetricsApiV1RunsRunIdMetricsGetResponse(rsp)
 }
 
 // DeleteScenarioApiV1ScenariosScenarioIdDeleteWithResponse Delete Scenario
@@ -9747,6 +12425,39 @@ func ParseEndConversationApiV1ConversationsConversationIdEndPostResponse(rsp *ht
 	return response, nil
 }
 
+// ParseGetEvaluationApiV1ConversationsConversationIdEvaluationGetResponse parses an HTTP response from a GetEvaluationApiV1ConversationsConversationIdEvaluationGetWithResponse call
+func ParseGetEvaluationApiV1ConversationsConversationIdEvaluationGetResponse(rsp *http.Response) (*GetEvaluationApiV1ConversationsConversationIdEvaluationGetResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetEvaluationApiV1ConversationsConversationIdEvaluationGetResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ConversationEvaluation
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest HTTPValidationError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseStreamEventsApiV1ConversationsConversationIdEventsGetResponse parses an HTTP response from a StreamEventsApiV1ConversationsConversationIdEventsGetWithResponse call
 func ParseStreamEventsApiV1ConversationsConversationIdEventsGetResponse(rsp *http.Response) (*StreamEventsApiV1ConversationsConversationIdEventsGetResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -10012,6 +12723,153 @@ func ParseHealthApiV1HealthGetResponse(rsp *http.Response) (*HealthApiV1HealthGe
 	return response, nil
 }
 
+// ParseGetAgreementApiV1JudgesAgreementGetResponse parses an HTTP response from a GetAgreementApiV1JudgesAgreementGetWithResponse call
+func ParseGetAgreementApiV1JudgesAgreementGetResponse(rsp *http.Response) (*GetAgreementApiV1JudgesAgreementGetResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetAgreementApiV1JudgesAgreementGetResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest JudgeAgreement
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListLabelersApiV1LabelersGetResponse parses an HTTP response from a ListLabelersApiV1LabelersGetWithResponse call
+func ParseListLabelersApiV1LabelersGetResponse(rsp *http.Response) (*ListLabelersApiV1LabelersGetResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListLabelersApiV1LabelersGetResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest []LabelerRead
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseCreateLabelerApiV1LabelersPostResponse parses an HTTP response from a CreateLabelerApiV1LabelersPostWithResponse call
+func ParseCreateLabelerApiV1LabelersPostResponse(rsp *http.Response) (*CreateLabelerApiV1LabelersPostResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CreateLabelerApiV1LabelersPostResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest LabelerCreated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest HTTPValidationError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseRevokeLabelerApiV1LabelersLabelerIdDeleteResponse parses an HTTP response from a RevokeLabelerApiV1LabelersLabelerIdDeleteWithResponse call
+func ParseRevokeLabelerApiV1LabelersLabelerIdDeleteResponse(rsp *http.Response) (*RevokeLabelerApiV1LabelersLabelerIdDeleteResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &RevokeLabelerApiV1LabelersLabelerIdDeleteResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case rsp.StatusCode == 204:
+		break // No content-type
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest HTTPValidationError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseRenewTokenApiV1LabelersLabelerIdTokenPostResponse parses an HTTP response from a RenewTokenApiV1LabelersLabelerIdTokenPostWithResponse call
+func ParseRenewTokenApiV1LabelersLabelerIdTokenPostResponse(rsp *http.Response) (*RenewTokenApiV1LabelersLabelerIdTokenPostResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &RenewTokenApiV1LabelersLabelerIdTokenPostResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest LabelerCreated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest HTTPValidationError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseListPersonasApiV1PersonasGetResponse parses an HTTP response from a ListPersonasApiV1PersonasGetWithResponse call
 func ParseListPersonasApiV1PersonasGetResponse(rsp *http.Response) (*ListPersonasApiV1PersonasGetResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -10265,6 +13123,131 @@ func ParseListPhoneNumbersApiV1PhoneNumbersGetResponse(rsp *http.Response) (*Lis
 	return response, nil
 }
 
+// ParseGetReviewApiV1ReviewConversationsConversationIdGetResponse parses an HTTP response from a GetReviewApiV1ReviewConversationsConversationIdGetWithResponse call
+func ParseGetReviewApiV1ReviewConversationsConversationIdGetResponse(rsp *http.Response) (*GetReviewApiV1ReviewConversationsConversationIdGetResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetReviewApiV1ReviewConversationsConversationIdGetResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ReviewConversation
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest HTTPValidationError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetRecordingApiV1ReviewConversationsConversationIdRecordingGetResponse parses an HTTP response from a GetRecordingApiV1ReviewConversationsConversationIdRecordingGetWithResponse call
+func ParseGetRecordingApiV1ReviewConversationsConversationIdRecordingGetResponse(rsp *http.Response) (*GetRecordingApiV1ReviewConversationsConversationIdRecordingGetResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetRecordingApiV1ReviewConversationsConversationIdRecordingGetResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest interface{}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest HTTPValidationError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseLabelItemApiV1ReviewItemsItemIdLabelsPostResponse parses an HTTP response from a LabelItemApiV1ReviewItemsItemIdLabelsPostWithResponse call
+func ParseLabelItemApiV1ReviewItemsItemIdLabelsPostResponse(rsp *http.Response) (*LabelItemApiV1ReviewItemsItemIdLabelsPostResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &LabelItemApiV1ReviewItemsItemIdLabelsPostResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest ReviewConversation
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest HTTPValidationError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetQueueApiV1ReviewQueueGetResponse parses an HTTP response from a GetQueueApiV1ReviewQueueGetWithResponse call
+func ParseGetQueueApiV1ReviewQueueGetResponse(rsp *http.Response) (*GetQueueApiV1ReviewQueueGetResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetQueueApiV1ReviewQueueGetResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest []QueuedReview
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseListRunsApiV1RunsGetResponse parses an HTTP response from a ListRunsApiV1RunsGetWithResponse call
 func ParseListRunsApiV1RunsGetResponse(rsp *http.Response) (*ListRunsApiV1RunsGetResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -10380,6 +13363,39 @@ func ParseCancelRunApiV1RunsRunIdCancelPostResponse(rsp *http.Response) (*Cancel
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest RunRead
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest HTTPValidationError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetRunMetricsApiV1RunsRunIdMetricsGetResponse parses an HTTP response from a GetRunMetricsApiV1RunsRunIdMetricsGetWithResponse call
+func ParseGetRunMetricsApiV1RunsRunIdMetricsGetResponse(rsp *http.Response) (*GetRunMetricsApiV1RunsRunIdMetricsGetResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetRunMetricsApiV1RunsRunIdMetricsGetResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest RunMetrics
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}

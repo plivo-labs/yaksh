@@ -37,6 +37,12 @@ def upgrade() -> None:
             server_default=sa.text("'[]'::jsonb"),
             nullable=False,
         ),
+        sa.Column(
+            "rules",
+            postgresql.JSONB(astext_type=sa.Text()),
+            server_default=sa.text("'[]'::jsonb"),
+            nullable=False,
+        ),
         sa.Column("current_version", sa.Integer(), nullable=False),
         sa.Column(
             "created_at",
@@ -396,6 +402,8 @@ def upgrade() -> None:
         sa.Column("language", sa.Enum("en", "hinglish", name="language"), nullable=False),
         sa.Column("instructions", sa.Text(), nullable=False),
         sa.Column("nudge", sa.Text(), nullable=False),
+        sa.Column("today", sa.Date(), nullable=False),
+        sa.Column("time_zone", sa.Text(), nullable=False),
         sa.Column("caller_number", sa.Text(), nullable=True),
         sa.Column("call_uuid", sa.Text(), nullable=True),
         sa.Column("dial_deadline_at", sa.DateTime(timezone=True), nullable=True),
@@ -462,8 +470,12 @@ def upgrade() -> None:
         sa.Column("ended_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("talk_ms", sa.Integer(), nullable=True),
         sa.Column("recording_path", sa.Text(), nullable=True),
+        sa.Column("caller_voice_path", sa.Text(), nullable=True),
         sa.Column("transcript", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
         sa.Column("caller_reason", sa.Text(), nullable=True),
+        sa.Column("caller_settings", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
+        sa.Column("caller_usage", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
+        sa.Column("line_facts", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
         sa.Column("claimed_by", sa.Text(), nullable=True),
         sa.Column("lease_expires_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("run_id", sa.UUID(), nullable=True),
@@ -540,6 +552,281 @@ def upgrade() -> None:
         "ix_conversations_run_status", "conversations", ["run_id", "status"], unique=False
     )
     op.create_index("ix_conversations_retry_of", "conversations", ["retry_of"], unique=False)
+    op.create_table(
+        "evaluations",
+        sa.Column("id", sa.UUID(), server_default=sa.text("uuidv7()"), nullable=False),
+        sa.Column("conversation_id", sa.UUID(), nullable=False),
+        sa.Column(
+            "state",
+            sa.Enum("queued", "running", "done", "failed", name="evaluation_state"),
+            nullable=False,
+        ),
+        sa.Column("code_version", sa.Text(), nullable=True),
+        sa.Column("claimed_by", sa.Text(), nullable=True),
+        sa.Column("claim_seq", sa.Integer(), server_default=sa.text("0"), nullable=False),
+        sa.Column("lease_expires_at", sa.DateTime(timezone=True), nullable=True),
+        sa.Column("attempts", sa.Integer(), server_default=sa.text("0"), nullable=False),
+        sa.Column("not_before", sa.DateTime(timezone=True), nullable=True),
+        sa.Column("failure", sa.Text(), nullable=True),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.Column("started_at", sa.DateTime(timezone=True), nullable=True),
+        sa.Column("ended_at", sa.DateTime(timezone=True), nullable=True),
+        sa.Column(
+            "scenario_verdict", sa.Enum("pass", "fail", "not_scored", name="verdict"), nullable=True
+        ),
+        sa.Column(
+            "conversation_verdict",
+            sa.Enum("pass", "fail", "not_scored", name="verdict"),
+            nullable=True,
+        ),
+        sa.Column(
+            "effective_scenario_verdict",
+            sa.Enum("pass", "fail", "not_scored", name="verdict"),
+            nullable=True,
+        ),
+        sa.Column(
+            "effective_conversation_verdict",
+            sa.Enum("pass", "fail", "not_scored", name="verdict"),
+            nullable=True,
+        ),
+        sa.Column("jev_usage", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
+        sa.Column("audit", sa.Boolean(), server_default=sa.text("false"), nullable=False),
+        sa.ForeignKeyConstraint(["conversation_id"], ["conversations.id"]),
+        sa.PrimaryKeyConstraint("id"),
+        sa.UniqueConstraint("conversation_id", name=op.f("uq_evaluations_conversation_id")),
+    )
+    op.create_index(
+        "ix_evaluations_state_created", "evaluations", ["state", "created_at"], unique=False
+    )
+    op.create_table(
+        "metric_values",
+        sa.Column("evaluation_id", sa.UUID(), nullable=False),
+        sa.Column("metric_key", sa.Text(), nullable=False),
+        sa.Column("value", postgresql.JSONB(astext_type=sa.Text()), nullable=False),
+        sa.Column(
+            "flags",
+            postgresql.ARRAY(sa.Text()),
+            server_default=sa.text("'{}'::text[]"),
+            nullable=False,
+        ),
+        sa.ForeignKeyConstraint(["evaluation_id"], ["evaluations.id"]),
+        sa.PrimaryKeyConstraint("evaluation_id", "metric_key"),
+    )
+    op.create_table(
+        "judge_versions",
+        sa.Column("id", sa.UUID(), server_default=sa.text("uuidv7()"), nullable=False),
+        sa.Column("judge", sa.Text(), nullable=False),
+        sa.Column("provider", sa.Text(), nullable=False),
+        sa.Column("model", sa.Text(), nullable=False),
+        sa.Column("settings", postgresql.JSONB(astext_type=sa.Text()), nullable=False),
+        sa.Column("prompt_sha256", sa.Text(), nullable=False),
+        sa.Column("schema_sha256", sa.Text(), nullable=False),
+        sa.Column("evidence_view_version", sa.Integer(), nullable=False),
+        sa.Column("code_checks_version", sa.Integer(), nullable=False),
+        sa.Column("content_sha256", sa.Text(), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.PrimaryKeyConstraint("id"),
+        sa.UniqueConstraint("content_sha256", name=op.f("uq_judge_versions_content_sha256")),
+    )
+    op.create_table(
+        "evaluation_items",
+        sa.Column("id", sa.UUID(), server_default=sa.text("uuidv7()"), nullable=False),
+        sa.Column("evaluation_id", sa.UUID(), nullable=False),
+        sa.Column("item_key", sa.Text(), nullable=False),
+        sa.Column("subject", sa.Text(), nullable=False),
+        sa.Column("judge_version_id", sa.UUID(), nullable=True),
+        sa.Column("decided_by", sa.Enum("code", "jev", "llm", name="decided_by"), nullable=False),
+        sa.Column("role", sa.Enum("deciding", "reporting", name="item_role"), nullable=False),
+        sa.Column("answer", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
+        sa.Column(
+            "evidence_checks",
+            postgresql.JSONB(astext_type=sa.Text()),
+            server_default=sa.text("'{}'::jsonb"),
+            nullable=False,
+        ),
+        sa.Column(
+            "machine_outcome",
+            sa.Enum(
+                "pass",
+                "fail",
+                "not_applicable",
+                "unsure",
+                "blocked",
+                "error",
+                "pending",
+                name="outcome",
+            ),
+            nullable=False,
+        ),
+        sa.Column(
+            "unsure_kind",
+            sa.Enum("hidden_action", "not_confirmed_played", "unclear", name="unsure_kind"),
+            nullable=True,
+        ),
+        sa.Column("error_reason", sa.Text(), nullable=True),
+        sa.Column("caller_effect", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
+        sa.Column("jev_version_id", sa.UUID(), nullable=True),
+        sa.Column("jev_choice", sa.Text(), nullable=True),
+        sa.Column("jev_probabilities", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
+        sa.Column(
+            "effective_outcome",
+            sa.Enum(
+                "pass",
+                "fail",
+                "not_applicable",
+                "unsure",
+                "blocked",
+                "error",
+                "pending",
+                name="outcome",
+            ),
+            nullable=False,
+        ),
+        sa.Column(
+            "effective_unsure_kind",
+            sa.Enum("hidden_action", "not_confirmed_played", "unclear", name="unsure_kind"),
+            nullable=True,
+        ),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.ForeignKeyConstraint(["evaluation_id"], ["evaluations.id"]),
+        sa.ForeignKeyConstraint(["jev_version_id"], ["judge_versions.id"]),
+        sa.ForeignKeyConstraint(["judge_version_id"], ["judge_versions.id"]),
+        sa.PrimaryKeyConstraint("id"),
+        sa.UniqueConstraint(
+            "evaluation_id", "item_key", name=op.f("uq_evaluation_items_evaluation_id_item_key")
+        ),
+    )
+    op.create_table(
+        "labelers",
+        sa.Column("id", sa.UUID(), server_default=sa.text("uuidv7()"), nullable=False),
+        sa.Column("name", sa.Text(), nullable=False),
+        sa.Column("token_sha256", sa.Text(), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.Column("revoked_at", sa.DateTime(timezone=True), nullable=True),
+        sa.PrimaryKeyConstraint("id", name=op.f("pk_labelers")),
+        sa.UniqueConstraint("name", name=op.f("uq_labelers_name")),
+        sa.UniqueConstraint("token_sha256", name=op.f("uq_labelers_token_sha256")),
+    )
+    op.create_table(
+        "labels",
+        sa.Column("id", sa.UUID(), server_default=sa.text("uuidv7()"), nullable=False),
+        sa.Column("item_id", sa.UUID(), nullable=False),
+        sa.Column("labeler_id", sa.UUID(), nullable=False),
+        sa.Column("lane", sa.Enum("audit", "ad_hoc", name="lane"), nullable=False),
+        sa.Column("blind", sa.Boolean(), nullable=False),
+        sa.Column(
+            "answer",
+            sa.Enum(
+                "pass", "fail", "not_applicable", "cannot_tell", "blocked", name="label_answer"
+            ),
+            nullable=False,
+        ),
+        sa.Column(
+            "reason",
+            sa.Enum(
+                "agent_error",
+                "applicability",
+                "transcript_error",
+                "spoken_form",
+                "date_or_time",
+                "read_back",
+                "window_or_order",
+                "exact_value",
+                "hidden_action",
+                "evidence_misread",
+                "criterion_ambiguous",
+                "caller_error",
+                "scenario_error",
+                "test_settings_error",
+                "line_or_audio",
+                "other",
+                name="label_reason",
+            ),
+            nullable=True,
+        ),
+        sa.Column("note", sa.Text(), nullable=True),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.CheckConstraint(
+            "reason <> 'other' OR btrim(coalesce(note, '')) <> ''",
+            name=op.f("ck_labels_other_has_note"),
+        ),
+        sa.CheckConstraint(
+            "answer IN ('pass', 'not_applicable') OR reason IS NOT NULL",
+            name=op.f("ck_labels_problem_has_reason"),
+        ),
+        sa.ForeignKeyConstraint(
+            ["item_id"], ["evaluation_items.id"], name=op.f("fk_labels_item_id_evaluation_items")
+        ),
+        sa.ForeignKeyConstraint(
+            ["labeler_id"], ["labelers.id"], name=op.f("fk_labels_labeler_id_labelers")
+        ),
+        sa.PrimaryKeyConstraint("id", name=op.f("pk_labels")),
+    )
+    op.create_index("ix_labels_item_id", "labels", ["item_id"], unique=False)
+    op.create_table(
+        "judge_calls",
+        sa.Column("id", sa.UUID(), server_default=sa.text("uuidv7()"), nullable=False),
+        sa.Column("item_id", sa.UUID(), nullable=False),
+        sa.Column("attempt", sa.Integer(), nullable=False),
+        sa.Column("request_sha256", sa.Text(), nullable=False),
+        sa.Column("model_returned", sa.Text(), nullable=True),
+        sa.Column("output", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
+        sa.Column("input_tokens", sa.Integer(), nullable=True),
+        sa.Column("output_tokens", sa.Integer(), nullable=True),
+        sa.Column("latency_ms", sa.Integer(), nullable=False),
+        sa.Column("error", sa.Text(), nullable=True),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.ForeignKeyConstraint(["item_id"], ["evaluation_items.id"]),
+        sa.PrimaryKeyConstraint("id"),
+    )
+    op.create_table(
+        "refused_calls",
+        sa.Column("id", sa.UUID(), server_default=sa.text("uuidv7()"), nullable=False),
+        sa.Column("call_uuid", sa.Text(), nullable=False),
+        sa.Column("to_number", sa.Text(), nullable=False),
+        sa.Column("from_number", sa.Text(), nullable=False),
+        sa.Column("reason", sa.Text(), nullable=False),
+        sa.Column("conversation_id", sa.UUID(), nullable=True),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.ForeignKeyConstraint(["conversation_id"], ["conversations.id"]),
+        sa.PrimaryKeyConstraint("id"),
+        sa.UniqueConstraint("call_uuid"),
+    )
     op.create_index(
         "ix_conversations_run_started", "conversations", ["run_id", "started_at"], unique=False
     )
@@ -601,6 +888,14 @@ def downgrade() -> None:
     op.drop_table("workers")
     op.drop_table("documents")
     op.drop_table("phone_numbers")
+    op.drop_table("labels")
+    op.drop_table("labelers")
+    op.drop_table("judge_calls")
+    op.drop_table("evaluation_items")
+    op.drop_table("judge_versions")
+    op.drop_table("metric_values")
+    op.drop_table("evaluations")
+    op.drop_table("refused_calls")
     op.drop_table("conversations")
     op.drop_table("runs")
     op.drop_table("scenario_versions")
@@ -625,5 +920,14 @@ def downgrade() -> None:
         "generation_status",
         "noise_sound",
         "noise_level",
+        "evaluation_state",
+        "verdict",
+        "outcome",
+        "unsure_kind",
+        "decided_by",
+        "item_role",
+        "lane",
+        "label_answer",
+        "label_reason",
     ):
         op.execute(f"DROP TYPE {enum}")

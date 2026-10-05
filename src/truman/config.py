@@ -34,6 +34,11 @@ class Settings(BaseSettings):
     worker_poll_interval_s: float = 0.5
     worker_heartbeat_s: float = 1.0
     worker_lease_s: int = 30
+    evaluator_poll_interval_s: float = 2.0
+    evaluator_lease_s: int = 60
+    evaluator_concurrency: int = 2
+    evaluator_judge_concurrency: int = Field(default=8, gt=0)
+    """Judge model calls in flight across one evaluator's evaluations."""
     end_timeout_s: float = 5.0
     deepgram_api_key: SecretStr | None = Field(default=None, validation_alias="DEEPGRAM_API_KEY")
     deepgram_base_url: str = Field(
@@ -47,7 +52,7 @@ class Settings(BaseSettings):
     openai_base_url: str = Field(
         default="https://api.openai.com/v1", validation_alias="OPENAI_BASE_URL"
     )
-    persona_llm_model: str = Field(default="gpt-4.1", validation_alias="PERSONA_LLM_MODEL")
+    persona_llm_model: str = Field(default="gpt-6-luna", validation_alias="PERSONA_LLM_MODEL")
     persona_llm_reasoning_effort: str | None = Field(
         default=None, validation_alias="PERSONA_LLM_REASONING_EFFORT"
     )
@@ -63,6 +68,41 @@ class Settings(BaseSettings):
         default=300.0, gt=0, validation_alias="GENERATION_LLM_TIMEOUT_S"
     )
     """One model call while writing scenarios; high reasoning effort takes minutes."""
+    judge_llm_model: str = Field(default="gpt-6-luna", validation_alias="JUDGE_LLM_MODEL")
+    """The model that judges calls; empty turns the judges off."""
+    judge_llm_reasoning_effort: str | None = Field(
+        default="medium", validation_alias="JUDGE_LLM_REASONING_EFFORT"
+    )
+    judge_llm_timeout_s: float = Field(default=60.0, gt=0, validation_alias="JUDGE_LLM_TIMEOUT_S")
+    judge_max_output_tokens: int = Field(
+        default=8000, gt=0, validation_alias="JUDGE_MAX_OUTPUT_TOKENS"
+    )
+    """Reasoning tokens count too."""
+    typesafe_api_key: SecretStr | None = Field(default=None, validation_alias="TYPESAFE_API_KEY")
+    """Optional. Jev, TypeSafe's classifier, answers criteria and agent rules first; call
+    transcripts are sent to TypeSafe."""
+    jev_pass_bar: float = Field(default=0.95, gt=0, le=1, validation_alias="JEV_PASS_BAR")
+    """How sure Jev must be that an item is met to publish it as a pass."""
+    judge_sources_timeout_s: float = Field(
+        default=180.0, gt=0, validation_alias="JUDGE_SOURCES_TIMEOUT_S"
+    )
+    """One request of the judges that read the agent's whole instructions or documents."""
+    judge_max_input_chars: int = Field(
+        default=400_000, gt=0, validation_alias="JUDGE_MAX_INPUT_CHARS"
+    )
+    """The most text one judge request holds: the call with the agent's instructions or its
+    documents. Larger sources make that judge's item an error."""
+    audit_sample_rate: float = Field(default=0.1, ge=0, le=1, validation_alias="AUDIT_SAMPLE_RATE")
+    """The share of judged calls in the audit lane, chosen by a hash of the conversation id."""
+    audit_weekly_budget: int = Field(default=30, ge=0, validation_alias="AUDIT_WEEKLY_BUDGET")
+    """The most audit conversations the review queue offers for one week of calls."""
+    judge_openai_api_key: SecretStr | None = Field(
+        default=None, validation_alias="JUDGE_OPENAI_API_KEY"
+    )
+    """The judge model's key and address; the caller's OpenAI settings when unset."""
+    judge_openai_base_url: str | None = Field(
+        default=None, validation_alias="JUDGE_OPENAI_BASE_URL"
+    )
     plivo_auth_id: SecretStr | None = Field(default=None, validation_alias="PLIVO_AUTH_ID")
     plivo_auth_token: SecretStr | None = Field(default=None, validation_alias="PLIVO_AUTH_TOKEN")
     plivo_numbers: Annotated[list[E164], NoDecode] = []

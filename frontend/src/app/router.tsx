@@ -9,6 +9,7 @@ import {
   NumbersCrumbs,
   PersonasCrumbs,
   RunCrumbs,
+  RunsCrumbs,
   VoicesCrumbs,
 } from "@/app/crumbs";
 import { RouteError } from "@/app/route-error";
@@ -21,7 +22,9 @@ import { ConversationsPage } from "@/pages/conversations";
 import { NotFoundPage } from "@/pages/not-found";
 import { NumbersPage } from "@/pages/numbers";
 import { PersonasPage } from "@/pages/personas";
+import { ReviewPage, ReviewQueuePage, ReviewShell } from "@/pages/review";
 import { RunPage } from "@/pages/run";
+import { RunsPage } from "@/pages/runs";
 import { VoicesPage } from "@/pages/voices";
 
 export const router = createBrowserRouter([
@@ -47,8 +50,18 @@ export const router = createBrowserRouter([
       { path: "agents/new", element: <NewAgentPage />, handle: { crumbs: NewAgentCrumbs } },
       { path: "agents/:id", element: <AgentPage />, handle: { crumbs: AgentCrumbs } },
       { path: "numbers", element: <NumbersPage />, handle: { crumbs: NumbersCrumbs } },
+      { path: "runs", element: <RunsPage />, handle: { crumbs: RunsCrumbs } },
       { path: "runs/:id", element: <RunPage />, handle: { crumbs: RunCrumbs } },
       { path: "*", element: <NotFoundPage /> },
+    ],
+  },
+  {
+    path: "/review",
+    element: <ReviewShell />,
+    errorElement: <RouteError />,
+    children: [
+      { index: true, element: <ReviewQueuePage /> },
+      { path: ":id", element: <ReviewPage /> },
     ],
   },
 ]);

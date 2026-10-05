@@ -2,7 +2,7 @@ import asyncio
 import sys
 import uuid
 import wave
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
@@ -249,6 +249,8 @@ async def test_an_expired_lease_is_marked_failed_while_a_live_one_is_not(
                 language=Language.EN,
                 instructions="orphaned by a dead worker",
                 nudge="Hello?",
+                today=date(2026, 10, 5),
+                time_zone="UTC",
                 caller_number="+15550100000",
                 max_duration_s=60,
                 max_turns=20,
@@ -810,12 +812,12 @@ async def test_the_caller_knows_its_facts_and_today_but_never_the_criteria(
 
     engine = create_engine(settings.database_url.encoded_string())
     async with create_sessionmaker(engine)() as session:
-        instructions = (
-            await conversations.create_conversation(session, zoned, command)
-        ).instructions
+        conversation = await conversations.create_conversation(session, zoned, command)
     await engine.dispose()
 
     today = datetime.now(ZoneInfo(timezone)).date()
+    instructions = conversation.instructions
+    assert (conversation.today, conversation.time_zone) == (today, timezone)
     assert f"Today is {today:%A}, {today.day} {today:%B %Y}." in instructions
     assert "- Current appointment: next Thursday, 10:30 am" in instructions
     assert "## What you do not have\n- Patient ID" in instructions

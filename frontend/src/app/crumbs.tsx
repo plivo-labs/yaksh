@@ -58,6 +58,7 @@ function Trail({ steps }: { steps: Step[] }) {
 const AGENTS = { label: "Agents", to: "/agents" };
 
 export const AgentsCrumbs = () => <Trail steps={[{ label: "Agents" }]} />;
+export const RunsCrumbs = () => <Trail steps={[{ label: "Runs" }]} />;
 export const ConversationsCrumbs = () => <Trail steps={[{ label: "Conversations" }]} />;
 export const PersonasCrumbs = () => <Trail steps={[{ label: "Personas" }]} />;
 export const VoicesCrumbs = () => <Trail steps={[{ label: "Voices" }]} />;
@@ -71,18 +72,8 @@ export function AgentCrumbs() {
 
 export function RunCrumbs() {
   const run = useRun(useParams().id);
-  const agent = useAgent(run.data?.agent_id);
   return (
-    <Trail
-      steps={[
-        AGENTS,
-        {
-          label: agent.data?.name ?? run.data?.agent_name,
-          to: run.data && `/agents/${run.data.agent_id}`,
-        },
-        { label: run.data && runTitle(run.data) },
-      ]}
-    />
+    <Trail steps={[{ label: "Runs", to: "/runs" }, { label: run.data && runTitle(run.data) }]} />
   );
 }
 

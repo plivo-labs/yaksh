@@ -12,8 +12,10 @@ from truman.api.auth import require_token
 from truman.api.deps import SessionDep, SettingsDep
 from truman.api.pagination import Page, PageDep
 from truman.api.schemas.conversations import (
+    ConversationEvaluation,
     ConversationRead,
     ConversationSummary,
+    ItemRead,
     LatencySummary,
     TurnRead,
 )
@@ -29,6 +31,7 @@ from truman.domain.conversations import (
     Transcript,
 )
 from truman.domain.latency import Latency, place
+from truman.evaluation import results
 from truman.simulation import conversations
 from truman.simulation.listen import live_audio
 
@@ -50,10 +53,9 @@ def recording_url(conversation: Conversation) -> str | None:
 async def summaries(
     session: AsyncSession,
     rows: list[Conversation],
-    measured: Mapping[uuid.UUID, Latency] | None = None,
+    found: Mapping[uuid.UUID, results.Evaluated] | None = None,
 ) -> list[ConversationSummary]:
-    """`measured` holds response times already read with the rows; the rest are read here, as
-    lists defer the transcript."""
+    """`found` holds evaluations already read; the rest are read here."""
     agents = await conversations.pinned_agents(session, (row.agent_version_id for row in rows))
     personas = await conversations.pinned_personas(
         session, (row.persona_version_id for row in rows)
@@ -61,8 +63,8 @@ async def summaries(
     scenarios = await conversations.pinned_scenarios(
         session, (row.scenario_version_id for row in rows)
     )
-    if measured is None:
-        measured = await conversations.latencies(session, (row.id for row in rows))
+    if found is None:
+        found = await results.evaluated(session, (row.id for row in rows))
     items = []
     for row in rows:
         data = {
@@ -74,8 +76,10 @@ async def summaries(
         data["persona_version"], data["persona_name"] = personas[row.persona_version_id]
         data["scenario_version"], data["scenario_name"] = scenarios[row.scenario_version_id]
         data["recording_url"] = recording_url(row)
-        latency = measured.get(row.id)
+        evaluation = found.get(row.id)
+        latency = evaluation.latency if evaluation else None
         data["latency"] = LatencySummary.of(latency) if latency and latency.replies else None
+        data["evaluation"] = evaluation.state if evaluation else None
         data["background_noise"] = BackgroundNoise(
             sound=row.background_noise_sound, level=row.background_noise_level
         )
@@ -86,14 +90,14 @@ async def summaries(
 async def summary(
     session: AsyncSession,
     conversation: Conversation,
-    measured: Mapping[uuid.UUID, Latency] | None = None,
+    found: Mapping[uuid.UUID, results.Evaluated] | None = None,
 ) -> ConversationSummary:
-    return (await summaries(session, [conversation], measured))[0]
+    return (await summaries(session, [conversation], found))[0]
 
 
-def turns_with_replies(transcript: Transcript) -> list[TurnRead]:
+def turns_with_replies(transcript: Transcript, latency: Latency | None) -> list[TurnRead]:
     """The turns, each agent turn with the reply it starts with."""
-    replies = transcript.latency.replies if transcript.latency else []
+    replies = latency.replies if latency else []
     agent = [index for index, turn in enumerate(transcript.turns) if turn.role is Role.AGENT]
     starts = [transcript.turns[index].started_at_ms for index in agent]
     placed = dict(zip(agent, place(starts, replies), strict=True))
@@ -112,14 +116,15 @@ def turns_with_replies(transcript: Transcript) -> list[TurnRead]:
 
 async def detail(session: AsyncSession, conversation: Conversation) -> ConversationRead:
     transcript = conversations.transcript_of(conversation)
-    measured = {conversation.id: transcript.latency} if transcript.latency else {}
-    base = await summary(session, conversation, measured)
+    found = await results.evaluated(session, [conversation.id])
+    latency = found[conversation.id].latency if conversation.id in found else None
+    base = await summary(session, conversation, found)
     return ConversationRead(
         **base.model_dump(),
         instructions=conversation.instructions,
         scenario=await conversations.pinned_scenario_config(session, conversation),
-        transcript=turns_with_replies(transcript),
-        replies=transcript.latency.replies if transcript.latency else [],
+        transcript=turns_with_replies(transcript, latency),
+        replies=latency.replies if latency else [],
         wire_events=transcript.wire_events,
         validity=transcript.validity,
         retried_as=await conversations.retried_as(session, conversation),
@@ -169,6 +174,24 @@ async def list_conversations(
 @router.get("/{conversation_id}")
 async def get_conversation(conversation_id: uuid.UUID, session: SessionDep) -> ConversationRead:
     return await detail(session, await conversations.get_conversation(session, conversation_id))
+
+
+@router.get("/{conversation_id}/evaluation")
+async def get_evaluation(conversation_id: uuid.UUID, session: SessionDep) -> ConversationEvaluation:
+    await conversations.get_conversation(session, conversation_id)
+    evaluation, metrics, items = await results.evaluation(session, conversation_id)
+    return ConversationEvaluation(
+        evaluation=evaluation.state if evaluation else None,
+        failure=evaluation.failure if evaluation else None,
+        metrics=metrics,
+        scenario_verdict=evaluation.scenario_verdict if evaluation else None,
+        conversation_verdict=evaluation.conversation_verdict if evaluation else None,
+        effective_scenario_verdict=evaluation.effective_scenario_verdict if evaluation else None,
+        effective_conversation_verdict=(
+            evaluation.effective_conversation_verdict if evaluation else None
+        ),
+        items=[ItemRead.model_validate(item) for item in items],
+    )
 
 
 @router.get("/{conversation_id}/recording")
