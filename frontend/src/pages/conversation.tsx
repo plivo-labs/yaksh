@@ -5,7 +5,7 @@ import { Link, useParams, useSearchParams } from "react-router";
 
 import { BackButton } from "@/components/back-button";
 import { CallMetricsCard } from "@/components/call-metrics";
-import { CallResultsCard } from "@/components/call-results";
+import { CallResults } from "@/components/call-results";
 import { EndCallDialog } from "@/components/confirm-dialogs";
 import { CopyId } from "@/components/copy-id";
 import { Fact } from "@/components/panel";
@@ -36,6 +36,7 @@ import {
 } from "@/components/ui/message-scroller";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
@@ -79,6 +80,9 @@ export function ConversationPage() {
   const conversation = useConversation(id);
   const agent = useAgent(conversation.data?.agent_id);
   const [ending, setEnding] = useState(false);
+  /** The turn a quote asked to see; `times` repeats the scroll when the same turn is asked
+   * again. */
+  const [shown, setShown] = useState<ShownTurn | null>(null);
   const player = useRef<PlayerHandle>(null);
   const layout = useDefaultLayout({
     id: "truman.conversation",
@@ -109,12 +113,11 @@ export function ConversationPage() {
   const data = conversation.data;
   const active = ACTIVE_STATUSES.includes(data.status);
   const connectedMs = connectedAt(data);
-  const playTurn = data.recording_url
-    ? (turn: number) => {
-        const at = turnStart(data, turn);
-        if (at !== null) player.current?.playFrom(at);
-      }
-    : undefined;
+  const showTurn = (turn: number) => {
+    setShown((current) => ({ index: turn - 1, times: (current?.times ?? 0) + 1 }));
+    const at = turnStart(data, turn);
+    if (data.recording_url && at !== null) player.current?.playFrom(at);
+  };
 
   return (
     <div className="flex h-full flex-col gap-6">
@@ -166,53 +169,76 @@ export function ConversationPage() {
         defaultLayout={layout.defaultLayout}
         onLayoutChanged={layout.onLayoutChanged}
       >
-        <ResizablePanel id="call" minSize="35%">
+        <ResizablePanel id="call" minSize="20%">
           <CallPane
             key={data.id}
             conversation={data}
             player={player}
             start={Number(params.get("t")) || 0}
+            shown={shown}
           />
         </ResizablePanel>
         <ResizableHandle withHandle />
-        <ResizablePanel id="details" defaultSize={320} minSize={260} maxSize="50%">
-          <ScrollArea className="h-full">
-            <div className="flex flex-col gap-6 p-px pr-4 pl-3">
-              <CallResultsCard
-                conversationId={data.id}
-                evaluation={data.evaluation}
-                onTurn={playTurn}
-              />
-              <CallMetricsCard conversationId={data.id} evaluation={data.evaluation} />
-              <ScenarioCard name={data.scenario_name} scenario={data.scenario} />
-              <Card>
-                <CardHeader>
-                  <RailTitle role="Caller" name={data.persona_name} />
-                  <CardDescription>
-                    {LANGUAGE_NAMES[data.language]}, <CallerLine conversation={data} />, up to{" "}
-                    {data.max_turns} turns and {data.max_duration_s}s once connected
-                  </CardDescription>
-                  {noiseLabel(data.background_noise) && (
-                    <CardDescription>
-                      Background noise: {noiseLabel(data.background_noise)}
-                    </CardDescription>
-                  )}
-                </CardHeader>
-                <CardContent className="grid gap-3 text-sm">
-                  <CallerPrompt instructions={data.instructions} />
-                </CardContent>
-              </Card>
-              <WireEvents
-                events={data.wire_events}
-                validity={data.validity}
-                onPlay={
-                  data.recording_url && connectedMs !== undefined
-                    ? (atMs) => player.current?.playFrom(Math.max(0, atMs - connectedMs) / 1000)
-                    : undefined
-                }
-              />
-            </div>
-          </ScrollArea>
+        <ResizablePanel id="details" defaultSize={420} minSize={300} maxSize="80%">
+          <Tabs
+            defaultValue={data.evaluation ? "results" : "scenario"}
+            className="h-full min-h-0 gap-3 pl-3"
+          >
+            <TabsList variant="line" className="w-full shrink-0 justify-start overflow-x-auto">
+              <TabsTrigger value="results">Results</TabsTrigger>
+              <TabsTrigger value="metrics">Metrics</TabsTrigger>
+              <TabsTrigger value="scenario">Scenario</TabsTrigger>
+              <TabsTrigger value="caller">Caller</TabsTrigger>
+              <TabsTrigger value="wire">On the wire</TabsTrigger>
+            </TabsList>
+            <ScrollArea className="min-h-0 flex-1">
+              <div className="p-px pr-4 pb-6">
+                <TabsContent value="results">
+                  <CallResults
+                    conversationId={data.id}
+                    evaluation={data.evaluation}
+                    onTurn={showTurn}
+                  />
+                </TabsContent>
+                <TabsContent value="metrics">
+                  <CallMetricsCard conversationId={data.id} evaluation={data.evaluation} />
+                </TabsContent>
+                <TabsContent value="scenario">
+                  <ScenarioCard name={data.scenario_name} scenario={data.scenario} />
+                </TabsContent>
+                <TabsContent value="caller">
+                  <Card>
+                    <CardHeader>
+                      <RailTitle role="Caller" name={data.persona_name} />
+                      <CardDescription>
+                        {LANGUAGE_NAMES[data.language]}, <CallerLine conversation={data} />, up to{" "}
+                        {data.max_turns} turns and {data.max_duration_s}s once connected
+                      </CardDescription>
+                      {noiseLabel(data.background_noise) && (
+                        <CardDescription>
+                          Background noise: {noiseLabel(data.background_noise)}
+                        </CardDescription>
+                      )}
+                    </CardHeader>
+                    <CardContent className="grid gap-3 text-sm">
+                      <CallerPrompt instructions={data.instructions} />
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+                <TabsContent value="wire">
+                  <WireEvents
+                    events={data.wire_events}
+                    validity={data.validity}
+                    onPlay={
+                      data.recording_url && connectedMs !== undefined
+                        ? (atMs) => player.current?.playFrom(Math.max(0, atMs - connectedMs) / 1000)
+                        : undefined
+                    }
+                  />
+                </TabsContent>
+              </div>
+            </ScrollArea>
+          </Tabs>
         </ResizablePanel>
       </ResizablePanelGroup>
     </div>
@@ -345,14 +371,23 @@ function replyMark(reply: Reply, connectedMs: number): Mark {
   };
 }
 
+/** A turn to bring into view, by index; `times` counts the asks, so asking for the same turn
+ * again scrolls to it again. */
+export interface ShownTurn {
+  index: number;
+  times: number;
+}
+
 export function CallPane({
   conversation,
   player,
   start,
+  shown = null,
 }: {
   conversation: Conversation;
   player: RefObject<PlayerHandle | null>;
   start: number;
+  shown?: ShownTurn | null;
 }) {
   const [heard, setHeard] = useState<number | null>(null);
   const connectedMs = connectedAt(conversation);
@@ -385,6 +420,7 @@ export function CallPane({
         waiting={waitingText(conversation)}
         connectedMs={connectedMs ?? 0}
         heard={heard}
+        shown={shown}
         onPlay={
           conversation.recording_url && connectedMs !== undefined
             ? (seconds) => player.current?.playFrom(seconds)
@@ -609,12 +645,24 @@ function FollowAudio({ index }: { index: number | null }) {
   return null;
 }
 
+/** Brings the turn a quote asked for into view. */
+function ShowTurn({ shown }: { shown: ShownTurn | null }) {
+  const { scrollToMessage } = useMessageScroller();
+  useEffect(() => {
+    if (shown === null) return;
+    const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    scrollToMessage(String(shown.index), { align: "center", behavior: still ? "auto" : "smooth" });
+  }, [shown, scrollToMessage]);
+  return null;
+}
+
 function Transcript({
   turns,
   active,
   waiting,
   connectedMs,
   heard,
+  shown,
   onPlay,
 }: {
   turns: Turn[];
@@ -624,6 +672,8 @@ function Transcript({
   connectedMs: number;
   /** The turn the recording is playing, by index. */
   heard: number | null;
+  /** The turn a quote asked to see. */
+  shown: ShownTurn | null;
   /** Plays the recording from that second; absent while there is no recording. */
   onPlay?: (seconds: number) => void;
 }) {
@@ -650,6 +700,7 @@ function Transcript({
           <MessageScrollerProvider autoScroll>
             <MessageScroller>
               {onPlay && <FollowAudio index={follow ? heard : null} />}
+              <ShowTurn shown={shown} />
               <MessageScrollerViewport className="pr-4">
                 <MessageScrollerContent className="gap-4">
                   {turns.map((turn, index) => {
@@ -689,6 +740,7 @@ function Transcript({
                                 className={cn(
                                   onPlay && "cursor-pointer",
                                   index === heard && "ring-2 ring-ring/60",
+                                  index === shown?.index && "ring-2 ring-status-progress/70",
                                   turn.provenance === "cut" && "line-through opacity-60",
                                   turn.provenance === "unconfirmed" && "opacity-60",
                                 )}

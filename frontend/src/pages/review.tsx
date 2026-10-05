@@ -44,7 +44,7 @@ import {
   VERDICT_TEXT,
   type Verdict,
 } from "@/lib/types";
-import { CallPane, ScenarioCard } from "@/pages/conversation";
+import { CallPane, ScenarioCard, type ShownTurn } from "@/pages/conversation";
 
 /** The review screen, for labelers. It holds a labeler's token, which opens only the review
  * routes, so it stands outside the console and its API token. */
@@ -138,6 +138,7 @@ export function ReviewPage() {
   const seen = params.get("seen") === "1";
   const review = useReview(id, seen);
   const player = useRef<PlayerHandle>(null);
+  const [shown, setShown] = useState<ShownTurn | null>(null);
   if (review.isPending) return <Skeleton className="h-full w-full" />;
   if (review.isError) {
     return (
@@ -149,12 +150,11 @@ export function ReviewPage() {
   }
   const data = review.data;
   const conversation = data.conversation;
-  const playTurn = conversation.recording_url
-    ? (turn: number) => {
-        const at = turnStart(conversation, turn);
-        if (at !== null) player.current?.playFrom(at);
-      }
-    : undefined;
+  const playTurn = (turn: number) => {
+    setShown((current) => ({ index: turn - 1, times: (current?.times ?? 0) + 1 }));
+    const at = turnStart(conversation, turn);
+    if (conversation.recording_url && at !== null) player.current?.playFrom(at);
+  };
   return (
     <div className="flex h-full flex-col gap-4">
       <div className="grid shrink-0 gap-1">
@@ -170,7 +170,7 @@ export function ReviewPage() {
       </div>
       <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[minmax(0,1fr)_400px]">
         <div className="min-h-0">
-          <CallPane conversation={conversation} player={player} start={0} />
+          <CallPane conversation={conversation} player={player} start={0} shown={shown} />
         </div>
         <ScrollArea className="min-h-0">
           <div className="flex flex-col gap-6 p-px pr-4">
