@@ -322,8 +322,8 @@ function ItemLabel({
             <span
               className={
                 agrees(item.label.answer, item.label.reason, item.machine)
-                  ? "text-success-tag-foreground"
-                  : "text-warning-foreground"
+                  ? "text-status-success-text"
+                  : "text-status-warning-text"
               }
             >
               {agrees(item.label.answer, item.label.reason, item.machine)

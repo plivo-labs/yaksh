@@ -192,7 +192,7 @@ export function SegmentBar({ counts, label }: { counts: Record<string, number>; 
       {SEGMENT_ORDER.filter((key) => counts[key]).map((key) => (
         <span
           key={key}
-          className={cn("h-full first:rounded-l-full last:rounded-r-full", SEGMENT[key])}
+          className={cn("h-full first:rounded-l-sm last:rounded-r-sm", SEGMENT[key])}
           style={{ width: `${(counts[key] / total) * 100}%` }}
         />
       ))}

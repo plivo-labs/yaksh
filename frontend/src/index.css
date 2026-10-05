@@ -19,6 +19,19 @@
     "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
+/* Status as text on the canvas. The tag inks read on white, but in dark they are near white,
+ * made for the tag fills, so dark text takes the solid status colors. */
+:root {
+  --status-success-text: var(--success-tag-foreground);
+  --status-warning-text: var(--warning-foreground);
+  --status-danger-text: var(--danger-foreground);
+}
+.dark {
+  --status-success-text: var(--status-success);
+  --status-warning-text: var(--status-warning);
+  --status-danger-text: var(--status-danger);
+}
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
@@ -70,6 +83,9 @@
   --color-status-danger: hsl(var(--status-danger));
   --color-status-progress: hsl(var(--status-progress));
   --color-status-neutral: hsl(var(--status-neutral));
+  --color-status-success-text: hsl(var(--status-success-text));
+  --color-status-warning-text: hsl(var(--status-warning-text));
+  --color-status-danger-text: hsl(var(--status-danger-text));
 
   /* The surface ladder (bg), hover fills (hv) and strokes (st). */
   --color-bg1: hsl(var(--bg1));

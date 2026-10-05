@@ -266,14 +266,16 @@ function GroupFilter({ run }: { run: Run }) {
         <Button
           key={group.value}
           type="button"
-          variant={chosen === group.value ? "secondary" : "ghost"}
+          variant={chosen === group.value ? "tertiary" : "ghost"}
           size="sm"
           aria-pressed={chosen === group.value}
           onClick={() => choose(group.value)}
           className="tabular-nums"
         >
           {group.label}
-          <span className="text-muted-foreground">{run.counts[group.value]}</span>
+          <span className={chosen === group.value ? undefined : "text-muted-foreground"}>
+            {run.counts[group.value]}
+          </span>
         </Button>
       ))}
     </div>

@@ -408,8 +408,8 @@ function Callout({ tone, children }: { tone: "warn" | "danger"; children: ReactN
   return (
     <p
       className={cn(
-        "rounded-md px-2.5 py-1.5 text-xs-400",
-        tone === "warn" ? "bg-warning text-warning-foreground" : "bg-danger text-danger-foreground",
+        "border-l-2 py-0.5 pl-2.5 text-xs-400 text-foreground",
+        tone === "warn" ? "border-status-warning" : "border-status-danger",
       )}
     >
       {children}

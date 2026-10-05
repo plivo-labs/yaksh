@@ -45,8 +45,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import {
-  BAND_FILL,
   BAND_TEXT,
+  BAND_WASH,
   clock,
   duration,
   noiseLabel,
@@ -370,7 +370,7 @@ function replyMark(reply: Reply, connectedMs: number): Mark {
     to,
     label: seconds(wait),
     title: `Agent answered after ${seconds(wait)}`,
-    fill: BAND_FILL[band],
+    fill: BAND_WASH[band],
     text: BAND_TEXT[band],
   };
 }
@@ -772,11 +772,11 @@ function Transcript({
                               {typeof turn.response_ms === "number" && (
                                 <ResponseTime ms={turn.response_ms} />
                               )}
-                              {turn.talked_over && <Badge>talked over</Badge>}
-                              {turn.scripted && <Badge>fixed line</Badge>}
-                              {turn.provenance === "cut" && <Badge>cut off</Badge>}
+                              {turn.talked_over && <Badge>Talked over</Badge>}
+                              {turn.scripted && <Badge>Fixed line</Badge>}
+                              {turn.provenance === "cut" && <Badge>Cut off</Badge>}
                               {turn.provenance === "unconfirmed" && (
-                                <Badge>not confirmed played</Badge>
+                                <Badge>Not confirmed played</Badge>
                               )}
                             </MessageHeader>
                             <Bubble variant={turn.role}>
