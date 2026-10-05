@@ -84,7 +84,7 @@ export function VoicesPage() {
             };
             return (
               <li key={item.id}>
-                <Card className="relative h-full transition-colors has-[[data-slot=card-link]:focus-visible]:ring-2 has-[[data-slot=card-link]:focus-visible]:ring-ring/50 hover:bg-muted/40 has-[[data-slot=card-link]:active]:bg-muted/70">
+                <Card className="relative h-full transition-colors has-[[data-slot=card-link]:focus-visible]:ring-2 has-[[data-slot=card-link]:focus-visible]:ring-ring/50 hover:bg-hv1 has-[[data-slot=card-link]:active]:bg-muted/70">
                   <CardHeader>
                     <CardTitle>
                       <button
@@ -129,7 +129,7 @@ export function VoicesPage() {
                     ))}
                   </CardContent>
                   {preview.error(item.id) && (
-                    <CardContent className="relative z-10 text-sm text-destructive">
+                    <CardContent className="relative z-10 text-p-400 text-destructive">
                       {preview.error(item.id)}
                     </CardContent>
                   )}

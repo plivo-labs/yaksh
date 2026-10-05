@@ -136,7 +136,8 @@ export function Shell() {
         position="bottom-right"
         toastOptions={{
           classNames: {
-            toast: "!rounded-lg !border-border !bg-popover !text-popover-foreground !font-sans",
+            toast:
+              "!rounded-lg !border-border !bg-popover !text-popover-foreground !font-sans !shadow-2",
             description: "!text-muted-foreground",
           },
         }}

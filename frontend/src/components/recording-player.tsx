@@ -146,7 +146,7 @@ export function LiveWaveform({ view }: { view: LiveView }) {
   return (
     <div className="grid gap-3">
       <div className="grid grid-cols-[3rem_minmax(0,1fr)] gap-x-2">
-        <div className="grid content-start gap-2 pt-5 text-xs text-muted-foreground">
+        <div className="grid content-start gap-2 pt-5 text-xs-400 text-muted-foreground">
           {LANES.map((lane) => (
             <span key={lane} className="flex h-10 items-center">
               {lane}
@@ -174,7 +174,7 @@ export function LiveWaveform({ view }: { view: LiveView }) {
           />
         </div>
       </div>
-      <p className="text-sm text-muted-foreground tabular-nums">Live, {clock(played * 1000)}</p>
+      <p className="text-p-400 text-muted-foreground tabular-nums">Live, {clock(played * 1000)}</p>
     </div>
   );
 }
@@ -225,10 +225,10 @@ export function RecordingPlayer({
 }) {
   const recording = useRecording(url);
   if (url === null) {
-    return <p className="text-sm text-muted-foreground">Available once the call has ended.</p>;
+    return <p className="text-p-400 text-muted-foreground">Available once the call has ended.</p>;
   }
   if (recording.isError) {
-    return <p className="text-sm text-destructive">The recording did not load.</p>;
+    return <p className="text-p-400 text-destructive">The recording did not load.</p>;
   }
   if (recording.isPending) return <Skeleton className="h-40 w-full" />;
   return (
@@ -513,7 +513,7 @@ function Player({
         onTimeUpdate={(event) => onTime?.(event.currentTarget.currentTime)}
       />
       <div className="grid grid-cols-[3rem_minmax(0,1fr)] gap-x-2">
-        <div className="grid content-start gap-2 pt-5 text-xs text-muted-foreground">
+        <div className="grid content-start gap-2 pt-5 text-xs-400 text-muted-foreground">
           {lanes.map((_, index) => (
             <span key={index} className="flex h-10 items-center">
               {stereo ? LANES[index] : "Call"}
@@ -573,7 +573,7 @@ function Player({
                 />
                 <span
                   className={cn(
-                    "absolute top-0.5 left-1/2 rounded-sm bg-card px-0.5 font-mono text-[11px] leading-4 whitespace-nowrap tabular-nums",
+                    "absolute top-0.5 left-1/2 rounded-sm bg-card px-0.5 text-xxs-600 whitespace-nowrap tabular-nums",
                     mark.text,
                   )}
                   style={{ translate: inside((mark.from + mark.to) / 2 / duration) }}
@@ -591,7 +591,7 @@ function Player({
                 <span className="absolute inset-y-0 left-0 w-px bg-foreground/25" />
                 <span
                   ref={hint}
-                  className="absolute top-0 left-0 z-10 rounded-sm bg-popover px-1.5 py-0.5 text-[11px] leading-none whitespace-nowrap tabular-nums shadow-sm ring-1 ring-border"
+                  className="absolute top-0 left-0 z-10 rounded-sm bg-popover px-1.5 py-0.5 text-xxs-600 whitespace-nowrap tabular-nums shadow-1 ring-1 ring-border"
                   style={{ translate: `${shift}px` }}
                 >
                   {clock(hover.fraction * duration * 1000)}
@@ -611,7 +611,7 @@ function Player({
         <Button size="icon-sm" aria-label={playing ? "Pause" : "Play"} onClick={toggle}>
           {playing ? <Pause /> : <Play />}
         </Button>
-        <span className="ml-2 text-sm tabular-nums">
+        <span className="ml-2 text-p-400 tabular-nums">
           {clock(time * 1000)}
           <span className="text-muted-foreground"> / {clock(duration * 1000)}</span>
         </span>
@@ -679,7 +679,7 @@ function Player({
             </Hint>
             <PopoverContent align="end" className="w-64">
               <div className="grid gap-1.5">
-                <span className="text-xs text-muted-foreground">Volume</span>
+                <span className="text-xs-400 text-muted-foreground">Volume</span>
                 <div className="flex items-center gap-2">
                   <Button
                     variant="ghost"
@@ -699,7 +699,7 @@ function Player({
                       onValueChange={(next) => route({ volume: next as number })}
                     />
                   </div>
-                  <span className="w-10 text-right text-sm tabular-nums">
+                  <span className="w-10 text-right text-p-400 tabular-nums">
                     {Math.round(volume * 100)}%
                   </span>
                 </div>
@@ -821,7 +821,7 @@ const Tile = memo(function Tile({
         {ticks.map((tick) => (
           <span
             key={tick}
-            className="absolute top-0 h-full border-l pl-1 text-[11px] leading-4 text-muted-foreground tabular-nums"
+            className="absolute top-0 h-full border-l pl-1 text-xxs-400 leading-4 text-muted-foreground tabular-nums"
             style={{ left: `${((tick - index * span) / span) * 100}%` }}
           >
             {stamp(tick)}
@@ -855,7 +855,7 @@ const Lanes = memo(function Lanes({
           viewBox={`0 0 ${lane.length} 2`}
           preserveAspectRatio="none"
           aria-hidden
-          className={`h-10 w-full fill-current transition-opacity duration-150 ${index === 0 ? "text-foreground" : "text-brand-text"} ${isMuted(listen, index, peaks.length) ? "opacity-30" : ""}`}
+          className={`h-10 w-full fill-current transition-opacity duration-150 ${index === 0 ? "text-foreground" : "text-chart-1"} ${isMuted(listen, index, peaks.length) ? "opacity-30" : ""}`}
         >
           {lane.map((peak, bar) => {
             const height = Math.max(peak, 0.02);

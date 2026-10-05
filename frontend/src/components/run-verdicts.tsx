@@ -207,7 +207,7 @@ function ScenarioList({ verdicts }: { verdicts: RunVerdicts }) {
       </div>
       <div
         aria-hidden
-        className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-6 border-b px-5 pb-2 text-label text-muted-foreground sm:grid-cols-[minmax(0,1fr)_auto_8rem]"
+        className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-6 border-b px-5 pb-2 text-s-500 text-muted-foreground sm:grid-cols-[minmax(0,1fr)_auto_8rem]"
       >
         <span className="pl-6">Scenario</span>
         <span>{repeats === 1 ? "Call" : `Repeats 1 to ${repeats}`}</span>
@@ -231,9 +231,9 @@ function ScenarioList({ verdicts }: { verdicts: RunVerdicts }) {
 }
 
 const CHIP: Record<Verdict, string> = {
-  pass: "bg-status-success/14 text-status-success-text",
-  fail: "bg-status-danger/12 text-status-danger-text",
-  not_scored: "bg-status-warning/16 text-status-warning-text",
+  pass: "bg-success-tag text-success-tag-foreground",
+  fail: "bg-danger text-danger-foreground",
+  not_scored: "bg-warning text-warning-foreground",
 };
 
 const CHIP_OUTCOME: Record<Verdict, Outcome> = {
@@ -270,7 +270,7 @@ function ScenarioRow({
   const rate = scenario.scored ? scenario.passes / scenario.scored : 0;
   return (
     <li>
-      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-6 px-5 py-2.5 transition-colors duration-150 hover:bg-muted/40 sm:grid-cols-[minmax(0,1fr)_auto_8rem]">
+      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-6 px-5 py-2.5 transition-colors duration-150 hover:bg-hv1 sm:grid-cols-[minmax(0,1fr)_auto_8rem]">
         <button
           type="button"
           aria-expanded={open}
@@ -291,9 +291,9 @@ function ScenarioRow({
             </span>
             <span className="flex flex-wrap items-center gap-x-2 text-xs-400 text-muted-foreground">
               <span>{CATEGORY_LABELS[scenario.category]}</span>
-              {mixed && <span className="text-status-warning-text">Passed and failed</span>}
+              {mixed && <span className="text-warning-foreground">Passed and failed</span>}
               {failing.length > 0 && (
-                <span className="text-status-danger-text">
+                <span className="text-danger-foreground">
                   {failing.length} {failing.length === 1 ? "criterion" : "criteria"} failed
                 </span>
               )}
@@ -431,7 +431,7 @@ function HowJudged({
     .join(" · ");
   return (
     <details className="group border-t">
-      <summary className="flex cursor-pointer list-none items-center gap-2 px-5 py-3 outline-none select-none hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-inset [&::-webkit-details-marker]:hidden">
+      <summary className="flex cursor-pointer list-none items-center gap-2 px-5 py-3 outline-none select-none hover:bg-hv1 focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-inset [&::-webkit-details-marker]:hidden">
         <ChevronRight
           aria-hidden
           className="size-4 shrink-0 text-muted-foreground transition-transform duration-150 ease-out group-open:rotate-90 motion-reduce:transition-none"
@@ -495,7 +495,7 @@ function HowJudged({
                   <span className="text-s-400">{caller.persona}</span>
                   <span className="text-xs-400 text-muted-foreground tabular-nums">
                     <span
-                      className={cn(caller.likely > 0 && "font-medium text-status-warning-text")}
+                      className={cn(caller.likely > 0 && "font-medium text-warning-foreground")}
                     >
                       {caller.likely} likely
                     </span>

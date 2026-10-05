@@ -109,7 +109,7 @@ export function AgentsPage() {
           aria-busy={agents.isFetching}
           className={`transition-opacity duration-150 ${agents.isPlaceholderData ? "opacity-60" : ""}`}
         >
-          <div className={`${ROW} hidden border-b pb-3 text-label text-muted-foreground md:grid`}>
+          <div className={`${ROW} hidden border-b pb-3 text-s-500 text-muted-foreground md:grid`}>
             <SortHeader label="Agent" field="name" sort={sort} onSort={sortBy} />
             <SortHeader label="Language" field="language" sort={sort} onSort={sortBy} />
             <span>Scenarios</span>
@@ -131,7 +131,7 @@ export function AgentsPage() {
                 </li>
               ))
             ) : agents.data.items.length === 0 ? (
-              <li className="px-3 py-8 text-sm text-muted-foreground">
+              <li className="px-3 py-8 text-p-400 text-muted-foreground">
                 No agents match “{search}”.
               </li>
             ) : (
@@ -151,14 +151,14 @@ function AgentRow({ agent }: { agent: AgentSummary }) {
   const call = last.data;
   return (
     <li
-      className={`${ROW} group relative py-3.5 transition-colors duration-150 hover:bg-muted/60 has-[a:active]:bg-muted has-[a:focus-visible]:bg-muted has-[a:focus-visible]:ring-2 has-[a:focus-visible]:ring-ring/50 has-[a:focus-visible]:ring-inset`}
+      className={`${ROW} group relative py-3.5 transition-colors duration-150 hover:bg-hv1 has-[a:active]:bg-hv2 has-[a:focus-visible]:bg-hv1 has-[a:focus-visible]:ring-2 has-[a:focus-visible]:ring-ring/50 has-[a:focus-visible]:ring-inset`}
     >
       <div className="min-w-0">
         <div className="grid min-w-0 gap-0.5">
           <Link
             to={`/agents/${agent.id}`}
             title={agent.name}
-            className="truncate text-s-500 outline-none after:absolute after:inset-0 transition-colors group-hover:text-brand-text"
+            className="truncate text-s-500 outline-none after:absolute after:inset-0 transition-colors"
           >
             {agent.name}
           </Link>
@@ -171,7 +171,7 @@ function AgentRow({ agent }: { agent: AgentSummary }) {
           <Skeleton className="h-4 w-12" />
         ) : (
           <>
-            <span className="font-mono">{scenarios.data}</span>{" "}
+            <span className="tabular-nums">{scenarios.data}</span>{" "}
             <span className="text-muted-foreground">
               {scenarios.data === 1 ? "scenario" : "scenarios"}
             </span>
@@ -200,7 +200,7 @@ function AgentRow({ agent }: { agent: AgentSummary }) {
           <span className="text-muted-foreground">Never called</span>
         )}
       </div>
-      <div className="col-span-2 font-mono text-xs-400 text-muted-foreground md:col-span-1">
+      <div className="col-span-2 text-xs-400 text-muted-foreground md:col-span-1">
         <span className="md:hidden">Updated </span>
         <RelativeTime iso={agent.updated_at} />
       </div>

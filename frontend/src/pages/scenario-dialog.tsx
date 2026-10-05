@@ -111,7 +111,7 @@ function AddRow({
         {children}
       </Button>
       {count >= limit && (
-        <span className="text-sm text-muted-foreground">The limit is {limit}.</span>
+        <span className="text-p-400 text-muted-foreground">The limit is {limit}.</span>
       )}
     </div>
   );

@@ -85,7 +85,10 @@ function GenerationNotice({
 }) {
   const running = progress.status === "running";
   return (
-    <div role="status" className="flex items-center gap-3 border-b bg-muted/40 px-5 py-3 text-sm">
+    <div
+      role="status"
+      className="flex items-center gap-3 border-b bg-muted/40 px-5 py-3 text-p-400"
+    >
       {running && <Spinner />}
       <p
         key={progress.status}
@@ -211,11 +214,11 @@ export function AgentScenarios({ agent }: { agent: Agent }) {
             <Skeleton className="h-11" />
           </div>
         ) : scenarios.isError ? (
-          <p role="alert" className="px-5 py-4 text-sm text-destructive">
+          <p role="alert" className="px-5 py-4 text-p-400 text-destructive">
             {scenarios.error.message}
           </p>
         ) : items.length === 0 ? (
-          <p className="px-5 py-6 text-sm text-muted-foreground">
+          <p className="px-5 py-6 text-p-400 text-muted-foreground">
             No scenarios yet. Generate them from what Truman knows about the agent, or write one.
           </p>
         ) : (
@@ -276,7 +279,7 @@ export function AgentScenarios({ agent }: { agent: Agent }) {
                         </DropdownMenuContent>
                       </DropdownMenu>
                     ) : (
-                      <p className="text-sm text-muted-foreground">
+                      <p className="text-p-400 text-muted-foreground">
                         Select at most {MAX_BULK} to change or delete them at once.
                       </p>
                     )}
@@ -317,7 +320,7 @@ export function AgentScenarios({ agent }: { agent: Agent }) {
                 <li
                   key={item.id}
                   className={cn(
-                    "flex items-center gap-3 pr-4 pl-5 transition-colors duration-150 hover:bg-muted/60 has-[[data-slot=scenario-open]:active]:bg-muted",
+                    "flex items-center gap-3 pr-4 pl-5 transition-colors duration-150 hover:bg-hv1 has-[[data-slot=scenario-open]:active]:bg-muted",
                     generation.newIds.has(item.id) && RISE,
                   )}
                 >

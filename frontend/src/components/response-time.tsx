@@ -7,7 +7,7 @@ export function ResponseTime({ ms, className }: { ms: number; className?: string
   return (
     <span
       className={cn(
-        "rounded-sm px-1.5 font-mono text-xs leading-5 tabular-nums",
+        "rounded-sm px-1.5 text-xs-500 leading-5 tabular-nums",
         BAND_FILL[band],
         BAND_TEXT[band],
         className,

@@ -159,7 +159,7 @@ function LineState({
   if (pending) return <Skeleton className="h-6 w-56" />;
   if (!call) {
     return (
-      <div className="flex items-center gap-2 text-sm">
+      <div className="flex items-center gap-2 text-p-400">
         <StatusLabel tone="off">Idle</StatusLabel>
         <span className="text-muted-foreground">Never called</span>
       </div>
@@ -175,7 +175,7 @@ function LineState({
   return (
     <Link
       to={`/conversations/${call.id}`}
-      className="-mx-2 flex items-center gap-2 rounded-md px-2 py-1 text-s-400 outline-none transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring/50"
+      className="-mx-2 flex items-center gap-2 rounded-md px-2 py-1 text-s-400 outline-none transition-colors hover:bg-hv1 focus-visible:ring-2 focus-visible:ring-ring/50"
     >
       <Settle value={active ? state : "Idle"}>
         <StatusLabel
@@ -256,8 +256,8 @@ function Settings({ agent }: { agent: Agent }) {
         </Fact>
         {agent.outbound && <OutboundFacts outbound={agent.outbound} />}
         <div className="grid gap-0.5">
-          <dt className="text-xs text-muted-foreground">Brief</dt>
-          <dd className="text-sm whitespace-pre-wrap">
+          <dt className="text-xs-400 text-muted-foreground">Brief</dt>
+          <dd className="text-p-400 whitespace-pre-wrap">
             {agent.brief ?? <span className="text-muted-foreground">None</span>}
           </dd>
         </div>
@@ -294,8 +294,8 @@ function OutboundFacts({ outbound }: { outbound: OutboundSettings }) {
   return (
     <>
       <div className="grid gap-0.5">
-        <dt className="text-xs text-muted-foreground">Start request</dt>
-        <dd className="text-sm break-all">
+        <dt className="text-xs-400 text-muted-foreground">Start request</dt>
+        <dd className="text-p-400 break-all">
           <span className="text-muted-foreground">POST </span>
           {trigger.url}
         </dd>
@@ -308,9 +308,9 @@ function OutboundFacts({ outbound }: { outbound: OutboundSettings }) {
         )}
       </Fact>
       <div className="grid min-w-0 gap-1">
-        <dt className="text-xs text-muted-foreground">Request body</dt>
+        <dt className="text-xs-400 text-muted-foreground">Request body</dt>
         <dd className="min-w-0">
-          <pre className="max-h-48 overflow-auto rounded-md bg-muted p-3 font-mono text-xs leading-relaxed">
+          <pre className="max-h-48 overflow-auto rounded-md bg-muted p-3 font-mono text-xs-400 leading-relaxed">
             {JSON.stringify(trigger.body, null, 2)}
           </pre>
         </dd>

@@ -32,7 +32,7 @@ function PopoverContent({
         <PopoverPrimitive.Popup
           data-slot="popover-content"
           className={cn(
-            "z-50 flex w-72 origin-(--transform-origin) flex-col gap-4 rounded-lg border bg-popover p-4 text-sm text-popover-foreground shadow-lg outline-hidden transition-[opacity,scale] duration-150 ease-out data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0 motion-reduce:transition-opacity",
+            "z-50 flex w-72 origin-(--transform-origin) flex-col gap-4 rounded-lg border bg-popover p-4 text-p-400 text-popover-foreground shadow-1 outline-hidden transition-[opacity,scale] duration-150 ease-out data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0 motion-reduce:transition-opacity",
             className,
           )}
           {...props}
@@ -46,7 +46,7 @@ function PopoverHeader({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="popover-header"
-      className={cn("flex flex-col gap-1 text-sm", className)}
+      className={cn("flex flex-col gap-1 text-p-400", className)}
       {...props}
     />
   );
@@ -56,7 +56,7 @@ function PopoverTitle({ className, ...props }: PopoverPrimitive.Title.Props) {
   return (
     <PopoverPrimitive.Title
       data-slot="popover-title"
-      className={cn("text-base font-medium", className)}
+      className={cn("text-p-400 font-medium", className)}
       {...props}
     />
   );

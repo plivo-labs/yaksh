@@ -46,7 +46,7 @@ export function RunList({
   const grid = cn(showAgent ? COLUMNS.withAgent : COLUMNS.withoutAgent, GUTTER[place]);
   if (query.error) {
     return (
-      <p role="alert" className={cn(GUTTER[place], "py-4 text-sm text-destructive")}>
+      <p role="alert" className={cn(GUTTER[place], "py-4 text-p-400 text-destructive")}>
         Could not load the runs: {query.error.message}
       </p>
     );
@@ -60,7 +60,7 @@ export function RunList({
       )}
     >
       <div
-        className={cn(grid, "hidden border-b py-3 text-label text-muted-foreground @3xl/runs:grid")}
+        className={cn(grid, "hidden border-b py-3 text-s-500 text-muted-foreground @3xl/runs:grid")}
       >
         <span>Status</span>
         <span>Run</span>
@@ -77,7 +77,7 @@ export function RunList({
             </li>
           ))
         ) : query.data.items.length === 0 ? (
-          <li className={cn(GUTTER[place], "py-6 text-sm text-muted-foreground")}>{empty}</li>
+          <li className={cn(GUTTER[place], "py-6 text-p-400 text-muted-foreground")}>{empty}</li>
         ) : (
           query.data.items.map((run) => (
             <RunRow key={run.id} run={run} grid={grid} showAgent={showAgent} />
@@ -101,7 +101,7 @@ function RunRow({ run, grid, showAgent }: { run: RunSummary; grid: string; showA
     <li
       className={cn(
         grid,
-        "group relative py-3.5 transition-colors duration-150 hover:bg-muted/60 has-[a:active]:bg-muted has-[a:focus-visible]:bg-muted has-[a:focus-visible]:ring-2 has-[a:focus-visible]:ring-ring/50 has-[a:focus-visible]:ring-inset",
+        "group relative py-3.5 transition-colors duration-150 hover:bg-hv1 has-[a:active]:bg-hv2 has-[a:focus-visible]:bg-hv1 has-[a:focus-visible]:ring-2 has-[a:focus-visible]:ring-ring/50 has-[a:focus-visible]:ring-inset",
       )}
     >
       <div>
@@ -112,7 +112,7 @@ function RunRow({ run, grid, showAgent }: { run: RunSummary; grid: string; showA
           to={`/runs/${run.id}`}
           aria-label={label(run)}
           title={runTitle(run)}
-          className="truncate text-s-500 outline-none transition-colors after:absolute after:inset-0 group-hover:text-brand-text"
+          className="truncate text-s-500 outline-none transition-colors after:absolute after:inset-0"
         >
           {runTitle(run)}
         </Link>
@@ -140,11 +140,11 @@ function RunRow({ run, grid, showAgent }: { run: RunSummary; grid: string; showA
           <span className="text-muted-foreground">version {run.agent_version}</span>
         </div>
       )}
-      <div className="hidden font-mono text-xs-400 tabular-nums @3xl/runs:block">{finished}</div>
+      <div className="hidden text-xs-400 tabular-nums @3xl/runs:block">{finished}</div>
       <div className="hidden text-s-400 @3xl/runs:block">
         {run.response_p90_ms !== null && <ResponseTime ms={run.response_p90_ms} />}
       </div>
-      <div className="hidden font-mono text-xs-400 @3xl/runs:block">{started}</div>
+      <div className="hidden text-xs-400 text-muted-foreground @3xl/runs:block">{started}</div>
     </li>
   );
 }

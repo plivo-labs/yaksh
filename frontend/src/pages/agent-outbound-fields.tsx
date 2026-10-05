@@ -73,7 +73,7 @@ export function OutboundFields({
                     <Input
                       aria-label={`Header ${index + 1} value`}
                       placeholder="Bearer {{env.TRUMAN_TRIGGER_KEY}}"
-                      className="flex-1 font-mono text-xs"
+                      className="flex-1 font-mono text-xs-400"
                       value={header.value}
                       onChange={(e) => setHeader(index, { value: e.target.value })}
                     />
@@ -111,7 +111,7 @@ export function OutboundFields({
             <Textarea
               id="trigger_body"
               rows={8}
-              className="font-mono text-xs"
+              className="font-mono text-xs-400"
               aria-invalid={Boolean(problems.body)}
               aria-describedby={problems.body ? "trigger_body-error" : undefined}
               value={draft.body}
@@ -193,7 +193,7 @@ export function OutboundFields({
                 value={draft.dial_window}
                 onChange={(e) => set("dial_window", e.target.value)}
               />
-              <span className="text-sm text-muted-foreground">seconds</span>
+              <span className="text-p-400 text-muted-foreground">seconds</span>
             </div>
             {problems.dial_window ? (
               <FieldError id="dial_window-error">{problems.dial_window}</FieldError>

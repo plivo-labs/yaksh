@@ -181,7 +181,7 @@ export function GenerateDialog({
                       />
                       <label
                         htmlFor={`generate-document-${entry.document_id}`}
-                        className="min-w-0 flex-1 truncate text-sm"
+                        className="min-w-0 flex-1 truncate text-p-400"
                       >
                         {entry.name}
                       </label>
@@ -200,7 +200,7 @@ export function GenerateDialog({
                 A job or question gets a checked persona again only after it got all of them.
               </FieldDescription>
               {personas.isPending && (
-                <p className="text-sm text-muted-foreground">Loading personas</p>
+                <p className="text-p-400 text-muted-foreground">Loading personas</p>
               )}
               {personas.isError && (
                 <FieldError>Could not load the personas: {personas.error.message}</FieldError>
@@ -215,7 +215,7 @@ export function GenerateDialog({
                     />
                     <label
                       htmlFor={`generate-persona-${persona.id}`}
-                      className="min-w-0 flex-1 truncate text-sm"
+                      className="min-w-0 flex-1 truncate text-p-400"
                     >
                       {persona.name}
                     </label>

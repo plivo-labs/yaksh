@@ -281,7 +281,7 @@ function Text({
     placeholder,
     "aria-invalid": Boolean(problem),
     "aria-describedby": problem ? `${id}-error` : undefined,
-    className: mono ? "font-mono text-xs" : undefined,
+    className: mono ? "font-mono text-xs-400" : undefined,
   };
   return (
     <Field>

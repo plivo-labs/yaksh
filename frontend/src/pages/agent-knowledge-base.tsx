@@ -256,7 +256,7 @@ export function KnowledgeBasePanel({
         action={addButtons}
         notice={
           progress && (
-            <p className="flex items-center gap-2 px-5 pt-4 text-sm text-muted-foreground">
+            <p className="flex items-center gap-2 px-5 pt-4 text-p-400 text-muted-foreground">
               <Spinner />
               {progress}
             </p>
@@ -272,8 +272,8 @@ export function KnowledgeBasePanel({
                 <Upload className="size-4" />
               </span>
               <div className="grid gap-1">
-                <p className="text-sm font-medium">Drop PDF, TXT or MD files here</p>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-p-400 font-medium">Drop PDF, TXT or MD files here</p>
+                <p className="text-p-400 text-muted-foreground">
                   Add the FAQ, policies or product facts the agent answers from.
                 </p>
               </div>
@@ -284,7 +284,7 @@ export function KnowledgeBasePanel({
             {documents.map((document) => (
               <li
                 key={document.document_id}
-                className="flex items-center gap-3 px-5 py-3.5 transition-colors duration-150 hover:bg-muted/60 has-[>button:active]:bg-muted"
+                className="flex items-center gap-3 px-5 py-3.5 transition-colors duration-150 hover:bg-hv1 has-[>button:active]:bg-muted"
               >
                 <FileText className="size-4 shrink-0 text-muted-foreground" />
                 <button
@@ -297,7 +297,7 @@ export function KnowledgeBasePanel({
                     {details(document)}
                   </span>
                   {Boolean(document.empty_pages) && (
-                    <span className="text-xs text-status-warning">
+                    <span className="text-xs-400 text-status-warning">
                       {document.empty_pages} of {document.pages} pages had no text (scanned?)
                     </span>
                   )}
@@ -341,7 +341,7 @@ export function KnowledgeBasePanel({
             aria-hidden
             className="pointer-events-none absolute inset-0 z-10 grid place-items-center rounded-lg border-2 border-dashed border-primary/40 bg-background/85 backdrop-blur-[2px] transition-opacity duration-150 ease-out starting:opacity-0"
           >
-            <p className="flex items-center gap-2 px-6 text-sm font-medium">
+            <p className="flex items-center gap-2 px-6 text-p-400 font-medium">
               <Upload className="size-4 shrink-0" />
               {refusal ?? "Drop to add to the knowledge base"}
             </p>
@@ -452,7 +452,7 @@ function DocumentSheet({
             ) : (
               <Textarea
                 id="document-text"
-                className="h-full resize-none font-mono text-xs"
+                className="h-full resize-none font-mono text-xs-400"
                 aria-invalid={tooLong}
                 disabled={working}
                 value={shownText}
