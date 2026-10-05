@@ -405,7 +405,6 @@ async def call_request(
         max_turns=conversation.max_turns,
         goodbye=LANGUAGES[conversation.language].goodbye,
         agent_data=ScenarioConfig.model_validate(scenario_version.config).agent_data,
-        pickup=LANGUAGES[conversation.language].pickup,
         accept_calls_until=conversation.dial_deadline_at,
         output_dir=settings.data_dir / str(conversation.id),
     )

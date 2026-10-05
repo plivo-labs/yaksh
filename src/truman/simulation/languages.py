@@ -12,8 +12,6 @@ class LanguagePolicy:
     instruction: str
     nudge: str
     sample: str
-    pickup: str
-    """What a person says on answering the phone."""
     goodbye: str
     """What the caller says when it has answered its most agent turns."""
 
@@ -23,7 +21,6 @@ LANGUAGES: dict[Language, LanguagePolicy] = {
         "Speak English.",
         "Hello? Are you still there?",
         "Hi, I'm calling about my booking for next Tuesday. Can you check it for me?",
-        "Hello?",
         "Okay, thanks. I have to go now. Bye.",
     ),
     Language.HINGLISH: LanguagePolicy(
@@ -31,7 +28,6 @@ LANGUAGES: dict[Language, LanguagePolicy] = {
         "confirm kept in English.",
         "हेलो? आप वहाँ हैं?",
         "नमस्ते, मुझे next Tuesday की booking के बारे में बात करनी है। क्या आप check कर सकते हैं?",
-        "हेलो?",
         "ठीक है, thank you. मुझे अब जाना होगा, bye.",
     ),
 }

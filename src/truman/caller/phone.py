@@ -859,12 +859,8 @@ class PhoneCaller:
 
         @transport.event_handler("on_client_connected")
         async def on_connected(_transport: Any, _socket: Any) -> None:
-            if request.agent.agent_speaks_first:
-                return
-            if request.agent.outbound is None:
+            if not request.agent.agent_speaks_first:
                 await persona.speak_first()
-            else:
-                await persona.say(request.pickup)
 
         @transport.event_handler("on_client_disconnected")
         async def on_disconnected(_transport: Any, _socket: Any) -> None:

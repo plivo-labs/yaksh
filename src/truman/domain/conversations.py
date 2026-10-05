@@ -274,8 +274,6 @@ class CallRequest(BaseModel):
     up."""
     goodbye: str
     agent_data: list[Fact] = []
-    pickup: str = "Hello?"
-    """What the caller says on answering an outbound agent that waits for the callee."""
     accept_calls_until: datetime | None = None
     """Outbound: when the window for the agent's call closes."""
     output_dir: Path
