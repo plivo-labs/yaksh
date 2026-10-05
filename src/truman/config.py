@@ -52,7 +52,7 @@ class Settings(BaseSettings):
     openai_base_url: str = Field(
         default="https://api.openai.com/v1", validation_alias="OPENAI_BASE_URL"
     )
-    persona_llm_model: str = Field(default="gpt-4.1", validation_alias="PERSONA_LLM_MODEL")
+    persona_llm_model: str = Field(default="gpt-6-luna", validation_alias="PERSONA_LLM_MODEL")
     persona_llm_reasoning_effort: str | None = Field(
         default=None, validation_alias="PERSONA_LLM_REASONING_EFFORT"
     )
