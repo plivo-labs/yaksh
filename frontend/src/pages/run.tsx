@@ -70,7 +70,11 @@ export function RunPage() {
   return (
     <div className="grid gap-6">
       <Overview run={data} />
-      <RunVerdictsPanel runId={data.id} active={ACTIVE_RUN_STATUSES.includes(data.status)} />
+      <RunVerdictsPanel
+        runId={data.id}
+        agentId={data.agent_id}
+        active={ACTIVE_RUN_STATUSES.includes(data.status)}
+      />
       <RunMetricsPanel runId={data.id} active={ACTIVE_RUN_STATUSES.includes(data.status)} />
       <Conversations run={data} />
     </div>

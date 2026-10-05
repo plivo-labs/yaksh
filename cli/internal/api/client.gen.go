@@ -1686,8 +1686,30 @@ type ReviewVerdicts struct {
 // Role defines model for Role.
 type Role string
 
+// RuleCounts One agent rule over a set of judged calls.
+type RuleCounts struct {
+	Counts map[string]int `json:"counts"`
+	Key    string         `json:"key"`
+	Name   string         `json:"name"`
+	Role   ItemRole       `json:"role"`
+}
+
+// RuleFailure defines model for RuleFailure.
+type RuleFailure struct {
+	ConversationId openapi_types.UUID `json:"conversation_id"`
+	EndedAt        *time.Time         `json:"ended_at"`
+	ScenarioName   string             `json:"scenario_name"`
+}
+
 // RuleGate When an LLM rule can apply, decided in code before any model call.
 type RuleGate string
+
+// RuleResults One of the agent's current rules over the judged calls that ran it as it is written now.
+type RuleResults struct {
+	Counts   map[string]int `json:"counts"`
+	Failures []RuleFailure  `json:"failures"`
+	Key      string         `json:"key"`
+}
 
 // RunCreate Limits that an operator sets, such as the most repeats, are checked where the settings
 // are known.
@@ -1828,6 +1850,7 @@ type RunVerdicts struct {
 	PassHat2Scenarios int                  `json:"pass_hat_2_scenarios"`
 	PassRate          *float32             `json:"pass_rate"`
 	Pending           int                  `json:"pending"`
+	Rules             []RuleCounts         `json:"rules"`
 	Scenarios         []ScenarioVerdicts   `json:"scenarios"`
 	Worst             *float32             `json:"worst"`
 }
@@ -2805,6 +2828,13 @@ type ClientInterface interface {
 	// Corresponds with POST /api/v1/agents/{agent_id}/duplicate (the `DuplicateAgentApiV1AgentsAgentIdDuplicatePost` operationId).
 	DuplicateAgentApiV1AgentsAgentIdDuplicatePost(ctx context.Context, agentId openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// GetRuleResultsApiV1AgentsAgentIdRuleResultsGet Get Rule Results
+	//
+	// Each current rule over the judged calls that ran it as it is written now.
+	//
+	// Corresponds with GET /api/v1/agents/{agent_id}/rule-results (the `GetRuleResultsApiV1AgentsAgentIdRuleResultsGet` operationId).
+	GetRuleResultsApiV1AgentsAgentIdRuleResultsGet(ctx context.Context, agentId openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// ListGenerationsApiV1AgentsAgentIdScenarioGenerationsGet List Generations
 	//
 	// Corresponds with GET /api/v1/agents/{agent_id}/scenario-generations (the `ListGenerationsApiV1AgentsAgentIdScenarioGenerationsGet` operationId).
@@ -3382,6 +3412,23 @@ func (c *Client) UpdateAgentApiV1AgentsAgentIdPatch(ctx context.Context, agentId
 // Corresponds with POST /api/v1/agents/{agent_id}/duplicate (the `DuplicateAgentApiV1AgentsAgentIdDuplicatePost` operationId).
 func (c *Client) DuplicateAgentApiV1AgentsAgentIdDuplicatePost(ctx context.Context, agentId openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewDuplicateAgentApiV1AgentsAgentIdDuplicatePostRequest(c.Server, agentId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetRuleResultsApiV1AgentsAgentIdRuleResultsGet Get Rule Results
+//
+// Each current rule over the judged calls that ran it as it is written now.
+//
+// Corresponds with GET /api/v1/agents/{agent_id}/rule-results (the `GetRuleResultsApiV1AgentsAgentIdRuleResultsGet` operationId).
+func (c *Client) GetRuleResultsApiV1AgentsAgentIdRuleResultsGet(ctx context.Context, agentId openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetRuleResultsApiV1AgentsAgentIdRuleResultsGetRequest(c.Server, agentId)
 	if err != nil {
 		return nil, err
 	}
@@ -4846,6 +4893,40 @@ func NewDuplicateAgentApiV1AgentsAgentIdDuplicatePostRequest(server string, agen
 	}
 
 	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetRuleResultsApiV1AgentsAgentIdRuleResultsGetRequest constructs an http.Request for the GetRuleResultsApiV1AgentsAgentIdRuleResultsGet method
+func NewGetRuleResultsApiV1AgentsAgentIdRuleResultsGetRequest(server string, agentId openapi_types.UUID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "agent_id", agentId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/agents/%s/rule-results", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -7464,6 +7545,15 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with POST /api/v1/agents/{agent_id}/duplicate (the `DuplicateAgentApiV1AgentsAgentIdDuplicatePost` operationId).
 	DuplicateAgentApiV1AgentsAgentIdDuplicatePostWithResponse(ctx context.Context, agentId openapi_types.UUID, reqEditors ...RequestEditorFn) (*DuplicateAgentApiV1AgentsAgentIdDuplicatePostResponse, error)
 
+	// GetRuleResultsApiV1AgentsAgentIdRuleResultsGetWithResponse Get Rule Results
+	//
+	// Each current rule over the judged calls that ran it as it is written now.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/agents/{agent_id}/rule-results (the `GetRuleResultsApiV1AgentsAgentIdRuleResultsGet` operationId).
+	GetRuleResultsApiV1AgentsAgentIdRuleResultsGetWithResponse(ctx context.Context, agentId openapi_types.UUID, reqEditors ...RequestEditorFn) (*GetRuleResultsApiV1AgentsAgentIdRuleResultsGetResponse, error)
+
 	// ListGenerationsApiV1AgentsAgentIdScenarioGenerationsGetWithResponse List Generations
 	//
 	// Returns a wrapper object for the known response body format(s).
@@ -8276,6 +8366,54 @@ func (r DuplicateAgentApiV1AgentsAgentIdDuplicatePostResponse) StatusCode() int 
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r DuplicateAgentApiV1AgentsAgentIdDuplicatePostResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetRuleResultsApiV1AgentsAgentIdRuleResultsGetResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *[]RuleResults
+	// JSON422 the response for an HTTP 422 `application/json` response
+	JSON422 *HTTPValidationError
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetRuleResultsApiV1AgentsAgentIdRuleResultsGetResponse) GetJSON200() *[]RuleResults {
+	return r.JSON200
+}
+
+// GetJSON422 returns the response for an HTTP 422 `application/json` response
+func (r GetRuleResultsApiV1AgentsAgentIdRuleResultsGetResponse) GetJSON422() *HTTPValidationError {
+	return r.JSON422
+}
+
+// GetBody returns the raw response body bytes
+func (r GetRuleResultsApiV1AgentsAgentIdRuleResultsGetResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetRuleResultsApiV1AgentsAgentIdRuleResultsGetResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetRuleResultsApiV1AgentsAgentIdRuleResultsGetResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetRuleResultsApiV1AgentsAgentIdRuleResultsGetResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -10907,6 +11045,21 @@ func (c *ClientWithResponses) DuplicateAgentApiV1AgentsAgentIdDuplicatePostWithR
 	return ParseDuplicateAgentApiV1AgentsAgentIdDuplicatePostResponse(rsp)
 }
 
+// GetRuleResultsApiV1AgentsAgentIdRuleResultsGetWithResponse Get Rule Results
+//
+// Each current rule over the judged calls that ran it as it is written now.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/agents/{agent_id}/rule-results (the `GetRuleResultsApiV1AgentsAgentIdRuleResultsGet` operationId).
+func (c *ClientWithResponses) GetRuleResultsApiV1AgentsAgentIdRuleResultsGetWithResponse(ctx context.Context, agentId openapi_types.UUID, reqEditors ...RequestEditorFn) (*GetRuleResultsApiV1AgentsAgentIdRuleResultsGetResponse, error) {
+	rsp, err := c.GetRuleResultsApiV1AgentsAgentIdRuleResultsGet(ctx, agentId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetRuleResultsApiV1AgentsAgentIdRuleResultsGetResponse(rsp)
+}
+
 // ListGenerationsApiV1AgentsAgentIdScenarioGenerationsGetWithResponse List Generations
 //
 // Returns a wrapper object for the known response body format(s).
@@ -12044,6 +12197,39 @@ func ParseDuplicateAgentApiV1AgentsAgentIdDuplicatePostResponse(rsp *http.Respon
 			return nil, err
 		}
 		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest HTTPValidationError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetRuleResultsApiV1AgentsAgentIdRuleResultsGetResponse parses an HTTP response from a GetRuleResultsApiV1AgentsAgentIdRuleResultsGetWithResponse call
+func ParseGetRuleResultsApiV1AgentsAgentIdRuleResultsGetResponse(rsp *http.Response) (*GetRuleResultsApiV1AgentsAgentIdRuleResultsGetResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetRuleResultsApiV1AgentsAgentIdRuleResultsGetResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest []RuleResults
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
 		var dest HTTPValidationError

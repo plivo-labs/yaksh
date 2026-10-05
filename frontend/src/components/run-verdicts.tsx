@@ -5,15 +5,15 @@ import { Link } from "react-router";
 import { Panel, PanelHeader } from "@/components/panel";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Explained, Meter, OutcomeIcon, SegmentBar, Stat } from "@/components/verdict-ui";
+import { Explained, Meter, OutcomeCounts, OutcomeIcon, Stat } from "@/components/verdict-ui";
 import { counted, percent } from "@/lib/format";
 import { useJudgeAgreement, useRunMetrics } from "@/lib/queries";
+import { ROLE_TEXT } from "@/lib/rules";
 import {
   CATEGORY_LABELS,
   DECIDED_BY_TEXT,
   JUDGE_TEXT,
   type JudgeAgreement,
-  OUTCOME_TEXT,
   type Outcome,
   type RunVerdicts,
   type Verdict,
@@ -26,9 +26,17 @@ type Scenario = RunVerdicts["scenarios"][number];
 type Criterion = RunVerdicts["criteria"][number];
 
 /** The run's verdicts. The tiles answer "how did it do, and how far can I trust that" at a
- * glance; the scenario list shows which scenarios failed and opens to their criteria; how the
- * calls were judged sits last, closed. */
-export function RunVerdictsPanel({ runId, active }: { runId: string; active: boolean }) {
+ * glance; the scenario list shows which scenarios failed and opens to their criteria, and the
+ * agent's rules follow; how the calls were judged sits last, closed. */
+export function RunVerdictsPanel({
+  runId,
+  agentId,
+  active,
+}: {
+  runId: string;
+  agentId: string;
+  active: boolean;
+}) {
   const metrics = useRunMetrics(runId, active);
   const agreement = useJudgeAgreement();
   if (!metrics.data) return null;
@@ -42,6 +50,7 @@ export function RunVerdictsPanel({ runId, active }: { runId: string; active: boo
         <>
           <Scorecard verdicts={verdicts} />
           <ScenarioList verdicts={verdicts} />
+          {verdicts.rules.length > 0 && <RuleList rules={verdicts.rules} agentId={agentId} />}
           <HowJudged verdicts={verdicts} agreement={agreement.data} />
         </>
       ) : (
@@ -369,16 +378,7 @@ function ScenarioRow({
   );
 }
 
-function outcomeName(key: string): string {
-  return key === "not_testable" ? "Not testable" : (OUTCOME_TEXT[key as Outcome] ?? key);
-}
-
 function CriterionRow({ criterion }: { criterion: Criterion }) {
-  const passed = criterion.counts.pass ?? 0;
-  const scored = passed + (criterion.counts.fail ?? 0);
-  const detail = Object.entries(criterion.counts)
-    .map(([key, count]) => `${outcomeName(key)} ${count}`)
-    .join(", ");
   const problem = Boolean(criterion.counts.fail || criterion.counts.error);
   return (
     <li className="grid grid-cols-[1.25rem_minmax(0,1fr)_6rem_3rem] items-center gap-x-3 py-2">
@@ -386,28 +386,44 @@ function CriterionRow({ criterion }: { criterion: Criterion }) {
       <span className={cn("text-s-400", !problem && "text-muted-foreground")}>
         {criterion.text}
       </span>
-      <Tooltip>
-        <TooltipTrigger className="w-full cursor-help rounded-sm py-1 outline-none focus-visible:ring-2 focus-visible:ring-ring/50">
-          <SegmentBar
-            counts={criterion.counts}
-            label={`Criterion ${criterion.number}: ${detail}`}
-          />
-        </TooltipTrigger>
-        <TooltipContent>{detail}</TooltipContent>
-      </Tooltip>
-      <span
-        className="text-right text-xs-500 tabular-nums"
-        title={
-          scored ? "Passed, of the calls where it passed or failed" : "No call passed or failed it"
-        }
-      >
-        {scored ? (
-          `${passed}/${scored}`
-        ) : (
-          <span className="text-xs-400 text-muted-foreground">None</span>
-        )}
-      </span>
+      <OutcomeCounts counts={criterion.counts} label={`Criterion ${criterion.number}`} />
     </li>
+  );
+}
+
+/** The agent's rules over the run's judged calls. */
+function RuleList({ rules, agentId }: { rules: RunVerdicts["rules"]; agentId: string }) {
+  return (
+    <section aria-label="Agent rules" className="border-t">
+      <div className="flex items-center justify-between gap-3 px-5 pt-4 pb-2">
+        <h3 className="text-s-500">Agent rules</h3>
+        <Button
+          variant="ghost"
+          size="sm"
+          nativeButton={false}
+          render={<Link to={`/agents/${agentId}?tab=rules`} />}
+        >
+          Edit rules
+          <ChevronRight />
+        </Button>
+      </div>
+      <ul className="divide-y border-t">
+        {rules.map((rule) => (
+          <li
+            key={rule.key}
+            className="grid grid-cols-[minmax(0,1fr)_6rem_3rem] items-center gap-x-3 px-5 py-2.5"
+          >
+            <span className="grid min-w-0 gap-0.5">
+              <span className="truncate text-s-500" title={rule.name}>
+                {rule.name}
+              </span>
+              <span className="text-xs-400 text-muted-foreground">{ROLE_TEXT[rule.role]}</span>
+            </span>
+            <OutcomeCounts counts={rule.counts} label={rule.name} />
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 

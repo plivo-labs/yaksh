@@ -226,6 +226,32 @@ class CriterionCounts(BaseModel):
     """Passes over passes and fails."""
 
 
+class RuleCounts(BaseModel):
+    """One agent rule over a set of judged calls."""
+
+    key: str
+    name: str
+    role: ItemRole
+    counts: dict[str, int]
+    """By outcome after labels, as for a criterion."""
+
+
+class RuleFailure(BaseModel):
+    conversation_id: uuid.UUID
+    scenario_name: str
+    ended_at: datetime | None
+
+
+class RuleResults(BaseModel):
+    """One of the agent's current rules over the judged calls that ran it as it is written now."""
+
+    key: str
+    counts: dict[str, int]
+    """By outcome after labels, as for a criterion."""
+    failures: list[RuleFailure]
+    """The latest failed calls, newest first."""
+
+
 class CallerFidelity(BaseModel):
     persona: str
     calls: int
@@ -271,6 +297,8 @@ class RunVerdicts(BaseModel):
     """Scenarios that both passed and failed across repeats. No cause is named: repeats mix the
     agent, the caller and the line."""
     criteria: list[CriterionCounts]
+    rules: list[RuleCounts]
+    """The agent rules the run's calls ran, by name."""
     decided_by: dict[DecidedBy, int]
     """The criteria and agent rules that code, Jev or the judge model decided."""
     errors: int

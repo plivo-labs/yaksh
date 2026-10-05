@@ -1,7 +1,4 @@
-import { Plus, Trash2 } from "lucide-react";
-
 import { Segmented } from "@/components/segmented";
-import { Button } from "@/components/ui/button";
 import {
   Field,
   FieldContent,
@@ -13,91 +10,24 @@ import {
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { MAX_RULES, NEW_LLM, NEW_PHRASE, ruleProblems } from "@/lib/rules";
+import { ruleProblems } from "@/lib/rules";
 import type { AgentRule, LlmRule, PhraseRule } from "@/lib/types";
 
-/** The agent's rules: checks on every judged call, beside each scenario's criteria. */
-export function RulesField({
-  rules,
-  onChange,
-  submitted,
-}: {
-  rules: AgentRule[];
-  onChange: (rules: AgentRule[]) => void;
-  submitted: boolean;
-}) {
-  const replace = (index: number, rule: AgentRule) =>
-    onChange(rules.map((current, at) => (at === index ? rule : current)));
-  const full = rules.length >= MAX_RULES;
-  return (
-    <FieldGroup>
-      {rules.map((rule, index) => (
-        <RuleEditor
-          key={index}
-          id={`rule-${index}`}
-          rule={rule}
-          submitted={submitted}
-          onChange={(next) => replace(index, next)}
-          onRemove={() => onChange(rules.filter((_, at) => at !== index))}
-        />
-      ))}
-      <div className="flex flex-wrap items-center gap-2">
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          disabled={full}
-          onClick={() => onChange([...rules, NEW_LLM])}
-        >
-          <Plus />
-          LLM rule
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          disabled={full}
-          onClick={() => onChange([...rules, NEW_PHRASE])}
-        >
-          <Plus />
-          Phrase rule
-        </Button>
-        {full && <FieldDescription>An agent has at most {MAX_RULES} rules.</FieldDescription>}
-      </div>
-    </FieldGroup>
-  );
-}
-
-function RuleEditor({
-  id,
+/** One rule's fields. The kind is chosen when the rule is added and does not change. */
+export function RuleFields({
   rule,
   submitted,
   onChange,
-  onRemove,
 }: {
-  id: string;
   rule: AgentRule;
   submitted: boolean;
   onChange: (rule: AgentRule) => void;
-  onRemove: () => void;
 }) {
   const problems = submitted ? ruleProblems(rule) : {};
   return (
-    <div className="grid gap-5 rounded-md border px-4 py-4">
-      <div className="flex items-center justify-between gap-3">
-        <span className="text-s-500">{rule.kind === "llm" ? "LLM rule" : "Phrase rule"}</span>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-sm"
-          aria-label={`Remove ${rule.name || "this rule"}`}
-          onClick={onRemove}
-        >
-          <Trash2 />
-        </Button>
-      </div>
+    <FieldGroup>
       <Text
-        id={`${id}-name`}
+        id="rule-name"
         label="Name"
         value={rule.name}
         maxLength={200}
@@ -106,34 +36,32 @@ function RuleEditor({
         onChange={(name) => onChange({ ...rule, name })}
       />
       {rule.kind === "llm" ? (
-        <LlmFields id={id} rule={rule} problems={problems} onChange={onChange} />
+        <LlmFields rule={rule} problems={problems} onChange={onChange} />
       ) : (
-        <PhraseFields id={id} rule={rule} problems={problems} onChange={onChange} />
+        <PhraseFields rule={rule} problems={problems} onChange={onChange} />
       )}
-      <Field orientation="horizontal">
+      <Field orientation="horizontal" className="rounded-md border bg-muted/40 px-3.5 py-3">
         <FieldContent>
-          <FieldLabel htmlFor={`${id}-role`}>Counts in the call's verdict</FieldLabel>
+          <FieldLabel htmlFor="rule-role">Counts in the call's verdict</FieldLabel>
           <FieldDescription>When off, the rule only reports.</FieldDescription>
         </FieldContent>
         <Switch
-          id={`${id}-role`}
+          id="rule-role"
           checked={rule.role === "deciding"}
           onCheckedChange={(checked) =>
             onChange({ ...rule, role: checked ? "deciding" : "reporting" })
           }
         />
       </Field>
-    </div>
+    </FieldGroup>
   );
 }
 
 function LlmFields({
-  id,
   rule,
   problems,
   onChange,
 }: {
-  id: string;
   rule: LlmRule;
   problems: Partial<Record<string, string>>;
   onChange: (rule: LlmRule) => void;
@@ -150,7 +78,7 @@ function LlmFields({
         onChange={(gate) => onChange({ ...rule, gate })}
       />
       <Text
-        id={`${id}-applies`}
+        id="rule-applies"
         label="Applies when"
         long
         value={rule.applies_when}
@@ -159,7 +87,7 @@ function LlmFields({
         onChange={(applies_when) => onChange({ ...rule, applies_when })}
       />
       <Text
-        id={`${id}-pass`}
+        id="rule-pass"
         label="Passes when"
         long
         value={rule.pass_when}
@@ -168,7 +96,7 @@ function LlmFields({
         onChange={(pass_when) => onChange({ ...rule, pass_when })}
       />
       <Text
-        id={`${id}-fail`}
+        id="rule-fail"
         label="Fails when"
         long
         value={rule.fail_when}
@@ -177,7 +105,7 @@ function LlmFields({
         onChange={(fail_when) => onChange({ ...rule, fail_when })}
       />
       <Text
-        id={`${id}-not`}
+        id="rule-not"
         label="Not a failure"
         long
         value={rule.not_a_failure ?? ""}
@@ -189,12 +117,10 @@ function LlmFields({
 }
 
 function PhraseFields({
-  id,
   rule,
   problems,
   onChange,
 }: {
-  id: string;
   rule: PhraseRule;
   problems: Partial<Record<string, string>>;
   onChange: (rule: PhraseRule) => void;
@@ -231,7 +157,7 @@ function PhraseFields({
         />
       </div>
       <Text
-        id={`${id}-value`}
+        id="rule-value"
         label={rule.match === "phrase" ? "Phrase" : "Pattern"}
         value={rule.value}
         maxLength={200}

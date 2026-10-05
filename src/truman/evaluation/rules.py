@@ -17,6 +17,7 @@ from truman.domain.rules import (
 )
 from truman.evaluation.canonical import canonical, contains
 from truman.evaluation.judging import ItemResult
+from truman.evaluation.verdicts import RULE
 
 
 def gate_open(rule: LlmRule, transcript: Transcript) -> bool:
@@ -28,7 +29,7 @@ def gate_open(rule: LlmRule, transcript: Transcript) -> bool:
 def gated(rule: LlmRule) -> ItemResult:
     """An LLM rule whose gate is shut: not applicable, with no model call."""
     return ItemResult(
-        key=f"rule-{rule.key}",
+        key=f"{RULE}{rule.key}",
         subject=rule.name,
         judge=None,
         decided_by=DecidedBy.CODE,
@@ -52,7 +53,7 @@ def phrase_item(rule: PhraseRule, turns: Sequence[Turn]) -> ItemResult:
         ]
     except TimeoutError:
         return ItemResult(
-            key=f"rule-{rule.key}",
+            key=f"{RULE}{rule.key}",
             subject=rule.name,
             judge=None,
             decided_by=DecidedBy.CODE,
@@ -63,7 +64,7 @@ def phrase_item(rule: PhraseRule, turns: Sequence[Turn]) -> ItemResult:
     found = bool(matched)
     passed = found if rule.expects is PhraseExpectation.REQUIRED else not found
     return ItemResult(
-        key=f"rule-{rule.key}",
+        key=f"{RULE}{rule.key}",
         subject=rule.name,
         judge=None,
         decided_by=DecidedBy.CODE,
