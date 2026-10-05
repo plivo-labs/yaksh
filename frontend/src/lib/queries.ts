@@ -65,7 +65,7 @@ export const keys = {
   voices: ["voices"] as const,
   voicesFor: (language: Language | "all") => ["voices", language] as const,
   phoneNumbers: ["phone-numbers"] as const,
-  runs: (agentId: string) => ["runs", agentId] as const,
+  runs: (agentId: string | undefined) => ["runs", agentId ?? "all"] as const,
   run: (id: string) => ["runs", "one", id] as const,
   runMetrics: (id: string) => ["runs", "metrics", id] as const,
   document: (id: string) => ["documents", id] as const,
@@ -407,12 +407,9 @@ export function useEndConversation(id: string) {
 
 export const RUNS_PAGE = 8;
 
-export function useRuns(agentId: string, page: number) {
-  const search = new URLSearchParams({
-    agent_id: agentId,
-    page: String(page),
-    page_size: String(RUNS_PAGE),
-  });
+export function useRuns(agentId: string | undefined, page: number) {
+  const search = new URLSearchParams({ page: String(page), page_size: String(RUNS_PAGE) });
+  if (agentId) search.set("agent_id", agentId);
   return useQuery({
     queryKey: [...keys.runs(agentId), page],
     queryFn: ({ signal }) => api<Page<RunSummary>>(`/runs?${search}`, { signal }),

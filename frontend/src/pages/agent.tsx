@@ -2,10 +2,10 @@ import { ChevronRight, PhoneOutgoing } from "lucide-react";
 import { useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router";
 
-import { BackButton } from "@/components/back-button";
 import { CopyId } from "@/components/copy-id";
 import { ConversationList } from "@/components/conversation-list";
 import { ActionPanel, Fact, Panel, PanelHeader } from "@/components/panel";
+import { RunList } from "@/components/run-list";
 import { Settle } from "@/components/settle";
 import { StatusLabel } from "@/components/status-label";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -24,7 +24,6 @@ import {
 } from "@/lib/types";
 import { EditAgentSheet } from "@/pages/agent-form";
 import { AgentKnowledgeBase } from "@/pages/agent-knowledge-base";
-import { AgentRuns } from "@/pages/agent-runs";
 import { AgentScenarios } from "@/pages/agent-scenarios";
 import { StartCallDialog } from "@/pages/start-call-dialog";
 
@@ -101,7 +100,7 @@ function AgentTabs({ agent }: { agent: Agent }) {
         <AgentScenarios agent={agent} />
       </TabsContent>
       <TabsContent keepMounted value="runs">
-        <AgentRuns agent={agent} />
+        <RunList agentId={agent.id} />
       </TabsContent>
       <TabsContent keepMounted value="calls">
         <Calls agent={agent} />
@@ -120,12 +119,9 @@ function Designation({ agent }: { agent: Agent }) {
     <Panel>
       <div className="flex flex-wrap items-center gap-x-6 gap-y-4 px-5 pt-5 pb-4">
         <div className="grid min-w-0 flex-1 basis-72 gap-1">
-          <div className="flex min-w-0 items-center gap-2">
-            <BackButton fallback="/agents" />
-            <h1 className="truncate text-h3-500" title={agent.name}>
-              {agent.name}
-            </h1>
-          </div>
+          <h1 className="truncate text-h3-500" title={agent.name}>
+            {agent.name}
+          </h1>
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-s-400">
             <span className="text-muted-foreground">{reach(agent)}</span>
             <LineState call={last.data} pending={last.isPending} />

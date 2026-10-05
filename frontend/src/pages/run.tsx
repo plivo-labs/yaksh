@@ -1,9 +1,8 @@
 import { Play, Square } from "lucide-react";
 import { type ReactNode, useState } from "react";
-import { useParams, useSearchParams } from "react-router";
+import { Link, useParams, useSearchParams } from "react-router";
 import { toast } from "sonner";
 
-import { BackButton } from "@/components/back-button";
 import { ConversationList } from "@/components/conversation-list";
 import { CopyId } from "@/components/copy-id";
 import { Pager } from "@/components/pager";
@@ -83,20 +82,27 @@ export function RunPage() {
 function Overview({ run }: { run: Run }) {
   const total = runTotal(run);
   const finished = FINISHED.reduce((sum, group) => sum + run.counts[group], 0);
+  const running = run.counts.in_progress;
+  const share = (count: number) => `${total ? (count / total) * 100 : 0}%`;
   const endReasons = Object.entries(run.end_reasons) as [EndReason, number][];
   return (
     <Panel>
       <div className="flex flex-wrap items-start gap-x-6 gap-y-4 px-5 pt-5 pb-4">
         <div className="grid min-w-0 flex-1 basis-72 gap-1">
           <div className="flex min-w-0 items-center gap-2">
-            <BackButton fallback={`/agents/${run.agent_id}`} />
             <h1 className="truncate text-h3-500" title={runTitle(run)}>
               {runTitle(run)}
             </h1>
             <RunStatusLabel status={run.status} />
           </div>
           <p className="text-s-400 text-muted-foreground">
-            {run.agent_name}, version {run.agent_version}
+            <Link
+              to={`/agents/${run.agent_id}`}
+              className="rounded-sm underline decoration-muted-foreground/40 underline-offset-4 outline-none hover:text-foreground hover:decoration-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
+            >
+              {run.agent_name}
+            </Link>
+            , version {run.agent_version}
             {run.started_at && `, started ${when(run.started_at)}`}
             {run.ended_at && `, ended ${when(run.ended_at)}`}
           </p>
@@ -110,8 +116,11 @@ function Overview({ run }: { run: Run }) {
       </div>
       <div className="grid gap-3 border-t px-5 py-4">
         <div className="flex items-baseline justify-between text-sm">
-          <span className="font-medium tabular-nums">
-            {finished} of {total} finished
+          <span className="tabular-nums">
+            <span className="font-medium">
+              {finished} of {total} finished
+            </span>
+            {running > 0 && <span className="text-muted-foreground">, {running} in progress</span>}
           </span>
           {run.retries > 0 && (
             <span className="text-muted-foreground tabular-nums">
@@ -125,12 +134,18 @@ function Overview({ run }: { run: Run }) {
           aria-valuemin={0}
           aria-valuemax={total}
           aria-valuenow={finished}
-          className="h-1.5 overflow-hidden rounded-full bg-muted"
+          className="flex h-1.5 overflow-hidden rounded-full bg-muted"
         >
           <div
-            className="h-full rounded-full bg-primary transition-[width] duration-300 ease-out"
-            style={{ width: `${total ? (finished / total) * 100 : 0}%` }}
+            className="h-full bg-primary transition-[width] duration-300 ease-out"
+            style={{ width: share(finished) }}
           />
+          {running > 0 && (
+            <div
+              className="h-full bar-shimmer transition-[width] duration-300 ease-out"
+              style={{ width: share(running) }}
+            />
+          )}
         </div>
         <GroupFilter run={run} />
         {endReasons.length > 0 && (

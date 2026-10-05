@@ -4,6 +4,7 @@ import {
   ClipboardCheck,
   Hash,
   KeyRound,
+  ListChecks,
   MoonStar,
   PhoneCall,
   SunMedium,
@@ -35,9 +36,9 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
-const links: { to: string; label: string; icon: typeof Bot; under?: string[] }[] = [
-  /* A run belongs to an agent, so a run page keeps Agents active. */
-  { to: "/agents", label: "Agents", icon: Bot, under: ["/runs"] },
+const links: { to: string; label: string; icon: typeof Bot }[] = [
+  { to: "/agents", label: "Agents", icon: Bot },
+  { to: "/runs", label: "Runs", icon: ListChecks },
   { to: "/conversations", label: "Conversations", icon: PhoneCall },
   { to: "/personas", label: "Personas", icon: UserRound },
   { to: "/voices", label: "Voices", icon: AudioLines },
@@ -61,7 +62,7 @@ export function Shell() {
     <TooltipProvider delay={500}>
       <SidebarProvider
         defaultOpen={sidebarOpen()}
-        style={{ "--sidebar-width": "15rem" } as CSSProperties}
+        style={{ "--sidebar-width": "12rem" } as CSSProperties}
       >
         <Sidebar collapsible="icon">
           <SidebarHeader>
@@ -78,10 +79,10 @@ export function Shell() {
             <SidebarGroup>
               <SidebarGroupContent>
                 <SidebarMenu>
-                  {links.map(({ to, label, icon: Icon, under = [] }) => (
+                  {links.map(({ to, label, icon: Icon }) => (
                     <SidebarMenuItem key={to}>
                       <SidebarMenuButton
-                        isActive={[to, ...under].some((path) => pathname.startsWith(path))}
+                        isActive={pathname.startsWith(to)}
                         tooltip={label}
                         render={<NavLink to={to} />}
                       >

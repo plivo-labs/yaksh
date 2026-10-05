@@ -2,7 +2,6 @@ import { type ReactNode, type SubmitEvent, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { toast } from "sonner";
 
-import { BackButton } from "@/components/back-button";
 import { DeleteConfirm, DiscardConfirm } from "@/components/confirm-dialogs";
 import { Panel, PanelHeader } from "@/components/panel";
 import { Segmented } from "@/components/segmented";
@@ -359,10 +358,7 @@ export function NewAgentPage() {
   return (
     <div className="grid gap-6">
       <div className="grid gap-1">
-        <div className="flex items-center gap-2">
-          <BackButton fallback="/agents" />
-          <h1 className="text-h3-500">New agent</h1>
-        </div>
+        <h1 className="text-h3-500">New agent</h1>
         <p className="text-sm text-muted-foreground">
           Tell Truman how to reach the agent and what it does.
         </p>

@@ -3,7 +3,6 @@ import { Fragment, type RefObject, useEffect, useRef, useState } from "react";
 import { useDefaultLayout } from "react-resizable-panels";
 import { Link, useParams, useSearchParams } from "react-router";
 
-import { BackButton } from "@/components/back-button";
 import { CallMetricsCard } from "@/components/call-metrics";
 import { CallResults } from "@/components/call-results";
 import { EndCallDialog } from "@/components/confirm-dialogs";
@@ -124,18 +123,13 @@ export function ConversationPage() {
       <div className="grid shrink-0 gap-4">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="grid min-w-0 gap-1">
-            <div className="flex min-w-0 items-center gap-2">
-              <BackButton
-                fallback={data.run_id ? `/runs/${data.run_id}` : `/agents/${data.agent_id}`}
-              />
-              <h1 className="truncate text-h3-500" title={data.scenario_name}>
-                {data.scenario_name}
-              </h1>
-            </div>
+            <h1 className="truncate text-h3-500" title={data.scenario_name}>
+              {data.scenario_name}
+            </h1>
             <p className="truncate text-s-400 text-muted-foreground">
               <Link
                 to={`/agents/${data.agent_id}`}
-                className="underline-offset-4 hover:text-foreground hover:underline"
+                className="underline decoration-muted-foreground/40 underline-offset-4 hover:text-foreground hover:decoration-foreground"
               >
                 {agent.data?.name ?? data.agent_name}
               </Link>

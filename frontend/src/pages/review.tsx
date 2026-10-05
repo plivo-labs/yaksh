@@ -5,7 +5,6 @@ import { Link, NavLink, Outlet, useParams, useSearchParams } from "react-router"
 import { TokenGate } from "@/app/token";
 import { useDarkMode } from "@/app/use-dark-mode";
 import { useToken } from "@/app/use-token";
-import { BackButton } from "@/components/back-button";
 import { type OnTurn, ItemResult, VerdictLabel, type VerdictKind } from "@/components/call-results";
 import { Panel, PanelHeader } from "@/components/panel";
 import type { PlayerHandle } from "@/components/recording-player";
@@ -157,10 +156,7 @@ export function ReviewPage() {
   return (
     <div className="flex h-full flex-col gap-4">
       <div className="grid shrink-0 gap-1">
-        <div className="flex min-w-0 items-center gap-2">
-          <BackButton fallback="/review" />
-          <h1 className="truncate text-h3-500">{conversation.scenario_name}</h1>
-        </div>
+        <h1 className="truncate text-h3-500">{conversation.scenario_name}</h1>
         <p className="text-s-400 text-muted-foreground">
           {data.lane === "audit"
             ? "Audit call: your labels on its judged items are blind and measure the judges."

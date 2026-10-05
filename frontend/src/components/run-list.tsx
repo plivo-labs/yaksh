@@ -8,7 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { usePageParam } from "@/hooks/use-page-param";
 import { counted, runTitle, runTotal } from "@/lib/format";
 import { RUNS_PAGE, useRuns } from "@/lib/queries";
-import { type Agent, OUTCOME_GROUPS, type RunSummary } from "@/lib/types";
+import { OUTCOME_GROUPS, type RunSummary } from "@/lib/types";
 
 function progress(run: RunSummary): string {
   const parts = OUTCOME_GROUPS.filter((group) => run.counts[group.value] > 0).map(
@@ -17,8 +17,9 @@ function progress(run: RunSummary): string {
   return `${counted(runTotal(run), "conversation", "conversations")}: ${parts.join(", ")}`;
 }
 
-export function AgentRuns({ agent }: { agent: Agent }) {
-  const runs = useRuns(agent.id, usePageParam());
+/** Runs, newest first: one agent's runs, or every agent's runs with each run's agent. */
+export function RunList({ agentId }: { agentId?: string }) {
+  const runs = useRuns(agentId, usePageParam());
   return (
     <ActionPanel>
       {runs.isPending ? (
@@ -31,7 +32,9 @@ export function AgentRuns({ agent }: { agent: Agent }) {
         </p>
       ) : runs.data.items.length === 0 ? (
         <p className="px-5 py-6 text-sm text-muted-foreground">
-          No runs yet. Select scenarios on the Scenarios tab and click Run.
+          {agentId
+            ? "No runs yet. Select scenarios on the Scenarios tab and click Run."
+            : "No runs yet. Open an agent, select scenarios on its Scenarios tab and click Run."}
         </p>
       ) : (
         <ul className="divide-y">
@@ -49,7 +52,10 @@ export function AgentRuns({ agent }: { agent: Agent }) {
                   <span className="truncate text-s-500 transition-colors group-hover:text-brand-text">
                     {runTitle(run)}
                   </span>
-                  <span className="truncate text-muted-foreground">{progress(run)}</span>
+                  <span className="truncate text-muted-foreground">
+                    {!agentId && `${run.agent_name}, version ${run.agent_version} · `}
+                    {progress(run)}
+                  </span>
                 </span>
                 <span className="text-right font-mono text-xs-400 text-muted-foreground">
                   <RelativeTime iso={run.created_at} />
