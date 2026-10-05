@@ -739,6 +739,9 @@ function Transcript({
   onPlay?: (seconds: number) => void;
 }) {
   const [follow, setFollow] = useStoredBoolean("truman.transcript.follow", true);
+  /** A live call opens at its newest turn, a finished one at its first. Kept from the first
+   * render, so a call that ends while it is open does not jump back to the start. */
+  const [openedLive] = useState(active);
   return (
     <Card className="min-h-0">
       <CardHeader className="shrink-0 border-b">
@@ -758,7 +761,10 @@ function Transcript({
             {active ? waiting : "Nothing was transcribed."}
           </p>
         ) : (
-          <MessageScrollerProvider autoScroll>
+          <MessageScrollerProvider
+            autoScroll={active}
+            defaultScrollPosition={openedLive ? "end" : "start"}
+          >
             <MessageScroller>
               {onPlay && <FollowAudio index={follow ? heard : null} />}
               <ShowTurn shown={shown} />
