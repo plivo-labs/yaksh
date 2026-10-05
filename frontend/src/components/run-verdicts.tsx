@@ -147,7 +147,9 @@ function Scorecard({ verdicts }: { verdicts: RunVerdicts }) {
         <p className="text-xs-400 text-muted-foreground">
           {calls - scored === 0
             ? "Every judged call has a verdict."
-            : `${calls - scored} not scored. Below 95%, read the pass rate as a range.`}
+            : full
+              ? `${calls - scored} not scored.`
+              : `${calls - scored} not scored, so the pass rate is a range.`}
         </p>
       </Stat>
       <Stat
