@@ -30,7 +30,7 @@ from tests.conftest import (
 )
 from truman.api import create_app
 from truman.config import Settings
-from truman.db.models import Conversation, Persona, Scenario
+from truman.db.models import Conversation, Persona, Run, Scenario
 from truman.domain.conversations import (
     CallerSettings,
     CallerUsage,
@@ -503,6 +503,40 @@ async def test_runs_are_listed_newest_first_and_by_agent(client: AsyncClient) ->
     assert listed["total"] == 2
     assert (await client.get("/api/v1/runs")).json()["total"] == 3
     assert (await client.get(f"/api/v1/runs/{uuid.uuid4()}")).status_code == 404
+
+
+async def test_the_status_filter_lists_the_runs_that_show_that_status(
+    client: AsyncClient, db: Db
+) -> None:
+    runs = {
+        status: await new_run(client)
+        for status in ("queued", "running", "cancelling", "done", "cancelled")
+    }
+    states = {
+        "running": (False, ConversationStatus.RUNNING, True),
+        "cancelling": (True, ConversationStatus.RUNNING, True),
+        "done": (False, ConversationStatus.COMPLETED, True),
+        "cancelled": (True, ConversationStatus.CANCELLED, False),
+    }
+    async with db() as session:
+        for status, (cancelled, conversation, started) in states.items():
+            run_id = uuid.UUID(runs[status]["id"])
+            if cancelled:
+                await session.execute(
+                    update(Run).where(Run.id == run_id).values(cancelled_at=func.now())
+                )
+            await session.execute(
+                update(Conversation)
+                .where(Conversation.run_id == run_id)
+                .values(status=conversation, started_at=func.now() if started else None)
+            )
+        await session.commit()
+
+    for status, run in runs.items():
+        listed = (await client.get("/api/v1/runs", params={"status": status})).json()["items"]
+
+        assert [(found["id"], found["status"]) for found in listed] == [(run["id"], status)]
+    assert (await client.get("/api/v1/runs", params={"status": "lost"})).status_code == 422
 
 
 async def test_omitted_fields_take_the_operators_defaults_as_the_api_reports_them(

@@ -2134,6 +2134,7 @@ type GetReviewApiV1ReviewConversationsConversationIdGetParams struct {
 // ListRunsApiV1RunsGetParams defines parameters for ListRunsApiV1RunsGet.
 type ListRunsApiV1RunsGetParams struct {
 	AgentId  *openapi_types.UUID `form:"agent_id,omitempty" json:"agent_id,omitempty"`
+	Status   *RunStatus          `form:"status,omitempty" json:"status,omitempty"`
 	Page     *int                `form:"page,omitempty" json:"page,omitempty"`
 	PageSize *int                `form:"page_size,omitempty" json:"page_size,omitempty"`
 }
@@ -6621,6 +6622,18 @@ func NewListRunsApiV1RunsGetRequest(server string, params *ListRunsApiV1RunsGetP
 		if params.AgentId != nil {
 
 			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "agent_id", *params.AgentId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Status != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "status", *params.Status, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "", Format: ""}); err != nil {
 				return nil, err
 			} else {
 				for _, qp := range strings.Split(queryFrag, "&") {
