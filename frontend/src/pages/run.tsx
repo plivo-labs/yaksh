@@ -26,7 +26,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { usePageParam } from "@/hooks/use-page-param";
-import { duration, noiseLabel, runTitle, runTotal, when } from "@/lib/format";
+import { duration, noiseLabel, runFinished, runTitle, runTotal, when } from "@/lib/format";
 import {
   CONVERSATIONS_PAGE,
   useAgent,
@@ -44,8 +44,6 @@ import {
   WAITING_REASON_TEXT,
 } from "@/lib/types";
 import { RunDialog } from "@/pages/run-dialog";
-
-const FINISHED: OutcomeGroup[] = ["completed", "did_not_connect", "error", "cancelled"];
 
 export function RunPage() {
   const { id = "" } = useParams();
@@ -81,7 +79,7 @@ export function RunPage() {
 
 function Overview({ run }: { run: Run }) {
   const total = runTotal(run);
-  const finished = FINISHED.reduce((sum, group) => sum + run.counts[group], 0);
+  const finished = runFinished(run);
   const running = run.counts.in_progress;
   const share = (count: number) => `${total ? (count / total) * 100 : 0}%`;
   const endReasons = Object.entries(run.end_reasons) as [EndReason, number][];

@@ -405,7 +405,7 @@ export function useEndConversation(id: string) {
   });
 }
 
-export const RUNS_PAGE = 8;
+export const RUNS_PAGE = 25;
 
 export function useRuns(agentId: string | undefined, page: number) {
   const search = new URLSearchParams({ page: String(page), page_size: String(RUNS_PAGE) });

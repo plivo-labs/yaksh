@@ -102,6 +102,13 @@ export function runTotal(run: { counts: Record<OutcomeGroup, number> }): number 
   return Object.values(run.counts).reduce((sum, count) => sum + count, 0);
 }
 
+const FINISHED: OutcomeGroup[] = ["completed", "did_not_connect", "error", "cancelled"];
+
+/** How many of a run's counted conversations are over, whatever their outcome. */
+export function runFinished(run: { counts: Record<OutcomeGroup, number> }): number {
+  return FINISHED.reduce((sum, group) => sum + run.counts[group], 0);
+}
+
 /** A wait with one decimal: 2.1s. */
 export function seconds(ms: number): string {
   return `${(ms / 1000).toFixed(1)}s`;

@@ -5,6 +5,7 @@ import { Link, useParams, useSearchParams } from "react-router";
 import { CopyId } from "@/components/copy-id";
 import { ConversationList } from "@/components/conversation-list";
 import { ActionPanel, Fact, Panel, PanelHeader } from "@/components/panel";
+import { Pager } from "@/components/pager";
 import { RunList } from "@/components/run-list";
 import { Settle } from "@/components/settle";
 import { StatusLabel } from "@/components/status-label";
@@ -12,8 +13,16 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { usePageParam } from "@/hooks/use-page-param";
 import { phone, reach, since, textSize, when } from "@/lib/format";
-import { useAgent, useAgents, useConversations, useLastCall } from "@/lib/queries";
+import {
+  RUNS_PAGE,
+  useAgent,
+  useAgents,
+  useConversations,
+  useLastCall,
+  useRuns,
+} from "@/lib/queries";
 import { CONVERSATION_TONE } from "@/lib/status";
 import {
   ACTIVE_STATUSES,
@@ -100,7 +109,7 @@ function AgentTabs({ agent }: { agent: Agent }) {
         <AgentScenarios agent={agent} />
       </TabsContent>
       <TabsContent keepMounted value="runs">
-        <RunList agentId={agent.id} />
+        <Runs agent={agent} />
       </TabsContent>
       <TabsContent keepMounted value="calls">
         <Calls agent={agent} />
@@ -182,6 +191,20 @@ function LineState({
           : `Last call ${call.status} ${since(call.started_at ?? call.created_at)}`}
       </span>
     </Link>
+  );
+}
+
+function Runs({ agent }: { agent: Agent }) {
+  const runs = useRuns(agent.id, usePageParam());
+  return (
+    <ActionPanel>
+      <RunList
+        query={runs}
+        place="panel"
+        empty="No runs yet. Select scenarios on the Scenarios tab and click Run."
+      />
+      <Pager className="border-t px-5 py-3" query={runs} pageSize={RUNS_PAGE} />
+    </ActionPanel>
   );
 }
 
