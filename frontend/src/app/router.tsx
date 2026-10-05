@@ -21,6 +21,7 @@ import { ConversationsPage } from "@/pages/conversations";
 import { NotFoundPage } from "@/pages/not-found";
 import { NumbersPage } from "@/pages/numbers";
 import { PersonasPage } from "@/pages/personas";
+import { ReviewPage, ReviewQueuePage, ReviewShell } from "@/pages/review";
 import { RunPage } from "@/pages/run";
 import { VoicesPage } from "@/pages/voices";
 
@@ -49,6 +50,15 @@ export const router = createBrowserRouter([
       { path: "numbers", element: <NumbersPage />, handle: { crumbs: NumbersCrumbs } },
       { path: "runs/:id", element: <RunPage />, handle: { crumbs: RunCrumbs } },
       { path: "*", element: <NotFoundPage /> },
+    ],
+  },
+  {
+    path: "/review",
+    element: <ReviewShell />,
+    errorElement: <RouteError />,
+    children: [
+      { index: true, element: <ReviewQueuePage /> },
+      { path: ":id", element: <ReviewPage /> },
     ],
   },
 ]);

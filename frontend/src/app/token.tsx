@@ -5,7 +5,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 
-export function TokenGate({ onToken }: { onToken: (token: string) => void }) {
+export function TokenGate({
+  onToken,
+  title = "API token",
+  description = "The value of TRUMAN_API_TOKEN on the server.",
+}: {
+  onToken: (token: string) => void;
+  title?: string;
+  description?: string;
+}) {
   const [value, setValue] = useState("");
   const submit = (event: SubmitEvent) => {
     event.preventDefault();
@@ -15,8 +23,8 @@ export function TokenGate({ onToken }: { onToken: (token: string) => void }) {
     <main className="flex min-h-svh items-center justify-center p-6">
       <Card className="w-full max-w-sm">
         <CardHeader>
-          <CardTitle>API token</CardTitle>
-          <CardDescription>The value of TRUMAN_API_TOKEN on the server.</CardDescription>
+          <CardTitle>{title}</CardTitle>
+          <CardDescription>{description}</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={submit}>

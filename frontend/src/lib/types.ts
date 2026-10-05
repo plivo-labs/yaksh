@@ -223,7 +223,36 @@ export interface KnowledgeBaseDocument extends KnowledgeBaseEntry {
 export interface Agent extends AgentSummary {
   config: string | null;
   knowledge_base: KnowledgeBaseDocument[];
+  rules: AgentRule[];
 }
+
+/** A check on every judged call of the agent, judged like a criterion. Its gate is decided in
+ * code before any model call. */
+export interface LlmRule {
+  kind: "llm";
+  key: string;
+  name: string;
+  gate: "always" | "agent_spoke";
+  applies_when: string;
+  pass_when: string;
+  fail_when: string;
+  not_a_failure: string | null;
+  role: "deciding" | "reporting";
+}
+
+/** A phrase or pattern that code looks for in the agent's lines. */
+export interface PhraseRule {
+  kind: "phrase";
+  key: string;
+  name: string;
+  expects: "required" | "forbidden";
+  match: "phrase" | "regex";
+  value: string;
+  where: "first_agent_turn" | "any_agent_turn";
+  role: "deciding" | "reporting";
+}
+
+export type AgentRule = LlmRule | PhraseRule;
 
 export interface DocumentSummary {
   id: string;
@@ -253,6 +282,7 @@ export interface AgentInput {
   config: string | null;
   /** Sent only when the agent is added; later changes go through the knowledge base panel. */
   knowledge_base?: KnowledgeBaseEntry[];
+  rules: AgentRule[];
 }
 
 export interface PhoneNumber {
@@ -786,3 +816,210 @@ export interface RunMetrics {
   by_noise: { noise: BackgroundNoise; numbers: RunNumbers }[];
   verdicts: RunVerdicts;
 }
+
+export type LabelAnswer = "pass" | "fail" | "not_applicable" | "cannot_tell" | "blocked";
+export type LabelReason =
+  | "agent_error"
+  | "applicability"
+  | "transcript_error"
+  | "spoken_form"
+  | "date_or_time"
+  | "read_back"
+  | "window_or_order"
+  | "exact_value"
+  | "hidden_action"
+  | "evidence_misread"
+  | "criterion_ambiguous"
+  | "caller_error"
+  | "scenario_error"
+  | "test_settings_error"
+  | "line_or_audio"
+  | "other";
+export type Lane = "audit" | "ad_hoc";
+
+export interface LabelRead {
+  answer: LabelAnswer;
+  /** Needed for a fail, can't tell or blocked. */
+  reason: LabelReason | null;
+  note: string | null;
+  lane: Lane;
+  /** Given before the labeler saw the machine result. */
+  blind: boolean;
+  created_at: string;
+}
+
+export interface ReviewItem {
+  id: string;
+  item_key: string;
+  subject: string;
+  role: "deciding" | "reporting";
+  /** The machine result stays hidden until this labeler labels the item. */
+  blind: boolean;
+  machine: EvaluationItem | null;
+  /** This labeler's latest label. */
+  label: LabelRead | null;
+}
+
+export interface ReviewConversation {
+  conversation: Conversation;
+  lane: Lane;
+  items: ReviewItem[];
+  /** Null until this labeler has labeled every blind item. */
+  verdicts: {
+    scenario_verdict: Verdict | null;
+    conversation_verdict: Verdict | null;
+    effective_scenario_verdict: Verdict | null;
+    effective_conversation_verdict: Verdict | null;
+  } | null;
+}
+
+export interface QueuedReview {
+  conversation_id: string;
+  scenario_name: string;
+  ended_at: string;
+  items: number;
+  labeled: number;
+}
+
+export interface JudgeAgreement {
+  /** Each item counts once, by its first blind audit label. A judge version with no such label
+   * is not listed: it is not yet measured. */
+  versions: { judge: string; model: string; version: string; items: Share }[];
+  /** Calls with a blind label on every criterion whose labels give the machine's verdict. */
+  conversations: Share;
+  /** Items with blind labels from two labelers where the two agree. */
+  labelers: Share;
+  /** Offered audit calls labeled in full. */
+  offered_calls: Share;
+}
+
+export const OUTCOME_TEXT: Record<Outcome, string> = {
+  pass: "Pass",
+  fail: "Fail",
+  not_applicable: "Not applicable",
+  unsure: "Unsure",
+  blocked: "Blocked",
+  error: "Error",
+  pending: "Labels disagree",
+};
+
+export const VERDICT_TEXT: Record<Verdict, string> = {
+  pass: "Pass",
+  fail: "Fail",
+  not_scored: "Not scored",
+};
+
+export const DECIDED_BY_TEXT: Record<EvaluationItem["decided_by"], string> = {
+  code: "Code",
+  jev: "Jev",
+  llm: "Judge model",
+};
+
+export const JUDGE_TEXT: Record<string, string> = {
+  criterion: "Criterion",
+  agent_rule: "Agent rule",
+  instructions: "Instruction adherence",
+  hallucination: "Hallucination",
+  caller_check: "Caller check",
+  jev: "Jev",
+};
+
+export const UNSURE_TEXT: Record<UnsureKind, string> = {
+  hidden_action: "needs an action the call cannot show, so it counts as not applicable",
+  not_confirmed_played: "the caller's audio is not confirmed as played",
+  unclear: "the call does not show enough",
+};
+
+export const ERROR_TEXT: Record<string, string> = {
+  judge_unavailable: "The judge model was not available.",
+  judge_failed: "The judge model refused, rejected the request or stopped before its answer ended.",
+  invalid_evidence: "The judge's quotes did not match the call, twice.",
+  sources_too_large: "The config or the documents are too large for one request.",
+  pattern_timeout: "The pattern ran past its time limit.",
+};
+
+/** Answers that name a problem, so they say which one. */
+export const NEEDS_REASON: LabelAnswer[] = ["fail", "cannot_tell", "blocked"];
+
+export const LABEL_ANSWERS: { value: LabelAnswer; label: string }[] = [
+  { value: "pass", label: "Pass" },
+  { value: "fail", label: "Fail" },
+  { value: "not_applicable", label: "Not applicable" },
+  { value: "cannot_tell", label: "Can't tell" },
+  { value: "blocked", label: "Blocked" },
+];
+
+export const LABEL_REASONS: { value: LabelReason; label: string; example: string }[] = [
+  {
+    value: "agent_error",
+    label: "Agent error",
+    example: "The agent quoted $80; the criterion says $95.",
+  },
+  {
+    value: "applicability",
+    label: "Applicability",
+    example: "The judge said not applicable, but the caller asked about the price.",
+  },
+  {
+    value: "transcript_error",
+    label: "Transcript error",
+    example: 'The text says "eighty"; the recording says "ninety-five".',
+  },
+  {
+    value: "spoken_form",
+    label: "Spoken form",
+    example: 'The agent said "two thirty p.m."; the judge wanted "2:30 PM".',
+  },
+  {
+    value: "date_or_time",
+    label: "Date or time",
+    example: '"Next Tuesday" is a different day from the one the judge took.',
+  },
+  {
+    value: "read_back",
+    label: "Read-back",
+    example: "The agent read back the time but not the date.",
+  },
+  {
+    value: "window_or_order",
+    label: "Window or order",
+    example: "The agent asked for the date of birth after it booked.",
+  },
+  {
+    value: "exact_value",
+    label: "Exact value",
+    example: '"Ninety-five" without "dollars", which the criterion allows.',
+  },
+  {
+    value: "hidden_action",
+    label: "Hidden action",
+    example: "Only the clinic's calendar can show this.",
+  },
+  {
+    value: "evidence_misread",
+    label: "Evidence misread",
+    example: "The judge quoted the caller's words as the agent's.",
+  },
+  {
+    value: "criterion_ambiguous",
+    label: "Criterion ambiguous",
+    example: '"Confirms the booking" can mean a read-back or a question.',
+  },
+  {
+    value: "caller_error",
+    label: "Caller error",
+    example: "The caller gave the wrong date of birth.",
+  },
+  {
+    value: "scenario_error",
+    label: "Scenario error",
+    example: "The scenario asks for a Sunday slot; the clinic is closed on Sunday.",
+  },
+  {
+    value: "test_settings_error",
+    label: "Test settings error",
+    example: "The turn limit ended the call before the booking.",
+  },
+  { value: "line_or_audio", label: "Line or audio", example: "The agent's audio dropped for 3s." },
+  { value: "other", label: "Other", example: "Needs a note." },
+];

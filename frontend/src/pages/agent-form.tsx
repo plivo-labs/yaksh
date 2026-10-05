@@ -35,6 +35,7 @@ import { useDraftKnowledgeBase } from "@/hooks/use-knowledge-base";
 import { revealErrors } from "@/lib/forms";
 import { APPEAR } from "@/lib/motion";
 import { useDeleteAgent, useSaveAgent } from "@/lib/queries";
+import { ruleProblems, toRules } from "@/lib/rules";
 import {
   EMPTY_OUTBOUND,
   isPhoneNumber,
@@ -47,6 +48,7 @@ import {
 import {
   type Agent,
   type AgentInput,
+  type AgentRule,
   type Direction,
   LANGUAGE_ITEMS,
   type Language,
@@ -55,6 +57,7 @@ import { cn } from "@/lib/utils";
 import { ConfigField, MAX_CONFIG_CHARS } from "@/pages/agent-config-field";
 import { KnowledgeBasePanel } from "@/pages/agent-knowledge-base";
 import { OutboundFields } from "@/pages/agent-outbound-fields";
+import { RulesField } from "@/pages/agent-rules-field";
 
 interface Draft {
   name: string;
@@ -66,6 +69,7 @@ interface Draft {
   language: Language;
   brief: string;
   config: string;
+  rules: AgentRule[];
 }
 
 const EMPTY: Draft = {
@@ -78,6 +82,7 @@ const EMPTY: Draft = {
   language: "en",
   brief: "",
   config: "",
+  rules: [],
 };
 
 function toDraft(agent: Agent): Draft {
@@ -91,6 +96,7 @@ function toDraft(agent: Agent): Draft {
     language: agent.language,
     brief: agent.brief ?? "",
     config: agent.config ?? "",
+    rules: agent.rules,
   };
 }
 
@@ -120,6 +126,7 @@ function toInput(draft: Draft): AgentInput {
     language: draft.language,
     brief: draft.brief.trim() || null,
     config: draft.config.trim() ? draft.config : null,
+    rules: toRules(draft.rules),
   };
 }
 
@@ -141,8 +148,9 @@ function useAgentDraft(agent?: Agent) {
       ? Object.keys(outboundProblems(draft.outbound)).length > 0
       : !isPhoneNumber(draft.agent_number),
     config: draft.config.length > MAX_CONFIG_CHARS,
+    rules: draft.rules.some((rule) => Object.keys(ruleProblems(rule)).length > 0),
   };
-  const ready = !needs.name && !needs.reach && !needs.config;
+  const ready = !needs.name && !needs.reach && !needs.config && !needs.rules;
   const check = (element: HTMLFormElement) =>
     revealErrors(element, () => setSubmitted(true), ready);
   /** Who calls changed, so fields that swap with it may fade in; the first render stays still. */
@@ -292,6 +300,23 @@ function ContextFields({ form }: { form: AgentDraft }) {
   );
 }
 
+const CONTEXT_NOTE =
+  "Optional. Truman reads these and the knowledge base to write test scenarios. The judges read the config to check that the agent kept to its instructions, and the knowledge base to find statements it contradicts.";
+
+const RULES_NOTE =
+  "Checks on every judged call of this agent, beside each scenario's criteria. The judge model decides an LLM rule; code decides a phrase rule.";
+
+function RulesFields({ form }: { form: AgentDraft }) {
+  const { draft, set, submitted } = form;
+  return (
+    <RulesField
+      rules={draft.rules}
+      onChange={(rules) => set("rules", rules)}
+      submitted={submitted}
+    />
+  );
+}
+
 function Section({
   title,
   description,
@@ -359,13 +384,13 @@ export function NewAgentPage() {
               <RequestFields form={form} />
             </Section>
           )}
-          <Section
-            title="What it does"
-            description="Optional. Truman reads these and the knowledge base to write test scenarios."
-          >
+          <Section title="What it does" description={CONTEXT_NOTE}>
             <ContextFields form={form} />
           </Section>
           <KnowledgeBasePanel source={knowledgeBase} title="Knowledge base" />
+          <Section title="Rules" description={RULES_NOTE} className="lg:col-span-2">
+            <RulesFields form={form} />
+          </Section>
         </div>
         <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-2">
           {save.error && <FieldError className="mr-auto">{save.error.message}</FieldError>}
@@ -464,7 +489,13 @@ function AgentForm({
       )}
       <FieldSet>
         <FieldLegend>What it does</FieldLegend>
+        <FieldDescription>{CONTEXT_NOTE}</FieldDescription>
         <ContextFields form={form} />
+      </FieldSet>
+      <FieldSet>
+        <FieldLegend>Rules</FieldLegend>
+        <FieldDescription>{RULES_NOTE}</FieldDescription>
+        <RulesFields form={form} />
       </FieldSet>
 
       {(save.error || remove.error) && (

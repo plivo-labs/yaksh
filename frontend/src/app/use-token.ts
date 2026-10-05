@@ -1,28 +1,29 @@
 import { useEffect, useState } from "react";
 
-import { TOKEN_KEY, UNAUTHORIZED_EVENT, getToken, setToken } from "@/lib/api";
+import { type Credential, getToken, setToken } from "@/lib/api";
 
-export function useToken(): [string, (token: string) => void] {
-  const [token, setState] = useState(getToken);
+/** The stored token, cleared when the server refuses it and followed across tabs. */
+export function useToken(credential: Credential): [string, (token: string) => void] {
+  const [token, setState] = useState(() => getToken(credential));
   useEffect(() => {
     const clear = () => {
-      setToken("");
+      setToken(credential, "");
       setState("");
     };
     const follow = (event: StorageEvent) => {
-      if (event.key === TOKEN_KEY) setState(event.newValue ?? "");
+      if (event.key === credential.key) setState(event.newValue ?? "");
     };
-    window.addEventListener(UNAUTHORIZED_EVENT, clear);
+    window.addEventListener(credential.refused, clear);
     window.addEventListener("storage", follow);
     return () => {
-      window.removeEventListener(UNAUTHORIZED_EVENT, clear);
+      window.removeEventListener(credential.refused, clear);
       window.removeEventListener("storage", follow);
     };
-  }, []);
+  }, [credential]);
   return [
     token,
     (next: string) => {
-      setToken(next);
+      setToken(credential, next);
       setState(next);
     },
   ];

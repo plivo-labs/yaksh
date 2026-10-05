@@ -9,6 +9,7 @@ import { CopyId } from "@/components/copy-id";
 import { Pager } from "@/components/pager";
 import { Fact, Panel, PanelHeader } from "@/components/panel";
 import { RunMetricsPanel } from "@/components/run-metrics";
+import { RunVerdictsPanel } from "@/components/run-verdicts";
 import { RunStatusLabel } from "@/components/status-label";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
@@ -71,6 +72,7 @@ export function RunPage() {
   return (
     <div className="grid gap-6">
       <Overview run={data} />
+      <RunVerdictsPanel runId={data.id} active={ACTIVE_RUN_STATUSES.includes(data.status)} />
       <RunMetricsPanel runId={data.id} active={ACTIVE_RUN_STATUSES.includes(data.status)} />
       <Conversations run={data} />
     </div>

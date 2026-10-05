@@ -5,6 +5,7 @@ import { Link, useParams, useSearchParams } from "react-router";
 
 import { BackButton } from "@/components/back-button";
 import { CallMetricsCard } from "@/components/call-metrics";
+import { CallResultsCard } from "@/components/call-results";
 import { EndCallDialog } from "@/components/confirm-dialogs";
 import { CopyId } from "@/components/copy-id";
 import { Fact } from "@/components/panel";
@@ -54,6 +55,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { useStoredBoolean } from "@/hooks/use-stored-boolean";
 import { APPEAR, REVEAL, RISE } from "@/lib/motion";
 import { keys, useAgent, useConversation } from "@/lib/queries";
+import { connectedAt, turnStart } from "@/lib/turns";
 import { subscribe } from "@/lib/sse";
 import { storage } from "@/lib/storage";
 import { cn } from "@/lib/utils";
@@ -107,6 +109,12 @@ export function ConversationPage() {
   const data = conversation.data;
   const active = ACTIVE_STATUSES.includes(data.status);
   const connectedMs = connectedAt(data);
+  const playTurn = data.recording_url
+    ? (turn: number) => {
+        const at = turnStart(data, turn);
+        if (at !== null) player.current?.playFrom(at);
+      }
+    : undefined;
 
   return (
     <div className="flex h-full flex-col gap-6">
@@ -170,6 +178,11 @@ export function ConversationPage() {
         <ResizablePanel id="details" defaultSize={320} minSize={260} maxSize="50%">
           <ScrollArea className="h-full">
             <div className="flex flex-col gap-6 p-px pr-4 pl-3">
+              <CallResultsCard
+                conversationId={data.id}
+                evaluation={data.evaluation}
+                onTurn={playTurn}
+              />
               <CallMetricsCard conversationId={data.id} evaluation={data.evaluation} />
               <ScenarioCard name={data.scenario_name} scenario={data.scenario} />
               <Card>
@@ -332,13 +345,7 @@ function replyMark(reply: Reply, connectedMs: number): Mark {
   };
 }
 
-/** When the call connected, counted from the dial. The recording starts here; turn and wire
- * times count from the dial. */
-function connectedAt(conversation: Conversation): number | undefined {
-  return conversation.wire_events.find((event) => event.kind === "connected")?.at_ms;
-}
-
-function CallPane({
+export function CallPane({
   conversation,
   player,
   start,
@@ -418,7 +425,7 @@ function RailTitle({ role, name }: { role: string; name: string }) {
   );
 }
 
-function ScenarioCard({ name, scenario }: { name: string; scenario: ScenarioConfig }) {
+export function ScenarioCard({ name, scenario }: { name: string; scenario: ScenarioConfig }) {
   return (
     <Card>
       <CardHeader>

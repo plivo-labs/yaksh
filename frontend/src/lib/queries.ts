@@ -26,6 +26,11 @@ import {
   type Defaults,
   type ConversationSummary,
   type Generation,
+  type JudgeAgreement,
+  type LabelAnswer,
+  type LabelReason,
+  type QueuedReview,
+  type ReviewConversation,
   type Language,
   type Page,
   type Persona,
@@ -64,6 +69,9 @@ export const keys = {
   run: (id: string) => ["runs", "one", id] as const,
   runMetrics: (id: string) => ["runs", "metrics", id] as const,
   document: (id: string) => ["documents", id] as const,
+  reviewQueue: ["review", "queue"] as const,
+  review: (conversationId: string, seen: boolean) =>
+    ["review", "one", conversationId, seen] as const,
 };
 
 const PAGE_SIZE = 100;
@@ -432,7 +440,21 @@ export function useRunMetrics(id: string, active: boolean) {
     queryKey: keys.runMetrics(id),
     queryFn: ({ signal }) => api<RunMetrics>(`/runs/${id}/metrics`, { signal }),
     refetchInterval: (query) =>
-      active || (query.state.data?.overall.pending ?? 0) > 0 ? 3_000 : false,
+      active ||
+      (query.state.data?.overall.pending ?? 0) > 0 ||
+      (query.state.data?.verdicts.pending ?? 0) > 0
+        ? 3_000
+        : false,
+  });
+}
+
+/** How often blind audit labels agree with each judge version; it changes only as people
+ * label, so it is read once a minute at most. */
+export function useJudgeAgreement() {
+  return useQuery({
+    queryKey: ["judges", "agreement"],
+    queryFn: ({ signal }) => api<JudgeAgreement>("/judges/agreement", { signal }),
+    staleTime: 60_000,
   });
 }
 
@@ -587,4 +609,44 @@ export async function downloadDocument(id: string, name: string): Promise<void> 
   const link = Object.assign(document.createElement("a"), { href: url, download: name });
   link.click();
   URL.revokeObjectURL(url);
+}
+
+/** The audit calls this labeler still has items to label in. */
+export function useReviewQueue() {
+  return useQuery({
+    queryKey: keys.reviewQueue,
+    queryFn: ({ signal }) => api<QueuedReview[]>("/review/queue", { signal }),
+  });
+}
+
+/** A judged call as this labeler sees it: blind items carry no machine result. `seen`: the
+ * labeler came from the machine's results, so the call is ad hoc. */
+export function useReview(conversationId: string, seen: boolean) {
+  return useQuery({
+    queryKey: keys.review(conversationId, seen),
+    queryFn: ({ signal }) =>
+      api<ReviewConversation>(`/review/conversations/${conversationId}?seen=${seen}`, { signal }),
+  });
+}
+
+export interface LabelInput {
+  answer: LabelAnswer;
+  reason: LabelReason | null;
+  note: string | null;
+}
+
+/** Labels one item; the call comes back with what the label reveals. */
+export function useSaveLabel(conversationId: string, seen: boolean) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ itemId, label }: { itemId: string; label: LabelInput }) =>
+      api<ReviewConversation>(`/review/items/${itemId}/labels`, {
+        method: "POST",
+        json: { ...label, seen },
+      }),
+    onSuccess: (found) => {
+      client.setQueryData(keys.review(conversationId, seen), found);
+      void client.invalidateQueries({ queryKey: keys.reviewQueue });
+    },
+  });
 }

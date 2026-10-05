@@ -249,6 +249,13 @@ function Settings({ agent }: { agent: Agent }) {
             <span className="font-normal text-muted-foreground">None</span>
           )}
         </Fact>
+        <Fact label="Rules">
+          {agent.rules.length > 0 ? (
+            agent.rules.map((rule) => rule.name).join(", ")
+          ) : (
+            <span className="font-normal text-muted-foreground">None</span>
+          )}
+        </Fact>
         <Fact label="External id">
           {agent.external_id ?? <span className="font-normal text-muted-foreground">None</span>}
         </Fact>
