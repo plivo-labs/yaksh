@@ -1,8 +1,23 @@
-# Judges
+---
+title: Judges
+description: What each judge reads, where the text goes, and what it answers.
+---
 
-After a call, the evaluator measures it in code and then judges it. This page lists each judge: what it reads, where that text goes, and what it answers. The README gives the settings.
+After a call, the evaluator measures it in code and then judges it. This page lists each judge: what it reads, where that text goes, and what it answers.
 
 Only completed calls that no one stopped are judged, and only while `JUDGE_LLM_MODEL` is not empty and the judge model has a key. Every judge's text goes to the judge model at `JUDGE_OPENAI_BASE_URL` (or `OPENAI_BASE_URL`). With `TYPESAFE_API_KEY`, the transcript also goes to TypeSafe for the Jev first pass.
+
+## Settings
+
+| Variable | Purpose |
+| --- | --- |
+| `JUDGE_LLM_MODEL` | The judge model, default `gpt-6-luna`. Empty turns the judges off. |
+| `JUDGE_LLM_REASONING_EFFORT` | Default `medium`. |
+| `JUDGE_OPENAI_API_KEY`, `JUDGE_OPENAI_BASE_URL` | The judge's key and address; the caller's `OPENAI_API_KEY` and `OPENAI_BASE_URL` when unset. |
+| `JUDGE_MAX_INPUT_CHARS` | The most text one judge request holds, default 400,000 characters. |
+| `TYPESAFE_API_KEY` | Optional. Makes judging cheaper: Jev, TypeSafe's classifier, answers each criterion and LLM rule first. Call transcripts are sent to TypeSafe. Most accurate in English. |
+| `JEV_PASS_BAR` | How sure Jev must be that an item is met to publish it as a pass, default 0.95. |
+| `JUDGE_SOURCES_TIMEOUT_S` | How long one request of the instruction adherence and hallucination judges may take, default 180 s. They get one try; a failure is their item's error. |
 
 ## What each judge reads
 
@@ -31,4 +46,4 @@ Each judge's prompt, answer schema, model and settings are hashed into a judge v
 
 ## Writing criteria
 
-The judges decide criteria as written. See [Writing criteria](writing-criteria.md) for what a judge can and cannot see, and for examples.
+The judges decide criteria as written. See [Writing criteria](/docs/writing-criteria) for what a judge can and cannot see, and for examples.
