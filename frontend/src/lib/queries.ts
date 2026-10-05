@@ -40,6 +40,7 @@ import {
   type Run,
   type RunInput,
   type RunMetrics,
+  type RunStatus,
   type RunSummary,
   type Scenario,
   type ScenarioInput,
@@ -65,7 +66,8 @@ export const keys = {
   voices: ["voices"] as const,
   voicesFor: (language: Language | "all") => ["voices", language] as const,
   phoneNumbers: ["phone-numbers"] as const,
-  runs: (agentId: string | undefined) => ["runs", agentId ?? "all"] as const,
+  runs: (filters: RunFilters) =>
+    ["runs", "list", filters.agentId ?? "all", filters.status ?? "any"] as const,
   run: (id: string) => ["runs", "one", id] as const,
   runMetrics: (id: string) => ["runs", "metrics", id] as const,
   document: (id: string) => ["documents", id] as const,
@@ -407,11 +409,18 @@ export function useEndConversation(id: string) {
 
 export const RUNS_PAGE = 25;
 
-export function useRuns(agentId: string | undefined, page: number) {
+/** Runs of one agent, of one status, or both; every run when neither is set. */
+export interface RunFilters {
+  agentId?: string;
+  status?: RunStatus;
+}
+
+export function useRuns(filters: RunFilters, page: number) {
   const search = new URLSearchParams({ page: String(page), page_size: String(RUNS_PAGE) });
-  if (agentId) search.set("agent_id", agentId);
+  if (filters.agentId) search.set("agent_id", filters.agentId);
+  if (filters.status) search.set("status", filters.status);
   return useQuery({
-    queryKey: [...keys.runs(agentId), page],
+    queryKey: [...keys.runs(filters), page],
     queryFn: ({ signal }) => api<Page<RunSummary>>(`/runs?${search}`, { signal }),
     placeholderData: keepPreviousData,
     refetchInterval: (query) =>

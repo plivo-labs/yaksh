@@ -195,7 +195,7 @@ function LineState({
 }
 
 function Runs({ agent }: { agent: Agent }) {
-  const runs = useRuns(agent.id, usePageParam());
+  const runs = useRuns({ agentId: agent.id }, usePageParam());
   return (
     <ActionPanel>
       <RunList
