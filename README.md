@@ -75,7 +75,7 @@ The conversation page shows the p90 and the p50 (nearest rank), the number of re
 
 ## Call metrics
 
-After each call, the evaluator also computes metrics from what the call saved. `GET /api/v1/conversations/<conversation id>/metrics` returns them, with the state of the evaluation: `queued`, `running`, `done` or `failed`. A call that did not connect gets only `usage`. A call without a recording gets no speech metrics: a missing value, not a zero.
+After each call, the evaluator also computes metrics from what the call saved. `GET /api/v1/conversations/<conversation id>/evaluation` returns them with the verdicts and the state of the evaluation: `queued`, `running`, `done` or `failed`. A call that did not connect gets only `usage`. A call without a recording gets no speech metrics: a missing value, not a zero.
 
 | Metric | What it holds | Flags |
 | --- | --- | --- |
