@@ -190,10 +190,7 @@ function ConversationView({ id }: { id: string }) {
             defaultValue={data.evaluation ? "results" : "scenario"}
             className="h-full min-h-0 gap-3 pl-3"
           >
-            <TabsList
-              variant="line"
-              className="h-auto w-full shrink-0 justify-start overflow-x-auto overflow-y-hidden pb-2"
-            >
+            <TabsList variant="line" className="shrink-0 overflow-x-auto overflow-y-hidden">
               <TabsTrigger value="results">Results</TabsTrigger>
               <TabsTrigger value="metrics">Metrics</TabsTrigger>
               <TabsTrigger value="scenario">Scenario</TabsTrigger>
