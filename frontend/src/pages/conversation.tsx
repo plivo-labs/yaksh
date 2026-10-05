@@ -203,8 +203,6 @@ export function ConversationPage() {
   );
 }
 
-/** The recording and the transcript. Keyed by the conversation, so the turn that was playing
- * does not carry over to the next conversation. */
 /** What is known about the call, as label and value pairs. A value that does not exist yet is
  * left out, not shown as empty. */
 function ConversationFacts({ conversation }: { conversation: Conversation }) {
@@ -327,6 +325,8 @@ function connectedAt(conversation: Conversation): number | undefined {
   return conversation.wire_events.find((event) => event.kind === "connected")?.at_ms;
 }
 
+/** The recording and the transcript. Keyed by the conversation, so the turn that was playing
+ * does not carry over to the next conversation. */
 function CallPane({
   conversation,
   player,
