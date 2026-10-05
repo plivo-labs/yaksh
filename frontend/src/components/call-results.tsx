@@ -3,6 +3,7 @@ import { Link } from "react-router";
 
 import { StatusLabel } from "@/components/status-label";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   Card,
   CardAction,
@@ -84,12 +85,12 @@ export function CallResultsCard({
           {data.scenario_verdict !== null && (
             <dl className="grid grid-cols-2 gap-3">
               <VerdictFact
-                label="Scenario"
+                kind="scenario"
                 machine={data.scenario_verdict}
                 effective={data.effective_scenario_verdict}
               />
               <VerdictFact
-                label="With deciding rules"
+                kind="conversation"
                 machine={data.conversation_verdict}
                 effective={data.effective_conversation_verdict}
               />
@@ -115,19 +116,46 @@ export function CallResultsCard({
   );
 }
 
+const VERDICT_KINDS = {
+  scenario: {
+    label: "Scenario",
+    hint: "From the scenario's criteria only.",
+  },
+  conversation: {
+    label: "With agent rules",
+    hint: "The scenario's criteria plus the agent rules set to count in the call's verdict. Rules that only report do not change it.",
+  },
+} as const;
+
+export type VerdictKind = keyof typeof VERDICT_KINDS;
+
+/** A verdict's name, with what it counts on hover or focus. */
+export function VerdictLabel({ kind }: { kind: VerdictKind }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger className="cursor-help rounded-sm text-xs text-muted-foreground underline decoration-dotted underline-offset-2 outline-none focus-visible:ring-2 focus-visible:ring-ring/50">
+        {VERDICT_KINDS[kind].label}
+      </TooltipTrigger>
+      <TooltipContent className="max-w-64">{VERDICT_KINDS[kind].hint}</TooltipContent>
+    </Tooltip>
+  );
+}
+
 function VerdictFact({
-  label,
+  kind,
   machine,
   effective,
 }: {
-  label: string;
+  kind: VerdictKind;
   machine: Verdict | null;
   effective: Verdict | null;
 }) {
   if (machine === null || effective === null) return null;
   return (
     <div className="grid gap-1">
-      <dt className="text-xs text-muted-foreground">{label}</dt>
+      <dt className="justify-self-start">
+        <VerdictLabel kind={kind} />
+      </dt>
       <dd className="grid gap-0.5">
         <StatusLabel tone={VERDICT_TONE[effective]}>{VERDICT_TEXT[effective]}</StatusLabel>
         {effective !== machine && (

@@ -6,7 +6,7 @@ import { TokenGate } from "@/app/token";
 import { useDarkMode } from "@/app/use-dark-mode";
 import { useToken } from "@/app/use-token";
 import { BackButton } from "@/components/back-button";
-import { type OnTurn, ItemResult } from "@/components/call-results";
+import { type OnTurn, ItemResult, VerdictLabel, type VerdictKind } from "@/components/call-results";
 import { Panel, PanelHeader } from "@/components/panel";
 import type { PlayerHandle } from "@/components/recording-player";
 import { RelativeTime } from "@/components/relative-time";
@@ -221,12 +221,12 @@ function Verdicts({ verdicts }: { verdicts: ReviewConversation["verdicts"] }) {
       <CardContent>
         <dl className="grid grid-cols-2 gap-3 text-sm">
           <VerdictLine
-            label="Scenario"
+            kind="scenario"
             machine={verdicts.scenario_verdict}
             effective={verdicts.effective_scenario_verdict}
           />
           <VerdictLine
-            label="With deciding rules"
+            kind="conversation"
             machine={verdicts.conversation_verdict}
             effective={verdicts.effective_conversation_verdict}
           />
@@ -237,18 +237,20 @@ function Verdicts({ verdicts }: { verdicts: ReviewConversation["verdicts"] }) {
 }
 
 function VerdictLine({
-  label,
+  kind,
   machine,
   effective,
 }: {
-  label: string;
+  kind: VerdictKind;
   machine: Verdict | null;
   effective: Verdict | null;
 }) {
   if (machine === null || effective === null) return null;
   return (
     <div className="grid gap-1">
-      <dt className="text-xs text-muted-foreground">{label}</dt>
+      <dt className="justify-self-start">
+        <VerdictLabel kind={kind} />
+      </dt>
       <dd className="grid gap-0.5">
         <StatusLabel tone={VERDICT_TONE[effective]}>{VERDICT_TEXT[effective]}</StatusLabel>
         <span className="text-xs text-muted-foreground">
