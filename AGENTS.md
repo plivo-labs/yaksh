@@ -13,14 +13,14 @@ src/truman/
   caller/       runs the simulated caller and connects to the customer's agent
   integrations/ clients for outside services: Plivo, ElevenLabs
   simulation/   defines scenarios and personas and orchestrates test conversations
-  evaluation/   the evaluation queue and the metrics of saved conversations; judges are planned
+  evaluation/   the evaluation queue, and the metrics, judges and labels of saved conversations
   api/          HTTP endpoints for the UI and integrations
   worker/       claims queued conversations from Postgres and runs them under a lease; evaluator.py does the same for evaluations
   db/           database models and migrations
 frontend/       React UI
 cli/            Go command-line client for the API, its own module; skill/SKILL.md is the guide for coding agents
 docker/         container builds and self-hosted deployment
-docs/           empty for now; Markdown docs go here, Fumadocs site later
+docs/           Markdown docs (judges, writing criteria) and decisions/; Fumadocs site later
 tests/          automated tests and fixtures
 ```
 
@@ -30,8 +30,8 @@ Two stages, each a separate job, each retryable on its own. The worker saves the
 
 ```
 Simulated test:   api -> worker -> simulation -> caller -> saved conversation, queued evaluation
-                  evaluator -> evaluation -> saved metrics
-Imported call:    api -> queued evaluation -> evaluator -> evaluation -> saved metrics
+                  evaluator -> evaluation -> saved metrics and verdicts
+Imported call:    api -> queued evaluation -> evaluator -> evaluation -> saved metrics and verdicts
 ```
 
 `simulation/` turns each scenario and persona into a prompt and a goal and calls the `Caller` interface once per conversation. A run creates one conversation for each repeat of each scenario; a retry is a new conversation (attempt + 1, `retry_of`) that copies the inputs of the one it replaces (docs/decisions/0012). `caller/` has one conversation at a time and returns transcript, recording and timing; the conversation is saved before anything is judged. `evaluation/` starts from a saved conversation, whoever produced it: one result per conversation per judge, then reliability (pass@k, pass^k) across repeats. Only the latest attempt of each repeat of each scenario counts: a conversation that another one's `retry_of` points to is not a sample. `worker/` only sequences the stages. A conversation freezes its inputs when it is created: the pinned agent, scenario and persona versions and the finished caller prompt; how the caller maps them to provider settings follows the running code. A run creates its conversations at once with the same versions and the same "today"; a retry keeps the prompt, and so the "today", of the attempt it replaces. With evaluation, a run will also freeze its rubric and judge prompt versions.
