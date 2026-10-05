@@ -245,8 +245,6 @@ export function ConversationPage() {
   );
 }
 
-/** The recording and the transcript. Keyed by the conversation, so the turn that was playing
- * does not carry over to the next conversation. */
 /** What is known about the call, as label and value pairs. A value that does not exist yet is
  * left out, not shown as empty. */
 function ConversationFacts({ conversation }: { conversation: Conversation }) {
@@ -378,6 +376,8 @@ export interface ShownTurn {
   times: number;
 }
 
+/** The recording and the transcript. Keyed by the conversation, so the turn that was playing
+ * does not carry over to the next conversation. */
 export function CallPane({
   conversation,
   player,

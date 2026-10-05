@@ -22,6 +22,6 @@ fi
 
 echo "TRUMAN_PUBLIC_URL=$url"
 echo
-echo "Put that line in docker/.env, then recreate the worker so it picks it up (from the repo root):"
-echo "  docker compose -f docker/compose.dev.yaml create --force-recreate worker"
-echo "  docker compose -f docker/compose.dev.yaml start worker"
+echo "Put that line in docker/.env, then recreate the API and the worker so they pick it up (from the repo root):"
+echo "  docker compose -f docker/compose.dev.yaml create --force-recreate api worker"
+echo "  docker compose -f docker/compose.dev.yaml start api worker"

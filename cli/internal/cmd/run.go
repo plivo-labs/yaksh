@@ -325,8 +325,12 @@ func (a *app) runCancelCmd() *cobra.Command {
 			r, err := wait.Run(cmd.Context(), c, id, wait.Options{
 				Interval: a.pollInterval, Progress: stderr, Live: isTerminal(stderr),
 			})
-			if err != nil {
-				return err
+			switch {
+			case errors.Is(err, context.Canceled):
+				return &nextStep{"stopped waiting; the cancel was sent", "truman run cancel " + id.String()}
+			case err != nil:
+				return &nextStep{fmt.Sprintf("could not read run %s (%s); the cancel was sent", id, describe(err)),
+					"truman run cancel " + id.String()}
 			}
 			if err := printJSON(cmd.OutOrStdout(), r.Body); err != nil {
 				return err

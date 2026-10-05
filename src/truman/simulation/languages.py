@@ -13,7 +13,8 @@ class LanguagePolicy:
     nudge: str
     sample: str
     goodbye: str
-    """What the caller says when it has answered its most agent turns."""
+    """What the caller says when it has answered its most agent turns, or when it tries a second
+    time to end the call without a word."""
 
 
 LANGUAGES: dict[Language, LanguagePolicy] = {

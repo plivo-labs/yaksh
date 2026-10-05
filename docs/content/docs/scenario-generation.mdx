@@ -1,0 +1,43 @@
+---
+title: Scenario generation
+description: Let a model write scenarios for an agent.
+---
+
+A model can write scenarios for an agent. The model is `GENERATION_LLM_MODEL`, or the persona model if you do not set it. Scenario generation is off without `OPENAI_API_KEY`.
+
+## Write scenarios in the console
+
+1. Open the agent.
+2. On the **Scenarios** tab, click **Generate**.
+3. In the **Generate scenarios** dialog, select the mode, the number of scenarios and the personas.
+4. Click **Generate**.
+
+Stay on the page until the generation completes. If you go to a different page or click **Stop**, the generation stops. Truman keeps the scenarios that it saved before the stop.
+
+## Modes
+
+| Mode | Description |
+| --- | --- |
+| `agent` | Scenarios for the tasks of the agent. The model reads the brief, the configuration and the knowledge base documents of the agent. |
+| `knowledge_base` | Questions that the documents answer, and some questions that they do not answer. Select 1 to 20 documents. |
+
+## Rules
+
+- `count` is 1 to 20. The default is 5.
+- Truman writes at most 5 scenarios that do a test of the same thing in the same category. Thus, a short brief can give fewer scenarios than `count`.
+- Select 1 to 20 personas. Each subject of the new scenarios gets each selected persona before it gets the same persona again.
+- `instructions` is optional, with at most 2000 characters. It tells the model what to focus on, for example "focus on rescheduling".
+- The brief, the configuration and the documents together can have at most 800,000 characters. In the `knowledge_base` mode, Truman counts only the brief and the selected documents. If the text is longer, Truman rejects the request. Use the `knowledge_base` mode with fewer documents, or make the configuration shorter.
+- Truman makes two tries for each scenario. If the two tries fail, Truman discards the scenario and continues.
+- Truman writes the scenarios in English.
+
+With the API, use `POST /api/v1/agents/<agent id>/scenarios/generate`. The response is a Server-Sent Events stream. It sends each scenario when Truman saves it. If you close the stream, the generation stops. The scenarios that Truman saved stay.
+
+## Knowledge base documents
+
+An agent can have at most 20 documents in its knowledge base. You can upload PDF, TXT and MD files, or paste text. File uploads need S3-compatible storage. Refer to [Configuration](/docs/configuration#file-storage).
+
+- A file can have at most 20 MB and 1,000,000 characters of text.
+- TXT and MD files must be UTF-8.
+- Truman rejects a PDF without text, for example a scanned PDF. Truman also rejects a PDF with a password.
+- A document does not change after you add it. The API cannot delete a document.

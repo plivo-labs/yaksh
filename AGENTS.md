@@ -20,7 +20,7 @@ src/truman/
 frontend/       React UI
 cli/            Go command-line client for the API, its own module; skill/SKILL.md is the guide for coding agents
 docker/         container builds and self-hosted deployment
-docs/           Markdown docs (judges, writing criteria) and decisions/; Fumadocs site later
+docs/           docs site (Fumadocs, pages in docs/content/docs/); decisions, ideas and bugs as Markdown
 tests/          automated tests and fixtures
 ```
 

@@ -378,6 +378,34 @@ func TestRunCancelWaitsUntilTheRunIsCancelled(t *testing.T) {
 	}
 }
 
+func TestRunCancelSaysWhatToRunNextWhenTheWaitEnds(t *testing.T) {
+	stopped, firstRead := stopOnFirstRead()
+	tests := []struct {
+		name string
+		ctx  context.Context
+		read http.HandlerFunc
+		want string
+	}{
+		{"read fails", context.Background(), reply(503, `{"error":{"code":"unavailable","message":"database is down"}}`), "could not read run " + runID},
+		{"stopped", stopped, firstRead, "stopped waiting"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			f := newFakeAPI(t, map[string]http.HandlerFunc{
+				"POST /api/v1/runs/{id}/cancel": reply(202, runJSON("cancelling", `"in_progress":1`)),
+				"GET /api/v1/runs/{id}":         tt.read,
+			})
+			code, _, stderr := run(t, tt.ctx, against(f), "", "run", "cancel", runID)
+
+			for _, want := range []string{tt.want, "the cancel was sent", "next: truman run cancel " + runID} {
+				if code != 1 || !strings.Contains(stderr, want) {
+					t.Fatalf("code = %d, stderr = %q; want %q", code, stderr, want)
+				}
+			}
+		})
+	}
+}
+
 func TestConversationStartWaitPrintsEachEventThenTheConversation(t *testing.T) {
 	events := "event: turn\ndata: {\"role\":\"agent\",\"text\":\"Hello\"}\n\n: ping\n\nevent: status\ndata: {\"status\":\"completed\"}\n\n"
 	for _, tt := range []struct {

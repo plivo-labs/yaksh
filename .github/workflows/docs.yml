@@ -1,0 +1,32 @@
+name: docs
+
+on:
+  push:
+    branches: [dev, main]
+  pull_request:
+    paths:
+      - docs/**
+      - cli/openapi.json
+      - .github/workflows/docs.yml
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: docs
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - uses: oven-sh/setup-bun@v2
+      - name: Install
+        run: bun install --frozen-lockfile
+      - name: Type check
+        run: bun run types:check
+      - name: Build
+        run: bun run build

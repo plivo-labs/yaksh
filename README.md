@@ -36,12 +36,14 @@ Agents are called on the real phone network through [Plivo](https://www.plivo.co
 | `TRUMAN_PUBLIC_URL` | The public `https://` address that reaches the worker's port 8770. Phone calls are off without it. |
 | `TRUMAN_RING_TIMEOUT_S` | How long the agent's number rings before the call ends as `no_answer`, default 30. |
 
-For development, `scripts/tunnel.sh` opens a Cloudflare quick tunnel to the worker (no account needed) and prints the `TRUMAN_PUBLIC_URL` line to put in `docker/.env`; the hostname changes every time the tunnel starts. For a fixed hostname, run a [named tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/) that routes your hostname to `http://worker:8770`, or put the worker behind any other public HTTPS host. Either way, the worker reads `TRUMAN_PUBLIC_URL` at startup, so recreate it after changing the value:
+For development, `scripts/tunnel.sh` opens a Cloudflare quick tunnel to the worker (no account needed) and prints the `TRUMAN_PUBLIC_URL` line to put in `docker/.env`; the hostname changes every time the tunnel starts. For a fixed hostname, run a [named tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/) that routes your hostname to the worker (`http://localhost:8770` from the host, `http://worker:8770` from a container on the Compose network), or put the worker behind any other public HTTPS host that also passes WebSocket connections. Either way, the API and the worker read `TRUMAN_PUBLIC_URL` at startup, so recreate both after changing the value. In `docker/compose.yaml` the API service is `truman`:
 
 ```sh
-docker compose -f docker/compose.dev.yaml create --force-recreate worker
-docker compose -f docker/compose.dev.yaml start worker
+docker compose -f docker/compose.yaml create --force-recreate truman worker
+docker compose -f docker/compose.yaml start truman worker
 ```
+
+In `docker/compose.dev.yaml` the services are `api worker`.
 
 Pick a persona, create the agent with its number and a scenario that runs with the persona, then start a conversation with the scenario. `GET /api/v1/personas` lists the built-in personas. A conversation uses the scenario's persona; `persona_id` on the conversation picks another one for that call. The wire events show `ringing`, `answered` and `connected` as the call progresses:
 
@@ -69,7 +71,7 @@ After each call is saved, the evaluator measures how long the agent made the cal
 - The agent's speech comes from the voice detector of the live call, Pipecat's Silero VAD, with the same settings, run over the agent channel of the recording. A spoken "hmm" counts as speech. In tests, an agent's quiet "thinking" sound did not.
 - Truman measures at its own connection, so the number includes the path between Truman and the agent's system, both ways. For a phone call, that is the path to Plivo, about 0.2 s through the development tunnel, and the phone path to the agent.
 
-The conversation page shows the p90 and the p50 (nearest rank), the number of replies and of talk-overs, the response time on each agent turn that answers a caller reply, and a band on the recording for each wait: green under 1 s, amber from 1 to 2 s, red over 2 s. `GET /api/v1/runs/<run id>` pools the replies of the latest attempts into `response_p50_ms` and `response_p90_ms`. `GET /api/v1/conversations?run_id=<run id>&sort=-response_p90_ms` lists the slowest conversations first. Calls without the measurement show "Latency not measured". See `docs/decisions/0019-response-time-at-trumans-connection.md`.
+The conversation page shows the p90 and the p50 (nearest rank), the number of replies and of talk-overs, the response time on each agent turn that answers a caller reply, and a band on the recording for each wait: green under 1 s, amber from 1 to 2 s, red over 2 s. `GET /api/v1/runs/<run id>` pools the replies of the latest attempts into `response_p50_ms` and `response_p90_ms`. `GET /api/v1/conversations?run_id=<run id>&sort=-response_p90_ms` lists the slowest conversations first. Calls without the measurement show "Not measured". See `docs/decisions/0019-response-time-at-trumans-connection.md`.
 
 ## Call metrics
 
@@ -145,7 +147,7 @@ Uploaded files (PDF, TXT and MD documents about an agent) are kept in S3-compati
 An outbound agent calls Truman. Truman sends the agent's trigger, a POST request that makes the agent call one of Truman's numbers, and answers that call.
 
 1. In the Plivo console, create an Application with answer URL `<TRUMAN_PUBLIC_URL>/incoming` and hangup URL `<TRUMAN_PUBLIC_URL>/incoming/hangup`, both `POST`, and link the numbers that receive test calls to it.
-2. Set the variables below and restart the worker. It reads the Application and its numbers at startup. The Numbers page says why outbound tests are off, if they are.
+2. Set the variables below, then recreate the API and the worker as in Phone: the API reads `TRUMAN_PLIVO_APP_ID` and the worker reads all of them at startup, and a restart keeps the old values. The worker reads the Application and its numbers at startup too, so restart it after a change in the Plivo console. The Numbers page says why outbound tests are off, if they are.
 3. Create an agent with direction outbound, its trigger URL, headers and JSON body. In the trigger, `{{truman.number}}` is the number to call, `{{truman.conversation_id}}` the conversation, `{{agent_data.<name>}}` a value from the scenario and `{{env.TRUMAN_TRIGGER_<NAME>}}` a secret from the environment.
 
 | Variable | Purpose |
@@ -167,11 +169,11 @@ curl -X POST localhost:8000/api/v1/runs -H "Authorization: Bearer $TRUMAN_API_TO
 ```
 
 - The run starts one conversation for each repeat of each scenario, all of them or none. Every conversation pins the agent, scenario and persona versions that were current when the run was created.
-- `max_parallel` sets how many conversations of the run can be on the line at once. `start_interval_s` sets the least time between two conversation starts; a conversation starts when a worker takes it. When Truman calls the agent, the call follows a few seconds later; when the agent calls Truman, the start sends the trigger, and the call can come up to the agent's dial window later. Without them, the run has no limit and no delay of its own. Both protect the agent under test. Single test calls start before the queued conversations of runs.
+- `max_parallel` sets how many conversations of the run can be in progress at once, from the moment a worker takes one until it ends, so ringing and the wait for an outbound agent's call count too. `start_interval_s` sets the least time between two conversation starts; a conversation starts when a worker takes it. When Truman calls the agent, the call follows a few seconds later; when the agent calls Truman, the start sends the trigger, and the call can come up to the agent's dial window later. Without them, the run has no limit and no delay of its own. Both protect the agent under test. Single test calls start before the queued conversations of runs.
 - `max_duration_s` is the time limit of each call, 10 to 1800 seconds, default `TRUMAN_DEFAULT_MAX_DURATION_S` (300).
 - `max_turns` is how many agent turns the caller answers, 1 to 100, default `TRUMAN_DEFAULT_MAX_TURNS` (20). At the next turn the caller says goodbye and says nothing more, and the conversation ends with `turn_limit`. The caller ends the call on its own only when its goal is achieved, so this limit ends the calls that go nowhere. When the caller ends the call, Truman waits until both sides are quiet for 8 seconds before it hangs up, so the agent can close the call. See `docs/decisions/0013-close-before-hang-up.md`. A reply that ends the call without a word does not end it: the caller gets one more reply to speak in, and after that Truman says the goodbye for it. See `docs/decisions/0020-the-caller-speaks-before-it-ends-the-call.md`.
 - `background_noise` plays one background in every conversation of the run, for example `{"sound": "none"}` to compare a run with and without noise. Left out, each conversation plays its persona's setting.
-- `max_retries`, default 1, is the number of extra attempts for a conversation that ends with an error on Truman's side or on the line. 0 turns retries off. Conversations in the "did not connect" group are not tried again.
+- `max_retries`, default 1 (0 when `TRUMAN_MAX_RUN_RETRIES` is 0), is the number of extra attempts for a conversation that ends with an error on Truman's side or on the line. 0 turns retries off. Conversations in the "did not connect" group are not tried again.
 - `GET /api/v1/defaults` returns the values the server uses when a request leaves these fields out: `max_duration_s`, `max_turns`, and `max_retries` of a run. The console fills its forms with them.
 - The same `Idempotency-Key` with the same body returns the first run, so a client can send a request again safely. The same key with another body is refused.
 - `POST /api/v1/runs/<run id>/cancel` cancels the queued conversations and asks the workers to end the calls on the line. The run shows `cancelling` until those calls end.
@@ -214,6 +216,8 @@ truman run start --agent <agent id> --all --wait
 docker compose -f docker/compose.dev.yaml up --build
 ```
 
-Open http://localhost:5173. Python and frontend changes reload in place.
+Open http://localhost:5173. API and frontend changes reload in place. The worker does not reload: after a Python change, restart it with `docker compose -f docker/compose.dev.yaml restart worker`.
 
-Without Docker: `uv sync && uv run prek install`, start Postgres (`docker compose -f docker/compose.dev.yaml up postgres`), export `TRUMAN_API_TOKEN` and `TRUMAN_DATABASE_URL=postgresql+asyncpg://truman:truman@localhost:5433/truman`, then `uv run truman-server api --reload`, `uv run truman-server worker` and `uv run truman-server evaluator` in two more terminals, and, in `frontend/`, `bun install && bun run dev`. Tests start their own Postgres through Docker.
+Without Docker: `uv sync && uv run prek install`, start Postgres (`docker compose -f docker/compose.dev.yaml up -d postgres`), export `TRUMAN_API_TOKEN` and `TRUMAN_DATABASE_URL=postgresql+asyncpg://truman:truman@localhost:5433/truman`, then `uv run truman-server api --reload`, `uv run truman-server worker` and `uv run truman-server evaluator` in two more terminals with the same exports, and, in another terminal in `frontend/`, `bun install && bun run dev`. Tests start their own Postgres through Docker.
+
+The docs site is in `docs/` and uses [Fumadocs](https://fumadocs.dev): in `docs/`, `bun install && bun run dev`, then open http://localhost:3000/docs. Its API reference comes from `cli/openapi.json`.
