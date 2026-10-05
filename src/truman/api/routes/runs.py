@@ -53,10 +53,13 @@ async def create_run(
 
 @router.get("")
 async def list_runs(
-    session: SessionDep, page: PageDep, agent_id: uuid.UUID | None = None
+    session: SessionDep,
+    page: PageDep,
+    agent_id: uuid.UUID | None = None,
+    status: RunStatus | None = None,
 ) -> Page[RunSummary]:
     rows, total = await runs.list_runs(
-        session, offset=page.offset, limit=page.page_size, agent_id=agent_id
+        session, offset=page.offset, limit=page.page_size, agent_id=agent_id, status=status
     )
     return Page.of(await summaries(session, rows), total, page)
 

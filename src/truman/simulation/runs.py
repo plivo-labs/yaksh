@@ -25,6 +25,7 @@ from truman.domain.errors import ConflictError, NotFoundError, ValidationError
 from truman.domain.runs import (
     RunCreate,
     RunProgress,
+    RunStatus,
     run_status,
     waiting_reason,
 )
@@ -217,6 +218,37 @@ def latest_attempt() -> ColumnElement[bool]:
     return ~select(retry.id).where(retry.retry_of == Conversation.id).exists()
 
 
+def has_status(status: RunStatus) -> ColumnElement[bool]:
+    """The runs that show this status: the rule of `run_status` over the same facts that
+    `counted` reads, a latest attempt still active and any attempt started."""
+    active = (
+        select(Conversation.id)
+        .where(
+            Conversation.run_id == Run.id,
+            latest_attempt(),
+            Conversation.status.in_(ACTIVE_STATUSES),
+        )
+        .exists()
+    )
+    started = (
+        select(Conversation.id)
+        .where(Conversation.run_id == Run.id, Conversation.started_at.is_not(None))
+        .exists()
+    )
+    cancelled = Run.cancelled_at.is_not(None)
+    match status:
+        case RunStatus.QUEUED:
+            return and_(~cancelled, active, ~started)
+        case RunStatus.RUNNING:
+            return and_(~cancelled, active, started)
+        case RunStatus.CANCELLING:
+            return and_(cancelled, active)
+        case RunStatus.DONE:
+            return and_(~cancelled, ~active)
+        case RunStatus.CANCELLED:
+            return and_(cancelled, ~active)
+
+
 def run_full() -> ColumnElement[bool]:
     """The run has as many calls on the line as its max parallel."""
     live = aliased(Conversation)
@@ -285,11 +317,18 @@ async def key_share_references(session: AsyncSession, rows: Sequence[Row[Any]]) 
 
 
 async def list_runs(
-    session: AsyncSession, *, offset: int, limit: int, agent_id: uuid.UUID | None = None
+    session: AsyncSession,
+    *,
+    offset: int,
+    limit: int,
+    agent_id: uuid.UUID | None = None,
+    status: RunStatus | None = None,
 ) -> tuple[list[Run], int]:
     query = select(Run)
     if agent_id is not None:
         query = query.where(Run.agent_id == agent_id)
+    if status is not None:
+        query = query.where(has_status(status))
     total = await session.scalar(select(func.count()).select_from(query.subquery()))
     rows = await session.scalars(
         query.order_by(Run.created_at.desc(), Run.id.desc()).offset(offset).limit(limit)
