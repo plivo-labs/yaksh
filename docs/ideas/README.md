@@ -1,7 +1,6 @@
 # Ideas
 
 - [Another agent version or target for one run](run-agent-override.md)
-- [Listen to a live call](live-call-listening.md)
 - [Load-balanced workers](load-balanced-workers.md)
 - [Practice calls for people](practice-calls-for-people.md)
 - [Scenario groups](scenario-groups.md)

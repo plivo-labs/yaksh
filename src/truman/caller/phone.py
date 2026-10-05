@@ -41,6 +41,7 @@ from truman.caller.audio import (
     Stamper,
 )
 from truman.caller.latency import CallerReply, measure
+from truman.caller.listen import AudioTap, LiveAudio
 from truman.caller.pipeline import (
     CallState,
     Persona,
@@ -636,6 +637,7 @@ class PhoneCaller:
         observer.wire_event(WireEvent(kind=WireEventKind.CONNECT_STARTED, at_ms=clock.ms()))
         entry = self._registry.expect(request.conversation_id)
         trigger: asyncio.Future[TriggerOutcome] | None = None
+        live = LiveAudio(str(self._settings.database_url), request.conversation_id)
         try:
             if request.agent.outbound is None:
                 dialed = await self._dialer.dial(request, entry, observer, clock.ms, stop)
@@ -649,10 +651,11 @@ class PhoneCaller:
             if isinstance(dialed, CallOutcome):
                 return dialed
             try:
-                return await self._talk(request, observer, stop, clock, dialed, entry)
+                return await self._talk(request, observer, stop, clock, dialed, entry, live)
             finally:
                 await self._hang_up(dialed.call_uuid)
         finally:
+            await live.close()
             self._registry.forget(request.conversation_id)
             if trigger is not None:
                 trigger.cancel()
@@ -694,6 +697,7 @@ class PhoneCaller:
         clock: Clock,
         dialed: Connected,
         entry: PendingStream,
+        live: LiveAudio,
     ) -> CallOutcome:
         connected_ms = clock.ms()
         observer.wire_event(WireEvent(kind=WireEventKind.CONNECTED, at_ms=connected_ms))
@@ -739,6 +743,7 @@ class PhoneCaller:
             before_output=[checkpoints],
             after_output=[marks, WireTap(transcript, settled)],
             state=state,
+            observers=[AudioTap(transport.input(), transport.output(), live)],
         )
 
         @transport.event_handler("on_client_connected")
@@ -771,6 +776,7 @@ class PhoneCaller:
         finally:
             if greeting is not None:
                 greeting.cancel()
+            await live.close()
         ended_ms = clock.ms()
         started_ms = recording.start_ms(connected_ms)
         if started_ms < connected_ms:
