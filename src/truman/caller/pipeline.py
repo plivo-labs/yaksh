@@ -21,6 +21,7 @@ from pipecat.frames.frames import (
     LLMRunFrame,
     TTSSpeakFrame,
 )
+from pipecat.observers.base_observer import BaseObserver
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.worker import PipelineParams, PipelineWorker
 from pipecat.processors.aggregators.llm_context import LLMContext
@@ -240,6 +241,7 @@ class Persona:
         after_output: Sequence[FrameProcessor],
         state: CallState,
         before_output: Sequence[FrameProcessor] = (),
+        observers: Sequence[BaseObserver] = (),
     ) -> None:
         self.llm = llm_service(settings, keys, request.instructions)
         self.stt = DeepgramSTTService(
@@ -302,6 +304,7 @@ class Persona:
             idle_timeout_secs=None,
             cancel_timeout_secs=END_GRACE_S,
             enable_rtvi=False,
+            observers=list(observers),
         )
 
         retried_silent_end = False
