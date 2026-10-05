@@ -34,7 +34,7 @@ from truman.db.models import AgentVersion, Conversation, RunningWorker, Scenario
 from truman.db.session import create_engine, create_sessionmaker
 from truman.domain.agents import AgentConfig
 from truman.domain.background_noise import NoiseLevel, NoiseMix, NoiseSound
-from truman.domain.conversations import ConversationCreate, ConversationStatus
+from truman.domain.conversations import CallRequest, ConversationCreate, ConversationStatus
 from truman.domain.languages import Language
 from truman.simulation import conversations
 from truman.simulation.background_noise import sound_path, volume
@@ -751,6 +751,20 @@ async def test_shutdown_with_stuck_engine_disposal_still_exits(
     assert exit_code == 1
 
 
+async def call_request_of(settings: Settings, conversation_id: str) -> CallRequest:
+    """What the worker would hand the caller for the conversation."""
+    engine = create_engine(settings.database_url.encoded_string())
+    try:
+        async with create_sessionmaker(engine)() as session:
+            row = await conversations.get_conversation(session, uuid.UUID(conversation_id))
+            agent = await session.get_one(AgentVersion, row.agent_version_id)
+            return await conversations.call_request(
+                session, settings, row, "+15550100000", AgentConfig.model_validate(agent.config)
+            )
+    finally:
+        await engine.dispose()
+
+
 async def test_a_conversation_freezes_its_persona_scenario_and_prompt(
     client: AsyncClient, settings: Settings
 ) -> None:
@@ -758,7 +772,7 @@ async def test_a_conversation_freezes_its_persona_scenario_and_prompt(
     persona = await create_persona(
         client, language="hinglish", background_noise={"sound": "cafe", "level": "busy"}
     )
-    scenario = await create_scenario(client, agent_id)
+    scenario = await create_scenario(client, agent_id, first_words="Haan, bolo?")
     started = await start(client, agent_id, persona_id=persona["id"], scenario_id=scenario["id"])
     await client.patch(
         f"/api/v1/personas/{persona['id']}",
@@ -768,20 +782,18 @@ async def test_a_conversation_freezes_its_persona_scenario_and_prompt(
             "background_noise": {"sound": "none"},
         },
     )
-    await client.patch(
+    cleared = await client.patch(
         f"/api/v1/scenarios/{scenario['id']}",
-        json={"name": "Renamed", "goal": "Cancel the cleaning.", "known_facts": []},
+        json={
+            "name": "Renamed",
+            "goal": "Cancel the cleaning.",
+            "known_facts": [],
+            "first_words": None,
+        },
     )
 
     detail = (await client.get(f"/api/v1/conversations/{started['id']}")).json()
-    engine = create_engine(settings.database_url.encoded_string())
-    async with create_sessionmaker(engine)() as session:
-        row = await conversations.get_conversation(session, uuid.UUID(started["id"]))
-        agent = await session.get_one(AgentVersion, row.agent_version_id)
-        request = await conversations.call_request(
-            session, settings, row, "+15550100000", AgentConfig.model_validate(agent.config)
-        )
-    await engine.dispose()
+    request = await call_request_of(settings, started["id"])
 
     assert (detail["persona_name"], detail["persona_version"]) == (persona["name"], 1)
     assert (detail["scenario_name"], detail["scenario_version"]) == ("Renamed", 1)
@@ -792,10 +804,23 @@ async def test_a_conversation_freezes_its_persona_scenario_and_prompt(
     assert SCENARIO["goal"] in request.instructions and "Cancel" not in request.instructions
     assert "- Name: Priya Raman" in request.instructions and "Hinglish" in request.instructions
     assert request.voice.speed == 1.0 and request.nudge == "हेलो? आप वहाँ हैं?"
+    assert request.first_words == detail["scenario"]["first_words"] == "Haan, bolo?"
+    assert cleared.json()["first_words"] is None
     assert detail["background_noise"] == {"sound": "cafe", "level": "busy"}
     assert request.background_noise == NoiseMix(
         path=sound_path(NoiseSound.CAFE), volume=volume(NoiseLevel.BUSY)
     )
+
+
+async def test_a_scenario_without_first_words_opens_with_its_languages_opening(
+    client: AsyncClient, settings: Settings
+) -> None:
+    started = await start(client, await create_agent_id(client))
+
+    request = await call_request_of(settings, started["id"])
+    defaults = (await client.get("/api/v1/defaults")).json()
+
+    assert request.first_words == defaults["first_words"]["en"] == "Hello"
 
 
 @pytest.mark.parametrize("timezone", ["Pacific/Kiritimati", "Pacific/Pago_Pago"])

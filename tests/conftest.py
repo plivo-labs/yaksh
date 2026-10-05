@@ -103,6 +103,7 @@ SPOKEN = as_wav(array("h", [8000, -8000] * 2000).tobytes())
 """What the fake voice says: half a second of call audio, a loud square wave."""
 CALLER = {
     "instructions": "You want to book a room.",
+    "first_words": "Hello",
     "nudge": "Hello? Are you still there?",
     "caller_language": Language.EN,
     "voice": VoiceSettings(provider=VoiceProvider.ELEVENLABS, id=ENGLISH_VOICE.id),

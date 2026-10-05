@@ -262,6 +262,8 @@ class CallRequest(BaseModel):
     conversation_id: uuid.UUID
     agent: AgentConfig
     instructions: str
+    first_words: str
+    """What the caller says first when it speaks first."""
     nudge: str
     caller_language: Language
     voice: VoiceSettings

@@ -522,6 +522,12 @@ export function ScenarioCard({ name, scenario }: { name: string; scenario: Scena
       </CardHeader>
       <CardContent>
         <dl className="grid gap-3 text-p-400">
+          {scenario.first_words && (
+            <div className="grid gap-1">
+              <dt className="text-xs-400 text-muted-foreground">First words</dt>
+              <dd>{scenario.first_words}</dd>
+            </div>
+          )}
           <Facts label="Knows" facts={scenario.known_facts} />
           <Facts label="Sent to the agent" facts={scenario.agent_data} />
           {scenario.unknown_facts.length > 0 && (

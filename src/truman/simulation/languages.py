@@ -1,5 +1,6 @@
-"""How a persona speaks each language: the prompt line, the idle nudge and the sentence a
-voice preview speaks. Provider codes belong to the caller and the integrations, not here."""
+"""How a persona speaks each language: the prompt line, the first words, the idle nudge and the
+sentence a voice preview speaks. Provider codes belong to the caller and the integrations, not
+here."""
 
 from dataclasses import dataclass
 
@@ -10,6 +11,8 @@ from truman.domain.voices import VoiceGender
 @dataclass(frozen=True)
 class LanguagePolicy:
     instruction: str
+    first_words: str
+    """What the caller says first when it speaks first and the scenario sets none."""
     nudge: str
     sample: str
     goodbye: str
@@ -19,17 +22,19 @@ class LanguagePolicy:
 
 LANGUAGES: dict[Language, LanguagePolicy] = {
     Language.EN: LanguagePolicy(
-        "Speak English.",
-        "Hello? Are you still there?",
-        "Hi, I'm calling about my booking for next Tuesday. Can you check it for me?",
-        "Okay, thanks. I have to go now. Bye.",
+        instruction="Speak English.",
+        first_words="Hello",
+        nudge="Hello? Are you still there?",
+        sample="Hi, I'm calling about my booking for next Tuesday. Can you check it for me?",
+        goodbye="Okay, thanks. I have to go now. Bye.",
     ),
     Language.HINGLISH: LanguagePolicy(
-        "Speak Hinglish: Devanagari script, with common English words such as appointment or "
-        "confirm kept in English.",
-        "हेलो? आप वहाँ हैं?",
-        "नमस्ते, मुझे next Tuesday की booking के बारे में बात करनी है। क्या आप check कर सकते हैं?",
-        "ठीक है, thank you. मुझे अब जाना होगा, bye.",
+        instruction="Speak Hinglish: Devanagari script, with common English words such as "
+        "appointment or confirm kept in English.",
+        first_words="Hello",
+        nudge="हेलो? आप वहाँ हैं?",
+        sample="नमस्ते, मुझे next Tuesday की booking के बारे में बात करनी है। क्या आप check कर सकते हैं?",
+        goodbye="ठीक है, thank you. मुझे अब जाना होगा, bye.",
     ),
 }
 

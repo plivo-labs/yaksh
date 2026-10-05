@@ -18,6 +18,7 @@ FactValue = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1
 Criterion = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=500)]
 Name = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=80)]
 Description = Annotated[str, StringConstraints(strip_whitespace=True, max_length=500)]
+FirstWords = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
 
 
 class Category(StrEnum):
@@ -57,6 +58,9 @@ class ScenarioConfig(BaseModel):
     unknown_facts: list[FactName] = Field(default_factory=list, max_length=20)
     criteria: list[Criterion] = Field(min_length=1, max_length=10)
     agent_data: list[Fact] = Field(default_factory=list, max_length=30)
+    first_words: FirstWords | None = None
+    """What the caller says first when it speaks first, without its model; None says its
+    language's opening."""
 
     @model_validator(mode="after")
     def names_and_criteria_are_distinct(self) -> ScenarioConfig:
@@ -111,6 +115,8 @@ class ScenarioUpdate(BaseModel):
     unknown_facts: list[FactName] | None = Field(default=None, max_length=20)
     criteria: list[Criterion] | None = Field(default=None, min_length=1, max_length=10)
     agent_data: list[Fact] | None = Field(default=None, max_length=30)
+    first_words: FirstWords | None = None
+    """None clears it."""
 
     @field_validator(
         "name",

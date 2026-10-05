@@ -18,7 +18,6 @@ from pipecat.frames.frames import (
     Frame,
     FunctionCallResultProperties,
     LLMContextFrame,
-    LLMRunFrame,
     TTSSpeakFrame,
 )
 from pipecat.observers.base_observer import BaseObserver
@@ -46,7 +45,6 @@ from truman.caller.transcript import (
     AgentTurnTap,
     GeneratedTap,
     TranscriptBuilder,
-    last_user_message,
 )
 from truman.caller.usage import UsageMeter
 from truman.config import Settings
@@ -196,8 +194,7 @@ def watch_silence(
 
 class TurnLimit(FrameProcessor):
     """Between the agent's turns and the persona model: the model answers at most `turns` agent
-    turns. At the next one, `at_limit` runs instead, once. A run of the model that answers no
-    agent turn, such as the caller's opening, does not count."""
+    turns. At the next one, `at_limit` runs instead, once."""
 
     def __init__(self, turns: int, at_limit: Callable[[], Awaitable[None]]) -> None:
         super().__init__()
@@ -208,7 +205,7 @@ class TurnLimit(FrameProcessor):
     async def process_frame(self, frame: Frame, direction: FrameDirection) -> None:
         await super().process_frame(frame, direction)
         if isinstance(frame, LLMContextFrame) and direction is FrameDirection.DOWNSTREAM:
-            answers = not frame.speculation and last_user_message(frame.context) is not None
+            answers = not frame.speculation
             if self._left == 0:
                 if answers and not self._reached:
                     self._reached = True
@@ -390,6 +387,7 @@ class Persona:
         self._transcript = transcript
         self._observer = observer
         self._clock = clock
+        self._first_words = request.first_words
 
         async def nudge() -> None:
             await self.say(request.nudge)
@@ -409,7 +407,7 @@ class Persona:
             state.blame("the pipeline could not be set up: a provider did not connect")
 
     async def speak_first(self) -> None:
-        await self.worker.queue_frame(LLMRunFrame())
+        await self.say(self._first_words)
 
     async def say(self, text: str) -> None:
         """Speak fixed text for the caller, such as the idle nudge, without the model."""
@@ -420,7 +418,8 @@ class Persona:
         return self._transcript.quiet
 
     async def greet_if_silent(self) -> None:
-        """An agent that should speak first but says nothing gets a hello, as a caller would."""
+        """An agent that should speak first but says nothing gets the first words, as a caller
+        would say hello."""
         await asyncio.sleep(IDLE_S)
         if not self._transcript.agent_spoke and not self._transcript.agent_speaking:
             self._observer.wire_event(
