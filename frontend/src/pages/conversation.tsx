@@ -5,6 +5,7 @@ import { Link, useParams, useSearchParams } from "react-router";
 
 import { BackButton } from "@/components/back-button";
 import { EndCallDialog } from "@/components/confirm-dialogs";
+import { LiveListen } from "@/components/live-listen";
 import { CopyId } from "@/components/copy-id";
 import { Fact } from "@/components/panel";
 import { type Mark, type PlayerHandle, RecordingPlayer } from "@/components/recording-player";
@@ -59,6 +60,7 @@ import { cn } from "@/lib/utils";
 import {
   END_REASON_LABELS,
   ACTIVE_STATUSES,
+  LIVE_STATUSES,
   type Conversation,
   type Fact as ScenarioFact,
   LANGUAGE_NAMES,
@@ -131,6 +133,9 @@ export function ConversationPage() {
           </div>
           <div className="flex items-center gap-4">
             <ConversationStatusLabel status={data.status} />
+            {LIVE_STATUSES.includes(data.status) && (
+              <LiveListen key={data.id} conversationId={data.id} />
+            )}
             {active && (
               <Button variant="outline" size="sm" onClick={() => setEnding(true)}>
                 End call
