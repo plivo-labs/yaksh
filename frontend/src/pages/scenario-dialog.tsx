@@ -36,7 +36,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { useCloseGuard } from "@/hooks/use-close-guard";
 import { revealErrors } from "@/lib/forms";
-import { useDeleteScenario, usePersonas, useSaveScenario } from "@/lib/queries";
+import { useDefaults, useDeleteScenario, usePersonas, useSaveScenario } from "@/lib/queries";
 import {
   type AgentSummary,
   CATEGORY_ITEMS,
@@ -56,6 +56,7 @@ const EMPTY: ScenarioInput = {
   unknown_facts: [],
   criteria: [""],
   agent_data: [],
+  first_words: null,
 };
 
 function toDraft(scenario: Scenario): ScenarioInput {
@@ -69,6 +70,7 @@ function toDraft(scenario: Scenario): ScenarioInput {
     unknown_facts: scenario.unknown_facts,
     criteria: scenario.criteria,
     agent_data: scenario.agent_data,
+    first_words: scenario.first_words,
   };
 }
 
@@ -90,6 +92,7 @@ function toInput(draft: ScenarioInput): ScenarioInput {
     unknown_facts: draft.unknown_facts.map((name) => name.trim()).filter(Boolean),
     criteria: draft.criteria.map((text) => text.trim()).filter(Boolean),
     agent_data: trimFacts(draft.agent_data),
+    first_words: draft.first_words?.trim() || null,
   };
 }
 
@@ -221,6 +224,9 @@ export function ScenarioDialog({
   const removeListItem = (key: "unknown_facts" | "criteria", index: number) =>
     change((current) => ({ [key]: current[key].filter((_, at) => at !== index) }));
 
+  const defaults = useDefaults();
+  const persona = personas.data?.find((item) => item.id === input.persona_id);
+  const opening = persona ? defaults.data?.first_words[persona.language] : undefined;
   const outbound = agent.direction === "outbound";
   const halfFact = (facts: ScenarioFact[]) => facts.some((fact) => !fact.name || !fact.value);
   const halfKnown = halfFact(input.known_facts);
@@ -349,6 +355,21 @@ export function ScenarioDialog({
               />
               <FieldDescription>Put names, numbers and dates in the facts below.</FieldDescription>
               {submitted && !input.goal && <FieldError>Describe what the caller wants.</FieldError>}
+            </Field>
+
+            <Field>
+              <FieldLabel htmlFor="scenario-first-words">First words</FieldLabel>
+              <Input
+                id="scenario-first-words"
+                maxLength={200}
+                placeholder={opening}
+                value={draft.first_words ?? ""}
+                onChange={(e) => change(() => ({ first_words: e.target.value }))}
+              />
+              <FieldDescription>
+                What the caller says when it speaks first: when the agent waits for the caller, or
+                says nothing at the start. Leave it empty for the default of the persona's language.
+              </FieldDescription>
             </Field>
 
             <FieldSet>

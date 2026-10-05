@@ -138,9 +138,7 @@ async def test_the_persona_answers_its_most_agent_turns_and_then_the_limit_takes
     def after(*agent_turns: str) -> LLMContext:
         return LLMContext(messages=[{"role": "user", "content": turn} for turn in agent_turns])
 
-    opening = LLMContextFrame(context=after())
     turns = [
-        opening,
         LLMContextFrame(context=after("Hi.")),
         LLMContextFrame(context=after("Hi.", "Your name?"), speculation=True),
         LLMContextFrame(context=after("Hi.", "Your name?")),
@@ -152,8 +150,7 @@ async def test_the_persona_answers_its_most_agent_turns_and_then_the_limit_takes
     down, _ = await run_test(TurnLimit(2, at_limit), frames_to_send=turns)
 
     asked = [frame for frame in down if isinstance(frame, LLMContextFrame)]
-    assert asked[0] is opening
-    assert [frame.speculation for frame in asked] == [False, False, True, False]
+    assert [frame.speculation for frame in asked] == [False, True, False]
     assert reached == ["goodbye"]
 
 

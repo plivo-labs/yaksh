@@ -387,10 +387,12 @@ async def call_request(
 ) -> CallRequest:
     persona_version = await session.get_one(PersonaVersion, conversation.persona_version_id)
     scenario_version = await session.get_one(ScenarioVersion, conversation.scenario_version_id)
+    scenario = ScenarioConfig.model_validate(scenario_version.config)
     return CallRequest(
         conversation_id=conversation.id,
         agent=agent,
         instructions=conversation.instructions,
+        first_words=scenario.first_words or LANGUAGES[conversation.language].first_words,
         nudge=conversation.nudge,
         caller_language=conversation.language,
         voice=PersonaConfig.model_validate(persona_version.config).voice,
@@ -404,7 +406,7 @@ async def call_request(
         max_duration_s=conversation.max_duration_s,
         max_turns=conversation.max_turns,
         goodbye=LANGUAGES[conversation.language].goodbye,
-        agent_data=ScenarioConfig.model_validate(scenario_version.config).agent_data,
+        agent_data=scenario.agent_data,
         accept_calls_until=conversation.dial_deadline_at,
         output_dir=settings.data_dir / str(conversation.id),
     )

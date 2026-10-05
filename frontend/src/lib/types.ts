@@ -389,6 +389,8 @@ export interface ScenarioConfig {
   unknown_facts: string[];
   criteria: string[];
   agent_data: Fact[];
+  /** What the caller says first when it speaks first; null says its language's opening. */
+  first_words: string | null;
 }
 
 export type Category = "happy_path" | "recovery" | "boundary";
@@ -603,6 +605,8 @@ export interface Defaults {
   max_turns: number;
   /** Of a run. */
   max_retries: number;
+  /** What the caller says first, by the persona's language, when a scenario sets none. */
+  first_words: Record<Language, string>;
 }
 
 export interface GenerateInput {

@@ -5072,13 +5072,24 @@
           "max_retries": {
             "type": "integer",
             "title": "Max Retries"
+          },
+          "first_words": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "propertyNames": {
+              "$ref": "#/components/schemas/Language"
+            },
+            "type": "object",
+            "title": "First Words"
           }
         },
         "type": "object",
         "required": [
           "max_duration_s",
           "max_turns",
-          "max_retries"
+          "max_retries",
+          "first_words"
         ],
         "title": "Defaults",
         "description": "What the server uses for a field that a request leaves out."
@@ -8226,6 +8237,19 @@
             "type": "array",
             "maxItems": 30,
             "title": "Agent Data"
+          },
+          "first_words": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Words"
           }
         },
         "additionalProperties": false,
@@ -8281,6 +8305,19 @@
             "type": "array",
             "maxItems": 30,
             "title": "Agent Data"
+          },
+          "first_words": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Words"
           },
           "name": {
             "type": "string",
@@ -8420,6 +8457,17 @@
             "type": "array",
             "title": "Agent Data"
           },
+          "first_words": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Words"
+          },
           "current_version": {
             "type": "integer",
             "title": "Current Version"
@@ -8449,6 +8497,7 @@
           "unknown_facts",
           "criteria",
           "agent_data",
+          "first_words",
           "current_version",
           "created_at",
           "updated_at"
@@ -8581,6 +8630,19 @@
               }
             ],
             "title": "Agent Data"
+          },
+          "first_words": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Words"
           }
         },
         "additionalProperties": false,

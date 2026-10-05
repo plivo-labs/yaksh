@@ -1172,9 +1172,10 @@ type DecidedBy string
 
 // Defaults What the server uses for a field that a request leaves out.
 type Defaults struct {
-	MaxDurationS int `json:"max_duration_s"`
-	MaxRetries   int `json:"max_retries"`
-	MaxTurns     int `json:"max_turns"`
+	FirstWords   map[string]string `json:"first_words"`
+	MaxDurationS int               `json:"max_duration_s"`
+	MaxRetries   int               `json:"max_retries"`
+	MaxTurns     int               `json:"max_turns"`
 }
 
 // Direction defines model for Direction.
@@ -1861,6 +1862,7 @@ type RunVerdicts struct {
 type ScenarioConfig struct {
 	AgentData    *[]Fact   `json:"agent_data,omitempty"`
 	Criteria     []string  `json:"criteria"`
+	FirstWords   *string   `json:"first_words,omitempty"`
 	Goal         string    `json:"goal"`
 	KnownFacts   *[]Fact   `json:"known_facts,omitempty"`
 	UnknownFacts *[]string `json:"unknown_facts,omitempty"`
@@ -1874,6 +1876,7 @@ type ScenarioCreate struct {
 	Category     *Category          `json:"category,omitempty"`
 	Criteria     []string           `json:"criteria"`
 	Description  *string            `json:"description,omitempty"`
+	FirstWords   *string            `json:"first_words,omitempty"`
 	Goal         string             `json:"goal"`
 	KnownFacts   *[]Fact            `json:"known_facts,omitempty"`
 	Name         string             `json:"name"`
@@ -1897,6 +1900,7 @@ type ScenarioRead struct {
 	Criteria       []string            `json:"criteria"`
 	CurrentVersion int                 `json:"current_version"`
 	Description    *string             `json:"description"`
+	FirstWords     *string             `json:"first_words"`
 	GenerationId   *openapi_types.UUID `json:"generation_id"`
 	Goal           string              `json:"goal"`
 	Id             openapi_types.UUID  `json:"id"`
@@ -1913,6 +1917,7 @@ type ScenarioUpdate struct {
 	Category     *Category           `json:"category,omitempty"`
 	Criteria     *[]string           `json:"criteria,omitempty"`
 	Description  *string             `json:"description,omitempty"`
+	FirstWords   *string             `json:"first_words,omitempty"`
 	Goal         *string             `json:"goal,omitempty"`
 	KnownFacts   *[]Fact             `json:"known_facts,omitempty"`
 	Name         *string             `json:"name,omitempty"`
