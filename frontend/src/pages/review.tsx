@@ -10,7 +10,6 @@ import { type OnTurn, ItemResult, VerdictLabel, type VerdictKind } from "@/compo
 import { Panel, PanelHeader } from "@/components/panel";
 import type { PlayerHandle } from "@/components/recording-player";
 import { RelativeTime } from "@/components/relative-time";
-import { StatusLabel } from "@/components/status-label";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -28,10 +27,10 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { VerdictPill } from "@/components/verdict-ui";
 import { LABELER_TOKEN } from "@/lib/api";
 import { useReview, useReviewQueue, useSaveLabel } from "@/lib/queries";
 import { turnStart } from "@/lib/turns";
-import { VERDICT_TONE } from "@/lib/status";
 import {
   type EvaluationItem,
   LABEL_ANSWERS,
@@ -251,8 +250,8 @@ function VerdictLine({
       <dt className="justify-self-start">
         <VerdictLabel kind={kind} />
       </dt>
-      <dd className="grid gap-0.5">
-        <StatusLabel tone={VERDICT_TONE[effective]}>{VERDICT_TEXT[effective]}</StatusLabel>
+      <dd className="grid justify-items-start gap-1">
+        <VerdictPill verdict={effective} />
         <span className="text-xs text-muted-foreground">
           Machine: {VERDICT_TEXT[machine].toLowerCase()}
         </span>
