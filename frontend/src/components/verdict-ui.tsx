@@ -200,6 +200,48 @@ export function SegmentBar({ counts, label }: { counts: Record<string, number>; 
   );
 }
 
+function outcomeName(key: string): string {
+  return key === "not_testable" ? "Not testable" : (OUTCOME_TEXT[key as Outcome] ?? key);
+}
+
+/** Outcome counts as a bar that names them on hover, then the passes over the calls that passed
+ * or failed, in the last two columns of its row's grid. */
+export function OutcomeCounts({
+  counts,
+  label,
+}: {
+  counts: Record<string, number>;
+  label: string;
+}) {
+  const passed = counts.pass ?? 0;
+  const scored = passed + (counts.fail ?? 0);
+  const detail = Object.entries(counts)
+    .map(([key, count]) => `${outcomeName(key)} ${count}`)
+    .join(", ");
+  return (
+    <div className="col-span-2 grid grid-cols-subgrid items-center">
+      <Tooltip>
+        <TooltipTrigger className="w-full cursor-help rounded-sm py-1 outline-none focus-visible:ring-2 focus-visible:ring-ring/50">
+          <SegmentBar counts={counts} label={`${label}: ${detail}`} />
+        </TooltipTrigger>
+        <TooltipContent>{detail}</TooltipContent>
+      </Tooltip>
+      <span
+        className="text-right text-xs-500 tabular-nums"
+        title={
+          scored ? "Passed, of the calls where it passed or failed" : "No call passed or failed it"
+        }
+      >
+        {scored ? (
+          `${passed}/${scored}`
+        ) : (
+          <span className="text-xs-400 text-muted-foreground">None</span>
+        )}
+      </span>
+    </div>
+  );
+}
+
 /** A big number and what it means: the glance layer of a panel. */
 export function Stat({
   label,

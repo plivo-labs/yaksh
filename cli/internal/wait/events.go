@@ -30,8 +30,17 @@ type Event struct {
 
 // Conversation follows the call's event stream and passes each event to emit, in order. The
 // stream first replays what already happened, and the server ends it once the call has ended.
-// If the stream breaks, or ctx is done, it returns an error and the call goes on.
+// If the stream breaks, it returns an error, and if ctx is done, the cause of ctx. The call goes
+// on either way.
 func Conversation(ctx context.Context, c *api.Client, id uuid.UUID, emit func(Event) error) error {
+	err := follow(ctx, c, id, emit)
+	if err != nil && ctx.Err() != nil {
+		return context.Cause(ctx)
+	}
+	return err
+}
+
+func follow(ctx context.Context, c *api.Client, id uuid.UUID, emit func(Event) error) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	resp, err := api.Stream(c).StreamEventsApiV1ConversationsConversationIdEventsGet(ctx, id)

@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"os"
+
 	"github.com/spf13/cobra"
 
 	"github.com/plivo-labs/truman/cli/internal/api"
@@ -11,8 +13,41 @@ func (a *app) agentCmd() *cobra.Command {
 		Use:   "agent",
 		Short: "The voice agents that Truman tests",
 	}
-	agent.AddCommand(a.agentListCmd(), a.agentViewCmd())
+	agent.AddCommand(a.agentListCmd(), a.agentViewCmd(), a.agentUpdateCmd())
 	return agent
+}
+
+func (a *app) agentUpdateCmd() *cobra.Command {
+	var configFile string
+	cmd := &cobra.Command{
+		Use:   "update <id> --config-file <path>",
+		Short: "Change an agent's configuration in Truman, which the judges read; a change makes a new agent version",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			id, err := parseID("agent", args[0])
+			if err != nil {
+				return err
+			}
+			config, err := os.ReadFile(configFile)
+			if err != nil {
+				return err
+			}
+			c, err := a.client()
+			if err != nil {
+				return err
+			}
+			text := string(config)
+			body, err := api.Body(c.UpdateAgentApiV1AgentsAgentIdPatch(cmd.Context(), id, api.AgentUpdate{Config: &text}))
+			if err != nil {
+				return err
+			}
+			return printJSON(cmd.OutOrStdout(), body)
+		},
+	}
+	cmd.Flags().StringVar(&configFile, "config-file", "",
+		"a file with the agent's full configuration as text: a prompt, a flow or an export")
+	cmd.MarkFlagRequired("config-file")
+	return cmd
 }
 
 func (a *app) agentListCmd() *cobra.Command {

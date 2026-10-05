@@ -39,7 +39,7 @@ from truman.evaluation.sources import (
     judge_hallucination,
     judge_instructions,
 )
-from truman.evaluation.verdicts import counted, verdict
+from truman.evaluation.verdicts import RULE, counted, verdict
 
 
 @dataclass(frozen=True)
@@ -97,7 +97,7 @@ async def evaluate(
         await judging.jev.ask(
             view,
             {f"criterion-{n}": text for n, text in enumerate(scenario.criteria, 1)}
-            | {f"rule-{rule.key}": rule_text(rule) for rule in open_rules},
+            | {f"{RULE}{rule.key}": rule_text(rule) for rule in open_rules},
         )
         if judging.jev is not None
         else None
@@ -163,7 +163,7 @@ async def evaluate(
         rules = [
             group.create_task(
                 decided(
-                    f"rule-{rule.key}",
+                    f"{RULE}{rule.key}",
                     rule.name,
                     rule.role,
                     partial(

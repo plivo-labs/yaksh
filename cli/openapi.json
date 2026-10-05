@@ -382,6 +382,59 @@
         }
       }
     },
+    "/api/v1/agents/{agent_id}/rule-results": {
+      "get": {
+        "tags": [
+          "agents"
+        ],
+        "summary": "Get Rule Results",
+        "description": "Each current rule over the judged calls that ran it as it is written now.",
+        "operationId": "get_rule_results_api_v1_agents__agent_id__rule_results_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Agent Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RuleResults"
+                  },
+                  "title": "Response Get Rule Results Api V1 Agents  Agent Id  Rule Results Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/agents/{agent_id}/versions": {
       "get": {
         "tags": [
@@ -7147,6 +7200,69 @@
         ],
         "title": "Role"
       },
+      "RuleCounts": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "role": {
+            "$ref": "#/components/schemas/ItemRole"
+          },
+          "counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Counts"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "name",
+          "role",
+          "counts"
+        ],
+        "title": "RuleCounts",
+        "description": "One agent rule over a set of judged calls."
+      },
+      "RuleFailure": {
+        "properties": {
+          "conversation_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Conversation Id"
+          },
+          "scenario_name": {
+            "type": "string",
+            "title": "Scenario Name"
+          },
+          "ended_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ended At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "conversation_id",
+          "scenario_name",
+          "ended_at"
+        ],
+        "title": "RuleFailure"
+      },
       "RuleGate": {
         "type": "string",
         "enum": [
@@ -7155,6 +7271,36 @@
         ],
         "title": "RuleGate",
         "description": "When an LLM rule can apply, decided in code before any model call."
+      },
+      "RuleResults": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Counts"
+          },
+          "failures": {
+            "items": {
+              "$ref": "#/components/schemas/RuleFailure"
+            },
+            "type": "array",
+            "title": "Failures"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "counts",
+          "failures"
+        ],
+        "title": "RuleResults",
+        "description": "One of the agent's current rules over the judged calls that ran it as it is written now."
       },
       "RunCreate": {
         "properties": {
@@ -7976,6 +8122,13 @@
             "type": "array",
             "title": "Criteria"
           },
+          "rules": {
+            "items": {
+              "$ref": "#/components/schemas/RuleCounts"
+            },
+            "type": "array",
+            "title": "Rules"
+          },
           "decided_by": {
             "additionalProperties": {
               "type": "integer"
@@ -8020,6 +8173,7 @@
           "scenarios",
           "inconsistent",
           "criteria",
+          "rules",
           "decided_by",
           "errors",
           "callers",

@@ -5,6 +5,7 @@ from collections.abc import Iterable
 from truman.domain.evaluations import ItemRole, Outcome, UnsureKind, Verdict
 
 CRITERION = "criterion-"
+RULE = "rule-"
 NOT_SCORED = frozenset({Outcome.UNSURE, Outcome.BLOCKED, Outcome.ERROR, Outcome.PENDING})
 
 

@@ -2,6 +2,11 @@ import type { AgentRule, LlmRule, PhraseRule } from "@/lib/types";
 
 export const MAX_RULES = 20;
 
+export const ROLE_TEXT: Record<AgentRule["role"], string> = {
+  deciding: "Counts in the call's verdict",
+  reporting: "Reports only",
+};
+
 export const NEW_LLM: LlmRule = {
   kind: "llm",
   key: "",

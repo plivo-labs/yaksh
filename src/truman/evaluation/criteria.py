@@ -12,6 +12,7 @@ from truman.domain.rules import LlmRule
 from truman.evaluation.evidence import with_item
 from truman.evaluation.judging import Answered, Check, ItemResult, JudgeSpec, ask, prompt
 from truman.evaluation.quotes import absence_problems, quote_problems
+from truman.evaluation.verdicts import RULE
 
 NULLABLE_TURNS = {
     "anyOf": [
@@ -148,4 +149,4 @@ async def judge_rule(
         slots=slots,
         retry_later=retry_later,
     )
-    return item(answered, f"rule-{rule.key}", rule.name, AGENT_RULE.name, rule.role)
+    return item(answered, f"{RULE}{rule.key}", rule.name, AGENT_RULE.name, rule.role)

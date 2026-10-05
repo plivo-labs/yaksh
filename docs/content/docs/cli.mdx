@@ -3,7 +3,7 @@ title: CLI
 description: The truman CLI is a command-line client for coding agents, CI and persons.
 ---
 
-`truman` is a command-line client for the Truman API. Coding agents, CI and persons use the same commands. The `agent`, `scenario`, `persona`, `run` and `conversation` commands write the JSON of the server to stdout. With `--wait`, `truman conversation start` writes one line of JSON for each event of the call, and then a last line with the conversation.
+`truman` is a command-line client for the Truman API. Coding agents, CI and persons use the same commands. The `agent`, `scenario`, `persona`, `run` and `conversation` commands write the JSON of the server to stdout. With `--wait`, `truman conversation start` writes one line of JSON for each event of the call, then a line with the conversation. For a call that completed, a last line holds the evaluation of the judges.
 
 `truman auth status` and `truman version` write JSON that the CLI makes. `truman guide` writes Markdown. `truman auth login` and `truman auth logout` do not write to stdout. Each command writes progress, hints and errors to stderr. Each command exits with 0 if it has no error, and with 1 if it has an error.
 
@@ -41,7 +41,15 @@ You can also set two variables and not use `truman auth login`, for example in C
 truman run start --agent <agent id> --all --wait
 ```
 
-This command starts a run of all scenarios of the agent and waits until the run stops. With `--wait`, the command exits with 1 if a conversation of the run did not complete, for example if its call did not connect. For a conversation that has retries, only the last retry counts. Exit 0 does not tell you that the agent did its tasks correctly. If you stop the command with Ctrl-C, the CLI cancels the run. `truman agent list` shows the IDs of the agents.
+This command starts a run of all scenarios of the agent, waits until the run stops, and then waits for the verdicts of the judges. With `--wait`, the command exits with 0 only if all conversations of the run completed and the judges passed all calls. For a conversation that has retries, only the last retry counts. The judges decide each call by its scenario verdict after the labels of persons, as for the pass rate of the run. A call that did not connect, a call that the judges failed or did not score, and a failed evaluation give exit 1. If no `--timeout` is set, the wait for the judges stops after 10 minutes. If the judges are off, exit 0 does not tell you that the agent did its tasks correctly. If you stop the command with Ctrl-C while the run continues, the CLI cancels the run. `truman agent list` shows the IDs of the agents.
+
+If the judges failed a call, these commands show why:
+
+- `truman run metrics <run id>` shows the pass rate, the coverage, the calls of each scenario with their verdicts, and the counts of each criterion. A call with a null verdict is a call whose evaluation failed.
+- `truman conversation evaluation <conversation id>` shows the verdicts of one call, and each criterion and rule with the quotes and the reasoning of its judge.
+- `truman conversation view <conversation id>` shows the transcript of the call.
+
+The instruction adherence judge reads the `config` of the agent in Truman. After you change the prompt or the flow of the agent, update this copy with `truman agent update <agent id> --config-file prompt.md`.
 
 `truman guide` shows how a coding agent uses the CLI to do tests of a voice agent. The same text is the skill in `cli/skill/SKILL.md`. To add the skill for all your projects, use `npx skills add plivo-labs/truman -g`. Without `-g`, the skill goes only into the project in the current folder.
 

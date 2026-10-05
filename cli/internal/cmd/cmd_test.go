@@ -273,15 +273,41 @@ func TestRunStartAllTakesEveryPageOfScenarios(t *testing.T) {
 	}
 }
 
+// metricsJSON is a run's metrics with pending calls and one scenario whose calls got verdicts.
+// Each verdict is JSON; null is a failed evaluation.
+func metricsJSON(pending int, verdicts ...string) string {
+	calls := make([]string, len(verdicts))
+	for i, verdict := range verdicts {
+		calls[i] = fmt.Sprintf(`{"conversation_id":"%s","repeat":%d,"verdict":%s}`, convID, i+1, verdict)
+	}
+	return fmt.Sprintf(`{"verdicts":{"pending":%d,"errors":0,"scenarios":[{"scenario_id":"%s","calls":[%s]}]}}`,
+		pending, scenA, strings.Join(calls, ","))
+}
+
 func TestRunStartWaitPassesWhenEveryCallCompleted(t *testing.T) {
 	f := newFakeAPI(t, map[string]http.HandlerFunc{
-		"POST /api/v1/runs":     reply(202, runJSON("queued", `"waiting":2`)),
-		"GET /api/v1/runs/{id}": replies(runJSON("running", `"in_progress":2`), runJSON("done", `"completed":2`)),
+		"POST /api/v1/runs":             reply(202, runJSON("queued", `"waiting":2`)),
+		"GET /api/v1/runs/{id}":         replies(runJSON("running", `"in_progress":2`), runJSON("done", `"completed":2`)),
+		"GET /api/v1/runs/{id}/metrics": reply(200, metricsJSON(0, `"pass"`, `"pass"`)),
 	})
 	code, stdout, stderr := run(t, context.Background(), against(f), "", "run", "start", "--agent", agentID, "--scenario", scenA, "--wait")
 
-	if code != 0 || !strings.Contains(stdout, `"status": "done"`) || !strings.HasSuffix(stderr, "done: 2 of 2 calls completed\n") {
+	if code != 0 || !strings.Contains(stdout, `"status": "done"`) || !strings.HasSuffix(stderr, "done: 2 of 2 calls completed; judges: 2 pass\n") {
 		t.Fatalf("code = %d, stdout = %q, stderr = %q", code, stdout, stderr)
+	}
+}
+
+func TestRunWaitWaitsForTheJudgesAndFailsUnlessTheyPassEveryCall(t *testing.T) {
+	f := newFakeAPI(t, map[string]http.HandlerFunc{
+		"GET /api/v1/runs/{id}":         reply(200, runJSON("done", `"completed":3`)),
+		"GET /api/v1/runs/{id}/metrics": replies(metricsJSON(3), metricsJSON(0, `"pass"`, `"not_scored"`, `null`)),
+	})
+	code, _, stderr := run(t, context.Background(), against(f), "", "run", "wait", runID)
+
+	want := "error: run " + runID + " done: 3 of 3 calls completed; judges: 1 pass, 1 not scored, 1 evaluation failed\n" +
+		"next: truman run metrics " + runID + "\n"
+	if code != 1 || !strings.HasSuffix(stderr, want) || len(f.requests("GET", "/api/v1/runs/"+runID+"/metrics")) != 2 {
+		t.Fatalf("code = %d, stderr = %q; want 1, two reads of the metrics and %q", code, stderr, want)
 	}
 }
 
@@ -408,19 +434,25 @@ func TestRunCancelSaysWhatToRunNextWhenTheWaitEnds(t *testing.T) {
 
 func TestConversationStartWaitPrintsEachEventThenTheConversation(t *testing.T) {
 	events := "event: turn\ndata: {\"role\":\"agent\",\"text\":\"Hello\"}\n\n: ping\n\nevent: status\ndata: {\"status\":\"completed\"}\n\n"
+	judged := func(verdict string) string {
+		return fmt.Sprintf(`{"evaluation":"done","effective_scenario_verdict":"%s"}`, verdict)
+	}
 	for _, tt := range []struct {
-		status, endReason string
-		code              int
+		name, status, endReason, evaluation string
+		code                                int
+		next                                string
 	}{
-		{"completed", "caller_hangup", 0},
-		{"failed", "no_answer", 1},
+		{"passed", "completed", "caller_hangup", judged("pass"), 0, ""},
+		{"not scored", "completed", "caller_hangup", judged("not_scored"), 1, "truman conversation evaluation " + convID},
+		{"call failed", "failed", "no_answer", "", 1, "truman conversation view " + convID},
 	} {
-		t.Run(tt.status, func(t *testing.T) {
+		t.Run(tt.name, func(t *testing.T) {
 			conversation := fmt.Sprintf(`{"id":"%s","status":"%s","end_reason":"%s"}`, convID, tt.status, tt.endReason)
 			f := newFakeAPI(t, map[string]http.HandlerFunc{
-				"POST /api/v1/conversations":            reply(202, fmt.Sprintf(`{"id":"%s","status":"queued"}`, convID)),
-				"GET /api/v1/conversations/{id}/events": reply(200, events),
-				"GET /api/v1/conversations/{id}":        reply(200, conversation),
+				"POST /api/v1/conversations":                reply(202, fmt.Sprintf(`{"id":"%s","status":"queued"}`, convID)),
+				"GET /api/v1/conversations/{id}/events":     reply(200, events),
+				"GET /api/v1/conversations/{id}":            reply(200, conversation),
+				"GET /api/v1/conversations/{id}/evaluation": replies(`{"evaluation":"queued"}`, tt.evaluation),
 			})
 			code, stdout, stderr := run(t, context.Background(), against(f), "",
 				"conversation", "start", "--agent", agentID, "--scenario", scenA, "--wait")
@@ -428,11 +460,14 @@ func TestConversationStartWaitPrintsEachEventThenTheConversation(t *testing.T) {
 			want := `{"event":"turn","data":{"role":"agent","text":"Hello"}}` + "\n" +
 				`{"event":"status","data":{"status":"completed"}}` + "\n" +
 				`{"event":"conversation","data":` + conversation + "}\n"
+			if tt.evaluation != "" {
+				want += `{"event":"evaluation","data":` + tt.evaluation + "}\n"
+			}
 			if code != tt.code || stdout != want {
 				t.Fatalf("code = %d, stdout = %q, stderr = %q", code, stdout, stderr)
 			}
-			if tt.code == 1 && !strings.Contains(stderr, "next: truman conversation view "+convID) {
-				t.Fatalf("stderr = %q, want the next command", stderr)
+			if tt.next != "" && !strings.Contains(stderr, "next: "+tt.next) {
+				t.Fatalf("stderr = %q, want next: %s", stderr, tt.next)
 			}
 		})
 	}
