@@ -1,5 +1,6 @@
 import {
   AudioLines,
+  BookOpen,
   Bot,
   ClipboardCheck,
   Hash,
@@ -24,6 +25,7 @@ import {
   SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
+  SidebarGroupLabel,
   SidebarHeader,
   SidebarInset,
   SidebarMenu,
@@ -36,15 +38,23 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
-const links: { to: string; label: string; icon: typeof Bot }[] = [
-  { to: "/agents", label: "Agents", icon: Bot },
-  { to: "/runs", label: "Runs", icon: ListChecks },
-  { to: "/conversations", label: "Conversations", icon: PhoneCall },
-  { to: "/personas", label: "Personas", icon: UserRound },
-  { to: "/voices", label: "Voices", icon: AudioLines },
-  { to: "/numbers", label: "Numbers", icon: Hash },
-  /* The review screen stands outside the console: it holds a labeler's token. */
-  { to: "/review", label: "Review", icon: ClipboardCheck },
+const groups: { label: string; links: { to: string; label: string; icon: typeof Bot }[] }[] = [
+  {
+    label: "Test",
+    links: [
+      { to: "/agents", label: "Agents", icon: Bot },
+      { to: "/runs", label: "Runs", icon: ListChecks },
+      { to: "/conversations", label: "Conversations", icon: PhoneCall },
+    ],
+  },
+  {
+    label: "Callers",
+    links: [
+      { to: "/personas", label: "Personas", icon: UserRound },
+      { to: "/voices", label: "Voices", icon: AudioLines },
+      { to: "/numbers", label: "Numbers", icon: Hash },
+    ],
+  },
 ];
 
 const sidebarOpen = () => !document.cookie.split("; ").includes("sidebar_state=false");
@@ -76,27 +86,56 @@ export function Shell() {
             </SidebarMenu>
           </SidebarHeader>
           <SidebarContent>
-            <SidebarGroup>
-              <SidebarGroupContent>
-                <SidebarMenu>
-                  {links.map(({ to, label, icon: Icon }) => (
-                    <SidebarMenuItem key={to}>
-                      <SidebarMenuButton
-                        isActive={pathname.startsWith(to)}
-                        tooltip={label}
-                        render={<NavLink to={to} />}
-                      >
-                        <Icon />
-                        <span>{label}</span>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  ))}
-                </SidebarMenu>
-              </SidebarGroupContent>
-            </SidebarGroup>
+            {groups.map((group) => (
+              <SidebarGroup key={group.label}>
+                <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
+                <SidebarGroupContent>
+                  <SidebarMenu>
+                    {group.links.map(({ to, label, icon: Icon }) => (
+                      <SidebarMenuItem key={to}>
+                        <SidebarMenuButton
+                          isActive={pathname.startsWith(to)}
+                          tooltip={label}
+                          render={<NavLink to={to} />}
+                        >
+                          <Icon />
+                          <span>{label}</span>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    ))}
+                  </SidebarMenu>
+                </SidebarGroupContent>
+              </SidebarGroup>
+            ))}
           </SidebarContent>
           <SidebarFooter className="border-t border-sidebar-border">
             <SidebarMenu>
+              {/* The review screen stands outside the console: it holds a labeler's token. */}
+              <SidebarMenuItem>
+                <SidebarMenuButton tooltip="Review" render={<a href="/review" target="_blank" />}>
+                  <ClipboardCheck />
+                  <span>
+                    Review<span className="sr-only"> (opens in a new tab)</span>
+                  </span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  tooltip="Docs"
+                  render={
+                    <a
+                      href="https://github.com/plivo-labs/truman/tree/dev/docs/content/docs"
+                      target="_blank"
+                      rel="noreferrer"
+                    />
+                  }
+                >
+                  <BookOpen />
+                  <span>
+                    Docs<span className="sr-only"> (opens in a new tab)</span>
+                  </span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
               <SidebarMenuItem>
                 <SidebarMenuButton tooltip={theme} onClick={toggleDark}>
                   {dark ? <SunMedium /> : <MoonStar />}
