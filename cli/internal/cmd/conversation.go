@@ -140,7 +140,7 @@ func (a *app) followConversation(ctx context.Context, c *api.Client, id uuid.UUI
 	}
 	// The judges skip a call that someone stopped, and a run counts it as cancelled.
 	if outcome.Status != api.ConversationStatusCompleted || stopped {
-		return &nextStep{what, view}
+		return &failure{nextStep{what, view}}
 	}
 	evaluation := "truman conversation evaluation " + id.String()
 	limit := timeout
@@ -169,7 +169,7 @@ func (a *app) followConversation(ctx context.Context, c *api.Client, id uuid.UUI
 		what += "; " + s
 	}
 	if !e.Passed() {
-		return &nextStep{what, evaluation}
+		return &failure{nextStep{what, evaluation}}
 	}
 	fmt.Fprintln(stderr, what)
 	return nil

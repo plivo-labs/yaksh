@@ -186,8 +186,9 @@ func allScenarios(ctx context.Context, c *api.Client, agentID uuid.UUID) ([]uuid
 	return ids, nil
 }
 
-// waitForRun waits for the run to end, prints it, waits for the judges' verdicts, and fails
-// unless every call completed and the judges passed every call. One timeout covers both waits;
+// waitForRun waits for the run to end and for the judges' verdicts, prints the run as it is then,
+// and fails unless every call completed and the judges passed every call. When the wait for the
+// judges ends early, it prints the ended run before the error. One timeout covers both waits;
 // without one, the judges get judgeTimeout. With cancelOnStop, Ctrl-C or SIGTERM cancels a run
 // that is still going.
 func (a *app) waitForRun(cmd *cobra.Command, c *api.Client, id uuid.UUID, timeout time.Duration, cancelOnStop bool) error {
@@ -211,9 +212,6 @@ func (a *app) waitForRun(cmd *cobra.Command, c *api.Client, id uuid.UUID, timeou
 	case err != nil:
 		return &nextStep{fmt.Sprintf("could not read run %s (%s); the run goes on", id, describe(err)), again}
 	}
-	if err := printJSON(cmd.OutOrStdout(), r.Body); err != nil {
-		return err
-	}
 	var v wait.Verdicts
 	if r.Passed() {
 		limit := timeout
@@ -223,14 +221,29 @@ func (a *app) waitForRun(cmd *cobra.Command, c *api.Client, id uuid.UUID, timeou
 		judging, stop := withTimeout(ctx, limit)
 		defer stop()
 		v, err = wait.RunVerdicts(judging, c, id, opts)
+		if err == nil {
+			// The evaluator computes the run's response times with the verdicts.
+			var judged wait.Result
+			if judged, err = wait.Run(judging, c, id, opts); err == nil {
+				r = judged
+			}
+		}
+		if err != nil {
+			if err := printJSON(cmd.OutOrStdout(), r.Body); err != nil {
+				return err
+			}
+		}
 		switch {
 		case errors.Is(err, wait.ErrTimeout):
 			return &nextStep{fmt.Sprintf("run %s ended, but the judges were not done before the %s time limit", id, limit), again}
 		case errors.Is(err, context.Canceled):
 			return &nextStep{"stopped waiting for the judges; the run has ended", again}
 		case err != nil:
-			return &nextStep{fmt.Sprintf("could not read the verdicts of run %s (%s)", id, describe(err)), again}
+			return &nextStep{fmt.Sprintf("could not read run %s or its verdicts (%s)", id, describe(err)), again}
 		}
+	}
+	if err := printJSON(cmd.OutOrStdout(), r.Body); err != nil {
+		return err
 	}
 	summary := r.Summary()
 	if s := v.Summary(); s != "" {
@@ -238,10 +251,10 @@ func (a *app) waitForRun(cmd *cobra.Command, c *api.Client, id uuid.UUID, timeou
 	}
 	switch {
 	case !r.Passed():
-		return &nextStep{summary, fmt.Sprintf(
-			"truman conversation list --run %s --latest-attempts --group error,did_not_connect", id)}
+		return &failure{nextStep{summary, fmt.Sprintf(
+			"truman conversation list --run %s --latest-attempts --group error,did_not_connect", id)}}
 	case !v.Passed():
-		return &nextStep{summary, "truman run metrics " + id.String()}
+		return &failure{nextStep{summary, "truman run metrics " + id.String()}}
 	}
 	fmt.Fprintln(stderr, summary)
 	return nil

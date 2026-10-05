@@ -285,14 +285,16 @@ func metricsJSON(pending int, verdicts ...string) string {
 }
 
 func TestRunStartWaitPassesWhenEveryCallCompleted(t *testing.T) {
+	judged := fmt.Sprintf(`{"id":"%s","status":"done","counts":{"completed":2},"response_p90_ms":1200}`, runID)
 	f := newFakeAPI(t, map[string]http.HandlerFunc{
 		"POST /api/v1/runs":             reply(202, runJSON("queued", `"waiting":2`)),
-		"GET /api/v1/runs/{id}":         replies(runJSON("running", `"in_progress":2`), runJSON("done", `"completed":2`)),
+		"GET /api/v1/runs/{id}":         replies(runJSON("running", `"in_progress":2`), runJSON("done", `"completed":2`), judged),
 		"GET /api/v1/runs/{id}/metrics": reply(200, metricsJSON(0, `"pass"`, `"pass"`)),
 	})
 	code, stdout, stderr := run(t, context.Background(), against(f), "", "run", "start", "--agent", agentID, "--scenario", scenA, "--wait")
 
-	if code != 0 || !strings.Contains(stdout, `"status": "done"`) || !strings.HasSuffix(stderr, "done: 2 of 2 calls completed; judges: 2 pass\n") {
+	// The run is printed as it is after the judges, with the response times that they compute.
+	if code != 0 || !strings.Contains(stdout, `"response_p90_ms": 1200`) || !strings.HasSuffix(stderr, "done: 2 of 2 calls completed; judges: 2 pass\n") {
 		t.Fatalf("code = %d, stdout = %q, stderr = %q", code, stdout, stderr)
 	}
 }
@@ -304,7 +306,7 @@ func TestRunWaitWaitsForTheJudgesAndFailsUnlessTheyPassEveryCall(t *testing.T) {
 	})
 	code, _, stderr := run(t, context.Background(), against(f), "", "run", "wait", runID)
 
-	want := "error: run " + runID + " done: 3 of 3 calls completed; judges: 1 pass, 1 not scored, 1 evaluation failed\n" +
+	want := "failed: run " + runID + " done: 3 of 3 calls completed; judges: 1 pass, 1 not scored, 1 evaluation failed\n" +
 		"next: truman run metrics " + runID + "\n"
 	if code != 1 || !strings.HasSuffix(stderr, want) || len(f.requests("GET", "/api/v1/runs/"+runID+"/metrics")) != 2 {
 		t.Fatalf("code = %d, stderr = %q; want 1, two reads of the metrics and %q", code, stderr, want)
@@ -317,7 +319,7 @@ func TestRunWaitFailsAndSaysWhatToRunNext(t *testing.T) {
 	})
 	code, stdout, stderr := run(t, context.Background(), against(f), "", "run", "wait", runID)
 
-	want := "error: run " + runID + " done: 3 of 4 calls completed, 1 did not connect\n" +
+	want := "failed: run " + runID + " done: 3 of 4 calls completed, 1 did not connect\n" +
 		"next: truman conversation list --run " + runID + " --latest-attempts --group error,did_not_connect\n"
 	if code != 1 || !strings.Contains(stdout, `"status": "done"`) || stderr != want {
 		t.Fatalf("code = %d, stdout = %q, stderr = %q", code, stdout, stderr)
@@ -465,6 +467,9 @@ func TestConversationStartWaitPrintsEachEventThenTheConversation(t *testing.T) {
 			}
 			if code != tt.code || stdout != want {
 				t.Fatalf("code = %d, stdout = %q, stderr = %q", code, stdout, stderr)
+			}
+			if tt.next != "" && !strings.Contains(stderr, "failed: conversation "+convID+" "+tt.status) {
+				t.Fatalf("stderr = %q, want the outcome after failed:", stderr)
 			}
 			if tt.next != "" && !strings.Contains(stderr, "next: "+tt.next) {
 				t.Fatalf("stderr = %q, want next: %s", stderr, tt.next)

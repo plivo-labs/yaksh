@@ -62,7 +62,12 @@ func (a *app) execute(ctx context.Context, args []string, stdin io.Reader, stdou
 	root.SetOut(stdout)
 	root.SetErr(stderr)
 	if err := root.ExecuteContext(ctx); err != nil {
-		fmt.Fprintln(stderr, "error:", describe(err))
+		var f *failure
+		if errors.As(err, &f) {
+			fmt.Fprintln(stderr, "failed:", f.Error())
+		} else {
+			fmt.Fprintln(stderr, "error:", describe(err))
+		}
 		return 1
 	}
 	return 0
@@ -92,6 +97,10 @@ type nextStep struct {
 func (e *nextStep) Error() string {
 	return e.what + "\nnext: " + e.next
 }
+
+// failure is a test that ran and did not pass: a call that did not complete, or a verdict. It
+// prints as "failed:", so that it does not read as a command that went wrong.
+type failure struct{ nextStep }
 
 // describe turns an error into a message that says what happened and the next step.
 func describe(err error) string {

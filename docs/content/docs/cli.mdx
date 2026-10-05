@@ -5,7 +5,7 @@ description: The truman CLI is a command-line client for coding agents, CI and p
 
 `truman` is a command-line client for the Truman API. Coding agents, CI and persons use the same commands. The `agent`, `scenario`, `persona`, `run` and `conversation` commands write the JSON of the server to stdout. With `--wait`, `truman conversation start` writes one line of JSON for each event of the call, then a line with the conversation. For a call that completed, a last line holds the evaluation of the judges.
 
-`truman auth status` and `truman version` write JSON that the CLI makes. `truman guide` writes Markdown. `truman auth login` and `truman auth logout` do not write to stdout. Each command writes progress, hints and errors to stderr. Each command exits with 0 if it has no error, and with 1 if it has an error.
+`truman auth status` and `truman version` write JSON that the CLI makes. `truman guide` writes Markdown. `truman auth login` and `truman auth logout` do not write to stdout. Each command writes progress, hints and errors to stderr. Each command exits with 0 if it has no error, and with 1 if it has an error. If a test ran and did not pass, the last lines start with `failed:` and `next:`. If the command itself went wrong, the line starts with `error:`.
 
 ## Install
 
@@ -51,6 +51,6 @@ If the judges failed a call, these commands show why:
 
 The instruction adherence judge reads the `config` of the agent in Truman. After you change the prompt or the flow of the agent, update this copy with `truman agent update <agent id> --config-file prompt.md`.
 
-`truman guide` shows how a coding agent uses the CLI to do tests of a voice agent. The same text is the skill in `cli/skill/SKILL.md`. To add the skill for all your projects, use `npx skills add plivo-labs/truman -g`. Without `-g`, the skill goes only into the project in the current folder.
+`truman guide` shows how a coding agent uses the CLI to do tests of a voice agent. The same text is the skill in `cli/skill/truman/SKILL.md`. To add the skill for all your projects, use `npx skills add plivo-labs/truman -g`. Without `-g`, the skill goes only into the project in the current folder.
 
 `truman --help` and `truman <command> --help` show all commands and flags.

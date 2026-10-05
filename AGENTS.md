@@ -18,7 +18,7 @@ src/truman/
   worker/       claims queued conversations from Postgres and runs them under a lease; evaluator.py does the same for evaluations
   db/           database models and migrations
 frontend/       React UI
-cli/            Go command-line client for the API, its own module; skill/SKILL.md is the guide for coding agents
+cli/            Go command-line client for the API, its own module; skill/truman/SKILL.md is the guide for coding agents
 docker/         container builds and self-hosted deployment
 docs/           docs site (Fumadocs, pages in docs/content/docs/); decisions, ideas and bugs as Markdown
 tests/          automated tests and fixtures
