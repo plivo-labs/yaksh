@@ -1,0 +1,27 @@
+---
+title: Listen to a live call
+description: Hear both sides of a call while it runs.
+---
+
+On the page of a live call, the **Listen** button plays the call. The agent is on the left and the caller is on the right. The caller side includes the background noise. The audio is approximately half a second behind the call.
+
+The audio stops in these cases:
+
+- The call ends.
+- You click **Stop listening**.
+- You leave the page.
+
+Many people can listen to the same call at the same time.
+
+## How it works
+
+1. The worker takes the audio of the two sides inside its Pipecat pipeline. It uses an observer, which is not on the path of the call. Thus, a slow listener cannot make the call slow. This step does not use Plivo.
+2. The worker sends the audio to the API with Postgres `NOTIFY`. It sends the audio of a call only while a person listens. While a listener stays, the API asks for the audio every 5 seconds.
+3. The API streams the audio to the console: `GET /api/v1/conversations/{id}/listen`. The route sends audio only while the call is `running` or `ending`. For other calls, it answers 404.
+4. The console plays each piece of audio at its position in the call. It waits approximately 0.4 seconds for slow pieces. If one side falls a little behind, it skips quiet audio until it is in time again. If one side falls more than 0.3 seconds behind, it skips audio until it is in time again.
+
+## Limits
+
+- Each running call uses one more connection to Postgres. Each listener uses one more connection on the API.
+- `LISTEN` needs a connection for the full session. A connection pooler in transaction mode cannot carry it.
+- If the worker gets the audio of the agent late at the start of a call, the console skips that audio.
