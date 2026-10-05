@@ -80,14 +80,19 @@ import {
   type WireEvent,
 } from "@/lib/types";
 
+/** Keyed by the conversation, so moving to another attempt starts with no turn shown and the
+ * result rows opened for that call. */
 export function ConversationPage() {
   const { id = "" } = useParams();
+  return <ConversationView key={id} id={id} />;
+}
+
+function ConversationView({ id }: { id: string }) {
   const [params] = useSearchParams();
   const conversation = useConversation(id);
   const agent = useAgent(conversation.data?.agent_id);
   const [ending, setEnding] = useState(false);
-  /** The turn a quote asked to see; `times` repeats the scroll when the same turn is asked
-   * again. */
+  /** The turn a quote asked to see. */
   const [shown, setShown] = useState<ShownTurn | null>(null);
   const player = useRef<PlayerHandle>(null);
   const layout = useDefaultLayout({
@@ -120,7 +125,7 @@ export function ConversationPage() {
   const active = ACTIVE_STATUSES.includes(data.status);
   const connectedMs = connectedAt(data);
   const showTurn = (turn: number) => {
-    setShown((current) => ({ index: turn - 1, times: (current?.times ?? 0) + 1 }));
+    setShown({ index: turn - 1 });
     const at = turnStart(data, turn);
     if (data.recording_url && at !== null) player.current?.playFrom(at);
   };
@@ -185,7 +190,10 @@ export function ConversationPage() {
             defaultValue={data.evaluation ? "results" : "scenario"}
             className="h-full min-h-0 gap-3 pl-3"
           >
-            <TabsList variant="line" className="w-full shrink-0 justify-start overflow-x-auto">
+            <TabsList
+              variant="line"
+              className="h-auto w-full shrink-0 justify-start overflow-x-auto overflow-y-hidden pb-2"
+            >
               <TabsTrigger value="results">Results</TabsTrigger>
               <TabsTrigger value="metrics">Metrics</TabsTrigger>
               <TabsTrigger value="scenario">Scenario</TabsTrigger>
@@ -370,11 +378,10 @@ function replyMark(reply: Reply, connectedMs: number): Mark {
   };
 }
 
-/** A turn to bring into view, by index; `times` counts the asks, so asking for the same turn
+/** A turn to bring into view, by index. Each ask is a new object, so asking for the same turn
  * again scrolls to it again. */
 export interface ShownTurn {
   index: number;
-  times: number;
 }
 
 /** The call's audio: while the call is live, a Listen button that plays it and draws it as it

@@ -10,7 +10,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Explained, Meter, Stat } from "@/components/verdict-ui";
-import { BAND_TEXT, noiseLabel, percent, responseBand, seconds } from "@/lib/format";
+import { BAND_TEXT, counted, noiseLabel, percent, responseBand, seconds } from "@/lib/format";
 import { useRunMetrics } from "@/lib/queries";
 import { CATEGORY_LABELS, FLAG_TEXT, type RunNumbers, type Share } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -116,7 +116,7 @@ export function RunMetricsPanel({ runId, active }: { runId: string; active: bool
           />
           <p className="text-xs-400 text-muted-foreground">
             {overall.errors_before_connect > 0
-              ? `${overall.errors_before_connect} Truman errors before connecting.`
+              ? `${counted(overall.errors_before_connect, "Truman error", "Truman errors")} before connecting.`
               : "No Truman error before connecting."}
           </p>
         </Stat>

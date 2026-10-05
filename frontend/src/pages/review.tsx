@@ -149,7 +149,7 @@ export function ReviewPage() {
   const data = review.data;
   const conversation = data.conversation;
   const playTurn = (turn: number) => {
-    setShown((current) => ({ index: turn - 1, times: (current?.times ?? 0) + 1 }));
+    setShown({ index: turn - 1 });
     const at = turnStart(conversation, turn);
     if (conversation.recording_url && at !== null) player.current?.playFrom(at);
   };

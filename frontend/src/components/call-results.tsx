@@ -3,8 +3,7 @@ import { type ReactNode, useState } from "react";
 import { Link } from "react-router";
 
 import { Spinner } from "@/components/ui/spinner";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { OutcomeIcon, VerdictPill } from "@/components/verdict-ui";
+import { Explained, OutcomeIcon, VerdictPill } from "@/components/verdict-ui";
 import { percent } from "@/lib/format";
 import { useConversationEvaluation } from "@/lib/queries";
 import {
@@ -168,7 +167,7 @@ function OutcomeCounts({ items }: { items: EvaluationItem[] }) {
     >
       {ORDER.filter((outcome) => counts.get(outcome)).map((outcome) => (
         <li key={outcome} className="flex items-center gap-1 text-xs-500 tabular-nums">
-          <OutcomeIcon outcome={outcome} className="size-3.5" />
+          <OutcomeIcon outcome={outcome} className="size-3.5" decorative />
           {counts.get(outcome)}
           <span className="font-normal text-muted-foreground">
             {OUTCOME_TEXT[outcome].toLowerCase()}
@@ -195,12 +194,9 @@ export type VerdictKind = keyof typeof VERDICT_KINDS;
 /** A verdict's name, with what it counts on hover or focus. */
 export function VerdictLabel({ kind }: { kind: VerdictKind }) {
   return (
-    <Tooltip>
-      <TooltipTrigger className="cursor-help rounded-sm text-xs-400 text-muted-foreground underline decoration-muted-foreground/40 decoration-dotted underline-offset-[3px] outline-none focus-visible:ring-2 focus-visible:ring-ring/50">
-        {VERDICT_KINDS[kind].label}
-      </TooltipTrigger>
-      <TooltipContent className="max-w-64">{VERDICT_KINDS[kind].hint}</TooltipContent>
-    </Tooltip>
+    <Explained hint={VERDICT_KINDS[kind].hint} className="text-xs-400 text-muted-foreground">
+      {VERDICT_KINDS[kind].label}
+    </Explained>
   );
 }
 
@@ -365,7 +361,7 @@ export function ItemResult({
   return (
     <li className="grid gap-2">
       <div className="flex items-center gap-2">
-        <OutcomeIcon outcome={outcome} />
+        <OutcomeIcon outcome={outcome} decorative />
         <span className="text-s-500">{OUTCOME_TEXT[outcome]}</span>
         <span className="text-xs-400 text-muted-foreground">
           {machineOnly ? "The machine's answer" : item.subject} · {decidedBy(item)}
@@ -466,7 +462,11 @@ function Answer({
       parts.push(
         <div key={key} className="grid gap-1.5 rounded-md border px-2.5 py-2">
           <span className="flex items-center gap-1.5 text-xs-500">
-            <OutcomeIcon outcome={part.verdict === "pass" ? "pass" : "fail"} className="size-3.5" />
+            <OutcomeIcon
+              outcome={part.verdict === "pass" ? "pass" : "fail"}
+              className="size-3.5"
+              decorative
+            />
             {name} {part.verdict === "pass" ? "kept" : "not kept"}
           </span>
           {part.call_quote && <Quotes quotes={[part.call_quote]} onTurn={onTurn} />}

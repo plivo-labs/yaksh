@@ -8,7 +8,7 @@ import {
   CircleX,
   type LucideIcon,
 } from "lucide-react";
-import type { ReactNode } from "react";
+import { type ReactNode, useId } from "react";
 
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { OUTCOME_TEXT, type Outcome, VERDICT_TEXT, type Verdict } from "@/lib/types";
@@ -24,16 +24,22 @@ const OUTCOME_ICON: Record<Outcome, { icon: LucideIcon; color: string }> = {
   pending: { icon: CircleDashed, color: "text-status-warning" },
 };
 
-/** An item's outcome as an icon; screen readers read its name. */
-export function OutcomeIcon({ outcome, className }: { outcome: Outcome; className?: string }) {
+/** An item's outcome as an icon. Screen readers read its name, unless it is `decorative`:
+ * set that where the outcome's name is already written next to it. */
+export function OutcomeIcon({
+  outcome,
+  className,
+  decorative = false,
+}: {
+  outcome: Outcome;
+  className?: string;
+  decorative?: boolean;
+}) {
   const { icon: Icon, color } = OUTCOME_ICON[outcome];
-  return (
-    <Icon
-      role="img"
-      aria-label={OUTCOME_TEXT[outcome]}
-      className={cn("size-4 shrink-0", color, className)}
-    />
-  );
+  const name = decorative
+    ? { "aria-hidden": true }
+    : { role: "img", "aria-label": OUTCOME_TEXT[outcome] };
+  return <Icon {...name} className={cn("size-4 shrink-0", color, className)} />;
 }
 
 const PILL: Record<Verdict, string> = {
@@ -43,12 +49,11 @@ const PILL: Record<Verdict, string> = {
 };
 
 /** A verdict as a filled pill: the one thing to see first. */
-export function VerdictPill({ verdict, size = "md" }: { verdict: Verdict; size?: "sm" | "md" }) {
+export function VerdictPill({ verdict }: { verdict: Verdict }) {
   return (
     <span
       className={cn(
-        "inline-flex items-center rounded-full font-medium whitespace-nowrap",
-        size === "md" ? "px-2.5 py-0.5 text-s-500" : "px-2 py-px text-xs-500",
+        "inline-flex items-center rounded-full px-2.5 py-0.5 text-s-500 font-medium whitespace-nowrap",
         PILL[verdict],
       )}
     >
@@ -57,7 +62,8 @@ export function VerdictPill({ verdict, size = "md" }: { verdict: Verdict; size?:
   );
 }
 
-/** A label with a dotted underline that explains itself on hover or focus. */
+/** A label with a dotted underline that explains itself on hover or focus. The tooltip sets no
+ * description, so a hidden copy of the hint gives screen readers the same text. */
 export function Explained({
   children,
   hint,
@@ -67,18 +73,25 @@ export function Explained({
   hint: ReactNode;
   className?: string;
 }) {
+  const id = useId();
   return (
-    <Tooltip>
-      <TooltipTrigger
-        className={cn(
-          "cursor-help rounded-sm text-left underline decoration-muted-foreground/40 decoration-dotted underline-offset-[3px] outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
-          className,
-        )}
-      >
-        {children}
-      </TooltipTrigger>
-      <TooltipContent className="max-w-72">{hint}</TooltipContent>
-    </Tooltip>
+    <>
+      <Tooltip>
+        <TooltipTrigger
+          aria-describedby={id}
+          className={cn(
+            "cursor-help rounded-sm text-left underline decoration-muted-foreground/40 decoration-dotted underline-offset-[3px] outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+            className,
+          )}
+        >
+          {children}
+        </TooltipTrigger>
+        <TooltipContent className="max-w-72">{hint}</TooltipContent>
+      </Tooltip>
+      <span id={id} className="sr-only">
+        {hint}
+      </span>
+    </>
   );
 }
 

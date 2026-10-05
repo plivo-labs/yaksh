@@ -3,7 +3,6 @@ import {
   type BackgroundNoise,
   NOISE_SOUND_LABELS,
   type OutcomeGroup,
-  type Share,
 } from "@/lib/types";
 
 export function clock(ms: number): string {
@@ -144,14 +143,6 @@ export function region(text: string): string {
     .toLowerCase()
     .replace(/(^|\s)\p{L}/gu, (start) => start.toUpperCase());
   return parts.join(", ");
-}
-
-/** A share as "2 of 3, 67%", with its 95% interval when there is one. */
-export function shareText(share: Share): string {
-  if (share.total === 0) return "None yet";
-  const rate = `${share.count} of ${share.total}, ${percent(share.count / share.total)}`;
-  if (share.low === null || share.high === null) return rate;
-  return `${rate} (95%: ${percent(share.low)} to ${percent(share.high)})`;
 }
 
 export function percent(rate: number): string {

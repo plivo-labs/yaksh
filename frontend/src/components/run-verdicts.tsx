@@ -6,7 +6,7 @@ import { Panel, PanelHeader } from "@/components/panel";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Explained, Meter, OutcomeIcon, SegmentBar, Stat } from "@/components/verdict-ui";
-import { percent } from "@/lib/format";
+import { counted, percent } from "@/lib/format";
 import { useJudgeAgreement, useRunMetrics } from "@/lib/queries";
 import {
   CATEGORY_LABELS,
@@ -81,7 +81,11 @@ function Scorecard({ verdicts }: { verdicts: RunVerdicts }) {
     <div className="grid grid-cols-1 gap-3 border-b bg-muted/30 px-5 py-4 sm:grid-cols-2 xl:grid-cols-4">
       <Stat
         label="Pass rate"
-        hint="The mean of each scenario's pass rate, so a scenario with more calls does not count more. The band is the 95% range for this set of scenarios."
+        hint={
+          ranged
+            ? "The mean of each scenario's pass rate, so a scenario with more calls does not count more. Fewer than 95% of the calls are scored, so the band runs from every unscored call as a fail to every unscored call as a pass."
+            : "The mean of each scenario's pass rate, so a scenario with more calls does not count more. The band is the 95% range for this set of scenarios."
+        }
         value={
           ranged
             ? `${percent(verdicts.worst ?? 0)} to ${percent(verdicts.best ?? 0)}`
@@ -96,7 +100,7 @@ function Scorecard({ verdicts }: { verdicts: RunVerdicts }) {
             low={ranged ? verdicts.worst : verdicts.interval_low}
             high={ranged ? verdicts.best : verdicts.interval_high}
             tone={tone(rate)}
-            label="Pass rate"
+            label={ranged ? "Pass rate, worst case" : "Pass rate"}
           />
         )}
         <p className="text-xs-400 text-muted-foreground">
@@ -122,9 +126,11 @@ function Scorecard({ verdicts }: { verdicts: RunVerdicts }) {
         <p className="text-xs-400 text-muted-foreground">
           {verdicts.pass_hat_2 === null
             ? "Needs two scored repeats of a scenario."
-            : verdicts.inconsistent.length === 0
-              ? "No scenario both passed and failed."
-              : `${verdicts.inconsistent.length} ${verdicts.inconsistent.length === 1 ? "scenario" : "scenarios"} passed and failed across repeats.`}
+            : `Over ${counted(verdicts.pass_hat_2_scenarios, "scenario", "scenarios")}. ${
+                verdicts.inconsistent.length === 0
+                  ? "No scenario both passed and failed."
+                  : `${counted(verdicts.inconsistent.length, "scenario", "scenarios")} passed and failed across repeats.`
+              }`}
         </p>
       </Stat>
       <Stat
@@ -157,7 +163,7 @@ function Scorecard({ verdicts }: { verdicts: RunVerdicts }) {
         <p className="text-xs-400 text-muted-foreground">
           {checked === 0
             ? "No call was checked."
-            : `Changed a result in ${likely} of ${checked} calls; ${possible} more possibly.`}
+            : `Likely affected the test in ${likely} of ${checked} calls; ${possible} more possibly.`}
         </p>
       </Stat>
     </div>
@@ -300,6 +306,7 @@ function ScenarioRow({
               return (
                 <span
                   key={repeat}
+                  role="img"
                   aria-label={`Repeat ${repeat}: no judged call`}
                   className="size-6 rounded-md border border-dashed"
                 />
@@ -365,14 +372,14 @@ function outcomeName(key: string): string {
 }
 
 function CriterionRow({ criterion }: { criterion: Criterion }) {
-  const total = Object.values(criterion.counts).reduce((sum, count) => sum + count, 0);
   const passed = criterion.counts.pass ?? 0;
+  const scored = passed + (criterion.counts.fail ?? 0);
   const detail = Object.entries(criterion.counts)
     .map(([key, count]) => `${outcomeName(key)} ${count}`)
     .join(", ");
   const problem = Boolean(criterion.counts.fail || criterion.counts.error);
   return (
-    <li className="grid grid-cols-[1.25rem_minmax(0,1fr)_6rem_2.5rem] items-center gap-x-3 py-2">
+    <li className="grid grid-cols-[1.25rem_minmax(0,1fr)_6rem_3rem] items-center gap-x-3 py-2">
       <span className="text-xs-400 text-muted-foreground tabular-nums">{criterion.number}</span>
       <span className={cn("text-s-400", !problem && "text-muted-foreground")}>
         {criterion.text}
@@ -386,8 +393,17 @@ function CriterionRow({ criterion }: { criterion: Criterion }) {
         </TooltipTrigger>
         <TooltipContent>{detail}</TooltipContent>
       </Tooltip>
-      <span className="text-right text-xs-500 tabular-nums">
-        {passed}/{total}
+      <span
+        className="text-right text-xs-500 tabular-nums"
+        title={
+          scored ? "Passed, of the calls where it passed or failed" : "No call passed or failed it"
+        }
+      >
+        {scored ? (
+          `${passed}/${scored}`
+        ) : (
+          <span className="text-xs-400 text-muted-foreground">None</span>
+        )}
       </span>
     </li>
   );
@@ -424,38 +440,45 @@ function HowJudged({
       <div className="grid gap-6 px-5 pt-1 pb-5 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
         <section className="grid content-start gap-2">
           <h4 className="text-label text-muted-foreground">Judges</h4>
-          <ul className="divide-y rounded-md border">
-            {verdicts.judge_versions.map((version) => {
-              const items = measured.get(version.version);
-              return (
-                <li key={version.version} className="grid gap-0.5 px-3 py-2">
-                  <div className="flex items-baseline justify-between gap-3">
-                    <span className="text-s-500">{JUDGE_TEXT[version.judge] ?? version.judge}</span>
-                    <span className="text-xs-400 text-muted-foreground tabular-nums">
-                      {version.items} items
-                    </span>
-                  </div>
-                  <div className="flex flex-wrap items-baseline justify-between gap-x-3 text-xs-400 text-muted-foreground">
-                    <span>
-                      {version.model} · <span className="font-mono">{version.version}</span>
-                    </span>
-                    {items && items.total > 0 ? (
-                      <Explained
-                        hint={`How often the first blind label from the audit lane agrees with this judge, over ${items.total} ${items.total === 1 ? "item" : "items"}.${items.low !== null && items.high !== null ? ` 95% range ${percent(items.low)} to ${percent(items.high)}.` : ""}`}
-                      >
-                        Agrees with labels {percent(items.count / items.total)}
-                      </Explained>
-                    ) : (
-                      <span>Not yet measured on your agents</span>
-                    )}
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
+          {verdicts.judge_versions.length > 0 && (
+            <ul className="divide-y rounded-md border">
+              {verdicts.judge_versions.map((version) => {
+                const items = measured.get(version.version);
+                return (
+                  <li key={version.version} className="grid gap-0.5 px-3 py-2">
+                    <div className="flex items-baseline justify-between gap-3">
+                      <span className="text-s-500">
+                        {JUDGE_TEXT[version.judge] ?? version.judge}
+                      </span>
+                      <span className="text-xs-400 text-muted-foreground tabular-nums">
+                        {counted(version.items, "item", "items")}
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap items-baseline justify-between gap-x-3 text-xs-400 text-muted-foreground">
+                      <span>
+                        {version.model} · <span className="font-mono">{version.version}</span>
+                      </span>
+                      {items && items.total > 0 ? (
+                        <Explained
+                          hint={`How often the first blind label from the audit lane agrees with this judge, over ${items.total} ${items.total === 1 ? "item" : "items"}.${items.low !== null && items.high !== null ? ` 95% range ${percent(items.low)} to ${percent(items.high)}.` : ""}`}
+                        >
+                          Agrees with labels {percent(items.count / items.total)}
+                        </Explained>
+                      ) : (
+                        <span>Not yet measured on your agents</span>
+                      )}
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
           <p className="text-xs-400 text-muted-foreground">
-            {decided.map(([who, count]) => `${DECIDED_BY_TEXT[who]}: ${count} items`).join(" · ")}
-            {verdicts.errors > 0 && ` · ${verdicts.errors} items no judge could decide`}
+            {decided
+              .map(([who, count]) => `${DECIDED_BY_TEXT[who]}: ${counted(count, "item", "items")}`)
+              .join(" · ")}
+            {verdicts.errors > 0 &&
+              ` · ${counted(verdicts.errors, "item", "items")} no judge could decide`}
           </p>
         </section>
         {verdicts.callers.length > 0 && (
