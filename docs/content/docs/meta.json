@@ -1,0 +1,17 @@
+{
+  "pages": [
+    "index",
+    "quickstart",
+    "configuration",
+    "outbound-agents",
+    "runs",
+    "results",
+    "scenario-generation",
+    "background-noise",
+    "response-time",
+    "cli",
+    "troubleshooting",
+    "development",
+    "api"
+  ]
+}

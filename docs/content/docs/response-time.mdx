@@ -1,0 +1,28 @@
+---
+title: Response time
+description: How long the agent makes the caller wait.
+---
+
+After each call, Truman measures how long the agent made the caller wait.
+
+## Measurement
+
+Truman measures a response time for each reply of the caller. It is the time from the end of the speech of the caller to the start of the next speech of the agent. Before the caller speaks, the response time starts when the stream of Truman opens. Thus, the response time also shows if the agent is slow to speak first. If the agent already speaks at that time, the start of the call gets no value.
+
+These replies get no response time:
+
+- A talk-over: the agent starts to speak before the caller completes its speech.
+- A reply that the agent does not answer before the caller speaks again. The percentiles do not include that wait.
+
+Truman finds the two points as follows:
+
+- The end of the speech of the caller is the last point where the voice detector finds speech in the text-to-speech audio of the reply. Truman uses this audio without the background noise. The text-to-speech audio has quiet audio after the last word, and the end does not include it. In the measured replies of one voice, this quiet audio was 0.03 to 0.35 seconds. If the reply stops before its audio is complete, the end is the time when Truman sent its last audio: the `caller_audio_end` wire event.
+- The speech of the agent comes from the voice detector of the call, the Silero VAD of Pipecat. Truman uses it on the agent channel of the recording. A spoken "hmm" counts as speech. In the measured recordings, a quiet "thinking" sound of an agent did not count.
+
+Truman measures at its own connection. Thus, the value includes the path between Truman and the system of the agent, in the two directions. For a phone call, this is the path to Plivo and the phone path to the agent. Through the development tunnel, the path to Plivo is approximately 0.2 seconds.
+
+## Results
+
+The conversation page shows the p90 and the p50 (nearest rank). **Replies** shows the number of replies that the agent answered, with the start of the call if it has a value. This number includes the talk-overs, and the page also shows the number of talk-overs. The page shows the response time on each agent turn that answers a reply of the caller or the start of the call. On the recording, it shows a band for each wait: green below 1 second, amber from 1 to 2 seconds, and red above 2 seconds. If a call connected and stopped but has no measured reply, the page shows **Not measured**.
+
+`GET /api/v1/runs/<run id>` calculates `response_p50_ms` and `response_p90_ms` from the replies of the last conversation of each repeat. `GET /api/v1/conversations?run_id=<run id>&sort=-response_p90_ms` lists the slowest conversations first.
