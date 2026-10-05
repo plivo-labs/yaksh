@@ -53,7 +53,7 @@ export function Pager({
   };
   return (
     <Pagination className={cn("justify-between", className)}>
-      <span className="font-mono text-xs-400 text-muted-foreground tabular-nums">
+      <span className="text-xs-400 text-muted-foreground tabular-nums">
         {(page - 1) * pageSize + 1} to {Math.min(page * pageSize, total)} of {total}
       </span>
       <PaginationContent>

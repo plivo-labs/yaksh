@@ -116,7 +116,7 @@ function SliderField({
     <Field>
       <div className="flex items-baseline justify-between">
         <FieldLabel id={`${id}-label`}>{label}</FieldLabel>
-        <span aria-hidden className="font-mono text-sm tabular-nums">
+        <span aria-hidden className="text-s-500 tabular-nums">
           {value.toFixed(2)}
         </span>
       </div>

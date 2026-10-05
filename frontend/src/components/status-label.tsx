@@ -10,14 +10,14 @@ const COLOR: Record<Tone, string> = {
   amber: "bg-status-warning",
   green: "bg-status-success",
   red: "bg-status-danger",
-  off: "bg-status-idle",
+  off: "bg-status-neutral",
 };
 
-/** The CX console's status text: only a failure is colored, the dot carries the rest. */
+/** The dot carries the color; the word stays ink, or muted while the status is waiting or over. */
 const TEXT: Record<Tone, string> = {
   amber: "text-muted-foreground",
   green: "text-foreground",
-  red: "text-status-danger",
+  red: "text-foreground",
   off: "text-muted-foreground",
 };
 
@@ -49,7 +49,7 @@ function Dot({
   );
 }
 
-/** A status as the CX console shows it: a dot and mono text, without a chip. */
+/** A status as an 8px dot and a word, without a chip. */
 export function StatusLabel({
   tone,
   live = false,
@@ -62,11 +62,11 @@ export function StatusLabel({
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1.5 font-mono text-xs-400 whitespace-nowrap capitalize",
+        "inline-flex items-center gap-1.5 text-s-400 whitespace-nowrap capitalize",
         TEXT[tone],
       )}
     >
-      <Dot tone={tone} live={live} size="sm" />
+      <Dot tone={tone} live={live} />
       {children}
     </span>
   );

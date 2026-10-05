@@ -226,7 +226,7 @@ function ReachFields({ form }: { form: AgentDraft }) {
           options={REACH_OPTIONS}
           onChange={(value) => set("direction", value)}
         />
-        <p className="text-sm text-muted-foreground">{REACH_HINTS[draft.direction]}</p>
+        <p className="text-p-400 text-muted-foreground">{REACH_HINTS[draft.direction]}</p>
       </div>
       {!outbound && (
         <Field className={swap}>
@@ -331,7 +331,7 @@ function Section({
     <Panel className={className}>
       <PanelHeader title={title} />
       <div className="grid gap-5 px-5 py-5">
-        {description && <p className="text-sm text-muted-foreground">{description}</p>}
+        {description && <p className="text-p-400 text-muted-foreground">{description}</p>}
         {children}
       </div>
     </Panel>
@@ -359,7 +359,7 @@ export function NewAgentPage() {
     <div className="grid gap-6">
       <div className="grid gap-1">
         <h1 className="text-h3-500">New agent</h1>
-        <p className="text-sm text-muted-foreground">
+        <p className="text-p-400 text-muted-foreground">
           Tell Truman how to reach the agent and what it does.
         </p>
       </div>

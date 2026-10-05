@@ -42,7 +42,7 @@ export function NumbersPage() {
             </Alert>
           )}
           <div>
-            <div className={`${ROW} border-b pb-3 text-label text-muted-foreground`}>
+            <div className={`${ROW} border-b pb-3 text-s-500 text-muted-foreground`}>
               <span>Number</span>
               <span>Name</span>
               <span>Region</span>
@@ -57,7 +57,7 @@ export function NumbersPage() {
                   </li>
                 ))
               ) : numbers.data.items.length === 0 ? (
-                <li className="grid gap-1 px-3 py-8 text-sm">
+                <li className="grid gap-1 px-3 py-8 text-p-400">
                   <span>No numbers yet.</span>
                   <span className="text-muted-foreground">
                     The worker loads them from your Plivo account when it starts.

@@ -7,7 +7,7 @@ function Table({ className, ...props }: React.ComponentProps<"table">) {
     <div data-slot="table-container" className="relative w-full overflow-x-auto">
       <table
         data-slot="table"
-        className={cn("w-full caption-bottom text-sm", className)}
+        className={cn("w-full caption-bottom text-p-400", className)}
         {...props}
       />
     </div>
@@ -22,12 +22,7 @@ function TableBody({ className, ...props }: React.ComponentProps<"tbody">) {
   return (
     <tbody
       data-slot="table-body"
-      className={cn(
-        "[&_tr:last-child]:border-0",
-        // The first cell is the row's link: it lifts to brand blue when a clickable row is hovered.
-        "[&_tr>td:first-child]:text-primary [&_tr.cursor-pointer>td:first-child]:transition-colors [&_tr.cursor-pointer:hover>td:first-child]:text-brand-text",
-        className,
-      )}
+      className={cn("[&_tr:last-child]:border-0", "[&_tr>td:first-child]:text-primary", className)}
       {...props}
     />
   );
@@ -48,7 +43,7 @@ function TableRow({ className, ...props }: React.ComponentProps<"tr">) {
     <tr
       data-slot="table-row"
       className={cn(
-        "border-b transition-colors hover:bg-muted/50 has-aria-expanded:bg-muted/50 data-[state=selected]:bg-muted",
+        "border-b transition-colors hover:bg-hv1 has-aria-expanded:bg-hv1 data-[state=selected]:bg-muted",
         className,
       )}
       {...props}
@@ -83,7 +78,7 @@ function TableCaption({ className, ...props }: React.ComponentProps<"caption">) 
   return (
     <caption
       data-slot="table-caption"
-      className={cn("mt-4 text-sm text-muted-foreground", className)}
+      className={cn("mt-4 text-p-400 text-muted-foreground", className)}
       {...props}
     />
   );

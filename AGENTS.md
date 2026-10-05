@@ -52,6 +52,7 @@ Imported call:    api -> queued evaluation -> evaluator -> evaluation -> saved m
 - Modern, battle-tested tooling and libraries, current stable versions: Python 3.14 with uv, ruff, pyrefly, pytest; FastAPI, SQLAlchemy 2, Alembic, Pydantic 2. No legacy tools kept for familiarity.
 - The import rules above are enforced by import-linter (`lint-imports`, contracts in `pyproject.toml`).
 - The CLI is Go with cobra; its API client is generated with oapi-codegen from `cli/openapi.json`. After an API change, run `uv run python scripts/export_openapi.py` and `go -C cli generate ./...`; CI fails when the spec or the client is out of date.
+- The console's colors, type ramp and radius come from `@plivo/tokens` (pinned in `frontend/package.json`), and its `DESIGN.md` is the style guide. Use the token classes, such as `text-p-400`, `bg-bg1` and the tag pairs, and not Tailwind's default text sizes or a literal color. The token classes take no variant prefix: choose them in TSX. Indigo (`brand`) never colors a control.
 - Records that a conversation depends on are versioned: every change to an agent's configuration writes an `agent_versions` row, and a conversation pins the version it ran against.
 - Work on `dev`; `main` is for releases.
 - Commit messages follow commitlint: conventional commits, one line, no trailers.

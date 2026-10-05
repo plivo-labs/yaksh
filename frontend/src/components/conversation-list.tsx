@@ -63,7 +63,7 @@ export function ConversationList({
   const grid = cn(showAgent ? COLUMNS.withAgent : COLUMNS.withoutAgent, GUTTER[place]);
   if (query.error) {
     return (
-      <p role="alert" className={cn(GUTTER[place], "py-4 text-sm text-destructive")}>
+      <p role="alert" className={cn(GUTTER[place], "py-4 text-p-400 text-destructive")}>
         Could not load the conversations: {query.error.message}
       </p>
     );
@@ -79,7 +79,7 @@ export function ConversationList({
       <div
         className={cn(
           grid,
-          "hidden border-b py-3 text-label text-muted-foreground @3xl/conversations:grid",
+          "hidden border-b py-3 text-s-500 text-muted-foreground @3xl/conversations:grid",
         )}
       >
         <span>Status</span>
@@ -129,7 +129,7 @@ export function ConversationList({
             </li>
           ))
         ) : query.data.items.length === 0 ? (
-          <li className={cn(GUTTER[place], "py-6 text-sm text-muted-foreground")}>{empty}</li>
+          <li className={cn(GUTTER[place], "py-6 text-p-400 text-muted-foreground")}>{empty}</li>
         ) : (
           query.data.items.map((conversation) => (
             <ConversationRow
@@ -170,7 +170,7 @@ function ConversationRow({
     <li
       className={cn(
         grid,
-        "group relative py-3.5 transition-colors duration-150 hover:bg-muted/60 has-[a:active]:bg-muted has-[a:focus-visible]:bg-muted has-[a:focus-visible]:ring-2 has-[a:focus-visible]:ring-ring/50 has-[a:focus-visible]:ring-inset",
+        "group relative py-3.5 transition-colors duration-150 hover:bg-hv1 has-[a:active]:bg-hv2 has-[a:focus-visible]:bg-hv1 has-[a:focus-visible]:ring-2 has-[a:focus-visible]:ring-ring/50 has-[a:focus-visible]:ring-inset",
       )}
     >
       <div>
@@ -184,7 +184,7 @@ function ConversationRow({
             title={[conversation.scenario_name, conversation.failure_reason]
               .filter(Boolean)
               .join("\n")}
-            className="truncate text-s-500 outline-none transition-colors after:absolute after:inset-0 group-hover:text-brand-text"
+            className="truncate text-s-500 outline-none transition-colors after:absolute after:inset-0"
           >
             {conversation.scenario_name}
           </Link>
@@ -225,7 +225,7 @@ function ConversationRow({
           <span className="truncate text-destructive">{conversation.failure_reason}</span>
         )}
       </div>
-      <div className="hidden font-mono text-xs-400 tabular-nums @3xl/conversations:block">
+      <div className="hidden text-xs-400 tabular-nums @3xl/conversations:block">
         {duration(conversation.talk_ms)}
       </div>
       <div className="hidden text-s-400 @3xl/conversations:block">
@@ -233,7 +233,9 @@ function ConversationRow({
           <ResponseTime ms={conversation.latency.p90_ms} />
         )}
       </div>
-      <div className="hidden font-mono text-xs-400 @3xl/conversations:block">{started}</div>
+      <div className="hidden text-xs-400 text-muted-foreground @3xl/conversations:block">
+        {started}
+      </div>
       <ConversationMenu conversation={conversation} name={name} />
     </li>
   );

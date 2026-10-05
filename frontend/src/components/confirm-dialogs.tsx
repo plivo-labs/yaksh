@@ -42,7 +42,7 @@ export function DeleteDialog({
           <AlertDialogTitle>Delete {name}?</AlertDialogTitle>
           <AlertDialogDescription>{description}</AlertDialogDescription>
         </AlertDialogHeader>
-        {error && <p className="text-sm text-destructive">{error}</p>}
+        {error && <p className="text-p-400 text-destructive">{error}</p>}
         <AlertDialogFooter>
           <AlertDialogCancel>Keep</AlertDialogCancel>
           <AlertDialogAction

@@ -211,7 +211,7 @@ export function StartCallDialog({
                   onChange={(event) => setMaxDuration(event.target.value)}
                   className="w-24 tabular-nums"
                 />
-                <span className="text-sm text-muted-foreground">seconds</span>
+                <span className="text-p-400 text-muted-foreground">seconds</span>
               </div>
               {durationOk ? (
                 <FieldDescription id="max_duration_hint">
@@ -239,7 +239,7 @@ export function StartCallDialog({
                   onChange={(event) => setMaxTurns(event.target.value)}
                   className="w-24 tabular-nums"
                 />
-                <span className="text-sm text-muted-foreground">turns</span>
+                <span className="text-p-400 text-muted-foreground">turns</span>
               </div>
               {turnsOk ? (
                 <FieldDescription id="max_turns_hint">

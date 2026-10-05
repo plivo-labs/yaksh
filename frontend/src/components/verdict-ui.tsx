@@ -43,9 +43,9 @@ export function OutcomeIcon({
 }
 
 const PILL: Record<Verdict, string> = {
-  pass: "bg-status-success/12 text-status-success-text",
-  fail: "bg-status-danger/10 text-status-danger-text",
-  not_scored: "bg-status-warning/12 text-status-warning-text",
+  pass: "bg-success-tag text-success-tag-foreground",
+  fail: "bg-danger text-danger-foreground",
+  not_scored: "bg-warning text-warning-foreground",
 };
 
 /** A verdict as a filled pill: the one thing to see first. */
@@ -53,7 +53,7 @@ export function VerdictPill({ verdict }: { verdict: Verdict }) {
   return (
     <span
       className={cn(
-        "inline-flex items-center rounded-full px-2.5 py-0.5 text-s-500 font-medium whitespace-nowrap",
+        "inline-flex items-center rounded-sm px-2.5 py-0.5 text-xs-600 whitespace-nowrap",
         PILL[verdict],
       )}
     >
@@ -126,7 +126,7 @@ export function Meter({
       aria-valuemax={100}
       aria-valuenow={Math.round(value * 100)}
       className={cn(
-        "relative w-full rounded-full bg-muted",
+        "relative w-full rounded-sm bg-muted",
         ranged ? "h-2" : "h-1.5 overflow-hidden",
       )}
     >
@@ -134,13 +134,13 @@ export function Meter({
         <>
           <span
             aria-hidden
-            className={cn("absolute inset-y-0 rounded-full opacity-35", TONE_FILL[tone])}
+            className={cn("absolute inset-y-0 rounded-sm opacity-35", TONE_FILL[tone])}
             style={{ left: `${low * 100}%`, width: `${Math.max(0.01, high - low) * 100}%` }}
           />
           <span
             aria-hidden
             className={cn(
-              "absolute -inset-y-0.5 w-[3px] -translate-x-1/2 rounded-full",
+              "absolute -inset-y-0.5 w-[3px] -translate-x-1/2 rounded-sm",
               TONE_FILL[tone],
             )}
             style={{ left: `${value * 100}%` }}
@@ -149,7 +149,7 @@ export function Meter({
       ) : (
         <span
           aria-hidden
-          className={cn("absolute inset-y-0 left-0 rounded-full", TONE_FILL[tone])}
+          className={cn("absolute inset-y-0 left-0 rounded-sm", TONE_FILL[tone])}
           style={{ width: `${value * 100}%` }}
         />
       )}
@@ -187,7 +187,7 @@ export function SegmentBar({ counts, label }: { counts: Record<string, number>; 
     <div
       role="img"
       aria-label={label}
-      className="flex h-1.5 w-full gap-px overflow-hidden rounded-full"
+      className="flex h-1.5 w-full gap-px overflow-hidden rounded-sm"
     >
       {SEGMENT_ORDER.filter((key) => counts[key]).map((key) => (
         <span
@@ -217,9 +217,7 @@ export function Stat({
       <Explained hint={hint} className="justify-self-start text-label text-muted-foreground">
         {label}
       </Explained>
-      <div className="font-heading text-[26px] leading-[30px] font-medium tracking-[-0.02em] tabular-nums">
-        {value}
-      </div>
+      <div className="text-h1-500 tabular-nums">{value}</div>
       {children}
     </div>
   );

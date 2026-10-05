@@ -116,15 +116,15 @@ export function seconds(ms: number): string {
 export type ResponseBand = "good" | "slow" | "bad";
 
 export const BAND_TEXT: Record<ResponseBand, string> = {
-  good: "text-status-success-text",
-  slow: "text-status-warning-text",
-  bad: "text-status-danger-text",
+  good: "text-success-tag-foreground",
+  slow: "text-warning-foreground",
+  bad: "text-danger-foreground",
 };
 
 export const BAND_FILL: Record<ResponseBand, string> = {
-  good: "bg-status-success/15",
-  slow: "bg-status-warning/15",
-  bad: "bg-status-danger/15",
+  good: "bg-success-tag",
+  slow: "bg-warning",
+  bad: "bg-danger",
 };
 
 /** Under 1 s, 1 to 2 s, over 2 s. */

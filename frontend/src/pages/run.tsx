@@ -113,7 +113,7 @@ function Overview({ run }: { run: Run }) {
         <RunActions run={run} />
       </div>
       <div className="grid gap-3 border-t px-5 py-4">
-        <div className="flex items-baseline justify-between text-sm">
+        <div className="flex items-baseline justify-between text-p-400">
           <span className="tabular-nums">
             <span className="font-medium">
               {finished} of {total} finished
@@ -132,7 +132,7 @@ function Overview({ run }: { run: Run }) {
           aria-valuemin={0}
           aria-valuemax={total}
           aria-valuenow={finished}
-          className="flex h-1.5 overflow-hidden rounded-full bg-muted"
+          className="flex h-1.5 overflow-hidden rounded-sm bg-muted"
         >
           <div
             className="h-full bg-primary transition-[width] duration-300 ease-out"
@@ -307,7 +307,7 @@ function Conversations({ run }: { run: Run }) {
       <PanelHeader
         title={groupLabel ? `Conversations: ${groupLabel.toLowerCase()}` : "Conversations"}
       />
-      <p className="border-b px-5 py-2.5 text-xs text-muted-foreground">
+      <p className="border-b px-5 py-2.5 text-xs-400 text-muted-foreground">
         The latest attempt of each repeat of each scenario. Open a retry to see the attempt before
         it.
       </p>

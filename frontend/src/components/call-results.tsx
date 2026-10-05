@@ -319,7 +319,7 @@ function ItemRow({ item, onTurn }: { item: EvaluationItem; onTurn?: OnTurn }) {
         aria-expanded={open}
         aria-controls={id}
         onClick={() => setOpen(!open)}
-        className="flex w-full items-start gap-2.5 px-3 py-2.5 text-left outline-none transition-colors duration-150 hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-inset"
+        className="flex w-full items-start gap-2.5 px-3 py-2.5 text-left outline-none transition-colors duration-150 hover:bg-hv1 focus-visible:bg-hv1 focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-inset"
       >
         <OutcomeIcon outcome={item.effective_outcome} className="mt-0.5" />
         <span className="grid min-w-0 flex-1 gap-0.5">
@@ -409,9 +409,7 @@ function Callout({ tone, children }: { tone: "warn" | "danger"; children: ReactN
     <p
       className={cn(
         "rounded-md px-2.5 py-1.5 text-xs-400",
-        tone === "warn"
-          ? "bg-status-warning/10 text-status-warning-text"
-          : "bg-status-danger/8 text-status-danger-text",
+        tone === "warn" ? "bg-warning text-warning-foreground" : "bg-danger text-danger-foreground",
       )}
     >
       {children}
@@ -541,7 +539,7 @@ function Quotes({ quotes, onTurn }: { quotes: Quote[]; onTurn?: OnTurn }) {
 /** A turn number that takes you to the turn in the transcript. */
 function TurnChip({ turn, onTurn }: { turn: number; onTurn?: OnTurn }) {
   const chip =
-    "shrink-0 rounded-sm bg-muted px-1.5 font-mono text-[11px] leading-[17px] text-muted-foreground tabular-nums";
+    "shrink-0 rounded-sm bg-muted px-1.5 font-mono text-xs-400 text-muted-foreground tabular-nums";
   if (!onTurn) return <span className={chip}>T{turn}</span>;
   return (
     <button

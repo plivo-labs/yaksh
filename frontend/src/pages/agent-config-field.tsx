@@ -52,7 +52,7 @@ export function ConfigField({
       <Textarea
         id="config"
         rows={8}
-        className="max-h-96 font-mono text-xs"
+        className="max-h-96 font-mono text-xs-400"
         placeholder="The agent's prompt, a flow export or an assistant definition, as text."
         aria-invalid={value.length > MAX_CONFIG_CHARS}
         value={value}

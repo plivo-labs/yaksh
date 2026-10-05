@@ -226,7 +226,7 @@ function ConversationView({ id }: { id: string }) {
                         </CardDescription>
                       )}
                     </CardHeader>
-                    <CardContent className="grid gap-3 text-sm">
+                    <CardContent className="grid gap-3 text-p-400">
                       <CallerPrompt instructions={data.instructions} />
                     </CardContent>
                   </Card>
@@ -262,12 +262,12 @@ function ConversationFacts({ conversation }: { conversation: Conversation }) {
     <dl className="flex flex-wrap gap-x-10 gap-y-3">
       {conversation.started_at && (
         <Fact className={arrived} label="Started">
-          <span className="font-mono">{when(conversation.started_at)}</span>
+          <span className="tabular-nums">{when(conversation.started_at)}</span>
         </Fact>
       )}
       {conversation.talk_ms !== null && (
         <Fact className={arrived} label="Connected">
-          <span className="font-mono">{duration(conversation.talk_ms)}</span>
+          <span className="tabular-nums">{duration(conversation.talk_ms)}</span>
         </Fact>
       )}
       {conversation.end_reason && (
@@ -287,7 +287,7 @@ function ConversationFacts({ conversation }: { conversation: Conversation }) {
       )}
       {latency && (
         <Fact className={arrived} label="Replies">
-          <span className="font-mono">{latency.replies}</span>
+          <span className="tabular-nums">{latency.replies}</span>
           {latency.talked_over > 0 && `, ${latency.talked_over} talked over`}
         </Fact>
       )}
@@ -306,7 +306,7 @@ function ConversationFacts({ conversation }: { conversation: Conversation }) {
       {(conversation.retry_of || conversation.retried_as) && (
         <Fact className={arrived} label="Attempt">
           <span className="flex gap-3">
-            <span className="font-mono">{conversation.attempt}</span>
+            <span className="tabular-nums">{conversation.attempt}</span>
             {conversation.retry_of && (
               <Link
                 to={`/conversations/${conversation.retry_of}`}
@@ -327,7 +327,7 @@ function ConversationFacts({ conversation }: { conversation: Conversation }) {
         </Fact>
       )}
       <Fact className={arrived} label="Agent version">
-        <span className="font-mono">{conversation.agent_version}</span>
+        <span className="tabular-nums">{conversation.agent_version}</span>
       </Fact>
       <Fact label="Conversation id">
         <CopyId id={conversation.id} label="conversation id" />
@@ -401,10 +401,10 @@ function AudioCard({
   let content;
   if (live.view) content = <LiveWaveform view={live.view} />;
   else if (live.listening) {
-    content = <p className="text-sm text-muted-foreground">Waiting for the call's audio.</p>;
+    content = <p className="text-p-400 text-muted-foreground">Waiting for the call's audio.</p>;
   } else if (isLive) {
     content = (
-      <p className="text-sm text-muted-foreground">
+      <p className="text-p-400 text-muted-foreground">
         Listen plays the call while it runs. The recording comes when the call ends.
       </p>
     );
@@ -505,7 +505,7 @@ function waitingText(conversation: Conversation): string {
 function RailTitle({ role, name }: { role: string; name: string }) {
   return (
     <div className="grid gap-0.5">
-      <span className="text-xs text-muted-foreground">{role}</span>
+      <span className="text-xs-400 text-muted-foreground">{role}</span>
       <CardTitle>{name}</CardTitle>
     </div>
   );
@@ -519,17 +519,17 @@ export function ScenarioCard({ name, scenario }: { name: string; scenario: Scena
         <CardDescription className="whitespace-pre-wrap">{scenario.goal}</CardDescription>
       </CardHeader>
       <CardContent>
-        <dl className="grid gap-3 text-sm">
+        <dl className="grid gap-3 text-p-400">
           <Facts label="Knows" facts={scenario.known_facts} />
           <Facts label="Sent to the agent" facts={scenario.agent_data} />
           {scenario.unknown_facts.length > 0 && (
             <div className="grid gap-1">
-              <dt className="text-xs text-muted-foreground">Does not have</dt>
+              <dt className="text-xs-400 text-muted-foreground">Does not have</dt>
               <dd>{scenario.unknown_facts.join(", ")}</dd>
             </div>
           )}
           <div className="grid gap-1">
-            <dt className="text-xs text-muted-foreground">Criteria</dt>
+            <dt className="text-xs-400 text-muted-foreground">Criteria</dt>
             <dd>
               <ul className="grid list-disc gap-1 pl-4 marker:text-muted-foreground">
                 {scenario.criteria.map((text) => (
@@ -548,7 +548,7 @@ function Facts({ label, facts }: { label: string; facts: ScenarioFact[] }) {
   if (facts.length === 0) return null;
   return (
     <div className="grid gap-1">
-      <dt className="text-xs text-muted-foreground">{label}</dt>
+      <dt className="text-xs-400 text-muted-foreground">{label}</dt>
       <dd className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1">
         {facts.map((fact) => (
           <Fragment key={fact.name}>
@@ -576,7 +576,10 @@ function CallerPrompt({ instructions }: { instructions: string }) {
       </Button>
       {shown && (
         <pre
-          className={cn("whitespace-pre-wrap rounded-md bg-muted p-3 font-mono text-xs", REVEAL)}
+          className={cn(
+            "whitespace-pre-wrap rounded-md bg-muted p-3 font-mono text-xs-400",
+            REVEAL,
+          )}
         >
           {instructions}
         </pre>
@@ -734,7 +737,7 @@ function Transcript({
         <CardTitle>Transcript</CardTitle>
         {onPlay && (
           <CardAction>
-            <label className="flex items-center gap-2 text-sm text-muted-foreground">
+            <label className="flex items-center gap-2 text-p-400 text-muted-foreground">
               <Switch checked={follow} onCheckedChange={setFollow} />
               Follow audio
             </label>
@@ -743,7 +746,7 @@ function Transcript({
       </CardHeader>
       <CardContent className="min-h-0 flex-1">
         {turns.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
+          <p className="text-p-400 text-muted-foreground">
             {active ? waiting : "Nothing was transcribed."}
           </p>
         ) : (
@@ -763,7 +766,7 @@ function Transcript({
                       >
                         <Message align={turn.role === "caller" ? "end" : "start"}>
                           <MessageContent>
-                            <MessageHeader className="gap-2 font-mono">
+                            <MessageHeader className="gap-2 tabular-nums">
                               <span>{turn.role === "agent" ? "Agent" : "Caller"}</span>
                               <span>{clock(at)}</span>
                               {typeof turn.response_ms === "number" && (
@@ -804,7 +807,7 @@ function Transcript({
                     );
                   })}
                   {active && (
-                    <p className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <p className="flex items-center gap-2 text-xs-400 text-muted-foreground">
                       <Spinner className="size-3" />
                       Live
                     </p>
@@ -847,9 +850,9 @@ function WireEvents({
       </CardHeader>
       <CardContent>
         {events.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Nothing yet.</p>
+          <p className="text-p-400 text-muted-foreground">Nothing yet.</p>
         ) : (
-          <ol className="grid gap-1 font-mono text-xs">
+          <ol className="grid gap-1 font-mono text-xs-400">
             {events.map((event, index) => (
               <li key={index} className="grid gap-0.5">
                 <div className="flex justify-between gap-4">

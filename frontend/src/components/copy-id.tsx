@@ -10,7 +10,7 @@ export function CopyId({ id, label, full = false }: { id: string; label: string;
       title={id}
       aria-label={`Copy ${label}`}
       onClick={() => void copyText(id, `${label[0].toUpperCase()}${label.slice(1)} copied`)}
-      className="relative z-10 inline-flex items-center gap-1.5 rounded-sm font-mono text-xs text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
+      className="relative z-10 inline-flex items-center gap-1.5 rounded-sm font-mono text-xs-400 text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
     >
       {full ? id : id.slice(-8)}
       <Copy className="size-3.5" />

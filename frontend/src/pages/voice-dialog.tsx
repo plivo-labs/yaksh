@@ -218,7 +218,7 @@ export function VoiceDialog({
 
             {details && (
               <>
-                <div className={`flex flex-wrap items-center gap-2 text-sm ${APPEAR}`}>
+                <div className={`flex flex-wrap items-center gap-2 text-p-400 ${APPEAR}`}>
                   {details.gender && <GenderBadge gender={details.gender} />}
                   {details.accent && (
                     <span className="text-muted-foreground capitalize">{details.accent}</span>
@@ -260,7 +260,7 @@ export function VoiceDialog({
                             checked={draft.languages.includes(language)}
                             onCheckedChange={(on) => toggleLanguage(language, on)}
                           />
-                          <label htmlFor={`language-${language}`} className="flex-1 text-sm">
+                          <label htmlFor={`language-${language}`} className="flex-1 text-p-400">
                             {LANGUAGE_NAMES[language]}
                           </label>
                           <Button

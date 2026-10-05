@@ -30,10 +30,7 @@ function FieldLegend({
     <legend
       data-slot="field-legend"
       data-variant={variant}
-      className={cn(
-        "mb-3 data-[variant=label]:text-s-500 data-[variant=legend]:text-h4-500",
-        className,
-      )}
+      className={cn("mb-3", variant === "label" ? "text-s-500" : "text-h4-500", className)}
       {...props}
     />
   );
@@ -147,7 +144,7 @@ function FieldSeparator({
       data-slot="field-separator"
       data-content={!!children}
       className={cn(
-        "relative -my-2 h-5 text-sm group-data-[variant=outline]/field-group:-mb-2",
+        "relative -my-2 h-5 text-p-400 group-data-[variant=outline]/field-group:-mb-2",
         className,
       )}
       {...props}

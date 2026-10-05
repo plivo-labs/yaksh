@@ -49,7 +49,7 @@ function Metrics({ found }: { found: ConversationEvaluation }) {
   const consumed = usage?.value.usage;
   const settings = usage?.value.settings;
   return (
-    <CardContent className="grid gap-3 text-sm">
+    <CardContent className="grid gap-3 text-p-400">
       {flags.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
           {flags.map((flag) => (
@@ -152,7 +152,7 @@ function problems(faults: CaptureFaults): string {
 function Line({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="grid gap-1">
-      <dt className="text-xs text-muted-foreground">{label}</dt>
+      <dt className="text-xs-400 text-muted-foreground">{label}</dt>
       <dd className="wrap-anywhere">{children}</dd>
     </div>
   );

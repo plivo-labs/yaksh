@@ -87,7 +87,7 @@ export function ReviewQueuePage() {
   return (
     <Panel className="mx-auto max-w-3xl overflow-hidden">
       <PanelHeader title="Audit queue" />
-      <p className="border-b px-5 py-2.5 text-xs text-muted-foreground">
+      <p className="border-b px-5 py-2.5 text-xs-400 text-muted-foreground">
         Calls picked at random to measure the judges. Your labels on their judged items are blind:
         each machine result shows after you save your label. Label every judged item of a call to
         see its verdicts.
@@ -98,26 +98,26 @@ export function ReviewQueuePage() {
           <Skeleton className="h-10 w-full" />
         </div>
       ) : queue.isError ? (
-        <p role="alert" className="px-5 py-4 text-sm text-status-danger">
+        <p role="alert" className="px-5 py-4 text-p-400 text-status-danger">
           Could not load the queue: {queue.error.message}
         </p>
       ) : queue.data.length === 0 ? (
-        <p className="px-5 py-4 text-sm text-muted-foreground">Nothing to label now.</p>
+        <p className="px-5 py-4 text-p-400 text-muted-foreground">Nothing to label now.</p>
       ) : (
         <ul className="divide-y">
           {queue.data.map((entry) => (
             <li key={entry.conversation_id}>
               <Link
                 to={`/review/${entry.conversation_id}`}
-                className="flex items-center justify-between gap-4 px-5 py-3.5 outline-none transition-colors duration-150 hover:bg-muted/60 focus-visible:bg-muted/60"
+                className="flex items-center justify-between gap-4 px-5 py-3.5 outline-none transition-colors duration-150 hover:bg-hv1 focus-visible:bg-hv1"
               >
                 <span className="grid min-w-0 gap-0.5">
                   <span className="truncate text-s-500">{entry.scenario_name}</span>
-                  <span className="text-xs text-muted-foreground">
+                  <span className="text-xs-400 text-muted-foreground">
                     Ended <RelativeTime iso={entry.ended_at} />
                   </span>
                 </span>
-                <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
+                <span className="shrink-0 text-xs-400 text-muted-foreground tabular-nums">
                   {entry.labeled} of {entry.items} labeled
                 </span>
               </Link>
@@ -203,7 +203,7 @@ export function ReviewPage() {
 function Verdicts({ verdicts }: { verdicts: ReviewConversation["verdicts"] }) {
   if (verdicts === null) {
     return (
-      <p className="text-sm text-muted-foreground">
+      <p className="text-p-400 text-muted-foreground">
         The call's verdicts show when you have labeled every judged item.
       </p>
     );
@@ -214,7 +214,7 @@ function Verdicts({ verdicts }: { verdicts: ReviewConversation["verdicts"] }) {
         <CardTitle>Verdicts</CardTitle>
       </CardHeader>
       <CardContent>
-        <dl className="grid grid-cols-2 gap-3 text-sm">
+        <dl className="grid grid-cols-2 gap-3 text-p-400">
           <VerdictLine
             kind="scenario"
             machine={verdicts.scenario_verdict}
@@ -248,7 +248,7 @@ function VerdictLine({
       </dt>
       <dd className="grid justify-items-start gap-1">
         <VerdictPill verdict={effective} />
-        <span className="text-xs text-muted-foreground">
+        <span className="text-xs-400 text-muted-foreground">
           Machine: {VERDICT_TEXT[machine].toLowerCase()}
         </span>
       </dd>
@@ -309,10 +309,10 @@ function ItemLabel({
   };
 
   return (
-    <li className="grid gap-3 rounded-md border px-4 py-3 text-sm">
+    <li className="grid gap-3 rounded-md border px-4 py-3 text-p-400">
       <span className="wrap-anywhere">{item.subject}</span>
       {item.label && !editing ? (
-        <p className="flex flex-wrap items-baseline gap-x-2 text-xs">
+        <p className="flex flex-wrap items-baseline gap-x-2 text-xs-400">
           <span>
             Your label: {ANSWER_TEXT[item.label.answer]}
             {item.label.reason && `, ${REASON_TEXT[item.label.reason]}`}
@@ -322,8 +322,8 @@ function ItemLabel({
             <span
               className={
                 agrees(item.label.answer, item.label.reason, item.machine)
-                  ? "text-status-success-text"
-                  : "text-status-warning-text"
+                  ? "text-success-tag-foreground"
+                  : "text-warning-foreground"
               }
             >
               {agrees(item.label.answer, item.label.reason, item.machine)
@@ -334,7 +334,7 @@ function ItemLabel({
           <Button
             variant="link"
             size="sm"
-            className="h-auto p-0 text-xs"
+            className="h-auto p-0 text-xs-400"
             onClick={() => setEditing(true)}
           >
             Change
@@ -399,7 +399,7 @@ function ItemLabel({
                     type="button"
                     variant="link"
                     size="sm"
-                    className="h-auto p-0 text-xs"
+                    className="h-auto p-0 text-xs-400"
                     onClick={() => setReason(null)}
                   >
                     Clear
@@ -439,7 +439,7 @@ function ItemLabel({
               </Button>
             )}
             {item.blind && (
-              <span className="text-xs text-muted-foreground">
+              <span className="text-xs-400 text-muted-foreground">
                 The machine result shows after you save.
               </span>
             )}
@@ -453,7 +453,7 @@ function ItemLabel({
         </ul>
       ) : (
         !item.blind && (
-          <p className="text-xs text-muted-foreground">
+          <p className="text-xs-400 text-muted-foreground">
             The machine result shows when you have labeled every judged item.
           </p>
         )
