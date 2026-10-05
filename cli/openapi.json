@@ -4925,6 +4925,31 @@
               }
             ],
             "title": "Caller Effect"
+          },
+          "jev_choice": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Jev Choice"
+          },
+          "jev_probabilities": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "number"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Jev Probabilities"
           }
         },
         "type": "object",
@@ -4939,7 +4964,9 @@
           "effective_unsure_kind",
           "answer",
           "error_reason",
-          "caller_effect"
+          "caller_effect",
+          "jev_choice",
+          "jev_probabilities"
         ],
         "title": "ItemRead"
       },

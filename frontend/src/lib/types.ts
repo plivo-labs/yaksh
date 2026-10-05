@@ -666,6 +666,9 @@ export interface EvaluationItem {
   error_reason: string | null;
   /** How Truman's caller affected this criterion, by the caller check. */
   caller_effect: { owner: string; effect: string; blame: string | null } | null;
+  /** What Jev chose when it answered the item first; a Jev pass has no other answer. */
+  jev_choice: string | null;
+  jev_probabilities: Record<string, number> | null;
 }
 
 export interface ConversationEvaluation {

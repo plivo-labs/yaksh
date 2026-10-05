@@ -594,6 +594,7 @@ def upgrade() -> None:
             sa.Enum("pass", "fail", "not_scored", name="verdict"),
             nullable=True,
         ),
+        sa.Column("jev_usage", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
         sa.ForeignKeyConstraint(["conversation_id"], ["conversations.id"]),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("conversation_id", name=op.f("uq_evaluations_conversation_id")),
@@ -673,6 +674,9 @@ def upgrade() -> None:
         ),
         sa.Column("error_reason", sa.Text(), nullable=True),
         sa.Column("caller_effect", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
+        sa.Column("jev_version_id", sa.UUID(), nullable=True),
+        sa.Column("jev_choice", sa.Text(), nullable=True),
+        sa.Column("jev_probabilities", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
         sa.Column(
             "effective_outcome",
             sa.Enum(
@@ -699,6 +703,7 @@ def upgrade() -> None:
             nullable=False,
         ),
         sa.ForeignKeyConstraint(["evaluation_id"], ["evaluations.id"]),
+        sa.ForeignKeyConstraint(["jev_version_id"], ["judge_versions.id"]),
         sa.ForeignKeyConstraint(["judge_version_id"], ["judge_versions.id"]),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint(

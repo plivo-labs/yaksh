@@ -3,8 +3,9 @@ its verdicts."""
 
 import asyncio
 import uuid
-from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from collections.abc import Awaitable, Callable, Mapping, Sequence
+from dataclasses import dataclass, replace
+from functools import partial
 from pathlib import Path
 
 from truman.db.models import Conversation
@@ -18,16 +19,17 @@ from truman.domain.conversations import (
     Transcript,
     Turn,
 )
-from truman.domain.evaluations import ItemRole, Metric, MetricKey, Outcome, UnsureKind
+from truman.domain.evaluations import DecidedBy, ItemRole, Metric, MetricKey, Outcome, UnsureKind
 from truman.domain.language_models import JsonModel
 from truman.domain.latency import Latency, Span, waits
 from truman.domain.rules import LlmRule, PhraseRule
 from truman.domain.scenarios import ScenarioConfig
 from truman.evaluation import metrics, speech
 from truman.evaluation.caller_check import CALLER_CHECK, applied, check_caller
-from truman.evaluation.criteria import AGENT_RULE, CRITERION, judge_criterion, judge_rule
+from truman.evaluation.criteria import AGENT_RULE, CRITERION, judge_criterion, judge_rule, rule_text
 from truman.evaluation.evaluations import Evaluated
 from truman.evaluation.evidence import CallView, render
+from truman.evaluation.jev import JEV, Jev
 from truman.evaluation.judging import ItemResult
 from truman.evaluation.rules import gate_open, gated, phrase_item
 from truman.evaluation.sources import (
@@ -53,6 +55,8 @@ class Judging:
     slots: asyncio.Semaphore
     max_input_chars: int
     """The most text one judge request holds; a judge whose sources do not fit is an error."""
+    jev: Jev | None = None
+    """Jev's first pass, with a TypeSafe key."""
 
 
 SOURCE_JUDGES = (INSTRUCTIONS, HALLUCINATION)
@@ -86,17 +90,59 @@ async def evaluate(
         phrases = [phrase_item(rule, turns) for rule in agent.rules if isinstance(rule, PhraseRule)]
         return Evaluated(metrics=found, items=phrases)
     view = render(call_view(conversation, agent, scenario, transcript))
+    open_rules = [
+        rule for rule in agent.rules if isinstance(rule, LlmRule) and gate_open(rule, transcript)
+    ]
+    first = (
+        await judging.jev.ask(
+            view,
+            {f"criterion-{n}": text for n, text in enumerate(scenario.criteria, 1)}
+            | {f"rule-{rule.key}": rule_text(rule) for rule in open_rules},
+        )
+        if judging.jev is not None
+        else None
+    )
+    bar = judging.jev.pass_bar if judging.jev is not None else 1.0
+    answers = first.answers if first is not None else {}
+
+    async def decided(
+        key: str, subject: str, role: ItemRole, judge: Callable[[], Awaitable[ItemResult]]
+    ) -> ItemResult:
+        """Jev's confident pass, or the judge model's answer with Jev's beside it."""
+        answer = answers.get(key)
+        if answer is not None and answer.passes(bar):
+            return ItemResult(
+                key=key,
+                subject=subject,
+                judge=JEV.name,
+                decided_by=DecidedBy.JEV,
+                role=role,
+                outcome=Outcome.PASS,
+                jev_choice=answer.choice,
+                jev_probabilities=answer.probabilities,
+            )
+        item = await judge()
+        if answer is None:
+            return item
+        return replace(item, jev_choice=answer.choice, jev_probabilities=answer.probabilities)
+
     async with asyncio.TaskGroup() as group:
         criteria = [
             group.create_task(
-                judge_criterion(
-                    judging.model,
-                    view,
-                    turns,
-                    number,
+                decided(
+                    f"criterion-{number}",
                     criterion,
-                    slots=judging.slots,
-                    retry_later=retry_later,
+                    ItemRole.DECIDING,
+                    partial(
+                        judge_criterion,
+                        judging.model,
+                        view,
+                        turns,
+                        number,
+                        criterion,
+                        slots=judging.slots,
+                        retry_later=retry_later,
+                    ),
                 )
             )
             for number, criterion in enumerate(scenario.criteria, 1)
@@ -116,11 +162,22 @@ async def evaluate(
         )
         rules = [
             group.create_task(
-                judge_rule(
-                    judging.model, view, turns, rule, slots=judging.slots, retry_later=retry_later
+                decided(
+                    f"rule-{rule.key}",
+                    rule.name,
+                    rule.role,
+                    partial(
+                        judge_rule,
+                        judging.model,
+                        view,
+                        turns,
+                        rule,
+                        slots=judging.slots,
+                        retry_later=retry_later,
+                    ),
                 )
             )
-            if isinstance(rule, LlmRule) and gate_open(rule, transcript)
+            if rule in open_rules
             else rule
             for rule in agent.rules
         ]
@@ -165,6 +222,7 @@ async def evaluate(
         scenario_verdict=verdict(outcomes(items, criteria_only=True)),
         conversation_verdict=verdict(outcomes(items, criteria_only=False)),
         judge_versions=judging.versions,
+        jev_usage=first.usage if first is not None else None,
     )
 
 

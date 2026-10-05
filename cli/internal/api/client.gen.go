@@ -1136,10 +1136,12 @@ type ItemRead struct {
 	DecidedBy    DecidedBy               `json:"decided_by"`
 
 	// EffectiveOutcome An item's result: a judge's verdict, or what stopped one.
-	EffectiveOutcome    Outcome     `json:"effective_outcome"`
-	EffectiveUnsureKind *UnsureKind `json:"effective_unsure_kind"`
-	ErrorReason         *string     `json:"error_reason"`
-	ItemKey             string      `json:"item_key"`
+	EffectiveOutcome    Outcome             `json:"effective_outcome"`
+	EffectiveUnsureKind *UnsureKind         `json:"effective_unsure_kind"`
+	ErrorReason         *string             `json:"error_reason"`
+	ItemKey             string              `json:"item_key"`
+	JevChoice           *string             `json:"jev_choice"`
+	JevProbabilities    *map[string]float32 `json:"jev_probabilities"`
 
 	// MachineOutcome An item's result: a judge's verdict, or what stopped one.
 	MachineOutcome Outcome     `json:"machine_outcome"`

@@ -118,7 +118,8 @@ class Evaluated:
     scenario_verdict: Verdict | None = None
     conversation_verdict: Verdict | None = None
     judge_versions: Mapping[str, uuid.UUID] = field(default_factory=dict)
-    """The stored judge version of each judge the items name."""
+    """The stored judge version of each judge the items name, Jev's under "jev"."""
+    jev_usage: dict[str, int] | None = None
 
 
 async def finish(
@@ -139,6 +140,7 @@ async def finish(
             conversation_verdict=evaluated.conversation_verdict,
             effective_scenario_verdict=evaluated.scenario_verdict,
             effective_conversation_verdict=evaluated.conversation_verdict,
+            jev_usage=evaluated.jev_usage,
         )
         .returning(Evaluation.id)
     )
@@ -167,6 +169,9 @@ async def finish(
             unsure_kind=found.unsure_kind,
             error_reason=found.error_reason,
             caller_effect=found.caller_effect,
+            jev_version_id=evaluated.judge_versions["jev"] if found.jev_choice else None,
+            jev_choice=found.jev_choice,
+            jev_probabilities=found.jev_probabilities,
             effective_outcome=found.outcome,
             effective_unsure_kind=found.unsure_kind,
         )

@@ -128,6 +128,9 @@ class ItemRead(BaseModel):
     error_reason: str | None
     caller_effect: dict[str, Any] | None
     """How Truman's caller affected this criterion, by the caller check."""
+    jev_choice: str | None
+    """What Jev chose when it answered the item first; a Jev pass has no other answer."""
+    jev_probabilities: dict[str, float] | None
 
 
 class ConversationEvaluation(BaseModel):

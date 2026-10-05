@@ -81,19 +81,20 @@ def evaluator() -> None:
 
 
 async def run_evaluator(settings: Settings) -> None:
-    from truman.worker.evaluator import Evaluator, judge_model
+    from truman.worker.evaluator import Evaluator, jev_first_pass, judge_model
 
     engine = create_engine(str(settings.database_url))
     model = judge_model(settings)
     sources_model = judge_model(settings, sources=True)
+    jev = jev_first_pass(settings)
     stop = asyncio.Event()
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGINT, signal.SIGTERM):
         loop.add_signal_handler(sig, stop.set)
     try:
-        await Evaluator(create_sessionmaker(engine), settings, model, sources_model).run(stop)
+        await Evaluator(create_sessionmaker(engine), settings, model, sources_model, jev).run(stop)
     finally:
-        for client in (model, sources_model):
+        for client in (model, sources_model, jev):
             if client is not None:
                 await client.close()
         if not await bounded_dispose(engine, settings.end_timeout_s):

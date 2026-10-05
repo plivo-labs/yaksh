@@ -78,6 +78,11 @@ class Settings(BaseSettings):
         default=8000, gt=0, validation_alias="JUDGE_MAX_OUTPUT_TOKENS"
     )
     """Reasoning tokens count too."""
+    typesafe_api_key: SecretStr | None = Field(default=None, validation_alias="TYPESAFE_API_KEY")
+    """Optional. Jev, TypeSafe's classifier, answers criteria and agent rules first; call
+    transcripts are sent to TypeSafe."""
+    jev_pass_bar: float = Field(default=0.95, gt=0, le=1, validation_alias="JEV_PASS_BAR")
+    """How sure Jev must be that an item is met to publish it as a pass."""
     judge_sources_timeout_s: float = Field(
         default=180.0, gt=0, validation_alias="JUDGE_SOURCES_TIMEOUT_S"
     )

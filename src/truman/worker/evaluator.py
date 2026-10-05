@@ -8,6 +8,7 @@ import os
 import socket
 import uuid
 
+from pipecat.classifiers.jev.classifier import JevClassifier
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -20,6 +21,7 @@ from truman.domain.language_models import JsonModel, ModelCallError
 from truman.domain.scenarios import ScenarioConfig
 from truman.evaluation import call, evaluations
 from truman.evaluation.call import JUDGES, SOURCE_JUDGES, Judging
+from truman.evaluation.jev import JEV, JEV_MODEL, Jev
 from truman.evaluation.sources import Document
 from truman.integrations.openai_models import OpenAIJsonModel
 
@@ -60,6 +62,16 @@ def judge_model(settings: Settings, *, sources: bool = False) -> OpenAIJsonModel
     )
 
 
+def jev_first_pass(settings: Settings) -> Jev | None:
+    """Jev, when a TypeSafe key is set."""
+    if settings.typesafe_api_key is None:
+        return None
+    classifier = JevClassifier(
+        api_key=settings.typesafe_api_key.get_secret_value(), model=JEV_MODEL
+    )
+    return Jev(classifier, settings.jev_pass_bar)
+
+
 async def knowledge_base(session: AsyncSession, agent: AgentConfig) -> list[Document]:
     """The agent's knowledge-base documents, each under the name the agent gives it, in its
     order."""
@@ -84,6 +96,7 @@ class Evaluator:
         settings: Settings,
         model: JsonModel | None = None,
         sources_model: JsonModel | None = None,
+        jev: Jev | None = None,
     ) -> None:
         """model judges calls; None runs the code metrics and phrase rules only. sources_model
         judges the agent's instructions and documents; model when None."""
@@ -91,6 +104,7 @@ class Evaluator:
         self._settings = settings
         self._model = model
         self._sources_model = sources_model
+        self._jev = jev
         self._judging: Judging | None = None
         self.evaluator_id = f"{socket.gethostname()}:{os.getpid()}:{uuid.uuid4().hex[:8]}"
         self._slots = asyncio.Semaphore(settings.evaluator_concurrency)
@@ -133,15 +147,23 @@ class Evaluator:
                 [
                     judge.version(PROVIDER, model, sources if judge in SOURCE_JUDGES else settings)
                     for judge in JUDGES
-                ],
+                ]
+                + (
+                    [JEV.version("typesafe", self._jev.model, {"pass_bar": self._jev.pass_bar})]
+                    if self._jev is not None
+                    else []
+                ),
             )
-        log.info("judging with %s", model)
+        log.info(
+            "judging with %s%s", model, f", Jev first ({self._jev.model})" if self._jev else ""
+        )
         return Judging(
             model=self._model,
             sources_model=self._sources_model or self._model,
             versions=versions,
             slots=asyncio.Semaphore(self._settings.evaluator_judge_concurrency),
             max_input_chars=self._settings.judge_max_input_chars,
+            jev=self._jev,
         )
 
     async def run(self, stop: asyncio.Event) -> None:

@@ -80,6 +80,9 @@ class ItemResult:
     attempts: list[Attempt] = field(default_factory=list)
     caller_effect: dict[str, Any] | None = None
     """How the caller check says Truman's caller affected a criterion: owner, effect, blame."""
+    jev_choice: str | None = None
+    """What Jev chose for the item, when Jev answered it first."""
+    jev_probabilities: dict[str, float] | None = None
 
 
 class JudgeUnavailable(Exception):

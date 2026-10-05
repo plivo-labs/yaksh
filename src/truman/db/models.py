@@ -287,6 +287,8 @@ class Evaluation(Base):
     effective_conversation_verdict: Mapped[Verdict | None] = mapped_column(
         pg_enum(Verdict, "verdict")
     )
+    jev_usage: Mapped[dict[str, int] | None] = mapped_column(JSONB)
+    """The tokens of the evaluation's Jev request, when it made one."""
 
     __table_args__ = (Index("ix_evaluations_state_created", "state", "created_at"),)
 
@@ -346,6 +348,10 @@ class EvaluationItem(Base):
     error_reason: Mapped[str | None] = mapped_column(Text)
     caller_effect: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     """How the caller check says Truman's caller affected this criterion."""
+    jev_version_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("judge_versions.id"))
+    """The Jev version that answered the item first, when it did."""
+    jev_choice: Mapped[str | None] = mapped_column(Text)
+    jev_probabilities: Mapped[dict[str, float] | None] = mapped_column(JSONB)
     effective_outcome: Mapped[Outcome] = mapped_column(pg_enum(Outcome, "outcome"))
     effective_unsure_kind: Mapped[UnsureKind | None] = mapped_column(
         pg_enum(UnsureKind, "unsure_kind")
