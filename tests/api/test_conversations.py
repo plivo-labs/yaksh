@@ -26,6 +26,7 @@ from tests.conftest import (
     create_scenario,
     eventually,
     start,
+    start_run,
     wait_for,
     wait_until,
 )
@@ -34,21 +35,13 @@ from yaksha.db.models import AgentVersion, Conversation, RunningWorker, Scenario
 from yaksha.db.session import create_engine, create_sessionmaker
 from yaksha.domain.agents import AgentConfig
 from yaksha.domain.background_noise import NoiseLevel, NoiseMix, NoiseSound
-from yaksha.domain.conversations import CallRequest, ConversationCreate, ConversationStatus
+from yaksha.domain.conversations import CallRequest, ConversationStatus
 from yaksha.domain.languages import Language
-from yaksha.simulation import conversations
+from yaksha.domain.runs import RunCreate
+from yaksha.simulation import conversations, runs
 from yaksha.simulation.background_noise import sound_path, volume
 from yaksha.simulation.calls import STOP_IGNORED
 from yaksha.worker.worker import FINALIZE_ATTEMPTS, Worker
-
-
-def unchecked(agent_id: str) -> dict[str, str]:
-    """A start body for requests refused before the scenario and the persona are read."""
-    return {
-        "agent_id": agent_id,
-        "persona_id": str(uuid.uuid4()),
-        "scenario_id": str(uuid.uuid4()),
-    }
 
 
 async def stuck_worker(kind: str, settings: Settings, data_dir: Path) -> asyncio.subprocess.Process:
@@ -89,7 +82,7 @@ async def test_a_conversation_runs_to_completion_with_its_transcript(
 ) -> None:
     agent_id = await create_agent_id(client)
     started = await start(client, agent_id)
-    assert started["status"] == "queued" and started["agent_version"] == 1
+    assert started["agent_version"] == 1
 
     done = await wait_for(client, started["id"], {"completed"})
 
@@ -160,20 +153,6 @@ async def test_ending_a_running_conversation_hangs_up_and_is_idempotent(
     assert again.status_code == 200 and again.json()["status"] == "completed"
 
 
-async def test_starting_and_deleting_an_agent_cannot_both_succeed(client: AsyncClient) -> None:
-    agent_id = await create_agent_id(client)
-    persona = await create_persona(client)
-    scenario = await create_scenario(client, agent_id)
-    body = {"agent_id": agent_id, "persona_id": persona["id"], "scenario_id": scenario["id"]}
-
-    started, deleted = await asyncio.gather(
-        client.post("/api/v1/conversations", json=body),
-        client.delete(f"/api/v1/agents/{agent_id}"),
-    )
-
-    assert (started.status_code, deleted.status_code) in {(202, 409), (404, 204)}
-
-
 async def test_two_workers_never_run_the_same_conversation_twice(
     client: AsyncClient, settings: Settings, caller: FakeCaller
 ) -> None:
@@ -242,6 +221,8 @@ async def test_an_expired_lease_is_marked_failed_while_a_live_one_is_not(
             .values(
                 agent_id=uuid.UUID(agent_id),
                 agent_version_id=uuid.UUID(live["agent_version_id"]),
+                run_id=uuid.UUID(live["run_id"]),
+                repeat=2,
                 persona_id=uuid.UUID(live["persona_id"]),
                 persona_version_id=uuid.UUID(live["persona_version_id"]),
                 scenario_id=uuid.UUID(live["scenario_id"]),
@@ -294,11 +275,8 @@ async def test_a_conversation_gets_its_number_from_the_pool_and_outbound_tests_n
     outbound = await create_agent_id(client, **OUTBOUND_AGENT)
 
     queued = await start(client, agent)
-    chosen = await client.post(
-        "/api/v1/conversations",
-        json={**unchecked(agent), "caller_number": "+15550100000"},
-    )
-    refused = await client.post("/api/v1/conversations", json=unchecked(outbound))
+    chosen = await start_run(client, agent, [str(uuid.uuid4())], caller_number="+15550100000")
+    refused = await start_run(client, outbound, [str(uuid.uuid4())])
 
     assert queued["status"] == "queued" and queued["caller_number"] is None
     assert chosen.status_code == 422
@@ -318,7 +296,7 @@ async def test_conversations_cannot_start_while_phone_calls_are_off(
         transport=ASGITransport(app=app), base_url="http://test", headers=headers
     ) as client:
         agent = await create_agent_id(client)
-        response = await client.post("/api/v1/conversations", json=unchecked(agent))
+        response = await start_run(client, agent, [str(uuid.uuid4())])
     await app.state.engine.dispose()
 
     assert response.status_code == 422
@@ -617,26 +595,6 @@ async def test_a_call_whose_sound_file_is_broken_fails_with_the_reason(
     assert failed["failure_reason"] == "ValueError: street.wav is not 8 kHz 16-bit mono audio"
 
 
-async def test_a_call_plays_its_own_noise_or_else_the_personas(client: AsyncClient) -> None:
-    agent_id = await create_agent_id(client)
-    persona = await create_persona(client, background_noise={"sound": "street", "level": "busy"})
-
-    own = await start(client, agent_id, persona_id=persona["id"])
-    replaced = await start(
-        client,
-        agent_id,
-        persona_id=persona["id"],
-        background_noise={"sound": "cafe", "level": "loud"},
-    )
-    quiet = await start(
-        client, agent_id, persona_id=persona["id"], background_noise={"sound": "none"}
-    )
-
-    assert own["background_noise"] == {"sound": "street", "level": "busy"}
-    assert replaced["background_noise"] == {"sound": "cafe", "level": "loud"}
-    assert quiet["background_noise"] == {"sound": "none", "level": "busy"}
-
-
 async def test_events_for_an_unknown_conversation_is_a_json_404(client: AsyncClient) -> None:
     response = await client.get(f"/api/v1/conversations/{uuid.uuid4()}/events")
 
@@ -772,8 +730,10 @@ async def test_a_conversation_freezes_its_persona_scenario_and_prompt(
     persona = await create_persona(
         client, language="hinglish", background_noise={"sound": "cafe", "level": "busy"}
     )
-    scenario = await create_scenario(client, agent_id, first_words="Haan, bolo?")
-    started = await start(client, agent_id, persona_id=persona["id"], scenario_id=scenario["id"])
+    scenario = await create_scenario(
+        client, agent_id, first_words="Haan, bolo?", persona_id=persona["id"]
+    )
+    started = await start(client, agent_id, scenario_id=scenario["id"])
     await client.patch(
         f"/api/v1/personas/{persona['id']}",
         json={
@@ -828,16 +788,16 @@ async def test_the_caller_knows_its_facts_and_today_but_never_the_criteria(
     client: AsyncClient, settings: Settings, timezone: str
 ) -> None:
     agent_id = await create_agent_id(client)
-    persona = await create_persona(client)
     scenario = await create_scenario(client, agent_id)
-    command = ConversationCreate.model_validate(
-        {"agent_id": agent_id, "persona_id": persona["id"], "scenario_id": scenario["id"]}
-    )
+    command = RunCreate.model_validate({"agent_id": agent_id, "scenario_ids": [scenario["id"]]})
     zoned = settings.model_copy(update={"timezone": timezone})
 
     engine = create_engine(settings.database_url.encoded_string())
     async with create_sessionmaker(engine)() as session:
-        conversation = await conversations.create_conversation(session, zoned, command)
+        run = await runs.create_run(session, zoned, command, None)
+        conversation = (
+            await session.scalars(select(Conversation).where(Conversation.run_id == run.id))
+        ).one()
     await engine.dispose()
 
     today = datetime.now(ZoneInfo(timezone)).date()
@@ -849,53 +809,14 @@ async def test_the_caller_knows_its_facts_and_today_but_never_the_criteria(
     assert SCENARIO["criteria"][0] not in instructions
 
 
-async def test_a_call_runs_with_the_scenarios_persona_unless_another_is_given(
-    client: AsyncClient,
-) -> None:
-    agent_id = await create_agent_id(client)
-    scenario = await create_scenario(client, agent_id)
-    other = (await create_persona(client, name="Calm caller"))["id"]
-
-    own = await client.post(
-        "/api/v1/conversations", json={"agent_id": agent_id, "scenario_id": scenario["id"]}
-    )
-    chosen = await start(client, agent_id, scenario_id=scenario["id"], persona_id=other)
-
-    assert own.status_code == 202 and own.json()["persona_id"] == scenario["persona_id"]
-    assert chosen["persona_id"] == other
-
-
-async def test_a_conversation_needs_a_live_persona(client: AsyncClient) -> None:
-    agent_id = await create_agent_id(client)
-    persona = await create_persona(client)
-    scenario = await create_scenario(client, agent_id)
-    await client.delete(f"/api/v1/personas/{persona['id']}")
-
-    for persona_id in (persona["id"], str(uuid.uuid4())):
-        body = {"agent_id": agent_id, "persona_id": persona_id, "scenario_id": scenario["id"]}
-        response = await client.post("/api/v1/conversations", json=body)
-        assert response.status_code == 404 and "persona" in response.json()["error"]["message"]
-
-
 async def test_a_conversation_needs_a_live_scenario_of_its_agent(
     client: AsyncClient, settings: Settings
 ) -> None:
     agent_id, other_id = await create_agent_id(client), await create_agent_id(client, name="Other")
-    persona = await create_persona(client)
     deleted = await create_scenario(client, agent_id)
     await client.delete(f"/api/v1/scenarios/{deleted['id']}")
     foreign = await create_scenario(client, other_id)
-
-    def body(scenario_id: str) -> dict[str, str]:
-        return {"agent_id": agent_id, "persona_id": persona["id"], "scenario_id": scenario_id}
-
-    gone = await client.post("/api/v1/conversations", json=body(deleted["id"]))
-    missing = await client.post("/api/v1/conversations", json=body(str(uuid.uuid4())))
-    crossed = await client.post("/api/v1/conversations", json=body(foreign["id"]))
     live = await start(client, agent_id)
-
-    assert gone.status_code == missing.status_code == 404
-    assert crossed.status_code == 422 and "another agent" in crossed.json()["error"]["message"]
 
     def version_of(scenario_id: str) -> Any:
         return (

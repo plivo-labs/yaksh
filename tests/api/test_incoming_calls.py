@@ -7,9 +7,9 @@ import pytest
 from httpx import AsyncClient
 from sqlalchemy import insert, select, update
 
-from tests.conftest import OUTBOUND_AGENT, create_agent, create_persona, create_scenario
+from tests.conftest import OUTBOUND_AGENT, create_agent, create_scenario
 from yaksha.config import Settings
-from yaksha.db.models import Conversation, PhoneNumber, RefusedCall
+from yaksha.db.models import Conversation, PhoneNumber, RefusedCall, Run
 from yaksha.db.session import create_engine, create_sessionmaker
 from yaksha.domain.background_noise import NoiseLevel, NoiseSound
 from yaksha.domain.conversations import (
@@ -41,19 +41,33 @@ async def waiting_conversation(
     outbound = {**OUTBOUND_AGENT["outbound"], "calling_numbers": calling_numbers or []}
     agent = await create_agent(client, **{**OUTBOUND_AGENT, "outbound": outbound})
     scenario = await create_scenario(client, agent["id"])
-    persona = await create_persona(client, name=f"Caller {uuid.uuid4()}")
+    agent_version_id = await first_version_id(client, f"/api/v1/agents/{agent['id']}")
     number = f"+1555{random.randrange(10**7):07d}"
     now = datetime.now(UTC)
     engine = create_engine(settings.database_url.encoded_string())
     async with engine.begin() as connection:
+        run_id = await connection.scalar(
+            insert(Run)
+            .values(
+                agent_id=uuid.UUID(agent["id"]),
+                agent_version_id=agent_version_id,
+                repeats=1,
+                max_duration_s=120,
+                max_turns=20,
+                max_retries=0,
+            )
+            .returning(Run.id)
+        )
         conversation_id = await connection.scalar(
             insert(Conversation)
             .values(
                 agent_id=uuid.UUID(agent["id"]),
-                agent_version_id=await first_version_id(client, f"/api/v1/agents/{agent['id']}"),
-                persona_id=uuid.UUID(persona["id"]),
+                agent_version_id=agent_version_id,
+                run_id=run_id,
+                repeat=1,
+                persona_id=uuid.UUID(scenario["persona_id"]),
                 persona_version_id=await first_version_id(
-                    client, f"/api/v1/personas/{persona['id']}"
+                    client, f"/api/v1/personas/{scenario['persona_id']}"
                 ),
                 scenario_id=uuid.UUID(scenario["id"]),
                 scenario_version_id=await first_version_id(

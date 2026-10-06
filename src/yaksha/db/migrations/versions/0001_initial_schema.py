@@ -478,8 +478,8 @@ def upgrade() -> None:
         sa.Column("line_facts", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
         sa.Column("claimed_by", sa.Text(), nullable=True),
         sa.Column("lease_expires_at", sa.DateTime(timezone=True), nullable=True),
-        sa.Column("run_id", sa.UUID(), nullable=True),
-        sa.Column("repeat", sa.Integer(), nullable=True),
+        sa.Column("run_id", sa.UUID(), nullable=False),
+        sa.Column("repeat", sa.Integer(), nullable=False),
         sa.Column("attempt", sa.Integer(), nullable=False),
         sa.Column("retry_of", sa.UUID(), nullable=True),
         sa.Column(
@@ -489,12 +489,8 @@ def upgrade() -> None:
             nullable=False,
         ),
         sa.CheckConstraint(
-            '(run_id IS NULL) = ("repeat" IS NULL)', name=op.f("ck_conversations_run_has_repeat")
-        ),
-        sa.CheckConstraint(
-            "attempt >= 1 AND (retry_of IS NULL) = (attempt = 1)"
-            " AND (retry_of IS NULL OR run_id IS NOT NULL)",
-            name=op.f("ck_conversations_retry_is_later_attempt_in_run"),
+            "attempt >= 1 AND (retry_of IS NULL) = (attempt = 1)",
+            name=op.f("ck_conversations_retry_is_later_attempt"),
         ),
         sa.ForeignKeyConstraint(
             ["agent_id"], ["agents.id"], name=op.f("fk_conversations_agent_id_agents")

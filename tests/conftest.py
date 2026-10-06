@@ -162,22 +162,29 @@ async def create_scenario(client: AsyncClient, agent_id: str, **overrides: Any) 
     return response.json()
 
 
-async def start(client: AsyncClient, agent_id: str, **overrides: Any) -> dict[str, Any]:
-    if "persona_id" not in overrides:
-        overrides["persona_id"] = await new_persona_id(client)
-    if "scenario_id" not in overrides:
-        overrides["scenario_id"] = (
-            await create_scenario(
-                client,
-                agent_id,
-                name=f"Scenario {uuid.uuid4()}",
-                persona_id=overrides["persona_id"],
-            )
-        )["id"]
-    body = {"agent_id": agent_id, **overrides}
-    response = await client.post("/api/v1/conversations", json=body)
+async def start(
+    client: AsyncClient,
+    agent_id: str,
+    *,
+    persona_id: str | None = None,
+    scenario_id: str | None = None,
+) -> dict[str, Any]:
+    """The conversation of a new run of one scenario, without retries. Without a scenario, a new
+    one of the agent with persona_id, or with a new persona, is started."""
+    if scenario_id is None:
+        scenario = await create_scenario(
+            client,
+            agent_id,
+            name=f"Scenario {uuid.uuid4()}",
+            persona_id=persona_id or await new_persona_id(client),
+        )
+        scenario_id = str(scenario["id"])
+    else:
+        assert persona_id is None, "a scenario runs with its own persona"
+    response = await start_run(client, agent_id, [scenario_id], max_retries=0)
     assert response.status_code == 202, response.text
-    return response.json()
+    (conversation,) = await run_conversations(client, response.json()["id"])
+    return conversation
 
 
 async def start_run(

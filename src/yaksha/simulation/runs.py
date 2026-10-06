@@ -105,7 +105,7 @@ async def create_run(
         await session.commit()
         return earlier
     inputs = await snapshot(
-        session, settings, agent, command.scenario_ids, background_noise=command.background_noise
+        session, settings, agent, command.scenario_ids, command.background_noise
     )
     noise = command.background_noise
     run = Run(
@@ -202,15 +202,17 @@ async def get_run(session: AsyncSession, run_id: uuid.UUID, *, lock: bool = Fals
     return run
 
 
-async def locked_run(session: AsyncSession, conversation_id: uuid.UUID) -> Run | None:
-    """The conversation's run, locked, or None for a single test call."""
-    return await session.scalar(
-        select(Run)
-        .join(Conversation, Conversation.run_id == Run.id)
-        .where(Conversation.id == conversation_id)
-        .with_for_update(of=Run)
-        .execution_options(populate_existing=True)
-    )
+async def locked_run(session: AsyncSession, conversation_id: uuid.UUID) -> Run:
+    """The conversation's run, locked."""
+    return (
+        await session.scalars(
+            select(Run)
+            .join(Conversation, Conversation.run_id == Run.id)
+            .where(Conversation.id == conversation_id)
+            .with_for_update(of=Run)
+            .execution_options(populate_existing=True)
+        )
+    ).one()
 
 
 def latest_attempt() -> ColumnElement[bool]:

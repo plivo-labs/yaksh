@@ -190,8 +190,7 @@ function ConversationRow({
           )}
         </span>
         <span className="truncate text-s-400 text-muted-foreground">
-          {conversation.persona_name}
-          {conversation.repeat !== null && `, repeat ${conversation.repeat}`}
+          {conversation.persona_name}, repeat {conversation.repeat}
         </span>
         <span className="truncate text-s-400 text-muted-foreground @3xl/conversations:hidden">
           {end && `${end}, `}
@@ -236,8 +235,11 @@ function ConversationRow({
  * id ends it because two rows can share everything else down to the minute; its last
  * characters are random, its first ones are a timestamp. */
 function label(conversation: ConversationSummary): string {
-  const parts = [conversation.scenario_name, conversation.persona_name];
-  if (conversation.repeat !== null) parts.push(`repeat ${conversation.repeat}`);
+  const parts = [
+    conversation.scenario_name,
+    conversation.persona_name,
+    `repeat ${conversation.repeat}`,
+  ];
   if (conversation.attempt > 1) parts.push(`attempt ${conversation.attempt}`);
   const noise = noiseLabel(conversation.background_noise);
   if (noise) parts.push(`background noise ${noise}`);

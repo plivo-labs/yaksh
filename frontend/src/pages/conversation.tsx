@@ -298,13 +298,11 @@ function ConversationFacts({ conversation }: { conversation: Conversation }) {
           {measuring[conversation.evaluation ?? "none"]}
         </Fact>
       )}
-      {conversation.run_id && (
-        <Fact className={arrived} label="Run">
-          <Link to={`/runs/${conversation.run_id}`} className="underline-offset-4 hover:underline">
-            Repeat {conversation.repeat}
-          </Link>
-        </Fact>
-      )}
+      <Fact className={arrived} label="Run">
+        <Link to={`/runs/${conversation.run_id}`} className="underline-offset-4 hover:underline">
+          Repeat {conversation.repeat}
+        </Link>
+      </Fact>
       {(conversation.retry_of || conversation.retried_as) && (
         <Fact className={arrived} label="Attempt">
           <span className="flex gap-3">

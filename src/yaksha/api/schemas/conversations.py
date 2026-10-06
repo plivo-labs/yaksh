@@ -92,8 +92,8 @@ class ConversationSummary(BaseModel):
     call connected."""
     recording_url: str | None
     caller_reason: str | None
-    run_id: uuid.UUID | None
-    repeat: int | None
+    run_id: uuid.UUID
+    repeat: int
     attempt: int
     retry_of: uuid.UUID | None
     created_at: datetime

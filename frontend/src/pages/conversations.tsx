@@ -1,9 +1,6 @@
-import { Plus } from "lucide-react";
-
 import { ConversationList } from "@/components/conversation-list";
 import { Pager } from "@/components/pager";
 import { SearchInput } from "@/components/search-input";
-import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
@@ -16,7 +13,6 @@ import { useFilterParams } from "@/hooks/use-filter-params";
 import { usePageParam } from "@/hooks/use-page-param";
 import { CONVERSATIONS_PAGE, useAgents, useConversations } from "@/lib/queries";
 import type { ConversationStatus } from "@/lib/types";
-import { StartCallDialog } from "@/pages/start-call-dialog";
 
 const STATUSES: ConversationStatus[] = [
   "queued",
@@ -59,15 +55,8 @@ export function ConversationsPage() {
 
   return (
     <div className="grid gap-6">
-      <div className="flex min-h-[30px] flex-wrap items-center gap-x-2 gap-y-4">
-        <h1 className="mr-auto text-h3-500">Conversations</h1>
-        <StartCallDialog
-          agents={agents.data ?? []}
-          render={<Button size="sm" disabled={!agents.data?.length} />}
-        >
-          <Plus />
-          Start call
-        </StartCallDialog>
+      <div className="flex min-h-[30px] items-center">
+        <h1 className="text-h3-500">Conversations</h1>
       </div>
 
       <div className="flex flex-wrap items-center gap-2">

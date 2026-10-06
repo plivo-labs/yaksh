@@ -10,7 +10,6 @@ import (
 	"strings"
 	"sync"
 	"testing"
-	"testing/iotest"
 	"time"
 
 	"github.com/google/uuid"
@@ -111,47 +110,5 @@ func TestResultPassedAndSummary(t *testing.T) {
 				t.Fatalf("Passed = %v, Summary = %q; want %v, %q", r.Passed(), r.Summary(), tt.passed, tt.summary)
 			}
 		})
-	}
-}
-
-func TestReadEventsReportsABrokenStream(t *testing.T) {
-	broken := iotest.TimeoutReader(strings.NewReader("event: turn\ndata: {}\n\n"))
-	if err := readEvents(broken, func(Event) error { return nil }); err == nil {
-		t.Fatal("readEvents returned no error for a stream that broke")
-	}
-}
-
-func TestConversationEndsAnErrorResponseThatStalls(t *testing.T) {
-	old := errorBodyTimeout
-	errorBodyTimeout = 20 * time.Millisecond
-	t.Cleanup(func() { errorBodyTimeout = old })
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusServiceUnavailable)
-		w.(http.Flusher).Flush()
-		<-r.Context().Done()
-	}))
-	defer srv.Close()
-	c, _ := api.New(srv.URL, "t", "test")
-
-	err := Conversation(context.Background(), c, runID, func(Event) error { return nil })
-
-	if err == nil || errors.Is(err, context.Canceled) || !strings.Contains(err.Error(), "503 and then stalled") {
-		t.Fatalf("Conversation error = %v, want the stalled 503 named, not a stop", err)
-	}
-}
-
-func TestConversationReturnsTheServersError(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(`{"error":{"code":"not_found","message":"conversation not found"}}`))
-	}))
-	defer srv.Close()
-	c, _ := api.New(srv.URL, "t", "test")
-
-	err := Conversation(context.Background(), c, runID, func(Event) error { return nil })
-
-	var apiErr *api.Error
-	if !errors.As(err, &apiErr) || apiErr.Status != http.StatusNotFound {
-		t.Fatalf("Conversation error = %v, want a 404 *api.Error", err)
 	}
 }

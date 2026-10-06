@@ -53,7 +53,7 @@ func slowBody(t *testing.T, delay time.Duration) *httptest.Server {
 	return srv
 }
 
-func TestABodyThatStallsFailsTheRequestButNotAStream(t *testing.T) {
+func TestABodyThatStallsFailsTheRequest(t *testing.T) {
 	old := requestTimeout
 	requestTimeout = 50 * time.Millisecond
 	t.Cleanup(func() { requestTimeout = old })
@@ -65,9 +65,6 @@ func TestABodyThatStallsFailsTheRequestButNotAStream(t *testing.T) {
 
 	if _, err := Body(c.HealthApiV1HealthGet(context.Background())); err == nil {
 		t.Fatal("a body that stalled past the request timeout did not fail")
-	}
-	if body, err := Body(Stream(c).HealthApiV1HealthGet(context.Background())); err != nil || len(body) == 0 {
-		t.Fatalf("Stream = %q, %v; want the body after the delay", body, err)
 	}
 }
 

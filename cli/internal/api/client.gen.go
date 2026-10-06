@@ -1036,16 +1036,6 @@ type CategoryNumbers struct {
 // Channel defines model for Channel.
 type Channel string
 
-// ConversationCreate defines model for ConversationCreate.
-type ConversationCreate struct {
-	AgentId         openapi_types.UUID  `json:"agent_id"`
-	BackgroundNoise *BackgroundNoise    `json:"background_noise,omitempty"`
-	MaxDurationS    *int                `json:"max_duration_s,omitempty"`
-	MaxTurns        *int                `json:"max_turns,omitempty"`
-	PersonaId       *openapi_types.UUID `json:"persona_id,omitempty"`
-	ScenarioId      openapi_types.UUID  `json:"scenario_id"`
-}
-
 // ConversationEvaluation defines model for ConversationEvaluation.
 type ConversationEvaluation struct {
 	ConversationVerdict          *Verdict          `json:"conversation_verdict"`
@@ -1090,11 +1080,11 @@ type ConversationRead struct {
 	PersonaVersion   int                 `json:"persona_version"`
 	PersonaVersionId openapi_types.UUID  `json:"persona_version_id"`
 	RecordingUrl     *string             `json:"recording_url"`
-	Repeat           *int                `json:"repeat"`
+	Repeat           int                 `json:"repeat"`
 	Replies          []Reply             `json:"replies"`
 	RetriedAs        *openapi_types.UUID `json:"retried_as"`
 	RetryOf          *openapi_types.UUID `json:"retry_of"`
-	RunId            *openapi_types.UUID `json:"run_id"`
+	RunId            openapi_types.UUID  `json:"run_id"`
 
 	// Scenario What a scenario version pins. The goal and the facts go to the caller. The criteria never
 	// do: they are what the agent must say or do on the call. Agent data goes only to the agent,
@@ -1146,9 +1136,9 @@ type ConversationSummary struct {
 	PersonaVersion    int                 `json:"persona_version"`
 	PersonaVersionId  openapi_types.UUID  `json:"persona_version_id"`
 	RecordingUrl      *string             `json:"recording_url"`
-	Repeat            *int                `json:"repeat"`
+	Repeat            int                 `json:"repeat"`
 	RetryOf           *openapi_types.UUID `json:"retry_of"`
-	RunId             *openapi_types.UUID `json:"run_id"`
+	RunId             openapi_types.UUID  `json:"run_id"`
 	ScenarioId        openapi_types.UUID  `json:"scenario_id"`
 	ScenarioName      string              `json:"scenario_name"`
 	ScenarioVersion   int                 `json:"scenario_version"`
@@ -2216,9 +2206,6 @@ type GenerateScenariosApiV1AgentsAgentIdScenariosGeneratePostJSONRequestBody = G
 // AssignPersonaApiV1AgentsAgentIdScenariosPersonaPostJSONRequestBody defines body for AssignPersonaApiV1AgentsAgentIdScenariosPersonaPost for application/json ContentType.
 type AssignPersonaApiV1AgentsAgentIdScenariosPersonaPostJSONRequestBody = AssignPersona
 
-// CreateConversationApiV1ConversationsPostJSONRequestBody defines body for CreateConversationApiV1ConversationsPost for application/json ContentType.
-type CreateConversationApiV1ConversationsPostJSONRequestBody = ConversationCreate
-
 // CreateTextDocumentApiV1DocumentsPostJSONRequestBody defines body for CreateTextDocumentApiV1DocumentsPost for application/json ContentType.
 type CreateTextDocumentApiV1DocumentsPostJSONRequestBody = TextDocumentCreate
 
@@ -2934,20 +2921,6 @@ type ClientInterface interface {
 	// Corresponds with GET /api/v1/conversations (the `ListConversationsApiV1ConversationsGet` operationId).
 	ListConversationsApiV1ConversationsGet(ctx context.Context, params *ListConversationsApiV1ConversationsGetParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// CreateConversationApiV1ConversationsPostWithBody Create Conversation
-	//
-	// Takes any type of body and a specified content type.
-	//
-	// Corresponds with POST /api/v1/conversations (the `CreateConversationApiV1ConversationsPost` operationId).
-	CreateConversationApiV1ConversationsPostWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// CreateConversationApiV1ConversationsPost Create Conversation
-	//
-	// Takes a body of the `application/json` content type.
-	//
-	// Corresponds with POST /api/v1/conversations (the `CreateConversationApiV1ConversationsPost` operationId).
-	CreateConversationApiV1ConversationsPost(ctx context.Context, body CreateConversationApiV1ConversationsPostJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
-
 	// GetConversationApiV1ConversationsConversationIdGet Get Conversation
 	//
 	// Corresponds with GET /api/v1/conversations/{conversation_id} (the `GetConversationApiV1ConversationsConversationIdGet` operationId).
@@ -3661,40 +3634,6 @@ func (c *Client) GetVersionApiV1AgentsAgentIdVersionsVersionGet(ctx context.Cont
 // Corresponds with GET /api/v1/conversations (the `ListConversationsApiV1ConversationsGet` operationId).
 func (c *Client) ListConversationsApiV1ConversationsGet(ctx context.Context, params *ListConversationsApiV1ConversationsGetParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewListConversationsApiV1ConversationsGetRequest(c.Server, params)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// CreateConversationApiV1ConversationsPostWithBody Create Conversation
-//
-// Takes any type of body and a specified content type.
-//
-// Corresponds with POST /api/v1/conversations (the `CreateConversationApiV1ConversationsPost` operationId).
-func (c *Client) CreateConversationApiV1ConversationsPostWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewCreateConversationApiV1ConversationsPostRequestWithBody(c.Server, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// CreateConversationApiV1ConversationsPost Create Conversation
-//
-// Takes a body of the `application/json` content type.
-//
-// Corresponds with POST /api/v1/conversations (the `CreateConversationApiV1ConversationsPost` operationId).
-func (c *Client) CreateConversationApiV1ConversationsPost(ctx context.Context, body CreateConversationApiV1ConversationsPostJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewCreateConversationApiV1ConversationsPostRequest(c.Server, body)
 	if err != nil {
 		return nil, err
 	}
@@ -5558,46 +5497,6 @@ func NewListConversationsApiV1ConversationsGetRequest(server string, params *Lis
 	if err != nil {
 		return nil, err
 	}
-
-	return req, nil
-}
-
-// NewCreateConversationApiV1ConversationsPostRequest calls the generic CreateConversationApiV1ConversationsPost builder with application/json body
-func NewCreateConversationApiV1ConversationsPostRequest(server string, body CreateConversationApiV1ConversationsPostJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewCreateConversationApiV1ConversationsPostRequestWithBody(server, "application/json", bodyReader)
-}
-
-// NewCreateConversationApiV1ConversationsPostRequestWithBody constructs an http.Request for the CreateConversationApiV1ConversationsPost method, with any body, and a specified content type
-func NewCreateConversationApiV1ConversationsPostRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/api/v1/conversations")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
 
 	return req, nil
 }
@@ -7693,20 +7592,6 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with GET /api/v1/conversations (the `ListConversationsApiV1ConversationsGet` operationId).
 	ListConversationsApiV1ConversationsGetWithResponse(ctx context.Context, params *ListConversationsApiV1ConversationsGetParams, reqEditors ...RequestEditorFn) (*ListConversationsApiV1ConversationsGetResponse, error)
 
-	// CreateConversationApiV1ConversationsPostWithBodyWithResponse Create Conversation
-	//
-	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
-	//
-	// Corresponds with POST /api/v1/conversations (the `CreateConversationApiV1ConversationsPost` operationId).
-	CreateConversationApiV1ConversationsPostWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateConversationApiV1ConversationsPostResponse, error)
-
-	// CreateConversationApiV1ConversationsPostWithResponse Create Conversation
-	//
-	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
-	//
-	// Corresponds with POST /api/v1/conversations (the `CreateConversationApiV1ConversationsPost` operationId).
-	CreateConversationApiV1ConversationsPostWithResponse(ctx context.Context, body CreateConversationApiV1ConversationsPostJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateConversationApiV1ConversationsPostResponse, error)
-
 	// GetConversationApiV1ConversationsConversationIdGetWithResponse Get Conversation
 	//
 	// Returns a wrapper object for the known response body format(s).
@@ -8877,54 +8762,6 @@ func (r ListConversationsApiV1ConversationsGetResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r ListConversationsApiV1ConversationsGetResponse) ContentType() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Header.Get("Content-Type")
-	}
-	return ""
-}
-
-type CreateConversationApiV1ConversationsPostResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	// JSON202 the response for an HTTP 202 `application/json` response
-	JSON202 *ConversationSummary
-	// JSON4XX the response for an HTTP 4XX `application/json` response
-	JSON4XX *ErrorResponse
-}
-
-// GetJSON202 returns the response for an HTTP 202 `application/json` response
-func (r CreateConversationApiV1ConversationsPostResponse) GetJSON202() *ConversationSummary {
-	return r.JSON202
-}
-
-// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
-func (r CreateConversationApiV1ConversationsPostResponse) GetJSON4XX() *ErrorResponse {
-	return r.JSON4XX
-}
-
-// GetBody returns the raw response body bytes
-func (r CreateConversationApiV1ConversationsPostResponse) GetBody() []byte {
-	return r.Body
-}
-
-// Status returns HTTPResponse.Status
-func (r CreateConversationApiV1ConversationsPostResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r CreateConversationApiV1ConversationsPostResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r CreateConversationApiV1ConversationsPostResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -11378,32 +11215,6 @@ func (c *ClientWithResponses) ListConversationsApiV1ConversationsGetWithResponse
 	return ParseListConversationsApiV1ConversationsGetResponse(rsp)
 }
 
-// CreateConversationApiV1ConversationsPostWithBodyWithResponse Create Conversation
-//
-// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
-//
-// Corresponds with POST /api/v1/conversations (the `CreateConversationApiV1ConversationsPost` operationId).
-func (c *ClientWithResponses) CreateConversationApiV1ConversationsPostWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateConversationApiV1ConversationsPostResponse, error) {
-	rsp, err := c.CreateConversationApiV1ConversationsPostWithBody(ctx, contentType, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseCreateConversationApiV1ConversationsPostResponse(rsp)
-}
-
-// CreateConversationApiV1ConversationsPostWithResponse Create Conversation
-//
-// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
-//
-// Corresponds with POST /api/v1/conversations (the `CreateConversationApiV1ConversationsPost` operationId).
-func (c *ClientWithResponses) CreateConversationApiV1ConversationsPostWithResponse(ctx context.Context, body CreateConversationApiV1ConversationsPostJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateConversationApiV1ConversationsPostResponse, error) {
-	rsp, err := c.CreateConversationApiV1ConversationsPost(ctx, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseCreateConversationApiV1ConversationsPostResponse(rsp)
-}
-
 // GetConversationApiV1ConversationsConversationIdGetWithResponse Get Conversation
 //
 // Returns a wrapper object for the known response body format(s).
@@ -12665,39 +12476,6 @@ func ParseListConversationsApiV1ConversationsGetResponse(rsp *http.Response) (*L
 			return nil, err
 		}
 		response.JSON200 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
-		var dest ErrorResponse
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON4XX = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParseCreateConversationApiV1ConversationsPostResponse parses an HTTP response from a CreateConversationApiV1ConversationsPostWithResponse call
-func ParseCreateConversationApiV1ConversationsPostResponse(rsp *http.Response) (*CreateConversationApiV1ConversationsPostResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &CreateConversationApiV1ConversationsPostResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 202:
-		var dest ConversationSummary
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON202 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
 		var dest ErrorResponse

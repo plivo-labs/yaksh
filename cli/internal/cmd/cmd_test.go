@@ -228,28 +228,17 @@ type closedPipe struct{}
 
 func (closedPipe) Write([]byte) (int, error) { return 0, io.ErrClosedPipe }
 
-func TestStartKeepsTheIDWhenStdoutFails(t *testing.T) {
+func TestRunStartKeepsTheIDWhenStdoutFails(t *testing.T) {
 	f := newFakeAPI(t, map[string]http.HandlerFunc{
-		"POST /api/v1/runs":          reply(202, runJSON("queued", `"waiting":1`)),
-		"POST /api/v1/conversations": reply(202, fmt.Sprintf(`{"id":"%s","status":"queued"}`, convID)),
+		"POST /api/v1/runs": reply(202, runJSON("queued", `"waiting":1`)),
 	})
 	vars := against(f)
-	tests := []struct {
-		args []string
-		id   string
-	}{
-		{[]string{"run", "start", "--agent", agentID, "--scenario", scenA}, runID},
-		{[]string{"conversation", "start", "--agent", agentID, "--scenario", scenA}, convID},
-	}
-	for _, tt := range tests {
-		t.Run(tt.args[0], func(t *testing.T) {
-			a := &app{version: "0.1.0", getenv: func(k string) string { return vars[k] }}
-			var stderr bytes.Buffer
-			code := a.execute(context.Background(), tt.args, strings.NewReader(""), closedPipe{}, &stderr)
-			if code != 1 || !strings.Contains(stderr.String(), tt.id) {
-				t.Fatalf("code = %d, stderr = %q; want 1 and the ID", code, stderr.String())
-			}
-		})
+	a := &app{version: "0.1.0", getenv: func(k string) string { return vars[k] }}
+	var stderr bytes.Buffer
+	args := []string{"run", "start", "--agent", agentID, "--scenario", scenA}
+	code := a.execute(context.Background(), args, strings.NewReader(""), closedPipe{}, &stderr)
+	if code != 1 || !strings.Contains(stderr.String(), runID) {
+		t.Fatalf("code = %d, stderr = %q; want 1 and the run ID", code, stderr.String())
 	}
 }
 
@@ -435,95 +424,6 @@ func TestRunCancelSaysWhatToRunNextWhenTheWaitEnds(t *testing.T) {
 				}
 			}
 		})
-	}
-}
-
-func TestConversationStartWaitPrintsEachEventThenTheConversation(t *testing.T) {
-	events := "event: turn\ndata: {\"role\":\"agent\",\"text\":\"Hello\"}\n\n: ping\n\nevent: status\ndata: {\"status\":\"completed\"}\n\n"
-	judged := func(verdict string) string {
-		return fmt.Sprintf(`{"evaluation":"done","effective_scenario_verdict":"%s"}`, verdict)
-	}
-	for _, tt := range []struct {
-		name, status, endReason, evaluation string
-		code                                int
-		next                                string
-	}{
-		{"passed", "completed", "caller_hangup", judged("pass"), 0, ""},
-		{"not scored", "completed", "caller_hangup", judged("not_scored"), 1, "yaksha conversation evaluation " + convID},
-		{"call failed", "failed", "no_answer", "", 1, "yaksha conversation view " + convID},
-	} {
-		t.Run(tt.name, func(t *testing.T) {
-			conversation := fmt.Sprintf(`{"id":"%s","status":"%s","end_reason":"%s"}`, convID, tt.status, tt.endReason)
-			f := newFakeAPI(t, map[string]http.HandlerFunc{
-				"POST /api/v1/conversations":                reply(202, fmt.Sprintf(`{"id":"%s","status":"queued"}`, convID)),
-				"GET /api/v1/conversations/{id}/events":     reply(200, events),
-				"GET /api/v1/conversations/{id}":            reply(200, conversation),
-				"GET /api/v1/conversations/{id}/evaluation": replies(`{"evaluation":"queued"}`, tt.evaluation),
-			})
-			code, stdout, stderr := run(t, context.Background(), against(f), "",
-				"conversation", "start", "--agent", agentID, "--scenario", scenA, "--wait")
-
-			want := `{"event":"turn","data":{"role":"agent","text":"Hello"}}` + "\n" +
-				`{"event":"status","data":{"status":"completed"}}` + "\n" +
-				`{"event":"conversation","data":` + conversation + "}\n"
-			if tt.evaluation != "" {
-				want += `{"event":"evaluation","data":` + tt.evaluation + "}\n"
-			}
-			if code != tt.code || stdout != want {
-				t.Fatalf("code = %d, stdout = %q, stderr = %q", code, stdout, stderr)
-			}
-			if tt.next != "" && !strings.Contains(stderr, "failed: conversation "+convID+" "+tt.status) {
-				t.Fatalf("stderr = %q, want the outcome after failed:", stderr)
-			}
-			if tt.next != "" && !strings.Contains(stderr, "next: "+tt.next) {
-				t.Fatalf("stderr = %q, want next: %s", stderr, tt.next)
-			}
-		})
-	}
-}
-
-func TestConversationStartWaitSaysWhenTheStreamEndsBeforeTheCall(t *testing.T) {
-	f := newFakeAPI(t, map[string]http.HandlerFunc{
-		"POST /api/v1/conversations":            reply(202, fmt.Sprintf(`{"id":"%s","status":"queued"}`, convID)),
-		"GET /api/v1/conversations/{id}/events": reply(200, "event: status\ndata: {\"status\":\"running\"}\n\n"),
-		"GET /api/v1/conversations/{id}":        reply(200, fmt.Sprintf(`{"id":"%s","status":"running"}`, convID)),
-	})
-	code, _, stderr := run(t, context.Background(), against(f), "", "conversation", "start", "--agent", agentID, "--scenario", scenA, "--wait")
-
-	if code != 1 || !strings.Contains(stderr, "the event stream ended before the call; the call is running") {
-		t.Fatalf("code = %d, stderr = %q", code, stderr)
-	}
-}
-
-func TestConversationStartWaitKeepsACallStartedWhileStopping(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	f := newFakeAPI(t, map[string]http.HandlerFunc{
-		"POST /api/v1/conversations": func(w http.ResponseWriter, r *http.Request) {
-			cancel()
-			w.WriteHeader(http.StatusAccepted)
-			w.Write([]byte(fmt.Sprintf(`{"id":"%s","status":"queued"}`, convID)))
-		},
-		"GET /api/v1/conversations/{id}/events": reply(200, ""),
-	})
-	code, _, stderr := run(t, ctx, against(f), "", "conversation", "start", "--agent", agentID, "--scenario", scenA, "--wait")
-
-	for _, want := range []string{"conversation " + convID + " started", "the call goes on", "next: yaksha conversation view " + convID} {
-		if code != 1 || !strings.Contains(stderr, want) {
-			t.Fatalf("code = %d, stderr = %q; want %q", code, stderr, want)
-		}
-	}
-}
-
-func TestConversationStartWaitKeepsTheIDWhenTheLastReadFails(t *testing.T) {
-	f := newFakeAPI(t, map[string]http.HandlerFunc{
-		"POST /api/v1/conversations":            reply(202, fmt.Sprintf(`{"id":"%s","status":"queued"}`, convID)),
-		"GET /api/v1/conversations/{id}/events": reply(200, "event: status\ndata: {\"status\":\"completed\"}\n\n"),
-		"GET /api/v1/conversations/{id}":        reply(503, `{"error":{"code":"unavailable","message":"database is down"}}`),
-	})
-	code, _, stderr := run(t, context.Background(), against(f), "", "conversation", "start", "--agent", agentID, "--scenario", scenA, "--wait")
-
-	if code != 1 || !strings.Contains(stderr, "could not read conversation "+convID) || !strings.Contains(stderr, "next: yaksha conversation view "+convID) {
-		t.Fatalf("code = %d, stderr = %q", code, stderr)
 	}
 }
 

@@ -1,4 +1,4 @@
-import { ChevronDown, Copy, Pencil, PhoneOutgoing } from "lucide-react";
+import { ChevronDown, Copy, Pencil } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router";
 
@@ -17,7 +17,7 @@ import { createdBetween, useDatesParam } from "@/hooks/use-dates-param";
 import { usePageParam } from "@/hooks/use-page-param";
 import { copyText } from "@/lib/clipboard";
 import { phone, reach, textSize, when } from "@/lib/format";
-import { RUNS_PAGE, useAgent, useAgents, useLastCall, useRuns } from "@/lib/queries";
+import { RUNS_PAGE, useAgent, useLastCall, useRuns } from "@/lib/queries";
 import { CONVERSATION_TONE } from "@/lib/status";
 import {
   ACTIVE_STATUSES,
@@ -30,7 +30,6 @@ import { EditAgentSheet } from "@/pages/agent-form";
 import { AgentKnowledgeBase } from "@/pages/agent-knowledge-base";
 import { AgentRules } from "@/pages/agent-rules";
 import { AgentScenarios } from "@/pages/agent-scenarios";
-import { StartCallDialog } from "@/pages/start-call-dialog";
 
 export function AgentPage() {
   const { id = "" } = useParams();
@@ -106,28 +105,17 @@ function AgentTabs({ agent }: { agent: Agent }) {
 }
 
 function Designation({ agent }: { agent: Agent }) {
-  const agents = useAgents();
   const last = useLastCall(agent.id);
   return (
     <Panel>
-      <div className="flex flex-wrap items-center gap-x-6 gap-y-4 px-5 pt-5 pb-4">
-        <div className="grid min-w-0 flex-1 basis-72 gap-1">
-          <h1 className="truncate text-h3-500" title={agent.name}>
-            {agent.name}
-          </h1>
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-s-400">
-            <span className="text-muted-foreground">{reach(agent)}</span>
-            <LineState call={last.data} pending={last.isPending} />
-          </div>
+      <div className="grid min-w-0 gap-1 px-5 pt-5 pb-4">
+        <h1 className="truncate text-h3-500" title={agent.name}>
+          {agent.name}
+        </h1>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-s-400">
+          <span className="text-muted-foreground">{reach(agent)}</span>
+          <LineState call={last.data} pending={last.isPending} />
         </div>
-        <StartCallDialog
-          agents={agents.data ?? [agent]}
-          agentId={agent.id}
-          render={<Button size="sm" className="w-full sm:ml-auto sm:w-auto" />}
-        >
-          <PhoneOutgoing />
-          Start call
-        </StartCallDialog>
       </div>
     </Panel>
   );

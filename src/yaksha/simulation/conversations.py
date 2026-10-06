@@ -1,7 +1,6 @@
 import asyncio
 import uuid
 from collections.abc import AsyncIterator, Iterable, Sequence
-from dataclasses import asdict
 from datetime import timedelta
 from typing import Any
 
@@ -32,7 +31,6 @@ from yaksha.domain.conversations import (
     Admission,
     CallOutcome,
     CallRequest,
-    ConversationCreate,
     ConversationStatus,
     EndReason,
     IncomingCall,
@@ -46,7 +44,6 @@ from yaksha.domain.personas import PersonaConfig
 from yaksha.domain.scenarios import ScenarioConfig
 from yaksha.domain.triggers import SEND_TIMEOUT_S
 from yaksha.evaluation import evaluations, results
-from yaksha.simulation.agents import get_agent
 from yaksha.simulation.background_noise import noise_mix
 from yaksha.simulation.languages import LANGUAGES
 from yaksha.simulation.numbers import free_numbers, lease_number, release_numbers
@@ -59,7 +56,6 @@ from yaksha.simulation.runs import (
     run_full,
     run_waiting,
 )
-from yaksha.simulation.starts import snapshot
 
 LEASE_LOST = "worker lost its lease on the conversation; outcome unknown"
 WORKER_STOPPED = "worker stopped during the call; outcome unknown"
@@ -69,28 +65,6 @@ PHONE_SETTINGS = "set PLIVO_AUTH_ID, PLIVO_AUTH_TOKEN and YAKSHA_PUBLIC_URL"
 
 class PoolExhaustedError(Exception):
     """Every pool number is on a call; the conversation goes back to the queue."""
-
-
-async def create_conversation(
-    session: AsyncSession, settings: Settings, command: ConversationCreate
-) -> Conversation:
-    agent = await get_agent(session, command.agent_id, lock=True)
-    (inputs,) = await snapshot(
-        session,
-        settings,
-        agent,
-        [command.scenario_id],
-        command.persona_id,
-        command.background_noise,
-    )
-    conversation = Conversation(
-        **asdict(inputs),
-        max_duration_s=command.max_duration_s or settings.default_max_duration_s,
-        max_turns=command.max_turns or settings.default_max_turns,
-    )
-    session.add(conversation)
-    await session.commit()
-    return conversation
 
 
 SORT_KEYS = {
@@ -285,43 +259,15 @@ def claim_values(worker_id: str, lease_s: int) -> dict[str, Any]:
 async def claim_next(
     session: AsyncSession, worker_id: str, lease_s: int, receiving_app_id: str | None
 ) -> Conversation | None:
-    """Claim the oldest queued conversation that can run now: single test calls first, then
-    run conversations in the order their runs were created."""
-    runnable = runnable_now(receiving_app_id)
-    candidate = (
-        select(Conversation.id)
-        .where(
-            Conversation.status == ConversationStatus.QUEUED,
-            Conversation.run_id.is_(None),
-            runnable,
-        )
-        .order_by(Conversation.created_at, Conversation.id)
-        .limit(1)
-        .with_for_update(skip_locked=True)
-        .scalar_subquery()
-    )
-    single = (
-        await session.scalars(
-            update(Conversation)
-            .where(Conversation.id == candidate)
-            .values(claim_values(worker_id, lease_s))
-            .returning(Conversation)
-        )
-    ).one_or_none()
-    if single is not None:
-        await session.commit()
-        return single
-    return await claim_from_runs(session, worker_id, lease_s, runnable)
-
-
-async def claim_from_runs(
-    session: AsyncSession, worker_id: str, lease_s: int, runnable: ColumnElement[bool]
-) -> Conversation | None:
-    """Claim under the run's lock, so no two workers pass a run's max parallel or its start
-    interval. The candidate is picked without a lock; when the claim finds it taken, or its
-    run no longer ready, the next candidate is tried."""
+    """Claim the oldest queued conversation that can run now, in the order the runs were
+    created. The claim holds the run's lock, so no two workers pass a run's max parallel or its
+    start interval. The candidate is picked without a lock; when the claim finds it taken, or
+    its run no longer ready, the next candidate is tried."""
     ready = and_(
-        Conversation.status == ConversationStatus.QUEUED, runnable, ~run_full(), ~run_waiting()
+        Conversation.status == ConversationStatus.QUEUED,
+        runnable_now(receiving_app_id),
+        ~run_full(),
+        ~run_waiting(),
     )
     while True:
         candidate = (
@@ -540,10 +486,8 @@ def expired() -> ColumnElement[bool]:
 
 
 async def reap_expired(session: AsyncSession, number_rest_s: int) -> int:
-    """Fail the live conversations whose worker lost its lease: single test calls in one
-    transaction, then each run's in its own, under the run's lock, with its retries."""
-    reaped = len(await end_expired(session, Conversation.run_id.is_(None), number_rest_s))
-    await session.commit()
+    """Fail the live conversations whose worker lost its lease: each run's in its own
+    transaction, under the run's lock, with its retries."""
     run_ids = list(
         await session.scalars(
             select(Run.id)
@@ -554,9 +498,10 @@ async def reap_expired(session: AsyncSession, number_rest_s: int) -> int:
         )
     )
     await session.commit()
+    reaped = 0
     for run_id in run_ids:
         run = await get_run(session, run_id, lock=True)
-        ended = await end_expired(session, Conversation.run_id == run_id, number_rest_s)
+        ended = await end_expired(session, run_id, number_rest_s)
         await retry(session, run, ended)
         await session.commit()
         reaped += len(ended)
@@ -564,12 +509,12 @@ async def reap_expired(session: AsyncSession, number_rest_s: int) -> int:
 
 
 async def end_expired(
-    session: AsyncSession, which: ColumnElement[bool], number_rest_s: int
+    session: AsyncSession, run_id: uuid.UUID, number_rest_s: int
 ) -> list[Row[Any]]:
     ended = list(
         await session.execute(
             update(Conversation)
-            .where(expired(), which)
+            .where(expired(), Conversation.run_id == run_id)
             .values(
                 status=ConversationStatus.FAILED,
                 end_reason=EndReason.LEASE_LOST,
@@ -615,8 +560,8 @@ async def finalize(
     transcript: Transcript,
     number_rest_s: int,
 ) -> bool:
-    """Record the terminal state; a run conversation in the error group is queued again, up to
-    its run's retries. A call that was not cancelled is queued for evaluation in the same
+    """Record the terminal state; a conversation in the error group is queued again, up to its
+    run's retries. A call that was not cancelled is queued for evaluation in the same
     transaction, so it is evaluated exactly when it is saved. Returns False when the row was no
     longer ours to finish."""
     transcript.stream_opened_ms = outcome.stream_opened_ms
@@ -659,8 +604,7 @@ async def finalize(
     ).one_or_none()
     if ended is not None:
         await release_numbers(session, [conversation_id], number_rest_s)
-        if run is not None:
-            await retry(session, run, [ended])
+        await retry(session, run, [ended])
         if ended.status is not ConversationStatus.CANCELLED:
             await evaluations.enqueue(session, [conversation_id])
     await session.commit()
