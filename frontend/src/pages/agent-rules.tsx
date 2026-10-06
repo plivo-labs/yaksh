@@ -19,7 +19,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { Explained, OutcomeCounts } from "@/components/verdict-ui";
 import { useCloseGuard } from "@/hooks/use-close-guard";
-import { since } from "@/lib/format";
+import { when } from "@/lib/format";
 import { revealErrors } from "@/lib/forms";
 import { useRuleResults, useSaveRules } from "@/lib/queries";
 import { MAX_RULES, NEW_LLM, NEW_PHRASE, ROLE_TEXT, ruleProblems } from "@/lib/rules";
@@ -182,7 +182,7 @@ function RuleRow({
               >
                 {failure.scenario_name}
               </Link>
-              {failure.ended_at && ` ${since(failure.ended_at)}`}
+              {failure.ended_at && ` ${when(failure.ended_at)}`}
             </Fragment>
           ))}
         </p>

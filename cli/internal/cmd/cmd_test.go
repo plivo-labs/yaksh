@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"slices"
 	"strings"
@@ -138,7 +139,10 @@ func TestListsSendOnlyTheFlagsThatWereSet(t *testing.T) {
 	}{
 		{[]string{"agent", "list", "--external-id", "support-line", "--page", "2"}, "/api/v1/agents", "external_id=support-line&page=2"},
 		{[]string{"scenario", "list", "--agent", agentID, "--page-size", "5"}, "/api/v1/agents/" + agentID + "/scenarios", "page_size=5"},
-		{[]string{"run", "list", "--agent", agentID}, "/api/v1/runs", "agent_id=" + agentID},
+		{[]string{"run", "list", "--agent", agentID, "--status", "running"}, "/api/v1/runs", "agent_id=" + agentID + "&status=running"},
+		{[]string{"run", "list", "--from", "2026-10-01", "--before", "2026-10-02T05:30:00+05:30"}, "/api/v1/runs",
+			"created_before=2026-10-02T05%3A30%3A00%2B05%3A30&created_from=" +
+				url.QueryEscape(time.Date(2026, 10, 1, 0, 0, 0, 0, time.Local).Format(time.RFC3339))},
 		{[]string{"conversation", "list", "--run", runID, "--latest-attempts", "--group", "error,did_not_connect"}, "/api/v1/conversations",
 			"group=did_not_connect&group=error&latest_attempts=true&run_id=" + runID},
 	}

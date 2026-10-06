@@ -1,6 +1,6 @@
 import { Link } from "react-router";
 
-import { RelativeTime } from "@/components/relative-time";
+import { Timestamp } from "@/components/timestamp";
 import { ResponseTime } from "@/components/response-time";
 import { RunStatusLabel } from "@/components/status-label";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -12,9 +12,9 @@ import { cn } from "@/lib/utils";
  * and in a narrow panel. */
 const COLUMNS = {
   withAgent:
-    "grid grid-cols-1 items-center gap-x-4 gap-y-1 @3xl/runs:grid-cols-[6.5rem_minmax(0,2fr)_minmax(0,1fr)_6rem_7rem_8rem]",
+    "grid grid-cols-1 items-center gap-x-4 gap-y-1 @3xl/runs:grid-cols-[6.5rem_minmax(0,2fr)_minmax(0,1fr)_6rem_7rem_8rem_8rem]",
   withoutAgent:
-    "grid grid-cols-1 items-center gap-x-4 gap-y-1 @3xl/runs:grid-cols-[6.5rem_minmax(0,2fr)_6rem_7rem_8rem]",
+    "grid grid-cols-1 items-center gap-x-4 gap-y-1 @3xl/runs:grid-cols-[6.5rem_minmax(0,2fr)_6rem_7rem_8rem_8rem]",
 };
 const GUTTER = { page: "px-3", panel: "px-5" };
 
@@ -68,6 +68,7 @@ export function RunList({
         <span>Finished</span>
         <span>Response p90</span>
         <span>Started</span>
+        <span>Ended</span>
       </div>
       <ul className={cn("divide-y", place === "page" && "border-b")}>
         {query.data === undefined ? (
@@ -91,7 +92,14 @@ export function RunList({
 function RunRow({ run, grid, showAgent }: { run: RunSummary; grid: string; showAgent: boolean }) {
   const finished = `${runFinished(run)} of ${runTotal(run)}`;
   const started = run.started_at ? (
-    <RelativeTime iso={run.started_at} />
+    <Timestamp iso={run.started_at} />
+  ) : ACTIVE_RUN_STATUSES.includes(run.status) ? (
+    "Not yet"
+  ) : (
+    "Never"
+  );
+  const ended = run.ended_at ? (
+    <Timestamp iso={run.ended_at} />
   ) : ACTIVE_RUN_STATUSES.includes(run.status) ? (
     "Not yet"
   ) : (
@@ -121,10 +129,15 @@ function RunRow({ run, grid, showAgent }: { run: RunSummary; grid: string; showA
           {finished} finished,{" "}
           {run.started_at ? (
             <>
-              started <RelativeTime iso={run.started_at} />
+              started <Timestamp iso={run.started_at} />
             </>
           ) : (
             "not started"
+          )}
+          {run.ended_at && (
+            <>
+              , ended <Timestamp iso={run.ended_at} />
+            </>
           )}
         </span>
       </div>
@@ -145,6 +158,7 @@ function RunRow({ run, grid, showAgent }: { run: RunSummary; grid: string; showA
         {run.response_p90_ms !== null && <ResponseTime ms={run.response_p90_ms} />}
       </div>
       <div className="hidden text-xs-400 text-muted-foreground @3xl/runs:block">{started}</div>
+      <div className="hidden text-xs-400 text-muted-foreground @3xl/runs:block">{ended}</div>
     </li>
   );
 }

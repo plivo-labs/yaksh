@@ -3,6 +3,7 @@ import { type ReactNode, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router";
 
 import { CopyId } from "@/components/copy-id";
+import { DateRangeFilter } from "@/components/date-range-filter";
 import { ActionPanel, Fact, Panel, PanelHeader } from "@/components/panel";
 import { Pager } from "@/components/pager";
 import { RunList } from "@/components/run-list";
@@ -12,9 +13,10 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { createdBetween, useDateRangeParam } from "@/hooks/use-date-range-param";
 import { usePageParam } from "@/hooks/use-page-param";
 import { copyText } from "@/lib/clipboard";
-import { phone, reach, since, textSize, when } from "@/lib/format";
+import { phone, reach, textSize, when } from "@/lib/format";
 import { RUNS_PAGE, useAgent, useAgents, useLastCall, useRuns } from "@/lib/queries";
 import { CONVERSATION_TONE } from "@/lib/status";
 import {
@@ -170,20 +172,25 @@ function LineState({
       <span className="text-muted-foreground">
         {active
           ? call.scenario_name
-          : `Last call ${call.status} ${since(call.started_at ?? call.created_at)}`}
+          : `Last call ${call.status} ${when(call.started_at ?? call.created_at)}`}
       </span>
     </Link>
   );
 }
 
 function Runs({ agent }: { agent: Agent }) {
-  const runs = useRuns({ agentId: agent.id }, usePageParam());
+  const [range, setRange] = useDateRangeParam();
+  const runs = useRuns({ agentId: agent.id, ...createdBetween(range) }, usePageParam());
   return (
-    <ActionPanel>
+    <ActionPanel action={<DateRangeFilter range={range} onRangeChange={setRange} />}>
       <RunList
         query={runs}
         place="panel"
-        empty="No runs yet. Select scenarios on the Scenarios tab and click Run."
+        empty={
+          range
+            ? "No runs in these dates."
+            : "No runs yet. Select scenarios on the Scenarios tab and click Run."
+        }
       />
       <Pager className="border-t px-5 py-3" query={runs} pageSize={RUNS_PAGE} />
     </ActionPanel>

@@ -71,7 +71,14 @@ export const keys = {
   voicesFor: (language: Language | "all") => ["voices", language] as const,
   phoneNumbers: ["phone-numbers"] as const,
   runs: (filters: RunFilters) =>
-    ["runs", "list", filters.agentId ?? "all", filters.status ?? "any"] as const,
+    [
+      "runs",
+      "list",
+      filters.agentId ?? "all",
+      filters.status ?? "any",
+      filters.createdFrom ?? "",
+      filters.createdBefore ?? "",
+    ] as const,
   run: (id: string) => ["runs", "one", id] as const,
   runMetrics: (id: string) => ["runs", "metrics", id] as const,
   document: (id: string) => ["documents", id] as const,
@@ -448,12 +455,16 @@ export const RUNS_PAGE = 25;
 export interface RunFilters {
   agentId?: string;
   status?: RunStatus;
+  createdFrom?: string;
+  createdBefore?: string;
 }
 
 export function useRuns(filters: RunFilters, page: number) {
   const search = new URLSearchParams({ page: String(page), page_size: String(RUNS_PAGE) });
   if (filters.agentId) search.set("agent_id", filters.agentId);
   if (filters.status) search.set("status", filters.status);
+  if (filters.createdFrom) search.set("created_from", filters.createdFrom);
+  if (filters.createdBefore) search.set("created_before", filters.createdBefore);
   return useQuery({
     queryKey: [...keys.runs(filters), page],
     queryFn: ({ signal }) => api<Page<RunSummary>>(`/runs?${search}`, { signal }),

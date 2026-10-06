@@ -2,6 +2,7 @@ import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Header, Response, status
+from pydantic import AwareDatetime
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from yaksha.api.auth import require_token
@@ -57,9 +58,19 @@ async def list_runs(
     page: PageDep,
     agent_id: uuid.UUID | None = None,
     status: RunStatus | None = None,
+    created_from: AwareDatetime | None = None,
+    created_before: AwareDatetime | None = None,
 ) -> Page[RunSummary]:
+    """`created_from` includes its time and `created_before` excludes its time, so ranges
+    next to each other do not overlap. Both need a time zone."""
     rows, total = await runs.list_runs(
-        session, offset=page.offset, limit=page.page_size, agent_id=agent_id, status=status
+        session,
+        offset=page.offset,
+        limit=page.page_size,
+        agent_id=agent_id,
+        status=status,
+        created_from=created_from,
+        created_before=created_before,
     )
     return Page.of(await summaries(session, rows), total, page)
 

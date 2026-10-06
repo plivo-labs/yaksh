@@ -8,7 +8,7 @@ import { DeleteDialog } from "@/components/confirm-dialogs";
 import { Pager } from "@/components/pager";
 import { SearchInput } from "@/components/search-input";
 import { SortHeader } from "@/components/sort-header";
-import { RelativeTime } from "@/components/relative-time";
+import { Timestamp } from "@/components/timestamp";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -193,7 +193,7 @@ function AgentRow({ agent }: { agent: AgentSummary }) {
             <span className="truncate text-muted-foreground">
               <span className="capitalize">{words(call.status)}</span>
               {call.talk_ms !== null && `, ${duration(call.talk_ms)}`},{" "}
-              <RelativeTime iso={call.started_at ?? call.created_at} />
+              <Timestamp iso={call.started_at ?? call.created_at} />
             </span>
           </>
         ) : (
@@ -202,7 +202,7 @@ function AgentRow({ agent }: { agent: AgentSummary }) {
       </div>
       <div className="col-span-2 text-xs-400 text-muted-foreground md:col-span-1">
         <span className="md:hidden">Updated </span>
-        <RelativeTime iso={agent.updated_at} />
+        <Timestamp iso={agent.updated_at} />
       </div>
       <AgentMenu agent={agent} />
     </li>

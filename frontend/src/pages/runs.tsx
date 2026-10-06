@@ -1,5 +1,6 @@
 import { useSearchParams } from "react-router";
 
+import { DateRangeFilter } from "@/components/date-range-filter";
 import { Pager } from "@/components/pager";
 import { RunList } from "@/components/run-list";
 import {
@@ -10,6 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { createdBetween, useDateRangeParam } from "@/hooks/use-date-range-param";
 import { usePageParam } from "@/hooks/use-page-param";
 import { RUNS_PAGE, useAgents, useRuns } from "@/lib/queries";
 import type { RunStatus } from "@/lib/types";
@@ -18,20 +20,22 @@ const STATUSES: RunStatus[] = ["queued", "running", "cancelling", "done", "cance
 
 const ANY = "any";
 
-/** Every agent's runs, newest first, narrowed by agent and status in the address. */
+/** Every agent's runs, newest first, narrowed by agent, status and dates in the address. */
 export function RunsPage() {
   const [params, setParams] = useSearchParams();
   const agentId = params.get("agent_id") ?? ANY;
   const status = params.get("status") ?? ANY;
+  const [range, setRange] = useDateRangeParam();
   const agents = useAgents();
   const runs = useRuns(
     {
       agentId: agentId === ANY ? undefined : agentId,
       status: STATUSES.find((value) => value === status),
+      ...createdBetween(range),
     },
     usePageParam(),
   );
-  const filtered = agentId !== ANY || status !== ANY;
+  const filtered = agentId !== ANY || status !== ANY || range !== undefined;
 
   const agentItems = [
     { value: ANY, label: "All agents" },
@@ -101,6 +105,11 @@ export function RunsPage() {
             </SelectGroup>
           </SelectContent>
         </Select>
+        <DateRangeFilter
+          range={range}
+          onRangeChange={setRange}
+          className="min-w-0 flex-1 sm:w-auto sm:flex-none"
+        />
       </div>
 
       <div>

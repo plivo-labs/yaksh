@@ -2166,10 +2166,12 @@ type GetReviewApiV1ReviewConversationsConversationIdGetParams struct {
 
 // ListRunsApiV1RunsGetParams defines parameters for ListRunsApiV1RunsGet.
 type ListRunsApiV1RunsGetParams struct {
-	AgentId  *openapi_types.UUID `form:"agent_id,omitempty" json:"agent_id,omitempty"`
-	Status   *RunStatus          `form:"status,omitempty" json:"status,omitempty"`
-	Page     *int                `form:"page,omitempty" json:"page,omitempty"`
-	PageSize *int                `form:"page_size,omitempty" json:"page_size,omitempty"`
+	AgentId       *openapi_types.UUID `form:"agent_id,omitempty" json:"agent_id,omitempty"`
+	Status        *RunStatus          `form:"status,omitempty" json:"status,omitempty"`
+	CreatedFrom   *time.Time          `form:"created_from,omitempty" json:"created_from,omitempty"`
+	CreatedBefore *time.Time          `form:"created_before,omitempty" json:"created_before,omitempty"`
+	Page          *int                `form:"page,omitempty" json:"page,omitempty"`
+	PageSize      *int                `form:"page_size,omitempty" json:"page_size,omitempty"`
 }
 
 // CreateRunApiV1RunsPostParams defines parameters for CreateRunApiV1RunsPost.
@@ -3174,6 +3176,9 @@ type ClientInterface interface {
 	GetQueueApiV1ReviewQueueGet(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListRunsApiV1RunsGet List Runs
+	//
+	// `created_from` includes its time and `created_before` excludes its time, so ranges
+	// next to each other do not overlap. Both need a time zone.
 	//
 	// Corresponds with GET /api/v1/runs (the `ListRunsApiV1RunsGet` operationId).
 	ListRunsApiV1RunsGet(ctx context.Context, params *ListRunsApiV1RunsGetParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -4268,6 +4273,9 @@ func (c *Client) GetQueueApiV1ReviewQueueGet(ctx context.Context, reqEditors ...
 }
 
 // ListRunsApiV1RunsGet List Runs
+//
+// `created_from` includes its time and `created_before` excludes its time, so ranges
+// next to each other do not overlap. Both need a time zone.
 //
 // Corresponds with GET /api/v1/runs (the `ListRunsApiV1RunsGet` operationId).
 func (c *Client) ListRunsApiV1RunsGet(ctx context.Context, params *ListRunsApiV1RunsGetParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -6734,6 +6742,30 @@ func NewListRunsApiV1RunsGetRequest(server string, params *ListRunsApiV1RunsGetP
 
 		}
 
+		if params.CreatedFrom != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "created_from", *params.CreatedFrom, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.CreatedBefore != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "created_before", *params.CreatedBefore, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
 		if params.Page != nil {
 
 			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "page", *params.Page, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
@@ -7949,6 +7981,9 @@ type ClientWithResponsesInterface interface {
 	GetQueueApiV1ReviewQueueGetWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetQueueApiV1ReviewQueueGetResponse, error)
 
 	// ListRunsApiV1RunsGetWithResponse List Runs
+	//
+	// `created_from` includes its time and `created_before` excludes its time, so ranges
+	// next to each other do not overlap. Both need a time zone.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -11847,6 +11882,9 @@ func (c *ClientWithResponses) GetQueueApiV1ReviewQueueGetWithResponse(ctx contex
 }
 
 // ListRunsApiV1RunsGetWithResponse List Runs
+//
+// `created_from` includes its time and `created_before` excludes its time, so ranges
+// next to each other do not overlap. Both need a time zone.
 //
 // Returns a wrapper object for the known response body format(s).
 //
