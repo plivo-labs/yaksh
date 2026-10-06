@@ -1,4 +1,4 @@
-import { Copy, PhoneOutgoing } from "lucide-react";
+import { ChevronDown, Copy, PhoneOutgoing } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router";
 
@@ -257,24 +257,44 @@ function Purpose({ agent, edit }: { agent: Agent; edit: ReactNode }) {
   );
 }
 
+/** The settings a reader needs first, and the rest under "Show more". */
 function Settings({ agent, edit }: { agent: Agent; edit: ReactNode }) {
+  const { outbound } = agent;
   return (
     <Panel>
       <PanelHeader title="Settings" action={edit} />
-      <dl className="grid grid-cols-[minmax(0,1fr)] gap-4 px-5 py-4">
+      <dl className="grid grid-cols-[minmax(0,1fr)] gap-4 px-5 pt-4">
         <Fact label="Language">{LANGUAGE_NAMES[agent.language]}</Fact>
         <Fact label="Opens with">
           {agent.agent_speaks_first ? "Agent speaks first" : "Caller speaks first"}
         </Fact>
-        {agent.outbound && <OutboundFacts outbound={agent.outbound} />}
-        <Fact label="External id" wrap>
-          {agent.external_id ?? <span className="font-normal text-muted-foreground">None</span>}
-        </Fact>
-        <Fact label="Agent id">
-          <CopyId id={agent.id} label="agent id" />
-        </Fact>
-        <Fact label="Added">{when(agent.created_at)}</Fact>
+        {outbound && (
+          <div className="grid gap-0.5">
+            <dt className="text-xs-400 text-muted-foreground">Start request</dt>
+            <dd className="text-p-400 break-all">
+              <span className="text-muted-foreground">POST </span>
+              {outbound.trigger.url}
+            </dd>
+          </div>
+        )}
       </dl>
+      <details className="group px-5 pt-3 pb-4">
+        <summary className="flex w-fit cursor-pointer list-none items-center gap-1 rounded-sm text-xs-500 text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden">
+          <span className="group-open:hidden">Show more</span>
+          <span className="hidden group-open:inline">Show less</span>
+          <ChevronDown className="size-3.5 transition-transform duration-150 group-open:rotate-180" />
+        </summary>
+        <dl className="mt-4 grid grid-cols-[minmax(0,1fr)] gap-4">
+          {outbound && <OutboundFacts outbound={outbound} />}
+          <Fact label="External id" wrap>
+            {agent.external_id ?? <span className="font-normal text-muted-foreground">None</span>}
+          </Fact>
+          <Fact label="Agent id">
+            <CopyId id={agent.id} label="agent id" />
+          </Fact>
+          <Fact label="Added">{when(agent.created_at)}</Fact>
+        </dl>
+      </details>
     </Panel>
   );
 }
@@ -284,13 +304,6 @@ function OutboundFacts({ outbound }: { outbound: OutboundSettings }) {
   const { trigger } = outbound;
   return (
     <>
-      <div className="grid gap-0.5">
-        <dt className="text-xs-400 text-muted-foreground">Start request</dt>
-        <dd className="text-p-400 break-all">
-          <span className="text-muted-foreground">POST </span>
-          {trigger.url}
-        </dd>
-      </div>
       <Fact label="Headers" wrap>
         {trigger.headers.length > 0 ? (
           trigger.headers.map((header) => header.name).join(", ")
@@ -298,14 +311,6 @@ function OutboundFacts({ outbound }: { outbound: OutboundSettings }) {
           <span className="font-normal text-muted-foreground">None</span>
         )}
       </Fact>
-      <Fact label="Calling numbers" wrap>
-        {outbound.calling_numbers.length > 0 ? (
-          outbound.calling_numbers.map(phone).join(", ")
-        ) : (
-          <span className="font-normal text-muted-foreground">Any number</span>
-        )}
-      </Fact>
-      <Fact label="Dial window">{outbound.dial_window_s} seconds</Fact>
       <div className="grid min-w-0 gap-1">
         <dt className="text-xs-400 text-muted-foreground">Request body</dt>
         <dd className="min-w-0">
@@ -314,6 +319,14 @@ function OutboundFacts({ outbound }: { outbound: OutboundSettings }) {
           </pre>
         </dd>
       </div>
+      <Fact label="Calling numbers" wrap>
+        {outbound.calling_numbers.length > 0 ? (
+          outbound.calling_numbers.map(phone).join(", ")
+        ) : (
+          <span className="font-normal text-muted-foreground">Any number</span>
+        )}
+      </Fact>
+      <Fact label="Dial window">{outbound.dial_window_s} seconds</Fact>
     </>
   );
 }

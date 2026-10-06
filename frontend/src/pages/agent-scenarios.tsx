@@ -1,10 +1,20 @@
 import { Toggle } from "@base-ui/react/toggle";
 import { ToggleGroup } from "@base-ui/react/toggle-group";
-import { ChevronDown, PhoneIncoming, PhoneOutgoing, Play, Plus, Sparkles, X } from "lucide-react";
-import { Fragment, type ReactNode, useState } from "react";
+import {
+  ChevronDown,
+  Pencil,
+  PhoneIncoming,
+  PhoneOutgoing,
+  Play,
+  Plus,
+  Sparkles,
+  Trash2,
+  X,
+} from "lucide-react";
+import { Fragment, type ReactNode, useRef, useState } from "react";
 import { toast } from "sonner";
 
-import { DeleteConfirm } from "@/components/confirm-dialogs";
+import { DeleteConfirm, DeleteDialog } from "@/components/confirm-dialogs";
 import { CopyId } from "@/components/copy-id";
 import { Panel } from "@/components/panel";
 import { SearchInput } from "@/components/search-input";
@@ -154,6 +164,7 @@ export function AgentScenarios({ agent }: { agent: Agent }) {
   const [generating, setGenerating] = useState(false);
   const [running, setRunning] = useState<string[] | null>(null);
   const [picked, setPicked] = useState<ReadonlySet<string>>(new Set());
+  const selectAll = useRef<HTMLButtonElement>(null);
   const scenario = editing === "new" ? undefined : (editing ?? undefined);
 
   const items = scenarios.data ?? [];
@@ -165,8 +176,6 @@ export function AgentScenarios({ agent }: { agent: Agent }) {
   if (open && open.id !== openId) setOpenId(open.id);
   const selected = items.filter((item) => picked.has(item.id)).map((item) => item.id);
   const listedPicked = listed.filter((item) => picked.has(item.id)).length;
-  /** Changes to many scenarios at once are capped; a run is limited by the server's own cap. */
-  const bulk = selected.length <= MAX_BULK;
   const pick = (ids: string[], on: boolean) =>
     setPicked((current) => {
       const next = new Set(current);
@@ -251,7 +260,7 @@ export function AgentScenarios({ agent }: { agent: Agent }) {
           </div>
         ) : (
           <div className="grid lg:grid-cols-[26rem_minmax(0,1fr)]">
-            <div className="min-w-0 border-b lg:border-r lg:border-b-0">
+            <div className="flex min-w-0 flex-col border-b lg:border-r lg:border-b-0">
               <div className="grid gap-2 border-b px-4 py-3">
                 <div className="flex gap-2">
                   <SearchInput
@@ -323,6 +332,7 @@ export function AgentScenarios({ agent }: { agent: Agent }) {
               </div>
               <div className="flex min-h-12 flex-wrap items-center gap-x-3 gap-y-2 border-b px-4 py-2">
                 <Checkbox
+                  ref={selectAll}
                   aria-label="Select all shown scenarios"
                   disabled={listed.length === 0}
                   checked={listed.length > 0 && listedPicked === listed.length}
@@ -334,75 +344,43 @@ export function AgentScenarios({ agent }: { agent: Agent }) {
                     )
                   }
                 />
-                {selected.length > 0 ? (
-                  <>
-                    <span className="text-s-500">{selected.length} selected</span>
-                    <div className="ml-auto flex flex-wrap items-center gap-2">
-                      {bulk ? (
-                        <DropdownMenu disabled={assign.isPending || !personas.data?.length}>
-                          <DropdownMenuTrigger
-                            aria-label="Set the persona of the selected scenarios"
-                            render={<Button variant="outline" size="sm" />}
-                          >
-                            Set persona
-                            <ChevronDown />
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            {personas.data?.map((persona) => (
-                              <DropdownMenuItem
-                                key={persona.id}
-                                onClick={() => assignPersona(persona)}
-                              >
-                                {persona.name}
-                              </DropdownMenuItem>
-                            ))}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      ) : (
-                        <p className="text-s-400 text-muted-foreground">
-                          Select at most {MAX_BULK} to change or delete them at once.
-                        </p>
-                      )}
-                      <Button size="sm" onClick={() => setRunning(selected)}>
-                        <Play />
-                        Run {selected.length}
-                      </Button>
-                      {bulk && (
-                        <DeleteConfirm
-                          name={counted(selected.length, "scenario", "scenarios")}
-                          description="Past and queued conversations are not changed."
-                          pending={remove.isPending}
-                          onDelete={(close) => deleteScenarios(selected, close)}
-                        />
-                      )}
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <span className="text-s-400 text-muted-foreground">
-                      {listed.length === items.length
-                        ? counted(items.length, "scenario", "scenarios")
-                        : `${listed.length} of ${counted(items.length, "scenario", "scenarios")}`}
-                    </span>
-                    {shownBatch && (
-                      <div className="ml-auto">
-                        <DeleteConfirm
-                          name={`this batch of ${counted(items.length, "scenario", "scenarios")}`}
-                          label="Delete this batch"
-                          description="Past and queued conversations are not changed."
-                          pending={remove.isPending}
-                          onDelete={(close) =>
-                            deleteScenarios(
-                              items.map((item) => item.id),
-                              close,
-                            )
-                          }
-                        />
-                      </div>
-                    )}
-                  </>
+                <span className="text-s-400 text-muted-foreground">
+                  {listed.length === items.length
+                    ? counted(items.length, "scenario", "scenarios")
+                    : `${listed.length} of ${counted(items.length, "scenario", "scenarios")}`}
+                </span>
+                {shownBatch && (
+                  <div className="ml-auto">
+                    <DeleteConfirm
+                      name={`this batch of ${counted(items.length, "scenario", "scenarios")}`}
+                      label="Delete this batch"
+                      description="Past and queued conversations are not changed."
+                      pending={remove.isPending}
+                      onDelete={(close) =>
+                        deleteScenarios(
+                          items.map((item) => item.id),
+                          close,
+                        )
+                      }
+                    />
+                  </div>
                 )}
               </div>
+              {selected.length > 0 && (
+                <SelectionBar
+                  count={selected.length}
+                  personas={personas.data ?? []}
+                  assigning={assign.isPending}
+                  deleting={remove.isPending}
+                  onPersona={assignPersona}
+                  onRun={() => setRunning(selected)}
+                  onDelete={(close) => deleteScenarios(selected, close)}
+                  onClear={() => {
+                    setPicked(new Set());
+                    selectAll.current?.focus();
+                  }}
+                />
+              )}
               {listed.length === 0 ? (
                 <p className="px-4 py-6 text-p-400 text-muted-foreground">
                   No scenarios match the filters.
@@ -458,6 +436,104 @@ export function AgentScenarios({ agent }: { agent: Agent }) {
         />
       )}
     </>
+  );
+}
+
+/** The actions for the checked scenarios, in a bar that stays in view at the bottom of the list
+ * while it scrolls. It comes first in the page's order, so the keyboard reaches it before the
+ * rows. */
+function SelectionBar({
+  count,
+  personas,
+  assigning,
+  deleting,
+  onPersona,
+  onRun,
+  onDelete,
+  onClear,
+}: {
+  count: number;
+  personas: Persona[];
+  assigning: boolean;
+  deleting: boolean;
+  onPersona: (persona: Persona) => void;
+  onRun: () => void;
+  onDelete: (close: () => void) => void;
+  onClear: () => void;
+}) {
+  const [confirming, setConfirming] = useState(false);
+  /** Changes to many scenarios at once are capped; a run is limited by the server's own cap. */
+  const bulk = count <= MAX_BULK;
+  const onInk =
+    "text-primary-foreground hover:bg-primary-foreground/10 hover:text-primary-foreground aria-expanded:bg-primary-foreground/10";
+  return (
+    <div
+      role="group"
+      aria-label="Selected scenarios"
+      className={cn(
+        "sticky bottom-0 z-10 order-last m-3 flex flex-wrap items-center gap-1 rounded-md bg-primary py-1.5 pr-1.5 pl-3.5 text-primary-foreground shadow-md",
+        RISE,
+      )}
+    >
+      <span className="text-s-500 whitespace-nowrap">{count} selected</span>
+      <Button
+        variant="ghost"
+        size="sm"
+        className={cn(onInk, "text-primary-foreground/70")}
+        onClick={onClear}
+      >
+        Clear
+      </Button>
+      <div className="ml-auto flex items-center gap-1">
+        {bulk && (
+          <>
+            <DropdownMenu disabled={assigning || personas.length === 0}>
+              <DropdownMenuTrigger
+                aria-label="Set the persona of the selected scenarios"
+                render={<Button variant="ghost" size="sm" className={onInk} />}
+              >
+                Persona
+                <ChevronDown />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {personas.map((persona) => (
+                  <DropdownMenuItem key={persona.id} onClick={() => onPersona(persona)}>
+                    {persona.name}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label={`Delete ${counted(count, "scenario", "scenarios")}`}
+              title="Delete"
+              className={onInk}
+              onClick={() => setConfirming(true)}
+            >
+              <Trash2 />
+            </Button>
+          </>
+        )}
+        <Button variant="outline" size="sm" className="border-transparent" onClick={onRun}>
+          <Play />
+          Run {count}
+        </Button>
+      </div>
+      {!bulk && (
+        <p className="basis-full pb-1 text-xs-400 text-primary-foreground/70">
+          Select at most {MAX_BULK} to change or delete them at once.
+        </p>
+      )}
+      <DeleteDialog
+        name={counted(count, "scenario", "scenarios")}
+        description="Past and queued conversations are not changed."
+        pending={deleting}
+        open={confirming}
+        onOpenChange={setConfirming}
+        onDelete={onDelete}
+      />
+    </div>
   );
 }
 
@@ -552,6 +628,7 @@ function ScenarioDetail({
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={onEdit}>
+            <Pencil />
             Edit
           </Button>
           <Button variant="outline" size="sm" onClick={onRun}>
