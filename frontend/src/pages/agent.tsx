@@ -1,4 +1,4 @@
-import { ChevronDown, Copy, PhoneOutgoing } from "lucide-react";
+import { ChevronDown, Copy, Pencil, PhoneOutgoing } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router";
 
@@ -196,6 +196,7 @@ function AgentConfig({ agent, active }: { agent: Agent; active: boolean }) {
   const [editing, setEditing] = useState(false);
   const edit = (
     <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
+      <Pencil />
       Edit
     </Button>
   );
