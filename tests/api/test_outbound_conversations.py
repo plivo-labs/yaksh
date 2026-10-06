@@ -19,12 +19,12 @@ from tests.conftest import (
     reap,
     start_run,
 )
-from truman.config import Settings
-from truman.db.models import Conversation, PhoneNumber, RunningWorker
-from truman.db.session import create_engine, create_sessionmaker
-from truman.simulation import conversations
-from truman.simulation.workers import report_worker
-from truman.worker.worker import Worker
+from yaksha.config import Settings
+from yaksha.db.models import Conversation, PhoneNumber, RunningWorker
+from yaksha.db.session import create_engine, create_sessionmaker
+from yaksha.simulation import conversations
+from yaksha.simulation.workers import report_worker
+from yaksha.worker.worker import Worker
 
 APP_ID = "31216907353261579"
 RECEIVING = "+15716535187"

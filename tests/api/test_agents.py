@@ -14,8 +14,8 @@ from tests.conftest import (
     create_scenario,
     wait_for_lock_waiters,
 )
-from truman.config import Settings
-from truman.db.models import Scenario
+from yaksha.config import Settings
+from yaksha.db.models import Scenario
 
 
 async def test_changing_config_creates_a_version_but_renaming_does_not(
@@ -115,7 +115,7 @@ async def test_requests_without_a_valid_token_are_rejected(client: AsyncClient) 
 def test_an_empty_token_is_refused_at_startup() -> None:
     with pytest.raises(ValidationError):
         Settings.model_validate(
-            {"api_token": "", "database_url": "postgresql+asyncpg://truman:truman@db/truman"}
+            {"api_token": "", "database_url": "postgresql+asyncpg://yaksha:yaksha@db/yaksha"}
         )
 
 

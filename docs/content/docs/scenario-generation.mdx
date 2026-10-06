@@ -12,7 +12,7 @@ A model can write scenarios for an agent. The model is `GENERATION_LLM_MODEL`, o
 3. In the **Generate scenarios** dialog, select the mode, the number of scenarios and the personas.
 4. Click **Generate**.
 
-Stay on the page until the generation completes. If you go to a different page or click **Stop**, the generation stops. Truman keeps the scenarios that it saved before the stop.
+Stay on the page until the generation completes. If you go to a different page or click **Stop**, the generation stops. Yaksha keeps the scenarios that it saved before the stop.
 
 ## Modes
 
@@ -24,14 +24,14 @@ Stay on the page until the generation completes. If you go to a different page o
 ## Rules
 
 - `count` is 1 to 20. The default is 5.
-- Truman writes at most 5 scenarios that do a test of the same thing in the same category. Thus, a short brief can give fewer scenarios than `count`.
+- Yaksha writes at most 5 scenarios that do a test of the same thing in the same category. Thus, a short brief can give fewer scenarios than `count`.
 - Select 1 to 20 personas. Each subject of the new scenarios gets each selected persona before it gets the same persona again.
 - `instructions` is optional, with at most 2000 characters. It tells the model what to focus on, for example "focus on rescheduling".
-- The brief, the configuration and the documents together can have at most 800,000 characters. In the `knowledge_base` mode, Truman counts only the brief and the selected documents. If the text is longer, Truman rejects the request. Use the `knowledge_base` mode with fewer documents, or make the configuration shorter.
-- Truman makes two tries for each scenario. If the two tries fail, Truman discards the scenario and continues.
-- Truman writes the scenarios in English.
+- The brief, the configuration and the documents together can have at most 800,000 characters. In the `knowledge_base` mode, Yaksha counts only the brief and the selected documents. If the text is longer, Yaksha rejects the request. Use the `knowledge_base` mode with fewer documents, or make the configuration shorter.
+- Yaksha makes two tries for each scenario. If the two tries fail, Yaksha discards the scenario and continues.
+- Yaksha writes the scenarios in English.
 
-With the API, use `POST /api/v1/agents/<agent id>/scenarios/generate`. The response is a Server-Sent Events stream. It sends each scenario when Truman saves it. If you close the stream, the generation stops. The scenarios that Truman saved stay.
+With the API, use `POST /api/v1/agents/<agent id>/scenarios/generate`. The response is a Server-Sent Events stream. It sends each scenario when Yaksha saves it. If you close the stream, the generation stops. The scenarios that Yaksha saved stay.
 
 ## Knowledge base documents
 
@@ -39,5 +39,5 @@ An agent can have at most 20 documents in its knowledge base. You can upload PDF
 
 - A file can have at most 20 MB and 1,000,000 characters of text.
 - TXT and MD files must be UTF-8.
-- Truman rejects a PDF without text, for example a scanned PDF. Truman also rejects a PDF with a password.
+- Yaksha rejects a PDF without text, for example a scanned PDF. Yaksha also rejects a PDF with a password.
 - A document does not change after you add it. The API cannot delete a document.

@@ -1,13 +1,13 @@
 import { createGetUrl } from 'fumadocs-core/source';
 
-export const appName = 'Truman';
+export const appName = 'Yaksha';
 export const docsRoute = '/docs';
 export const docsImageRoute = '/og/docs';
 export const docsContentRoute = '/llms.mdx/docs';
 
 export const gitConfig = {
   user: 'plivo-labs',
-  repo: 'truman',
+  repo: 'yaksha',
   branch: 'main',
 };
 

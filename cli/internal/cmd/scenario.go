@@ -3,7 +3,7 @@ package cmd
 import (
 	"github.com/spf13/cobra"
 
-	"github.com/plivo-labs/truman/cli/internal/api"
+	"github.com/plivo-labs/yaksha/cli/internal/api"
 )
 
 func (a *app) scenarioCmd() *cobra.Command {

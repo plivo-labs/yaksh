@@ -28,10 +28,10 @@ from tests.conftest import (
     wait_for_lock_waiters,
     wait_for_run,
 )
-from truman.api import create_app
-from truman.config import Settings
-from truman.db.models import Conversation, Persona, Run, Scenario
-from truman.domain.conversations import (
+from yaksha.api import create_app
+from yaksha.config import Settings
+from yaksha.db.models import Conversation, Persona, Run, Scenario
+from yaksha.domain.conversations import (
     CallerSettings,
     CallerUsage,
     CallOutcome,
@@ -43,8 +43,8 @@ from truman.domain.conversations import (
     Transcript,
     Turn,
 )
-from truman.domain.evaluations import Metric, MetricKey
-from truman.domain.latency import (
+from yaksha.domain.evaluations import Metric, MetricKey
+from yaksha.domain.latency import (
     AgentMedia,
     CallerReplyWindow,
     Latency,
@@ -52,8 +52,8 @@ from truman.domain.latency import (
     Span,
     waits,
 )
-from truman.domain.voices import VoiceProvider, VoiceSettings
-from truman.worker.worker import Worker
+from yaksha.domain.voices import VoiceProvider, VoiceSettings
+from yaksha.worker.worker import Worker
 
 NO_OUTCOMES = dict.fromkeys(
     ("waiting", "in_progress", "completed", "did_not_connect", "error", "cancelled"), 0

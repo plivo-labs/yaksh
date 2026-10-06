@@ -1,5 +1,5 @@
-from truman.api import create_app
-from truman.config import Settings
+from yaksha.api import create_app
+from yaksha.config import Settings
 
 ERROR_BODY = {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}
 

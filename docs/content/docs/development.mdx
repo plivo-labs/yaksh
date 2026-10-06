@@ -1,18 +1,18 @@
 ---
 title: Development
-description: Operate Truman from the source code.
+description: Operate Yaksha from the source code.
 ---
 
 ## With Docker
 
-1. Make the `docker/.env` file. Set `TRUMAN_API_TOKEN` in it. Refer to steps 2 and 3 of [Quickstart](/docs/quickstart#start-truman). The API and the worker do not start without this token. To make test calls, also set the credentials of the services in this file. Refer to [Configuration](/docs/configuration).
+1. Make the `docker/.env` file. Set `YAKSHA_API_TOKEN` in it. Refer to steps 2 and 3 of [Quickstart](/docs/quickstart#start-yaksha). The API and the worker do not start without this token. To make test calls, also set the credentials of the services in this file. Refer to [Configuration](/docs/configuration).
 2. Start the development stack:
 
    ```sh
    docker compose -f docker/compose.dev.yaml up --build
    ```
 
-3. Open http://localhost:5173. Enter the value of `TRUMAN_API_TOKEN`.
+3. Open http://localhost:5173. Enter the value of `YAKSHA_API_TOKEN`.
 
 When you change the Python code, the API loads the changes automatically. When you change the frontend code, the console loads the changes automatically. The worker does not load the changes. After you change Python code, start the worker again:
 
@@ -36,9 +36,9 @@ The two Docker Compose files use the same project name. Thus, use only one stack
    docker compose -f docker/compose.dev.yaml up -d postgres
    ```
 
-3. Use `export` to set `TRUMAN_API_TOKEN` to a secret value. Also use `export` to set `TRUMAN_DATABASE_URL` to `postgresql+asyncpg://truman:truman@localhost:5433/truman`. To make test calls, also set the credentials of the services. Refer to [Configuration](/docs/configuration).
-4. From the root of the repository, start the API with `uv run truman-server api --reload`.
-5. In a second terminal, set the same variables. Then, from the root of the repository, start the worker with `uv run truman-server worker`. The worker does not load changes. After you change the code, stop the worker. Then start it again.
+3. Use `export` to set `YAKSHA_API_TOKEN` to a secret value. Also use `export` to set `YAKSHA_DATABASE_URL` to `postgresql+asyncpg://yaksha:yaksha@localhost:5433/yaksha`. To make test calls, also set the credentials of the services. Refer to [Configuration](/docs/configuration).
+4. From the root of the repository, start the API with `uv run yaksha-server api --reload`.
+5. In a second terminal, set the same variables. Then, from the root of the repository, start the worker with `uv run yaksha-server worker`. The worker does not load changes. After you change the code, stop the worker. Then start it again.
 6. In a third terminal, go to `frontend/`. Start the console with `bun install && bun run dev`.
 
 Instead of `export`, you can put the variables in `.env` at the root of the repository. The API and the worker read this file when you start them from the root.
@@ -47,9 +47,9 @@ To do the automated tests, use `uv run pytest`. These tests use Docker to start 
 
 ## Phone calls in development
 
-Do this procedure only with `docker/compose.dev.yaml`. `scripts/tunnel.sh` opens a Cloudflare quick tunnel to the worker container. A Cloudflare account is not necessary for a quick tunnel. The script shows the `TRUMAN_PUBLIC_URL` line.
+Do this procedure only with `docker/compose.dev.yaml`. `scripts/tunnel.sh` opens a Cloudflare quick tunnel to the worker container. A Cloudflare account is not necessary for a quick tunnel. The script shows the `YAKSHA_PUBLIC_URL` line.
 
-Put this line in `docker/.env`. For outbound tests, also change the two URLs of the Plivo Application, because the worker examines the Application only when it starts. Then make the `api` and `worker` containers again, because they read `TRUMAN_PUBLIC_URL` only when they start:
+Put this line in `docker/.env`. For outbound tests, also change the two URLs of the Plivo Application, because the worker examines the Application only when it starts. Then make the `api` and `worker` containers again, because they read `YAKSHA_PUBLIC_URL` only when they start:
 
 ```sh
 docker compose -f docker/compose.dev.yaml create --force-recreate api worker

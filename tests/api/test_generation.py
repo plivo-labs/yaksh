@@ -18,14 +18,14 @@ from tests.conftest import (
     create_scenario,
     new_persona_id,
 )
-from truman.api import create_app
-from truman.config import Settings
-from truman.db.models import Scenario, ScenarioGeneration
-from truman.db.session import create_engine, create_sessionmaker
-from truman.domain.errors import UnavailableError
-from truman.domain.generation import MAX_PLANNER_CHARS, GenerateScenarios, GenerationStatus
-from truman.domain.language_models import ModelAnswer
-from truman.simulation import generation
+from yaksha.api import create_app
+from yaksha.config import Settings
+from yaksha.db.models import Scenario, ScenarioGeneration
+from yaksha.db.session import create_engine, create_sessionmaker
+from yaksha.domain.errors import UnavailableError
+from yaksha.domain.generation import MAX_PLANNER_CHARS, GenerateScenarios, GenerationStatus
+from yaksha.domain.language_models import ModelAnswer
+from yaksha.simulation import generation
 
 BRIEF = "Reschedules missed clinic visits. Never gives medical advice; transfers to a nurse."
 OPEN_REQUEST = "Make it a request a caller could plausibly make to this agent.\n"

@@ -8,7 +8,7 @@ Short sounds at random times, such as a door, a dog or a cough, to test false ba
 
 ## Own sound files
 
-A user adds a sound that Truman does not ship. The upload must turn the file into the format of the shipped sounds: 8 kHz 16-bit mono WAV at -25 dBFS RMS, a whole number of 20 ms chunks (`src/truman/simulation/sounds/README.md`). The file store that documents use can hold it.
+A user adds a sound that Yaksha does not ship. The upload must turn the file into the format of the shipped sounds: 8 kHz 16-bit mono WAV at -25 dBFS RMS, a whole number of 20 ms chunks (`src/yaksha/simulation/sounds/README.md`). The file store that documents use can hold it.
 
 ## Line problems
 

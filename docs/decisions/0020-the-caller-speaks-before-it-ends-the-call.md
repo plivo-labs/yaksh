@@ -8,7 +8,7 @@ Status: accepted
 The caller's model ends a call with the `end_call` tool. A reply that calls `end_call` without any words does not end the call:
 
 - The first time in a call, the tool result tells the model that the call did not end. It must answer the agent's latest turn aloud and say goodbye in the reply that calls `end_call`. Pipecat runs the model again (`run_llm=True`).
-- The second time, Truman says the language's goodbye line, then ends the call.
+- The second time, Yaksha says the language's goodbye line, then ends the call.
 
 The caller asks the model for one tool call at a time (`parallel_tool_calls: false`), so one reply cannot end the call twice.
 
@@ -16,7 +16,7 @@ The caller asks the model for one tool call at a time (`parallel_tool_calls: fal
 
 - In a real call, gpt-4.1 answered the agent's "…Is that correct?" with only `end_call`. The line was silent for 10 s, and the question got no answer. The caller prompt already asked for a goodbye, but no code checked it.
 - With the check, real calls had a silent `end_call` in 3 of 5 calls and then in 2 of 5 calls. After each refusal, the caller spoke before it ended the call, for example "Yes, that's correct… Okay, thanks. Bye." after "…Is that correct?".
-- test-voice-agent asks its model for JSON with the spoken text and an end flag, and asks again once when the text is empty. Truman keeps the tool, because it streams the model's text into the TTS.
+- test-voice-agent asks its model for JSON with the spoken text and an end flag, and asks again once when the text is empty. Yaksha keeps the tool, because it streams the model's text into the TTS.
 - Pipecat runs the tool handler on its own task, and a later reply can start before it runs. So the generated tap records, for each tool call, whether its reply had words when Pipecat starts the calls (`FunctionCallsStartedFrame`).
 
 ## Cost

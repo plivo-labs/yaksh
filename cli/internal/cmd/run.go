@@ -10,8 +10,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/spf13/cobra"
 
-	"github.com/plivo-labs/truman/cli/internal/api"
-	"github.com/plivo-labs/truman/cli/internal/wait"
+	"github.com/plivo-labs/yaksha/cli/internal/api"
+	"github.com/plivo-labs/yaksha/cli/internal/wait"
 )
 
 // cancelTimeout bounds the cancel request that follows Ctrl-C or SIGTERM.
@@ -70,7 +70,7 @@ func (a *app) runStartCmd() *cobra.Command {
 	fl.IntVar(&f.maxTurns, "max-turns", 0, "how many agent turns the caller answers")
 	fl.IntVar(&f.maxParallel, "max-parallel", 0, "how many calls of the run can be on the line at once")
 	fl.IntVar(&f.startIntervalS, "start-interval-s", 0, "the least time between two call starts, in seconds")
-	fl.IntVar(&f.maxRetries, "max-retries", 0, "extra tries for a call that fails on Truman's side or on the line")
+	fl.IntVar(&f.maxRetries, "max-retries", 0, "extra tries for a call that fails on Yaksha's side or on the line")
 	fl.StringVar(&f.noiseSound, "noise-sound", "", "background noise for every call, for example cafe; none turns it off")
 	fl.StringVar(&f.noiseLevel, "noise-level", "", "the noise level: light, busy or loud")
 	fl.StringVar(&f.name, "name", "", "a name for the run")
@@ -133,7 +133,7 @@ func (a *app) startRun(cmd *cobra.Command, f runStartFlags) error {
 	}
 	if !f.wait {
 		// The ID goes out first, so a failed write to stdout cannot lose the run.
-		fmt.Fprintf(cmd.ErrOrStderr(), "next: truman run wait %s\n", id)
+		fmt.Fprintf(cmd.ErrOrStderr(), "next: yaksha run wait %s\n", id)
 		return printJSON(cmd.OutOrStdout(), created)
 	}
 	fmt.Fprintf(cmd.ErrOrStderr(), "run %s started\n", id)
@@ -196,7 +196,7 @@ func (a *app) waitForRun(cmd *cobra.Command, c *api.Client, id uuid.UUID, timeou
 	defer cancel()
 	stderr := cmd.ErrOrStderr()
 	opts := wait.Options{Interval: a.pollInterval, Progress: stderr, Live: isTerminal(stderr)}
-	again := "truman run wait " + id.String()
+	again := "yaksha run wait " + id.String()
 	r, err := wait.Run(ctx, c, id, opts)
 	switch {
 	case errors.Is(err, wait.ErrTimeout):
@@ -252,9 +252,9 @@ func (a *app) waitForRun(cmd *cobra.Command, c *api.Client, id uuid.UUID, timeou
 	switch {
 	case !r.Passed():
 		return &failure{nextStep{summary, fmt.Sprintf(
-			"truman conversation list --run %s --latest-attempts --group error,did_not_connect", id)}}
+			"yaksha conversation list --run %s --latest-attempts --group error,did_not_connect", id)}}
 	case !v.Passed():
-		return &failure{nextStep{summary, "truman run metrics " + id.String()}}
+		return &failure{nextStep{summary, "yaksha run metrics " + id.String()}}
 	}
 	fmt.Fprintln(stderr, summary)
 	return nil
@@ -267,10 +267,10 @@ func cancelAfterStop(ctx context.Context, c *api.Client, id uuid.UUID) error {
 	defer cancel()
 	if _, err := api.Body(c.CancelRunApiV1RunsRunIdCancelPost(ctx, id)); err != nil {
 		return &nextStep{fmt.Sprintf("stopped, but could not cancel run %s: %v", id, err),
-			"truman run cancel " + id.String()}
+			"yaksha run cancel " + id.String()}
 	}
 	return &nextStep{fmt.Sprintf("stopped: run %s is cancelled, and its calls on the line are ending", id),
-		"truman run view " + id.String()}
+		"yaksha run view " + id.String()}
 }
 
 func (a *app) runWaitCmd() *cobra.Command {
@@ -401,10 +401,10 @@ func (a *app) runCancelCmd() *cobra.Command {
 			})
 			switch {
 			case errors.Is(err, context.Canceled):
-				return &nextStep{"stopped waiting; the cancel was sent", "truman run cancel " + id.String()}
+				return &nextStep{"stopped waiting; the cancel was sent", "yaksha run cancel " + id.String()}
 			case err != nil:
 				return &nextStep{fmt.Sprintf("could not read run %s (%s); the cancel was sent", id, describe(err)),
-					"truman run cancel " + id.String()}
+					"yaksha run cancel " + id.String()}
 			}
 			if err := printJSON(cmd.OutOrStdout(), r.Body); err != nil {
 				return err

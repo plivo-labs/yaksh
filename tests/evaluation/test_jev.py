@@ -17,12 +17,12 @@ from tests.conftest import (
     start_run,
 )
 from tests.evaluation.test_judged_calls import CALL, Judge
-from truman.config import Settings
-from truman.db.models import Evaluation, EvaluationItem, JudgeVersion
-from truman.domain.conversations import CallOutcome, EndReason
-from truman.domain.evaluations import DecidedBy, EvaluationState, Outcome
-from truman.evaluation.jev import Jev, JevAnswer
-from truman.worker.evaluator import Evaluator
+from yaksha.config import Settings
+from yaksha.db.models import Evaluation, EvaluationItem, JudgeVersion
+from yaksha.domain.conversations import CallOutcome, EndReason
+from yaksha.domain.evaluations import DecidedBy, EvaluationState, Outcome
+from yaksha.evaluation.jev import Jev, JevAnswer
+from yaksha.worker.evaluator import Evaluator
 
 
 class StubJevClient(JevClient):

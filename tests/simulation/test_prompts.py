@@ -1,10 +1,10 @@
 from datetime import date
 
-from truman.domain.languages import Language
-from truman.domain.personas import PersonaConfig
-from truman.domain.voices import VoiceGender, VoiceProvider, VoiceSettings
-from truman.simulation.languages import HINDI_FORMS
-from truman.simulation.prompts import caller_instructions
+from yaksha.domain.languages import Language
+from yaksha.domain.personas import PersonaConfig
+from yaksha.domain.voices import VoiceGender, VoiceProvider, VoiceSettings
+from yaksha.simulation.languages import HINDI_FORMS
+from yaksha.simulation.prompts import caller_instructions
 
 VOICE = VoiceSettings(provider=VoiceProvider.ELEVENLABS, id="v1")
 

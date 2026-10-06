@@ -104,8 +104,8 @@ export function StartCallDialog({
           <DialogTitle>Start a conversation</DialogTitle>
           <DialogDescription>
             {chosenAgent?.direction === "outbound"
-              ? "Truman asks the agent to call, then answers as the persona and follows the scenario."
-              : "Truman calls the agent as the persona and follows the scenario."}
+              ? "Yaksha asks the agent to call, then answers as the persona and follows the scenario."
+              : "Yaksha calls the agent as the persona and follows the scenario."}
           </DialogDescription>
         </DialogHeader>
         <form

@@ -1,4 +1,4 @@
-module github.com/plivo-labs/truman/cli
+module github.com/plivo-labs/yaksha/cli
 
 go 1.27.0
 

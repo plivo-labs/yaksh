@@ -1,7 +1,7 @@
 from pipecat.audio.vad.vad_analyzer import VADState
 
-from truman.domain.latency import CallerReplyWindow, Span, Speech
-from truman.evaluation.speech import Window, measure, placed_reply, segments
+from yaksha.domain.latency import CallerReplyWindow, Span, Speech
+from yaksha.evaluation.speech import Window, measure, placed_reply, segments
 
 QUIET, STARTING, SPEAKING, STOPPING = (
     VADState.QUIET,

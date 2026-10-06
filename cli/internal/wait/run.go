@@ -1,4 +1,4 @@
-// Package wait waits for Truman's long work: a run until it ends, the judges' verdicts, and the
+// Package wait waits for Yaksha's long work: a run until it ends, the judges' verdicts, and the
 // event stream of a call.
 package wait
 
@@ -14,7 +14,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/plivo-labs/truman/cli/internal/api"
+	"github.com/plivo-labs/yaksha/cli/internal/api"
 )
 
 // ErrTimeout is the cause to give a context whose time limit ends a wait, so that the wait

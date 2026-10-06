@@ -8,11 +8,11 @@ from httpx import AsyncClient
 from sqlalchemy import insert, select, update
 
 from tests.conftest import OUTBOUND_AGENT, create_agent, create_persona, create_scenario
-from truman.config import Settings
-from truman.db.models import Conversation, PhoneNumber, RefusedCall
-from truman.db.session import create_engine, create_sessionmaker
-from truman.domain.background_noise import NoiseLevel, NoiseSound
-from truman.domain.conversations import (
+from yaksha.config import Settings
+from yaksha.db.models import Conversation, PhoneNumber, RefusedCall
+from yaksha.db.session import create_engine, create_sessionmaker
+from yaksha.domain.background_noise import NoiseLevel, NoiseSound
+from yaksha.domain.conversations import (
     Admission,
     CallOutcome,
     ConversationStatus,
@@ -20,8 +20,8 @@ from truman.domain.conversations import (
     IncomingCall,
     Transcript,
 )
-from truman.domain.languages import Language
-from truman.simulation import conversations
+from yaksha.domain.languages import Language
+from yaksha.simulation import conversations
 
 AGENT_NUMBER = "+14155550100"
 

@@ -1,13 +1,13 @@
-# Truman
+# Yaksha
 
 Simulate, evaluate and improve AI agents. One Python service plus a React frontend.
 
-Truman is open source and self-hosted: users run it on their own infrastructure. Plivo builds it and provides the phone network, but Plivo does not run it as a service. Design for outside users, not for Plivo-internal infrastructure.
+Yaksha is open source and self-hosted: users run it on their own infrastructure. Plivo builds it and provides the phone network, but Plivo does not run it as a service. Design for outside users, not for Plivo-internal infrastructure.
 
 ## Layout
 
 ```
-src/truman/
+src/yaksha/
   config.py     process settings from environment variables
   domain/       shared data models and interfaces
   caller/       runs the simulated caller and connects to the customer's agent
@@ -18,7 +18,7 @@ src/truman/
   worker/       claims queued conversations from Postgres and runs them under a lease; evaluator.py does the same for evaluations
   db/           database models and migrations
 frontend/       React UI
-cli/            Go command-line client for the API, its own module; skill/truman/SKILL.md is the guide for coding agents
+cli/            Go command-line client for the API, its own module; skill/yaksha/SKILL.md is the guide for coding agents
 docker/         container builds and self-hosted deployment
 docs/           docs site (Fumadocs, pages in docs/content/docs/); decisions, ideas and bugs as Markdown
 tests/          automated tests and fixtures

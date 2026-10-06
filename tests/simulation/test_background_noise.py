@@ -9,9 +9,9 @@ import audioop
 import pytest
 from pipecat.audio.mixers.soundfile_mixer import SoundfileMixer
 
-from truman.caller.audio import FRAME_BYTES, SAMPLE_RATE
-from truman.domain.background_noise import BackgroundNoise, NoiseLevel, NoiseSound
-from truman.simulation.background_noise import (
+from yaksha.caller.audio import FRAME_BYTES, SAMPLE_RATE
+from yaksha.domain.background_noise import BackgroundNoise, NoiseLevel, NoiseSound
+from yaksha.simulation.background_noise import (
     LEAD_S,
     TAIL_S,
     sound_path,

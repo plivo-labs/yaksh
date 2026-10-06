@@ -8,7 +8,7 @@ import websockets
 from httpx import ASGITransport, AsyncClient, Response
 
 from tests.conftest import PLIVO_TOKEN, plivo_signed, refuse_calls
-from truman.caller.plivo_server import (
+from yaksha.caller.plivo_server import (
     HANGUP_XML,
     NO_CALL,
     REJECT_XML,
@@ -17,10 +17,10 @@ from truman.caller.plivo_server import (
     StreamRegistry,
     create_app,
 )
-from truman.domain.conversations import Admission, IncomingCall
+from yaksha.domain.conversations import Admission, IncomingCall
 
-PUBLIC_URL = "https://truman.example.com"
-STREAM_SIGNED_URL = "http://truman.example.com"
+PUBLIC_URL = "https://yaksha.example.com"
+STREAM_SIGNED_URL = "http://yaksha.example.com"
 RETRIES = "rc=5&amp;ct=2000&amp;rd=1000&amp;rp=5xx,ct"
 
 
@@ -62,9 +62,9 @@ async def test_the_answer_xml_streams_a_waiting_conversation_and_hangs_up_others
     assert answer.status_code == 200 and answer.headers["content-type"].startswith(
         "application/xml"
     )
-    assert f"wss://truman.example.com/stream/{conversation_id}" in answer.text
+    assert f"wss://yaksha.example.com/stream/{conversation_id}" in answer.text
     assert (
-        f'statusCallbackUrl="https://truman.example.com/stream-status/{conversation_id}#{RETRIES}"'
+        f'statusCallbackUrl="https://yaksha.example.com/stream-status/{conversation_id}#{RETRIES}"'
         in answer.text
     )
     assert 'bidirectional="true"' in answer.text and 'keepCallAlive="true"' in answer.text
@@ -202,7 +202,7 @@ async def test_an_admitted_incoming_call_streams_with_a_plivo_side_time_limit() 
     )
     assert answered.text == retried.text
     assert answered.text.index('<Hangup schedule="150"/>') < answered.text.index("<Stream")
-    assert f"wss://truman.example.com/stream/{waiting}" in answered.text
+    assert f"wss://yaksha.example.com/stream/{waiting}" in answered.text
     assert entry.callbacks.get_nowait() == CALL
 
 

@@ -5,7 +5,7 @@ import pytest
 from httpx import AsyncClient
 
 from tests.conftest import create_agent
-from truman.domain.agents import MAX_BRIEF_CHARS, MAX_KNOWLEDGE_BASE_DOCUMENTS
+from yaksha.domain.agents import MAX_BRIEF_CHARS, MAX_KNOWLEDGE_BASE_DOCUMENTS
 
 FLOW = '{"nodes": [{"name": "Missed visit", "prompt": "Offer a new time."}]}'
 

@@ -1,7 +1,7 @@
 import wave
 from pathlib import Path
 
-from truman.caller.audio import (
+from yaksha.caller.audio import (
     SAMPLE_RATE,
     CallerReply,
     CallRecording,
@@ -9,7 +9,7 @@ from truman.caller.audio import (
     placed,
     save_caller_voice,
 )
-from truman.domain.latency import AgentMedia, CallerReplyWindow, Span
+from yaksha.domain.latency import AgentMedia, CallerReplyWindow, Span
 
 
 def silence(seconds: float) -> bytes:

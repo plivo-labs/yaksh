@@ -79,14 +79,14 @@ func TestNewSendsTokenAndUserAgent(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c, err := New(srv.URL+"/", "secret", "truman-cli/test")
+	c, err := New(srv.URL+"/", "secret", "yaksha-cli/test")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if _, err := Body(c.HealthApiV1HealthGet(context.Background())); err != nil {
 		t.Fatal(err)
 	}
-	if auth != "Bearer secret" || agent != "truman-cli/test" {
+	if auth != "Bearer secret" || agent != "yaksha-cli/test" {
 		t.Fatalf("Authorization = %q, User-Agent = %q", auth, agent)
 	}
 }

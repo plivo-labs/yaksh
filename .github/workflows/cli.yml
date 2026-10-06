@@ -6,7 +6,7 @@ on:
   pull_request:
     paths:
       - cli/**
-      - src/truman/**
+      - src/yaksha/**
       - scripts/export_openapi.py
       - pyproject.toml
       - uv.lock

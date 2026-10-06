@@ -13,9 +13,9 @@ from tests.conftest import (
     FakeVoiceClient,
     listed_voice_id,
 )
-from truman.domain.languages import Language
-from truman.domain.voices import VoiceProvider
-from truman.simulation.languages import LANGUAGES
+from yaksha.domain.languages import Language
+from yaksha.domain.voices import VoiceProvider
+from yaksha.simulation.languages import LANGUAGES
 
 NEW_VOICE = {"provider": "elevenlabs", "provider_voice_id": UNLISTED_VOICE.id}
 

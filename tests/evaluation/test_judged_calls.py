@@ -14,9 +14,9 @@ from tests.conftest import (
     finish,
     start_run,
 )
-from truman.config import Settings
-from truman.db.models import Evaluation, EvaluationItem, JudgeCall, JudgeVersion, MetricValue
-from truman.domain.conversations import (
+from yaksha.config import Settings
+from yaksha.db.models import Evaluation, EvaluationItem, JudgeCall, JudgeVersion, MetricValue
+from yaksha.domain.conversations import (
     CallOutcome,
     EndReason,
     Role,
@@ -25,11 +25,11 @@ from truman.domain.conversations import (
     WireEvent,
     WireEventKind,
 )
-from truman.domain.evaluations import DecidedBy, EvaluationState, MetricKey, Outcome, Verdict
-from truman.domain.language_models import ModelAnswer, ModelCallError
-from truman.evaluation import judging
-from truman.evaluation.evaluations import MAX_ATTEMPTS
-from truman.worker.evaluator import Evaluator
+from yaksha.domain.evaluations import DecidedBy, EvaluationState, MetricKey, Outcome, Verdict
+from yaksha.domain.language_models import ModelAnswer, ModelCallError
+from yaksha.evaluation import judging
+from yaksha.evaluation.evaluations import MAX_ATTEMPTS
+from yaksha.worker.evaluator import Evaluator
 
 TURNS = [
     Turn(role=Role.AGENT, text="Thanks for calling, this is Ava.", started_at_ms=0, ended_at_ms=1),

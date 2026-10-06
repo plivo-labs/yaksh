@@ -80,7 +80,7 @@ export function Shell() {
               <SidebarMenuItem>
                 <SidebarMenuButton size="lg" render={<NavLink to="/agents" />}>
                   <img src="/favicon.svg" alt="" className="size-8 shrink-0" />
-                  <span className="text-h4-500">Truman</span>
+                  <span className="text-h4-500">Yaksha</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>
@@ -124,7 +124,7 @@ export function Shell() {
                   tooltip="Docs"
                   render={
                     <a
-                      href="https://github.com/plivo-labs/truman/tree/dev/docs/content/docs"
+                      href="https://github.com/plivo-labs/yaksha/tree/dev/docs/content/docs"
                       target="_blank"
                       rel="noreferrer"
                     />

@@ -58,22 +58,22 @@ type WireEventKind =
   | "trigger_sent"
   | "waiting_for_call";
 
-/** What each wire event means, from where Truman records it. */
+/** What each wire event means, from where Yaksha records it. */
 export const WIRE_EVENT_HELP: Record<WireEventKind, string> = {
-  connect_started: "Truman started the call: it dials the agent, or waits for the agent's call.",
-  waiting_for_call: "Truman waits for the agent to call the number it leased for this test.",
+  connect_started: "Yaksha started the call: it dials the agent, or waits for the agent's call.",
+  waiting_for_call: "Yaksha waits for the agent to call the number it leased for this test.",
   trigger_sent:
-    "Truman tried to send the request that makes the agent call. The text below gives the result, or why it was not sent.",
+    "Yaksha tried to send the request that makes the agent call. The text below gives the result, or why it was not sent.",
   ringing: "Plivo reports that the agent's phone rings.",
-  answered: "The call is answered: the agent picked up, or Truman took the agent's call.",
+  answered: "The call is answered: the agent picked up, or Yaksha took the agent's call.",
   connected: "The audio stream is open. Talk time and the recording start here.",
   caller_audio_start:
-    "Truman started to send the caller's speech. This does not prove that the agent heard it.",
-  caller_audio_end: "Truman stopped sending the caller's speech.",
+    "Yaksha started to send the caller's speech. This does not prove that the agent heard it.",
+  caller_audio_end: "Yaksha stopped sending the caller's speech.",
   agent_audio:
     "Sound from the agent's side started after a quiet stretch: speech, music, a beep or line noise.",
   clear_audio:
-    "The agent started to speak, so Truman told Plivo to drop caller speech still queued. It cuts the caller off only when the caller was still speaking.",
+    "The agent started to speak, so Yaksha told Plivo to drop caller speech still queued. It cuts the caller off only when the caller was still speaking.",
   silence_greeting: "The agent should speak first but stayed silent, so the caller said hello.",
   stop: "Plivo stopped the audio stream.",
   caller_error:
@@ -709,7 +709,7 @@ export interface EvaluationItem {
   effective_unsure_kind: UnsureKind | null;
   answer: Record<string, unknown> | null;
   error_reason: string | null;
-  /** How Truman's caller affected this criterion, by the caller check. */
+  /** How Yaksha's caller affected this criterion, by the caller check. */
   caller_effect: { owner: string; effect: string; blame: string | null } | null;
   /** What Jev chose when it answered the item first; a Jev pass has no other answer. */
   jev_choice: string | null;
@@ -750,7 +750,7 @@ export const FLAG_TEXT: Record<string, string> = {
   unconfirmed_caller_turns: "Unconfirmed caller turns",
   missing_recording: "No recording",
   no_agent_media: "No media from the agent",
-  worker_stall: "Truman worker paused",
+  worker_stall: "Yaksha worker paused",
   incomplete_record: "Call record not saved in full",
 };
 

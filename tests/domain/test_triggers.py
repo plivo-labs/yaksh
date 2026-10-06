@@ -2,17 +2,17 @@ import json
 
 import pytest
 
-from truman.domain.scenarios import Fact
-from truman.domain.triggers import RenderError, Trigger, agent_data_names, render
+from yaksha.domain.scenarios import Fact
+from yaksha.domain.triggers import RenderError, Trigger, agent_data_names, render
 
 TRIGGER = Trigger.model_validate(
     {
         "url": "https://agents.example.com/calls",
-        "headers": [{"name": "Authorization", "value": "Bearer {{env.TRUMAN_TRIGGER_KEY}}"}],
+        "headers": [{"name": "Authorization", "value": "Bearer {{env.YAKSHA_TRIGGER_KEY}}"}],
         "body": {
-            "to": "{{truman.number}}",
+            "to": "{{yaksha.number}}",
             "customer": {"name": "{{ agent_data.Customer name }}", "vip": True},
-            "tags": ["run {{truman.conversation_id}}", 3],
+            "tags": ["run {{yaksha.conversation_id}}", 3],
         },
     }
 )
@@ -25,7 +25,7 @@ def test_placeholders_are_filled_inside_json_strings_without_changing_the_json()
         number="+15716535187",
         conversation_id="c-1",
         agent_data=FACTS,
-        env={"TRUMAN_TRIGGER_KEY": "sk_live"},
+        env={"YAKSHA_TRIGGER_KEY": "sk_live"},
     )
 
     assert json.loads(rendered.body) == {
@@ -39,7 +39,7 @@ def test_placeholders_are_filled_inside_json_strings_without_changing_the_json()
 
 @pytest.mark.parametrize(
     ("facts", "env", "missing"),
-    [([], {"TRUMAN_TRIGGER_KEY": "k"}, "Customer name"), (FACTS, {}, "TRUMAN_TRIGGER_KEY")],
+    [([], {"YAKSHA_TRIGGER_KEY": "k"}, "Customer name"), (FACTS, {}, "YAKSHA_TRIGGER_KEY")],
 )
 def test_a_missing_value_is_named_instead_of_sent_empty(
     facts: list[Fact], env: dict[str, str], missing: str

@@ -10,10 +10,10 @@ from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncEngine
 
-from truman.__main__ import run_worker
-from truman.caller.plivo_server import StreamRegistry
-from truman.config import Settings
-from truman.domain.conversations import (
+from yaksha.__main__ import run_worker
+from yaksha.caller.plivo_server import StreamRegistry
+from yaksha.config import Settings
+from yaksha.domain.conversations import (
     Caller,
     CallObserver,
     CallOutcome,
@@ -22,8 +22,8 @@ from truman.domain.conversations import (
     WireEvent,
     WireEventKind,
 )
-from truman.simulation import conversations
-from truman.worker import worker as worker_module
+from yaksha.simulation import conversations
+from yaksha.worker import worker as worker_module
 
 
 async def stuck(*args: Any, **kwargs: Any) -> Any:

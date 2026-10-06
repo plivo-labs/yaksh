@@ -5,7 +5,7 @@ Status: accepted
 
 ## Decision
 
-An outbound agent has one HTTP request template: an HTTPS URL, headers and a JSON body, sent with POST. Placeholders for the Truman number, the conversation ID, agent data and secrets are allowed only in header values and inside JSON string values. Truman parses the body, replaces placeholders inside each string, and serializes the result. Truman has no code for specific providers.
+An outbound agent has one HTTP request template: an HTTPS URL, headers and a JSON body, sent with POST. Placeholders for the Yaksha number, the conversation ID, agent data and secrets are allowed only in header values and inside JSON string values. Yaksha parses the body, replaces placeholders inside each string, and serializes the result. Yaksha has no code for specific providers.
 
 ## Why
 

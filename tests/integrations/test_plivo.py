@@ -6,8 +6,8 @@ import pytest
 from fastapi import FastAPI, Request, Response
 from fastapi.responses import JSONResponse, RedirectResponse
 
-from truman.caller.plivo_server import PlivoServer
-from truman.integrations.plivo import OutboundCall, PlivoApi, PlivoError
+from yaksha.caller.plivo_server import PlivoServer
+from yaksha.integrations.plivo import OutboundCall, PlivoApi, PlivoError
 
 AUTH_ID = "MAXXXXXXXXXXXXXXXXXX"
 AUTH_TOKEN = "secret-token"
@@ -75,10 +75,10 @@ async def plivo() -> AsyncIterator[tuple[PlivoApi, list[dict[str, Any]]]]:
         return JSONResponse(
             {
                 "app_id": app_id,
-                "app_name": "truman",
-                "answer_url": "https://truman.example/incoming",
+                "app_name": "yaksha",
+                "answer_url": "https://yaksha.example/incoming",
                 "answer_method": "POST",
-                "hangup_url": "https://truman.example/incoming/hangup",
+                "hangup_url": "https://yaksha.example/incoming/hangup",
                 "hangup_method": "POST",
             }
         )
@@ -103,9 +103,9 @@ def call(to_number: str = "+14155550100") -> OutboundCall:
     return OutboundCall(
         from_number="+17862242321",
         to_number=to_number,
-        answer_url="https://truman.example.com/answer/c1",
-        hangup_url="https://truman.example.com/callbacks/c1",
-        ring_url="https://truman.example.com/callbacks/c1",
+        answer_url="https://yaksha.example.com/answer/c1",
+        hangup_url="https://yaksha.example.com/callbacks/c1",
+        ring_url="https://yaksha.example.com/callbacks/c1",
         ring_timeout_s=30,
         time_limit_s=120,
     )
@@ -126,11 +126,11 @@ async def test_a_call_is_placed_with_the_parameters_plivo_needs(
             "authorization": f"Basic {basic}",
             "from": "+17862242321",
             "to": "+14155550100",
-            "answer_url": "https://truman.example.com/answer/c1",
+            "answer_url": "https://yaksha.example.com/answer/c1",
             "answer_method": "POST",
-            "hangup_url": "https://truman.example.com/callbacks/c1",
+            "hangup_url": "https://yaksha.example.com/callbacks/c1",
             "hangup_method": "POST",
-            "ring_url": "https://truman.example.com/callbacks/c1",
+            "ring_url": "https://yaksha.example.com/callbacks/c1",
             "ring_method": "POST",
             "ring_timeout": 30,
             "time_limit": 120,
@@ -174,11 +174,11 @@ async def test_an_application_is_read_and_a_missing_one_is_an_error(
 
     application = await api.get_application("24330520250244652")
 
-    assert application.problems("https://truman.example") == []
+    assert application.problems("https://yaksha.example") == []
     assert application.problems("https://elsewhere.example") == [
-        "Plivo application truman has answer URL 'https://truman.example/incoming'; "
+        "Plivo application yaksha has answer URL 'https://yaksha.example/incoming'; "
         "set it to 'https://elsewhere.example/incoming'",
-        "Plivo application truman has hangup URL 'https://truman.example/incoming/hangup'; "
+        "Plivo application yaksha has hangup URL 'https://yaksha.example/incoming/hangup'; "
         "set it to 'https://elsewhere.example/incoming/hangup'",
     ]
     with pytest.raises(PlivoError, match="404"):
@@ -191,7 +191,7 @@ async def test_a_listing_that_never_ends_is_an_error(
     plivo: tuple[PlivoApi, list[dict[str, Any]]], monkeypatch: pytest.MonkeyPatch
 ) -> None:
     api, _ = plivo
-    monkeypatch.setattr("truman.integrations.plivo.MAX_PAGES", 3)
+    monkeypatch.setattr("yaksha.integrations.plivo.MAX_PAGES", 3)
     looping = PlivoApi("LOOPING", "token", base_url=api.base_url)
 
     with pytest.raises(PlivoError, match="3 pages"):

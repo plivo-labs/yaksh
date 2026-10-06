@@ -14,15 +14,15 @@ from tests.conftest import (
     start_run,
     wait_for_lock_waiters,
 )
-from truman.config import Settings
-from truman.db.models import Evaluation, EvaluationItem
-from truman.domain.conversations import CallOutcome, EndReason
-from truman.domain.evaluations import DecidedBy, ItemRole, Outcome, Verdict
-from truman.evaluation import evaluations, labels
-from truman.evaluation.criteria import CRITERION
-from truman.evaluation.evaluations import Evaluated
-from truman.evaluation.judging import ItemResult
-from truman.evaluation.verdicts import verdict
+from yaksha.config import Settings
+from yaksha.db.models import Evaluation, EvaluationItem
+from yaksha.domain.conversations import CallOutcome, EndReason
+from yaksha.domain.evaluations import DecidedBy, ItemRole, Outcome, Verdict
+from yaksha.evaluation import evaluations, labels
+from yaksha.evaluation.criteria import CRITERION
+from yaksha.evaluation.evaluations import Evaluated
+from yaksha.evaluation.judging import ItemResult
+from yaksha.evaluation.verdicts import verdict
 
 
 async def judged_calls(

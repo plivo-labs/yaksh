@@ -7,12 +7,12 @@ Status: accepted; it replaces the moment that 0015 chose
 
 The `connected` wire event marks the start of the call's audio: the moment Plivo's stream opened, or the agent's first frame when Plivo's timestamp puts that frame earlier. Talk time and the call recording count from this moment.
 
-The worker knows this moment only when the call ends, because the agent's frames move onto Truman's clock by the shortest delay of all the frames. So the caller sends `connected` when the stream opens, and sends it again at the end when the moment is earlier. The second event replaces the first. The duration limit still counts from the moment the stream opened, because the worker must start that timer at once.
+The worker knows this moment only when the call ends, because the agent's frames move onto Yaksha's clock by the shortest delay of all the frames. So the caller sends `connected` when the stream opens, and sends it again at the end when the moment is earlier. The second event replaces the first. The duration limit still counts from the moment the stream opened, because the worker must start that timer at once.
 
 ## Why
 
-- 0015 assumed that Plivo sends the agent's audio from its `start` event. Real calls show that this is not true. In 4 calls on 2026-10-04 where the agent spoke first, Plivo stamped the agent's first frame 773 to 789 ms before Truman took the stream, and about 300 ms after Plivo reported the answer.
-- Plivo sent those frames in one burst after the stream opened, and Truman transcribed them. But the recording started at `connected` and cut them: 780 to 800 ms, which was 35 to 65% of the greeting.
+- 0015 assumed that Plivo sends the agent's audio from its `start` event. Real calls show that this is not true. In 4 calls on 2026-10-04 where the agent spoke first, Plivo stamped the agent's first frame 773 to 789 ms before Yaksha took the stream, and about 300 ms after Plivo reported the answer.
+- Plivo sent those frames in one burst after the stream opened, and Yaksha transcribed them. But the recording started at `connected` and cut them: 780 to 800 ms, which was 35 to 65% of the greeting.
 - With `connected` and the recording at the first frame, the same calls keep all of the greeting, the turns stay within 20 ms of their place in the recording, and the recording has less than 80 ms of silence before the first sound.
 - The console plays a turn from its time minus the time of `connected`, so it needs no change.
 

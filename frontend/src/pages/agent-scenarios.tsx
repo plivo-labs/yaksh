@@ -219,7 +219,7 @@ export function AgentScenarios({ agent }: { agent: Agent }) {
           </p>
         ) : items.length === 0 ? (
           <p className="px-5 py-6 text-p-400 text-muted-foreground">
-            No scenarios yet. Generate them from what Truman knows about the agent, or write one.
+            No scenarios yet. Generate them from what Yaksha knows about the agent, or write one.
           </p>
         ) : (
           <>

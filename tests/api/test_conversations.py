@@ -29,17 +29,17 @@ from tests.conftest import (
     wait_for,
     wait_until,
 )
-from truman.config import Settings
-from truman.db.models import AgentVersion, Conversation, RunningWorker, ScenarioVersion
-from truman.db.session import create_engine, create_sessionmaker
-from truman.domain.agents import AgentConfig
-from truman.domain.background_noise import NoiseLevel, NoiseMix, NoiseSound
-from truman.domain.conversations import CallRequest, ConversationCreate, ConversationStatus
-from truman.domain.languages import Language
-from truman.simulation import conversations
-from truman.simulation.background_noise import sound_path, volume
-from truman.simulation.calls import STOP_IGNORED
-from truman.worker.worker import FINALIZE_ATTEMPTS, Worker
+from yaksha.config import Settings
+from yaksha.db.models import AgentVersion, Conversation, RunningWorker, ScenarioVersion
+from yaksha.db.session import create_engine, create_sessionmaker
+from yaksha.domain.agents import AgentConfig
+from yaksha.domain.background_noise import NoiseLevel, NoiseMix, NoiseSound
+from yaksha.domain.conversations import CallRequest, ConversationCreate, ConversationStatus
+from yaksha.domain.languages import Language
+from yaksha.simulation import conversations
+from yaksha.simulation.background_noise import sound_path, volume
+from yaksha.simulation.calls import STOP_IGNORED
+from yaksha.worker.worker import FINALIZE_ATTEMPTS, Worker
 
 
 def unchecked(agent_id: str) -> dict[str, str]:
@@ -304,13 +304,13 @@ async def test_a_conversation_gets_its_number_from_the_pool_and_outbound_tests_n
     assert chosen.status_code == 422
     assert chosen.json()["error"]["details"][0]["loc"][-1] == "caller_number"
     assert refused.status_code == 422
-    assert refused.json()["error"]["message"] == "outbound tests are off: set TRUMAN_PLIVO_APP_ID"
+    assert refused.json()["error"]["message"] == "outbound tests are off: set YAKSHA_PLIVO_APP_ID"
 
 
 async def test_conversations_cannot_start_while_phone_calls_are_off(
     settings: Settings, tmp_path: Path
 ) -> None:
-    from truman.api import create_app
+    from yaksha.api import create_app
 
     app = create_app(settings.model_copy(update={"public_url": None}))
     headers = {"Authorization": f"Bearer {TOKEN}"}
@@ -429,7 +429,7 @@ async def test_worker_shutdown_stops_the_caller_and_keeps_the_evidence(
 async def test_shutdown_waits_while_result_writes_time_out_and_unwind_slowly(
     client: AsyncClient, settings: Settings, caller: FakeCaller, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from truman.simulation import conversations
+    from yaksha.simulation import conversations
 
     real_finalize = conversations.finalize
     attempts = {"n": 0}
@@ -444,9 +444,9 @@ async def test_shutdown_waits_while_result_writes_time_out_and_unwind_slowly(
                 raise
         return await real_finalize(*args, **kwargs)
 
-    monkeypatch.setattr("truman.simulation.conversations.finalize", slow_to_cancel)
-    monkeypatch.setattr("truman.worker.worker.FINALIZE_TIMEOUT_S", 0.2)
-    monkeypatch.setattr("truman.worker.worker.FINALIZE_RETRY_S", 0.05)
+    monkeypatch.setattr("yaksha.simulation.conversations.finalize", slow_to_cancel)
+    monkeypatch.setattr("yaksha.worker.worker.FINALIZE_TIMEOUT_S", 0.2)
+    monkeypatch.setattr("yaksha.worker.worker.FINALIZE_RETRY_S", 0.05)
     caller.release.clear()
     agent_id = await create_agent_id(client)
     started = await start(client, agent_id)
@@ -480,7 +480,7 @@ async def test_a_worker_that_cannot_renew_its_lease_stops_the_call(
     async def broken(*args: Any, **kwargs: Any) -> None:
         raise RuntimeError("database unreachable")
 
-    monkeypatch.setattr("truman.simulation.conversations.renew_lease", broken)
+    monkeypatch.setattr("yaksha.simulation.conversations.renew_lease", broken)
     done = await wait_for(client, started["id"], FINAL, timeout=10)
 
     assert done["status"] == "failed" and done["end_reason"] == "lease_lost"
@@ -493,7 +493,7 @@ async def test_a_result_write_that_fails_past_the_lease_is_retried_and_kept(
     settings: Settings,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from truman.simulation import conversations
+    from yaksha.simulation import conversations
 
     real_finalize = conversations.finalize
     failures = {"left": 1}
@@ -505,8 +505,8 @@ async def test_a_result_write_that_fails_past_the_lease_is_retried_and_kept(
             raise RuntimeError("connection reset")
         return await real_finalize(*args, **kwargs)
 
-    monkeypatch.setattr("truman.simulation.conversations.finalize", slow_then_flaky)
-    monkeypatch.setattr("truman.worker.worker.FINALIZE_RETRY_S", 0.05)
+    monkeypatch.setattr("yaksha.simulation.conversations.finalize", slow_then_flaky)
+    monkeypatch.setattr("yaksha.worker.worker.FINALIZE_RETRY_S", 0.05)
     agent_id = await create_agent_id(client)
     started = await start(client, agent_id)
 
@@ -530,7 +530,7 @@ async def test_a_renewal_that_hangs_stops_the_call_within_the_lease(
     async def hanging(*args: Any, **kwargs: Any) -> None:
         await asyncio.sleep(3600)
 
-    monkeypatch.setattr("truman.simulation.conversations.renew_lease", hanging)
+    monkeypatch.setattr("yaksha.simulation.conversations.renew_lease", hanging)
     done = await wait_for(client, started["id"], FINAL, timeout=10)
 
     assert done["status"] == "failed" and done["end_reason"] == "lease_lost"
@@ -582,7 +582,7 @@ async def test_a_conversation_that_cannot_be_prepared_fails_without_stopping_the
             raise RuntimeError("version row missing")
         return await real_call_request(*args, **kwargs)
 
-    monkeypatch.setattr("truman.simulation.conversations.call_request", flaky)
+    monkeypatch.setattr("yaksha.simulation.conversations.call_request", flaky)
     agent_id = await create_agent_id(client)
     first = await start(client, agent_id)
     failed = await wait_for(client, first["id"], FINAL)
@@ -606,7 +606,7 @@ async def test_a_call_whose_sound_file_is_broken_fails_with_the_reason(
         stereo.setsampwidth(2)
         stereo.setframerate(8000)
         stereo.writeframes(bytes(1280))
-    monkeypatch.setattr("truman.simulation.background_noise.SOUNDS", tmp_path)
+    monkeypatch.setattr("yaksha.simulation.background_noise.SOUNDS", tmp_path)
     persona = await create_persona(client, background_noise={"sound": "street"})
     agent_id = await create_agent_id(client)
 
@@ -677,7 +677,7 @@ async def test_a_call_whose_preparation_outlives_the_lease_is_not_started(
         await asyncio.sleep(settings.worker_lease_s + 0.5)
         return await real_call_request(*args, **kwargs)
 
-    monkeypatch.setattr("truman.simulation.conversations.call_request", slow)
+    monkeypatch.setattr("yaksha.simulation.conversations.call_request", slow)
     agent_id = await create_agent_id(client)
     started = await start(client, agent_id)
 
@@ -695,10 +695,10 @@ async def test_a_stalled_result_write_does_not_hold_capacity(
         await asyncio.sleep(3600)
         return True
 
-    monkeypatch.setattr("truman.simulation.conversations.finalize", stalled)
-    monkeypatch.setattr("truman.worker.worker.FINALIZE_TIMEOUT_S", 0.2)
-    monkeypatch.setattr("truman.worker.worker.FINALIZE_ATTEMPTS", 2)
-    monkeypatch.setattr("truman.worker.worker.FINALIZE_RETRY_S", 0.05)
+    monkeypatch.setattr("yaksha.simulation.conversations.finalize", stalled)
+    monkeypatch.setattr("yaksha.worker.worker.FINALIZE_TIMEOUT_S", 0.2)
+    monkeypatch.setattr("yaksha.worker.worker.FINALIZE_ATTEMPTS", 2)
+    monkeypatch.setattr("yaksha.worker.worker.FINALIZE_RETRY_S", 0.05)
     agent_id = await create_agent_id(client)
     await start(client, agent_id)
     await start(client, agent_id)

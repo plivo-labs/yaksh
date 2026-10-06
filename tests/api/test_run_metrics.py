@@ -13,15 +13,15 @@ from tests.conftest import (
     finish,
     start_run,
 )
-from truman.db.models import Evaluation as EvaluationRow
-from truman.domain.conversations import (
+from yaksha.db.models import Evaluation as EvaluationRow
+from yaksha.domain.conversations import (
     CallOutcome,
     EndReason,
     Transcript,
     WireEvent,
     WireEventKind,
 )
-from truman.domain.evaluations import (
+from yaksha.domain.evaluations import (
     DecidedBy,
     EvaluationState,
     ItemRole,
@@ -31,11 +31,11 @@ from truman.domain.evaluations import (
     Share,
     Verdict,
 )
-from truman.domain.latency import Latency, Reply
-from truman.evaluation import evaluations
-from truman.evaluation.criteria import AGENT_RULE, CRITERION
-from truman.evaluation.evaluations import MAX_ATTEMPTS, Evaluated
-from truman.evaluation.judging import ItemResult
+from yaksha.domain.latency import Latency, Reply
+from yaksha.evaluation import evaluations
+from yaksha.evaluation.criteria import AGENT_RULE, CRITERION
+from yaksha.evaluation.evaluations import MAX_ATTEMPTS, Evaluated
+from yaksha.evaluation.judging import ItemResult
 
 CONNECTED = Transcript(wire_events=[WireEvent(kind=WireEventKind.CONNECTED, at_ms=500)])
 
@@ -227,7 +227,7 @@ async def test_run_verdicts_pool_judged_calls_by_scenario(client: AsyncClient, d
                 ),
                 ItemResult(
                     key="caller_check",
-                    subject="Truman's caller kept to its test",
+                    subject="Yaksha's caller kept to its test",
                     judge=None,
                     decided_by=DecidedBy.LLM,
                     role=ItemRole.REPORTING,
@@ -301,7 +301,7 @@ async def test_run_verdicts_leave_out_calls_with_no_verdict_yet(
         )
     errored_check = ItemResult(
         key="caller_check",
-        subject="Truman's caller kept to its test",
+        subject="Yaksha's caller kept to its test",
         judge=None,
         decided_by=DecidedBy.LLM,
         role=ItemRole.REPORTING,

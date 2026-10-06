@@ -4,11 +4,11 @@ import pytest
 from pydantic import SecretStr
 
 from tests.conftest import FakeProvider, response_body
-from truman.api.app import generation_model
-from truman.config import Settings
-from truman.domain.errors import UnavailableError
-from truman.domain.language_models import ModelCallError
-from truman.integrations.openai_models import OpenAIJsonModel
+from yaksha.api.app import generation_model
+from yaksha.config import Settings
+from yaksha.domain.errors import UnavailableError
+from yaksha.domain.language_models import ModelCallError
+from yaksha.integrations.openai_models import OpenAIJsonModel
 
 SCHEMA = {
     "type": "object",

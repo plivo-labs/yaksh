@@ -11,7 +11,7 @@ export interface OutboundDraft {
 export const EMPTY_OUTBOUND: OutboundDraft = {
   url: "",
   headers: [],
-  body: '{\n  "to": "{{truman.number}}"\n}',
+  body: '{\n  "to": "{{yaksha.number}}"\n}',
   calling_numbers: [],
   dial_window: "120",
 };
@@ -51,7 +51,7 @@ function parseBody(text: string): Record<string, unknown> | null {
  * placeholders. */
 function urlProblem(typed: string): string | null {
   const url = typed.trim();
-  if (!url) return "Enter the URL Truman sends the request to.";
+  if (!url) return "Enter the URL Yaksha sends the request to.";
   if (url.includes("{{") || url.includes("}}")) {
     return "Put placeholders in the headers or the body, not in the URL.";
   }

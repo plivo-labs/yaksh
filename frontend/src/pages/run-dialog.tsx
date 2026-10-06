@@ -184,7 +184,7 @@ export function RunDialog({
                 <p className="text-muted-foreground">
                   {outbound
                     ? `${counted(usable.length, "number receives", "numbers receive")} the agent's calls. Each rests ${numbers.data.rest_s} seconds after a call.`
-                    : `Truman calls from ${counted(usable.length, "number", "numbers")}, one call on each at a time.`}
+                    : `Yaksha calls from ${counted(usable.length, "number", "numbers")}, one call on each at a time.`}
                 </p>
               )}
               {leftOut > 0 && (
@@ -277,7 +277,7 @@ export function RunDialog({
             </div>
             <FieldDescription>
               Max parallel and the delay protect the agent under test. The workers' limits protect
-              Truman's phone account.
+              Yaksha's phone account.
             </FieldDescription>
 
             <Field>
@@ -324,7 +324,7 @@ export function RunDialog({
                 onChange={(event) => setRetries(event.target.value)}
               />
               <FieldDescription>
-                A conversation that ends with an error on Truman's side or on the line is tried
+                A conversation that ends with an error on Yaksha's side or on the line is tried
                 again, up to this many times. Empty uses the server default.
               </FieldDescription>
               {submitted && !retriesOk && (

@@ -127,7 +127,7 @@ export function GenerateDialog({
         <DialogHeader className="px-6 pt-6 pb-4">
           <DialogTitle>Generate scenarios</DialogTitle>
           <DialogDescription>
-            Truman saves each scenario as it is written. Delete the ones you do not want.
+            Yaksha saves each scenario as it is written. Delete the ones you do not want.
           </DialogDescription>
         </DialogHeader>
 

@@ -93,7 +93,7 @@ export function AgentsPage() {
             </EmptyMedia>
             <EmptyTitle>No agents yet</EmptyTitle>
             <EmptyDescription>
-              An agent is the phone number Truman calls. Add one, give it a scenario, and Truman
+              An agent is the phone number Yaksha calls. Add one, give it a scenario, and Yaksha
               phones it with a simulated caller.
             </EmptyDescription>
           </EmptyHeader>

@@ -1,30 +1,30 @@
 ---
 title: Outbound agents
-description: Do tests of an agent that calls Truman.
+description: Do tests of an agent that calls Yaksha.
 ---
 
-An outbound agent calls Truman. Truman sends the trigger of the agent: a POST request that makes the agent call one of the Truman numbers. Then Truman answers the call.
+An outbound agent calls Yaksha. Yaksha sends the trigger of the agent: a POST request that makes the agent call one of the Yaksha numbers. Then Yaksha answers the call.
 
 ## Prepare for outbound tests
 
-1. In the Plivo console, make an Application. Set the answer URL to `<TRUMAN_PUBLIC_URL>/incoming`. Set the hangup URL to `<TRUMAN_PUBLIC_URL>/incoming/hangup`. Set the answer method and the hangup method to `POST`. Use the value of `TRUMAN_PUBLIC_URL` without a slash at the end.
+1. In the Plivo console, make an Application. Set the answer URL to `<YAKSHA_PUBLIC_URL>/incoming`. Set the hangup URL to `<YAKSHA_PUBLIC_URL>/incoming/hangup`. Set the answer method and the hangup method to `POST`. Use the value of `YAKSHA_PUBLIC_URL` without a slash at the end.
 2. In the Plivo console, set this Application on each number that gets test calls.
-3. In `docker/.env`, set `TRUMAN_PLIVO_APP_ID` to the ID of the Application. Then make the API and worker containers again, because they read this variable only when they start:
+3. In `docker/.env`, set `YAKSHA_PLIVO_APP_ID` to the ID of the Application. Then make the API and worker containers again, because they read this variable only when they start:
 
    ```sh
-   docker compose -f docker/compose.yaml create --force-recreate truman worker
-   docker compose -f docker/compose.yaml start truman worker
+   docker compose -f docker/compose.yaml create --force-recreate yaksha worker
+   docker compose -f docker/compose.yaml start yaksha worker
    ```
 
-4. Add an agent with the direction `outbound`. Give the URL, the headers and the JSON body of its trigger. In the Truman console, set **Who calls** to **The agent**. Then complete the fields in **Start request**.
+4. Add an agent with the direction `outbound`. Give the URL, the headers and the JSON body of its trigger. In the Yaksha console, set **Who calls** to **The agent**. Then complete the fields in **Start request**.
 
-The worker reads the Application and its numbers only when it starts. After you change the Application or its numbers in the Plivo console, start the worker again with `docker compose -f docker/compose.yaml restart worker`. If `TRUMAN_PUBLIC_URL` changes, also change the two URLs of the Application. If outbound tests are off, the **Numbers** page of the Truman console shows the cause.
+The worker reads the Application and its numbers only when it starts. After you change the Application or its numbers in the Plivo console, start the worker again with `docker compose -f docker/compose.yaml restart worker`. If `YAKSHA_PUBLIC_URL` changes, also change the two URLs of the Application. If outbound tests are off, the **Numbers** page of the Yaksha console shows the cause.
 
 ## Trigger
 
-The trigger URL must use `https` and a public address. Truman saves an `http` URL, but each test then stops with the end reason `trigger_failed`. For an agent on your own network, set `TRUMAN_ALLOW_PRIVATE_TRIGGERS`.
+The trigger URL must use `https` and a public address. Yaksha saves an `http` URL, but each test then stops with the end reason `trigger_failed`. For an agent on your own network, set `YAKSHA_ALLOW_PRIVATE_TRIGGERS`.
 
-The dial window (`dial_window_s`) is the time that Truman waits for the call of the agent: 10 to 600 seconds. The default is 120. The wait starts when Truman gets a number for the conversation. Truman adds 15 seconds for the trigger request. If no call comes during this time, the conversation stops with the end reason `no_call`. If you give calling numbers (`calling_numbers`), Truman accepts a call only from these numbers.
+The dial window (`dial_window_s`) is the time that Yaksha waits for the call of the agent: 10 to 600 seconds. The default is 120. The wait starts when Yaksha gets a number for the conversation. Yaksha adds 15 seconds for the trigger request. If no call comes during this time, the conversation stops with the end reason `no_call`. If you give calling numbers (`calling_numbers`), Yaksha accepts a call only from these numbers.
 
 ## Placeholders
 
@@ -32,25 +32,25 @@ You can put placeholders in header values and in the string values of the JSON b
 
 | Placeholder | Value |
 | --- | --- |
-| `{{truman.number}}` | The number that the agent must call. |
-| `{{truman.conversation_id}}` | The ID of the conversation. |
+| `{{yaksha.number}}` | The number that the agent must call. |
+| `{{yaksha.conversation_id}}` | The ID of the conversation. |
 | `{{agent_data.<name>}}` | A value from the agent data of the scenario. |
-| `{{env.TRUMAN_TRIGGER_<NAME>}}` | A secret from the environment of the worker. |
+| `{{env.YAKSHA_TRIGGER_<NAME>}}` | A secret from the environment of the worker. |
 
-Agent data is a list of names and values in a scenario. Truman sends it only in the trigger. The caller does not get it. Each scenario must have each agent data name that the trigger uses. If not, Truman rejects the request. For a run, Truman starts no conversation.
+Agent data is a list of names and values in a scenario. Yaksha sends it only in the trigger. The caller does not get it. Each scenario must have each agent data name that the trigger uses. If not, Yaksha rejects the request. For a run, Yaksha starts no conversation.
 
-If the worker does not have a `TRUMAN_TRIGGER_<NAME>` variable that the trigger uses, the conversation stops with the end reason `trigger_failed`.
+If the worker does not have a `YAKSHA_TRIGGER_<NAME>` variable that the trigger uses, the conversation stops with the end reason `trigger_failed`.
 
 ## Signed triggers
 
-Each trigger has the header `X-Truman-Delivery` with the ID of the conversation. Truman sends each trigger only one time. Thus, a second request with the same ID is a replay.
+Each trigger has the header `X-Yaksha-Delivery` with the ID of the conversation. Yaksha sends each trigger only one time. Thus, a second request with the same ID is a replay.
 
-If you set `TRUMAN_WEBHOOK_SIGNING_KEY`, each trigger also has these headers:
+If you set `YAKSHA_WEBHOOK_SIGNING_KEY`, each trigger also has these headers:
 
 | Header | Value |
 | --- | --- |
-| `X-Truman-Timestamp` | The time of the request, in Unix seconds. |
-| `X-Truman-Signature` | `v1=` and then the HMAC-SHA256 of `<X-Truman-Delivery>.<X-Truman-Timestamp>.<body>` in lowercase hexadecimal. The key is the value of `TRUMAN_WEBHOOK_SIGNING_KEY`. |
+| `X-Yaksha-Timestamp` | The time of the request, in Unix seconds. |
+| `X-Yaksha-Signature` | `v1=` and then the HMAC-SHA256 of `<X-Yaksha-Delivery>.<X-Yaksha-Timestamp>.<body>` in lowercase hexadecimal. The key is the value of `YAKSHA_WEBHOOK_SIGNING_KEY`. |
 
 To examine a trigger in your endpoint:
 

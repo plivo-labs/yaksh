@@ -17,10 +17,10 @@ from pipecat.frames.frames import (
 from pipecat.tests.utils import run_test
 
 from tests.conftest import FixedClock, Observer
-from truman.caller.audio import FRAME_BYTES, GAP_BYTES, PLAYOUT, SAMPLE_RATE, CallRecording, Clock
-from truman.caller.phone import CHUNK_BYTES, Checkpoints, StreamSerializer
-from truman.caller.transcript import TranscriptBuilder
-from truman.domain.conversations import Provenance, WireEventKind
+from yaksha.caller.audio import FRAME_BYTES, GAP_BYTES, PLAYOUT, SAMPLE_RATE, CallRecording, Clock
+from yaksha.caller.phone import CHUNK_BYTES, Checkpoints, StreamSerializer
+from yaksha.caller.transcript import TranscriptBuilder
+from yaksha.domain.conversations import Provenance, WireEventKind
 
 STREAM = "stream-1"
 LOUD = b"\x00\x10" * (FRAME_BYTES // 2)
@@ -28,7 +28,7 @@ QUIET = b"\x00" * FRAME_BYTES
 HUSH = b"\x01\x00" * (FRAME_BYTES // 2)
 LINEAR = "audio/x-l16;rate=8000"
 PLIVO_EPOCH = 1_705_312_199_000
-"""Plivo's clock when Truman's clock reads 0."""
+"""Plivo's clock when Yaksha's clock reads 0."""
 
 
 def media(pcm: bytes, timestamp: int | None = None) -> str:
@@ -68,7 +68,7 @@ async def test_checkpoints_follow_the_audio_and_their_reports_close_the_reply() 
     for word in (hello, there):
         transcript.caller_started(word.metadata[PLAYOUT])
         transcript.transmitted(
-            word.text, word.metadata["truman.offset"], word.metadata[PLAYOUT], self_spaced=False
+            word.text, word.metadata["yaksha.offset"], word.metadata[PLAYOUT], self_spaced=False
         )
     transcript.reply_ended(playout)
     assert observer.turns == []

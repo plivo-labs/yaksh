@@ -1,7 +1,7 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "Truman",
+    "title": "Yaksha",
     "version": "0.1.0"
   },
   "paths": {
@@ -1930,7 +1930,7 @@
           "phone-numbers"
         ],
         "summary": "List Phone Numbers",
-        "description": "The numbers Truman may use, as the worker last synced them from the Plivo account.",
+        "description": "The numbers Yaksha may use, as the worker last synced them from the Plivo account.",
         "operationId": "list_phone_numbers_api_v1_phone_numbers_get",
         "responses": {
           "200": {
@@ -5422,7 +5422,7 @@
           "turn_limit"
         ],
         "title": "EndReason",
-        "description": "Who or what ended the conversation, as Truman observed it."
+        "description": "Who or what ended the conversation, as Yaksha observed it."
       },
       "ErrorBody": {
         "properties": {
@@ -6384,7 +6384,7 @@
           "trigger"
         ],
         "title": "OutboundConfig",
-        "description": "How an outbound agent is made to call Truman, and how its call is recognized."
+        "description": "How an outbound agent is made to call Yaksha, and how its call is recognized."
       },
       "Outcome": {
         "type": "string",
@@ -9000,7 +9000,7 @@
           "phone"
         ],
         "title": "Transport",
-        "description": "How Truman reaches an agent; phone only today, kept as the seam for other ways."
+        "description": "How Yaksha reaches an agent; phone only today, kept as the seam for other ways."
       },
       "Trigger": {
         "properties": {

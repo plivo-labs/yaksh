@@ -880,7 +880,7 @@ type AgentConfig struct {
 	Outbound         *OutboundConfig           `json:"outbound,omitempty"`
 	Rules            *[]AgentConfig_Rules_Item `json:"rules,omitempty"`
 
-	// Transport How Truman reaches an agent; phone only today, kept as the seam for other ways.
+	// Transport How Yaksha reaches an agent; phone only today, kept as the seam for other ways.
 	Transport *Transport `json:"transport,omitempty"`
 }
 
@@ -903,7 +903,7 @@ type AgentCreate struct {
 	Outbound         *OutboundConfig           `json:"outbound,omitempty"`
 	Rules            *[]AgentCreate_Rules_Item `json:"rules,omitempty"`
 
-	// Transport How Truman reaches an agent; phone only today, kept as the seam for other ways.
+	// Transport How Yaksha reaches an agent; phone only today, kept as the seam for other ways.
 	Transport *Transport `json:"transport,omitempty"`
 }
 
@@ -929,7 +929,7 @@ type AgentRead struct {
 	Outbound         *OutboundConfig         `json:"outbound"`
 	Rules            []AgentRead_Rules_Item  `json:"rules"`
 
-	// Transport How Truman reaches an agent; phone only today, kept as the seam for other ways.
+	// Transport How Yaksha reaches an agent; phone only today, kept as the seam for other ways.
 	Transport Transport `json:"transport"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
@@ -953,7 +953,7 @@ type AgentSummary struct {
 	Name             string             `json:"name"`
 	Outbound         *OutboundConfig    `json:"outbound"`
 
-	// Transport How Truman reaches an agent; phone only today, kept as the seam for other ways.
+	// Transport How Yaksha reaches an agent; phone only today, kept as the seam for other ways.
 	Transport Transport `json:"transport"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
@@ -1206,7 +1206,7 @@ type DocumentSummary struct {
 	SizeBytes  *int               `json:"size_bytes"`
 }
 
-// EndReason Who or what ended the conversation, as Truman observed it.
+// EndReason Who or what ended the conversation, as Yaksha observed it.
 type EndReason string
 
 // ErrorBody defines model for ErrorBody.
@@ -1452,7 +1452,7 @@ type NoiseSound string
 // NumberState defines model for NumberState.
 type NumberState string
 
-// OutboundConfig How an outbound agent is made to call Truman, and how its call is recognized.
+// OutboundConfig How an outbound agent is made to call Yaksha, and how its call is recognized.
 type OutboundConfig struct {
 	CallingNumbers *[]string `json:"calling_numbers,omitempty"`
 	DialWindowS    *int      `json:"dial_window_s,omitempty"`
@@ -1989,7 +1989,7 @@ type TextDocumentCreate struct {
 	Text string `json:"text"`
 }
 
-// Transport How Truman reaches an agent; phone only today, kept as the seam for other ways.
+// Transport How Yaksha reaches an agent; phone only today, kept as the seam for other ways.
 type Transport string
 
 // Trigger A POST with a JSON body, sent once for each conversation.
@@ -3129,7 +3129,7 @@ type ClientInterface interface {
 
 	// ListPhoneNumbersApiV1PhoneNumbersGet List Phone Numbers
 	//
-	// The numbers Truman may use, as the worker last synced them from the Plivo account.
+	// The numbers Yaksha may use, as the worker last synced them from the Plivo account.
 	//
 	// Corresponds with GET /api/v1/phone-numbers (the `ListPhoneNumbersApiV1PhoneNumbersGet` operationId).
 	ListPhoneNumbersApiV1PhoneNumbersGet(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -4163,7 +4163,7 @@ func (c *Client) GetVersionApiV1PersonasPersonaIdVersionsVersionGet(ctx context.
 
 // ListPhoneNumbersApiV1PhoneNumbersGet List Phone Numbers
 //
-// The numbers Truman may use, as the worker last synced them from the Plivo account.
+// The numbers Yaksha may use, as the worker last synced them from the Plivo account.
 //
 // Corresponds with GET /api/v1/phone-numbers (the `ListPhoneNumbersApiV1PhoneNumbersGet` operationId).
 func (c *Client) ListPhoneNumbersApiV1PhoneNumbersGet(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -7896,7 +7896,7 @@ type ClientWithResponsesInterface interface {
 
 	// ListPhoneNumbersApiV1PhoneNumbersGetWithResponse List Phone Numbers
 	//
-	// The numbers Truman may use, as the worker last synced them from the Plivo account.
+	// The numbers Yaksha may use, as the worker last synced them from the Plivo account.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -11758,7 +11758,7 @@ func (c *ClientWithResponses) GetVersionApiV1PersonasPersonaIdVersionsVersionGet
 
 // ListPhoneNumbersApiV1PhoneNumbersGetWithResponse List Phone Numbers
 //
-// The numbers Truman may use, as the worker last synced them from the Plivo account.
+// The numbers Yaksha may use, as the worker last synced them from the Plivo account.
 //
 // Returns a wrapper object for the known response body format(s).
 //
