@@ -71,7 +71,15 @@ export const keys = {
   voicesFor: (language: Language | "all") => ["voices", language] as const,
   phoneNumbers: ["phone-numbers"] as const,
   runs: (filters: RunFilters) =>
-    ["runs", "list", filters.agentId ?? "all", filters.status ?? "any"] as const,
+    [
+      "runs",
+      "list",
+      filters.agentId ?? "all",
+      filters.status ?? "any",
+      filters.createdFrom ?? "",
+      filters.createdBefore ?? "",
+      filters.lastHours ?? 0,
+    ] as const,
   run: (id: string) => ["runs", "one", id] as const,
   runMetrics: (id: string) => ["runs", "metrics", id] as const,
   document: (id: string) => ["documents", id] as const,
@@ -448,15 +456,27 @@ export const RUNS_PAGE = 25;
 export interface RunFilters {
   agentId?: string;
   status?: RunStatus;
+  createdFrom?: string;
+  createdBefore?: string;
+  /** The runs of the hours up to each fetch. Each refetch moves the window, the query key stays. */
+  lastHours?: number;
 }
 
 export function useRuns(filters: RunFilters, page: number) {
   const search = new URLSearchParams({ page: String(page), page_size: String(RUNS_PAGE) });
   if (filters.agentId) search.set("agent_id", filters.agentId);
   if (filters.status) search.set("status", filters.status);
+  if (filters.createdFrom) search.set("created_from", filters.createdFrom);
+  if (filters.createdBefore) search.set("created_before", filters.createdBefore);
   return useQuery({
     queryKey: [...keys.runs(filters), page],
-    queryFn: ({ signal }) => api<Page<RunSummary>>(`/runs?${search}`, { signal }),
+    queryFn: ({ signal }) => {
+      if (filters.lastHours) {
+        const from = new Date(Date.now() - filters.lastHours * 3_600_000);
+        search.set("created_from", from.toISOString());
+      }
+      return api<Page<RunSummary>>(`/runs?${search}`, { signal });
+    },
     placeholderData: keepPreviousData,
     refetchInterval: (query) =>
       query.state.data?.items.some((run) => ACTIVE_RUN_STATUSES.includes(run.status))

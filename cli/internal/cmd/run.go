@@ -343,17 +343,23 @@ func (a *app) runMetricsCmd() *cobra.Command {
 
 func (a *app) runListCmd() *cobra.Command {
 	var (
-		agent          string
+		agent, status  string
+		from, before   time.Time
 		page, pageSize int
 	)
 	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "List runs, newest first",
-		Args:  cobra.NoArgs,
+		Example: `  yaksha run list --from 2026-10-01 --before 2026-10-02
+  yaksha run list --from 2026-10-01T09:00:00+05:30`,
+		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			params := api.ListRunsApiV1RunsGetParams{
-				Page:     changed(cmd, "page", page),
-				PageSize: changed(cmd, "page-size", pageSize),
+				Status:        changed(cmd, "status", api.RunStatus(status)),
+				CreatedFrom:   changed(cmd, "from", from),
+				CreatedBefore: changed(cmd, "before", before),
+				Page:          changed(cmd, "page", page),
+				PageSize:      changed(cmd, "page-size", pageSize),
 			}
 			if cmd.Flags().Changed("agent") {
 				id, err := parseID("agent", agent)
@@ -374,6 +380,9 @@ func (a *app) runListCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&agent, "agent", "", "only the runs of this agent")
+	cmd.Flags().StringVar(&status, "status", "", "only the runs with this status: queued, running, cancelling, done or cancelled")
+	cmd.Flags().Var(timeFlag{&from}, "from", "only the runs created at or after this time; a date alone is local midnight")
+	cmd.Flags().Var(timeFlag{&before}, "before", "only the runs created before this time; a date alone is local midnight")
 	addPageFlags(cmd, &page, &pageSize)
 	return cmd
 }

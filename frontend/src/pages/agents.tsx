@@ -1,6 +1,6 @@
 import { Bot, Copy, CopyPlus, Ellipsis, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router";
+import { Link, useNavigate } from "react-router";
 
 import { toast } from "sonner";
 
@@ -8,7 +8,7 @@ import { DeleteDialog } from "@/components/confirm-dialogs";
 import { Pager } from "@/components/pager";
 import { SearchInput } from "@/components/search-input";
 import { SortHeader } from "@/components/sort-header";
-import { RelativeTime } from "@/components/relative-time";
+import { Timestamp } from "@/components/timestamp";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -27,6 +27,7 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useFilterParams } from "@/hooks/use-filter-params";
 import { usePageParam } from "@/hooks/use-page-param";
 import { copyText } from "@/lib/clipboard";
 import { duration, reach, words } from "@/lib/format";
@@ -44,24 +45,13 @@ const ROW =
   "grid grid-cols-[minmax(0,1fr)_2rem] items-center gap-x-4 gap-y-2 px-3 md:grid-cols-[minmax(12rem,1.4fr)_7rem_6rem_minmax(12rem,1fr)_8rem_2rem]";
 
 export function AgentsPage() {
-  const [params, setParams] = useSearchParams();
+  const [params, update] = useFilterParams();
   const search = params.get("q") ?? "";
   const sort = params.get("sort") ?? "";
   const page = usePageParam();
   const agents = useAgentPage(search, sort, page);
-  const searchFor = (text: string) => {
-    const next = new URLSearchParams(params);
-    if (text) next.set("q", text);
-    else next.delete("q");
-    next.delete("page");
-    setParams(next, { replace: true });
-  };
-  const sortBy = (next: string) => {
-    const target = new URLSearchParams(params);
-    target.set("sort", next);
-    target.delete("page");
-    setParams(target, { replace: true });
-  };
+  const searchFor = (text: string) => update({ q: text });
+  const sortBy = (next: string) => update({ sort: next });
 
   return (
     <div className="grid gap-6">
@@ -193,7 +183,7 @@ function AgentRow({ agent }: { agent: AgentSummary }) {
             <span className="truncate text-muted-foreground">
               <span className="capitalize">{words(call.status)}</span>
               {call.talk_ms !== null && `, ${duration(call.talk_ms)}`},{" "}
-              <RelativeTime iso={call.started_at ?? call.created_at} />
+              <Timestamp iso={call.started_at ?? call.created_at} />
             </span>
           </>
         ) : (
@@ -202,7 +192,7 @@ function AgentRow({ agent }: { agent: AgentSummary }) {
       </div>
       <div className="col-span-2 text-xs-400 text-muted-foreground md:col-span-1">
         <span className="md:hidden">Updated </span>
-        <RelativeTime iso={agent.updated_at} />
+        <Timestamp iso={agent.updated_at} />
       </div>
       <AgentMenu agent={agent} />
     </li>

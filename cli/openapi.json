@@ -2236,6 +2236,7 @@
           "runs"
         ],
         "summary": "List Runs",
+        "description": "`created_from` includes its time and `created_before` excludes its time, so ranges\nnext to each other do not overlap. Both need a time zone.",
         "operationId": "list_runs_api_v1_runs_get",
         "security": [
           {
@@ -2274,6 +2275,40 @@
                 }
               ],
               "title": "Status"
+            }
+          },
+          {
+            "name": "created_from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Created From"
+            }
+          },
+          {
+            "name": "created_before",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Created Before"
             }
           },
           {

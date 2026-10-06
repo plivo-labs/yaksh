@@ -3,6 +3,7 @@ import uuid
 from collections import defaultdict
 from collections.abc import Sequence
 from dataclasses import asdict, fields
+from datetime import datetime
 from typing import Any
 
 from sqlalchemy import ColumnElement, Row, and_, func, select, update
@@ -323,12 +324,18 @@ async def list_runs(
     limit: int,
     agent_id: uuid.UUID | None = None,
     status: RunStatus | None = None,
+    created_from: datetime | None = None,
+    created_before: datetime | None = None,
 ) -> tuple[list[Run], int]:
     query = select(Run)
     if agent_id is not None:
         query = query.where(Run.agent_id == agent_id)
     if status is not None:
         query = query.where(has_status(status))
+    if created_from is not None:
+        query = query.where(Run.created_at >= created_from)
+    if created_before is not None:
+        query = query.where(Run.created_at < created_before)
     total = await session.scalar(select(func.count()).select_from(query.subquery()))
     rows = await session.scalars(
         query.order_by(Run.created_at.desc(), Run.id.desc()).offset(offset).limit(limit)

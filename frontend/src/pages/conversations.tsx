@@ -1,5 +1,4 @@
 import { Plus } from "lucide-react";
-import { useSearchParams } from "react-router";
 
 import { ConversationList } from "@/components/conversation-list";
 import { Pager } from "@/components/pager";
@@ -13,6 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useFilterParams } from "@/hooks/use-filter-params";
 import { usePageParam } from "@/hooks/use-page-param";
 import { CONVERSATIONS_PAGE, useAgents, useConversations } from "@/lib/queries";
 import type { ConversationStatus } from "@/lib/types";
@@ -31,7 +31,7 @@ const STATUSES: ConversationStatus[] = [
 const ANY = "any";
 
 export function ConversationsPage() {
-  const [params, setParams] = useSearchParams();
+  const [params, update] = useFilterParams();
   const agentId = params.get("agent_id") ?? ANY;
   const status = params.get("status") ?? ANY;
   const search = params.get("q") ?? "";
@@ -55,13 +55,7 @@ export function ConversationsPage() {
     ...STATUSES.map((value) => ({ value, label: value[0].toUpperCase() + value.slice(1) })),
   ];
 
-  const setParam = (key: string, value: string) => {
-    const next = new URLSearchParams(params);
-    if (value === ANY || value === "") next.delete(key);
-    else next.set(key, value);
-    next.delete("page");
-    setParams(next, { replace: true });
-  };
+  const setParam = (key: string, value: string) => update({ [key]: value === ANY ? null : value });
 
   return (
     <div className="grid gap-6">

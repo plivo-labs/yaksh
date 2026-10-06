@@ -8,7 +8,7 @@ import { useToken } from "@/app/use-token";
 import { type OnTurn, ItemResult, VerdictLabel, type VerdictKind } from "@/components/call-results";
 import { Panel, PanelHeader } from "@/components/panel";
 import type { PlayerHandle } from "@/components/recording-player";
-import { RelativeTime } from "@/components/relative-time";
+import { Timestamp } from "@/components/timestamp";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -114,7 +114,7 @@ export function ReviewQueuePage() {
                 <span className="grid min-w-0 gap-0.5">
                   <span className="truncate text-s-500">{entry.scenario_name}</span>
                   <span className="text-xs-400 text-muted-foreground">
-                    Ended <RelativeTime iso={entry.ended_at} />
+                    Ended <Timestamp iso={entry.ended_at} />
                   </span>
                 </span>
                 <span className="shrink-0 text-xs-400 text-muted-foreground tabular-nums">

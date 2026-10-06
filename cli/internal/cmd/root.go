@@ -138,6 +138,30 @@ func changed[T any](cmd *cobra.Command, flag string, v T) *T {
 	return &v
 }
 
+// timeFlag reads an RFC 3339 time, or a date that means midnight in the local time zone.
+type timeFlag struct{ t *time.Time }
+
+func (f timeFlag) Set(value string) error {
+	t, err := time.Parse(time.RFC3339, value)
+	if err != nil {
+		t, err = time.ParseInLocation(time.DateOnly, value, time.Local)
+	}
+	if err != nil {
+		return fmt.Errorf("%q is not a date such as 2026-10-01 or a time such as 2026-10-01T09:00:00+05:30", value)
+	}
+	*f.t = t
+	return nil
+}
+
+func (f timeFlag) String() string {
+	if f.t == nil || f.t.IsZero() {
+		return ""
+	}
+	return f.t.Format(time.RFC3339)
+}
+
+func (timeFlag) Type() string { return "time" }
+
 // parseID reads the ID of a kind of record, such as "agent", from an argument or a flag.
 func parseID(kind, value string) (uuid.UUID, error) {
 	id, err := uuid.Parse(value)

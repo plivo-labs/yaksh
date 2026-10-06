@@ -2,7 +2,7 @@ import asyncio
 import uuid
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
@@ -537,6 +537,40 @@ async def test_the_status_filter_lists_the_runs_that_show_that_status(
 
         assert [(found["id"], found["status"]) for found in listed] == [(run["id"], status)]
     assert (await client.get("/api/v1/runs", params={"status": "lost"})).status_code == 422
+
+
+async def test_the_date_filter_lists_the_runs_created_in_the_range(
+    client: AsyncClient, db: Db
+) -> None:
+    created = {
+        "before": "2026-09-30T23:59:59+00:00",
+        "first": "2026-10-01T00:00:00+00:00",
+        "last": "2026-10-01T23:59:59+00:00",
+        "after": "2026-10-02T00:00:00+00:00",
+    }
+    runs = {key: await new_run(client) for key in created}
+    async with db() as session:
+        for key, at in created.items():
+            await session.execute(
+                update(Run)
+                .where(Run.id == uuid.UUID(runs[key]["id"]))
+                .values(created_at=datetime.fromisoformat(at))
+            )
+        await session.commit()
+
+    async def listed(**params: str) -> list[str]:
+        body = (await client.get("/api/v1/runs", params=params)).json()
+        return [run["id"] for run in body["items"]]
+
+    day = {"created_from": created["first"], "created_before": created["after"]}
+    assert await listed(**day) == [runs["last"]["id"], runs["first"]["id"]]
+    assert await listed(created_from=created["after"]) == [runs["after"]["id"]]
+    assert await listed(created_before=created["first"]) == [runs["before"]["id"]]
+    assert await listed(
+        created_from="2026-10-01T05:30:00+05:30", created_before=created["last"]
+    ) == [runs["first"]["id"]]
+    naive = await client.get("/api/v1/runs", params={"created_from": "2026-10-01T00:00:00"})
+    assert naive.status_code == 422
 
 
 async def test_omitted_fields_take_the_operators_defaults_as_the_api_reports_them(

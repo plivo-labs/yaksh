@@ -18,9 +18,12 @@ export function duration(ms: number | null): string {
   return seconds < 60 ? `${seconds}s` : `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
 }
 
+/** The year shows only when it is not the current year. */
 export function when(iso: string | null): string {
   if (!iso) return "";
-  return new Date(iso).toLocaleString(undefined, {
+  const date = new Date(iso);
+  return date.toLocaleString(undefined, {
+    year: date.getFullYear() === new Date().getFullYear() ? undefined : "numeric",
     month: "short",
     day: "numeric",
     hour: "2-digit",
@@ -41,32 +44,6 @@ export function words(value: string): string {
 export function phone(number: string): string {
   const parts = /^\+1(\d{3})(\d{3})(\d{4})$/.exec(number);
   return parts ? `+1 ${parts[1]} ${parts[2]} ${parts[3]}` : number;
-}
-
-const RELATIVE = new Intl.RelativeTimeFormat(undefined, { numeric: "auto" });
-const STEPS: [Intl.RelativeTimeFormatUnit, number][] = [
-  ["second", 60],
-  ["minute", 60],
-  ["hour", 24],
-  ["day", 7],
-  ["week", 4.35],
-  ["month", 12],
-  ["year", Infinity],
-];
-
-export function since(iso: string): string {
-  let amount = (new Date(iso).getTime() - Date.now()) / 1000;
-  for (const [unit, size] of STEPS) {
-    if (Math.abs(amount) < size) return RELATIVE.format(Math.round(amount), unit);
-    amount /= size;
-  }
-  return "";
-}
-
-const EXACT = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "medium" });
-
-export function exact(iso: string): string {
-  return EXACT.format(new Date(iso));
 }
 
 /** Whole seconds as m:ss, for time rulers. */

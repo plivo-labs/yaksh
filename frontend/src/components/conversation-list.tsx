@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Link } from "react-router";
 
 import { EndCallDialog } from "@/components/confirm-dialogs";
-import { RelativeTime } from "@/components/relative-time";
+import { Timestamp } from "@/components/timestamp";
 import { ResponseTime } from "@/components/response-time";
 import { SortHeader } from "@/components/sort-header";
 import { ConversationStatusLabel } from "@/components/status-label";
@@ -154,7 +154,7 @@ function ConversationRow({
   const name = label(conversation);
   const end = conversation.end_reason && END_REASON_LABELS[conversation.end_reason];
   const started = conversation.started_at ? (
-    <RelativeTime iso={conversation.started_at} />
+    <Timestamp iso={conversation.started_at} />
   ) : ACTIVE_STATUSES.includes(conversation.status) ? (
     "Not yet"
   ) : (

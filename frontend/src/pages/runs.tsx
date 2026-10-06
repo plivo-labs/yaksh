@@ -1,5 +1,4 @@
-import { useSearchParams } from "react-router";
-
+import { DateFilter } from "@/components/date-filter";
 import { Pager } from "@/components/pager";
 import { RunList } from "@/components/run-list";
 import {
@@ -10,6 +9,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { createdBetween, useDatesParam } from "@/hooks/use-dates-param";
+import { useFilterParams } from "@/hooks/use-filter-params";
 import { usePageParam } from "@/hooks/use-page-param";
 import { RUNS_PAGE, useAgents, useRuns } from "@/lib/queries";
 import type { RunStatus } from "@/lib/types";
@@ -18,20 +19,22 @@ const STATUSES: RunStatus[] = ["queued", "running", "cancelling", "done", "cance
 
 const ANY = "any";
 
-/** Every agent's runs, newest first, narrowed by agent and status in the address. */
+/** Every agent's runs, newest first, narrowed by agent, status and dates in the address. */
 export function RunsPage() {
-  const [params, setParams] = useSearchParams();
+  const [params, update] = useFilterParams();
   const agentId = params.get("agent_id") ?? ANY;
   const status = params.get("status") ?? ANY;
+  const [dates, setDates] = useDatesParam();
   const agents = useAgents();
   const runs = useRuns(
     {
       agentId: agentId === ANY ? undefined : agentId,
       status: STATUSES.find((value) => value === status),
+      ...createdBetween(dates),
     },
     usePageParam(),
   );
-  const filtered = agentId !== ANY || status !== ANY;
+  const filtered = agentId !== ANY || status !== ANY || dates !== undefined;
 
   const agentItems = [
     { value: ANY, label: "All agents" },
@@ -42,13 +45,7 @@ export function RunsPage() {
     ...STATUSES.map((value) => ({ value, label: value[0].toUpperCase() + value.slice(1) })),
   ];
 
-  const setParam = (key: string, value: string) => {
-    const next = new URLSearchParams(params);
-    if (value === ANY) next.delete(key);
-    else next.set(key, value);
-    next.delete("page");
-    setParams(next, { replace: true });
-  };
+  const setParam = (key: string, value: string) => update({ [key]: value === ANY ? null : value });
 
   return (
     <div className="grid gap-6">
@@ -101,6 +98,11 @@ export function RunsPage() {
             </SelectGroup>
           </SelectContent>
         </Select>
+        <DateFilter
+          dates={dates}
+          onDatesChange={setDates}
+          className="min-w-0 flex-1 sm:w-auto sm:flex-none"
+        />
       </div>
 
       <div>
