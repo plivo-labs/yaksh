@@ -21,19 +21,19 @@ import (
 
 // Defines values for Category.
 const (
-	Boundary  Category = "boundary"
-	HappyPath Category = "happy_path"
-	Recovery  Category = "recovery"
+	EdgeCase   Category = "edge_case"
+	HappyPath  Category = "happy_path"
+	MessyInput Category = "messy_input"
 )
 
 // Valid indicates whether the value is a known member of the Category enum.
 func (e Category) Valid() bool {
 	switch e {
-	case Boundary:
+	case EdgeCase:
 		return true
 	case HappyPath:
 		return true
-	case Recovery:
+	case MessyInput:
 		return true
 	default:
 		return false

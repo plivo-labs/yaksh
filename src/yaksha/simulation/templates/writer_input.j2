@@ -1,12 +1,12 @@
 {# The kinds of test in plain words; the category labels themselves end up in names. #}
-{% set kinds = {"happy_path": "normal request", "recovery": "the caller gets information wrong first", "boundary": "a request the agent must refuse or redirect"} %}
-{% set tasks = {"happy_path": "A normal request: the caller has the right information and cooperates.", "recovery": "The caller gets information wrong first, and the agent must notice and recover.", "boundary": "The caller asks for something the agent must refuse, redirect or hand off."} %}
+{% set kinds = {"happy_path": "normal request", "messy_input": "the caller gets information wrong first", "edge_case": "a request the agent must refuse or redirect"} %}
+{% set tasks = {"happy_path": "A normal request: the caller has the right information and cooperates.", "messy_input": "The caller gets information wrong first, and the agent must notice and recover.", "edge_case": "The caller asks for something the agent must refuse, redirect or hand off."} %}
 {# How each repeat of one area differs from the first scenario on it, one for each of the
    MAX_REPEATS - 1 repeats; the first needs none. #}
 {% set repeat_angles = ["the caller picks a different option than the first time", "the caller asks an extra question along the way", "the caller is unsure and needs the options explained", "the caller has a detail that changes the outcome, still within the agent's job"] %}
-{# What the caller asks in a boundary test with no known refusal, one per slot, so writers
+{# What the caller asks in an edge case test with no known refusal, one per slot, so writers
    that run at the same time pick different requests. #}
-{% set open_boundary_requests = ["The caller asks for a service the business does not offer.", "The caller asks about a topic unrelated to the agent's job.", "The caller asks for advice the agent is not qualified to give.", "The caller asks for something only a person can do, such as a complaint to a manager.", "The caller asks the agent to act for someone other than the caller."] %}
+{% set open_edge_requests = ["The caller asks for a service the business does not offer.", "The caller asks about a topic unrelated to the agent's job.", "The caller asks for advice the agent is not qualified to give.", "The caller asks for something only a person can do, such as a complaint to a manager.", "The caller asks the agent to act for someone other than the caller."] %}
 {% macro subject(slot) -%}
 {%- if slot.capability -%}
 {{ slot.capability.name }}
@@ -17,8 +17,8 @@ a request outside the agent's job
 {%- endif -%}
 {%- endmacro %}
 {% macro variation(slot) -%}
-{%- if slot.category == "boundary" and not (slot.capability or slot.question) -%}
-{{ open_boundary_requests[slot.variant] }}
+{%- if slot.category == "edge_case" and not (slot.capability or slot.question) -%}
+{{ open_edge_requests[slot.variant] }}
 {%- elif slot.variant -%}
 Vary it: {{ repeat_angles[slot.variant - 1] }}.
 {%- endif -%}
@@ -48,7 +48,7 @@ The caller asks: "{{ slot.question.question }}"
 The documented answer is "{{ slot.question.answer }}", from "{{ slot.question.document }}": "{{ slot.question.quote }}". One criterion checks that the agent gives this answer.
 {% elif slot.question %}
 The caller asks: "{{ slot.question.question }}" The documents do not answer it. The criteria check that the agent does not invent an answer, and says it does not know or offers a way to find out.
-{% elif slot.category == "boundary" %}
+{% elif slot.category == "edge_case" %}
 Make it a request a caller could plausibly make to this agent.
 {% endif %}
 {% set change = variation(slot) %}

@@ -69,8 +69,8 @@ const ALL = "all";
 
 const CATEGORY_BADGE: Record<Category, "success" | "warning" | "info"> = {
   happy_path: "success",
-  recovery: "warning",
-  boundary: "info",
+  messy_input: "warning",
+  edge_case: "info",
 };
 
 function batchLabel(generation: Generation): string {

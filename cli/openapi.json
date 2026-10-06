@@ -4283,8 +4283,8 @@
         "type": "string",
         "enum": [
           "happy_path",
-          "recovery",
-          "boundary"
+          "messy_input",
+          "edge_case"
         ],
         "title": "Category",
         "description": "What kind of situation a scenario tests. How the caller talks comes from the persona."

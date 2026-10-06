@@ -393,16 +393,16 @@ export interface ScenarioConfig {
   first_words: string | null;
 }
 
-export type Category = "happy_path" | "recovery" | "boundary";
+export type Category = "happy_path" | "messy_input" | "edge_case";
 
 export const CATEGORY_ITEMS: { value: Category; label: string; hint: string }[] = [
   { value: "happy_path", label: "Happy path", hint: "A normal request with correct information" },
   {
-    value: "recovery",
-    label: "Recovery",
+    value: "messy_input",
+    label: "Messy input",
     hint: "The caller gives wrong, partial, spelled-out or corrected information",
   },
-  { value: "boundary", label: "Boundary", hint: "Out of scope, a refusal or a hand-off" },
+  { value: "edge_case", label: "Edge case", hint: "Out of scope, a refusal or a hand-off" },
 ];
 
 export const CATEGORY_LABELS = Object.fromEntries(

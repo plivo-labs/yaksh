@@ -86,7 +86,7 @@ class Question:
 
 @dataclass(frozen=True)
 class Slot:
-    """One scenario to write: what it tests, in which category, and for recovery slots how
+    """One scenario to write: what it tests, in which category, and for messy input slots how
     the caller gets the information wrong first."""
 
     category: Category
@@ -104,7 +104,7 @@ ENTITY_FORMATS = (
     "gives part of a value, then the rest when asked",
     "gives a value in an unexpected format",
 )
-"""How a recovery caller gets information wrong first; voice agents fail most on these."""
+"""How a messy input caller gets information wrong first; voice agents fail most on these."""
 
 MIN_QUOTE_CHARS = 12
 MAX_REPEATS = 5
@@ -113,23 +113,23 @@ repeat."""
 
 
 def category_quotas(count: int) -> dict[Category, int]:
-    """About 30% recovery and 20% boundary, and always at least one happy path."""
-    recovery = int(count * 0.3 + 0.5)
-    boundary = int(count * 0.2 + 0.5)
-    while recovery + boundary >= count and (recovery or boundary):
-        if boundary >= recovery:
-            boundary -= 1
+    """About 30% messy input and 20% edge case, and always at least one happy path."""
+    messy = int(count * 0.3 + 0.5)
+    edge = int(count * 0.2 + 0.5)
+    while messy + edge >= count and (messy or edge):
+        if edge >= messy:
+            edge -= 1
         else:
-            recovery -= 1
+            messy -= 1
     return {
-        Category.HAPPY_PATH: count - recovery - boundary,
-        Category.RECOVERY: recovery,
-        Category.BOUNDARY: boundary,
+        Category.HAPPY_PATH: count - messy - edge,
+        Category.MESSY_INPUT: messy,
+        Category.EDGE_CASE: edge,
     }
 
 
 def agent_slots(capabilities: list[Capability], count: int) -> list[Slot]:
-    """Spread the scenarios over what the agent does, untested and core first. Boundary slots
+    """Spread the scenarios over what the agent does, untested and core first. Edge case slots
     go to what the agent must refuse, or to a general out-of-scope request when none is known.
     Without anything the agent does, there is nothing to test. The same plan and count always
     give the same slots."""
@@ -143,18 +143,18 @@ def agent_slots(capabilities: list[Capability], count: int) -> list[Slot]:
     quotas = category_quotas(count)
     refusals = [c for c in capabilities if c.priority is Priority.BOUNDARY]
     slots: list[Slot] = []
-    for index in range(quotas[Category.HAPPY_PATH] + quotas[Category.RECOVERY]):
-        recovery = index >= quotas[Category.HAPPY_PATH]
+    for index in range(quotas[Category.HAPPY_PATH] + quotas[Category.MESSY_INPUT]):
+        messy = index >= quotas[Category.HAPPY_PATH]
         slots.append(
             Slot(
-                category=Category.RECOVERY if recovery else Category.HAPPY_PATH,
+                category=Category.MESSY_INPUT if messy else Category.HAPPY_PATH,
                 capability=doable[index % len(doable)],
-                entity_format=ENTITY_FORMATS[index % len(ENTITY_FORMATS)] if recovery else None,
+                entity_format=ENTITY_FORMATS[index % len(ENTITY_FORMATS)] if messy else None,
             )
         )
-    for index in range(quotas[Category.BOUNDARY]):
+    for index in range(quotas[Category.EDGE_CASE]):
         capability = refusals[index % len(refusals)] if refusals else None
-        slots.append(Slot(category=Category.BOUNDARY, capability=capability))
+        slots.append(Slot(category=Category.EDGE_CASE, capability=capability))
     return numbered(slots)
 
 
@@ -165,14 +165,14 @@ def question_slots(answered: list[Question], unanswered: list[Question], count: 
     asked_count = count - open_count if answered else 0
     slots = [
         Slot(
-            category=Category.RECOVERY if index % 3 == 2 else Category.HAPPY_PATH,
+            category=Category.MESSY_INPUT if index % 3 == 2 else Category.HAPPY_PATH,
             question=answered[index % len(answered)],
             entity_format=ENTITY_FORMATS[index % len(ENTITY_FORMATS)] if index % 3 == 2 else None,
         )
         for index in range(asked_count)
     ]
     slots += [
-        Slot(category=Category.BOUNDARY, question=unanswered[index]) for index in range(open_count)
+        Slot(category=Category.EDGE_CASE, question=unanswered[index]) for index in range(open_count)
     ]
     return numbered(slots)
 

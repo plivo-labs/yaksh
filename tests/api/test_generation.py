@@ -87,11 +87,11 @@ async def test_scenarios_are_planned_from_the_agent_and_saved_as_they_are_writte
     assert kinds == ["started", "planned", *["scenario"] * 5, "finished"]
     assert events[1][1] == {"count": 5}
     assert sorted(s["category"] for s in saved) == [
-        "boundary",
+        "edge_case",
         "happy_path",
         "happy_path",
-        "recovery",
-        "recovery",
+        "messy_input",
+        "messy_input",
     ]
     assert not any("Refill" in prompt for prompt in writer_prompts), "its quote was invented"
     assert finished == {"status": "done", "saved": 5, "dropped": 0, "error": None}
@@ -143,14 +143,14 @@ async def test_knowledge_base_mode_asks_what_the_chosen_documents_answer(
     saved = [(data["name"], data["category"]) for kind, data in events if kind == "scenario"]
     prompts = "\n".join(user for name, user in generation_model.calls if name == "scenario")
     assert sorted(category for _, category in saved) == [
-        "boundary",
+        "edge_case",
         "happy_path",
         "happy_path",
         "happy_path",
-        "recovery",
+        "messy_input",
     ]
     assert all(
-        name.startswith("Is there parking?" if category == "boundary" else "Do you take Medi-Cal?")
+        name.startswith("Is there parking?" if category == "edge_case" else "Do you take Medi-Cal?")
         for name, category in saved
     )
     assert "Aetna" not in prompts, "its quote is not in the document"
@@ -520,7 +520,7 @@ async def test_new_scenarios_spread_the_chosen_personas(
     events = await generate(client, agent["id"], count=3, persona_ids=[first, second])
 
     saved = {data["category"]: data["persona_id"] for kind, data in events if kind == "scenario"}
-    assert saved == {"happy_path": first, "recovery": second, "boundary": first}
+    assert saved == {"happy_path": first, "messy_input": second, "edge_case": first}
 
 
 async def test_a_generation_needs_live_personas_each_picked_once(client: AsyncClient) -> None:
