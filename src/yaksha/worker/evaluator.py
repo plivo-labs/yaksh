@@ -13,11 +13,18 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from yaksha.config import Settings
-from yaksha.db.models import AgentVersion, Conversation, Evaluation, ScenarioVersion
+from yaksha.db.models import (
+    AgentVersion,
+    Conversation,
+    Evaluation,
+    PersonaVersion,
+    ScenarioVersion,
+)
 from yaksha.db.models import Document as DocumentRow
 from yaksha.diagnostics import describe_exception
 from yaksha.domain.agents import AgentConfig
 from yaksha.domain.language_models import JsonModel, ModelCallError
+from yaksha.domain.personas import PersonaConfig
 from yaksha.domain.scenarios import ScenarioConfig
 from yaksha.evaluation import call, evaluations, labels
 from yaksha.evaluation.call import JUDGES, SOURCE_JUDGES, Judging
@@ -70,6 +77,11 @@ def jev_first_pass(settings: Settings) -> Jev | None:
         api_key=settings.typesafe_api_key.get_secret_value(), model=JEV_MODEL
     )
     return Jev(classifier, settings.jev_pass_bar)
+
+
+async def persona_prompt(session: AsyncSession, conversation: Conversation) -> str:
+    version = await session.get_one(PersonaVersion, conversation.persona_version_id)
+    return PersonaConfig.model_validate(version.config).prompt
 
 
 async def knowledge_base(session: AsyncSession, agent: AgentConfig) -> list[Document]:
@@ -218,11 +230,13 @@ class Evaluator:
                 scenario = await session.get_one(ScenarioVersion, conversation.scenario_version_id)
                 agent_config = AgentConfig.model_validate(agent.config)
                 judged = self._judging is not None and call.judged(conversation)
+                persona = await persona_prompt(session, conversation) if judged else None
                 documents = await knowledge_base(session, agent_config) if judged else []
             evaluated = await call.evaluate(
                 conversation,
                 agent_config,
                 ScenarioConfig.model_validate(scenario.config),
+                persona,
                 documents,
                 self._judging,
                 retry_later=evaluation.attempts < evaluations.MAX_ATTEMPTS,

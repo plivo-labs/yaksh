@@ -115,7 +115,7 @@ async def test_the_check_reads_the_caller_side_and_names_criteria_that_exist() -
         model,
         "VIEW",
         transcript,
-        "You are Jordan Lee, born 14 March 1990.",
+        "You are polite and give one detail at a time.",
         ["Asks for the date of birth.", "Reads it back."],
         EndReason.AGENT_HANGUP,
         Language.EN,
@@ -129,7 +129,7 @@ async def test_the_check_reads_the_caller_side_and_names_criteria_that_exist() -
         1,
         ItemRole.REPORTING,
     )
-    assert "CALLER INSTRUCTIONS\nYou are Jordan Lee" in model.requests[0]
+    assert "CALLER PERSONA\nYou are polite" in model.requests[0]
     assert "1. Asks for the date of birth.\n2. Reads it back." in model.requests[0]
     assert "Criterion 7 does not exist (1 to 2)." in model.requests[1]
 

@@ -108,7 +108,7 @@ async def check_caller(
     model: JsonModel,
     view: str,
     transcript: Transcript,
-    instructions: str,
+    persona: str | None,
     criteria: Sequence[str],
     end_reason: EndReason | None,
     language: Language,
@@ -116,10 +116,11 @@ async def check_caller(
     slots: asyncio.Semaphore,
     retry_later: bool,
 ) -> ItemResult:
+    """`persona` is how the caller talks; the caller's goal and facts come from the view."""
     numbered = "\n".join(f"{number}. {text}" for number, text in enumerate(criteria, 1))
     found = "\n".join(f"- {fact}" for fact in facts(transcript, end_reason, language)) or "- none"
     user = (
-        f"CALLER INSTRUCTIONS\n{instructions}\n\nCRITERIA\n{numbered}\n\n"
+        f"CALLER PERSONA\n{persona or 'none'}\n\nCRITERIA\n{numbered}\n\n"
         f"FACTS CODE FOUND\n{found}\n\n{view}"
     )
     answered = await ask(
