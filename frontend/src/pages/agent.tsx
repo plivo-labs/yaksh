@@ -258,26 +258,35 @@ function Purpose({ agent, edit }: { agent: Agent; edit: ReactNode }) {
   );
 }
 
-/** The settings a reader needs first, and the rest under "Show more". */
+/** The agent's identity first, and how it calls under "Show more". "Number" is the number Yaksha
+ * dials, or for an outbound agent the numbers it may call from. */
 function Settings({ agent, edit }: { agent: Agent; edit: ReactNode }) {
   const { outbound } = agent;
+  const none = <span className="font-normal text-muted-foreground">None</span>;
   return (
     <Panel>
       <PanelHeader title="Settings" action={edit} />
       <dl className="grid grid-cols-[minmax(0,1fr)] gap-4 px-5 pt-4">
-        <Fact label="Language">{LANGUAGE_NAMES[agent.language]}</Fact>
-        <Fact label="Opens with">
-          {agent.agent_speaks_first ? "Agent speaks first" : "Caller speaks first"}
+        <Fact label="Number" wrap>
+          {outbound ? (
+            outbound.calling_numbers.length > 0 ? (
+              outbound.calling_numbers.map(phone).join(", ")
+            ) : (
+              <span className="font-normal text-muted-foreground">Any number</span>
+            )
+          ) : agent.agent_number ? (
+            phone(agent.agent_number)
+          ) : (
+            none
+          )}
         </Fact>
-        {outbound && (
-          <div className="grid gap-0.5">
-            <dt className="text-xs-400 text-muted-foreground">Start request</dt>
-            <dd className="text-p-400 break-all">
-              <span className="text-muted-foreground">POST </span>
-              {outbound.trigger.url}
-            </dd>
-          </div>
-        )}
+        <Fact label="External id" wrap>
+          {agent.external_id ?? none}
+        </Fact>
+        <Fact label="Agent id">
+          <CopyId id={agent.id} label="agent id" />
+        </Fact>
+        <Fact label="Added">{when(agent.created_at)}</Fact>
       </dl>
       <details className="group px-5 pt-3 pb-4">
         <summary className="flex w-fit cursor-pointer list-none items-center gap-1 rounded-sm text-xs-500 text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden">
@@ -286,25 +295,29 @@ function Settings({ agent, edit }: { agent: Agent; edit: ReactNode }) {
           <ChevronDown className="size-3.5 transition-transform duration-150 group-open:rotate-180" />
         </summary>
         <dl className="mt-4 grid grid-cols-[minmax(0,1fr)] gap-4">
+          <Fact label="Language">{LANGUAGE_NAMES[agent.language]}</Fact>
+          <Fact label="Opens with">
+            {agent.agent_speaks_first ? "Agent speaks first" : "Caller speaks first"}
+          </Fact>
           {outbound && <OutboundFacts outbound={outbound} />}
-          <Fact label="External id" wrap>
-            {agent.external_id ?? <span className="font-normal text-muted-foreground">None</span>}
-          </Fact>
-          <Fact label="Agent id">
-            <CopyId id={agent.id} label="agent id" />
-          </Fact>
-          <Fact label="Added">{when(agent.created_at)}</Fact>
         </dl>
       </details>
     </Panel>
   );
 }
 
-/** What Yaksha sends to start an outbound agent's call, and how it takes the call. */
+/** What Yaksha sends to start an outbound agent's call, and how long it waits for the call. */
 function OutboundFacts({ outbound }: { outbound: OutboundSettings }) {
   const { trigger } = outbound;
   return (
     <>
+      <div className="grid gap-0.5">
+        <dt className="text-xs-400 text-muted-foreground">Start request</dt>
+        <dd className="text-p-400 break-all">
+          <span className="text-muted-foreground">POST </span>
+          {trigger.url}
+        </dd>
+      </div>
       <Fact label="Headers" wrap>
         {trigger.headers.length > 0 ? (
           trigger.headers.map((header) => header.name).join(", ")
@@ -320,13 +333,6 @@ function OutboundFacts({ outbound }: { outbound: OutboundSettings }) {
           </pre>
         </dd>
       </div>
-      <Fact label="Calling numbers" wrap>
-        {outbound.calling_numbers.length > 0 ? (
-          outbound.calling_numbers.map(phone).join(", ")
-        ) : (
-          <span className="font-normal text-muted-foreground">Any number</span>
-        )}
-      </Fact>
       <Fact label="Dial window">{outbound.dial_window_s} seconds</Fact>
     </>
   );
