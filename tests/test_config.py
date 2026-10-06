@@ -1,6 +1,7 @@
 import pytest
 
 from truman.config import Settings
+from truman.worker.evaluator import judge_model
 
 
 def test_an_empty_variable_counts_as_not_set(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -15,3 +16,18 @@ def test_an_empty_variable_counts_as_not_set(monkeypatch: pytest.MonkeyPatch) ->
 
     assert settings.public_url is None
     assert not settings.phone_enabled
+
+
+@pytest.mark.parametrize(("value", "judged"), [("off", False), ("OFF", False), ("", True)])
+def test_off_turns_the_judges_off_and_an_empty_model_keeps_the_default(
+    monkeypatch: pytest.MonkeyPatch, value: str, judged: bool
+) -> None:
+    monkeypatch.setenv("JUDGE_LLM_MODEL", value)
+    settings = Settings(
+        _env_file=None,
+        api_token="token",
+        database_url="postgresql+asyncpg://truman@localhost/truman",
+        openai_api_key="key",
+    )
+
+    assert (judge_model(settings) is not None) is judged

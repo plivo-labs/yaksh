@@ -45,11 +45,11 @@ PROVIDER = "openai_compatible"
 
 
 def judge_model(settings: Settings, *, sources: bool = False) -> OpenAIJsonModel | None:
-    """The model that judges calls; None when no model or key is set. The judges of the agent's
-    whole instructions or documents get a longer timeout and one retry: their requests are
-    large."""
+    """The model that judges calls; None when the judges are off or no key is set. The judges
+    of the agent's whole instructions or documents get a longer timeout and one retry: their
+    requests are large."""
     key = settings.judge_openai_api_key or settings.openai_api_key
-    if not settings.judge_llm_model or key is None:
+    if not settings.judges_on or key is None:
         return None
     return OpenAIJsonModel.openai(
         key.get_secret_value(),
@@ -112,7 +112,9 @@ class Evaluator:
 
     async def _prepare_judging(self) -> Judging | None:
         if self._model is None:
-            log.warning("no judge model is set: calls get code metrics and phrase rules only")
+            log.warning(
+                "the judges are off or have no key: calls get code metrics and phrase rules only"
+            )
             return None
         settings = {
             "reasoning_effort": self._settings.judge_llm_reasoning_effort,
@@ -138,7 +140,7 @@ class Evaluator:
             if not error.temporary:
                 raise RuntimeError(
                     f"the judge model {model} cannot be used ({error}); set JUDGE_LLM_MODEL to "
-                    "a model the judge endpoint has, or to an empty value to turn judging off"
+                    "a model the judge endpoint has, or to off to turn judging off"
                 ) from error
             log.warning("the judge model %s did not answer a first check: %s", model, error)
         async with self._sessionmaker() as session:

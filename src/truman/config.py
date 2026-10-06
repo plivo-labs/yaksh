@@ -73,7 +73,7 @@ class Settings(BaseSettings):
     )
     """One model call while writing scenarios; high reasoning effort takes minutes."""
     judge_llm_model: str = Field(default="gpt-6-luna", validation_alias="JUDGE_LLM_MODEL")
-    """The model that judges calls; empty turns the judges off."""
+    """The model that judges calls; "off" turns the judges off."""
     judge_llm_reasoning_effort: str | None = Field(
         default="medium", validation_alias="JUDGE_LLM_REASONING_EFFORT"
     )
@@ -135,6 +135,10 @@ class Settings(BaseSettings):
     def default_max_retries(self) -> int:
         """The retries of a run that does not set them: 1, or the operator's limit when lower."""
         return min(1, self.max_run_retries)
+
+    @property
+    def judges_on(self) -> bool:
+        return self.judge_llm_model.strip().lower() != "off"
 
     @property
     def phone_enabled(self) -> bool:

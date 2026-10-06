@@ -105,7 +105,7 @@ The evaluator also judges each completed call that no one stopped: one model cal
 
 | Variable | Purpose |
 | --- | --- |
-| `JUDGE_LLM_MODEL` | The judge model, default `gpt-6-luna`. Empty turns the judges off. |
+| `JUDGE_LLM_MODEL` | The judge model, default `gpt-6-luna`. `off` turns the judges off. |
 | `JUDGE_LLM_REASONING_EFFORT` | Default `medium`. |
 | `JUDGE_OPENAI_API_KEY`, `JUDGE_OPENAI_BASE_URL` | The judge's key and address; the caller's `OPENAI_API_KEY` and `OPENAI_BASE_URL` when unset. |
 | `JUDGE_MAX_INPUT_CHARS` | The most text one judge request holds, default 400,000 characters. |
