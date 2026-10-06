@@ -24,20 +24,20 @@ def capability(name: str, priority: Priority, *, tested: bool = False) -> Capabi
 
 
 @pytest.mark.parametrize(
-    ("count", "happy", "recovery", "boundary"),
+    ("count", "happy", "messy", "edge"),
     [(1, 1, 0, 0), (2, 1, 1, 0), (3, 1, 1, 1), (5, 2, 2, 1), (10, 5, 3, 2), (20, 10, 6, 4)],
 )
 def test_every_batch_has_a_happy_path_and_about_30_and_20_percent_of_the_rest(
-    count: int, happy: int, recovery: int, boundary: int
+    count: int, happy: int, messy: int, edge: int
 ) -> None:
     assert category_quotas(count) == {
         Category.HAPPY_PATH: happy,
-        Category.RECOVERY: recovery,
-        Category.BOUNDARY: boundary,
+        Category.MESSY_INPUT: messy,
+        Category.EDGE_CASE: edge,
     }
 
 
-def test_untested_core_work_comes_first_and_refusals_get_the_boundary_slots() -> None:
+def test_untested_core_work_comes_first_and_refusals_get_the_edge_case_slots() -> None:
     tested_core = capability("Book", Priority.CORE, tested=True)
     core = capability("Reschedule", Priority.CORE)
     secondary = capability("Directions", Priority.SECONDARY)
@@ -48,17 +48,17 @@ def test_untested_core_work_comes_first_and_refusals_get_the_boundary_slots() ->
     assert [(slot.category, slot.capability) for slot in slots] == [
         (Category.HAPPY_PATH, core),
         (Category.HAPPY_PATH, secondary),
-        (Category.RECOVERY, tested_core),
-        (Category.RECOVERY, core),
-        (Category.BOUNDARY, refusal),
+        (Category.MESSY_INPUT, tested_core),
+        (Category.MESSY_INPUT, core),
+        (Category.EDGE_CASE, refusal),
     ]
     assert [slot.entity_format for slot in slots[2:4]] == list(ENTITY_FORMATS[2:4])
 
 
-def test_without_known_refusals_a_boundary_slot_asks_for_something_out_of_scope() -> None:
+def test_without_known_refusals_an_edge_case_slot_asks_for_something_out_of_scope() -> None:
     slots = agent_slots([capability("Book", Priority.CORE)], 3)
 
-    assert (slots[-1].category, slots[-1].capability) == (Category.BOUNDARY, None)
+    assert (slots[-1].category, slots[-1].capability) == (Category.EDGE_CASE, None)
 
 
 def test_about_a_fifth_of_knowledge_questions_are_ones_the_documents_do_not_answer() -> None:
@@ -71,12 +71,12 @@ def test_about_a_fifth_of_knowledge_questions_are_ones_the_documents_do_not_answ
     assert [slot.category for slot in slots] == [
         Category.HAPPY_PATH,
         Category.HAPPY_PATH,
-        Category.RECOVERY,
+        Category.MESSY_INPUT,
         Category.HAPPY_PATH,
-        Category.BOUNDARY,
+        Category.EDGE_CASE,
     ]
     assert [slot.question for slot in slots[:4]] == answered
-    assert [slot.category for slot in only_open] == [Category.BOUNDARY]
+    assert [slot.category for slot in only_open] == [Category.EDGE_CASE]
 
 
 def test_a_quote_counts_only_when_the_context_has_it_and_it_is_not_tiny() -> None:

@@ -59,7 +59,7 @@ async def test_run_numbers_pool_the_counted_calls_overall_and_by_category(
 ) -> None:
     agent = await create_agent_id(client, name="Clinic")
     usual = await create_scenario(client, agent, name="Usual", category="happy_path")
-    edge = await create_scenario(client, agent, name="Edge", category="boundary")
+    edge = await create_scenario(client, agent, name="Edge", category="edge_case")
     response = await start_run(client, agent, [usual["id"], edge["id"]], repeats=2)
     run = response.json()
     ids = [await claim(db) for _ in range(4)]
@@ -108,7 +108,7 @@ async def test_run_numbers_pool_the_counted_calls_overall_and_by_category(
     assert share(2, 3) == {"count": 2, "total": 3, "low": 0.208, "high": 0.939}
     assert [
         (group["category"], group["numbers"]["conversations"]) for group in found["by_category"]
-    ] == [("happy_path", 2), ("boundary", 1)]
+    ] == [("happy_path", 2), ("edge_case", 1)]
     assert found["by_category"][0]["numbers"]["connected"] == share(1, 2)
     assert found["by_noise"] == [
         {"noise": {"sound": "none", "level": "busy"}, "numbers": found["overall"]}

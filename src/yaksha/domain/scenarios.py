@@ -26,9 +26,9 @@ class Category(StrEnum):
 
     HAPPY_PATH = "happy_path"
     """A normal request with correct information."""
-    RECOVERY = "recovery"
+    MESSY_INPUT = "messy_input"
     """The caller gives wrong, partial, spelled-out or corrected information."""
-    BOUNDARY = "boundary"
+    EDGE_CASE = "edge_case"
     """A request outside the agent's job, or one that pushes a rule: refusal or hand-off."""
 
 

@@ -134,19 +134,19 @@ async def test_category_and_description_change_without_a_new_version(
 ) -> None:
     agent_id = await create_agent_id(client)
     created = await create_scenario(
-        client, agent_id, category="recovery", description="  Wrong date of birth first.  "
+        client, agent_id, category="messy_input", description="  Wrong date of birth first.  "
     )
 
     updated = await client.patch(
-        f"/api/v1/scenarios/{created['id']}", json={"category": "boundary", "description": ""}
+        f"/api/v1/scenarios/{created['id']}", json={"category": "edge_case", "description": ""}
     )
     refused = await client.patch(f"/api/v1/scenarios/{created['id']}", json={"category": None})
 
     assert (created["category"], created["description"]) == (
-        "recovery",
+        "messy_input",
         "Wrong date of birth first.",
     )
-    assert (updated.json()["category"], updated.json()["description"]) == ("boundary", None)
+    assert (updated.json()["category"], updated.json()["description"]) == ("edge_case", None)
     assert updated.json()["current_version"] == 1
     assert refused.status_code == 422
 

@@ -6,7 +6,7 @@ An agent can have hundreds of scenarios, and a run starts from a hand-made selec
 
 ## Today
 
-- Scenarios belong to one agent. Their name, category (happy path, recovery, boundary) and description are not versioned.
+- Scenarios belong to one agent. Their name, category (happy path, messy input, edge case) and description are not versioned.
 - The only groups are the fixed category and the generation batch (`generation_id`). The scenario list filters by batch.
 - A selection lives in the page only. It feeds delete, and the run plan adds Run to it.
 

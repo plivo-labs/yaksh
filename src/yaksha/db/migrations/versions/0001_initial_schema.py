@@ -255,7 +255,7 @@ def upgrade() -> None:
         sa.Column("name", sa.Text(), nullable=False),
         sa.Column(
             "category",
-            sa.Enum("happy_path", "recovery", "boundary", name="scenario_category"),
+            sa.Enum("happy_path", "messy_input", "edge_case", name="scenario_category"),
             server_default="happy_path",
             nullable=False,
         ),

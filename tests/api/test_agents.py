@@ -126,7 +126,7 @@ async def test_a_duplicate_copies_the_config_and_live_scenarios_but_not_the_exte
         client, external_id="flow-7", brief="Books rooms", config="Greet, then book."
     )
     kept = await create_scenario(
-        client, original["id"], category="recovery", description="Checks a corrected date."
+        client, original["id"], category="messy_input", description="Checks a corrected date."
     )
     gone = await create_scenario(client, original["id"], name="Gone")
     await client.delete(f"/api/v1/scenarios/{gone['id']}")
@@ -155,7 +155,7 @@ async def test_a_duplicate_copies_the_config_and_live_scenarios_but_not_the_exte
             SCENARIO["name"],
             ["Books it."],
             1,
-            "recovery",
+            "messy_input",
             "Checks a corrected date.",
             kept["persona_id"],
         )
