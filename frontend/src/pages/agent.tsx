@@ -266,7 +266,7 @@ function Settings({ agent, edit }: { agent: Agent; edit: ReactNode }) {
   return (
     <Panel>
       <PanelHeader title="Settings" action={edit} />
-      <dl className="grid grid-cols-[minmax(0,1fr)] gap-4 px-5 pt-4">
+      <dl className="grid grid-cols-2 gap-x-6 gap-y-4 px-5 pt-4">
         <Fact label="Number" wrap>
           {outbound ? (
             outbound.calling_numbers.length > 0 ? (
@@ -294,7 +294,7 @@ function Settings({ agent, edit }: { agent: Agent; edit: ReactNode }) {
           <span className="hidden group-open:inline">Show less</span>
           <ChevronDown className="size-3.5 transition-transform duration-150 group-open:rotate-180" />
         </summary>
-        <dl className="mt-4 grid grid-cols-[minmax(0,1fr)] gap-4">
+        <dl className="mt-4 grid grid-cols-2 gap-x-6 gap-y-4">
           <Fact label="Language">{LANGUAGE_NAMES[agent.language]}</Fact>
           <Fact label="Opens with">
             {agent.agent_speaks_first ? "Agent speaks first" : "Caller speaks first"}
@@ -311,7 +311,7 @@ function OutboundFacts({ outbound }: { outbound: OutboundSettings }) {
   const { trigger } = outbound;
   return (
     <>
-      <div className="grid gap-0.5">
+      <div className="col-span-full grid gap-0.5">
         <dt className="text-xs-400 text-muted-foreground">Start request</dt>
         <dd className="text-p-400 break-all">
           <span className="text-muted-foreground">POST </span>
@@ -325,7 +325,7 @@ function OutboundFacts({ outbound }: { outbound: OutboundSettings }) {
           <span className="font-normal text-muted-foreground">None</span>
         )}
       </Fact>
-      <div className="grid min-w-0 gap-1">
+      <div className="col-span-full grid min-w-0 gap-1">
         <dt className="text-xs-400 text-muted-foreground">Request body</dt>
         <dd className="min-w-0">
           <pre className="max-h-48 overflow-auto rounded-md bg-muted p-3 font-mono text-xs-400 leading-relaxed">
