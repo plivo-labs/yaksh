@@ -1,6 +1,6 @@
 import { Play, Square } from "lucide-react";
 import { type ReactNode, useState } from "react";
-import { Link, useParams, useSearchParams } from "react-router";
+import { Link, useParams } from "react-router";
 import { toast } from "sonner";
 
 import { ConversationList } from "@/components/conversation-list";
@@ -25,6 +25,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
+import { useFilterParams } from "@/hooks/use-filter-params";
 import { usePageParam } from "@/hooks/use-page-param";
 import { duration, noiseLabel, runFinished, runTitle, runTotal, when } from "@/lib/format";
 import {
@@ -255,15 +256,9 @@ function RunActions({ run }: { run: Run }) {
 }
 
 function GroupFilter({ run }: { run: Run }) {
-  const [params, setParams] = useSearchParams();
+  const [params, update] = useFilterParams();
   const chosen = params.get("group");
-  const choose = (group: OutcomeGroup) => {
-    const next = new URLSearchParams(params);
-    if (chosen === group) next.delete("group");
-    else next.set("group", group);
-    next.delete("page");
-    setParams(next, { replace: true });
-  };
+  const choose = (group: OutcomeGroup) => update({ group: chosen === group ? null : group });
   return (
     <div className="flex flex-wrap gap-2" role="group" aria-label="Show conversations by outcome">
       {OUTCOME_GROUPS.map((group) => (
@@ -287,15 +282,10 @@ function GroupFilter({ run }: { run: Run }) {
 }
 
 function Conversations({ run }: { run: Run }) {
-  const [params, setParams] = useSearchParams();
+  const [params, update] = useFilterParams();
   const group = params.get("group");
   const sort = params.get("sort") ?? "created_at";
-  const sortBy = (next: string) => {
-    const changed = new URLSearchParams(params);
-    changed.set("sort", next);
-    changed.delete("page");
-    setParams(changed, { replace: true });
-  };
+  const sortBy = (next: string) => update({ sort: next });
   const conversations = useConversations(
     {
       run_id: run.id,

@@ -3,7 +3,7 @@ import { type ReactNode, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router";
 
 import { CopyId } from "@/components/copy-id";
-import { DateRangeFilter } from "@/components/date-range-filter";
+import { DateFilter } from "@/components/date-filter";
 import { ActionPanel, Fact, Panel, PanelHeader } from "@/components/panel";
 import { Pager } from "@/components/pager";
 import { RunList } from "@/components/run-list";
@@ -13,7 +13,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { createdBetween, useDateRangeParam } from "@/hooks/use-date-range-param";
+import { createdBetween, useDatesParam } from "@/hooks/use-dates-param";
 import { usePageParam } from "@/hooks/use-page-param";
 import { copyText } from "@/lib/clipboard";
 import { phone, reach, textSize, when } from "@/lib/format";
@@ -179,15 +179,15 @@ function LineState({
 }
 
 function Runs({ agent }: { agent: Agent }) {
-  const [range, setRange] = useDateRangeParam();
-  const runs = useRuns({ agentId: agent.id, ...createdBetween(range) }, usePageParam());
+  const [dates, setDates] = useDatesParam();
+  const runs = useRuns({ agentId: agent.id, ...createdBetween(dates) }, usePageParam());
   return (
-    <ActionPanel action={<DateRangeFilter range={range} onRangeChange={setRange} />}>
+    <ActionPanel action={<DateFilter dates={dates} onDatesChange={setDates} />}>
       <RunList
         query={runs}
         place="panel"
         empty={
-          range
+          dates
             ? "No runs in these dates."
             : "No runs yet. Select scenarios on the Scenarios tab and click Run."
         }
