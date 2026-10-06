@@ -12,7 +12,11 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_prefix="TRUMAN_", env_file=".env", extra="ignore", validate_by_name=True
+        env_prefix="TRUMAN_",
+        env_file=".env",
+        env_ignore_empty=True,
+        extra="ignore",
+        validate_by_name=True,
     )
 
     api_host: str = "127.0.0.1"
