@@ -83,14 +83,7 @@ export function AgentKnowledgeBase({ agent }: { agent: Agent }) {
   return <KnowledgeBasePanel source={useSavedKnowledgeBase(agent)} />;
 }
 
-/** `title` names the panel where no tab does. */
-export function KnowledgeBasePanel({
-  source,
-  title,
-}: {
-  source: KnowledgeBaseSource;
-  title?: string;
-}) {
+export function KnowledgeBasePanel({ source }: { source: KnowledgeBaseSource }) {
   const files = useRef<HTMLInputElement>(null);
   const [open, setOpen] = useState<KnowledgeBaseDocument | "new" | null>(null);
   const { documents, progress, setProgress } = source;
@@ -244,14 +237,12 @@ export function KnowledgeBasePanel({
       />
       <ActionPanel
         title={
-          title && (
-            <>
-              {title}{" "}
-              <span className="font-normal text-muted-foreground tabular-nums">
-                {documents.length}
-              </span>
-            </>
-          )
+          <>
+            Knowledge base{" "}
+            <span className="font-normal text-muted-foreground tabular-nums">
+              {documents.length}
+            </span>
+          </>
         }
         action={addButtons}
         notice={
