@@ -392,7 +392,7 @@ export function ScenarioDialog({
               <FieldSet>
                 <FieldLegend variant="label">Data sent to the agent</FieldLegend>
                 <FieldDescription>
-                  Truman puts these in the request that starts the call, as{" "}
+                  Yaksha puts these in the request that starts the call, as{" "}
                   <code>{"{{agent_data.<name>}}"}</code>. The caller does not see them.
                 </FieldDescription>
                 <FactRows

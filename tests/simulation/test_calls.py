@@ -3,8 +3,8 @@ import uuid
 from pathlib import Path
 
 from tests.conftest import CALLER
-from truman.domain.agents import AgentConfig
-from truman.domain.conversations import (
+from yaksha.domain.agents import AgentConfig
+from yaksha.domain.conversations import (
     CallObserver,
     CallOutcome,
     CallRequest,
@@ -12,7 +12,7 @@ from truman.domain.conversations import (
     WireEvent,
     WireEventKind,
 )
-from truman.simulation.calls import STOP_IGNORED, LiveCall, run_call
+from yaksha.simulation.calls import STOP_IGNORED, LiveCall, run_call
 
 REQUEST = CallRequest(
     conversation_id=uuid.uuid4(),

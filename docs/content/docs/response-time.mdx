@@ -3,23 +3,23 @@ title: Response time
 description: How long the agent makes the caller wait.
 ---
 
-After each call, Truman measures how long the agent made the caller wait.
+After each call, Yaksha measures how long the agent made the caller wait.
 
 ## Measurement
 
-Truman measures a response time for each reply of the caller. It is the time from the end of the speech of the caller to the start of the next speech of the agent. Before the caller speaks, the response time starts when the stream of Truman opens. Thus, the response time also shows if the agent is slow to speak first. If the agent already speaks at that time, the start of the call gets no value.
+Yaksha measures a response time for each reply of the caller. It is the time from the end of the speech of the caller to the start of the next speech of the agent. Before the caller speaks, the response time starts when the stream of Yaksha opens. Thus, the response time also shows if the agent is slow to speak first. If the agent already speaks at that time, the start of the call gets no value.
 
 These replies get no response time:
 
 - A talk-over: the agent starts to speak before the caller completes its speech.
 - A reply that the agent does not answer before the caller speaks again. The percentiles do not include that wait.
 
-Truman finds the two points as follows:
+Yaksha finds the two points as follows:
 
-- The end of the speech of the caller is the last point where the voice detector finds speech in the text-to-speech audio of the reply. Truman uses this audio without the background noise. The text-to-speech audio has quiet audio after the last word, and the end does not include it. In the measured replies of one voice, this quiet audio was 0.03 to 0.35 seconds. If the reply stops before its audio is complete, the end is the time when Truman sent its last audio: the `caller_audio_end` wire event.
-- The speech of the agent comes from the voice detector of the call, the Silero VAD of Pipecat. Truman uses it on the agent channel of the recording. A spoken "hmm" counts as speech. In the measured recordings, a quiet "thinking" sound of an agent did not count.
+- The end of the speech of the caller is the last point where the voice detector finds speech in the text-to-speech audio of the reply. Yaksha uses this audio without the background noise. The text-to-speech audio has quiet audio after the last word, and the end does not include it. In the measured replies of one voice, this quiet audio was 0.03 to 0.35 seconds. If the reply stops before its audio is complete, the end is the time when Yaksha sent its last audio: the `caller_audio_end` wire event.
+- The speech of the agent comes from the voice detector of the call, the Silero VAD of Pipecat. Yaksha uses it on the agent channel of the recording. A spoken "hmm" counts as speech. In the measured recordings, a quiet "thinking" sound of an agent did not count.
 
-Truman measures at its own connection. Thus, the value includes the path between Truman and the system of the agent, in the two directions. For a phone call, this is the path to Plivo and the phone path to the agent. Through the development tunnel, the path to Plivo is approximately 0.2 seconds.
+Yaksha measures at its own connection. Thus, the value includes the path between Yaksha and the system of the agent, in the two directions. For a phone call, this is the path to Plivo and the phone path to the agent. Through the development tunnel, the path to Plivo is approximately 0.2 seconds.
 
 ## Results
 

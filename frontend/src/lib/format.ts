@@ -75,9 +75,9 @@ export function stamp(seconds: number): string {
   return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, "0")}`;
 }
 
-/** How Truman reaches an agent: the number it dials, or that the agent calls Truman. */
+/** How Yaksha reaches an agent: the number it dials, or that the agent calls Yaksha. */
 export function reach(agent: AgentSummary): string {
-  return agent.agent_number ? phone(agent.agent_number) : "Calls Truman";
+  return agent.agent_number ? phone(agent.agent_number) : "Calls Yaksha";
 }
 
 /** A text's length as the model sees it: about four characters per token in English. */

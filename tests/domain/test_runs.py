@@ -1,7 +1,7 @@
 import pytest
 
-from truman.domain.conversations import ConversationStatus, EndReason, OutcomeGroup, outcome_group
-from truman.domain.runs import RunStatus, run_status
+from yaksha.domain.conversations import ConversationStatus, EndReason, OutcomeGroup, outcome_group
+from yaksha.domain.runs import RunStatus, run_status
 
 FAILED = {
     None: OutcomeGroup.ERROR,

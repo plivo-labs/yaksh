@@ -7,14 +7,14 @@ from httpx import AsyncClient
 from sqlalchemy import func, select, update
 
 from tests.conftest import Db, claim, eventually, expire_leases, finish, new_run, reap
-from truman.config import Settings
-from truman.db.models import Conversation, Evaluation, MetricValue
-from truman.domain.conversations import CallOutcome, EndReason, Transcript, WireEvent, WireEventKind
-from truman.domain.evaluations import EvaluationState, Metric, MetricKey
-from truman.domain.latency import CallerReplyWindow
-from truman.evaluation import evaluations
-from truman.evaluation.evaluations import MAX_ATTEMPTS, Evaluated
-from truman.worker.evaluator import Evaluator
+from yaksha.config import Settings
+from yaksha.db.models import Conversation, Evaluation, MetricValue
+from yaksha.domain.conversations import CallOutcome, EndReason, Transcript, WireEvent, WireEventKind
+from yaksha.domain.evaluations import EvaluationState, Metric, MetricKey
+from yaksha.domain.latency import CallerReplyWindow
+from yaksha.evaluation import evaluations
+from yaksha.evaluation.evaluations import MAX_ATTEMPTS, Evaluated
+from yaksha.worker.evaluator import Evaluator
 
 HUNG_UP = CallOutcome(connected=True, end_reason=EndReason.AGENT_HANGUP)
 RATE = 8000

@@ -25,9 +25,9 @@ from pipecat.turns.user_stop import SpeechTimeoutUserTurnStopStrategy
 from pipecat.turns.user_turn_strategies import UserTurnStrategies
 
 from tests.conftest import FakeProvider, make_settings
-from truman.caller import pipeline
-from truman.caller.audio import Clock
-from truman.caller.pipeline import (
+from yaksha.caller import pipeline
+from yaksha.caller.audio import Clock
+from yaksha.caller.pipeline import (
     CallState,
     Ending,
     Persona,
@@ -35,9 +35,9 @@ from truman.caller.pipeline import (
     llm_service,
     watch_silence,
 )
-from truman.caller.transcript import TranscriptBuilder
-from truman.config import Settings
-from truman.domain.conversations import CallObserver, CallRequest, EndReason, WireEvent
+from yaksha.caller.transcript import TranscriptBuilder
+from yaksha.config import Settings
+from yaksha.domain.conversations import CallObserver, CallRequest, EndReason, WireEvent
 
 KEYS = ("deepgram_api_key", "elevenlabs_api_key", "openai_api_key")
 

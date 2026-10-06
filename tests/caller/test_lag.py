@@ -1,7 +1,7 @@
 import asyncio
 import time
 
-from truman.caller.lag import LagSampler
+from yaksha.caller.lag import LagSampler
 
 
 class Clock:

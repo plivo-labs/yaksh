@@ -3,7 +3,7 @@ title: Background noise
 description: Mix background noise into the audio of the caller.
 ---
 
-A persona can have background noise. The noise plays for the full call, also when the caller does not speak. The recording includes the noise. The speech to text of Truman hears only the agent. Thus, the noise changes only the audio that the agent hears.
+A persona can have background noise. The noise plays for the full call, also when the caller does not speak. The recording includes the noise. The speech to text of Yaksha hears only the agent. Thus, the noise changes only the audio that the agent hears.
 
 | Field | Values |
 | --- | --- |
@@ -12,6 +12,6 @@ A persona can have background noise. The noise plays for the full call, also whe
 
 If you set `background_noise` when you start a conversation, the conversation uses it and not the setting of the persona. For example, use `{"sound": "none"}` for no noise, or `{"sound": "street", "level": "loud"}`. Always set `sound`, because a setting without `sound` plays no noise. With the CLI, always give `--noise-sound`. To use the setting of the persona, do not send `background_noise`.
 
-Truman keeps the setting when it makes the conversation, and a retry uses the same setting. A run can use one background noise setting for all its conversations. Refer to [Runs](/docs/runs).
+Yaksha keeps the setting when it makes the conversation, and a retry uses the same setting. A run can use one background noise setting for all its conversations. Refer to [Runs](/docs/runs).
 
-The sound files are loops in `src/truman/simulation/sounds/`. The README in that folder gives the prompts and the steps for each file.
+The sound files are loops in `src/yaksha/simulation/sounds/`. The README in that folder gives the prompts and the steps for each file.

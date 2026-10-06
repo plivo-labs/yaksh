@@ -8,7 +8,7 @@ from httpx import AsyncClient
 from sqlalchemy import func, select, update
 
 from tests.conftest import (
-    TRUMAN_FAILED,
+    YAKSHA_FAILED,
     Db,
     FakeCaller,
     checked_counts,
@@ -21,9 +21,9 @@ from tests.conftest import (
     wait_for_lock_waiters,
     wait_for_run,
 )
-from truman.config import Settings
-from truman.db.models import Conversation, Run, Scenario
-from truman.worker.worker import Worker
+from yaksha.config import Settings
+from yaksha.db.models import Conversation, Run, Scenario
+from yaksha.worker.worker import Worker
 
 ATTEMPT = {"id", "status", "attempt", "retry_of", "created_at"}
 """The columns that name an attempt."""
@@ -150,7 +150,7 @@ async def test_a_result_write_that_outlived_its_lease_and_the_reapers_make_one_r
     async with db() as holder:
         await holder.get_one(Run, uuid.UUID(run["id"]), with_for_update=True)
         if write_first:
-            writing = asyncio.create_task(finish(db, late, TRUMAN_FAILED))
+            writing = asyncio.create_task(finish(db, late, YAKSHA_FAILED))
             await wait_for_lock_waiters(db, 1)
             await asyncio.sleep(1.5)
             reaping = [asyncio.create_task(reap(db)) for _ in range(2)]
@@ -158,7 +158,7 @@ async def test_a_result_write_that_outlived_its_lease_and_the_reapers_make_one_r
             await asyncio.sleep(1.5)
             reaping = [asyncio.create_task(reap(db)) for _ in range(2)]
             await wait_for_lock_waiters(db, 2)
-            writing = asyncio.create_task(finish(db, late, TRUMAN_FAILED))
+            writing = asyncio.create_task(finish(db, late, YAKSHA_FAILED))
         await wait_for_lock_waiters(db, 3)
         await holder.rollback()
     recorded = await asyncio.wait_for(writing, 10)
@@ -185,7 +185,7 @@ async def test_a_retry_and_an_edit_of_its_scenario_at_the_same_moment_both_go_th
             )
         )
         await wait_for_lock_waiters(db, 1)
-        recording = asyncio.create_task(finish(db, queued["id"], TRUMAN_FAILED))
+        recording = asyncio.create_task(finish(db, queued["id"], YAKSHA_FAILED))
         await wait_for_lock_waiters(db, 2)
         await holder.rollback()
     edited, recorded = await asyncio.wait_for(asyncio.gather(editing, recording), 10)
@@ -201,8 +201,8 @@ async def test_the_reaper_makes_the_retry_when_every_result_write_fails(
     async def broken(*args: Any, **kwargs: Any) -> bool:
         raise RuntimeError("connection reset")
 
-    monkeypatch.setattr("truman.simulation.conversations.finalize", broken)
-    monkeypatch.setattr("truman.worker.worker.FINALIZE_RETRY_S", 0.05)
+    monkeypatch.setattr("yaksha.simulation.conversations.finalize", broken)
+    monkeypatch.setattr("yaksha.worker.worker.FINALIZE_RETRY_S", 0.05)
     run = await new_run(client)
 
     await wait_for_run(client, run["id"], "done", timeout=settings.worker_lease_s * 3 + 5)
@@ -229,7 +229,7 @@ async def test_a_retry_and_a_cancel_at_the_same_moment_leave_nothing_queued(
         if path == "reaper":
             return asyncio.create_task(reap(db))
         assert conversation is not None
-        return asyncio.create_task(finish(db, conversation, TRUMAN_FAILED))
+        return asyncio.create_task(finish(db, conversation, YAKSHA_FAILED))
 
     async with db() as holder:
         await holder.get_one(Run, uuid.UUID(run["id"]), with_for_update=True)

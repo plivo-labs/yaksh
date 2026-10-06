@@ -15,8 +15,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/plivo-labs/truman/cli/internal/config"
-	"github.com/plivo-labs/truman/cli/skill"
+	"github.com/plivo-labs/yaksha/cli/internal/config"
+	"github.com/plivo-labs/yaksha/cli/skill"
 )
 
 const (
@@ -112,7 +112,7 @@ func run(t *testing.T, ctx context.Context, vars map[string]string, stdin string
 }
 
 func against(f *fakeAPI) map[string]string {
-	return map[string]string{"TRUMAN_URL": f.URL, "TRUMAN_API_TOKEN": "t0k"}
+	return map[string]string{"YAKSHA_URL": f.URL, "YAKSHA_API_TOKEN": "t0k"}
 }
 
 func TestAgentListPrintsTheServersJSON(t *testing.T) {
@@ -179,11 +179,11 @@ func TestErrorsSayTheNextStep(t *testing.T) {
 		args []string
 		want string
 	}{
-		{"no server", map[string]string{}, []string{"agent", "list"}, `no Truman server: run "truman auth login" or set TRUMAN_URL`},
-		{"wrong token", against(refuses), []string{"agent", "list"}, `the token is wrong: run "truman auth login" or set TRUMAN_API_TOKEN`},
+		{"no server", map[string]string{}, []string{"agent", "list"}, `no Yaksha server: run "yaksha auth login" or set YAKSHA_URL`},
+		{"wrong token", against(refuses), []string{"agent", "list"}, `the token is wrong: run "yaksha auth login" or set YAKSHA_API_TOKEN`},
 		{"server message", against(missing), []string{"agent", "view", agentID}, "404 Not Found: agent not found"},
-		{"server down", map[string]string{"TRUMAN_URL": stopped.URL}, []string{"agent", "list"}, "cannot reach " + stopped.URL},
-		{"bad agent ID", against(missing), []string{"agent", "view", "support-line"}, `"support-line" is not an agent ID: find it with "truman agent list"`},
+		{"server down", map[string]string{"YAKSHA_URL": stopped.URL}, []string{"agent", "list"}, "cannot reach " + stopped.URL},
+		{"bad agent ID", against(missing), []string{"agent", "view", "support-line"}, `"support-line" is not an agent ID: find it with "yaksha agent list"`},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -203,7 +203,7 @@ func TestRunStartSendsOnlyTheFieldsThatWereSet(t *testing.T) {
 		"run", "start", "--agent", agentID, "--scenario", scenA+","+scenB, "--repeats", "2",
 		"--noise-sound", "cafe", "--idempotency-key", "ci-41")
 
-	if code != 0 || !strings.Contains(stdout, `"status": "queued"`) || stderr != "next: truman run wait "+runID+"\n" {
+	if code != 0 || !strings.Contains(stdout, `"status": "queued"`) || stderr != "next: yaksha run wait "+runID+"\n" {
 		t.Fatalf("code = %d, stdout = %q, stderr = %q", code, stdout, stderr)
 	}
 	req := f.requests("POST", "/api/v1/runs")[0]
@@ -307,7 +307,7 @@ func TestRunWaitWaitsForTheJudgesAndFailsUnlessTheyPassEveryCall(t *testing.T) {
 	code, _, stderr := run(t, context.Background(), against(f), "", "run", "wait", runID)
 
 	want := "failed: run " + runID + " done: 3 of 3 calls completed; judges: 1 pass, 1 not scored, 1 evaluation failed\n" +
-		"next: truman run metrics " + runID + "\n"
+		"next: yaksha run metrics " + runID + "\n"
 	if code != 1 || !strings.HasSuffix(stderr, want) || len(f.requests("GET", "/api/v1/runs/"+runID+"/metrics")) != 2 {
 		t.Fatalf("code = %d, stderr = %q; want 1, two reads of the metrics and %q", code, stderr, want)
 	}
@@ -320,7 +320,7 @@ func TestRunWaitFailsAndSaysWhatToRunNext(t *testing.T) {
 	code, stdout, stderr := run(t, context.Background(), against(f), "", "run", "wait", runID)
 
 	want := "failed: run " + runID + " done: 3 of 4 calls completed, 1 did not connect\n" +
-		"next: truman conversation list --run " + runID + " --latest-attempts --group error,did_not_connect\n"
+		"next: yaksha conversation list --run " + runID + " --latest-attempts --group error,did_not_connect\n"
 	if code != 1 || !strings.Contains(stdout, `"status": "done"`) || stderr != want {
 		t.Fatalf("code = %d, stdout = %q, stderr = %q", code, stdout, stderr)
 	}
@@ -374,7 +374,7 @@ func TestRunStartWaitKeepsTheRunWhenReadingItFails(t *testing.T) {
 	})
 	code, _, stderr := run(t, context.Background(), against(f), "", "run", "start", "--agent", agentID, "--scenario", scenA, "--wait")
 
-	for _, want := range []string{"run " + runID + " started", "could not read run " + runID, "next: truman run wait " + runID} {
+	for _, want := range []string{"run " + runID + " started", "could not read run " + runID, "next: yaksha run wait " + runID} {
 		if code != 1 || !strings.Contains(stderr, want) {
 			t.Fatalf("code = %d, stderr = %q; want %q", code, stderr, want)
 		}
@@ -425,7 +425,7 @@ func TestRunCancelSaysWhatToRunNextWhenTheWaitEnds(t *testing.T) {
 			})
 			code, _, stderr := run(t, tt.ctx, against(f), "", "run", "cancel", runID)
 
-			for _, want := range []string{tt.want, "the cancel was sent", "next: truman run cancel " + runID} {
+			for _, want := range []string{tt.want, "the cancel was sent", "next: yaksha run cancel " + runID} {
 				if code != 1 || !strings.Contains(stderr, want) {
 					t.Fatalf("code = %d, stderr = %q; want %q", code, stderr, want)
 				}
@@ -445,8 +445,8 @@ func TestConversationStartWaitPrintsEachEventThenTheConversation(t *testing.T) {
 		next                                string
 	}{
 		{"passed", "completed", "caller_hangup", judged("pass"), 0, ""},
-		{"not scored", "completed", "caller_hangup", judged("not_scored"), 1, "truman conversation evaluation " + convID},
-		{"call failed", "failed", "no_answer", "", 1, "truman conversation view " + convID},
+		{"not scored", "completed", "caller_hangup", judged("not_scored"), 1, "yaksha conversation evaluation " + convID},
+		{"call failed", "failed", "no_answer", "", 1, "yaksha conversation view " + convID},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			conversation := fmt.Sprintf(`{"id":"%s","status":"%s","end_reason":"%s"}`, convID, tt.status, tt.endReason)
@@ -503,7 +503,7 @@ func TestConversationStartWaitKeepsACallStartedWhileStopping(t *testing.T) {
 	})
 	code, _, stderr := run(t, ctx, against(f), "", "conversation", "start", "--agent", agentID, "--scenario", scenA, "--wait")
 
-	for _, want := range []string{"conversation " + convID + " started", "the call goes on", "next: truman conversation view " + convID} {
+	for _, want := range []string{"conversation " + convID + " started", "the call goes on", "next: yaksha conversation view " + convID} {
 		if code != 1 || !strings.Contains(stderr, want) {
 			t.Fatalf("code = %d, stderr = %q; want %q", code, stderr, want)
 		}
@@ -518,7 +518,7 @@ func TestConversationStartWaitKeepsTheIDWhenTheLastReadFails(t *testing.T) {
 	})
 	code, _, stderr := run(t, context.Background(), against(f), "", "conversation", "start", "--agent", agentID, "--scenario", scenA, "--wait")
 
-	if code != 1 || !strings.Contains(stderr, "could not read conversation "+convID) || !strings.Contains(stderr, "next: truman conversation view "+convID) {
+	if code != 1 || !strings.Contains(stderr, "could not read conversation "+convID) || !strings.Contains(stderr, "next: yaksha conversation view "+convID) {
 		t.Fatalf("code = %d, stderr = %q", code, stderr)
 	}
 }
@@ -555,7 +555,7 @@ func TestAuthLoginSavesNothingWhenTheServerRefusesTheToken(t *testing.T) {
 	if code != 1 || !strings.Contains(stderr, "nothing was saved") {
 		t.Fatalf("code = %d, stderr = %q", code, stderr)
 	}
-	if _, err := os.Stat(home + "/.config/truman/config.json"); !os.IsNotExist(err) {
+	if _, err := os.Stat(home + "/.config/yaksha/config.json"); !os.IsNotExist(err) {
 		t.Fatalf("a config file exists: %v", err)
 	}
 }
@@ -582,7 +582,7 @@ func TestAuthStatusThenLogout(t *testing.T) {
 		t.Fatalf("logout: code = %d, stderr = %q", code, stderr)
 	}
 	code, _, stderr = run(t, context.Background(), vars, "", "auth", "status")
-	if code != 1 || !strings.Contains(stderr, "no Truman server") {
+	if code != 1 || !strings.Contains(stderr, "no Yaksha server") {
 		t.Fatalf("status after logout: code = %d, stderr = %q", code, stderr)
 	}
 }
@@ -602,12 +602,12 @@ func TestCheckServer(t *testing.T) {
 		warns   bool
 		refused bool
 	}{
-		{"https://truman.example.com", false, false},
+		{"https://yaksha.example.com", false, false},
 		{"http://localhost:8000", false, false},
 		{"http://127.0.0.1:8000", false, false},
-		{"http://truman.example.com", true, false},
-		{"truman.example.com", false, true},
-		{"ftp://truman.example.com", false, true},
+		{"http://yaksha.example.com", true, false},
+		{"yaksha.example.com", false, true},
+		{"ftp://yaksha.example.com", false, true},
 	}
 	for _, tt := range tests {
 		warning, err := checkServer(tt.server)

@@ -1,4 +1,8 @@
-<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-<rect width="32" height="32" rx="4" fill="#000"/>
-<path d="M16.00 3.30Q17.20 10.95 24.60 12.20Q21.40 12.72 19.36 14.40Q18.70 15.00 18.70 15.90V21.20Q18.70 23.3 20.80 23.3H23.60Q24.1 23.3 24.1 23.80V27.70Q24.1 28.2 23.60 28.2H20.00Q13.30 28.2 13.30 21.50V15.90Q13.30 15.00 12.64 14.40Q10.60 12.72 7.40 12.20Q14.80 10.95 16.00 3.30Z" fill="#fff"/>
+<svg width="32" height="32" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+<rect width="100" height="100" rx="12.5" fill="#000"/>
+<g stroke="#fff" stroke-linejoin="round">
+<path d="M50 12C60 17 71 19 82 19V46C82 68 68 82 50 90C32 82 18 68 18 46V19C29 19 40 17 50 12Z" transform="translate(50 51) scale(.92) translate(-50 -51)" stroke-width="5.4" opacity=".45"/>
+<path d="M50 12C60 17 71 19 82 19V46C82 68 68 82 50 90C32 82 18 68 18 46V19C29 19 40 17 50 12Z" transform="translate(50 51) scale(.62) translate(-50 -51)" stroke-width="8"/>
+</g>
+<path d="M50 12C60 17 71 19 82 19V46C82 68 68 82 50 90C32 82 18 68 18 46V19C29 19 40 17 50 12Z" transform="translate(50 51) scale(.32) translate(-50 -51)" fill="#fff"/>
 </svg>

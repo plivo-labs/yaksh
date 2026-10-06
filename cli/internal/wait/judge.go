@@ -8,7 +8,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/plivo-labs/truman/cli/internal/api"
+	"github.com/plivo-labs/yaksha/cli/internal/api"
 )
 
 // Verdicts is a run's metrics as the server last sent them.

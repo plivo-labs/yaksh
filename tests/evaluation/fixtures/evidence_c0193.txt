@@ -11,11 +11,11 @@ DATE
 Today is Thursday, 1 October 2026. Time zone: America/New_York.
 
 CALL FACTS
-Truman called the agent at +15550100 from +15550177.
+Yaksha called the agent at +15550100 from +15550177.
 The agent hung up (Plivo hangup source: Callee). End reason: agent_hangup. Call length: 45.3 s.
 
 TRANSCRIPT
-The agent's lines are Truman's speech-to-text of the agent's audio. Judge what was said, not the spelling: "for" can mean "four", and "to" can mean "two".
+The agent's lines are Yaksha's speech-to-text of the agent's audio. Judge what was said, not the spelling: "for" can mean "four", and "to" can mean "two".
 [1] Agent: Thanks for calling Maple Dental, this is Ava. How can I help you today?
 [2] Caller: Hi, I'd like to book a cleaning for next Tuesday afternoon. I'm a new patient.
 [3] Agent: Sure, I can help with that. Can I have your full name and date of birth?

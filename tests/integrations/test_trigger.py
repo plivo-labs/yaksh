@@ -10,9 +10,9 @@ from aiohttp.abc import AbstractResolver, ResolveResult
 from fastapi import FastAPI, Request, Response
 from fastapi.responses import RedirectResponse, StreamingResponse
 
-from truman.caller.plivo_server import PlivoServer
-from truman.domain.triggers import RenderedTrigger
-from truman.integrations.trigger import (
+from yaksha.caller.plivo_server import PlivoServer
+from yaksha.domain.triggers import RenderedTrigger
+from yaksha.integrations.trigger import (
     PublicOnlyResolver,
     TriggerResult,
     is_public,
@@ -89,13 +89,13 @@ async def test_a_delivered_trigger_carries_its_delivery_id_and_signature(
     )
 
     headers = seen[0].headers
-    timestamp = headers["x-truman-timestamp"]
+    timestamp = headers["x-yaksha-timestamp"]
     expected = hmac.new(b"signing", f"conv-1.{timestamp}.".encode() + BODY, hashlib.sha256)
     assert outcome.result is TriggerResult.DELIVERED
     assert outcome.detail == 'HTTP 200: {"id": "call-9", "echo": "Bearer [secret]"}'
-    assert headers["x-truman-delivery"] == "conv-1"
+    assert headers["x-yaksha-delivery"] == "conv-1"
     assert headers["content-type"] == "application/json"
-    assert headers["x-truman-signature"] == f"v1={expected.hexdigest()}"
+    assert headers["x-yaksha-signature"] == f"v1={expected.hexdigest()}"
 
 
 @pytest.mark.parametrize(

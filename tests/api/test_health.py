@@ -1,8 +1,8 @@
 from httpx import ASGITransport, AsyncClient
 
-from truman import __version__
-from truman.api import create_app
-from truman.config import Settings
+from yaksha import __version__
+from yaksha.api import create_app
+from yaksha.config import Settings
 
 
 async def test_health_reports_ok_and_version_without_a_token(offline_settings: Settings) -> None:

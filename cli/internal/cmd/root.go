@@ -1,4 +1,4 @@
-// Package cmd holds the truman commands. A command reads its flags, makes one API call, and
+// Package cmd holds the yaksha commands. A command reads its flags, makes one API call, and
 // prints the server's JSON on stdout. Progress, hints and errors go to stderr.
 package cmd
 
@@ -19,11 +19,11 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 
-	"github.com/plivo-labs/truman/cli/internal/api"
-	"github.com/plivo-labs/truman/cli/internal/config"
+	"github.com/plivo-labs/yaksha/cli/internal/api"
+	"github.com/plivo-labs/yaksha/cli/internal/config"
 )
 
-var errNoServer = errors.New(`no Truman server: run "truman auth login" or set TRUMAN_URL`)
+var errNoServer = errors.New(`no Yaksha server: run "yaksha auth login" or set YAKSHA_URL`)
 
 // pollInterval is the time between two reads of a run.
 const pollInterval = 5 * time.Second
@@ -47,9 +47,9 @@ func Execute(
 
 func (a *app) execute(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	root := &cobra.Command{
-		Use:           "truman",
-		Short:         "Command-line client for a Truman server",
-		Long:          "Command-line client for a Truman server. Coding agents: run \"truman guide\" first.",
+		Use:           "yaksha",
+		Short:         "Command-line client for a Yaksha server",
+		Long:          "Command-line client for a Yaksha server. Coding agents: run \"yaksha guide\" first.",
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}
@@ -86,7 +86,7 @@ func (a *app) client() (*api.Client, error) {
 }
 
 func (a *app) userAgent() string {
-	return "truman-cli/" + a.version
+	return "yaksha-cli/" + a.version
 }
 
 // nextStep is an error whose message ends with the command to run next.
@@ -108,7 +108,7 @@ func describe(err error) string {
 	var urlErr *url.Error
 	switch {
 	case errors.As(err, &apiErr) && apiErr.Status == http.StatusUnauthorized:
-		return `the token is wrong: run "truman auth login" or set TRUMAN_API_TOKEN`
+		return `the token is wrong: run "yaksha auth login" or set YAKSHA_API_TOKEN`
 	case errors.As(err, &urlErr) && !errors.Is(err, context.Canceled):
 		return fmt.Sprintf("cannot reach %s: is the server running? (%v)", urlErr.URL, urlErr.Err)
 	}
@@ -142,7 +142,7 @@ func changed[T any](cmd *cobra.Command, flag string, v T) *T {
 func parseID(kind, value string) (uuid.UUID, error) {
 	id, err := uuid.Parse(value)
 	if err != nil {
-		return uuid.Nil, fmt.Errorf(`%q is not a%s %s ID: find it with "truman %s list"`,
+		return uuid.Nil, fmt.Errorf(`%q is not a%s %s ID: find it with "yaksha %s list"`,
 			value, article(kind), kind, kind)
 	}
 	return id, nil

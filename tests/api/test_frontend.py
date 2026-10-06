@@ -3,8 +3,8 @@ from pathlib import Path
 
 from httpx import ASGITransport, AsyncClient
 
-from truman.api import create_app
-from truman.config import Settings
+from yaksha.api import create_app
+from yaksha.config import Settings
 
 SettingsFactory = Callable[..., Settings]
 

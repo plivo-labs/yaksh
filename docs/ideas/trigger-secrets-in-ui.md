@@ -2,7 +2,7 @@
 
 ## Problem
 
-Trigger secrets come from `TRUMAN_TRIGGER_*` environment variables. A new or changed secret needs a `.env` edit and a worker restart.
+Trigger secrets come from `YAKSHA_TRIGGER_*` environment variables. A new or changed secret needs a `.env` edit and a worker restart.
 
 ## Idea
 

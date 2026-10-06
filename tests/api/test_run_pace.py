@@ -22,10 +22,10 @@ from tests.conftest import (
     wait_for,
     wait_for_lock_waiters,
 )
-from truman.db.models import Conversation, PhoneNumber, Run
-from truman.domain.conversations import ConversationStatus, EndReason
-from truman.simulation import conversations, numbers
-from truman.worker.worker import Worker
+from yaksha.db.models import Conversation, PhoneNumber, Run
+from yaksha.domain.conversations import ConversationStatus, EndReason
+from yaksha.simulation import conversations, numbers
+from yaksha.worker.worker import Worker
 
 
 async def queue_of(client: AsyncClient, run: dict[str, Any]) -> list[str]:
@@ -128,7 +128,7 @@ async def test_cancelling_a_run_cancels_its_queue_and_ends_its_live_call(
         await recording.wait()
         return await record(*args, **kwargs)
 
-    monkeypatch.setattr("truman.simulation.conversations.finalize", held)
+    monkeypatch.setattr("yaksha.simulation.conversations.finalize", held)
     caller.release.clear()
     run = await new_run(client, repeats=3, max_parallel=1)
     live = (await queue_of(client, run))[0]

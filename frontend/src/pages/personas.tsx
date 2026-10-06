@@ -64,7 +64,7 @@ export function PersonasPage() {
             </EmptyMedia>
             <EmptyTitle>No personas</EmptyTitle>
             <EmptyDescription>
-              A persona is the caller that Truman plays: how it behaves and which voice it uses.
+              A persona is the caller that Yaksha plays: how it behaves and which voice it uses.
             </EmptyDescription>
           </EmptyHeader>
           <EmptyContent>

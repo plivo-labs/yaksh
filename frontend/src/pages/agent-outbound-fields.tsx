@@ -15,7 +15,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { type OutboundDraft, outboundProblems } from "@/lib/outbound";
 import type { Header } from "@/lib/types";
 
-/** The start request's fields: what Truman sends, and how it accepts the agent's call. */
+/** The start request's fields: what Yaksha sends, and how it accepts the agent's call. */
 export function OutboundFields({
   draft,
   onChange,
@@ -72,7 +72,7 @@ export function OutboundFields({
                     />
                     <Input
                       aria-label={`Header ${index + 1} value`}
-                      placeholder="Bearer {{env.TRUMAN_TRIGGER_KEY}}"
+                      placeholder="Bearer {{env.YAKSHA_TRIGGER_KEY}}"
                       className="flex-1 font-mono text-xs-400"
                       value={header.value}
                       onChange={(e) => setHeader(index, { value: e.target.value })}
@@ -121,10 +121,10 @@ export function OutboundFields({
               <FieldError id="trigger_body-error">{problems.body}</FieldError>
             ) : (
               <FieldDescription>
-                Use these inside string values and header values: <code>{"{{truman.number}}"}</code>{" "}
-                (the number to call), <code>{"{{truman.conversation_id}}"}</code>,{" "}
+                Use these inside string values and header values: <code>{"{{yaksha.number}}"}</code>{" "}
+                (the number to call), <code>{"{{yaksha.conversation_id}}"}</code>,{" "}
                 <code>{"{{agent_data.<name>}}"}</code> (from the scenario) and{" "}
-                <code>{"{{env.TRUMAN_TRIGGER_<NAME>}}"}</code> (a secret in Truman's environment).
+                <code>{"{{env.YAKSHA_TRIGGER_<NAME>}}"}</code> (a secret in Yaksha's environment).
               </FieldDescription>
             )}
           </Field>
@@ -198,7 +198,7 @@ export function OutboundFields({
             {problems.dial_window ? (
               <FieldError id="dial_window-error">{problems.dial_window}</FieldError>
             ) : (
-              <FieldDescription>How long Truman waits for the agent to call.</FieldDescription>
+              <FieldDescription>How long Yaksha waits for the agent to call.</FieldDescription>
             )}
           </Field>
         </div>

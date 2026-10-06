@@ -1,6 +1,6 @@
 import pytest
 
-from truman.integrations.plivo_signature import is_signed
+from yaksha.integrations.plivo_signature import is_signed
 
 TOKEN = "test-auth-token"
 CALL = {"To": ["+15716535187"], "From": ["+19153188577"], "CallUUID": ["abc-123"]}
@@ -11,31 +11,31 @@ CALL = {"To": ["+15716535187"], "From": ["+19153188577"], "CallUUID": ["abc-123"
     [
         (
             "POST",
-            "https://truman.example/incoming",
+            "https://yaksha.example/incoming",
             CALL,
             "nonce-4",
-            "96J2SSsDEPuRMtYWF6hm1j/jrUiX8Iebp0QqFe/eqDQ=",
+            "LgfIyefhTWH8KWP1wOfvtX+msnGuqFS5Z1MJiQNdbn8=",
         ),
         (
             "POST",
-            "https://truman.example/answer/7f2c?x=1#rc=5",
+            "https://yaksha.example/answer/7f2c?x=1#rc=5",
             {**CALL, "Direction": ["inbound"]},
             "nonce-1",
-            "yQtkmaKQ1rKPrcOOLfi0X8aM9ZYJdqV+r+le8UP3RoA=",
+            "wPk3Z0e7UMwkSp2bkITZXpKBYdPL27jSZ1FfQ53C6vY=",
         ),
         (
             "POST",
-            "https://truman.example/callbacks/7f2c",
+            "https://yaksha.example/callbacks/7f2c",
             {},
             "n3",
-            "mzVaShXAb+ujoHh7iF5tI+D4q77ABlIrTAJdkxTP+eY=",
+            "/OpVCWLzL44XIshc0Suq5DN0UzuZ9Q9fJcem9Dekl1I=",
         ),
         (
             "GET",
-            "wss://truman.example/stream/7f2c",
+            "wss://yaksha.example/stream/7f2c",
             {},
             "nonce-2",
-            "d9TyhdfDqqrCSHpGC+UdPqXsot647gU3YA14d5r2Srs=",
+            "3+S2U/IlfB5i0N8o5sMwQgEKvqjTHo+w6eHNR92+1wA=",
         ),
     ],
     ids=["webhook", "query and fragment", "no fields", "websocket upgrade"],
@@ -51,8 +51,8 @@ def test_signatures_computed_by_the_plivo_sdk_are_accepted(
 
 
 def test_any_listed_signature_from_either_header_is_accepted() -> None:
-    url = "https://truman.example/incoming"
-    good = "96J2SSsDEPuRMtYWF6hm1j/jrUiX8Iebp0QqFe/eqDQ="
+    url = "https://yaksha.example/incoming"
+    good = "LgfIyefhTWH8KWP1wOfvtX+msnGuqFS5Z1MJiQNdbn8="
 
     main_account = {"x-plivo-signature-v3-nonce": "nonce-4", "x-plivo-signature-ma-v3": good}
     rotated = {"x-plivo-signature-v3-nonce": "nonce-4", "x-plivo-signature-v3": f"old, {good}"}
@@ -64,8 +64,8 @@ def test_any_listed_signature_from_either_header_is_accepted() -> None:
 
 
 def test_a_malformed_signature_is_refused_without_hiding_a_valid_one() -> None:
-    url = "https://truman.example/incoming"
-    good = "96J2SSsDEPuRMtYWF6hm1j/jrUiX8Iebp0QqFe/eqDQ="
+    url = "https://yaksha.example/incoming"
+    good = "LgfIyefhTWH8KWP1wOfvtX+msnGuqFS5Z1MJiQNdbn8="
     garbled = {"x-plivo-signature-v3-nonce": "nonce-4", "x-plivo-signature-v3": "\xff"}
 
     assert not is_signed(garbled, TOKEN, "POST", url, CALL)

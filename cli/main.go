@@ -1,4 +1,4 @@
-// Command truman is the command-line client for a Truman server.
+// Command yaksha is the command-line client for a Yaksha server.
 package main
 
 import (
@@ -7,7 +7,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/plivo-labs/truman/cli/internal/cmd"
+	"github.com/plivo-labs/yaksha/cli/internal/cmd"
 )
 
 // version is set at build time with -ldflags "-X main.version=0.4.2". A build without it is dev.

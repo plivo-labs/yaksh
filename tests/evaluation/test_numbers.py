@@ -1,7 +1,7 @@
 import pytest
 
-from truman.domain.evaluations import Verdict
-from truman.evaluation.numbers import (
+from yaksha.domain.evaluations import Verdict
+from yaksha.evaluation.numbers import (
     ScenarioResults,
     coverage,
     inconsistent,

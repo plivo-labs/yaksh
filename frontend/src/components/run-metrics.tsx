@@ -98,7 +98,7 @@ export function RunMetricsPanel({ runId, active }: { runId: string; active: bool
         </Stat>
         <Stat
           label="Connected"
-          hint="Calls where Truman and the agent were on the line together."
+          hint="Calls where Yaksha and the agent were on the line together."
           value={
             <>
               {overall.connected.count}
@@ -116,8 +116,8 @@ export function RunMetricsPanel({ runId, active }: { runId: string; active: bool
           />
           <p className="text-xs-400 text-muted-foreground">
             {overall.errors_before_connect > 0
-              ? `${counted(overall.errors_before_connect, "Truman error", "Truman errors")} before connecting.`
-              : "No Truman error before connecting."}
+              ? `${counted(overall.errors_before_connect, "Yaksha error", "Yaksha errors")} before connecting.`
+              : "No Yaksha error before connecting."}
           </p>
         </Stat>
         <Stat

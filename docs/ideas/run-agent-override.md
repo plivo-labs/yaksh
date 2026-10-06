@@ -9,7 +9,7 @@ A user wants to test a change before it replaces what the agent record points to
 - A run tests the agent as it is saved: the current agent version, with its number or start request, direction and context.
 - The agent version holds the target. What a conversation called is exactly what its pinned version says.
 - `POST /agents/{id}/duplicate` copies an agent. The way to test another target is to duplicate the agent, change the copy, and run the copy.
-- Truman cannot change the version inside the user's own voice platform. It can only call what the agent record points to.
+- Yaksha cannot change the version inside the user's own voice platform. It can only call what the agent record points to.
 
 ## Idea
 
@@ -22,4 +22,4 @@ A user wants to test a change before it replaces what the agent record points to
 - Is duplicating the agent enough, so only (1) is needed?
 - For (2): a run variant version, or a stored override on each conversation?
 - Which parts may change for one run: the number, the start request URL, headers, body?
-- May an override change the direction (Truman calls, or the agent calls)? Proposal: no.
+- May an override change the direction (Yaksha calls, or the agent calls)? Proposal: no.

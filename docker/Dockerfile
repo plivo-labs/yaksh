@@ -21,21 +21,21 @@ RUN --mount=type=cache,target=/root/.cache/uv uv sync --locked --no-dev --no-edi
 
 FROM backend AS dev
 RUN --mount=type=cache,target=/root/.cache/uv uv sync --locked
-ENV PATH="/app/.venv/bin:$PATH" TRUMAN_API_HOST=0.0.0.0
-CMD ["truman-server", "api", "--reload"]
+ENV PATH="/app/.venv/bin:$PATH" YAKSHA_API_HOST=0.0.0.0
+CMD ["yaksha-server", "api", "--reload"]
 
 FROM python:3.14-slim-trixie
-RUN groupadd --system truman && useradd --system --gid truman --home-dir /app truman \
-    && mkdir -p /app/data && chown truman:truman /app/data
+RUN groupadd --system yaksha && useradd --system --gid yaksha --home-dir /app yaksha \
+    && mkdir -p /app/data && chown yaksha:yaksha /app/data
 WORKDIR /app
-COPY --from=backend --chown=truman:truman /app/.venv ./.venv
-COPY --from=frontend --chown=truman:truman /build/dist ./frontend/dist
+COPY --from=backend --chown=yaksha:yaksha /app/.venv ./.venv
+COPY --from=frontend --chown=yaksha:yaksha /build/dist ./frontend/dist
 ENV PATH="/app/.venv/bin:$PATH" \
-    TRUMAN_API_HOST=0.0.0.0 \
-    TRUMAN_API_PORT=8000 \
-    TRUMAN_FRONTEND_DIST=/app/frontend/dist
-USER truman
+    YAKSHA_API_HOST=0.0.0.0 \
+    YAKSHA_API_PORT=8000 \
+    YAKSHA_FRONTEND_DIST=/app/frontend/dist
+USER yaksha
 EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health')"
-CMD ["truman-server", "api"]
+CMD ["yaksha-server", "api"]

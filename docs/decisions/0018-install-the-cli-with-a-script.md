@@ -5,19 +5,19 @@ Status: accepted; not built yet
 
 ## Decision
 
-- Users install the CLI with `curl -fsSL https://raw.githubusercontent.com/plivo-labs/truman/main/install.sh | bash`. The script is at the root of the repo on `main`; later it moves to our own domain. The CLI has no package on PyPI or npm.
+- Users install the CLI with `curl -fsSL https://raw.githubusercontent.com/plivo-labs/yaksha/main/install.sh | bash`. The script is at the root of the repo on `main`; later it moves to our own domain. The CLI has no package on PyPI or npm.
 - Each version tag builds the CLI for macOS and Linux with GoReleaser, and publishes the server's container image. Windows comes later.
 - Versions stay on 0.x (commitizen `major_version_zero`).
 - macOS builds get an ad-hoc signature. There is no notarization for now.
 - During the beta, the CLI always changes itself to the newest release of the server's 0.x: it updates when the server's 0.x differs, checks once a day for a newer patch, and goes down to an older server's 0.x. There is no pinning. A CLI built from source never changes itself.
-- Coding agents install the skill with `npx skills add plivo-labs/truman`. `truman guide` prints the skill that matches the binary.
+- Coding agents install the skill with `npx skills add plivo-labs/yaksha`. `yaksha guide` prints the skill that matches the binary.
 - The README gives a prompt that a user pastes into a coding agent: install the CLI with the script, install the skill, and follow it.
 
 ## Why
 
 - A script needs no package manager, and it works the same on a laptop and in CI.
-- Truman is self-hosted, so each user runs a server at its own version. A CLI that follows the server's 0.x always speaks that server's API.
-- `npx skills` installs one skill into many coding agents, so Truman needs no installer of its own for the skill.
+- Yaksha is self-hosted, so each user runs a server at its own version. A CLI that follows the server's 0.x always speaks that server's API.
+- `npx skills` installs one skill into many coding agents, so Yaksha needs no installer of its own for the skill.
 
 ## Cost
 

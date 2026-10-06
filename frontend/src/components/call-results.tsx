@@ -281,8 +281,8 @@ function callerEffectShort(found: NonNullable<EvaluationItem["caller_effect"]>):
   if (found.owner === "test_settings") return "the test's turn or time limit cut it off";
   if (found.owner === "scenario") return "the scenario cannot pass as written";
   return found.blame === "likely"
-    ? "Truman's caller likely changed it"
-    : "Truman's caller may have changed it";
+    ? "Yaksha's caller likely changed it"
+    : "Yaksha's caller may have changed it";
 }
 
 /** What the caller check found for a criterion, by who caused it. */
@@ -295,7 +295,7 @@ function callerEffect(found: NonNullable<EvaluationItem["caller_effect"]>): stri
   }
   if (found.owner === "scenario") return `The scenario cannot pass as written: ${found.effect}`;
   const how = found.blame === "likely" ? "likely changed" : "may have changed";
-  return `Truman's caller ${how} this: ${found.effect}`;
+  return `Yaksha's caller ${how} this: ${found.effect}`;
 }
 
 function decidedBy(item: EvaluationItem): string {

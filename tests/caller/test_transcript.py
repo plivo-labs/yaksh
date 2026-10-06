@@ -2,9 +2,9 @@ from pipecat.frames.frames import CancelFrame, InterruptionFrame, TTSStartedFram
 from pipecat.tests.utils import run_test
 
 from tests.conftest import FixedClock, Observer
-from truman.caller.audio import FRAME_BYTES, Clock, Playout
-from truman.caller.transcript import OFFSET, PLAYOUT, TranscriptBuilder, WireTap
-from truman.domain.conversations import Provenance, Role
+from yaksha.caller.audio import FRAME_BYTES, Clock, Playout
+from yaksha.caller.transcript import OFFSET, PLAYOUT, TranscriptBuilder, WireTap
+from yaksha.domain.conversations import Provenance, Role
 
 
 def played(arrived: int, sent: int) -> Playout:

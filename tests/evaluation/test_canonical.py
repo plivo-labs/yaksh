@@ -1,6 +1,6 @@
 import pytest
 
-from truman.evaluation.canonical import canonical, contains
+from yaksha.evaluation.canonical import canonical, contains
 
 
 @pytest.mark.parametrize(

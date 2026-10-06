@@ -5,13 +5,13 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/plivo-labs/truman/cli/internal/api"
+	"github.com/plivo-labs/yaksha/cli/internal/api"
 )
 
 func (a *app) agentCmd() *cobra.Command {
 	agent := &cobra.Command{
 		Use:   "agent",
-		Short: "The voice agents that Truman tests",
+		Short: "The voice agents that Yaksha tests",
 	}
 	agent.AddCommand(a.agentListCmd(), a.agentViewCmd(), a.agentUpdateCmd())
 	return agent
@@ -21,7 +21,7 @@ func (a *app) agentUpdateCmd() *cobra.Command {
 	var configFile string
 	cmd := &cobra.Command{
 		Use:   "update <id> --config-file <path>",
-		Short: "Change an agent's configuration in Truman, which the judges read; a change makes a new agent version",
+		Short: "Change an agent's configuration in Yaksha, which the judges read; a change makes a new agent version",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			id, err := parseID("agent", args[0])

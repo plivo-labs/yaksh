@@ -15,29 +15,29 @@ docker compose -f docker/compose.yaml logs worker
 
 | Message | Cause and action |
 | --- | --- |
-| `phone calls are off: set PLIVO_AUTH_ID, PLIVO_AUTH_TOKEN and TRUMAN_PUBLIC_URL` | The API does not have these variables. Set them in `docker/.env`. Then make the API and worker containers again. |
+| `phone calls are off: set PLIVO_AUTH_ID, PLIVO_AUTH_TOKEN and YAKSHA_PUBLIC_URL` | The API does not have these variables. Set them in `docker/.env`. Then make the API and worker containers again. |
 | `outbound tests are off: ...` | The outbound setup is not complete. The **Numbers** page shows the cause. Refer to [Outbound agents](/docs/outbound-agents). |
 
 ## The conversation stays queued
 
 - No worker operates. Read the log of the worker.
 - No number is free. Each phone conversation uses one number until it stops. The **Numbers** page shows the numbers.
-- The worker stopped when it started. If its log shows `the caller needs`, set the keys that the log names. If its log shows `TRUMAN_PLIVO_NUMBERS:`, remove the numbers that are not in the Plivo account.
+- The worker stopped when it started. If its log shows `the caller needs`, set the keys that the log names. If its log shows `YAKSHA_PLIVO_NUMBERS:`, remove the numbers that are not in the Plivo account.
 
 ## The call fails
 
 | Failure reason | Cause and action |
 | --- | --- |
-| `Plivo reported nothing about the call; is TRUMAN_PUBLIC_URL reachable from Plivo?` | Plivo sent no report about the call. Possibly, Plivo cannot get to `TRUMAN_PUBLIC_URL`. Examine the tunnel and the value. |
+| `Plivo reported nothing about the call; is YAKSHA_PUBLIC_URL reachable from Plivo?` | Plivo sent no report about the call. Possibly, Plivo cannot get to `YAKSHA_PUBLIC_URL`. Examine the tunnel and the value. |
 | `the agent answered but its audio stream never reached the worker` | The WebSocket connection to the worker failed. The public URL must pass WebSocket connections. |
 | `the agent did not answer: ...` | The agent did not answer the call. Examine the number of the agent. |
 | `phone calls are off: ...` | The worker does not have the phone variables. Set them. Then make the worker container again. |
 
-If the log of the worker shows `refused an unsigned request`, the worker could not verify the Plivo signature of a request. Make sure that `TRUMAN_PUBLIC_URL` is the URL that Plivo uses, and that `PLIVO_AUTH_TOKEN` is the token of the account. After a change, make the API and worker containers again.
+If the log of the worker shows `refused an unsigned request`, the worker could not verify the Plivo signature of a request. Make sure that `YAKSHA_PUBLIC_URL` is the URL that Plivo uses, and that `PLIVO_AUTH_TOKEN` is the token of the account. After a change, make the API and worker containers again.
 
 ## Outbound tests
 
-- `trigger_failed`: the `trigger_sent` wire event shows the HTTP status of the trigger, or why Truman did not send it.
+- `trigger_failed`: the `trigger_sent` wire event shows the HTTP status of the trigger, or why Yaksha did not send it.
 - `no_call`: the agent did not call during its dial window. Examine the number that the agent called, and the calling numbers of the agent.
 
 ## Log of a correct worker
@@ -45,5 +45,5 @@ If the log of the worker shows `refused an unsigned request`, the worker could n
 When a worker with a correct setup starts, its log shows these lines:
 
 - `number pool: N of M account numbers enabled: ...`
-- `outbound tests: application <name> sends calls here`, if you set `TRUMAN_PLIVO_APP_ID`.
+- `outbound tests: application <name> sends calls here`, if you set `YAKSHA_PLIVO_APP_ID`.
 - `plivo server listening on port 8770`

@@ -1,5 +1,5 @@
-from truman.db.models import Conversation
-from truman.domain.conversations import (
+from yaksha.db.models import Conversation
+from yaksha.domain.conversations import (
     LineFacts,
     Provenance,
     Role,
@@ -9,9 +9,9 @@ from truman.domain.conversations import (
     WireEvent,
     WireEventKind,
 )
-from truman.domain.evaluations import MetricKey
-from truman.domain.latency import AgentMedia, CallerReplyWindow, LoopLag, Span, Speech, waits
-from truman.evaluation import call, metrics
+from yaksha.domain.evaluations import MetricKey
+from yaksha.domain.latency import AgentMedia, CallerReplyWindow, LoopLag, Span, Speech, waits
+from yaksha.evaluation import call, metrics
 
 
 def reply(start_ms: int, end_ms: int) -> CallerReplyWindow:
@@ -36,7 +36,7 @@ def test_the_goodbye_starts_with_the_reply_that_was_going_out_when_the_caller_en
         caller_replies=replies, wire_events=[WireEvent(kind=WireEventKind.TURN_LIMIT, at_ms=4_000)]
     )
 
-    # After a silent end, Truman marks the end first and then says the goodbye.
+    # After a silent end, Yaksha marks the end first and then says the goodbye.
     silent = Transcript(
         caller_replies=[reply(10_000, 12_000), reply(20_600, 21_400)],
         wire_events=[WireEvent(kind=WireEventKind.END_CALL, at_ms=20_000, detail="done")],
@@ -120,7 +120,7 @@ def test_the_same_answer_after_each_caller_reply_is_a_repetition() -> None:
     assert metrics.agent_repetition(turns[:6]).flags == []
 
 
-def test_capture_faults_name_what_went_wrong_on_trumans_side() -> None:
+def test_capture_faults_name_what_went_wrong_on_yakshas_side() -> None:
     transcript = Transcript(
         turns=[
             turn(Role.CALLER, "Hi", provenance=Provenance.UNCONFIRMED),

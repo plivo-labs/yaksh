@@ -8,15 +8,15 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tests.conftest import FakeCaller, create_agent_id, start, wait_for, wait_until
-from truman.__main__ import sync_pool
-from truman.config import Settings
-from truman.db.models import Conversation, PhoneNumber
-from truman.db.session import create_engine, create_sessionmaker
-from truman.domain.conversations import CallOutcome, ConversationStatus, EndReason, Transcript
-from truman.domain.numbers import AccountNumber, PlivoApplication
-from truman.integrations.plivo import PlivoApi, PlivoError
-from truman.simulation import conversations, numbers
-from truman.worker.worker import Worker
+from yaksha.__main__ import sync_pool
+from yaksha.config import Settings
+from yaksha.db.models import Conversation, PhoneNumber
+from yaksha.db.session import create_engine, create_sessionmaker
+from yaksha.domain.conversations import CallOutcome, ConversationStatus, EndReason, Transcript
+from yaksha.domain.numbers import AccountNumber, PlivoApplication
+from yaksha.integrations.plivo import PlivoApi, PlivoError
+from yaksha.simulation import conversations, numbers
+from yaksha.worker.worker import Worker
 
 NUMBER = "+17862242321"
 OTHER = "+18005550100"
@@ -209,12 +209,12 @@ async def test_an_empty_listing_or_an_unreachable_plivo_keeps_the_last_synced_po
 async def test_the_pool_records_which_application_each_usable_number_is_linked_to(
     client: AsyncClient, settings: Settings
 ) -> None:
-    truman = PlivoApplication(
+    yaksha = PlivoApplication(
         app_id="11",
-        name="truman",
-        answer_url="https://truman.example/incoming",
+        name="yaksha",
+        answer_url="https://yaksha.example/incoming",
         answer_method="POST",
-        hangup_url="https://truman.example/incoming/hangup",
+        hangup_url="https://yaksha.example/incoming/hangup",
         hangup_method="POST",
     )
     listed = [
@@ -222,7 +222,7 @@ async def test_the_pool_records_which_application_each_usable_number_is_linked_t
         AccountNumber(number=OTHER, application_id="99"),
     ]
     engine = create_engine(settings.database_url.encoded_string())
-    await sync_pool(create_sessionmaker(engine), Listing(listed, {"11": truman}), [])
+    await sync_pool(create_sessionmaker(engine), Listing(listed, {"11": yaksha}), [])
     async with create_sessionmaker(engine)() as session:
         rows = await session.execute(
             select(PhoneNumber.number, PhoneNumber.application_id, PhoneNumber.application_name)
@@ -230,4 +230,4 @@ async def test_the_pool_records_which_application_each_usable_number_is_linked_t
         links = {number: (app_id, name) for number, app_id, name in rows.tuples()}
     await engine.dispose()
 
-    assert links == {NUMBER: ("11", "truman"), OTHER: ("99", None)}
+    assert links == {NUMBER: ("11", "yaksha"), OTHER: ("99", None)}

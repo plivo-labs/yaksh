@@ -5,7 +5,7 @@ Status: accepted
 
 ## Decision
 
-`TRUMAN_TIMEZONE` (default UTC) sets the caller's "today". Truman computes it when the conversation, or the run that creates it, is created and writes it into the caller prompt. A retry copies the prompt, so it keeps the "today" of the attempt it replaces.
+`YAKSHA_TIMEZONE` (default UTC) sets the caller's "today". Yaksha computes it when the conversation, or the run that creates it, is created and writes it into the caller prompt. A retry copies the prompt, so it keeps the "today" of the attempt it replaces.
 
 ## Why
 

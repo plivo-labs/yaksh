@@ -5,7 +5,7 @@ Status: accepted
 
 ## Decision
 
-When a conversation of a run ends with an error on Truman's side or on the line, and the run allows another attempt and is not cancelled, Truman queues a new conversation. It has attempt + 1, `retry_of` pointing to the one it replaces, and a copy of its inputs: the pinned versions, the caller prompt, the nudge, the time limit, the run and the repeat. The result write and the reaper make the retry under the run's lock, in the transaction that ends the attempt. Only the latest attempt of each repeat of each scenario counts.
+When a conversation of a run ends with an error on Yaksha's side or on the line, and the run allows another attempt and is not cancelled, Yaksha queues a new conversation. It has attempt + 1, `retry_of` pointing to the one it replaces, and a copy of its inputs: the pinned versions, the caller prompt, the nudge, the time limit, the run and the repeat. The result write and the reaper make the retry under the run's lock, in the transaction that ends the attempt. Only the latest attempt of each repeat of each scenario counts.
 
 ## Why
 

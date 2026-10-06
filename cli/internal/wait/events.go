@@ -12,7 +12,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/plivo-labs/truman/cli/internal/api"
+	"github.com/plivo-labs/yaksha/cli/internal/api"
 )
 
 // maxEventSize bounds one line of the stream. A turn's text is far smaller.

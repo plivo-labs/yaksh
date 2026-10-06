@@ -5,8 +5,8 @@ from pipecat.pipeline.worker import PipelineParams
 from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
 from pipecat.tests.utils import run_test
 
-from truman.caller.usage import UsageMeter
-from truman.domain.conversations import CallerUsage
+from yaksha.caller.usage import UsageMeter
+from yaksha.domain.conversations import CallerUsage
 
 
 class Spender(FrameProcessor):

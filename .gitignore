@@ -27,7 +27,7 @@ data/
 *.ogg
 *.pcm
 !tests/fixtures/**
-!src/truman/simulation/sounds/*.wav
+!src/yaksha/simulation/sounds/*.wav
 
 # editors and os
 .DS_Store

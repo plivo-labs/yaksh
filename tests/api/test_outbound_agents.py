@@ -17,7 +17,7 @@ async def test_each_version_of_an_outbound_agent_keeps_its_own_trigger(
 ) -> None:
     agent = await create_agent(client, **OUTBOUND_AGENT)
     url = f"/api/v1/agents/{agent['id']}"
-    new_body = {"to": "{{truman.number}}", "campaign": "renewals"}
+    new_body = {"to": "{{yaksha.number}}", "campaign": "renewals"}
 
     changed = await client.patch(url, json=with_trigger(body=new_body))
     versions = (await client.get(f"{url}/versions")).json()["items"]
@@ -51,15 +51,15 @@ async def test_the_direction_decides_which_settings_an_agent_needs(
 @pytest.mark.parametrize(
     ("changes", "reason"),
     [
-        ({"body": {"to": "{{truman.phone}}"}}, "unknown placeholder"),
-        ({"body": {"to": "{{env.OPENAI_API_KEY}}"}}, "TRUMAN_TRIGGER_"),
-        ({"body": {"to": "{{env.TRUMAN_WEBHOOK_SIGNING_KEY}}"}}, "TRUMAN_TRIGGER_"),
-        ({"body": {"to": "{{truman.number}"}}, "unmatched braces"),
-        ({"body": {"{{truman.number}}": "x"}}, "JSON keys"),
-        ({"url": "https://example.com/{{truman.number}}"}, "URL"),
+        ({"body": {"to": "{{yaksha.phone}}"}}, "unknown placeholder"),
+        ({"body": {"to": "{{env.OPENAI_API_KEY}}"}}, "YAKSHA_TRIGGER_"),
+        ({"body": {"to": "{{env.YAKSHA_WEBHOOK_SIGNING_KEY}}"}}, "YAKSHA_TRIGGER_"),
+        ({"body": {"to": "{{yaksha.number}"}}, "unmatched braces"),
+        ({"body": {"{{yaksha.number}}": "x"}}, "JSON keys"),
+        ({"url": "https://example.com/{{yaksha.number}}"}, "URL"),
         ({"headers": [{"name": "X-Key", "value": "a\r\nb"}]}, "line break"),
         ({"headers": [{"name": "Content-Type", "value": "text/plain"}]}, "sets the"),
-        ({"headers": [{"name": "X-Truman-Delivery", "value": "x"}]}, "sets the"),
+        ({"headers": [{"name": "X-Yaksha-Delivery", "value": "x"}]}, "sets the"),
         ({"headers": [{"name": "A", "value": "1"}, {"name": "a", "value": "2"}]}, "unique"),
         ({"url": "ftp://example.com/calls"}, "url"),
     ],

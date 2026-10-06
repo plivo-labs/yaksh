@@ -5,10 +5,10 @@ export interface Credential {
   refused: string;
 }
 
-export const API_TOKEN: Credential = { key: "truman.token", refused: "truman:unauthorized" };
+export const API_TOKEN: Credential = { key: "yaksha.token", refused: "yaksha:unauthorized" };
 export const LABELER_TOKEN: Credential = {
-  key: "truman.labeler",
-  refused: "truman:labeler-unauthorized",
+  key: "yaksha.labeler",
+  refused: "yaksha:labeler-unauthorized",
 };
 
 function credentialFor(path: string): Credential {

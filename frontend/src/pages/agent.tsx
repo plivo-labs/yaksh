@@ -287,7 +287,7 @@ function Settings({ agent }: { agent: Agent }) {
   );
 }
 
-/** What Truman sends to start an outbound agent's call, and how it takes the call. */
+/** What Yaksha sends to start an outbound agent's call, and how it takes the call. */
 function OutboundFacts({ outbound }: { outbound: OutboundSettings }) {
   const { trigger } = outbound;
   return (

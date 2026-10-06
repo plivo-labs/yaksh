@@ -14,14 +14,14 @@ from sqlalchemy import ColumnElement, func, text, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from testcontainers.community.postgres import PostgresContainer
 
-from truman.api import create_app
-from truman.caller.audio import Clock
-from truman.caller.plivo_server import PlivoServer
-from truman.config import Settings
-from truman.db.migrate import upgrade_to_head
-from truman.db.models import Conversation, Voice
-from truman.db.session import create_engine, create_sessionmaker
-from truman.domain.conversations import (
+from yaksha.api import create_app
+from yaksha.caller.audio import Clock
+from yaksha.caller.plivo_server import PlivoServer
+from yaksha.config import Settings
+from yaksha.db.migrate import upgrade_to_head
+from yaksha.db.models import Conversation, Voice
+from yaksha.db.session import create_engine, create_sessionmaker
+from yaksha.domain.conversations import (
     Admission,
     CallObserver,
     CallOutcome,
@@ -35,28 +35,28 @@ from truman.domain.conversations import (
     WireEvent,
     WireEventKind,
 )
-from truman.domain.errors import UnavailableError
-from truman.domain.evaluations import Metric, MetricKey
-from truman.domain.language_models import ModelAnswer, ModelCallError
-from truman.domain.languages import Language
-from truman.domain.numbers import AccountNumber
-from truman.domain.voices import ProviderVoice, VoiceGender, VoiceProvider, VoiceSettings
-from truman.evaluation import evaluations
-from truman.evaluation.evaluations import Evaluated
-from truman.integrations.elevenlabs import as_wav
-from truman.integrations.plivo_signature import signature, signed_text
-from truman.simulation import conversations, numbers
-from truman.worker.worker import Worker
+from yaksha.domain.errors import UnavailableError
+from yaksha.domain.evaluations import Metric, MetricKey
+from yaksha.domain.language_models import ModelAnswer, ModelCallError
+from yaksha.domain.languages import Language
+from yaksha.domain.numbers import AccountNumber
+from yaksha.domain.voices import ProviderVoice, VoiceGender, VoiceProvider, VoiceSettings
+from yaksha.evaluation import evaluations
+from yaksha.evaluation.evaluations import Evaluated
+from yaksha.integrations.elevenlabs import as_wav
+from yaksha.integrations.plivo_signature import signature, signed_text
+from yaksha.simulation import conversations, numbers
+from yaksha.worker.worker import Worker
 
 type Db = async_sessionmaker[AsyncSession]
 
 TOKEN = "test-token"
 PLIVO_TOKEN = "token"
 POOL = [AccountNumber(number=f"+1555010{n:04d}") for n in range(8)]
-OFFLINE_DATABASE_URL = "postgresql+asyncpg://truman:truman@localhost:5432/truman"
+OFFLINE_DATABASE_URL = "postgresql+asyncpg://yaksha:yaksha@localhost:5432/yaksha"
 FINAL = {"completed", "failed", "invalid", "cancelled"}
-TRUMAN_FAILED = CallOutcome(connected=False, end_reason=EndReason.ERROR, caller_error="boom")
-"""A call that failed on Truman's side, which a run tries again."""
+YAKSHA_FAILED = CallOutcome(connected=False, end_reason=EndReason.ERROR, caller_error="boom")
+"""A call that failed on Yaksha's side, which a run tries again."""
 LOCK_WAITERS = text(
     "SELECT count(*) FROM pg_stat_activity"
     " WHERE datname = current_database() AND wait_event_type = 'Lock'"
@@ -71,11 +71,11 @@ OUTBOUND_AGENT: dict[str, Any] = {
     "outbound": {
         "trigger": {
             "url": "https://agents.example.com/calls",
-            "headers": [{"name": "Authorization", "value": "Bearer {{env.TRUMAN_TRIGGER_KEY}}"}],
+            "headers": [{"name": "Authorization", "value": "Bearer {{env.YAKSHA_TRIGGER_KEY}}"}],
             "body": {
-                "to": "{{truman.number}}",
+                "to": "{{yaksha.number}}",
                 "customer": {"name": "{{agent_data.Customer name}}"},
-                "tags": ["truman", "{{truman.conversation_id}}"],
+                "tags": ["yaksha", "{{yaksha.conversation_id}}"],
             },
         },
         "calling_numbers": ["+14155550100"],
@@ -369,7 +369,7 @@ def make_settings(tmp_path: Path, **overrides: Any) -> Settings:
         "end_timeout_s": 0.5,
         "plivo_auth_id": "MAXXXX",
         "plivo_auth_token": "token",
-        "public_url": "http://truman.test",
+        "public_url": "http://yaksha.test",
     }
     return Settings.model_validate({**values, **overrides})
 

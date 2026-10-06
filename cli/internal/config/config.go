@@ -1,5 +1,5 @@
-// Package config finds the Truman server and its API token. The environment variables
-// TRUMAN_URL and TRUMAN_API_TOKEN win over the file that "truman auth login" saves.
+// Package config finds the Yaksha server and its API token. The environment variables
+// YAKSHA_URL and YAKSHA_API_TOKEN win over the file that "yaksha auth login" saves.
 package config
 
 import (
@@ -36,7 +36,7 @@ type Loaded struct {
 // When the environment sets both values, Load does not read the file at all.
 // getenv is os.Getenv outside tests.
 func Load(getenv func(string) string) (Loaded, error) {
-	server, token := getenv("TRUMAN_URL"), getenv("TRUMAN_API_TOKEN")
+	server, token := getenv("YAKSHA_URL"), getenv("YAKSHA_API_TOKEN")
 	if server != "" && token != "" {
 		return Loaded{
 			Settings:   Settings{Server: server, Token: token},
@@ -122,7 +122,7 @@ func Remove(getenv func(string) string) (bool, error) {
 	return true, nil
 }
 
-// Path is the saved file: $XDG_CONFIG_HOME/truman/config.json, or ~/.config/truman/config.json
+// Path is the saved file: $XDG_CONFIG_HOME/yaksha/config.json, or ~/.config/yaksha/config.json
 // when XDG_CONFIG_HOME is not set.
 func Path(getenv func(string) string) (string, error) {
 	dir := getenv("XDG_CONFIG_HOME")
@@ -133,5 +133,5 @@ func Path(getenv func(string) string) (string, error) {
 		}
 		dir = filepath.Join(home, ".config")
 	}
-	return filepath.Join(dir, "truman", "config.json"), nil
+	return filepath.Join(dir, "yaksha", "config.json"), nil
 }

@@ -94,16 +94,16 @@ function toDraft(agent: Agent): Draft {
 }
 
 const REACH_OPTIONS: { value: Direction; label: string }[] = [
-  { value: "inbound", label: "Truman" },
+  { value: "inbound", label: "Yaksha" },
   { value: "outbound", label: "The agent" },
 ];
 
 const REQUEST_NOTE =
-  "Truman sends this POST request to make the agent call one of Truman's numbers.";
+  "Yaksha sends this POST request to make the agent call one of Yaksha's numbers.";
 
 const REACH_HINTS: Record<Direction, string> = {
-  inbound: "Truman dials the agent's phone number and plays the caller.",
-  outbound: "Truman asks the agent to call, then answers as the caller.",
+  inbound: "Yaksha dials the agent's phone number and plays the caller.",
+  outbound: "Yaksha asks the agent to call, then answers as the caller.",
 };
 
 function toInput(draft: Draft): AgentInput {
@@ -292,7 +292,7 @@ function ContextFields({ form }: { form: AgentDraft }) {
 }
 
 const CONTEXT_NOTE =
-  "Optional. Truman reads these and the knowledge base to write test scenarios. The judges read the config to check that the agent kept to its instructions, and the knowledge base to find statements it contradicts.";
+  "Optional. Yaksha reads these and the knowledge base to write test scenarios. The judges read the config to check that the agent kept to its instructions, and the knowledge base to find statements it contradicts.";
 
 function Section({
   title,
@@ -338,7 +338,7 @@ export function NewAgentPage() {
       <div className="grid gap-1">
         <h1 className="text-h3-500">New agent</h1>
         <p className="text-p-400 text-muted-foreground">
-          Tell Truman how to reach the agent and what it does.
+          Tell Yaksha how to reach the agent and what it does.
         </p>
       </div>
       <form noValidate onSubmit={submit} className="grid gap-6">

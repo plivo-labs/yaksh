@@ -2061,89 +2061,6 @@ wheels = [
 ]
 
 [[package]]
-name = "truman"
-version = "0.1.0"
-source = { editable = "." }
-dependencies = [
-    { name = "aiobotocore" },
-    { name = "aiohttp" },
-    { name = "alembic" },
-    { name = "anyio" },
-    { name = "asyncpg" },
-    { name = "audioop-lts" },
-    { name = "fastapi" },
-    { name = "jinja2" },
-    { name = "openai" },
-    { name = "pipecat-ai", extra = ["deepgram", "jev"] },
-    { name = "pydantic" },
-    { name = "pydantic-settings" },
-    { name = "pypdf" },
-    { name = "python-dotenv" },
-    { name = "python-multipart" },
-    { name = "pyyaml" },
-    { name = "regex" },
-    { name = "sqlalchemy", extra = ["asyncio"] },
-    { name = "typer" },
-    { name = "uvicorn", extra = ["standard"] },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "commitizen" },
-    { name = "httpx" },
-    { name = "import-linter" },
-    { name = "prek" },
-    { name = "pyrefly" },
-    { name = "pytest" },
-    { name = "pytest-asyncio" },
-    { name = "ruff" },
-    { name = "testcontainers" },
-    { name = "types-aiobotocore-s3" },
-    { name = "types-pyyaml" },
-    { name = "types-regex" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "aiobotocore", specifier = ">=3.9.1" },
-    { name = "aiohttp", specifier = ">=3.14" },
-    { name = "alembic", specifier = ">=1.20.0" },
-    { name = "anyio", specifier = ">=4.15.1" },
-    { name = "asyncpg", specifier = ">=0.31.0" },
-    { name = "audioop-lts", specifier = ">=0.2.2" },
-    { name = "fastapi", specifier = ">=0.141.1" },
-    { name = "jinja2", specifier = ">=3.1.6" },
-    { name = "openai", specifier = ">=3.14.1" },
-    { name = "pipecat-ai", extras = ["deepgram", "elevenlabs", "silero", "jev"], specifier = ">=1.12.0" },
-    { name = "pydantic", specifier = ">=2.12" },
-    { name = "pydantic-settings", specifier = ">=2.15.0" },
-    { name = "pypdf", specifier = ">=6.19.0" },
-    { name = "python-dotenv", specifier = ">=1.2.3" },
-    { name = "python-multipart", specifier = ">=0.0.32" },
-    { name = "pyyaml", specifier = ">=6.0.3" },
-    { name = "regex", specifier = ">=2025.9.1" },
-    { name = "sqlalchemy", extras = ["asyncio"], specifier = ">=2.0.54" },
-    { name = "typer", specifier = ">=0.27.2" },
-    { name = "uvicorn", extras = ["standard"], specifier = ">=0.53.0" },
-]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "commitizen" },
-    { name = "httpx", specifier = ">=0.28.1" },
-    { name = "import-linter", specifier = ">=2.15" },
-    { name = "prek" },
-    { name = "pyrefly" },
-    { name = "pytest" },
-    { name = "pytest-asyncio" },
-    { name = "ruff" },
-    { name = "testcontainers", extras = ["postgres"], specifier = ">=4.15.0" },
-    { name = "types-aiobotocore-s3", specifier = ">=3.9.1" },
-    { name = "types-pyyaml", specifier = ">=6.0.12.20260906" },
-    { name = "types-regex", specifier = ">=2026.9.10.20260911" },
-]
-
-[[package]]
 name = "truststore"
 version = "0.10.4"
 source = { registry = "https://pypi.org/simple" }
@@ -2472,6 +2389,89 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/f7/2e/1785e6d2696db08b07c053b1f4ccb2b5e8f9d12e9bf2c7497693be6b4504/wrapt-2.4.1-cp315-cp315t-win_amd64.whl", hash = "sha256:3593b43fabab6b59fe77e38f7e40974aae120c30cea3fd1ceaea6621ee96be00", size = 102662, upload-time = "2026-09-10T23:11:49.831Z" },
     { url = "https://files.pythonhosted.org/packages/2f/fd/3f4ac5c4754948355e050f952ae7a64cdca94891e49fe9927c3f90a73334/wrapt-2.4.1-cp315-cp315t-win_arm64.whl", hash = "sha256:ac1939ccf3e1c33f463706fbf52db5075f5eefb6042bcc1f9cf48c2c20ef478c", size = 98500, upload-time = "2026-09-10T23:11:51.501Z" },
     { url = "https://files.pythonhosted.org/packages/4f/a2/edcfc8d9a30375791b775715f8501364588f65b494ec4f6930568a19e765/wrapt-2.4.1-py3-none-any.whl", hash = "sha256:1e84ec5d89a0a07a0ef6bcd343f5c8ecdc95601d71de3058cdc63274e86c193c", size = 75317, upload-time = "2026-09-10T23:12:14.82Z" },
+]
+
+[[package]]
+name = "yaksha"
+version = "0.1.0"
+source = { editable = "." }
+dependencies = [
+    { name = "aiobotocore" },
+    { name = "aiohttp" },
+    { name = "alembic" },
+    { name = "anyio" },
+    { name = "asyncpg" },
+    { name = "audioop-lts" },
+    { name = "fastapi" },
+    { name = "jinja2" },
+    { name = "openai" },
+    { name = "pipecat-ai", extra = ["deepgram", "jev"] },
+    { name = "pydantic" },
+    { name = "pydantic-settings" },
+    { name = "pypdf" },
+    { name = "python-dotenv" },
+    { name = "python-multipart" },
+    { name = "pyyaml" },
+    { name = "regex" },
+    { name = "sqlalchemy", extra = ["asyncio"] },
+    { name = "typer" },
+    { name = "uvicorn", extra = ["standard"] },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "commitizen" },
+    { name = "httpx" },
+    { name = "import-linter" },
+    { name = "prek" },
+    { name = "pyrefly" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+    { name = "ruff" },
+    { name = "testcontainers" },
+    { name = "types-aiobotocore-s3" },
+    { name = "types-pyyaml" },
+    { name = "types-regex" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "aiobotocore", specifier = ">=3.9.1" },
+    { name = "aiohttp", specifier = ">=3.14" },
+    { name = "alembic", specifier = ">=1.20.0" },
+    { name = "anyio", specifier = ">=4.15.1" },
+    { name = "asyncpg", specifier = ">=0.31.0" },
+    { name = "audioop-lts", specifier = ">=0.2.2" },
+    { name = "fastapi", specifier = ">=0.141.1" },
+    { name = "jinja2", specifier = ">=3.1.6" },
+    { name = "openai", specifier = ">=3.14.1" },
+    { name = "pipecat-ai", extras = ["deepgram", "elevenlabs", "silero", "jev"], specifier = ">=1.12.0" },
+    { name = "pydantic", specifier = ">=2.12" },
+    { name = "pydantic-settings", specifier = ">=2.15.0" },
+    { name = "pypdf", specifier = ">=6.19.0" },
+    { name = "python-dotenv", specifier = ">=1.2.3" },
+    { name = "python-multipart", specifier = ">=0.0.32" },
+    { name = "pyyaml", specifier = ">=6.0.3" },
+    { name = "regex", specifier = ">=2025.9.1" },
+    { name = "sqlalchemy", extras = ["asyncio"], specifier = ">=2.0.54" },
+    { name = "typer", specifier = ">=0.27.2" },
+    { name = "uvicorn", extras = ["standard"], specifier = ">=0.53.0" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "commitizen" },
+    { name = "httpx", specifier = ">=0.28.1" },
+    { name = "import-linter", specifier = ">=2.15" },
+    { name = "prek" },
+    { name = "pyrefly" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+    { name = "ruff" },
+    { name = "testcontainers", extras = ["postgres"], specifier = ">=4.15.0" },
+    { name = "types-aiobotocore-s3", specifier = ">=3.9.1" },
+    { name = "types-pyyaml", specifier = ">=6.0.12.20260906" },
+    { name = "types-regex", specifier = ">=2026.9.10.20260911" },
 ]
 
 [[package]]

@@ -11,8 +11,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/spf13/cobra"
 
-	"github.com/plivo-labs/truman/cli/internal/api"
-	"github.com/plivo-labs/truman/cli/internal/wait"
+	"github.com/plivo-labs/yaksha/cli/internal/api"
+	"github.com/plivo-labs/yaksha/cli/internal/wait"
 )
 
 func (a *app) conversationCmd() *cobra.Command {
@@ -74,7 +74,7 @@ func (a *app) conversationStartCmd() *cobra.Command {
 			}
 			if !follow {
 				// The ID goes out first, so a failed write to stdout cannot lose the call.
-				fmt.Fprintf(cmd.ErrOrStderr(), "next: truman conversation view %s\n", id)
+				fmt.Fprintf(cmd.ErrOrStderr(), "next: yaksha conversation view %s\n", id)
 				return printJSON(cmd.OutOrStdout(), created)
 			}
 			fmt.Fprintf(cmd.ErrOrStderr(), "conversation %s started\n", id)
@@ -103,7 +103,7 @@ func (a *app) conversationStartCmd() *cobra.Command {
 func (a *app) followConversation(ctx context.Context, c *api.Client, id uuid.UUID, timeout time.Duration, stdout, stderr io.Writer) error {
 	ctx, cancel := withTimeout(ctx, timeout)
 	defer cancel()
-	view := "truman conversation view " + id.String()
+	view := "yaksha conversation view " + id.String()
 	err := wait.Conversation(ctx, c, id, func(e wait.Event) error {
 		return writeLine(stdout, e)
 	})
@@ -142,7 +142,7 @@ func (a *app) followConversation(ctx context.Context, c *api.Client, id uuid.UUI
 	if outcome.Status != api.ConversationStatusCompleted || stopped {
 		return &failure{nextStep{what, view}}
 	}
-	evaluation := "truman conversation evaluation " + id.String()
+	evaluation := "yaksha conversation evaluation " + id.String()
 	limit := timeout
 	if limit <= 0 {
 		limit = judgeTimeout

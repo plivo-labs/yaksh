@@ -5,10 +5,10 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tests.conftest import PERSONA, create_persona
-from truman.config import Settings
-from truman.db.session import create_engine, create_sessionmaker
-from truman.simulation.personas import builtin_personas, seed_builtin_personas
-from truman.simulation.voices import builtin_voices, seed_builtin_voices
+from yaksha.config import Settings
+from yaksha.db.session import create_engine, create_sessionmaker
+from yaksha.simulation.personas import builtin_personas, seed_builtin_personas
+from yaksha.simulation.voices import builtin_voices, seed_builtin_voices
 
 
 @pytest.fixture
@@ -55,7 +55,7 @@ async def test_builtin_personas_take_the_gender_of_their_builtin_voice(
 async def test_a_builtin_persona_must_use_a_builtin_voice(
     session: AsyncSession, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr("truman.simulation.personas.builtin_voices", list)
+    monkeypatch.setattr("yaksha.simulation.personas.builtin_voices", list)
 
     with pytest.raises(RuntimeError, match="not a built-in voice"):
         await seed_builtin_personas(session)
