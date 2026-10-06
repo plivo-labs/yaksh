@@ -47,7 +47,7 @@ The run makes one conversation for each repeat of each scenario. It makes all of
 
 ## Start of a conversation
 
-A conversation starts when a worker gets it. If Yaksha calls the agent, the call starts some seconds after the conversation starts. If the agent calls Yaksha, Yaksha sends the trigger when the conversation starts. The call can come during the [dial window](/docs/outbound-agents#trigger) of the agent. A conversation that is not in a run starts before the queued conversations of runs.
+A conversation starts when a worker gets it. If Yaksha calls the agent, the call starts some seconds after the conversation starts. If the agent calls Yaksha, Yaksha sends the trigger when the conversation starts. The call can come during the [dial window](/docs/outbound-agents#trigger) of the agent.
 
 Without `max_parallel` and `start_interval_s`, the run sets no limit and no minimum time between the starts of two conversations. A conversation also waits until a worker and a number are available. The two fields protect the agent of the run.
 

@@ -1,16 +1,6 @@
 import { Toggle } from "@base-ui/react/toggle";
 import { ToggleGroup } from "@base-ui/react/toggle-group";
-import {
-  ChevronDown,
-  Pencil,
-  PhoneIncoming,
-  PhoneOutgoing,
-  Play,
-  Plus,
-  Sparkles,
-  Trash2,
-  X,
-} from "lucide-react";
+import { ChevronDown, Pencil, Play, Plus, Sparkles, Trash2, X } from "lucide-react";
 import { Fragment, type ReactNode, useRef, useState } from "react";
 import { toast } from "sonner";
 
@@ -41,13 +31,7 @@ import { type GenerationProgress, useGeneration } from "@/hooks/use-generation";
 import { usePersonaNames } from "@/hooks/use-persona-names";
 import { counted, when } from "@/lib/format";
 import { APPEAR, REVEAL, RISE } from "@/lib/motion";
-import {
-  useAgents,
-  useAssignPersona,
-  useDeleteScenarios,
-  useGenerations,
-  useScenarios,
-} from "@/lib/queries";
+import { useAssignPersona, useDeleteScenarios, useGenerations, useScenarios } from "@/lib/queries";
 import {
   type Agent,
   type Category,
@@ -63,7 +47,6 @@ import { cn } from "@/lib/utils";
 import { GenerateDialog } from "@/pages/generate-dialog";
 import { RunDialog } from "@/pages/run-dialog";
 import { ScenarioDialog } from "@/pages/scenario-dialog";
-import { StartCallDialog } from "@/pages/start-call-dialog";
 
 const ALL = "all";
 
@@ -607,7 +590,6 @@ function ScenarioDetail({
   onEdit: () => void;
   onRun: () => void;
 }) {
-  const agents = useAgents();
   const outbound = agent.direction === "outbound";
   return (
     <section
@@ -631,19 +613,10 @@ function ScenarioDetail({
             <Pencil />
             Edit
           </Button>
-          <Button variant="outline" size="sm" onClick={onRun}>
+          <Button size="sm" onClick={onRun}>
             <Play />
             Run
           </Button>
-          <StartCallDialog
-            agents={agents.data ?? [agent]}
-            agentId={agent.id}
-            scenarioId={scenario.id}
-            render={<Button size="sm" />}
-          >
-            {outbound ? <PhoneIncoming /> : <PhoneOutgoing />}
-            {outbound ? "Trigger" : "Ring"}
-          </StartCallDialog>
         </div>
       </header>
       <dl className="grid grid-cols-2 gap-x-8 gap-y-6 px-6 py-5">

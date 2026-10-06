@@ -202,9 +202,9 @@ class Conversation(Base):
     """Plivo's hangup report for a connected call (`LineFacts`): who hung up."""
     claimed_by: Mapped[str | None] = mapped_column(Text)
     lease_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    run_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
-    """The run that made the conversation; None for a single test call."""
-    repeat: Mapped[int | None] = mapped_column(Integer)
+    run_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
+    """The run that made the conversation."""
+    repeat: Mapped[int] = mapped_column(Integer)
     """Which repeat of its scenario in the run, from 1."""
     attempt: Mapped[int] = mapped_column(Integer, default=1)
     """1 for the first try; a retry has the next number."""
@@ -218,11 +218,9 @@ class Conversation(Base):
         ),
         ForeignKeyConstraint(["run_id", "agent_id"], ["runs.id", "runs.agent_id"]),
         UniqueConstraint("run_id", "repeat", "scenario_id", "attempt"),
-        CheckConstraint('(run_id IS NULL) = ("repeat" IS NULL)', name="run_has_repeat"),
         CheckConstraint(
-            "attempt >= 1 AND (retry_of IS NULL) = (attempt = 1)"
-            " AND (retry_of IS NULL OR run_id IS NOT NULL)",
-            name="retry_is_later_attempt_in_run",
+            "attempt >= 1 AND (retry_of IS NULL) = (attempt = 1)",
+            name="retry_is_later_attempt",
         ),
         ForeignKeyConstraint(
             ["persona_version_id", "persona_id"],

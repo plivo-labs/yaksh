@@ -6,7 +6,7 @@ Status: accepted
 ## Decision
 
 - A persona has a background noise: a sound from a fixed list (none, street, cafe, office, car, TV, crowd, kitchen, wind) and a level (light, busy, loud). This extends the persona of decision 0006, how the caller behaves and sounds, and the setting is versioned with the persona.
-- A single conversation or a run can replace the persona's setting. `{"sound": "none"}` means no noise; a missing or null value means the persona's setting.
+- A run can replace the persona's setting for all its conversations. `{"sound": "none"}` means no noise; a missing or null value means the persona's setting.
 - A conversation keeps the sound and the level it started with, and a retry copies them. When the call starts, the worker turns them into a file and a volume.
 - Pipecat's `SoundfileMixer` mixes the noise into the caller's audio in the phone transport, under the voice and in every pause.
 - The levels are signal-to-noise ratios of about 20, 10 and 5 dB against the measured speech level of the built-in voices, -20 dBFS. Every sound file has an RMS level of -25 dBFS, so the volumes are 0.178, 0.562 and 1.0.

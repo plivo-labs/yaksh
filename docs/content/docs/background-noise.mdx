@@ -10,8 +10,8 @@ A persona can have background noise. The noise plays for the full call, also whe
 | `sound` | `none`, `street`, `cafe`, `office`, `car`, `tv`, `crowd`, `kitchen`, `wind`. The default is `none`. |
 | `level` | `light`, `busy`, `loud`. The default is `busy`. At these levels, the voice of the caller is approximately 20, 10 or 5 dB more than the noise. These values are for the built-in voices. |
 
-If you set `background_noise` when you start a conversation, the conversation uses it and not the setting of the persona. For example, use `{"sound": "none"}` for no noise, or `{"sound": "street", "level": "loud"}`. Always set `sound`, because a setting without `sound` plays no noise. With the CLI, always give `--noise-sound`. To use the setting of the persona, do not send `background_noise`.
+If you set `background_noise` when you start a run, each conversation of the run uses it and not the setting of the persona. For example, use `{"sound": "none"}` for no noise, or `{"sound": "street", "level": "loud"}`. Always set `sound`, because a setting without `sound` plays no noise. With the CLI, always give `--noise-sound`. To use the setting of the persona, do not send `background_noise`.
 
-Yaksha keeps the setting when it makes the conversation, and a retry uses the same setting. A run can use one background noise setting for all its conversations. Refer to [Runs](/docs/runs).
+Yaksha keeps the setting when it makes the conversation, and a retry uses the same setting. Refer to [Runs](/docs/runs).
 
 The sound files are loops in `src/yaksha/simulation/sounds/`. The README in that folder gives the prompts and the steps for each file.

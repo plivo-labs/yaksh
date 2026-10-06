@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from httpx import AsyncClient
+from httpx import AsyncClient, Response
 from sqlalchemy import func, insert, select, update
 
 from tests.conftest import (
@@ -17,6 +17,8 @@ from tests.conftest import (
     expire_leases,
     make_settings,
     reap,
+    run_conversations,
+    start,
     start_run,
 )
 from yaksha.config import Settings
@@ -64,49 +66,29 @@ async def report(
     await engine.dispose()
 
 
-async def start_outbound(client: AsyncClient, **scenario: Any) -> Any:
+async def start_outbound(client: AsyncClient, **scenario: Any) -> Response:
     agent = await create_agent(client, **OUTBOUND_AGENT)
     created = await create_scenario(client, agent["id"], **scenario)
-    return await client.post(
-        "/api/v1/conversations", json={"agent_id": agent["id"], "scenario_id": created["id"]}
-    )
+    return await start_run(client, agent["id"], [created["id"]])
 
 
-async def test_an_outbound_start_needs_a_linked_number_and_the_triggers_agent_data(
-    client: AsyncClient, settings: Settings
-) -> None:
-    await report(settings)
-    unlinked = await start_outbound(client, agent_data=AGENT_DATA)
-    await link_number(settings)
-    lacking = await start_outbound(client, name="No data")
-    started = await start_outbound(client, name="With data", agent_data=AGENT_DATA)
-
-    assert unlinked.status_code == 422
-    assert unlinked.json()["error"]["message"] == (
-        f"outbound tests are off: no enabled number is linked to Plivo application {APP_ID}"
-    )
-    assert lacking.status_code == 422
-    assert lacking.json()["error"]["message"] == (
-        'the scenario "No data" has no agent data named customer name'
-    )
-    assert started.status_code == 202 and started.json()["direction"] == "outbound"
-
-
-async def test_an_outbound_run_needs_the_same_setup_and_names_a_scenario_without_agent_data(
+async def test_an_outbound_run_needs_a_linked_number_and_names_a_scenario_without_agent_data(
     client: AsyncClient, settings: Settings
 ) -> None:
     agent = await create_agent(client, **OUTBOUND_AGENT)
     with_data = await create_scenario(client, agent["id"], agent_data=AGENT_DATA)
     without = await create_scenario(client, agent["id"], name="No data")
 
-    off = await start_run(client, agent["id"], [with_data["id"]])
     await report(settings)
+    unlinked = await start_run(client, agent["id"], [with_data["id"]])
     await link_number(settings)
     lacking = await start_run(client, agent["id"], [with_data["id"], without["id"]])
     started = await start_run(client, agent["id"], [with_data["id"]])
 
-    assert off.status_code == 422
-    assert off.json()["error"]["message"].startswith("outbound tests are off: ")
+    assert unlinked.status_code == 422
+    assert unlinked.json()["error"]["message"] == (
+        f"outbound tests are off: no enabled number is linked to Plivo application {APP_ID}"
+    )
     assert lacking.status_code == 422
     assert lacking.json()["error"]["message"] == (
         'the scenario "No data" has no agent data named customer name'
@@ -121,7 +103,9 @@ async def test_an_outbound_conversation_runs_only_where_its_call_can_be_received
 ) -> None:
     await report(settings)
     await link_number(settings, available_after=datetime.now(UTC) + timedelta(minutes=5))
-    started = (await start_outbound(client, agent_data=AGENT_DATA)).json()
+    (started,) = await run_conversations(
+        client, (await start_outbound(client, agent_data=AGENT_DATA)).json()["id"]
+    )
 
     no_application = await claim(db)
     resting = await claim(db, receiving_app_id=APP_ID)
@@ -141,9 +125,7 @@ async def test_preparing_the_call_opens_the_dial_window_and_keeps_the_pinned_dat
     outbound = {**OUTBOUND_AGENT["outbound"], "dial_window_s": 30}
     agent = await create_agent(client, **{**OUTBOUND_AGENT, "outbound": outbound})
     scenario = await create_scenario(client, agent["id"], agent_data=AGENT_DATA)
-    await client.post(
-        "/api/v1/conversations", json={"agent_id": agent["id"], "scenario_id": scenario["id"]}
-    )
+    await start_run(client, agent["id"], [scenario["id"]])
     edited = [{"name": "Customer name", "value": "Someone else"}]
     await client.patch(f"/api/v1/scenarios/{scenario['id']}", json={"agent_data": edited})
     claimed = await claim(db, receiving_app_id=APP_ID)
@@ -170,15 +152,11 @@ async def test_a_waiting_outbound_conversation_does_not_hold_up_inbound_ones(
     await link_number(settings)
     waiting = await start_outbound(client, agent_data=AGENT_DATA)
     assert waiting.status_code == 202
-    inbound = await create_agent(client)
-    scenario = await create_scenario(client, inbound["id"])
-    queued = await client.post(
-        "/api/v1/conversations", json={"agent_id": inbound["id"], "scenario_id": scenario["id"]}
-    )
+    queued = await start(client, (await create_agent(client))["id"])
 
     claimed = await claim(db)
 
-    assert claimed == queued.json()["id"]
+    assert claimed == queued["id"]
 
 
 async def test_the_numbers_page_shows_the_outbound_numbers_and_their_rest(

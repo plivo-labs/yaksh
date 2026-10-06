@@ -41,8 +41,6 @@ Calls cost money and minutes. Run the fewest scenarios that test the change, and
 6. **Update Yaksha's copy.** When the prompt or flow changed: `yaksha agent update <agent-id> --config-file <prompt-or-flow-file>`. The instruction adherence judge checks the call against this text.
 7. **Run again.** Run only the scenarios that failed (step 1 with their IDs). When they pass, run the full set once. Stop when the full set passes. When the same scenario still fails after two fixes, stop and tell the user what you found and what you tried.
 
-For one call: `yaksha conversation start --agent <agent-id> --scenario <id> --wait --timeout <limit>` prints each event as one JSON line as it happens, then the conversation, then the evaluation of a completed call. It exits 0 only when the call completed, no one stopped it, and the judges passed it, or gave no verdict because they are off.
-
 ## Response times
 
 The agent's response time is the wait from the end of the caller's speech to the start of the agent's answer. Under 1 s is good, 1 to 2 s is slow, and over 2 s is too slow.

@@ -25,7 +25,6 @@ from yaksha.domain.background_noise import BackgroundNoise
 from yaksha.domain.conversations import (
     ACTIVE_STATUSES,
     LIVE_STATUSES,
-    ConversationCreate,
     ConversationStatus,
     OutcomeGroup,
     Role,
@@ -130,14 +129,6 @@ async def detail(session: AsyncSession, conversation: Conversation) -> Conversat
         validity=transcript.validity,
         retried_as=await conversations.retried_as(session, conversation),
     )
-
-
-@router.post("", status_code=status.HTTP_202_ACCEPTED)
-async def create_conversation(
-    command: ConversationCreate, session: SessionDep, settings: SettingsDep
-) -> ConversationSummary:
-    conversation = await conversations.create_conversation(session, settings, command)
-    return await summary(session, conversation)
 
 
 @router.get("")

@@ -21,7 +21,6 @@ import {
   type DocumentSummary,
   type KnowledgeBaseEntry,
   type Conversation,
-  type ConversationInput,
   type ConversationEvaluation,
   type EvaluationState,
   evaluationPending,
@@ -427,15 +426,6 @@ export function useConversationEvaluation(id: string, evaluation: EvaluationStat
     queryFn: ({ signal }) =>
       api<ConversationEvaluation>(`/conversations/${id}/evaluation`, { signal }),
     enabled: evaluation === "done" || evaluation === "failed",
-  });
-}
-
-export function useStartConversation() {
-  const client = useQueryClient();
-  return useMutation({
-    mutationFn: (input: ConversationInput) =>
-      api<ConversationSummary>("/conversations", { method: "POST", json: input }),
-    onSuccess: () => client.invalidateQueries({ queryKey: ["conversations"] }),
   });
 }
 

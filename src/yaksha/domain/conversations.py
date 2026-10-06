@@ -8,7 +8,7 @@ from typing import Protocol
 from pydantic import BaseModel, ConfigDict, Field
 
 from yaksha.domain.agents import AgentConfig
-from yaksha.domain.background_noise import BackgroundNoise, NoiseMix
+from yaksha.domain.background_noise import NoiseMix
 from yaksha.domain.languages import Language
 from yaksha.domain.latency import AgentMedia, CallerReplyWindow, LoopLag
 from yaksha.domain.scenarios import Fact
@@ -222,19 +222,6 @@ class CallerUsage(BaseModel):
     llm_cache_creation_tokens: int | None = None
     stt_audio_seconds: float | None = None
     tts_characters: int | None = None
-
-
-class ConversationCreate(BaseModel):
-    model_config = ConfigDict(extra="forbid", frozen=True)
-
-    agent_id: uuid.UUID
-    scenario_id: uuid.UUID
-    persona_id: uuid.UUID | None = None
-    """Another persona for this one call; None runs the scenario's own persona."""
-    background_noise: BackgroundNoise | None = None
-    """Another background for this one call; None plays the persona's setting."""
-    max_duration_s: int | None = Field(default=None, ge=10, le=1800)
-    max_turns: int | None = Field(default=None, ge=1, le=100)
 
 
 class IncomingCall(BaseModel):

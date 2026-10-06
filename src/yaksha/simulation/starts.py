@@ -52,13 +52,12 @@ async def snapshot(
     settings: Settings,
     agent: Agent,
     scenario_ids: Sequence[uuid.UUID],
-    persona_id: uuid.UUID | None = None,
-    background_noise: BackgroundNoise | None = None,
+    background_noise: BackgroundNoise | None,
 ) -> list[Inputs]:
     """Check that conversations of the agent's scenarios can start now, and read what they pin,
     once for all of them: the current agent, scenario and persona versions, and today. Each
-    scenario runs with its own persona, or with persona_id when one is given, and plays
-    background_noise when one is given, else its persona's. The caller holds the agent's lock.
+    scenario runs with its own persona, and plays background_noise when one is given, else its
+    persona's. The caller holds the agent's lock.
     A refusal about a scenario names it."""
     if not settings.phone_enabled:
         raise ValidationError(f"phone calls are off: {PHONE_SETTINGS}")
@@ -67,8 +66,7 @@ async def snapshot(
         if problem is not None:
             raise ValidationError(f"outbound tests are off: {problem}")
     scenarios = await scenarios_to_start(session, agent, scenario_ids)
-    chosen = [persona_id if persona_id is not None else s.persona_id for s in scenarios]
-    personas = await live_personas(session, chosen, share_lock=True)
+    personas = await live_personas(session, [s.persona_id for s in scenarios], share_lock=True)
     agent_version_id = (
         await session.execute(
             select(AgentVersion.id).where(
@@ -107,7 +105,8 @@ async def snapshot(
     today = datetime.now(ZoneInfo(settings.timezone)).date()
     outbound = agent_config_of(agent).outbound if agent.direction is Direction.OUTBOUND else None
     inputs = []
-    for scenario, persona in zip(scenarios, (personas[pid] for pid in chosen), strict=True):
+    for scenario in scenarios:
+        persona = personas[scenario.persona_id]
         config = persona_config_of(persona)
         noise = background_noise if background_noise is not None else config.background_noise
         wants = scenario_config_of(scenario)

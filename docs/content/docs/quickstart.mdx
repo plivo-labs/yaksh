@@ -93,13 +93,13 @@ You can do these steps in the console or with the API. The commands below use th
      }'
    ```
 
-5. Start a conversation:
+5. Start a run of the scenario:
 
    ```sh
-   curl -X POST localhost:8000/api/v1/conversations \
+   curl -X POST localhost:8000/api/v1/runs \
      -H "Authorization: Bearer $YAKSHA_API_TOKEN" \
      -H 'Content-Type: application/json' \
-     -d '{"agent_id": "<agent id>", "scenario_id": "<scenario id>"}'
+     -d '{"agent_id": "<agent id>", "scenario_ids": ["<scenario id>"]}'
    ```
 
 6. In the console, click **Conversations**. Then click the conversation.
@@ -107,4 +107,4 @@ You can do these steps in the console or with the API. The commands below use th
 
 The wire events of the conversation show `connect_started`, `ringing`, `answered` and `connected` while the call starts.
 
-A conversation uses the persona of its scenario. To use a different persona for one call, set `persona_id` on the conversation.
+A conversation uses the persona of its scenario.

@@ -80,7 +80,6 @@ async def test_a_run_starts_each_repeat_of_every_scenario_in_order_with_its_pers
     hurried = (await create_persona(client, name="Hurried caller"))["id"]
     first = await create_scenario(client, agent, persona_id=calm)
     second = await create_scenario(client, agent, name="Cancel a cleaning", persona_id=hurried)
-    single = await start(client, agent)
 
     response = await start_run(
         client,
@@ -113,7 +112,6 @@ async def test_a_run_starts_each_repeat_of_every_scenario_in_order_with_its_pers
     assert {(c["run_id"], c["attempt"], c["retry_of"], c["status"]) for c in queued} == {
         (run["id"], 1, None, "queued")
     }
-    assert single["run_id"] is None and single["id"] not in {c["id"] for c in queued}
     detail = (await client.get(f"/api/v1/runs/{run['id']}")).json()
     assert detail["scenario_ids"] == [second["id"], first["id"]]
     assert detail["median_talk_ms"] is None
@@ -194,6 +192,18 @@ async def test_a_run_needs_distinct_scenarios_within_the_limits(client: AsyncCli
     assert (await client.get("/api/v1/runs")).json()["total"] == 0
 
 
+async def test_starting_and_deleting_an_agent_cannot_both_succeed(client: AsyncClient) -> None:
+    agent_id = await create_agent_id(client)
+    scenario = await create_scenario(client, agent_id)
+
+    started, deleted = await asyncio.gather(
+        start_run(client, agent_id, [scenario["id"]]),
+        client.delete(f"/api/v1/agents/{agent_id}"),
+    )
+
+    assert (started.status_code, deleted.status_code) in {(202, 409), (404, 204)}
+
+
 async def test_a_run_replaces_the_noise_of_every_conversation_or_keeps_each_personas(
     client: AsyncClient,
 ) -> None:
@@ -217,6 +227,9 @@ async def test_a_run_replaces_the_noise_of_every_conversation_or_keeps_each_pers
     other = await start_run(
         client, agent, scenarios, key="noisy", background_noise={"sound": "none"}
     )
+    silent = (
+        await start_run(client, agent, scenarios, key="silent", background_noise={"sound": "none"})
+    ).json()
 
     assert own["background_noise"] is None
     assert [c["background_noise"] for c in await run_conversations(client, own["id"])] == [
@@ -229,6 +242,10 @@ async def test_a_run_replaces_the_noise_of_every_conversation_or_keeps_each_pers
         loud,
     ]
     assert other.status_code == 409
+    assert [c["background_noise"] for c in await run_conversations(client, silent["id"])] == [
+        {"sound": "none", "level": "busy"},
+        {"sound": "none", "level": "busy"},
+    ]
 
 
 async def test_a_repeated_request_returns_its_run_and_its_key_cannot_start_another(
@@ -629,9 +646,9 @@ async def client_with(settings: Settings, **changes: Any) -> AsyncGenerator[Asyn
 async def test_response_times_reach_the_turns_the_list_and_the_run(
     client: AsyncClient, db: Db
 ) -> None:
-    run = await new_run(client, repeats=2)
-    first, second = await claim(db), await claim(db)
-    assert first is not None and second is not None
+    run = await new_run(client, repeats=3)
+    first, second, unmeasured = await claim(db), await claim(db), await claim(db)
+    assert first is not None and second is not None and unmeasured is not None
     asked = Turn(
         role=Role.CALLER,
         text="Can I move my visit?",
@@ -674,9 +691,7 @@ async def test_response_times_reach_the_turns_the_list_and_the_run(
     await finish(db, first, hung_up, transcript=answered(2_300, 4_600))
     slow = response(0, [(1_000, 2_000)], [3_800])
     await finish(db, second, hung_up, transcript=answered(3_900))
-    single = await start(client, run["agent_id"])
-    assert await claim(db) == single["id"]
-    await finish(db, single["id"], hung_up)
+    await finish(db, unmeasured, hung_up)
     await evaluate_queued(db, {first: measured(quick), second: measured(slow)})
 
     detail = (await client.get(f"/api/v1/conversations/{first}")).json()
@@ -697,7 +712,7 @@ async def test_response_times_reach_the_turns_the_list_and_the_run(
     assert [(item["id"], item["latency"]) for item in listed.json()["items"]] == [
         (second, {"p50_ms": 1_800, "p90_ms": 1_800, "replies": 1, "talked_over": 0}),
         (first, detail["latency"]),
-        (single["id"], None),
+        (unmeasured, None),
     ]
     pooled = (await client.get(f"/api/v1/runs/{run['id']}")).json()
     assert (pooled["response_p50_ms"], pooled["response_p90_ms"]) == (200, 1_800)

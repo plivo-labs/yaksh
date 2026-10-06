@@ -5,7 +5,7 @@ Status: accepted
 
 ## Decision
 
-Each scenario points to one persona. A run starts every scenario with its own persona; a single test call can still pick another. The link is not versioned: each conversation pins the persona and its version. Personas stay separate records shared by all agents, as in 0006. Scenario generation spreads the chosen personas over the new scenarios: a capability or question gets a persona again only after it got all of them. A persona cannot be deleted while a live scenario points to it.
+Each scenario points to one persona. A run starts every scenario with its own persona (0025). The link is not versioned: each conversation pins the persona and its version. Personas stay separate records shared by all agents, as in 0006. Scenario generation spreads the chosen personas over the new scenarios: a capability or question gets a persona again only after it got all of them. A persona cannot be deleted while a live scenario points to it.
 
 ## Why
 
@@ -14,7 +14,7 @@ Each scenario points to one persona. A run starts every scenario with its own pe
 
 ## Cost
 
-- 0006 rejected a persona inside the scenario because one scenario could not be tested with different callers. In a run this is true again: a scenario runs with its one persona. Testing it with another caller means changing its persona, or a single call with another persona.
+- 0006 rejected a persona inside the scenario because one scenario could not be tested with different callers. In a run this is true again: a scenario runs with its one persona. Testing it with another caller means changing its persona.
 - A persona that scenarios use cannot be deleted until they point to another one.
 
 ## Other options

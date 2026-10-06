@@ -45,7 +45,7 @@ docker compose -f docker/compose.yaml start yaksha worker
 
 In `docker/compose.dev.yaml` the services are `api worker`.
 
-Pick a persona, create the agent with its number and a scenario that runs with the persona, then start a conversation with the scenario. `GET /api/v1/personas` lists the built-in personas. A conversation uses the scenario's persona; `persona_id` on the conversation picks another one for that call. The wire events show `ringing`, `answered` and `connected` as the call progresses:
+Pick a persona, create the agent with its number and a scenario that runs with the persona, then start a run of the scenario. `GET /api/v1/personas` lists the built-in personas. A conversation uses the scenario's persona. The wire events show `ringing`, `answered` and `connected` as the call progresses:
 
 ```sh
 curl localhost:8000/api/v1/personas -H "Authorization: Bearer $YAKSHA_API_TOKEN"
@@ -53,15 +53,15 @@ curl -X POST localhost:8000/api/v1/agents -H "Authorization: Bearer $YAKSHA_API_
   -d '{"name": "Support line", "agent_number": "+14155550100"}'
 curl -X POST localhost:8000/api/v1/agents/<agent id>/scenarios -H "Authorization: Bearer $YAKSHA_API_TOKEN" -H 'Content-Type: application/json' \
   -d '{"name": "Book a table", "persona_id": "<persona id>", "goal": "Book a table for two tonight.", "known_facts": [{"name": "Name", "value": "Priya Raman"}], "criteria": ["Reads the time and party size back before it books."]}'
-curl -X POST localhost:8000/api/v1/conversations -H "Authorization: Bearer $YAKSHA_API_TOKEN" -H 'Content-Type: application/json' \
-  -d '{"agent_id": "<agent id>", "scenario_id": "<scenario id>"}'
+curl -X POST localhost:8000/api/v1/runs -H "Authorization: Bearer $YAKSHA_API_TOKEN" -H 'Content-Type: application/json' \
+  -d '{"agent_id": "<agent id>", "scenario_ids": ["<scenario id>"]}'
 ```
 
 ## Background noise
 
 A persona can have background noise: street, cafe, office, car, TV, crowd, kitchen or wind, at a light, busy or loud level. At these levels the caller's voice is about 20, 10 or 5 dB above the noise. The noise plays for the whole call, also when the caller is silent, and the recording includes it. Yaksha's own speech to text hears only the agent, so the noise changes only what the agent hears.
 
-`background_noise` on a conversation replaces the persona's setting for that call, for example `{"sound": "none"}` for no noise or `{"sound": "street", "level": "loud"}`. A conversation keeps the setting it started with, and so does its retry. The sound files are loops in `src/yaksha/simulation/sounds/`; their README says how they were made. See `docs/decisions/0014-background-noise.md`.
+`background_noise` on a run replaces the persona's setting for each of its calls, for example `{"sound": "none"}` for no noise or `{"sound": "street", "level": "loud"}`. A conversation keeps the setting it started with, and so does its retry. The sound files are loops in `src/yaksha/simulation/sounds/`; their README says how they were made. See `docs/decisions/0014-background-noise.md`.
 
 ## Response time
 
@@ -180,7 +180,7 @@ curl -X POST localhost:8000/api/v1/runs -H "Authorization: Bearer $YAKSHA_API_TO
 ```
 
 - The run starts one conversation for each repeat of each scenario, all of them or none. Every conversation pins the agent, scenario and persona versions that were current when the run was created.
-- `max_parallel` sets how many conversations of the run can be in progress at once, from the moment a worker takes one until it ends, so ringing and the wait for an outbound agent's call count too. `start_interval_s` sets the least time between two conversation starts; a conversation starts when a worker takes it. When Yaksha calls the agent, the call follows a few seconds later; when the agent calls Yaksha, the start sends the trigger, and the call can come up to the agent's dial window later. Without them, the run has no limit and no delay of its own. Both protect the agent under test. Single test calls start before the queued conversations of runs.
+- `max_parallel` sets how many conversations of the run can be in progress at once, from the moment a worker takes one until it ends, so ringing and the wait for an outbound agent's call count too. `start_interval_s` sets the least time between two conversation starts; a conversation starts when a worker takes it. When Yaksha calls the agent, the call follows a few seconds later; when the agent calls Yaksha, the start sends the trigger, and the call can come up to the agent's dial window later. Without them, the run has no limit and no delay of its own. Both protect the agent under test.
 - `max_duration_s` is the time limit of each call, 10 to 1800 seconds, default `YAKSHA_DEFAULT_MAX_DURATION_S` (300).
 - `max_turns` is how many agent turns the caller answers, 1 to 100, default `YAKSHA_DEFAULT_MAX_TURNS` (20). At the next turn the caller says goodbye and says nothing more, and the conversation ends with `turn_limit`. The caller ends the call on its own only when its goal is achieved, so this limit ends the calls that go nowhere. When the caller ends the call, Yaksha waits until both sides are quiet for 8 seconds before it hangs up, so the agent can close the call. See `docs/decisions/0013-close-before-hang-up.md`. A reply that ends the call without a word does not end it: the caller gets one more reply to speak in, and after that Yaksha says the goodbye for it. See `docs/decisions/0020-the-caller-speaks-before-it-ends-the-call.md`.
 - `background_noise` plays one background in every conversation of the run, for example `{"sound": "none"}` to compare a run with and without noise. Left out, each conversation plays its persona's setting.

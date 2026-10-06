@@ -13,12 +13,10 @@ from tests.conftest import (
     FakeCaller,
     checked_counts,
     claim,
-    create_agent_id,
     expire_leases,
     new_run,
     reap,
     run_conversations,
-    start,
     wait_for,
     wait_for_lock_waiters,
 )
@@ -88,19 +86,15 @@ async def test_a_claim_that_waited_for_its_run_starts_the_delay_when_it_claims(
     assert await claim(db) is None, "the delay runs from the claim, not from its wait"
 
 
-async def test_single_calls_start_first_then_runs_in_the_order_they_were_started(
-    client: AsyncClient, db: Db
-) -> None:
+async def test_runs_start_in_the_order_they_were_started(client: AsyncClient, db: Db) -> None:
     earlier = await new_run(client)
     later = await new_run(client)
-    single = await start(client, await create_agent_id(client, name="Single calls"))
     waiting = await reason(client, earlier)
 
-    order = [await claim(db) for _ in range(4)]
+    order = [await claim(db) for _ in range(3)]
 
     assert waiting == "worker_or_number"
     assert order == [
-        single["id"],
         *await queue_of(client, earlier),
         *await queue_of(client, later),
         None,

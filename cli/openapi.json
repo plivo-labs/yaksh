@@ -574,50 +574,6 @@
       }
     },
     "/api/v1/conversations": {
-      "post": {
-        "tags": [
-          "conversations"
-        ],
-        "summary": "Create Conversation",
-        "operationId": "create_conversation_api_v1_conversations_post",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ConversationCreate"
-              }
-            }
-          }
-        },
-        "responses": {
-          "202": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ConversationSummary"
-                }
-              }
-            }
-          },
-          "4XX": {
-            "description": "The request failed. The error tells why.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        }
-      },
       "get": {
         "tags": [
           "conversations"
@@ -4347,75 +4303,6 @@
         ],
         "title": "Channel"
       },
-      "ConversationCreate": {
-        "properties": {
-          "agent_id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Agent Id"
-          },
-          "scenario_id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Scenario Id"
-          },
-          "persona_id": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "uuid"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Persona Id"
-          },
-          "background_noise": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/BackgroundNoise"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "max_duration_s": {
-            "anyOf": [
-              {
-                "type": "integer",
-                "maximum": 1800.0,
-                "minimum": 10.0
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Max Duration S"
-          },
-          "max_turns": {
-            "anyOf": [
-              {
-                "type": "integer",
-                "maximum": 100.0,
-                "minimum": 1.0
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Max Turns"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "agent_id",
-          "scenario_id"
-        ],
-        "title": "ConversationCreate"
-      },
       "ConversationEvaluation": {
         "properties": {
           "evaluation": {
@@ -4723,26 +4610,12 @@
             "title": "Caller Reason"
           },
           "run_id": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "uuid"
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "type": "string",
+            "format": "uuid",
             "title": "Run Id"
           },
           "repeat": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "type": "integer",
             "title": "Repeat"
           },
           "attempt": {
@@ -5095,26 +4968,12 @@
             "title": "Caller Reason"
           },
           "run_id": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "uuid"
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "type": "string",
+            "format": "uuid",
             "title": "Run Id"
           },
           "repeat": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "type": "integer",
             "title": "Repeat"
           },
           "attempt": {

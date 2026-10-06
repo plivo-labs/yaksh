@@ -504,8 +504,8 @@ export interface ConversationSummary {
   recording_url: string | null;
   /** Why the caller ended the call, in its own words: not a verdict. */
   caller_reason: string | null;
-  run_id: string | null;
-  repeat: number | null;
+  run_id: string;
+  repeat: number;
   attempt: number;
   /** The conversation this one tries again. */
   retry_of: string | null;
@@ -577,19 +577,6 @@ export interface RunSummary {
 
 export interface Run extends RunSummary {
   scenario_ids: string[];
-}
-
-export interface ConversationInput {
-  agent_id: string;
-  scenario_id: string;
-  /** Another persona for this one call; the scenario's own persona when left out. */
-  persona_id?: string;
-  /** The server default when left out. */
-  max_duration_s?: number;
-  /** The server default when left out. */
-  max_turns?: number;
-  /** Another background for this one call; the persona's setting when left out. */
-  background_noise?: BackgroundNoise;
 }
 
 export type GenerationMode = "agent" | "knowledge_base";
