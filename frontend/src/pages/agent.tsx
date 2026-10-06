@@ -1,5 +1,5 @@
-import { PhoneOutgoing } from "lucide-react";
-import { useState } from "react";
+import { Copy, PhoneOutgoing } from "lucide-react";
+import { type ReactNode, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router";
 
 import { CopyId } from "@/components/copy-id";
@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { usePageParam } from "@/hooks/use-page-param";
+import { copyText } from "@/lib/clipboard";
 import { phone, reach, since, textSize, when } from "@/lib/format";
 import { RUNS_PAGE, useAgent, useAgents, useLastCall, useRuns } from "@/lib/queries";
 import { CONVERSATION_TONE } from "@/lib/status";
@@ -89,10 +90,8 @@ function AgentTabs({ agent }: { agent: Agent }) {
           </TabsTrigger>
         ))}
       </TabsList>
-      <TabsContent keepMounted value="config" className="grid gap-6">
-        <Settings key={agent.id} agent={agent} />
-        <AgentKnowledgeBase agent={agent} />
-        {tab === "config" && <AgentRules agent={agent} />}
+      <TabsContent keepMounted value="config">
+        <AgentConfig key={agent.id} agent={agent} active={tab === "config"} />
       </TabsContent>
       <TabsContent keepMounted value="scenarios">
         <AgentScenarios agent={agent} />
@@ -191,45 +190,62 @@ function Runs({ agent }: { agent: Agent }) {
   );
 }
 
-function Settings({ agent }: { agent: Agent }) {
+/** What the agent does, in the wide column, and its settings, knowledge base and rules beside it.
+ * Both Edit buttons open the same sheet. */
+function AgentConfig({ agent, active }: { agent: Agent; active: boolean }) {
   const [editing, setEditing] = useState(false);
+  const edit = (
+    <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
+      Edit
+    </Button>
+  );
+  return (
+    <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_24rem]">
+      <Purpose agent={agent} edit={edit} />
+      <div className="grid gap-6">
+        <Settings agent={agent} edit={edit} />
+        <AgentKnowledgeBase agent={agent} />
+        {active && <AgentRules agent={agent} />}
+      </div>
+      {editing && <EditAgentSheet agent={agent} onClosed={() => setEditing(false)} />}
+    </div>
+  );
+}
+
+function Purpose({ agent, edit }: { agent: Agent; edit: ReactNode }) {
+  const { config } = agent;
   return (
     <Panel>
-      <PanelHeader
-        title="Settings"
-        action={
-          <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
-            Edit
-          </Button>
-        }
-      />
-      <dl className="grid grid-cols-[repeat(auto-fill,minmax(13rem,1fr))] gap-x-6 gap-y-4 px-5 py-4">
-        <Fact label="Language">{LANGUAGE_NAMES[agent.language]}</Fact>
-        <Fact label="Opens with">
-          {agent.agent_speaks_first ? "Agent speaks first" : "Caller speaks first"}
-        </Fact>
-        <Fact label="External id" wrap>
-          {agent.external_id ?? <span className="font-normal text-muted-foreground">None</span>}
-        </Fact>
-        <Fact label="Agent id">
-          <CopyId id={agent.id} label="agent id" />
-        </Fact>
-        <Fact label="Added">{when(agent.created_at)}</Fact>
-        {agent.outbound && <OutboundFacts outbound={agent.outbound} />}
-        <div className="col-span-full grid gap-0.5">
+      <PanelHeader title="What it does" action={edit} />
+      <dl className="grid gap-5 px-5 py-4">
+        <div className="grid gap-1">
           <dt className="text-xs-400 text-muted-foreground">Brief</dt>
           <dd className="text-p-400 whitespace-pre-wrap">
             {agent.brief ?? <span className="text-muted-foreground">None</span>}
           </dd>
         </div>
-        <div className="col-span-full grid min-w-0 gap-1">
-          <dt className="text-xs-400 text-muted-foreground">
-            Config{agent.config && ` · ${textSize(agent.config.length)}`}
+        <div className="grid min-w-0 gap-1">
+          <dt className="flex min-h-6 items-center gap-2 text-xs-400 text-muted-foreground">
+            Config
+            {config && (
+              <>
+                <span>{textSize(config.length)}</span>
+                <Button
+                  variant="ghost"
+                  size="xs"
+                  className="ml-auto"
+                  onClick={() => void copyText(config, "Config copied")}
+                >
+                  <Copy />
+                  Copy
+                </Button>
+              </>
+            )}
           </dt>
           <dd className="min-w-0">
-            {agent.config ? (
-              <pre className="max-h-96 overflow-auto rounded-md bg-muted p-3 font-mono text-xs-400 leading-relaxed whitespace-pre-wrap wrap-anywhere">
-                {agent.config}
+            {config ? (
+              <pre className="max-h-160 overflow-auto rounded-md bg-muted p-3 font-mono text-xs-400 leading-relaxed whitespace-pre-wrap wrap-anywhere">
+                {config}
               </pre>
             ) : (
               <span className="text-p-400 text-muted-foreground">None</span>
@@ -237,7 +253,28 @@ function Settings({ agent }: { agent: Agent }) {
           </dd>
         </div>
       </dl>
-      {editing && <EditAgentSheet agent={agent} onClosed={() => setEditing(false)} />}
+    </Panel>
+  );
+}
+
+function Settings({ agent, edit }: { agent: Agent; edit: ReactNode }) {
+  return (
+    <Panel>
+      <PanelHeader title="Settings" action={edit} />
+      <dl className="grid grid-cols-[minmax(0,1fr)] gap-4 px-5 py-4">
+        <Fact label="Language">{LANGUAGE_NAMES[agent.language]}</Fact>
+        <Fact label="Opens with">
+          {agent.agent_speaks_first ? "Agent speaks first" : "Caller speaks first"}
+        </Fact>
+        {agent.outbound && <OutboundFacts outbound={agent.outbound} />}
+        <Fact label="External id" wrap>
+          {agent.external_id ?? <span className="font-normal text-muted-foreground">None</span>}
+        </Fact>
+        <Fact label="Agent id">
+          <CopyId id={agent.id} label="agent id" />
+        </Fact>
+        <Fact label="Added">{when(agent.created_at)}</Fact>
+      </dl>
     </Panel>
   );
 }
@@ -247,7 +284,7 @@ function OutboundFacts({ outbound }: { outbound: OutboundSettings }) {
   const { trigger } = outbound;
   return (
     <>
-      <div className="col-span-full grid gap-0.5">
+      <div className="grid gap-0.5">
         <dt className="text-xs-400 text-muted-foreground">Start request</dt>
         <dd className="text-p-400 break-all">
           <span className="text-muted-foreground">POST </span>
@@ -269,7 +306,7 @@ function OutboundFacts({ outbound }: { outbound: OutboundSettings }) {
         )}
       </Fact>
       <Fact label="Dial window">{outbound.dial_window_s} seconds</Fact>
-      <div className="col-span-full grid min-w-0 gap-1">
+      <div className="grid min-w-0 gap-1">
         <dt className="text-xs-400 text-muted-foreground">Request body</dt>
         <dd className="min-w-0">
           <pre className="max-h-48 overflow-auto rounded-md bg-muted p-3 font-mono text-xs-400 leading-relaxed">
