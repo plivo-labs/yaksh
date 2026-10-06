@@ -1209,6 +1209,18 @@ type DocumentSummary struct {
 // EndReason Who or what ended the conversation, as Truman observed it.
 type EndReason string
 
+// ErrorBody defines model for ErrorBody.
+type ErrorBody struct {
+	Code    string        `json:"code"`
+	Details *[]FieldError `json:"details,omitempty"`
+	Message string        `json:"message"`
+}
+
+// ErrorResponse The body of every error response.
+type ErrorResponse struct {
+	Error ErrorBody `json:"error"`
+}
+
 // EvaluationState defines model for EvaluationState.
 type EvaluationState string
 
@@ -1216,6 +1228,24 @@ type EvaluationState string
 type Fact struct {
 	Name  string `json:"name"`
 	Value string `json:"value"`
+}
+
+// FieldError defines model for FieldError.
+type FieldError struct {
+	Loc  []FieldError_Loc_Item `json:"loc"`
+	Msg  string                `json:"msg"`
+	Type string                `json:"type"`
+}
+
+// FieldErrorLoc0 defines model for FieldError.Loc.0.
+type FieldErrorLoc0 = string
+
+// FieldErrorLoc1 defines model for FieldError.Loc.1.
+type FieldErrorLoc1 = int
+
+// FieldError_Loc_Item defines model for FieldError.loc.Item.
+type FieldError_Loc_Item struct {
+	union json.RawMessage
 }
 
 // GenerateScenarios defines model for GenerateScenarios.
@@ -1241,11 +1271,6 @@ type GenerationRead struct {
 
 // GenerationStatus defines model for GenerationStatus.
 type GenerationStatus string
-
-// HTTPValidationError defines model for HTTPValidationError.
-type HTTPValidationError struct {
-	Detail *[]ValidationError `json:"detail,omitempty"`
-}
 
 // Header defines model for Header.
 type Header struct {
@@ -1989,26 +2014,6 @@ type TurnRead struct {
 // UnsureKind defines model for UnsureKind.
 type UnsureKind string
 
-// ValidationError defines model for ValidationError.
-type ValidationError struct {
-	Ctx   *map[string]interface{}    `json:"ctx,omitempty"`
-	Input interface{}                `json:"input,omitempty"`
-	Loc   []ValidationError_Loc_Item `json:"loc"`
-	Msg   string                     `json:"msg"`
-	Type  string                     `json:"type"`
-}
-
-// ValidationErrorLoc0 defines model for ValidationError.Loc.0.
-type ValidationErrorLoc0 = string
-
-// ValidationErrorLoc1 defines model for ValidationError.Loc.1.
-type ValidationErrorLoc1 = int
-
-// ValidationError_Loc_Item defines model for ValidationError.loc.Item.
-type ValidationError_Loc_Item struct {
-	union json.RawMessage
-}
-
 // Validity defines model for Validity.
 type Validity struct {
 	Ok      bool      `json:"ok"`
@@ -2649,22 +2654,22 @@ func (t *AgentUpdate_Rules_Item) UnmarshalJSON(b []byte) error {
 	return err
 }
 
-// AsValidationErrorLoc0 returns the union data inside the ValidationError_Loc_Item as a ValidationErrorLoc0
-func (t ValidationError_Loc_Item) AsValidationErrorLoc0() (ValidationErrorLoc0, error) {
-	var body ValidationErrorLoc0
+// AsFieldErrorLoc0 returns the union data inside the FieldError_Loc_Item as a FieldErrorLoc0
+func (t FieldError_Loc_Item) AsFieldErrorLoc0() (FieldErrorLoc0, error) {
+	var body FieldErrorLoc0
 	err := json.Unmarshal(t.union, &body)
 	return body, err
 }
 
-// FromValidationErrorLoc0 overwrites any union data inside the ValidationError_Loc_Item as the provided ValidationErrorLoc0
-func (t *ValidationError_Loc_Item) FromValidationErrorLoc0(v ValidationErrorLoc0) error {
+// FromFieldErrorLoc0 overwrites any union data inside the FieldError_Loc_Item as the provided FieldErrorLoc0
+func (t *FieldError_Loc_Item) FromFieldErrorLoc0(v FieldErrorLoc0) error {
 	b, err := json.Marshal(v)
 	t.union = b
 	return err
 }
 
-// MergeValidationErrorLoc0 performs a merge with any union data inside the ValidationError_Loc_Item, using the provided ValidationErrorLoc0
-func (t *ValidationError_Loc_Item) MergeValidationErrorLoc0(v ValidationErrorLoc0) error {
+// MergeFieldErrorLoc0 performs a merge with any union data inside the FieldError_Loc_Item, using the provided FieldErrorLoc0
+func (t *FieldError_Loc_Item) MergeFieldErrorLoc0(v FieldErrorLoc0) error {
 	b, err := json.Marshal(v)
 	if err != nil {
 		return err
@@ -2675,22 +2680,22 @@ func (t *ValidationError_Loc_Item) MergeValidationErrorLoc0(v ValidationErrorLoc
 	return err
 }
 
-// AsValidationErrorLoc1 returns the union data inside the ValidationError_Loc_Item as a ValidationErrorLoc1
-func (t ValidationError_Loc_Item) AsValidationErrorLoc1() (ValidationErrorLoc1, error) {
-	var body ValidationErrorLoc1
+// AsFieldErrorLoc1 returns the union data inside the FieldError_Loc_Item as a FieldErrorLoc1
+func (t FieldError_Loc_Item) AsFieldErrorLoc1() (FieldErrorLoc1, error) {
+	var body FieldErrorLoc1
 	err := json.Unmarshal(t.union, &body)
 	return body, err
 }
 
-// FromValidationErrorLoc1 overwrites any union data inside the ValidationError_Loc_Item as the provided ValidationErrorLoc1
-func (t *ValidationError_Loc_Item) FromValidationErrorLoc1(v ValidationErrorLoc1) error {
+// FromFieldErrorLoc1 overwrites any union data inside the FieldError_Loc_Item as the provided FieldErrorLoc1
+func (t *FieldError_Loc_Item) FromFieldErrorLoc1(v FieldErrorLoc1) error {
 	b, err := json.Marshal(v)
 	t.union = b
 	return err
 }
 
-// MergeValidationErrorLoc1 performs a merge with any union data inside the ValidationError_Loc_Item, using the provided ValidationErrorLoc1
-func (t *ValidationError_Loc_Item) MergeValidationErrorLoc1(v ValidationErrorLoc1) error {
+// MergeFieldErrorLoc1 performs a merge with any union data inside the FieldError_Loc_Item, using the provided FieldErrorLoc1
+func (t *FieldError_Loc_Item) MergeFieldErrorLoc1(v FieldErrorLoc1) error {
 	b, err := json.Marshal(v)
 	if err != nil {
 		return err
@@ -2701,12 +2706,12 @@ func (t *ValidationError_Loc_Item) MergeValidationErrorLoc1(v ValidationErrorLoc
 	return err
 }
 
-func (t ValidationError_Loc_Item) MarshalJSON() ([]byte, error) {
+func (t FieldError_Loc_Item) MarshalJSON() ([]byte, error) {
 	b, err := t.union.MarshalJSON()
 	return b, err
 }
 
-func (t *ValidationError_Loc_Item) UnmarshalJSON(b []byte) error {
+func (t *FieldError_Loc_Item) UnmarshalJSON(b []byte) error {
 	err := t.union.UnmarshalJSON(b)
 	return err
 }
@@ -8101,8 +8106,8 @@ type ListAgentsApiV1AgentsGetResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *PageAgentSummary
-	// JSON422 the response for an HTTP 422 `application/json` response
-	JSON422 *HTTPValidationError
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -8110,9 +8115,9 @@ func (r ListAgentsApiV1AgentsGetResponse) GetJSON200() *PageAgentSummary {
 	return r.JSON200
 }
 
-// GetJSON422 returns the response for an HTTP 422 `application/json` response
-func (r ListAgentsApiV1AgentsGetResponse) GetJSON422() *HTTPValidationError {
-	return r.JSON422
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r ListAgentsApiV1AgentsGetResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
 }
 
 // GetBody returns the raw response body bytes
@@ -8149,8 +8154,8 @@ type CreateAgentApiV1AgentsPostResponse struct {
 	HTTPResponse *http.Response
 	// JSON201 the response for an HTTP 201 `application/json` response
 	JSON201 *AgentRead
-	// JSON422 the response for an HTTP 422 `application/json` response
-	JSON422 *HTTPValidationError
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
 }
 
 // GetJSON201 returns the response for an HTTP 201 `application/json` response
@@ -8158,9 +8163,9 @@ func (r CreateAgentApiV1AgentsPostResponse) GetJSON201() *AgentRead {
 	return r.JSON201
 }
 
-// GetJSON422 returns the response for an HTTP 422 `application/json` response
-func (r CreateAgentApiV1AgentsPostResponse) GetJSON422() *HTTPValidationError {
-	return r.JSON422
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r CreateAgentApiV1AgentsPostResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
 }
 
 // GetBody returns the raw response body bytes
@@ -8195,13 +8200,13 @@ func (r CreateAgentApiV1AgentsPostResponse) ContentType() string {
 type DeleteAgentApiV1AgentsAgentIdDeleteResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
-	// JSON422 the response for an HTTP 422 `application/json` response
-	JSON422 *HTTPValidationError
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
 }
 
-// GetJSON422 returns the response for an HTTP 422 `application/json` response
-func (r DeleteAgentApiV1AgentsAgentIdDeleteResponse) GetJSON422() *HTTPValidationError {
-	return r.JSON422
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r DeleteAgentApiV1AgentsAgentIdDeleteResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
 }
 
 // GetBody returns the raw response body bytes
@@ -8238,8 +8243,8 @@ type GetAgentApiV1AgentsAgentIdGetResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *AgentRead
-	// JSON422 the response for an HTTP 422 `application/json` response
-	JSON422 *HTTPValidationError
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -8247,9 +8252,9 @@ func (r GetAgentApiV1AgentsAgentIdGetResponse) GetJSON200() *AgentRead {
 	return r.JSON200
 }
 
-// GetJSON422 returns the response for an HTTP 422 `application/json` response
-func (r GetAgentApiV1AgentsAgentIdGetResponse) GetJSON422() *HTTPValidationError {
-	return r.JSON422
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r GetAgentApiV1AgentsAgentIdGetResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
 }
 
 // GetBody returns the raw response body bytes
@@ -8286,8 +8291,8 @@ type UpdateAgentApiV1AgentsAgentIdPatchResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *AgentRead
-	// JSON422 the response for an HTTP 422 `application/json` response
-	JSON422 *HTTPValidationError
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -8295,9 +8300,9 @@ func (r UpdateAgentApiV1AgentsAgentIdPatchResponse) GetJSON200() *AgentRead {
 	return r.JSON200
 }
 
-// GetJSON422 returns the response for an HTTP 422 `application/json` response
-func (r UpdateAgentApiV1AgentsAgentIdPatchResponse) GetJSON422() *HTTPValidationError {
-	return r.JSON422
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r UpdateAgentApiV1AgentsAgentIdPatchResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
 }
 
 // GetBody returns the raw response body bytes
@@ -8334,8 +8339,8 @@ type DuplicateAgentApiV1AgentsAgentIdDuplicatePostResponse struct {
 	HTTPResponse *http.Response
 	// JSON201 the response for an HTTP 201 `application/json` response
 	JSON201 *AgentRead
-	// JSON422 the response for an HTTP 422 `application/json` response
-	JSON422 *HTTPValidationError
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
 }
 
 // GetJSON201 returns the response for an HTTP 201 `application/json` response
@@ -8343,9 +8348,9 @@ func (r DuplicateAgentApiV1AgentsAgentIdDuplicatePostResponse) GetJSON201() *Age
 	return r.JSON201
 }
 
-// GetJSON422 returns the response for an HTTP 422 `application/json` response
-func (r DuplicateAgentApiV1AgentsAgentIdDuplicatePostResponse) GetJSON422() *HTTPValidationError {
-	return r.JSON422
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r DuplicateAgentApiV1AgentsAgentIdDuplicatePostResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
 }
 
 // GetBody returns the raw response body bytes
@@ -8382,8 +8387,8 @@ type GetRuleResultsApiV1AgentsAgentIdRuleResultsGetResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *[]RuleResults
-	// JSON422 the response for an HTTP 422 `application/json` response
-	JSON422 *HTTPValidationError
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -8391,9 +8396,9 @@ func (r GetRuleResultsApiV1AgentsAgentIdRuleResultsGetResponse) GetJSON200() *[]
 	return r.JSON200
 }
 
-// GetJSON422 returns the response for an HTTP 422 `application/json` response
-func (r GetRuleResultsApiV1AgentsAgentIdRuleResultsGetResponse) GetJSON422() *HTTPValidationError {
-	return r.JSON422
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r GetRuleResultsApiV1AgentsAgentIdRuleResultsGetResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
 }
 
 // GetBody returns the raw response body bytes
@@ -8430,8 +8435,8 @@ type ListGenerationsApiV1AgentsAgentIdScenarioGenerationsGetResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *PageGenerationRead
-	// JSON422 the response for an HTTP 422 `application/json` response
-	JSON422 *HTTPValidationError
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -8439,9 +8444,9 @@ func (r ListGenerationsApiV1AgentsAgentIdScenarioGenerationsGetResponse) GetJSON
 	return r.JSON200
 }
 
-// GetJSON422 returns the response for an HTTP 422 `application/json` response
-func (r ListGenerationsApiV1AgentsAgentIdScenarioGenerationsGetResponse) GetJSON422() *HTTPValidationError {
-	return r.JSON422
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r ListGenerationsApiV1AgentsAgentIdScenarioGenerationsGetResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
 }
 
 // GetBody returns the raw response body bytes
@@ -8478,8 +8483,8 @@ type ListScenariosApiV1AgentsAgentIdScenariosGetResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *PageScenarioRead
-	// JSON422 the response for an HTTP 422 `application/json` response
-	JSON422 *HTTPValidationError
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -8487,9 +8492,9 @@ func (r ListScenariosApiV1AgentsAgentIdScenariosGetResponse) GetJSON200() *PageS
 	return r.JSON200
 }
 
-// GetJSON422 returns the response for an HTTP 422 `application/json` response
-func (r ListScenariosApiV1AgentsAgentIdScenariosGetResponse) GetJSON422() *HTTPValidationError {
-	return r.JSON422
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r ListScenariosApiV1AgentsAgentIdScenariosGetResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
 }
 
 // GetBody returns the raw response body bytes
@@ -8526,8 +8531,8 @@ type CreateScenarioApiV1AgentsAgentIdScenariosPostResponse struct {
 	HTTPResponse *http.Response
 	// JSON201 the response for an HTTP 201 `application/json` response
 	JSON201 *ScenarioRead
-	// JSON422 the response for an HTTP 422 `application/json` response
-	JSON422 *HTTPValidationError
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
 }
 
 // GetJSON201 returns the response for an HTTP 201 `application/json` response
@@ -8535,9 +8540,9 @@ func (r CreateScenarioApiV1AgentsAgentIdScenariosPostResponse) GetJSON201() *Sce
 	return r.JSON201
 }
 
-// GetJSON422 returns the response for an HTTP 422 `application/json` response
-func (r CreateScenarioApiV1AgentsAgentIdScenariosPostResponse) GetJSON422() *HTTPValidationError {
-	return r.JSON422
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r CreateScenarioApiV1AgentsAgentIdScenariosPostResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
 }
 
 // GetBody returns the raw response body bytes
@@ -8572,13 +8577,13 @@ func (r CreateScenarioApiV1AgentsAgentIdScenariosPostResponse) ContentType() str
 type DeleteScenariosApiV1AgentsAgentIdScenariosDeletePostResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
-	// JSON422 the response for an HTTP 422 `application/json` response
-	JSON422 *HTTPValidationError
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
 }
 
-// GetJSON422 returns the response for an HTTP 422 `application/json` response
-func (r DeleteScenariosApiV1AgentsAgentIdScenariosDeletePostResponse) GetJSON422() *HTTPValidationError {
-	return r.JSON422
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r DeleteScenariosApiV1AgentsAgentIdScenariosDeletePostResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
 }
 
 // GetBody returns the raw response body bytes
@@ -8613,13 +8618,20 @@ func (r DeleteScenariosApiV1AgentsAgentIdScenariosDeletePostResponse) ContentTyp
 type GenerateScenariosApiV1AgentsAgentIdScenariosGeneratePostResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
-	// JSON422 the response for an HTTP 422 `application/json` response
-	JSON422 *HTTPValidationError
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *ErrorResponse
 }
 
-// GetJSON422 returns the response for an HTTP 422 `application/json` response
-func (r GenerateScenariosApiV1AgentsAgentIdScenariosGeneratePostResponse) GetJSON422() *HTTPValidationError {
-	return r.JSON422
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r GenerateScenariosApiV1AgentsAgentIdScenariosGeneratePostResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r GenerateScenariosApiV1AgentsAgentIdScenariosGeneratePostResponse) GetJSON503() *ErrorResponse {
+	return r.JSON503
 }
 
 // GetBody returns the raw response body bytes
@@ -8654,13 +8666,13 @@ func (r GenerateScenariosApiV1AgentsAgentIdScenariosGeneratePostResponse) Conten
 type AssignPersonaApiV1AgentsAgentIdScenariosPersonaPostResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
-	// JSON422 the response for an HTTP 422 `application/json` response
-	JSON422 *HTTPValidationError
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
 }
 
-// GetJSON422 returns the response for an HTTP 422 `application/json` response
-func (r AssignPersonaApiV1AgentsAgentIdScenariosPersonaPostResponse) GetJSON422() *HTTPValidationError {
-	return r.JSON422
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r AssignPersonaApiV1AgentsAgentIdScenariosPersonaPostResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
 }
 
 // GetBody returns the raw response body bytes
@@ -8697,8 +8709,8 @@ type ListVersionsApiV1AgentsAgentIdVersionsGetResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *PageAgentVersionRead
-	// JSON422 the response for an HTTP 422 `application/json` response
-	JSON422 *HTTPValidationError
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -8706,9 +8718,9 @@ func (r ListVersionsApiV1AgentsAgentIdVersionsGetResponse) GetJSON200() *PageAge
 	return r.JSON200
 }
 
-// GetJSON422 returns the response for an HTTP 422 `application/json` response
-func (r ListVersionsApiV1AgentsAgentIdVersionsGetResponse) GetJSON422() *HTTPValidationError {
-	return r.JSON422
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r ListVersionsApiV1AgentsAgentIdVersionsGetResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
 }
 
 // GetBody returns the raw response body bytes
@@ -8745,8 +8757,8 @@ type GetVersionApiV1AgentsAgentIdVersionsVersionGetResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *AgentVersionRead
-	// JSON422 the response for an HTTP 422 `application/json` response
-	JSON422 *HTTPValidationError
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -8754,9 +8766,9 @@ func (r GetVersionApiV1AgentsAgentIdVersionsVersionGetResponse) GetJSON200() *Ag
 	return r.JSON200
 }
 
-// GetJSON422 returns the response for an HTTP 422 `application/json` response
-func (r GetVersionApiV1AgentsAgentIdVersionsVersionGetResponse) GetJSON422() *HTTPValidationError {
-	return r.JSON422
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r GetVersionApiV1AgentsAgentIdVersionsVersionGetResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
 }
 
 // GetBody returns the raw response body bytes
@@ -8793,8 +8805,8 @@ type ListConversationsApiV1ConversationsGetResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *PageConversationSummary
-	// JSON422 the response for an HTTP 422 `application/json` response
-	JSON422 *HTTPValidationError
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -8802,9 +8814,9 @@ func (r ListConversationsApiV1ConversationsGetResponse) GetJSON200() *PageConver
 	return r.JSON200
 }
 
-// GetJSON422 returns the response for an HTTP 422 `application/json` response
-func (r ListConversationsApiV1ConversationsGetResponse) GetJSON422() *HTTPValidationError {
-	return r.JSON422
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r ListConversationsApiV1ConversationsGetResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
 }
 
 // GetBody returns the raw response body bytes
@@ -8841,8 +8853,8 @@ type CreateConversationApiV1ConversationsPostResponse struct {
 	HTTPResponse *http.Response
 	// JSON202 the response for an HTTP 202 `application/json` response
 	JSON202 *ConversationSummary
-	// JSON422 the response for an HTTP 422 `application/json` response
-	JSON422 *HTTPValidationError
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
 }
 
 // GetJSON202 returns the response for an HTTP 202 `application/json` response
@@ -8850,9 +8862,9 @@ func (r CreateConversationApiV1ConversationsPostResponse) GetJSON202() *Conversa
 	return r.JSON202
 }
 
-// GetJSON422 returns the response for an HTTP 422 `application/json` response
-func (r CreateConversationApiV1ConversationsPostResponse) GetJSON422() *HTTPValidationError {
-	return r.JSON422
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r CreateConversationApiV1ConversationsPostResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
 }
 
 // GetBody returns the raw response body bytes
@@ -8889,8 +8901,8 @@ type GetConversationApiV1ConversationsConversationIdGetResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *ConversationRead
-	// JSON422 the response for an HTTP 422 `application/json` response
-	JSON422 *HTTPValidationError
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -8898,9 +8910,9 @@ func (r GetConversationApiV1ConversationsConversationIdGetResponse) GetJSON200()
 	return r.JSON200
 }
 
-// GetJSON422 returns the response for an HTTP 422 `application/json` response
-func (r GetConversationApiV1ConversationsConversationIdGetResponse) GetJSON422() *HTTPValidationError {
-	return r.JSON422
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r GetConversationApiV1ConversationsConversationIdGetResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
 }
 
 // GetBody returns the raw response body bytes
@@ -8937,8 +8949,10 @@ type EndConversationApiV1ConversationsConversationIdEndPostResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *ConversationRead
-	// JSON422 the response for an HTTP 422 `application/json` response
-	JSON422 *HTTPValidationError
+	// JSON202 the response for an HTTP 202 `application/json` response
+	JSON202 *ConversationRead
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -8946,9 +8960,14 @@ func (r EndConversationApiV1ConversationsConversationIdEndPostResponse) GetJSON2
 	return r.JSON200
 }
 
-// GetJSON422 returns the response for an HTTP 422 `application/json` response
-func (r EndConversationApiV1ConversationsConversationIdEndPostResponse) GetJSON422() *HTTPValidationError {
-	return r.JSON422
+// GetJSON202 returns the response for an HTTP 202 `application/json` response
+func (r EndConversationApiV1ConversationsConversationIdEndPostResponse) GetJSON202() *ConversationRead {
+	return r.JSON202
+}
+
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r EndConversationApiV1ConversationsConversationIdEndPostResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
 }
 
 // GetBody returns the raw response body bytes
@@ -8985,8 +9004,8 @@ type GetEvaluationApiV1ConversationsConversationIdEvaluationGetResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *ConversationEvaluation
-	// JSON422 the response for an HTTP 422 `application/json` response
-	JSON422 *HTTPValidationError
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -8994,9 +9013,9 @@ func (r GetEvaluationApiV1ConversationsConversationIdEvaluationGetResponse) GetJ
 	return r.JSON200
 }
 
-// GetJSON422 returns the response for an HTTP 422 `application/json` response
-func (r GetEvaluationApiV1ConversationsConversationIdEvaluationGetResponse) GetJSON422() *HTTPValidationError {
-	return r.JSON422
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r GetEvaluationApiV1ConversationsConversationIdEvaluationGetResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
 }
 
 // GetBody returns the raw response body bytes
@@ -9031,13 +9050,13 @@ func (r GetEvaluationApiV1ConversationsConversationIdEvaluationGetResponse) Cont
 type StreamEventsApiV1ConversationsConversationIdEventsGetResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
-	// JSON422 the response for an HTTP 422 `application/json` response
-	JSON422 *HTTPValidationError
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
 }
 
-// GetJSON422 returns the response for an HTTP 422 `application/json` response
-func (r StreamEventsApiV1ConversationsConversationIdEventsGetResponse) GetJSON422() *HTTPValidationError {
-	return r.JSON422
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r StreamEventsApiV1ConversationsConversationIdEventsGetResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
 }
 
 // GetBody returns the raw response body bytes
@@ -9072,13 +9091,13 @@ func (r StreamEventsApiV1ConversationsConversationIdEventsGetResponse) ContentTy
 type ListenApiV1ConversationsConversationIdListenGetResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
-	// JSON422 the response for an HTTP 422 `application/json` response
-	JSON422 *HTTPValidationError
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
 }
 
-// GetJSON422 returns the response for an HTTP 422 `application/json` response
-func (r ListenApiV1ConversationsConversationIdListenGetResponse) GetJSON422() *HTTPValidationError {
-	return r.JSON422
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r ListenApiV1ConversationsConversationIdListenGetResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
 }
 
 // GetBody returns the raw response body bytes
@@ -9115,8 +9134,8 @@ type GetRecordingApiV1ConversationsConversationIdRecordingGetResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *interface{}
-	// JSON422 the response for an HTTP 422 `application/json` response
-	JSON422 *HTTPValidationError
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -9124,9 +9143,9 @@ func (r GetRecordingApiV1ConversationsConversationIdRecordingGetResponse) GetJSO
 	return r.JSON200
 }
 
-// GetJSON422 returns the response for an HTTP 422 `application/json` response
-func (r GetRecordingApiV1ConversationsConversationIdRecordingGetResponse) GetJSON422() *HTTPValidationError {
-	return r.JSON422
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r GetRecordingApiV1ConversationsConversationIdRecordingGetResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
 }
 
 // GetBody returns the raw response body bytes
@@ -9163,11 +9182,18 @@ type DefaultsApiV1DefaultsGetResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *Defaults
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
 func (r DefaultsApiV1DefaultsGetResponse) GetJSON200() *Defaults {
 	return r.JSON200
+}
+
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r DefaultsApiV1DefaultsGetResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
 }
 
 // GetBody returns the raw response body bytes
@@ -9204,8 +9230,8 @@ type CreateTextDocumentApiV1DocumentsPostResponse struct {
 	HTTPResponse *http.Response
 	// JSON201 the response for an HTTP 201 `application/json` response
 	JSON201 *DocumentSummary
-	// JSON422 the response for an HTTP 422 `application/json` response
-	JSON422 *HTTPValidationError
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
 }
 
 // GetJSON201 returns the response for an HTTP 201 `application/json` response
@@ -9213,9 +9239,9 @@ func (r CreateTextDocumentApiV1DocumentsPostResponse) GetJSON201() *DocumentSumm
 	return r.JSON201
 }
 
-// GetJSON422 returns the response for an HTTP 422 `application/json` response
-func (r CreateTextDocumentApiV1DocumentsPostResponse) GetJSON422() *HTTPValidationError {
-	return r.JSON422
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r CreateTextDocumentApiV1DocumentsPostResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
 }
 
 // GetBody returns the raw response body bytes
@@ -9252,8 +9278,10 @@ type UploadDocumentApiV1DocumentsUploadPostResponse struct {
 	HTTPResponse *http.Response
 	// JSON201 the response for an HTTP 201 `application/json` response
 	JSON201 *DocumentSummary
-	// JSON422 the response for an HTTP 422 `application/json` response
-	JSON422 *HTTPValidationError
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *ErrorResponse
 }
 
 // GetJSON201 returns the response for an HTTP 201 `application/json` response
@@ -9261,9 +9289,14 @@ func (r UploadDocumentApiV1DocumentsUploadPostResponse) GetJSON201() *DocumentSu
 	return r.JSON201
 }
 
-// GetJSON422 returns the response for an HTTP 422 `application/json` response
-func (r UploadDocumentApiV1DocumentsUploadPostResponse) GetJSON422() *HTTPValidationError {
-	return r.JSON422
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r UploadDocumentApiV1DocumentsUploadPostResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r UploadDocumentApiV1DocumentsUploadPostResponse) GetJSON503() *ErrorResponse {
+	return r.JSON503
 }
 
 // GetBody returns the raw response body bytes
@@ -9300,8 +9333,8 @@ type GetDocumentApiV1DocumentsDocumentIdGetResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *DocumentRead
-	// JSON422 the response for an HTTP 422 `application/json` response
-	JSON422 *HTTPValidationError
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -9309,9 +9342,9 @@ func (r GetDocumentApiV1DocumentsDocumentIdGetResponse) GetJSON200() *DocumentRe
 	return r.JSON200
 }
 
-// GetJSON422 returns the response for an HTTP 422 `application/json` response
-func (r GetDocumentApiV1DocumentsDocumentIdGetResponse) GetJSON422() *HTTPValidationError {
-	return r.JSON422
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r GetDocumentApiV1DocumentsDocumentIdGetResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
 }
 
 // GetBody returns the raw response body bytes
@@ -9346,13 +9379,20 @@ func (r GetDocumentApiV1DocumentsDocumentIdGetResponse) ContentType() string {
 type DownloadDocumentApiV1DocumentsDocumentIdFileGetResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
-	// JSON422 the response for an HTTP 422 `application/json` response
-	JSON422 *HTTPValidationError
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *ErrorResponse
 }
 
-// GetJSON422 returns the response for an HTTP 422 `application/json` response
-func (r DownloadDocumentApiV1DocumentsDocumentIdFileGetResponse) GetJSON422() *HTTPValidationError {
-	return r.JSON422
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r DownloadDocumentApiV1DocumentsDocumentIdFileGetResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r DownloadDocumentApiV1DocumentsDocumentIdFileGetResponse) GetJSON503() *ErrorResponse {
+	return r.JSON503
 }
 
 // GetBody returns the raw response body bytes
@@ -9389,11 +9429,18 @@ type HealthApiV1HealthGetResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *HealthResponse
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
 func (r HealthApiV1HealthGetResponse) GetJSON200() *HealthResponse {
 	return r.JSON200
+}
+
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r HealthApiV1HealthGetResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
 }
 
 // GetBody returns the raw response body bytes
@@ -9430,11 +9477,18 @@ type GetAgreementApiV1JudgesAgreementGetResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *JudgeAgreement
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
 func (r GetAgreementApiV1JudgesAgreementGetResponse) GetJSON200() *JudgeAgreement {
 	return r.JSON200
+}
+
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r GetAgreementApiV1JudgesAgreementGetResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
 }
 
 // GetBody returns the raw response body bytes
@@ -9471,11 +9525,18 @@ type ListLabelersApiV1LabelersGetResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *[]LabelerRead
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
 func (r ListLabelersApiV1LabelersGetResponse) GetJSON200() *[]LabelerRead {
 	return r.JSON200
+}
+
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r ListLabelersApiV1LabelersGetResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
 }
 
 // GetBody returns the raw response body bytes
@@ -9512,8 +9573,8 @@ type CreateLabelerApiV1LabelersPostResponse struct {
 	HTTPResponse *http.Response
 	// JSON201 the response for an HTTP 201 `application/json` response
 	JSON201 *LabelerCreated
-	// JSON422 the response for an HTTP 422 `application/json` response
-	JSON422 *HTTPValidationError
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
 }
 
 // GetJSON201 returns the response for an HTTP 201 `application/json` response
@@ -9521,9 +9582,9 @@ func (r CreateLabelerApiV1LabelersPostResponse) GetJSON201() *LabelerCreated {
 	return r.JSON201
 }
 
-// GetJSON422 returns the response for an HTTP 422 `application/json` response
-func (r CreateLabelerApiV1LabelersPostResponse) GetJSON422() *HTTPValidationError {
-	return r.JSON422
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r CreateLabelerApiV1LabelersPostResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
 }
 
 // GetBody returns the raw response body bytes
@@ -9558,13 +9619,13 @@ func (r CreateLabelerApiV1LabelersPostResponse) ContentType() string {
 type RevokeLabelerApiV1LabelersLabelerIdDeleteResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
-	// JSON422 the response for an HTTP 422 `application/json` response
-	JSON422 *HTTPValidationError
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
 }
 
-// GetJSON422 returns the response for an HTTP 422 `application/json` response
-func (r RevokeLabelerApiV1LabelersLabelerIdDeleteResponse) GetJSON422() *HTTPValidationError {
-	return r.JSON422
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r RevokeLabelerApiV1LabelersLabelerIdDeleteResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
 }
 
 // GetBody returns the raw response body bytes
@@ -9601,8 +9662,8 @@ type RenewTokenApiV1LabelersLabelerIdTokenPostResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *LabelerCreated
-	// JSON422 the response for an HTTP 422 `application/json` response
-	JSON422 *HTTPValidationError
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -9610,9 +9671,9 @@ func (r RenewTokenApiV1LabelersLabelerIdTokenPostResponse) GetJSON200() *Labeler
 	return r.JSON200
 }
 
-// GetJSON422 returns the response for an HTTP 422 `application/json` response
-func (r RenewTokenApiV1LabelersLabelerIdTokenPostResponse) GetJSON422() *HTTPValidationError {
-	return r.JSON422
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r RenewTokenApiV1LabelersLabelerIdTokenPostResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
 }
 
 // GetBody returns the raw response body bytes
@@ -9649,8 +9710,8 @@ type ListPersonasApiV1PersonasGetResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *PagePersonaRead
-	// JSON422 the response for an HTTP 422 `application/json` response
-	JSON422 *HTTPValidationError
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -9658,9 +9719,9 @@ func (r ListPersonasApiV1PersonasGetResponse) GetJSON200() *PagePersonaRead {
 	return r.JSON200
 }
 
-// GetJSON422 returns the response for an HTTP 422 `application/json` response
-func (r ListPersonasApiV1PersonasGetResponse) GetJSON422() *HTTPValidationError {
-	return r.JSON422
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r ListPersonasApiV1PersonasGetResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
 }
 
 // GetBody returns the raw response body bytes
@@ -9697,8 +9758,8 @@ type CreatePersonaApiV1PersonasPostResponse struct {
 	HTTPResponse *http.Response
 	// JSON201 the response for an HTTP 201 `application/json` response
 	JSON201 *PersonaRead
-	// JSON422 the response for an HTTP 422 `application/json` response
-	JSON422 *HTTPValidationError
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
 }
 
 // GetJSON201 returns the response for an HTTP 201 `application/json` response
@@ -9706,9 +9767,9 @@ func (r CreatePersonaApiV1PersonasPostResponse) GetJSON201() *PersonaRead {
 	return r.JSON201
 }
 
-// GetJSON422 returns the response for an HTTP 422 `application/json` response
-func (r CreatePersonaApiV1PersonasPostResponse) GetJSON422() *HTTPValidationError {
-	return r.JSON422
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r CreatePersonaApiV1PersonasPostResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
 }
 
 // GetBody returns the raw response body bytes
@@ -9743,13 +9804,13 @@ func (r CreatePersonaApiV1PersonasPostResponse) ContentType() string {
 type DeletePersonaApiV1PersonasPersonaIdDeleteResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
-	// JSON422 the response for an HTTP 422 `application/json` response
-	JSON422 *HTTPValidationError
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
 }
 
-// GetJSON422 returns the response for an HTTP 422 `application/json` response
-func (r DeletePersonaApiV1PersonasPersonaIdDeleteResponse) GetJSON422() *HTTPValidationError {
-	return r.JSON422
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r DeletePersonaApiV1PersonasPersonaIdDeleteResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
 }
 
 // GetBody returns the raw response body bytes
@@ -9786,8 +9847,8 @@ type GetPersonaApiV1PersonasPersonaIdGetResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *PersonaRead
-	// JSON422 the response for an HTTP 422 `application/json` response
-	JSON422 *HTTPValidationError
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -9795,9 +9856,9 @@ func (r GetPersonaApiV1PersonasPersonaIdGetResponse) GetJSON200() *PersonaRead {
 	return r.JSON200
 }
 
-// GetJSON422 returns the response for an HTTP 422 `application/json` response
-func (r GetPersonaApiV1PersonasPersonaIdGetResponse) GetJSON422() *HTTPValidationError {
-	return r.JSON422
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r GetPersonaApiV1PersonasPersonaIdGetResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
 }
 
 // GetBody returns the raw response body bytes
@@ -9834,8 +9895,8 @@ type UpdatePersonaApiV1PersonasPersonaIdPatchResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *PersonaRead
-	// JSON422 the response for an HTTP 422 `application/json` response
-	JSON422 *HTTPValidationError
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -9843,9 +9904,9 @@ func (r UpdatePersonaApiV1PersonasPersonaIdPatchResponse) GetJSON200() *PersonaR
 	return r.JSON200
 }
 
-// GetJSON422 returns the response for an HTTP 422 `application/json` response
-func (r UpdatePersonaApiV1PersonasPersonaIdPatchResponse) GetJSON422() *HTTPValidationError {
-	return r.JSON422
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r UpdatePersonaApiV1PersonasPersonaIdPatchResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
 }
 
 // GetBody returns the raw response body bytes
@@ -9882,8 +9943,8 @@ type ListVersionsApiV1PersonasPersonaIdVersionsGetResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *PagePersonaVersionRead
-	// JSON422 the response for an HTTP 422 `application/json` response
-	JSON422 *HTTPValidationError
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -9891,9 +9952,9 @@ func (r ListVersionsApiV1PersonasPersonaIdVersionsGetResponse) GetJSON200() *Pag
 	return r.JSON200
 }
 
-// GetJSON422 returns the response for an HTTP 422 `application/json` response
-func (r ListVersionsApiV1PersonasPersonaIdVersionsGetResponse) GetJSON422() *HTTPValidationError {
-	return r.JSON422
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r ListVersionsApiV1PersonasPersonaIdVersionsGetResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
 }
 
 // GetBody returns the raw response body bytes
@@ -9930,8 +9991,8 @@ type GetVersionApiV1PersonasPersonaIdVersionsVersionGetResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *PersonaVersionRead
-	// JSON422 the response for an HTTP 422 `application/json` response
-	JSON422 *HTTPValidationError
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -9939,9 +10000,9 @@ func (r GetVersionApiV1PersonasPersonaIdVersionsVersionGetResponse) GetJSON200()
 	return r.JSON200
 }
 
-// GetJSON422 returns the response for an HTTP 422 `application/json` response
-func (r GetVersionApiV1PersonasPersonaIdVersionsVersionGetResponse) GetJSON422() *HTTPValidationError {
-	return r.JSON422
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r GetVersionApiV1PersonasPersonaIdVersionsVersionGetResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
 }
 
 // GetBody returns the raw response body bytes
@@ -9978,11 +10039,18 @@ type ListPhoneNumbersApiV1PhoneNumbersGetResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *PhoneNumbers
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
 func (r ListPhoneNumbersApiV1PhoneNumbersGetResponse) GetJSON200() *PhoneNumbers {
 	return r.JSON200
+}
+
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r ListPhoneNumbersApiV1PhoneNumbersGetResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
 }
 
 // GetBody returns the raw response body bytes
@@ -10019,8 +10087,8 @@ type GetReviewApiV1ReviewConversationsConversationIdGetResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *ReviewConversation
-	// JSON422 the response for an HTTP 422 `application/json` response
-	JSON422 *HTTPValidationError
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -10028,9 +10096,9 @@ func (r GetReviewApiV1ReviewConversationsConversationIdGetResponse) GetJSON200()
 	return r.JSON200
 }
 
-// GetJSON422 returns the response for an HTTP 422 `application/json` response
-func (r GetReviewApiV1ReviewConversationsConversationIdGetResponse) GetJSON422() *HTTPValidationError {
-	return r.JSON422
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r GetReviewApiV1ReviewConversationsConversationIdGetResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
 }
 
 // GetBody returns the raw response body bytes
@@ -10067,8 +10135,8 @@ type GetRecordingApiV1ReviewConversationsConversationIdRecordingGetResponse stru
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *interface{}
-	// JSON422 the response for an HTTP 422 `application/json` response
-	JSON422 *HTTPValidationError
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -10076,9 +10144,9 @@ func (r GetRecordingApiV1ReviewConversationsConversationIdRecordingGetResponse) 
 	return r.JSON200
 }
 
-// GetJSON422 returns the response for an HTTP 422 `application/json` response
-func (r GetRecordingApiV1ReviewConversationsConversationIdRecordingGetResponse) GetJSON422() *HTTPValidationError {
-	return r.JSON422
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r GetRecordingApiV1ReviewConversationsConversationIdRecordingGetResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
 }
 
 // GetBody returns the raw response body bytes
@@ -10115,8 +10183,8 @@ type LabelItemApiV1ReviewItemsItemIdLabelsPostResponse struct {
 	HTTPResponse *http.Response
 	// JSON201 the response for an HTTP 201 `application/json` response
 	JSON201 *ReviewConversation
-	// JSON422 the response for an HTTP 422 `application/json` response
-	JSON422 *HTTPValidationError
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
 }
 
 // GetJSON201 returns the response for an HTTP 201 `application/json` response
@@ -10124,9 +10192,9 @@ func (r LabelItemApiV1ReviewItemsItemIdLabelsPostResponse) GetJSON201() *ReviewC
 	return r.JSON201
 }
 
-// GetJSON422 returns the response for an HTTP 422 `application/json` response
-func (r LabelItemApiV1ReviewItemsItemIdLabelsPostResponse) GetJSON422() *HTTPValidationError {
-	return r.JSON422
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r LabelItemApiV1ReviewItemsItemIdLabelsPostResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
 }
 
 // GetBody returns the raw response body bytes
@@ -10163,11 +10231,18 @@ type GetQueueApiV1ReviewQueueGetResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *[]QueuedReview
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
 func (r GetQueueApiV1ReviewQueueGetResponse) GetJSON200() *[]QueuedReview {
 	return r.JSON200
+}
+
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r GetQueueApiV1ReviewQueueGetResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
 }
 
 // GetBody returns the raw response body bytes
@@ -10204,8 +10279,8 @@ type ListRunsApiV1RunsGetResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *PageRunSummary
-	// JSON422 the response for an HTTP 422 `application/json` response
-	JSON422 *HTTPValidationError
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -10213,9 +10288,9 @@ func (r ListRunsApiV1RunsGetResponse) GetJSON200() *PageRunSummary {
 	return r.JSON200
 }
 
-// GetJSON422 returns the response for an HTTP 422 `application/json` response
-func (r ListRunsApiV1RunsGetResponse) GetJSON422() *HTTPValidationError {
-	return r.JSON422
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r ListRunsApiV1RunsGetResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
 }
 
 // GetBody returns the raw response body bytes
@@ -10252,8 +10327,8 @@ type CreateRunApiV1RunsPostResponse struct {
 	HTTPResponse *http.Response
 	// JSON202 the response for an HTTP 202 `application/json` response
 	JSON202 *RunSummary
-	// JSON422 the response for an HTTP 422 `application/json` response
-	JSON422 *HTTPValidationError
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
 }
 
 // GetJSON202 returns the response for an HTTP 202 `application/json` response
@@ -10261,9 +10336,9 @@ func (r CreateRunApiV1RunsPostResponse) GetJSON202() *RunSummary {
 	return r.JSON202
 }
 
-// GetJSON422 returns the response for an HTTP 422 `application/json` response
-func (r CreateRunApiV1RunsPostResponse) GetJSON422() *HTTPValidationError {
-	return r.JSON422
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r CreateRunApiV1RunsPostResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
 }
 
 // GetBody returns the raw response body bytes
@@ -10300,8 +10375,8 @@ type GetRunApiV1RunsRunIdGetResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *RunRead
-	// JSON422 the response for an HTTP 422 `application/json` response
-	JSON422 *HTTPValidationError
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -10309,9 +10384,9 @@ func (r GetRunApiV1RunsRunIdGetResponse) GetJSON200() *RunRead {
 	return r.JSON200
 }
 
-// GetJSON422 returns the response for an HTTP 422 `application/json` response
-func (r GetRunApiV1RunsRunIdGetResponse) GetJSON422() *HTTPValidationError {
-	return r.JSON422
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r GetRunApiV1RunsRunIdGetResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
 }
 
 // GetBody returns the raw response body bytes
@@ -10348,8 +10423,10 @@ type CancelRunApiV1RunsRunIdCancelPostResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *RunRead
-	// JSON422 the response for an HTTP 422 `application/json` response
-	JSON422 *HTTPValidationError
+	// JSON202 the response for an HTTP 202 `application/json` response
+	JSON202 *RunRead
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -10357,9 +10434,14 @@ func (r CancelRunApiV1RunsRunIdCancelPostResponse) GetJSON200() *RunRead {
 	return r.JSON200
 }
 
-// GetJSON422 returns the response for an HTTP 422 `application/json` response
-func (r CancelRunApiV1RunsRunIdCancelPostResponse) GetJSON422() *HTTPValidationError {
-	return r.JSON422
+// GetJSON202 returns the response for an HTTP 202 `application/json` response
+func (r CancelRunApiV1RunsRunIdCancelPostResponse) GetJSON202() *RunRead {
+	return r.JSON202
+}
+
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r CancelRunApiV1RunsRunIdCancelPostResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
 }
 
 // GetBody returns the raw response body bytes
@@ -10396,8 +10478,8 @@ type GetRunMetricsApiV1RunsRunIdMetricsGetResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *RunMetrics
-	// JSON422 the response for an HTTP 422 `application/json` response
-	JSON422 *HTTPValidationError
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -10405,9 +10487,9 @@ func (r GetRunMetricsApiV1RunsRunIdMetricsGetResponse) GetJSON200() *RunMetrics 
 	return r.JSON200
 }
 
-// GetJSON422 returns the response for an HTTP 422 `application/json` response
-func (r GetRunMetricsApiV1RunsRunIdMetricsGetResponse) GetJSON422() *HTTPValidationError {
-	return r.JSON422
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r GetRunMetricsApiV1RunsRunIdMetricsGetResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
 }
 
 // GetBody returns the raw response body bytes
@@ -10442,13 +10524,13 @@ func (r GetRunMetricsApiV1RunsRunIdMetricsGetResponse) ContentType() string {
 type DeleteScenarioApiV1ScenariosScenarioIdDeleteResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
-	// JSON422 the response for an HTTP 422 `application/json` response
-	JSON422 *HTTPValidationError
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
 }
 
-// GetJSON422 returns the response for an HTTP 422 `application/json` response
-func (r DeleteScenarioApiV1ScenariosScenarioIdDeleteResponse) GetJSON422() *HTTPValidationError {
-	return r.JSON422
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r DeleteScenarioApiV1ScenariosScenarioIdDeleteResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
 }
 
 // GetBody returns the raw response body bytes
@@ -10485,8 +10567,8 @@ type GetScenarioApiV1ScenariosScenarioIdGetResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *ScenarioRead
-	// JSON422 the response for an HTTP 422 `application/json` response
-	JSON422 *HTTPValidationError
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -10494,9 +10576,9 @@ func (r GetScenarioApiV1ScenariosScenarioIdGetResponse) GetJSON200() *ScenarioRe
 	return r.JSON200
 }
 
-// GetJSON422 returns the response for an HTTP 422 `application/json` response
-func (r GetScenarioApiV1ScenariosScenarioIdGetResponse) GetJSON422() *HTTPValidationError {
-	return r.JSON422
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r GetScenarioApiV1ScenariosScenarioIdGetResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
 }
 
 // GetBody returns the raw response body bytes
@@ -10533,8 +10615,8 @@ type UpdateScenarioApiV1ScenariosScenarioIdPatchResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *ScenarioRead
-	// JSON422 the response for an HTTP 422 `application/json` response
-	JSON422 *HTTPValidationError
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -10542,9 +10624,9 @@ func (r UpdateScenarioApiV1ScenariosScenarioIdPatchResponse) GetJSON200() *Scena
 	return r.JSON200
 }
 
-// GetJSON422 returns the response for an HTTP 422 `application/json` response
-func (r UpdateScenarioApiV1ScenariosScenarioIdPatchResponse) GetJSON422() *HTTPValidationError {
-	return r.JSON422
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r UpdateScenarioApiV1ScenariosScenarioIdPatchResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
 }
 
 // GetBody returns the raw response body bytes
@@ -10581,8 +10663,8 @@ type ListVersionsApiV1ScenariosScenarioIdVersionsGetResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *PageScenarioVersionRead
-	// JSON422 the response for an HTTP 422 `application/json` response
-	JSON422 *HTTPValidationError
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -10590,9 +10672,9 @@ func (r ListVersionsApiV1ScenariosScenarioIdVersionsGetResponse) GetJSON200() *P
 	return r.JSON200
 }
 
-// GetJSON422 returns the response for an HTTP 422 `application/json` response
-func (r ListVersionsApiV1ScenariosScenarioIdVersionsGetResponse) GetJSON422() *HTTPValidationError {
-	return r.JSON422
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r ListVersionsApiV1ScenariosScenarioIdVersionsGetResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
 }
 
 // GetBody returns the raw response body bytes
@@ -10629,8 +10711,8 @@ type GetVersionApiV1ScenariosScenarioIdVersionsVersionGetResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *ScenarioVersionRead
-	// JSON422 the response for an HTTP 422 `application/json` response
-	JSON422 *HTTPValidationError
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -10638,9 +10720,9 @@ func (r GetVersionApiV1ScenariosScenarioIdVersionsVersionGetResponse) GetJSON200
 	return r.JSON200
 }
 
-// GetJSON422 returns the response for an HTTP 422 `application/json` response
-func (r GetVersionApiV1ScenariosScenarioIdVersionsVersionGetResponse) GetJSON422() *HTTPValidationError {
-	return r.JSON422
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r GetVersionApiV1ScenariosScenarioIdVersionsVersionGetResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
 }
 
 // GetBody returns the raw response body bytes
@@ -10677,8 +10759,8 @@ type ListVoicesApiV1VoicesGetResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *PageVoiceRead
-	// JSON422 the response for an HTTP 422 `application/json` response
-	JSON422 *HTTPValidationError
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -10686,9 +10768,9 @@ func (r ListVoicesApiV1VoicesGetResponse) GetJSON200() *PageVoiceRead {
 	return r.JSON200
 }
 
-// GetJSON422 returns the response for an HTTP 422 `application/json` response
-func (r ListVoicesApiV1VoicesGetResponse) GetJSON422() *HTTPValidationError {
-	return r.JSON422
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r ListVoicesApiV1VoicesGetResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
 }
 
 // GetBody returns the raw response body bytes
@@ -10725,8 +10807,10 @@ type CreateVoiceApiV1VoicesPostResponse struct {
 	HTTPResponse *http.Response
 	// JSON201 the response for an HTTP 201 `application/json` response
 	JSON201 *VoiceRead
-	// JSON422 the response for an HTTP 422 `application/json` response
-	JSON422 *HTTPValidationError
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *ErrorResponse
 }
 
 // GetJSON201 returns the response for an HTTP 201 `application/json` response
@@ -10734,9 +10818,14 @@ func (r CreateVoiceApiV1VoicesPostResponse) GetJSON201() *VoiceRead {
 	return r.JSON201
 }
 
-// GetJSON422 returns the response for an HTTP 422 `application/json` response
-func (r CreateVoiceApiV1VoicesPostResponse) GetJSON422() *HTTPValidationError {
-	return r.JSON422
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r CreateVoiceApiV1VoicesPostResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r CreateVoiceApiV1VoicesPostResponse) GetJSON503() *ErrorResponse {
+	return r.JSON503
 }
 
 // GetBody returns the raw response body bytes
@@ -10773,8 +10862,10 @@ type LookupVoiceApiV1VoicesLookupGetResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *ProviderVoice
-	// JSON422 the response for an HTTP 422 `application/json` response
-	JSON422 *HTTPValidationError
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *ErrorResponse
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -10782,9 +10873,14 @@ func (r LookupVoiceApiV1VoicesLookupGetResponse) GetJSON200() *ProviderVoice {
 	return r.JSON200
 }
 
-// GetJSON422 returns the response for an HTTP 422 `application/json` response
-func (r LookupVoiceApiV1VoicesLookupGetResponse) GetJSON422() *HTTPValidationError {
-	return r.JSON422
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r LookupVoiceApiV1VoicesLookupGetResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r LookupVoiceApiV1VoicesLookupGetResponse) GetJSON503() *ErrorResponse {
+	return r.JSON503
 }
 
 // GetBody returns the raw response body bytes
@@ -10819,13 +10915,20 @@ func (r LookupVoiceApiV1VoicesLookupGetResponse) ContentType() string {
 type PreviewVoiceApiV1VoicesPreviewPostResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
-	// JSON422 the response for an HTTP 422 `application/json` response
-	JSON422 *HTTPValidationError
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *ErrorResponse
 }
 
-// GetJSON422 returns the response for an HTTP 422 `application/json` response
-func (r PreviewVoiceApiV1VoicesPreviewPostResponse) GetJSON422() *HTTPValidationError {
-	return r.JSON422
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r PreviewVoiceApiV1VoicesPreviewPostResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r PreviewVoiceApiV1VoicesPreviewPostResponse) GetJSON503() *ErrorResponse {
+	return r.JSON503
 }
 
 // GetBody returns the raw response body bytes
@@ -10860,13 +10963,13 @@ func (r PreviewVoiceApiV1VoicesPreviewPostResponse) ContentType() string {
 type DeleteVoiceApiV1VoicesVoiceIdDeleteResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
-	// JSON422 the response for an HTTP 422 `application/json` response
-	JSON422 *HTTPValidationError
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
 }
 
-// GetJSON422 returns the response for an HTTP 422 `application/json` response
-func (r DeleteVoiceApiV1VoicesVoiceIdDeleteResponse) GetJSON422() *HTTPValidationError {
-	return r.JSON422
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r DeleteVoiceApiV1VoicesVoiceIdDeleteResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
 }
 
 // GetBody returns the raw response body bytes
@@ -10903,8 +11006,8 @@ type UpdateVoiceApiV1VoicesVoiceIdPatchResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *VoiceRead
-	// JSON422 the response for an HTTP 422 `application/json` response
-	JSON422 *HTTPValidationError
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -10912,9 +11015,9 @@ func (r UpdateVoiceApiV1VoicesVoiceIdPatchResponse) GetJSON200() *VoiceRead {
 	return r.JSON200
 }
 
-// GetJSON422 returns the response for an HTTP 422 `application/json` response
-func (r UpdateVoiceApiV1VoicesVoiceIdPatchResponse) GetJSON422() *HTTPValidationError {
-	return r.JSON422
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r UpdateVoiceApiV1VoicesVoiceIdPatchResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
 }
 
 // GetBody returns the raw response body bytes
@@ -12042,12 +12145,12 @@ func ParseListAgentsApiV1AgentsGetResponse(rsp *http.Response) (*ListAgentsApiV1
 		}
 		response.JSON200 = &dest
 
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
-		var dest HTTPValidationError
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON422 = &dest
+		response.JSON4XX = &dest
 
 	}
 
@@ -12075,12 +12178,12 @@ func ParseCreateAgentApiV1AgentsPostResponse(rsp *http.Response) (*CreateAgentAp
 		}
 		response.JSON201 = &dest
 
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
-		var dest HTTPValidationError
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON422 = &dest
+		response.JSON4XX = &dest
 
 	}
 
@@ -12104,12 +12207,12 @@ func ParseDeleteAgentApiV1AgentsAgentIdDeleteResponse(rsp *http.Response) (*Dele
 	case rsp.StatusCode == 204:
 		break // No content-type
 
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
-		var dest HTTPValidationError
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON422 = &dest
+		response.JSON4XX = &dest
 
 	}
 
@@ -12137,12 +12240,12 @@ func ParseGetAgentApiV1AgentsAgentIdGetResponse(rsp *http.Response) (*GetAgentAp
 		}
 		response.JSON200 = &dest
 
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
-		var dest HTTPValidationError
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON422 = &dest
+		response.JSON4XX = &dest
 
 	}
 
@@ -12170,12 +12273,12 @@ func ParseUpdateAgentApiV1AgentsAgentIdPatchResponse(rsp *http.Response) (*Updat
 		}
 		response.JSON200 = &dest
 
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
-		var dest HTTPValidationError
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON422 = &dest
+		response.JSON4XX = &dest
 
 	}
 
@@ -12203,12 +12306,12 @@ func ParseDuplicateAgentApiV1AgentsAgentIdDuplicatePostResponse(rsp *http.Respon
 		}
 		response.JSON201 = &dest
 
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
-		var dest HTTPValidationError
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON422 = &dest
+		response.JSON4XX = &dest
 
 	}
 
@@ -12236,12 +12339,12 @@ func ParseGetRuleResultsApiV1AgentsAgentIdRuleResultsGetResponse(rsp *http.Respo
 		}
 		response.JSON200 = &dest
 
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
-		var dest HTTPValidationError
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON422 = &dest
+		response.JSON4XX = &dest
 
 	}
 
@@ -12269,12 +12372,12 @@ func ParseListGenerationsApiV1AgentsAgentIdScenarioGenerationsGetResponse(rsp *h
 		}
 		response.JSON200 = &dest
 
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
-		var dest HTTPValidationError
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON422 = &dest
+		response.JSON4XX = &dest
 
 	}
 
@@ -12302,12 +12405,12 @@ func ParseListScenariosApiV1AgentsAgentIdScenariosGetResponse(rsp *http.Response
 		}
 		response.JSON200 = &dest
 
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
-		var dest HTTPValidationError
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON422 = &dest
+		response.JSON4XX = &dest
 
 	}
 
@@ -12335,12 +12438,12 @@ func ParseCreateScenarioApiV1AgentsAgentIdScenariosPostResponse(rsp *http.Respon
 		}
 		response.JSON201 = &dest
 
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
-		var dest HTTPValidationError
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON422 = &dest
+		response.JSON4XX = &dest
 
 	}
 
@@ -12364,12 +12467,12 @@ func ParseDeleteScenariosApiV1AgentsAgentIdScenariosDeletePostResponse(rsp *http
 	case rsp.StatusCode == 204:
 		break // No content-type
 
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
-		var dest HTTPValidationError
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON422 = &dest
+		response.JSON4XX = &dest
 
 	}
 
@@ -12390,12 +12493,19 @@ func ParseGenerateScenariosApiV1AgentsAgentIdScenariosGeneratePostResponse(rsp *
 	}
 
 	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
-		var dest HTTPValidationError
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON422 = &dest
+		response.JSON4XX = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
 
 	}
 
@@ -12419,12 +12529,12 @@ func ParseAssignPersonaApiV1AgentsAgentIdScenariosPersonaPostResponse(rsp *http.
 	case rsp.StatusCode == 204:
 		break // No content-type
 
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
-		var dest HTTPValidationError
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON422 = &dest
+		response.JSON4XX = &dest
 
 	}
 
@@ -12452,12 +12562,12 @@ func ParseListVersionsApiV1AgentsAgentIdVersionsGetResponse(rsp *http.Response) 
 		}
 		response.JSON200 = &dest
 
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
-		var dest HTTPValidationError
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON422 = &dest
+		response.JSON4XX = &dest
 
 	}
 
@@ -12485,12 +12595,12 @@ func ParseGetVersionApiV1AgentsAgentIdVersionsVersionGetResponse(rsp *http.Respo
 		}
 		response.JSON200 = &dest
 
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
-		var dest HTTPValidationError
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON422 = &dest
+		response.JSON4XX = &dest
 
 	}
 
@@ -12518,12 +12628,12 @@ func ParseListConversationsApiV1ConversationsGetResponse(rsp *http.Response) (*L
 		}
 		response.JSON200 = &dest
 
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
-		var dest HTTPValidationError
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON422 = &dest
+		response.JSON4XX = &dest
 
 	}
 
@@ -12551,12 +12661,12 @@ func ParseCreateConversationApiV1ConversationsPostResponse(rsp *http.Response) (
 		}
 		response.JSON202 = &dest
 
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
-		var dest HTTPValidationError
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON422 = &dest
+		response.JSON4XX = &dest
 
 	}
 
@@ -12584,12 +12694,12 @@ func ParseGetConversationApiV1ConversationsConversationIdGetResponse(rsp *http.R
 		}
 		response.JSON200 = &dest
 
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
-		var dest HTTPValidationError
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON422 = &dest
+		response.JSON4XX = &dest
 
 	}
 
@@ -12617,12 +12727,19 @@ func ParseEndConversationApiV1ConversationsConversationIdEndPostResponse(rsp *ht
 		}
 		response.JSON200 = &dest
 
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
-		var dest HTTPValidationError
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 202:
+		var dest ConversationRead
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON422 = &dest
+		response.JSON202 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
 
 	}
 
@@ -12650,12 +12767,12 @@ func ParseGetEvaluationApiV1ConversationsConversationIdEvaluationGetResponse(rsp
 		}
 		response.JSON200 = &dest
 
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
-		var dest HTTPValidationError
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON422 = &dest
+		response.JSON4XX = &dest
 
 	}
 
@@ -12676,12 +12793,12 @@ func ParseStreamEventsApiV1ConversationsConversationIdEventsGetResponse(rsp *htt
 	}
 
 	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
-		var dest HTTPValidationError
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON422 = &dest
+		response.JSON4XX = &dest
 
 	}
 
@@ -12702,12 +12819,12 @@ func ParseListenApiV1ConversationsConversationIdListenGetResponse(rsp *http.Resp
 	}
 
 	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
-		var dest HTTPValidationError
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON422 = &dest
+		response.JSON4XX = &dest
 
 	}
 
@@ -12735,12 +12852,12 @@ func ParseGetRecordingApiV1ConversationsConversationIdRecordingGetResponse(rsp *
 		}
 		response.JSON200 = &dest
 
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
-		var dest HTTPValidationError
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON422 = &dest
+		response.JSON4XX = &dest
 
 	}
 
@@ -12768,6 +12885,13 @@ func ParseDefaultsApiV1DefaultsGetResponse(rsp *http.Response) (*DefaultsApiV1De
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
 	}
 
 	return response, nil
@@ -12794,12 +12918,12 @@ func ParseCreateTextDocumentApiV1DocumentsPostResponse(rsp *http.Response) (*Cre
 		}
 		response.JSON201 = &dest
 
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
-		var dest HTTPValidationError
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON422 = &dest
+		response.JSON4XX = &dest
 
 	}
 
@@ -12827,12 +12951,19 @@ func ParseUploadDocumentApiV1DocumentsUploadPostResponse(rsp *http.Response) (*U
 		}
 		response.JSON201 = &dest
 
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
-		var dest HTTPValidationError
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON422 = &dest
+		response.JSON4XX = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
 
 	}
 
@@ -12860,12 +12991,12 @@ func ParseGetDocumentApiV1DocumentsDocumentIdGetResponse(rsp *http.Response) (*G
 		}
 		response.JSON200 = &dest
 
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
-		var dest HTTPValidationError
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON422 = &dest
+		response.JSON4XX = &dest
 
 	}
 
@@ -12889,12 +13020,19 @@ func ParseDownloadDocumentApiV1DocumentsDocumentIdFileGetResponse(rsp *http.Resp
 	case rsp.StatusCode == 200:
 		break // No content-type
 
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
-		var dest HTTPValidationError
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON422 = &dest
+		response.JSON4XX = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
 
 	}
 
@@ -12922,6 +13060,13 @@ func ParseHealthApiV1HealthGetResponse(rsp *http.Response) (*HealthApiV1HealthGe
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
 	}
 
 	return response, nil
@@ -12947,6 +13092,13 @@ func ParseGetAgreementApiV1JudgesAgreementGetResponse(rsp *http.Response) (*GetA
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
 
 	}
 
@@ -12974,6 +13126,13 @@ func ParseListLabelersApiV1LabelersGetResponse(rsp *http.Response) (*ListLabeler
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
 	}
 
 	return response, nil
@@ -13000,12 +13159,12 @@ func ParseCreateLabelerApiV1LabelersPostResponse(rsp *http.Response) (*CreateLab
 		}
 		response.JSON201 = &dest
 
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
-		var dest HTTPValidationError
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON422 = &dest
+		response.JSON4XX = &dest
 
 	}
 
@@ -13029,12 +13188,12 @@ func ParseRevokeLabelerApiV1LabelersLabelerIdDeleteResponse(rsp *http.Response) 
 	case rsp.StatusCode == 204:
 		break // No content-type
 
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
-		var dest HTTPValidationError
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON422 = &dest
+		response.JSON4XX = &dest
 
 	}
 
@@ -13062,12 +13221,12 @@ func ParseRenewTokenApiV1LabelersLabelerIdTokenPostResponse(rsp *http.Response) 
 		}
 		response.JSON200 = &dest
 
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
-		var dest HTTPValidationError
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON422 = &dest
+		response.JSON4XX = &dest
 
 	}
 
@@ -13095,12 +13254,12 @@ func ParseListPersonasApiV1PersonasGetResponse(rsp *http.Response) (*ListPersona
 		}
 		response.JSON200 = &dest
 
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
-		var dest HTTPValidationError
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON422 = &dest
+		response.JSON4XX = &dest
 
 	}
 
@@ -13128,12 +13287,12 @@ func ParseCreatePersonaApiV1PersonasPostResponse(rsp *http.Response) (*CreatePer
 		}
 		response.JSON201 = &dest
 
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
-		var dest HTTPValidationError
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON422 = &dest
+		response.JSON4XX = &dest
 
 	}
 
@@ -13157,12 +13316,12 @@ func ParseDeletePersonaApiV1PersonasPersonaIdDeleteResponse(rsp *http.Response) 
 	case rsp.StatusCode == 204:
 		break // No content-type
 
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
-		var dest HTTPValidationError
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON422 = &dest
+		response.JSON4XX = &dest
 
 	}
 
@@ -13190,12 +13349,12 @@ func ParseGetPersonaApiV1PersonasPersonaIdGetResponse(rsp *http.Response) (*GetP
 		}
 		response.JSON200 = &dest
 
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
-		var dest HTTPValidationError
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON422 = &dest
+		response.JSON4XX = &dest
 
 	}
 
@@ -13223,12 +13382,12 @@ func ParseUpdatePersonaApiV1PersonasPersonaIdPatchResponse(rsp *http.Response) (
 		}
 		response.JSON200 = &dest
 
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
-		var dest HTTPValidationError
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON422 = &dest
+		response.JSON4XX = &dest
 
 	}
 
@@ -13256,12 +13415,12 @@ func ParseListVersionsApiV1PersonasPersonaIdVersionsGetResponse(rsp *http.Respon
 		}
 		response.JSON200 = &dest
 
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
-		var dest HTTPValidationError
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON422 = &dest
+		response.JSON4XX = &dest
 
 	}
 
@@ -13289,12 +13448,12 @@ func ParseGetVersionApiV1PersonasPersonaIdVersionsVersionGetResponse(rsp *http.R
 		}
 		response.JSON200 = &dest
 
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
-		var dest HTTPValidationError
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON422 = &dest
+		response.JSON4XX = &dest
 
 	}
 
@@ -13322,6 +13481,13 @@ func ParseListPhoneNumbersApiV1PhoneNumbersGetResponse(rsp *http.Response) (*Lis
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
 	}
 
 	return response, nil
@@ -13348,12 +13514,12 @@ func ParseGetReviewApiV1ReviewConversationsConversationIdGetResponse(rsp *http.R
 		}
 		response.JSON200 = &dest
 
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
-		var dest HTTPValidationError
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON422 = &dest
+		response.JSON4XX = &dest
 
 	}
 
@@ -13381,12 +13547,12 @@ func ParseGetRecordingApiV1ReviewConversationsConversationIdRecordingGetResponse
 		}
 		response.JSON200 = &dest
 
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
-		var dest HTTPValidationError
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON422 = &dest
+		response.JSON4XX = &dest
 
 	}
 
@@ -13414,12 +13580,12 @@ func ParseLabelItemApiV1ReviewItemsItemIdLabelsPostResponse(rsp *http.Response) 
 		}
 		response.JSON201 = &dest
 
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
-		var dest HTTPValidationError
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON422 = &dest
+		response.JSON4XX = &dest
 
 	}
 
@@ -13447,6 +13613,13 @@ func ParseGetQueueApiV1ReviewQueueGetResponse(rsp *http.Response) (*GetQueueApiV
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
 	}
 
 	return response, nil
@@ -13473,12 +13646,12 @@ func ParseListRunsApiV1RunsGetResponse(rsp *http.Response) (*ListRunsApiV1RunsGe
 		}
 		response.JSON200 = &dest
 
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
-		var dest HTTPValidationError
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON422 = &dest
+		response.JSON4XX = &dest
 
 	}
 
@@ -13506,12 +13679,12 @@ func ParseCreateRunApiV1RunsPostResponse(rsp *http.Response) (*CreateRunApiV1Run
 		}
 		response.JSON202 = &dest
 
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
-		var dest HTTPValidationError
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON422 = &dest
+		response.JSON4XX = &dest
 
 	}
 
@@ -13539,12 +13712,12 @@ func ParseGetRunApiV1RunsRunIdGetResponse(rsp *http.Response) (*GetRunApiV1RunsR
 		}
 		response.JSON200 = &dest
 
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
-		var dest HTTPValidationError
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON422 = &dest
+		response.JSON4XX = &dest
 
 	}
 
@@ -13572,12 +13745,19 @@ func ParseCancelRunApiV1RunsRunIdCancelPostResponse(rsp *http.Response) (*Cancel
 		}
 		response.JSON200 = &dest
 
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
-		var dest HTTPValidationError
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 202:
+		var dest RunRead
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON422 = &dest
+		response.JSON202 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
 
 	}
 
@@ -13605,12 +13785,12 @@ func ParseGetRunMetricsApiV1RunsRunIdMetricsGetResponse(rsp *http.Response) (*Ge
 		}
 		response.JSON200 = &dest
 
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
-		var dest HTTPValidationError
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON422 = &dest
+		response.JSON4XX = &dest
 
 	}
 
@@ -13634,12 +13814,12 @@ func ParseDeleteScenarioApiV1ScenariosScenarioIdDeleteResponse(rsp *http.Respons
 	case rsp.StatusCode == 204:
 		break // No content-type
 
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
-		var dest HTTPValidationError
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON422 = &dest
+		response.JSON4XX = &dest
 
 	}
 
@@ -13667,12 +13847,12 @@ func ParseGetScenarioApiV1ScenariosScenarioIdGetResponse(rsp *http.Response) (*G
 		}
 		response.JSON200 = &dest
 
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
-		var dest HTTPValidationError
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON422 = &dest
+		response.JSON4XX = &dest
 
 	}
 
@@ -13700,12 +13880,12 @@ func ParseUpdateScenarioApiV1ScenariosScenarioIdPatchResponse(rsp *http.Response
 		}
 		response.JSON200 = &dest
 
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
-		var dest HTTPValidationError
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON422 = &dest
+		response.JSON4XX = &dest
 
 	}
 
@@ -13733,12 +13913,12 @@ func ParseListVersionsApiV1ScenariosScenarioIdVersionsGetResponse(rsp *http.Resp
 		}
 		response.JSON200 = &dest
 
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
-		var dest HTTPValidationError
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON422 = &dest
+		response.JSON4XX = &dest
 
 	}
 
@@ -13766,12 +13946,12 @@ func ParseGetVersionApiV1ScenariosScenarioIdVersionsVersionGetResponse(rsp *http
 		}
 		response.JSON200 = &dest
 
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
-		var dest HTTPValidationError
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON422 = &dest
+		response.JSON4XX = &dest
 
 	}
 
@@ -13799,12 +13979,12 @@ func ParseListVoicesApiV1VoicesGetResponse(rsp *http.Response) (*ListVoicesApiV1
 		}
 		response.JSON200 = &dest
 
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
-		var dest HTTPValidationError
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON422 = &dest
+		response.JSON4XX = &dest
 
 	}
 
@@ -13832,12 +14012,19 @@ func ParseCreateVoiceApiV1VoicesPostResponse(rsp *http.Response) (*CreateVoiceAp
 		}
 		response.JSON201 = &dest
 
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
-		var dest HTTPValidationError
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON422 = &dest
+		response.JSON4XX = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
 
 	}
 
@@ -13865,12 +14052,19 @@ func ParseLookupVoiceApiV1VoicesLookupGetResponse(rsp *http.Response) (*LookupVo
 		}
 		response.JSON200 = &dest
 
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
-		var dest HTTPValidationError
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON422 = &dest
+		response.JSON4XX = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
 
 	}
 
@@ -13891,12 +14085,19 @@ func ParsePreviewVoiceApiV1VoicesPreviewPostResponse(rsp *http.Response) (*Previ
 	}
 
 	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
-		var dest HTTPValidationError
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON422 = &dest
+		response.JSON4XX = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
 
 	}
 
@@ -13920,12 +14121,12 @@ func ParseDeleteVoiceApiV1VoicesVoiceIdDeleteResponse(rsp *http.Response) (*Dele
 	case rsp.StatusCode == 204:
 		break // No content-type
 
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
-		var dest HTTPValidationError
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON422 = &dest
+		response.JSON4XX = &dest
 
 	}
 
@@ -13953,12 +14154,12 @@ func ParseUpdateVoiceApiV1VoicesVoiceIdPatchResponse(rsp *http.Response) (*Updat
 		}
 		response.JSON200 = &dest
 
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
-		var dest HTTPValidationError
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON422 = &dest
+		response.JSON4XX = &dest
 
 	}
 

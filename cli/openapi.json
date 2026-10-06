@@ -22,6 +22,16 @@
                 }
               }
             }
+          },
+          "4XX": {
+            "description": "The request failed. The error tells why.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -59,12 +69,12 @@
               }
             }
           },
-          "422": {
-            "description": "Validation Error",
+          "4XX": {
+            "description": "The request failed. The error tells why.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -178,12 +188,12 @@
               }
             }
           },
-          "422": {
-            "description": "Validation Error",
+          "4XX": {
+            "description": "The request failed. The error tells why.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -226,12 +236,12 @@
               }
             }
           },
-          "422": {
-            "description": "Validation Error",
+          "4XX": {
+            "description": "The request failed. The error tells why.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -282,12 +292,12 @@
               }
             }
           },
-          "422": {
-            "description": "Validation Error",
+          "4XX": {
+            "description": "The request failed. The error tells why.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -321,12 +331,12 @@
           "204": {
             "description": "Successful Response"
           },
-          "422": {
-            "description": "Validation Error",
+          "4XX": {
+            "description": "The request failed. The error tells why.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -369,12 +379,12 @@
               }
             }
           },
-          "422": {
-            "description": "Validation Error",
+          "4XX": {
+            "description": "The request failed. The error tells why.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -422,12 +432,12 @@
               }
             }
           },
-          "422": {
-            "description": "Validation Error",
+          "4XX": {
+            "description": "The request failed. The error tells why.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -493,12 +503,12 @@
               }
             }
           },
-          "422": {
-            "description": "Validation Error",
+          "4XX": {
+            "description": "The request failed. The error tells why.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -550,12 +560,12 @@
               }
             }
           },
-          "422": {
-            "description": "Validation Error",
+          "4XX": {
+            "description": "The request failed. The error tells why.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -596,12 +606,12 @@
               }
             }
           },
-          "422": {
-            "description": "Validation Error",
+          "4XX": {
+            "description": "The request failed. The error tells why.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -766,12 +776,12 @@
               }
             }
           },
-          "422": {
-            "description": "Validation Error",
+          "4XX": {
+            "description": "The request failed. The error tells why.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -814,12 +824,12 @@
               }
             }
           },
-          "422": {
-            "description": "Validation Error",
+          "4XX": {
+            "description": "The request failed. The error tells why.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -862,12 +872,12 @@
               }
             }
           },
-          "422": {
-            "description": "Validation Error",
+          "4XX": {
+            "description": "The request failed. The error tells why.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -908,12 +918,12 @@
               }
             }
           },
-          "422": {
-            "description": "Validation Error",
+          "4XX": {
+            "description": "The request failed. The error tells why.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -956,12 +966,22 @@
               }
             }
           },
-          "422": {
-            "description": "Validation Error",
+          "4XX": {
+            "description": "The request failed. The error tells why.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "The call of the conversation is still stopping.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationRead"
                 }
               }
             }
@@ -1019,12 +1039,12 @@
               }
             }
           },
-          "422": {
-            "description": "Validation Error",
+          "4XX": {
+            "description": "The request failed. The error tells why.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -1068,12 +1088,12 @@
               }
             }
           },
-          "422": {
-            "description": "Validation Error",
+          "4XX": {
+            "description": "The request failed. The error tells why.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -1095,6 +1115,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Defaults"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "The request failed. The error tells why.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -1131,12 +1161,12 @@
               }
             }
           },
-          "422": {
-            "description": "Validation Error",
+          "4XX": {
+            "description": "The request failed. The error tells why.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -1178,12 +1208,22 @@
               }
             }
           },
-          "422": {
-            "description": "Validation Error",
+          "4XX": {
+            "description": "The request failed. The error tells why.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "An outside service is not set up, or it did not answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -1231,12 +1271,12 @@
               }
             }
           },
-          "422": {
-            "description": "Validation Error",
+          "4XX": {
+            "description": "The request failed. The error tells why.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -1272,12 +1312,22 @@
           "200": {
             "description": "Successful Response"
           },
-          "422": {
-            "description": "Validation Error",
+          "4XX": {
+            "description": "The request failed. The error tells why.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "An outside service is not set up, or it did not answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -1300,6 +1350,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/JudgeAgreement"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "The request failed. The error tells why.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -1330,6 +1390,16 @@
                   },
                   "type": "array",
                   "title": "Response List Labelers Api V1 Labelers Get"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "The request failed. The error tells why.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -1369,12 +1439,12 @@
               }
             }
           },
-          "422": {
-            "description": "Validation Error",
+          "4XX": {
+            "description": "The request failed. The error tells why.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -1416,12 +1486,12 @@
           "204": {
             "description": "Successful Response"
           },
-          "422": {
-            "description": "Validation Error",
+          "4XX": {
+            "description": "The request failed. The error tells why.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -1465,12 +1535,12 @@
               }
             }
           },
-          "422": {
-            "description": "Validation Error",
+          "4XX": {
+            "description": "The request failed. The error tells why.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -1511,12 +1581,12 @@
               }
             }
           },
-          "422": {
-            "description": "Validation Error",
+          "4XX": {
+            "description": "The request failed. The error tells why.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -1570,12 +1640,12 @@
               }
             }
           },
-          "422": {
-            "description": "Validation Error",
+          "4XX": {
+            "description": "The request failed. The error tells why.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -1618,12 +1688,12 @@
               }
             }
           },
-          "422": {
-            "description": "Validation Error",
+          "4XX": {
+            "description": "The request failed. The error tells why.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -1674,12 +1744,12 @@
               }
             }
           },
-          "422": {
-            "description": "Validation Error",
+          "4XX": {
+            "description": "The request failed. The error tells why.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -1713,12 +1783,12 @@
           "204": {
             "description": "Successful Response"
           },
-          "422": {
-            "description": "Validation Error",
+          "4XX": {
+            "description": "The request failed. The error tells why.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -1784,12 +1854,12 @@
               }
             }
           },
-          "422": {
-            "description": "Validation Error",
+          "4XX": {
+            "description": "The request failed. The error tells why.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -1841,12 +1911,12 @@
               }
             }
           },
-          "422": {
-            "description": "Validation Error",
+          "4XX": {
+            "description": "The request failed. The error tells why.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -1869,6 +1939,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/PhoneNumbers"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "The request failed. The error tells why.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -1900,6 +1980,16 @@
                   },
                   "type": "array",
                   "title": "Response Get Queue Api V1 Review Queue Get"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "The request failed. The error tells why.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -1958,12 +2048,12 @@
               }
             }
           },
-          "422": {
-            "description": "Validation Error",
+          "4XX": {
+            "description": "The request failed. The error tells why.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -2004,12 +2094,12 @@
               }
             }
           },
-          "422": {
-            "description": "Validation Error",
+          "4XX": {
+            "description": "The request failed. The error tells why.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -2063,12 +2153,12 @@
               }
             }
           },
-          "422": {
-            "description": "Validation Error",
+          "4XX": {
+            "description": "The request failed. The error tells why.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -2129,12 +2219,12 @@
               }
             }
           },
-          "422": {
-            "description": "Validation Error",
+          "4XX": {
+            "description": "The request failed. The error tells why.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -2221,12 +2311,12 @@
               }
             }
           },
-          "422": {
-            "description": "Validation Error",
+          "4XX": {
+            "description": "The request failed. The error tells why.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -2269,12 +2359,12 @@
               }
             }
           },
-          "422": {
-            "description": "Validation Error",
+          "4XX": {
+            "description": "The request failed. The error tells why.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -2318,12 +2408,12 @@
               }
             }
           },
-          "422": {
-            "description": "Validation Error",
+          "4XX": {
+            "description": "The request failed. The error tells why.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -2366,12 +2456,22 @@
               }
             }
           },
-          "422": {
-            "description": "Validation Error",
+          "4XX": {
+            "description": "The request failed. The error tells why.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "The run is cancelled, and some of its calls are still stopping.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunRead"
                 }
               }
             }
@@ -2424,12 +2524,12 @@
               }
             }
           },
-          "422": {
-            "description": "Validation Error",
+          "4XX": {
+            "description": "The request failed. The error tells why.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -2510,12 +2610,12 @@
               }
             }
           },
-          "422": {
-            "description": "Validation Error",
+          "4XX": {
+            "description": "The request failed. The error tells why.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -2584,12 +2684,22 @@
               }
             }
           },
-          "422": {
-            "description": "Validation Error",
+          "4XX": {
+            "description": "The request failed. The error tells why.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "An outside service is not set up, or it did not answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -2635,12 +2745,12 @@
           "204": {
             "description": "Successful Response"
           },
-          "422": {
-            "description": "Validation Error",
+          "4XX": {
+            "description": "The request failed. The error tells why.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -2686,12 +2796,12 @@
           "204": {
             "description": "Successful Response"
           },
-          "422": {
-            "description": "Validation Error",
+          "4XX": {
+            "description": "The request failed. The error tells why.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -2757,12 +2867,12 @@
               }
             }
           },
-          "422": {
-            "description": "Validation Error",
+          "4XX": {
+            "description": "The request failed. The error tells why.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -2805,12 +2915,12 @@
               }
             }
           },
-          "422": {
-            "description": "Validation Error",
+          "4XX": {
+            "description": "The request failed. The error tells why.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -2861,12 +2971,12 @@
               }
             }
           },
-          "422": {
-            "description": "Validation Error",
+          "4XX": {
+            "description": "The request failed. The error tells why.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -2900,12 +3010,12 @@
           "204": {
             "description": "Successful Response"
           },
-          "422": {
-            "description": "Validation Error",
+          "4XX": {
+            "description": "The request failed. The error tells why.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -2971,12 +3081,12 @@
               }
             }
           },
-          "422": {
-            "description": "Validation Error",
+          "4XX": {
+            "description": "The request failed. The error tells why.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -3028,12 +3138,12 @@
               }
             }
           },
-          "422": {
-            "description": "Validation Error",
+          "4XX": {
+            "description": "The request failed. The error tells why.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -3105,12 +3215,12 @@
               }
             }
           },
-          "422": {
-            "description": "Validation Error",
+          "4XX": {
+            "description": "The request failed. The error tells why.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -3149,12 +3259,22 @@
               }
             }
           },
-          "422": {
-            "description": "Validation Error",
+          "4XX": {
+            "description": "The request failed. The error tells why.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "An outside service is not set up, or it did not answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -3206,12 +3326,22 @@
               }
             }
           },
-          "422": {
-            "description": "Validation Error",
+          "4XX": {
+            "description": "The request failed. The error tells why.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "An outside service is not set up, or it did not answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -3264,12 +3394,12 @@
               }
             }
           },
-          "422": {
-            "description": "Validation Error",
+          "4XX": {
+            "description": "The request failed. The error tells why.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -3303,12 +3433,12 @@
           "204": {
             "description": "Successful Response"
           },
-          "422": {
-            "description": "Validation Error",
+          "4XX": {
+            "description": "The request failed. The error tells why.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -3340,12 +3470,22 @@
               "audio/wav": {}
             }
           },
-          "422": {
-            "description": "Validation Error",
+          "4XX": {
+            "description": "The request failed. The error tells why.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "An outside service is not set up, or it did not answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -5284,6 +5424,51 @@
         "title": "EndReason",
         "description": "Who or what ended the conversation, as Truman observed it."
       },
+      "ErrorBody": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "details": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/FieldError"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Details"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "ErrorBody"
+      },
+      "ErrorResponse": {
+        "properties": {
+          "error": {
+            "$ref": "#/components/schemas/ErrorBody"
+          }
+        },
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "title": "ErrorResponse",
+        "description": "The body of every error response."
+      },
       "EvaluationState": {
         "type": "string",
         "enum": [
@@ -5317,6 +5502,39 @@
         ],
         "title": "Fact",
         "description": "A value the caller has and gives when the agent asks for it."
+      },
+      "FieldError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Loc"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Msg"
+          },
+          "type": {
+            "type": "string",
+            "title": "Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "FieldError"
       },
       "GenerateScenarios": {
         "properties": {
@@ -5414,19 +5632,6 @@
           "stopped"
         ],
         "title": "GenerationStatus"
-      },
-      "HTTPValidationError": {
-        "properties": {
-          "detail": {
-            "items": {
-              "$ref": "#/components/schemas/ValidationError"
-            },
-            "type": "array",
-            "title": "Detail"
-          }
-        },
-        "type": "object",
-        "title": "HTTPValidationError"
       },
       "Header": {
         "properties": {
@@ -8895,46 +9100,6 @@
           "unclear"
         ],
         "title": "UnsureKind"
-      },
-      "ValidationError": {
-        "properties": {
-          "loc": {
-            "items": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "integer"
-                }
-              ]
-            },
-            "type": "array",
-            "title": "Location"
-          },
-          "msg": {
-            "type": "string",
-            "title": "Message"
-          },
-          "type": {
-            "type": "string",
-            "title": "Error Type"
-          },
-          "input": {
-            "title": "Input"
-          },
-          "ctx": {
-            "type": "object",
-            "title": "Context"
-          }
-        },
-        "type": "object",
-        "required": [
-          "loc",
-          "msg",
-          "type"
-        ],
-        "title": "ValidationError"
       },
       "Validity": {
         "properties": {

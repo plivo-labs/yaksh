@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from truman.api.auth import require_token
 from truman.api.deps import SessionDep, SettingsDep
+from truman.api.errors import CLIENT_ERRORS, json_errors
 from truman.api.pagination import Page, PageDep
 from truman.api.schemas.conversations import (
     ConversationEvaluation,
@@ -202,7 +203,15 @@ async def get_recording(conversation_id: uuid.UUID, session: SessionDep) -> File
     return FileResponse(conversation.recording_path, media_type="audio/wav")
 
 
-@router.post("/{conversation_id}/end")
+@router.post(
+    "/{conversation_id}/end",
+    responses={
+        status.HTTP_202_ACCEPTED: {
+            "model": ConversationRead,
+            "description": "The call of the conversation is still stopping.",
+        }
+    },
+)
 async def end_conversation(
     conversation_id: uuid.UUID, session: SessionDep, response: Response
 ) -> ConversationRead:
@@ -220,6 +229,7 @@ async def conversation_exists(conversation_id: uuid.UUID, request: Request) -> N
 @router.get(
     "/{conversation_id}/events",
     response_class=EventSourceResponse,
+    responses=json_errors(CLIENT_ERRORS),
     dependencies=[Depends(conversation_exists)],
 )
 async def stream_events(
@@ -246,6 +256,7 @@ class AudioStream(StreamingResponse):
 @router.get(
     "/{conversation_id}/listen",
     response_class=AudioStream,
+    responses=json_errors(CLIENT_ERRORS),
     dependencies=[Depends(conversation_live)],
 )
 async def listen(

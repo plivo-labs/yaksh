@@ -8,7 +8,7 @@ from fastapi import APIRouter, FastAPI, HTTPException, status
 
 from truman import __version__
 from truman.api.body_limit import BodySizeLimit
-from truman.api.errors import register_error_handlers
+from truman.api.errors import CLIENT_ERRORS, register_error_handlers
 from truman.api.routes import (
     agents,
     conversations,
@@ -112,7 +112,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     register_error_handlers(app)
     app.add_middleware(BodySizeLimit, max_bytes=MAX_REQUEST_BYTES)
 
-    api = APIRouter(prefix="/api/v1")
+    api = APIRouter(prefix="/api/v1", responses=CLIENT_ERRORS)
     api.include_router(health.router)
     api.include_router(agents.router)
     api.include_router(conversations.router)

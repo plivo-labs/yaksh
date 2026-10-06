@@ -8,6 +8,7 @@ from fastapi.sse import EventSourceResponse, ServerSentEvent
 
 from truman.api.auth import require_token
 from truman.api.deps import SessionDep
+from truman.api.errors import CLIENT_ERRORS, UNAVAILABLE, json_errors
 from truman.api.pagination import Page, PageDep
 from truman.api.schemas.scenarios import GenerationRead, ScenarioRead, ScenarioVersionRead
 from truman.domain.generation import GenerateScenarios
@@ -68,7 +69,11 @@ async def generation_events(
             await events.aclose()
 
 
-@router.post("/agents/{agent_id}/scenarios/generate", response_class=EventSourceResponse)
+@router.post(
+    "/agents/{agent_id}/scenarios/generate",
+    response_class=EventSourceResponse,
+    responses=json_errors({**CLIENT_ERRORS, **UNAVAILABLE}),
+)
 async def generate_scenarios(
     events: Annotated[
         AsyncGenerator[generation.Event], Depends(generation_events, scope="request")
