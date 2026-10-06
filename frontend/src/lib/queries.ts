@@ -381,9 +381,9 @@ export const CONVERSATIONS_PAGE = 25;
 export function useConversations(
   filters: Record<string, string>,
   page: number,
-  { pageSize = CONVERSATIONS_PAGE, live = false }: { pageSize?: number; live?: boolean } = {},
+  { live = false }: { live?: boolean } = {},
 ) {
-  const params = { ...filters, page: String(page), page_size: String(pageSize) };
+  const params = { ...filters, page: String(page), page_size: String(CONVERSATIONS_PAGE) };
   const search = new URLSearchParams(params).toString();
   return useQuery({
     queryKey: keys.conversations(params),

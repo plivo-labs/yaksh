@@ -1,6 +1,6 @@
 import { Plus } from "lucide-react";
-import { Fragment, type SubmitEvent, useState } from "react";
-import { Link } from "react-router";
+import { Fragment, type SubmitEvent, useLayoutEffect, useRef, useState } from "react";
+import { Link, useLocation } from "react-router";
 import { toast } from "sonner";
 
 import { DeleteConfirm, DiscardConfirm } from "@/components/confirm-dialogs";
@@ -60,13 +60,21 @@ function summary(rule: AgentRule): string {
 }
 
 /** The agent's rules with how each did, and the dialog that adds or edits one. A rule with no key
- * is not saved yet. */
+ * is not saved yet. An address that ends in `#rules` scrolls to the panel. */
 export function AgentRules({ agent }: { agent: Agent }) {
   const results = useRuleResults(agent.id);
   const [editing, setEditing] = useState<AgentRule | null>(null);
   const full = agent.rules.length >= MAX_RULES;
+  const panel = useRef<HTMLElement>(null);
+  const { hash } = useLocation();
+  useLayoutEffect(() => {
+    if (hash === "#rules") panel.current?.scrollIntoView();
+  }, [hash]);
   return (
     <ActionPanel
+      ref={panel}
+      title="Rules"
+      className="scroll-mt-5"
       action={
         <>
           <p className="mr-auto max-w-prose text-s-400 text-muted-foreground">

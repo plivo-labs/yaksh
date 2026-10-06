@@ -401,7 +401,7 @@ function RuleList({ rules, agentId }: { rules: RunVerdicts["rules"]; agentId: st
           variant="ghost"
           size="sm"
           nativeButton={false}
-          render={<Link to={`/agents/${agentId}?tab=rules`} />}
+          render={<Link to={`/agents/${agentId}?tab=config#rules`} />}
         >
           Edit rules
           <ChevronRight />

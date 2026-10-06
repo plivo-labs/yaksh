@@ -361,7 +361,7 @@ export function NewAgentPage() {
           <Section title="What it does" description={CONTEXT_NOTE}>
             <ContextFields form={form} />
           </Section>
-          <KnowledgeBasePanel source={knowledgeBase} title="Knowledge base" />
+          <KnowledgeBasePanel source={knowledgeBase} />
         </div>
         <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-2">
           {save.error && <FieldError className="mr-auto">{save.error.message}</FieldError>}

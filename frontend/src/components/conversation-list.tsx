@@ -44,7 +44,6 @@ export function ConversationList({
   empty,
   place,
   showAgent = false,
-  agentVersion,
   sort,
 }: {
   query: {
@@ -56,8 +55,6 @@ export function ConversationList({
   empty: string;
   place: "page" | "panel";
   showAgent?: boolean;
-  /** The agent's current version: rows of an earlier version say so. */
-  agentVersion?: number;
   sort?: { value: string; onSort: (sort: string) => void };
 }) {
   const grid = cn(showAgent ? COLUMNS.withAgent : COLUMNS.withoutAgent, GUTTER[place]);
@@ -137,7 +134,6 @@ export function ConversationList({
               conversation={conversation}
               grid={grid}
               showAgent={showAgent}
-              agentVersion={agentVersion}
             />
           ))
         )}
@@ -150,12 +146,10 @@ function ConversationRow({
   conversation,
   grid,
   showAgent,
-  agentVersion,
 }: {
   conversation: ConversationSummary;
   grid: string;
   showAgent: boolean;
-  agentVersion: number | undefined;
 }) {
   const name = label(conversation);
   const end = conversation.end_reason && END_REASON_LABELS[conversation.end_reason];
@@ -198,9 +192,6 @@ function ConversationRow({
         <span className="truncate text-s-400 text-muted-foreground">
           {conversation.persona_name}
           {conversation.repeat !== null && `, repeat ${conversation.repeat}`}
-          {agentVersion !== undefined &&
-            conversation.agent_version < agentVersion &&
-            ", earlier version"}
         </span>
         <span className="truncate text-s-400 text-muted-foreground @3xl/conversations:hidden">
           {end && `${end}, `}

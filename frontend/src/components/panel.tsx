@@ -17,8 +17,8 @@ export function PanelHeader({ title, action }: { title: ReactNode; action?: Reac
   );
 }
 
-/** A panel with its actions above its content and `notice` between the two. Inside a tab the tab
- * names the panel, so it has no `title`. */
+/** A panel with its actions above its content and `notice` between the two. A panel that fills a
+ * tab alone has no `title`: the tab names it. */
 export function ActionPanel({
   title,
   action,
