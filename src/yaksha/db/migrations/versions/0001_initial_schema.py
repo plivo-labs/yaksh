@@ -878,9 +878,30 @@ def upgrade() -> None:
         sa.Column("seen_at", sa.DateTime(timezone=True), nullable=False),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_workers")),
     )
+    op.create_table(
+        "app_settings",
+        sa.Column("id", sa.Integer(), nullable=False),
+        sa.Column("version", sa.Integer(), server_default="0", nullable=False),
+        sa.Column(
+            "values",
+            postgresql.JSONB(astext_type=sa.Text()),
+            server_default=sa.text("'{}'::jsonb"),
+            nullable=False,
+        ),
+        sa.Column(
+            "secrets",
+            postgresql.JSONB(astext_type=sa.Text()),
+            server_default=sa.text("'{}'::jsonb"),
+            nullable=False,
+        ),
+        sa.CheckConstraint("id = 1", name=op.f("ck_app_settings_one_row")),
+        sa.PrimaryKeyConstraint("id", name=op.f("pk_app_settings")),
+    )
+    op.execute("INSERT INTO app_settings (id) VALUES (1)")
 
 
 def downgrade() -> None:
+    op.drop_table("app_settings")
     op.drop_table("workers")
     op.drop_table("documents")
     op.drop_table("phone_numbers")

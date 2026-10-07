@@ -2,7 +2,7 @@ import asyncio
 import uuid
 from pathlib import Path
 
-from tests.conftest import AGENT, CALLER
+from tests.conftest import AGENT, APP_SETTINGS, CALLER
 from yaksha.domain.agents import AgentConfig
 from yaksha.domain.conversations import (
     CallObserver,
@@ -21,6 +21,7 @@ REQUEST = CallRequest(
     caller_number="+15550100000",
     max_duration_s=10,
     output_dir=Path("/tmp/unused"),
+    app_settings=APP_SETTINGS,
 )
 
 

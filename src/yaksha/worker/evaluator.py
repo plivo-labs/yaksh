@@ -7,6 +7,8 @@ import logging
 import os
 import socket
 import uuid
+from collections.abc import Callable
+from dataclasses import dataclass
 
 from pipecat.classifiers.jev.classifier import JevClassifier
 from sqlalchemy import select
@@ -23,14 +25,16 @@ from yaksha.db.models import (
 from yaksha.db.models import Document as DocumentRow
 from yaksha.diagnostics import describe_exception
 from yaksha.domain.agents import AgentConfig
-from yaksha.domain.language_models import JsonModel, ModelCallError
+from yaksha.domain.language_models import JsonModel
 from yaksha.domain.personas import PersonaConfig
 from yaksha.domain.scenarios import ScenarioConfig
+from yaksha.domain.settings import AppSettings, reveal
 from yaksha.evaluation import call, evaluations, labels
 from yaksha.evaluation.call import JUDGES, SOURCE_JUDGES, Judging
 from yaksha.evaluation.jev import JEV, JEV_MODEL, Jev
 from yaksha.evaluation.sources import Document
 from yaksha.integrations.openai_models import OpenAIJsonModel
+from yaksha.settings.store import SettingsSource
 
 log = logging.getLogger(__name__)
 
@@ -39,44 +43,63 @@ DRAIN_S = 8.0
 Docker gives a container to stop. An evaluation it cancels is claimed again after its lease."""
 
 
-PROBE = {
-    "type": "object",
-    "properties": {"yes": {"type": "boolean"}},
-    "required": ["yes"],
-    "additionalProperties": False,
-}
-"""A first question at start, so a judge model that cannot answer stops the evaluator at once
-instead of failing every item."""
-PROBE_TIMEOUT_S = 20.0
 PROVIDER = "openai_compatible"
 
 
-def judge_model(settings: Settings, *, sources: bool = False) -> OpenAIJsonModel | None:
-    """The model that judges calls; None when the judges are off or no key is set. The judges
-    of the agent's whole instructions or documents get a longer timeout and one retry: their
+@dataclass(frozen=True)
+class JudgeClients:
+    """The clients that judge calls under one version of the settings. model is None while no
+    LLM key is saved: calls then get the code metrics and phrase rules only."""
+
+    model: JsonModel | None
+    sources_model: JsonModel | None = None
+    """Judges the agent's instructions and documents; model when None."""
+    jev: Jev | None = None
+
+    async def close(self) -> None:
+        for client in (self.model, self.sources_model, self.jev):
+            if client is not None:
+                await client.close()
+
+
+def judge_clients(settings: AppSettings) -> JudgeClients:
+    """The judge model at the LLM provider, and Jev when a TypeSafe key is saved. The judges of
+    the agent's whole instructions or documents get a longer timeout and one retry: their
     requests are large."""
-    key = settings.judge_openai_api_key or settings.openai_api_key
-    if not settings.judges_on or key is None:
-        return None
-    return OpenAIJsonModel.openai(
-        key.get_secret_value(),
-        settings.judge_llm_model,
-        base_url=settings.judge_openai_base_url or settings.openai_base_url,
-        timeout_s=settings.judge_sources_timeout_s if sources else settings.judge_llm_timeout_s,
-        reasoning_effort=settings.judge_llm_reasoning_effort,
-        retries=1 if sources else 3,
-        max_output_tokens=settings.judge_max_output_tokens,
-    )
+    key = settings.secrets.llm_api_key
+    if key is None:
+        return JudgeClients(model=None)
+    judges = settings.judges
+
+    def model(*, sources: bool) -> OpenAIJsonModel:
+        return OpenAIJsonModel.openai(
+            key.get_secret_value(),
+            judges.model,
+            base_url=settings.llm.base_url,
+            timeout_s=judges.sources_timeout_s if sources else judges.timeout_s,
+            reasoning_effort=judges.reasoning_effort,
+            retries=1 if sources else 3,
+            max_output_tokens=judges.max_output_tokens,
+        )
+
+    jev = None
+    if settings.secrets.typesafe_api_key is not None:
+        classifier = JevClassifier(
+            api_key=settings.secrets.typesafe_api_key.get_secret_value(), model=JEV_MODEL
+        )
+        jev = Jev(classifier, judges.jev_pass_bar)
+    return JudgeClients(model(sources=False), model(sources=True), jev)
 
 
-def jev_first_pass(settings: Settings) -> Jev | None:
-    """Jev, when a TypeSafe key is set."""
-    if settings.typesafe_api_key is None:
-        return None
-    classifier = JevClassifier(
-        api_key=settings.typesafe_api_key.get_secret_value(), model=JEV_MODEL
+def judging_inputs(settings: AppSettings) -> tuple[object, ...]:
+    """What the judging depends on; other changes to the settings keep the clients."""
+
+    return (
+        settings.llm.base_url,
+        reveal(settings.secrets.llm_api_key),
+        reveal(settings.secrets.typesafe_api_key),
+        settings.judges,
     )
-    return Jev(classifier, settings.jev_pass_bar)
 
 
 async def persona_prompt(session: AsyncSession, conversation: Conversation) -> str:
@@ -106,83 +129,81 @@ class Evaluator:
         self,
         sessionmaker: async_sessionmaker[AsyncSession],
         settings: Settings,
-        model: JsonModel | None = None,
-        sources_model: JsonModel | None = None,
-        jev: Jev | None = None,
+        source: SettingsSource,
+        clients: Callable[[AppSettings], JudgeClients] = judge_clients,
     ) -> None:
-        """model judges calls; None runs the code metrics and phrase rules only. sources_model
-        judges the agent's instructions and documents; model when None."""
+        """clients builds the judge clients for a version of the stored settings."""
         self._sessionmaker = sessionmaker
         self._settings = settings
-        self._model = model
-        self._sources_model = sources_model
-        self._jev = jev
+        self._source = source
+        self._clients = clients
         self._judging: Judging | None = None
+        self._judging_inputs: tuple[object, ...] | None = None
+        self._in_use: list[JudgeClients] = []
+        """Every client set built; one replaced by new settings may still serve an evaluation,
+        so all are closed at the end."""
+        self._prepared = asyncio.Lock()
         self.evaluator_id = f"{socket.gethostname()}:{os.getpid()}:{uuid.uuid4().hex[:8]}"
         self._slots = asyncio.Semaphore(settings.evaluator_concurrency)
         self._tasks: set[asyncio.Task[None]] = set()
 
-    async def _prepare_judging(self) -> Judging | None:
-        if self._model is None:
+    async def close(self) -> None:
+        for clients in self._in_use:
+            await clients.close()
+
+    async def _judging_for(self, settings: AppSettings) -> Judging | None:
+        """The judging of these settings, built again when what it depends on changed."""
+        async with self._prepared:
+            inputs = judging_inputs(settings)
+            if inputs != self._judging_inputs:
+                clients = self._clients(settings)
+                self._in_use.append(clients)
+                self._judging = await self._prepare_judging(settings, clients)
+                self._judging_inputs = inputs
+            return self._judging
+
+    async def _prepare_judging(self, app: AppSettings, clients: JudgeClients) -> Judging | None:
+        if clients.model is None:
             log.warning(
-                "the judges are off or have no key: calls get code metrics and phrase rules only"
+                "no LLM provider key is saved: calls get code metrics and phrase rules only"
             )
             return None
+        judges = app.judges
         settings = {
-            "reasoning_effort": self._settings.judge_llm_reasoning_effort,
-            "max_output_tokens": self._settings.judge_max_output_tokens,
-            "timeout_s": self._settings.judge_llm_timeout_s,
+            "reasoning_effort": judges.reasoning_effort,
+            "max_output_tokens": judges.max_output_tokens,
+            "timeout_s": judges.timeout_s,
             "retries": 3,
         }
-        sources = settings | {"timeout_s": self._settings.judge_sources_timeout_s, "retries": 1}
-        model = self._settings.judge_llm_model
-        try:
-            await asyncio.wait_for(
-                self._model.complete_json(
-                    system="Answer the question.",
-                    user="Is this a test?",
-                    name="probe",
-                    schema=PROBE,
-                ),
-                PROBE_TIMEOUT_S,
-            )
-        except TimeoutError:
-            log.warning("the judge model %s did not answer a first check in time", model)
-        except ModelCallError as error:
-            if not error.temporary:
-                raise RuntimeError(
-                    f"the judge model {model} cannot be used ({error}); set JUDGE_LLM_MODEL to "
-                    "a model the judge endpoint has, or to off to turn judging off"
-                ) from error
-            log.warning("the judge model %s did not answer a first check: %s", model, error)
+        sources = settings | {"timeout_s": judges.sources_timeout_s, "retries": 1}
+        jev = clients.jev
         async with self._sessionmaker() as session:
             versions = await evaluations.stored_judge_versions(
                 session,
                 [
-                    judge.version(PROVIDER, model, sources if judge in SOURCE_JUDGES else settings)
+                    judge.version(
+                        PROVIDER, judges.model, sources if judge in SOURCE_JUDGES else settings
+                    )
                     for judge in JUDGES
                 ]
                 + (
-                    [JEV.version("typesafe", self._jev.model, {"pass_bar": self._jev.pass_bar})]
-                    if self._jev is not None
+                    [JEV.version("typesafe", jev.model, {"pass_bar": jev.pass_bar})]
+                    if jev is not None
                     else []
                 ),
             )
-        log.info(
-            "judging with %s%s", model, f", Jev first ({self._jev.model})" if self._jev else ""
-        )
+        log.info("judging with %s%s", judges.model, f", Jev first ({jev.model})" if jev else "")
         return Judging(
-            model=self._model,
-            sources_model=self._sources_model or self._model,
+            model=clients.model,
+            sources_model=clients.sources_model or clients.model,
             versions=versions,
             slots=asyncio.Semaphore(self._settings.evaluator_judge_concurrency),
-            max_input_chars=self._settings.judge_max_input_chars,
-            jev=self._jev,
+            max_input_chars=judges.max_input_chars,
+            jev=jev,
         )
 
     async def run(self, stop: asyncio.Event) -> None:
         log.info("evaluator %s started", self.evaluator_id)
-        self._judging = await self._prepare_judging()
         try:
             while not stop.is_set():
                 try:
@@ -224,12 +245,14 @@ class Evaluator:
         held.set()
         heartbeat = asyncio.create_task(self._keep(evaluation, held))
         try:
+            app = await self._source.current()
+            judging = await self._judging_for(app)
             async with self._sessionmaker() as session:
                 conversation = await session.get_one(Conversation, evaluation.conversation_id)
                 agent = await session.get_one(AgentVersion, conversation.agent_version_id)
                 scenario = await session.get_one(ScenarioVersion, conversation.scenario_version_id)
                 agent_config = AgentConfig.model_validate(agent.config)
-                judged = self._judging is not None and call.judged(conversation)
+                judged = judging is not None and call.judged(conversation)
                 persona = await persona_prompt(session, conversation) if judged else None
                 documents = await knowledge_base(session, agent_config) if judged else []
             evaluated = await call.evaluate(
@@ -238,16 +261,13 @@ class Evaluator:
                 ScenarioConfig.model_validate(scenario.config),
                 persona,
                 documents,
-                self._judging,
+                judging,
                 retry_later=evaluation.attempts < evaluations.MAX_ATTEMPTS,
             )
             if not held.is_set():
                 return
             async with self._sessionmaker() as session:
-                audit = (
-                    labels.hash_fraction(evaluation.conversation_id)
-                    < self._settings.audit_sample_rate
-                )
+                audit = labels.hash_fraction(evaluation.conversation_id) < app.audit.sample_rate
                 if not await evaluations.finish(
                     session, evaluation.id, evaluation.claim_seq, evaluated, audit=audit
                 ):

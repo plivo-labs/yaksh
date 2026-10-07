@@ -6,7 +6,7 @@ from pydantic import AwareDatetime
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from yaksha.api.auth import require_token
-from yaksha.api.deps import SessionDep, SettingsDep
+from yaksha.api.deps import AppSettingsDep, SessionDep, SettingsDep
 from yaksha.api.pagination import Page, PageDep
 from yaksha.api.schemas.runs import RunRead, RunSummary
 from yaksha.db.models import Run
@@ -46,9 +46,10 @@ async def create_run(
     command: RunCreate,
     session: SessionDep,
     settings: SettingsDep,
+    app: AppSettingsDep,
     idempotency_key: Annotated[str | None, Header(min_length=1, max_length=200)] = None,
 ) -> RunSummary:
-    run = await runs.create_run(session, settings, command, idempotency_key)
+    run = await runs.create_run(session, settings, app, command, idempotency_key)
     return (await summaries(session, [run]))[0]
 
 

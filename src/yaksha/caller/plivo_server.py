@@ -87,9 +87,13 @@ def public_request_url(base: str, path: str, query: str) -> str:
 
 
 async def signed_fields(
-    request: Request, public_url: str, auth_token: str
+    request: Request, public_url: str, auth_token: str | None
 ) -> dict[str, str] | None:
-    """The request's query and form fields, or None when Plivo did not sign it."""
+    """The request's query and form fields, or None when Plivo did not sign it. Without a
+    saved auth token no request counts as signed."""
+    if auth_token is None:
+        log.warning("refused a request to %s: no Plivo auth token is saved", request.url.path)
+        return None
     form = await request.form()
     params: dict[str, list[str]] = {}
     for key, value in form.multi_items():
@@ -139,9 +143,13 @@ def plus_e164(number: str) -> str:
 
 
 def create_app(
-    registry: StreamRegistry, public_url: str, auth_token: str, accept: Accept
+    registry: StreamRegistry,
+    public_url: str,
+    auth_token: Callable[[], str | None],
+    accept: Accept,
 ) -> FastAPI:
-    """accept admits calls to Yaksha's numbers, or says why it refuses them."""
+    """accept admits calls to Yaksha's numbers, or says why it refuses them. auth_token gives
+    the Plivo auth token of the current settings, so a changed token applies at once."""
     app = FastAPI(title="Yaksha worker", docs_url=None, redoc_url=None, openapi_url=None)
 
     def expected(conversation_id: str) -> PendingStream | None:
@@ -154,7 +162,7 @@ def create_app(
     @app.post("/answer/{conversation_id}")
     async def answer(conversation_id: str, request: Request) -> Response:
         """Plivo fetches this when the agent answers; an error here reads as a platform fault."""
-        report = await signed_fields(request, public_url, auth_token)
+        report = await signed_fields(request, public_url, auth_token())
         if report is None:
             return Response(status_code=403)
         entry = expected(conversation_id)
@@ -170,7 +178,7 @@ def create_app(
     async def incoming(request: Request) -> Response:
         """An outbound agent calls one of Yaksha's numbers; answer it for the conversation
         waiting on that number, or refuse it."""
-        report = await signed_fields(request, public_url, auth_token)
+        report = await signed_fields(request, public_url, auth_token())
         if report is None:
             return Response(status_code=403)
         call = IncomingCall(
@@ -199,7 +207,7 @@ def create_app(
 
     @app.post("/incoming/hangup")
     async def incoming_hangup(request: Request) -> Response:
-        report = await signed_fields(request, public_url, auth_token)
+        report = await signed_fields(request, public_url, auth_token())
         if report is None:
             return Response(status_code=403)
         log.info("plivo reported %s for incoming call %s", summary(report), report.get("CallUUID"))
@@ -210,7 +218,7 @@ def create_app(
 
     @app.post("/callbacks/{conversation_id}")
     async def callback(conversation_id: str, request: Request) -> Response:
-        report = await signed_fields(request, public_url, auth_token)
+        report = await signed_fields(request, public_url, auth_token())
         if report is None:
             return Response(status_code=403)
         log.info("plivo reported %s for conversation %s", summary(report), conversation_id)
@@ -223,7 +231,7 @@ def create_app(
     async def stream_status(conversation_id: str, request: Request) -> Response:
         """Stream events (started, audio cleared, stopped) are only logged: the socket and the
         hangup report already tell a call what happened."""
-        report = await signed_fields(request, public_url, auth_token)
+        report = await signed_fields(request, public_url, auth_token())
         if report is None:
             return Response(status_code=403)
         log.info("plivo reported %s for the stream of %s", summary(report), conversation_id)
@@ -235,7 +243,8 @@ def create_app(
         url = public_request_url(
             stream_signature_base(public_url), websocket.url.path, websocket.url.query
         )
-        if not is_signed(websocket.headers, auth_token, "GET", url, {}):
+        token = auth_token()
+        if token is None or not is_signed(websocket.headers, token, "GET", url, {}):
             log.warning("refused an unsigned stream for conversation %s", conversation_id)
             await websocket.close(code=1008)
             return

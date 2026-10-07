@@ -11,9 +11,19 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from yaksha.config import Settings
 from yaksha.db.models import Conversation, PhoneNumber
 from yaksha.domain.numbers import AccountNumber
+from yaksha.domain.settings import AppSettings
 from yaksha.simulation.workers import receiving_problem
 
-PHONE_SETTINGS = "set PLIVO_AUTH_ID, PLIVO_AUTH_TOKEN and YAKSHA_PUBLIC_URL"
+
+def phone_problem(settings: Settings, app: AppSettings) -> str | None:
+    """Why phone calls are off, or None when they are on."""
+    if app.plivo_credentials is None:
+        return "add the Plivo Auth ID and Auth token in Settings"
+    if app.missing_caller_keys:
+        return f"add the {', '.join(app.missing_caller_keys)} key in Settings"
+    if settings.public_url is None:
+        return "set YAKSHA_PUBLIC_URL to the address Plivo can reach"
+    return None
 
 
 class UnknownNumbersError(Exception):
@@ -154,10 +164,13 @@ async def release_numbers(
     )
 
 
-async def outbound_problem(session: AsyncSession, settings: Settings) -> str | None:
+async def outbound_problem(
+    session: AsyncSession, settings: Settings, app: AppSettings
+) -> str | None:
     """Why an outbound test could not get its call now, or None when it could."""
-    if not settings.phone_enabled:
-        return PHONE_SETTINGS
+    problem = phone_problem(settings, app)
+    if problem is not None:
+        return problem
     app_id = settings.plivo_app_id
     if app_id is None:
         return "set YAKSHA_PLIVO_APP_ID"

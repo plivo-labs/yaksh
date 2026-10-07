@@ -1,10 +1,10 @@
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query, Request, status
+from fastapi import APIRouter, Depends, Query, status
 
 from yaksha.api.auth import require_token
-from yaksha.api.deps import SessionDep
+from yaksha.api.deps import BriefModelDep, SessionDep
 from yaksha.api.errors import UNAVAILABLE
 from yaksha.api.pagination import Page, PageDep
 from yaksha.api.schemas.agents import AgentRead, AgentSummary, AgentVersionRead
@@ -49,10 +49,10 @@ async def read_curl_command(curl: CurlCommand) -> StartRequestDraft:
 
 
 @router.post("/draft-brief", responses=UNAVAILABLE)
-async def draft_agent_brief(source: BriefSource, request: Request) -> BriefDraft:
+async def draft_agent_brief(source: BriefSource, model: BriefModelDep) -> BriefDraft:
     """Draft a brief from an agent's config, for the person to check and change. Nothing is
     saved."""
-    return BriefDraft(brief=await draft_brief(request.app.state.brief_model, source.config))
+    return BriefDraft(brief=await draft_brief(model, source.config))
 
 
 @router.get("")

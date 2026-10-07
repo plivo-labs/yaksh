@@ -12,6 +12,7 @@ from yaksha.domain.background_noise import NoiseMix
 from yaksha.domain.languages import Language
 from yaksha.domain.latency import AgentMedia, CallerReplyWindow, LoopLag
 from yaksha.domain.scenarios import Fact
+from yaksha.domain.settings import AppSettings
 from yaksha.domain.voices import VoiceSettings
 
 
@@ -266,6 +267,8 @@ class CallRequest(BaseModel):
     accept_calls_until: datetime | None = None
     """Outbound: when the window for the agent's call closes."""
     output_dir: Path
+    app_settings: AppSettings
+    """The settings when the call started; a change during the call does not reach it."""
 
 
 class CallOutcome(BaseModel):

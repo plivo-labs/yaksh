@@ -55,13 +55,15 @@ WRITERS = 4
 """Writer calls at once."""
 MAX_CRITERIA = 10
 MAX_NAME_CHARS = 80
-MODEL_OFF = "scenario generation is off: set OPENAI_API_KEY"
+MODEL_OFF = "scenario generation is off: add the LLM provider key in Settings"
 
 
 @dataclass(frozen=True)
 class Prepared:
     """Everything a generation reads, checked before any model call."""
 
+    model: JsonModel
+    """The model the generation runs on, checked to exist."""
     command: GenerateScenarios
     agent_id: uuid.UUID
     agent_name: str
@@ -148,6 +150,7 @@ async def prepare(
         .all()
     )
     prepared = Prepared(
+        model=model,
         command=command,
         agent_id=agent.id,
         agent_name=agent.name,
@@ -173,11 +176,12 @@ async def prepare(
 
 
 async def generate(
-    sessionmaker: async_sessionmaker[AsyncSession], model: JsonModel, prepared: Prepared
+    sessionmaker: async_sessionmaker[AsyncSession], prepared: Prepared
 ) -> AsyncGenerator[Event]:
     """The events of one generation. Closing the iterator, or cancelling it when the console
     disconnects, stops it: what is saved stays, and the generation is recorded as stopped."""
     command = prepared.command
+    model = prepared.model
     # Shielded, so a committed row always reaches the finally below.
     with anyio.CancelScope(shield=True):
         async with sessionmaker() as session:

@@ -32,7 +32,7 @@ import { cn } from "@/lib/utils";
 const PLACEHOLDERS: { name: string; meaning: string }[] = [
   { name: "{{yaksha.conversation_id}}", meaning: "the test call's ID" },
   { name: "{{agent_data.<name>}}", meaning: "a value from the scenario's data sent to the agent" },
-  { name: "{{env.YAKSHA_TRIGGER_<NAME>}}", meaning: "a secret in Yaksha's environment" },
+  { name: "{{secrets.<NAME>}}", meaning: "a trigger secret from Settings" },
 ];
 
 const METHODS: { value: TriggerMethod; label: string }[] = [
@@ -250,7 +250,7 @@ export function OutboundFields({
                 pairs={draft.headers}
                 noun="Header"
                 namePlaceholder="Authorization"
-                valuePlaceholder="Bearer {{env.YAKSHA_TRIGGER_KEY}}"
+                valuePlaceholder="Bearer {{secrets.API_KEY}}"
                 onChange={(next) => set("headers", next)}
               />
               {problems.headers && <FieldError>{problems.headers}</FieldError>}

@@ -40,5 +40,5 @@ async def test_a_draft_that_cannot_be_made_says_so(
 
 
 async def test_no_draft_without_a_model() -> None:
-    with pytest.raises(UnavailableError, match="OPENAI_API_KEY"):
+    with pytest.raises(UnavailableError, match="LLM provider key"):
         await draft_brief(None, "You book teeth.")

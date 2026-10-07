@@ -6,7 +6,7 @@ from yaksha.domain.language_models import JsonModel, ModelCallError
 from yaksha.simulation.generation_prompts import TEXT, strict_object
 from yaksha.simulation.templating import render
 
-MODEL_OFF = "drafting a brief is off: set OPENAI_API_KEY"
+MODEL_OFF = "drafting a brief is off: add the LLM provider key in Settings"
 BRIEF_SYSTEM = render("brief_system.j2")
 BRIEF_SCHEMA = strict_object({"brief": TEXT})
 MAX_SOURCE_CHARS = 200_000

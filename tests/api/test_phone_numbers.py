@@ -8,7 +8,6 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tests.conftest import FakeCaller, create_agent_id, start, wait_for, wait_until
-from yaksha.__main__ import sync_pool
 from yaksha.config import Settings
 from yaksha.db.models import Conversation, PhoneNumber
 from yaksha.db.session import create_engine, create_sessionmaker
@@ -16,6 +15,7 @@ from yaksha.domain.conversations import CallOutcome, ConversationStatus, EndReas
 from yaksha.domain.numbers import AccountNumber, PlivoApplication
 from yaksha.integrations.plivo import PlivoApi, PlivoError
 from yaksha.simulation import conversations, numbers
+from yaksha.worker.phone_account import sync_pool
 from yaksha.worker.worker import Worker
 
 NUMBER = "+17862242321"

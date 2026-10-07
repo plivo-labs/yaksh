@@ -15,10 +15,11 @@ from yaksha.domain.agents import Direction
 from yaksha.domain.background_noise import BackgroundNoise, NoiseLevel, NoiseSound
 from yaksha.domain.errors import NotFoundError, ValidationError
 from yaksha.domain.languages import Language
+from yaksha.domain.settings import AppSettings
 from yaksha.domain.triggers import check_agent_data
 from yaksha.simulation.agents import config_of as agent_config_of
 from yaksha.simulation.languages import LANGUAGES
-from yaksha.simulation.numbers import PHONE_SETTINGS, outbound_problem
+from yaksha.simulation.numbers import outbound_problem, phone_problem
 from yaksha.simulation.personas import config_of as persona_config_of
 from yaksha.simulation.personas import live_personas
 from yaksha.simulation.prompts import caller_instructions
@@ -50,6 +51,7 @@ class Inputs:
 async def snapshot(
     session: AsyncSession,
     settings: Settings,
+    app: AppSettings,
     agent: Agent,
     scenario_ids: Sequence[uuid.UUID],
     background_noise: BackgroundNoise | None,
@@ -59,10 +61,11 @@ async def snapshot(
     scenario runs with its own persona, and plays background_noise when one is given, else its
     persona's. The caller holds the agent's lock.
     A refusal about a scenario names it."""
-    if not settings.phone_enabled:
-        raise ValidationError(f"phone calls are off: {PHONE_SETTINGS}")
+    problem = phone_problem(settings, app)
+    if problem is not None:
+        raise ValidationError(f"phone calls are off: {problem}")
     if agent.direction is Direction.OUTBOUND:
-        problem = await outbound_problem(session, settings)
+        problem = await outbound_problem(session, settings, app)
         if problem is not None:
             raise ValidationError(f"outbound tests are off: {problem}")
     scenarios = await scenarios_to_start(session, agent, scenario_ids)
@@ -102,7 +105,7 @@ async def snapshot(
         .tuples()
         .all()
     )
-    today = datetime.now(ZoneInfo(settings.timezone)).date()
+    today = datetime.now(ZoneInfo(app.phone.timezone)).date()
     outbound = agent_config_of(agent).outbound if agent.direction is Direction.OUTBOUND else None
     inputs = []
     for scenario in scenarios:
@@ -132,7 +135,7 @@ async def snapshot(
                 ),
                 nudge=LANGUAGES[config.language].nudge,
                 today=today,
-                time_zone=settings.timezone,
+                time_zone=app.phone.timezone,
                 background_noise_sound=noise.sound,
                 background_noise_level=noise.level,
             )

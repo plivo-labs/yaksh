@@ -5,8 +5,7 @@ from typing import Any
 import pytest
 from pydantic import ValidationError
 
-from tests.conftest import Db, Scripted
-from yaksha.config import Settings
+from tests.conftest import Scripted
 from yaksha.diagnostics import describe_exception
 from yaksha.domain.conversations import Role, Transcript, Turn, WireEvent, WireEventKind
 from yaksha.domain.evaluations import DecidedBy, ItemRole, Outcome, UnsureKind, Verdict
@@ -17,7 +16,6 @@ from yaksha.evaluation.criteria import judge_criterion, judge_rule
 from yaksha.evaluation.judging import JudgeUnavailable
 from yaksha.evaluation.rules import gate_open, phrase_item
 from yaksha.evaluation.verdicts import verdict
-from yaksha.worker.evaluator import Evaluator
 
 TURNS = [
     Turn(role=Role.AGENT, text="Thanks for calling Maple Dental.", started_at_ms=0, ended_at_ms=1),
@@ -265,12 +263,3 @@ def test_a_group_of_errors_is_described_by_the_errors_in_it() -> None:
     group = ExceptionGroup("unhandled errors in a TaskGroup", [JudgeUnavailable("HTTP 429")])
 
     assert describe_exception(group) == "JudgeUnavailable: HTTP 429"
-
-
-async def test_an_evaluator_whose_judge_model_cannot_answer_stops_at_once(
-    db: Db, settings: Settings
-) -> None:
-    unknown = Scripted(ModelCallError("the model call failed: HTTP 404", temporary=False))
-
-    with pytest.raises(RuntimeError, match="cannot be used"):
-        await Evaluator(db, settings, unknown).run(asyncio.Event())

@@ -8,17 +8,21 @@ import {
   ListChecks,
   MoonStar,
   PhoneCall,
+  SlidersHorizontal,
   SunMedium,
   UserRound,
 } from "lucide-react";
 import type { ComponentType, CSSProperties } from "react";
-import { NavLink, Outlet, useLocation, useMatches } from "react-router";
+import { Link, Navigate, NavLink, Outlet, useLocation, useMatches } from "react-router";
 import { Toaster } from "sonner";
 
 import { TokenGate } from "@/app/token";
 import { useDarkMode } from "@/app/use-dark-mode";
 import { useToken } from "@/app/use-token";
 import { API_TOKEN } from "@/lib/api";
+import { useSettings } from "@/lib/queries";
+import type { AppSettings } from "@/lib/types";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   Sidebar,
   SidebarContent,
@@ -110,6 +114,16 @@ export function Shell() {
           </SidebarContent>
           <SidebarFooter className="border-t border-sidebar-border">
             <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  isActive={pathname.startsWith("/settings")}
+                  tooltip="Settings"
+                  render={<NavLink to="/settings" />}
+                >
+                  <SlidersHorizontal />
+                  <span>Settings</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
               {/* The review screen stands outside the console: it holds a labeler's token. */}
               <SidebarMenuItem>
                 <SidebarMenuButton tooltip="Review" render={<a href="/review" target="_blank" />}>
@@ -166,6 +180,7 @@ export function Shell() {
             )}
           </header>
           <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
+            {!pathname.startsWith("/settings") && <MissingKeys />}
             <Outlet />
           </div>
         </SidebarInset>
@@ -183,4 +198,44 @@ export function Shell() {
       />
     </TooltipProvider>
   );
+}
+
+/** What calls need and the settings do not hold yet. */
+function missingKeys(settings: AppSettings): string[] {
+  const secrets = settings.secrets;
+  return [
+    !secrets.llm_api_key && "the LLM provider key",
+    !secrets.deepgram_api_key && "the Deepgram key",
+    !secrets.elevenlabs_api_key && "the ElevenLabs key",
+    !(secrets.plivo_auth_id && secrets.plivo_auth_token) && "the Plivo Auth ID and Auth token",
+  ].filter((name): name is string => Boolean(name));
+}
+
+function MissingKeys() {
+  const settings = useSettings();
+  if (!settings.data) return null;
+  const missing = missingKeys(settings.data);
+  if (missing.length === 0) return null;
+  return (
+    <Alert className="mb-5">
+      <AlertTitle>Calls cannot start yet</AlertTitle>
+      <AlertDescription>
+        <p>
+          Add {missing.join(", ")} in{" "}
+          <Link to="/settings" className="underline">
+            Settings
+          </Link>
+          .
+        </p>
+      </AlertDescription>
+    </Alert>
+  );
+}
+
+/** The console opens on Settings until the LLM provider key is saved, and on Agents after. */
+export function FirstPage() {
+  const settings = useSettings();
+  if (settings.isPending) return null;
+  const firstRun = settings.data !== undefined && !settings.data.secrets.llm_api_key;
+  return <Navigate to={firstRun ? "/settings" : "/agents"} replace />;
 }

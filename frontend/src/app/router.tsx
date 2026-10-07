@@ -1,4 +1,4 @@
-import { Navigate, createBrowserRouter } from "react-router";
+import { createBrowserRouter } from "react-router";
 
 import {
   AgentCrumbs,
@@ -11,10 +11,11 @@ import {
   PersonasCrumbs,
   RunCrumbs,
   RunsCrumbs,
+  SettingsCrumbs,
   VoicesCrumbs,
 } from "@/app/crumbs";
 import { RouteError } from "@/app/route-error";
-import { Shell } from "@/app/shell";
+import { FirstPage, Shell } from "@/app/shell";
 import { AgentPage } from "@/pages/agent";
 import { AgentsPage } from "@/pages/agents";
 import { ConversationPage } from "@/pages/conversation";
@@ -28,6 +29,7 @@ import { PersonasPage } from "@/pages/personas";
 import { ReviewPage, ReviewQueuePage, ReviewShell } from "@/pages/review";
 import { RunPage } from "@/pages/run";
 import { RunsPage } from "@/pages/runs";
+import { SettingsPage } from "@/pages/settings";
 import { VoicesPage } from "@/pages/voices";
 
 export const router = createBrowserRouter([
@@ -36,7 +38,7 @@ export const router = createBrowserRouter([
     element: <Shell />,
     errorElement: <RouteError />,
     children: [
-      { index: true, element: <Navigate to="/agents" replace /> },
+      { index: true, element: <FirstPage /> },
       {
         path: "conversations",
         element: <ConversationsPage />,
@@ -65,6 +67,7 @@ export const router = createBrowserRouter([
       { path: "numbers", element: <NumbersPage />, handle: { crumbs: NumbersCrumbs } },
       { path: "runs", element: <RunsPage />, handle: { crumbs: RunsCrumbs } },
       { path: "runs/:id", element: <RunPage />, handle: { crumbs: RunCrumbs } },
+      { path: "settings", element: <SettingsPage />, handle: { crumbs: SettingsCrumbs } },
       { path: "*", element: <NotFoundPage /> },
     ],
   },

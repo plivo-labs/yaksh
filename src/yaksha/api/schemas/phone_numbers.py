@@ -6,7 +6,7 @@ from pydantic import BaseModel
 class NumberState(StrEnum):
     IN_USE = "in_use"
     RESTING = "resting"
-    """Released less than YAKSHA_NUMBER_REST_S ago; no new outbound test uses it yet."""
+    """Released within the number rest in Settings; no new outbound test uses it yet."""
     FREE = "free"
 
 

@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 from pydantic import BaseModel
 
-from yaksha.api.deps import SettingsDep
+from yaksha.api.deps import AppSettingsDep
 from yaksha.domain.languages import Language
 from yaksha.simulation.languages import LANGUAGES
 
@@ -20,10 +20,10 @@ class Defaults(BaseModel):
 
 
 @router.get("/defaults")
-async def defaults(settings: SettingsDep) -> Defaults:
+async def defaults(settings: AppSettingsDep) -> Defaults:
     return Defaults(
-        max_duration_s=settings.default_max_duration_s,
-        max_turns=settings.default_max_turns,
-        max_retries=settings.default_max_retries,
+        max_duration_s=settings.limits.default_max_duration_s,
+        max_turns=settings.limits.default_max_turns,
+        max_retries=settings.limits.default_max_retries,
         first_words={language: policy.first_words for language, policy in LANGUAGES.items()},
     )

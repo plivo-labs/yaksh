@@ -14,6 +14,7 @@ from tests.conftest import (
     create_scenario,
     eventually,
     finish,
+    make_evaluator,
     start_run,
 )
 from tests.evaluation.test_judged_calls import CALL, Judge
@@ -22,7 +23,6 @@ from yaksha.db.models import Evaluation, EvaluationItem, JudgeVersion
 from yaksha.domain.conversations import CallOutcome, EndReason
 from yaksha.domain.evaluations import DecidedBy, EvaluationState, Outcome
 from yaksha.evaluation.jev import Jev, JevAnswer
-from yaksha.worker.evaluator import Evaluator
 
 
 class StubJevClient(JevClient):
@@ -105,7 +105,7 @@ async def judged_with(
     )
     judge = Judge()
     stop = asyncio.Event()
-    evaluator = asyncio.create_task(Evaluator(db, settings, judge, jev=jev).run(stop))
+    evaluator = asyncio.create_task(make_evaluator(db, settings, judge, jev=jev).run(stop))
 
     async def done() -> Evaluation:
         async with db() as session:

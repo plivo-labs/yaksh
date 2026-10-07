@@ -14,6 +14,7 @@ import {
   ACTIVE_STATUSES,
   type Agent,
   type AgentDraft,
+  type AppSettings,
   type AgentInput,
   type StartRequestDraft,
   type AgentRule,
@@ -29,6 +30,7 @@ import {
   type Defaults,
   type ConversationSummary,
   type Generation,
+  type ImportResult,
   type JudgeAgreement,
   type LabelAnswer,
   type LabelReason,
@@ -38,6 +40,7 @@ import {
   type Page,
   type Persona,
   type PhoneNumbers,
+  type ProviderTest,
   type PersonaInput,
   type ProviderVoice,
   type Run,
@@ -48,6 +51,9 @@ import {
   type RuleResults,
   type Scenario,
   type ScenarioInput,
+  type SecretName,
+  type SettingsProvider,
+  type SettingsValues,
   type Voice,
   type VoiceEdit,
   type VoiceInput,
@@ -125,7 +131,7 @@ export function useAgentPage(search: string, sort: string, page: number) {
   });
 }
 
-/** The server's values for fields a request leaves out; they change only when it restarts. */
+/** The server's values for fields a request leaves out; they change with the settings. */
 export function useDefaults() {
   return useQuery({
     queryKey: ["defaults"],
@@ -728,6 +734,142 @@ export function useSaveLabel(conversationId: string, seen: boolean) {
     onSuccess: (found) => {
       client.setQueryData(keys.review(conversationId, seen), found);
       void client.invalidateQueries({ queryKey: keys.reviewQueue });
+    },
+  });
+}
+
+const settingsKey = ["settings"] as const;
+
+export function useSettings() {
+  return useQuery({ queryKey: settingsKey, queryFn: () => api<AppSettings>("/settings") });
+}
+
+/** After a change of the settings: what the server reads from them may change too. */
+function settingsChanged(client: QueryClient, settings: AppSettings) {
+  client.setQueryData(settingsKey, settings);
+  // A new key or base URL can change the provider's models and what each takes.
+  void client.invalidateQueries({ queryKey: [...settingsKey, "models"] });
+  void client.invalidateQueries({ queryKey: [...settingsKey, "efforts"] });
+  void client.invalidateQueries({ queryKey: ["defaults"] });
+  void client.invalidateQueries({ queryKey: keys.phoneNumbers });
+}
+
+export function useSaveSettingsValues() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (values: SettingsValues) =>
+      api<AppSettings>("/settings/values", { method: "PUT", json: values }),
+    onSuccess: (settings) => settingsChanged(client, settings),
+  });
+}
+
+/** Saves a key after its provider accepted it; a refused key is an error and is not saved. */
+export function useSaveSecret() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ name, value }: { name: SecretName; value: string }) =>
+      api<AppSettings>(`/settings/secrets/${name}`, { method: "PUT", json: { value } }),
+    onSuccess: (settings) => settingsChanged(client, settings),
+  });
+}
+
+/** Saves a Plivo account's Auth ID and Auth token together, after Plivo accepts them. */
+export function useSavePlivoAccount() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (account: { auth_id: string; auth_token: string }) =>
+      api<AppSettings>("/settings/plivo", { method: "PUT", json: account }),
+    onSuccess: (settings) => settingsChanged(client, settings),
+  });
+}
+
+export function useRemoveSecret() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (name: SecretName) =>
+      api<AppSettings>(`/settings/secrets/${name}`, { method: "DELETE" }),
+    onSuccess: (settings) => settingsChanged(client, settings),
+  });
+}
+
+export function useSaveTriggerSecret() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ name, value }: { name: string; value: string }) =>
+      api<AppSettings>(`/settings/trigger-secrets/${encodeURIComponent(name)}`, {
+        method: "PUT",
+        json: { value },
+      }),
+    onSuccess: (settings) => settingsChanged(client, settings),
+  });
+}
+
+export function useRemoveTriggerSecret() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (name: string) =>
+      api<AppSettings>(`/settings/trigger-secrets/${encodeURIComponent(name)}`, {
+        method: "DELETE",
+      }),
+    onSuccess: (settings) => settingsChanged(client, settings),
+  });
+}
+
+/** Makes a new signing key; the response is the only time it is shown. */
+export function useNewSigningKey() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: () => api<{ key: string }>("/settings/signing-key", { method: "POST" }),
+    onSuccess: () => void client.invalidateQueries({ queryKey: settingsKey }),
+  });
+}
+
+export function useTestProvider() {
+  return useMutation({
+    mutationFn: (provider: SettingsProvider) =>
+      api<ProviderTest>(`/settings/providers/${provider}/test`, { method: "POST" }),
+  });
+}
+
+/** The models the LLM provider lists; fetched when asked, and again with refetch(). */
+export function useProviderModels(enabled: boolean) {
+  return useQuery({
+    queryKey: [...settingsKey, "models"],
+    queryFn: () => api<{ models: string[] }>("/settings/models"),
+    enabled,
+    staleTime: Infinity,
+    retry: false,
+  });
+}
+
+/** The reasoning efforts a model takes; one short request per effort, so it is kept. */
+export function useModelEfforts(model: string | null) {
+  return useQuery({
+    queryKey: [...settingsKey, "efforts", model],
+    queryFn: () =>
+      api<{ model: string; efforts: string[] }>(
+        `/settings/models/${encodeURIComponent(model ?? "")}/efforts`,
+      ),
+    enabled: Boolean(model),
+    staleTime: Infinity,
+    retry: false,
+  });
+}
+
+export async function exportSettings(): Promise<string> {
+  return (await apiBlob("/settings/export")).text();
+}
+
+export function useImportSettings() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ document, dryRun }: { document: string; dryRun: boolean }) =>
+      api<ImportResult>("/settings/import", {
+        method: "POST",
+        json: { document, dry_run: dryRun },
+      }),
+    onSuccess: (result, { dryRun }) => {
+      if (!dryRun) settingsChanged(client, result.settings);
     },
   });
 }

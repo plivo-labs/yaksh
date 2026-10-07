@@ -35,8 +35,8 @@ export function NumbersPage() {
               <AlertDescription>
                 <p className="break-words">{numbers.data.outbound_problem}</p>
                 <p>
-                  The worker reads the Plivo application and its numbers when it starts, so restart
-                  it after a change in the Plivo console.
+                  The worker reads the Plivo application and its numbers when it starts and when the
+                  Plivo keys in Settings change. Restart it after a change in the Plivo console.
                 </p>
               </AlertDescription>
             </Alert>
@@ -60,7 +60,8 @@ export function NumbersPage() {
                 <li className="grid gap-1 px-3 py-8 text-p-400">
                   <span>No numbers yet.</span>
                   <span className="text-muted-foreground">
-                    The worker loads them from your Plivo account when it starts.
+                    The worker loads them from your Plivo account once the Plivo keys are saved in
+                    Settings.
                   </span>
                 </li>
               ) : (

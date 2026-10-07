@@ -6,7 +6,7 @@ from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from yaksha.api.auth import LabelerDep
-from yaksha.api.deps import SessionDep, SettingsDep
+from yaksha.api.deps import AppSettingsDep, SessionDep
 from yaksha.api.routes.conversations import detail
 from yaksha.api.schemas.conversations import ItemRead
 from yaksha.api.schemas.review import (
@@ -74,10 +74,10 @@ async def reviewed(
 
 @router.get("/queue")
 async def get_queue(
-    labeler: LabelerDep, session: SessionDep, settings: SettingsDep
+    labeler: LabelerDep, session: SessionDep, settings: AppSettingsDep
 ) -> list[QueuedReview]:
     """The audit calls this labeler still has items to label in."""
-    return await labels.queue(session, labeler.id, settings.audit_weekly_budget)
+    return await labels.queue(session, labeler.id, settings.audit.weekly_budget)
 
 
 @router.get("/conversations/{conversation_id}")
@@ -85,24 +85,24 @@ async def get_review(
     conversation_id: uuid.UUID,
     labeler: LabelerDep,
     session: SessionDep,
-    settings: SettingsDep,
+    settings: AppSettingsDep,
     seen: bool = False,
 ) -> ReviewConversation:
     """A judged call to label. Any judged call takes labels; only the calls the queue offers
     hide the machine results, and only their labels measure the judges. `seen`: the labeler
     came from the machine's results, so the call is ad hoc."""
     return await reviewed(
-        session, conversation_id, labeler, settings.audit_weekly_budget, seen=seen
+        session, conversation_id, labeler, settings.audit.weekly_budget, seen=seen
     )
 
 
 @router.get("/conversations/{conversation_id}/recording")
 async def get_recording(
-    conversation_id: uuid.UUID, labeler: LabelerDep, session: SessionDep, settings: SettingsDep
+    conversation_id: uuid.UUID, labeler: LabelerDep, session: SessionDep, settings: AppSettingsDep
 ) -> FileResponse:
     # Only checks that the call is judged: what a labeler may see does not depend on the audio.
     await labels.review(
-        session, conversation_id, labeler.id, settings.audit_weekly_budget, seen=True
+        session, conversation_id, labeler.id, settings.audit.weekly_budget, seen=True
     )
     conversation = await conversations.get_conversation(session, conversation_id)
     if conversation.recording_path is None or not Path(conversation.recording_path).is_file():
@@ -116,10 +116,10 @@ async def label_item(
     command: LabelCreate,
     labeler: LabelerDep,
     session: SessionDep,
-    settings: SettingsDep,
+    settings: AppSettingsDep,
 ) -> ReviewConversation:
     """Label one item; the call comes back with what the label reveals."""
-    budget = settings.audit_weekly_budget
+    budget = settings.audit.weekly_budget
     conversation_id = await labels.add_label(
         session,
         item_id,

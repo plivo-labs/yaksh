@@ -1,7 +1,7 @@
 # 0007 One install-wide timezone, "today" fixed at creation
 
 Date: 2026-09-29
-Status: accepted
+Status: accepted, changed by 0027 (the time zone is on the Settings page)
 
 ## Decision
 
