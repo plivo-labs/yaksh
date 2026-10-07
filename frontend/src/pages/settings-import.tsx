@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -76,10 +75,6 @@ export function ImportExport() {
         <DialogContent className="sm:max-w-xl">
           <DialogHeader>
             <DialogTitle>Import settings</DialogTitle>
-            <DialogDescription>
-              Yaksha checks every key in the file with its provider. It saves nothing unless every
-              check passes.
-            </DialogDescription>
           </DialogHeader>
           {preview.isPending ? (
             <p className="flex items-center gap-2 text-s-400 text-muted-foreground">
@@ -120,30 +115,78 @@ export function ImportExport() {
   );
 }
 
+const SECRET_LABELS: Record<string, string> = {
+  llm_api_key: "LLM provider key",
+  deepgram_api_key: "Deepgram key",
+  elevenlabs_api_key: "ElevenLabs key",
+  typesafe_api_key: "TypeSafe key",
+  plivo_auth_id: "Plivo Auth ID",
+  plivo_auth_token: "Plivo Auth token",
+  trigger_signing_key: "Signing key",
+};
+
+/** A stored secret name as the page calls it. */
+function secretLabel(name: string): string {
+  return name.startsWith("trigger:")
+    ? `Trigger secret ${name.slice("trigger:".length)}`
+    : (SECRET_LABELS[name] ?? name);
+}
+
+/** A change line with its secret named as the page names it; a value change stays as it is. */
+function changeLabel(change: string): string {
+  const [name, rest] = change.split(/: (.*)/s);
+  return name in SECRET_LABELS || name.startsWith("trigger:")
+    ? `${secretLabel(name)}: ${rest}`
+    : change;
+}
+
 function Changes({ result }: { result: ImportResult }) {
+  const skipped = result.skipped.map((entry) => secretLabel(entry.split(" (")[0]));
+  if (result.changes.length === 0 && skipped.length > 0) {
+    return (
+      <div className="grid gap-2 text-s-400">
+        <p className="text-s-500">This file has no key values.</p>
+        <p>
+          An export holds placeholders like{" "}
+          <code className="font-mono">{"${TRIGGER_SIGNING_KEY}"}</code>, not keys. Import a file
+          with real values, or use the CLI to apply it with those variables set.
+        </p>
+        <SkippedList names={skipped} />
+      </div>
+    );
+  }
   return (
     <div className="grid gap-3">
       {result.changes.length === 0 ? (
-        <p className="text-s-400">The file changes nothing.</p>
+        <p className="text-s-400">Nothing to import.</p>
       ) : (
-        <ul className="max-h-64 divide-y overflow-y-auto rounded-md border font-mono text-xs-400">
+        <ul className="max-h-64 divide-y overflow-y-auto rounded-md border text-xs-400">
           {result.changes.map((change) => (
             <li key={change} className="px-3 py-1.5">
-              {change}
+              {changeLabel(change)}
             </li>
           ))}
         </ul>
       )}
-      {result.skipped.length > 0 && (
+      {skipped.length > 0 && (
         <div className="grid gap-1 text-s-400">
-          <p>Not imported: the browser cannot read environment variables. Use the CLI for these.</p>
-          <ul className="font-mono text-xs-400 text-muted-foreground">
-            {result.skipped.map((name) => (
-              <li key={name}>{name}</li>
-            ))}
-          </ul>
+          <p>
+            Keys given as <code className="font-mono">{"${…}"}</code> were skipped. Your saved keys
+            stay.
+          </p>
+          <SkippedList names={skipped} />
         </div>
       )}
     </div>
+  );
+}
+
+function SkippedList({ names }: { names: string[] }) {
+  return (
+    <ul className="text-xs-400 text-muted-foreground">
+      {names.map((name) => (
+        <li key={name}>{name}</li>
+      ))}
+    </ul>
   );
 }

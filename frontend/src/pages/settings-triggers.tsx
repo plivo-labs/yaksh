@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { copyText } from "@/lib/clipboard";
+import { APPEAR, REVEAL } from "@/lib/motion";
 import { useNewSigningKey, useRemoveTriggerSecret, useSaveTriggerSecret } from "@/lib/queries";
 import type { AppSettings } from "@/lib/types";
 import { SettingRow } from "@/pages/settings-keys";
@@ -17,9 +18,6 @@ export function TriggersPanel({ settings }: { settings: AppSettings }) {
   return (
     <Panel>
       <PanelHeader title="Outbound triggers" />
-      <p className="px-5 py-3 text-s-400 text-muted-foreground">
-        Yaksha sends a trigger to an outbound agent's system to start each test call.
-      </p>
       <SigningKeyRow
         saved={settings.secrets.trigger_signing_key?.hint ?? null}
         set={Boolean(settings.secrets.trigger_signing_key)}
@@ -35,10 +33,10 @@ function SigningKeyRow({ saved, set }: { saved: string | null; set: boolean }) {
   return (
     <SettingRow
       label="Signing key"
-      help="Yaksha signs each trigger in the X-Yaksha-Signature header. The agent's system checks it with the same key."
+      help="Lets the agent's system check that a trigger came from Yaksha."
     >
       {shown ? (
-        <div className="grid gap-2">
+        <div className={`grid gap-2 ${APPEAR}`}>
           <div className="flex flex-wrap items-center gap-2">
             <Input
               readOnly
@@ -58,8 +56,7 @@ function SigningKeyRow({ saved, set }: { saved: string | null; set: boolean }) {
             </Button>
           </div>
           <span className="text-xs-400 text-warning-foreground">
-            Copy the key now. Yaksha does not show it again. Triggers use the new key from the next
-            call.
+            Copy it now. It won't be shown again.
           </span>
         </div>
       ) : (
@@ -125,7 +122,7 @@ function TriggerSecretsRow({ secrets }: { secrets: AppSettings["trigger_secrets"
       )}
       {adding ? (
         <form
-          className="grid gap-2"
+          className={`grid gap-2 ${REVEAL}`}
           onSubmit={(event) => {
             event.preventDefault();
             save.mutate(
@@ -187,7 +184,7 @@ function TriggerSecretsRow({ secrets }: { secrets: AppSettings["trigger_secrets"
       )}
       <DeleteDialog
         name={removing ?? ""}
-        description="A trigger that names this secret can no longer be sent; its calls end as not sent."
+        description="Triggers that use it will fail."
         pending={remove.isPending}
         error={remove.isError ? remove.error.message : undefined}
         open={removing !== null}

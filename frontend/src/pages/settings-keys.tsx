@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
+import { APPEAR, REVEAL } from "@/lib/motion";
 import {
   useRemoveSecret,
   useSavePlivoAccount,
@@ -54,7 +55,7 @@ export function ProviderPanel({
   children,
 }: {
   title: string;
-  description: ReactNode;
+  description?: ReactNode;
   provider: SettingsProvider;
   canTest: boolean;
   children: ReactNode;
@@ -77,11 +78,12 @@ export function ProviderPanel({
           </Button>
         }
       />
-      <p className="px-5 py-3 text-s-400 text-muted-foreground">{description}</p>
+      {description && <p className="px-5 py-3 text-s-400 text-muted-foreground">{description}</p>}
       {(result || test.isError) && (
         <p
+          key={test.submittedAt}
           role="status"
-          className={`mx-5 mb-3 flex items-start gap-2 rounded-md px-3 py-2 text-s-400 ${
+          className={`mx-5 mb-3 flex items-start gap-2 rounded-md px-3 py-2 text-s-400 ${APPEAR} ${
             result?.ok
               ? "bg-success-tag text-success-tag-foreground"
               : "bg-danger text-danger-foreground"
@@ -112,15 +114,15 @@ export function KeyRow({
   help,
   state,
   removable = false,
-  checkedWith,
+  checked = false,
 }: {
   name: SecretName;
   label: string;
   help?: ReactNode;
   state: SecretState | undefined;
   removable?: boolean;
-  /** Who checks the key before it is saved; none when nothing does. */
-  checkedWith?: string;
+  /** Whether the key's provider checks it before it is saved. */
+  checked?: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState("");
@@ -137,7 +139,7 @@ export function KeyRow({
     <SettingRow label={label} htmlFor={editing ? id : undefined} help={help}>
       {editing ? (
         <form
-          className="grid gap-2"
+          className={`grid gap-2 ${REVEAL}`}
           onSubmit={(event) => {
             event.preventDefault();
             save.mutate(
@@ -164,18 +166,12 @@ export function KeyRow({
           <div className="flex flex-wrap items-center gap-2">
             <Button type="submit" size="sm" disabled={!value.trim() || save.isPending}>
               {save.isPending && <Spinner />}
-              {checkedWith ? "Check and save" : "Save"}
+              {checked ? "Check and save" : "Save"}
             </Button>
             <Button type="button" size="sm" variant="ghost" onClick={close}>
               Cancel
             </Button>
           </div>
-          {checkedWith && (
-            <span className="text-xs-400 text-muted-foreground">
-              Yaksha sends one test request to {checkedWith}. It saves the value only when the
-              request succeeds.
-            </span>
-          )}
         </form>
       ) : (
         <div className="flex flex-wrap items-center gap-2">
@@ -223,14 +219,10 @@ export function PlivoAccountRow({ settings }: { settings: AppSettings }) {
     save.reset();
   };
   return (
-    <SettingRow
-      label="Auth ID and Auth token"
-      htmlFor={editing ? "plivo-auth-id" : undefined}
-      help="Yaksha checks them together with Plivo before it saves them."
-    >
+    <SettingRow label="Auth ID and Auth token" htmlFor={editing ? "plivo-auth-id" : undefined}>
       {editing ? (
         <form
-          className="grid gap-2"
+          className={`grid gap-2 ${REVEAL}`}
           onSubmit={(event) => {
             event.preventDefault();
             save.mutate({ auth_id: authId.trim(), auth_token: token.trim() }, { onSuccess: close });

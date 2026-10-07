@@ -1,3 +1,4 @@
+import { ChevronRight } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router";
 import { toast } from "sonner";
@@ -18,6 +19,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { RISE } from "@/lib/motion";
 import { useModelEfforts, useSaveSettingsValues, useSettings } from "@/lib/queries";
 import type { AppSettings, SettingsValues } from "@/lib/types";
 import { KeyRow, PlivoAccountRow, ProviderPanel, SettingRow } from "@/pages/settings-keys";
@@ -51,10 +53,6 @@ export function SettingsPage() {
         <h1 className="mr-auto text-h3-500">Settings</h1>
         <ImportExport />
       </div>
-      <p className="-mt-3 max-w-3xl text-p-400 text-muted-foreground">
-        Keys and models for the caller, the judges and the phone. A change applies to the next call.
-        A call in progress keeps the settings it started with.
-      </p>
       {settings.isError ? (
         <Alert variant="destructive">
           <AlertTitle>Could not load the settings</AlertTitle>
@@ -109,12 +107,6 @@ function Form({
 
   return (
     <>
-      <Alert>
-        <AlertDescription>
-          These settings stay in the environment: the database address, the encryption key, the API
-          token, the ports and file storage. Yaksha reads them before it can open the database.
-        </AlertDescription>
-      </Alert>
       <Tabs value={tab} onValueChange={(next) => onTab(next as Tab)} className="gap-5">
         <TabsList variant="line">
           {TABS.map((item) => (
@@ -129,12 +121,14 @@ function Form({
             title="LLM provider"
             provider="llm"
             canTest={Boolean(secrets.llm_api_key)}
-            description="Any OpenAI-compatible API with the Responses endpoint: OpenAI, Azure OpenAI or a gateway. The caller, scenario writing and the judges use it."
+            description="Any API with OpenAI's Responses endpoint, such as OpenAI or Azure OpenAI. Used by the caller, scenario writing and the judges."
           >
             <SettingRow
               label="Base URL"
               htmlFor="llm-url"
-              help="For Azure OpenAI: https://<resource>.openai.azure.com/openai/v1/. A new base URL removes the saved key; add the key again after you save."
+              help={keyRemovedBy(
+                draft.llm.base_url !== settings.values.llm.base_url && secrets.llm_api_key,
+              )}
             >
               <Input
                 id="llm-url"
@@ -142,24 +136,21 @@ function Form({
                 onChange={(event) => change("llm", "base_url", event.target.value)}
               />
             </SettingRow>
-            <KeyRow
-              name="llm_api_key"
-              label="API key"
-              help="Yaksha never shows a saved key again."
-              state={secrets.llm_api_key}
-              checkedWith="the base URL"
-            />
+            <KeyRow name="llm_api_key" label="API key" state={secrets.llm_api_key} checked />
           </ProviderPanel>
           <ProviderPanel
             title="Deepgram"
+            description="Speech to text."
             provider="deepgram"
             canTest={Boolean(secrets.deepgram_api_key)}
-            description="Speech to text. Hears the agent."
           >
             <SettingRow
               label="Base URL"
               htmlFor="deepgram-url"
-              help="Change it for a self-hosted Deepgram. A new base URL removes the saved key; add the key again after you save."
+              help={keyRemovedBy(
+                draft.deepgram.base_url !== settings.values.deepgram.base_url &&
+                  secrets.deepgram_api_key,
+              )}
             >
               <Input
                 id="deepgram-url"
@@ -179,35 +170,34 @@ function Form({
               name="deepgram_api_key"
               label="API key"
               state={secrets.deepgram_api_key}
-              checkedWith="Deepgram"
+              checked
             />
           </ProviderPanel>
           <ProviderPanel
             title="ElevenLabs"
+            description="Text to speech. Also used for voice previews."
             provider="elevenlabs"
             canTest={Boolean(secrets.elevenlabs_api_key)}
-            description="Text to speech. Speaks as the caller and plays voice previews."
           >
             <KeyRow
               name="elevenlabs_api_key"
               label="API key"
-              help="The API also uses it to look up voices."
               state={secrets.elevenlabs_api_key}
-              checkedWith="ElevenLabs"
+              checked
             />
           </ProviderPanel>
           <ProviderPanel
             title="TypeSafe"
             provider="typesafe"
             canTest={Boolean(secrets.typesafe_api_key)}
-            description="Optional. Jev, TypeSafe's classifier, checks criteria and agent rules before the judges. Yaksha sends call transcripts to TypeSafe."
+            description="Optional. Transcripts are sent to TypeSafe."
           >
             <KeyRow
               name="typesafe_api_key"
               label="API key"
               state={secrets.typesafe_api_key}
               removable
-              checkedWith="TypeSafe"
+              checked
             />
           </ProviderPanel>
         </TabsContent>
@@ -218,7 +208,13 @@ function Form({
             <SettingRow
               label="Model"
               htmlFor="caller-model"
-              help="The list comes from the LLM provider. For Azure, type the deployment name. Do not use gpt-4.1."
+              help={
+                draft.caller.model.startsWith("gpt-4.1") && (
+                  <span className="text-warning-foreground">
+                    gpt-4.1 can speak several replies at once.
+                  </span>
+                )
+              }
             >
               <ModelCombobox
                 id="caller-model"
@@ -259,7 +255,6 @@ function Form({
             <NumberRow
               id="generation-timeout"
               label="Request timeout"
-              help="Yaksha sends a failed request one more time."
               unit="seconds"
               value={draft.generation.timeout_s}
               onValueChange={(value) => change("generation", "timeout_s", value)}
@@ -267,9 +262,6 @@ function Form({
           </Panel>
           <Panel>
             <PanelHeader title="Judges" />
-            <p className="px-5 py-3 text-s-400 text-muted-foreground">
-              The model that judges each call after it ends.
-            </p>
             <SettingRow label="Model" htmlFor="judge-model">
               <ModelCombobox
                 id="judge-model"
@@ -286,53 +278,63 @@ function Form({
                 unset="the model's default"
               />
             </SettingRow>
-            <NumberRow
-              id="judge-timeout"
-              label="Request timeout"
-              unit="seconds"
-              value={draft.judges.timeout_s}
-              onValueChange={(value) => change("judges", "timeout_s", value)}
-            />
-            <NumberRow
-              id="judge-sources-timeout"
-              label="Timeout with instructions or documents"
-              help="For judges that read the agent's whole instructions or documents."
-              unit="seconds"
-              value={draft.judges.sources_timeout_s}
-              onValueChange={(value) => change("judges", "sources_timeout_s", value)}
-            />
-            <NumberRow
-              id="judge-output"
-              label="Output tokens"
-              help="The maximum for one request. Reasoning tokens count too."
-              value={draft.judges.max_output_tokens}
-              onValueChange={(value) => change("judges", "max_output_tokens", value)}
-            />
-            <NumberRow
-              id="judge-input"
-              label="Input characters"
-              help="The maximum for one request. A larger source makes that judge's item an error."
-              value={draft.judges.max_input_chars}
-              onValueChange={(value) => change("judges", "max_input_chars", value)}
-            />
+            <details className="group border-t">
+              <summary className="flex cursor-pointer list-none items-center gap-1.5 px-5 py-3 text-s-500 select-none hover:bg-hv1 [&::-webkit-details-marker]:hidden">
+                <ChevronRight className="size-4 text-muted-foreground transition-transform duration-150 ease-out group-open:rotate-90 motion-reduce:transition-none" />
+                Advanced
+              </summary>
+              <NumberRow
+                id="judge-timeout"
+                label="Request timeout"
+                unit="seconds"
+                value={draft.judges.timeout_s}
+                onValueChange={(value) => change("judges", "timeout_s", value)}
+              />
+              <NumberRow
+                id="judge-sources-timeout"
+                label="Timeout with instructions or documents"
+                unit="seconds"
+                value={draft.judges.sources_timeout_s}
+                onValueChange={(value) => change("judges", "sources_timeout_s", value)}
+              />
+              <NumberRow
+                id="judge-output"
+                help="Reasoning tokens count too."
+                label="Output tokens per request"
+                min={1}
+                value={draft.judges.max_output_tokens}
+                onValueChange={(value) => change("judges", "max_output_tokens", value)}
+              />
+              <NumberRow
+                id="judge-input"
+                help="Larger sources make the judge item an error."
+                label="Input characters per request"
+                min={1}
+                value={draft.judges.max_input_chars}
+                onValueChange={(value) => change("judges", "max_input_chars", value)}
+              />
+            </details>
           </Panel>
           <Panel>
             <PanelHeader title="Jev and audit" />
             <NumberRow
               id="jev-bar"
               label="Jev pass bar"
-              help="From 0 to 1. Jev publishes a pass only at or above this value."
+              help="Minimum confidence for a pass."
               step={0.01}
+              min={0}
+              max={1}
               value={draft.judges.jev_pass_bar}
               onValueChange={(value) => change("judges", "jev_pass_bar", value)}
             />
             <NumberRow
               id="audit-rate"
               label="Audit sample"
-              help="The share of judged calls in the audit lane, from 0 to 1."
-              step={0.01}
-              value={draft.audit.sample_rate}
-              onValueChange={(value) => change("audit", "sample_rate", value)}
+              unit="% of judged calls"
+              min={0}
+              max={100}
+              value={Math.round(draft.audit.sample_rate * 1000) / 10}
+              onValueChange={(value) => change("audit", "sample_rate", value / 100)}
             />
             <NumberRow
               id="audit-budget"
@@ -349,7 +351,6 @@ function Form({
             title="Plivo account"
             provider="plivo"
             canTest={Boolean(secrets.plivo_auth_id && secrets.plivo_auth_token)}
-            description="The account that owns the numbers and places the calls."
           >
             <PlivoAccountRow settings={settings} />
           </ProviderPanel>
@@ -358,8 +359,8 @@ function Form({
             <PanelHeader title="Calls" />
             <NumberRow
               id="ring-timeout"
+              help="Then the call ends as no answer."
               label="Ring timeout"
-              help="After this time, the call ends as no answer."
               unit="seconds"
               value={draft.phone.ring_timeout_s}
               onValueChange={(value) => change("phone", "ring_timeout_s", value)}
@@ -367,16 +368,12 @@ function Form({
             <NumberRow
               id="number-rest"
               label="Number rest"
-              help="A released number waits this long, so a late call does not reach the next test."
+              help="Wait before a number is reused."
               unit="seconds"
               value={draft.phone.number_rest_s}
               onValueChange={(value) => change("phone", "number_rest_s", value)}
             />
-            <SettingRow
-              label="Time zone"
-              htmlFor="timezone"
-              help="Sets the date the caller is told is today. A run takes it when it starts."
-            >
+            <SettingRow label="Time zone" htmlFor="timezone" help="Sets the caller's “today”.">
               <Input
                 id="timezone"
                 className="max-w-72"
@@ -395,61 +392,79 @@ function Form({
 
         <TabsContent value="limits" className="grid gap-5">
           <Panel>
-            <PanelHeader title="Run limits" />
-            <p className="px-5 py-3 text-s-400 text-muted-foreground">
-              These limits control the cost of one run.
-            </p>
+            <PanelHeader title="Defaults for a run" />
             <NumberRow
               id="max-turns"
+              help="Agent turns before the caller says goodbye."
               label="Turns per call"
-              help="The caller says goodbye after this many agent turns, when the run does not set a value. From 1 to 100."
+              min={1}
+              max={100}
               value={draft.limits.default_max_turns}
               onValueChange={(value) => change("limits", "default_max_turns", value)}
             />
             <NumberRow
               id="call-length"
               label="Call length"
-              help="The longest a call lasts, when the run does not set a value. From 10 to 1800."
               unit="seconds"
+              min={10}
+              max={1800}
               value={draft.limits.default_max_duration_s}
               onValueChange={(value) => change("limits", "default_max_duration_s", value)}
             />
+          </Panel>
+          <Panel>
+            <PanelHeader title="Maximums for a run" />
             <NumberRow
               id="max-conversations"
-              label="Conversations per run"
+              label="Conversations"
               help="Scenarios times repeats. Retries do not count."
+              min={1}
               value={draft.limits.max_run_conversations}
               onValueChange={(value) => change("limits", "max_run_conversations", value)}
             />
             <NumberRow
               id="max-repeats"
               label="Repeats per scenario"
+              min={1}
               value={draft.limits.max_run_repeats}
               onValueChange={(value) => change("limits", "max_run_repeats", value)}
             />
             <NumberRow
               id="max-retries"
               label="Retries per conversation"
+              min={0}
               value={draft.limits.max_run_retries}
               onValueChange={(value) => change("limits", "max_run_retries", value)}
             />
             <NumberRow
               id="start-interval"
+              help="Longest wait a run can set between call starts."
               label="Start interval"
-              help="The longest wait a run can set between two call starts."
               unit="seconds"
+              min={1}
               value={draft.limits.max_run_start_interval_s}
               onValueChange={(value) => change("limits", "max_run_start_interval_s", value)}
             />
           </Panel>
         </TabsContent>
       </Tabs>
+      <p className="text-xs-400 text-muted-foreground">
+        Database, API token, encryption key, ports and file storage are set in the environment.{" "}
+        <a
+          href="https://github.com/plivo-labs/yaksha/tree/dev/docs/content/docs/configuration.mdx"
+          target="_blank"
+          rel="noreferrer"
+          className="underline"
+        >
+          Docs
+        </a>
+      </p>
 
       {dirty && (
         <div
           role="region"
           aria-label="Unsaved changes"
-          className="sticky bottom-0 z-20 -mx-6 -mb-5 border-t bg-background"
+          className={`sticky bottom-0 z-20 -mx-6 -mb-5 border-t bg-background ${RISE}`}
         >
           <div className="flex flex-wrap items-center gap-3 px-6 py-3">
             <span className="text-s-500">You have unsaved changes.</span>
@@ -485,6 +500,8 @@ function NumberRow({
   help,
   unit,
   step = 1,
+  min,
+  max,
   value,
   onValueChange,
 }: {
@@ -493,6 +510,8 @@ function NumberRow({
   help?: string;
   unit?: string;
   step?: number;
+  min?: number;
+  max?: number;
   value: number;
   onValueChange: (value: number) => void;
 }) {
@@ -503,6 +522,8 @@ function NumberRow({
           id={id}
           type="number"
           step={step}
+          min={min}
+          max={max}
           className="max-w-36"
           value={Number.isFinite(value) ? value : ""}
           onChange={(event) => onValueChange(event.target.valueAsNumber)}
@@ -511,6 +532,13 @@ function NumberRow({
       </div>
     </SettingRow>
   );
+}
+
+/** The warning a changed base URL shows while its provider has a saved key. */
+function keyRemovedBy(changed: unknown) {
+  return changed ? (
+    <span className="text-warning-foreground">Saving removes the saved key.</span>
+  ) : undefined;
 }
 
 const UNSET = "unset";
@@ -545,7 +573,7 @@ function EffortSelect({
       <span className="text-s-400">
         {value ?? unset}
         <span className="block text-xs-400 text-muted-foreground">
-          Yaksha cannot check this model now: {efforts.error.message}
+          Can't check this model: {efforts.error.message}
         </span>
       </span>
     );

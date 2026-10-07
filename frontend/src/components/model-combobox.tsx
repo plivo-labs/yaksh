@@ -59,7 +59,7 @@ export function ModelCombobox({
       </Combobox.Trigger>
       <Combobox.Portal>
         <Combobox.Positioner sideOffset={4} className="isolate z-50">
-          <Combobox.Popup className="w-(--anchor-width) max-w-(--available-width) overflow-hidden rounded-lg border bg-popover text-popover-foreground shadow-1">
+          <Combobox.Popup className="w-(--anchor-width) max-w-(--available-width) origin-(--transform-origin) overflow-hidden rounded-lg border bg-popover text-popover-foreground shadow-1 transition-[opacity,scale] duration-150 ease-out data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0 motion-reduce:transition-opacity">
             <div className="flex items-center gap-2 border-b px-3">
               <SearchIcon className="size-4 shrink-0 text-muted-foreground" />
               <Combobox.Input
