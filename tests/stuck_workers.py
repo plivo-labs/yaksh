@@ -10,6 +10,7 @@ from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncEngine
 
+from tests.conftest import ENCRYPTION_KEY
 from yaksha.__main__ import run_worker
 from yaksha.caller.plivo_server import StreamRegistry
 from yaksha.config import Settings
@@ -22,8 +23,10 @@ from yaksha.domain.conversations import (
     WireEvent,
     WireEventKind,
 )
+from yaksha.domain.settings import AppSettings
 from yaksha.simulation import conversations
 from yaksha.worker import worker as worker_module
+from yaksha.worker.phone_account import PhoneAccount
 
 
 async def stuck(*args: Any, **kwargs: Any) -> Any:
@@ -64,10 +67,15 @@ def stuck_disposal() -> Caller:
     return HoldsUntilStop()
 
 
+async def offline(self: PhoneAccount, app: AppSettings) -> None:
+    """The test database holds made-up Plivo keys; the account is never asked."""
+
+
 KINDS = {"immortal": immortal, "stuck_write": stuck_write, "stuck_disposal": stuck_disposal}
 
 if __name__ == "__main__":
     kind, database_url, data_dir = sys.argv[1:]
+    PhoneAccount.refresh = offline
     settings = Settings.model_validate(
         {
             "api_token": "t",
@@ -77,6 +85,7 @@ if __name__ == "__main__":
             "worker_heartbeat_s": 0.05,
             "worker_lease_s": 2,
             "end_timeout_s": 0.3,
+            "encryption_key": ENCRYPTION_KEY,
         }
     )
-    asyncio.run(run_worker(settings, KINDS[kind](), StreamRegistry(), None))
+    asyncio.run(run_worker(settings, KINDS[kind](), StreamRegistry()))

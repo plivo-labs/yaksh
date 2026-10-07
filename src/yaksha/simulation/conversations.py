@@ -42,6 +42,7 @@ from yaksha.domain.conversations import (
 from yaksha.domain.errors import NotFoundError
 from yaksha.domain.personas import PersonaConfig
 from yaksha.domain.scenarios import ScenarioConfig
+from yaksha.domain.settings import AppSettings
 from yaksha.domain.triggers import SEND_TIMEOUT_S
 from yaksha.evaluation import evaluations, results
 from yaksha.simulation.background_noise import noise_mix
@@ -60,7 +61,6 @@ from yaksha.simulation.runs import (
 LEASE_LOST = "worker lost its lease on the conversation; outcome unknown"
 WORKER_STOPPED = "worker stopped during the call; outcome unknown"
 FAILURE_TEXT = {EndReason.WORKER_STOPPED: WORKER_STOPPED, EndReason.LEASE_LOST: LEASE_LOST}
-PHONE_SETTINGS = "set PLIVO_AUTH_ID, PLIVO_AUTH_TOKEN and YAKSHA_PUBLIC_URL"
 
 
 class PoolExhaustedError(Exception):
@@ -299,6 +299,7 @@ async def claim_next(
 async def prepare_call(
     session: AsyncSession,
     settings: Settings,
+    app: AppSettings,
     conversation: Conversation,
     receiving_app_id: str | None,
 ) -> CallRequest:
@@ -321,12 +322,13 @@ async def prepare_call(
     if number is None:
         raise PoolExhaustedError("no pool number is free")
     leased = await session.get_one(Conversation, conversation.id, populate_existing=True)
-    return await call_request(session, settings, leased, number, agent)
+    return await call_request(session, settings, app, leased, number, agent)
 
 
 async def call_request(
     session: AsyncSession,
     settings: Settings,
+    app: AppSettings,
     conversation: Conversation,
     number: str,
     agent: AgentConfig,
@@ -355,6 +357,7 @@ async def call_request(
         agent_data=scenario.agent_data,
         accept_calls_until=conversation.dial_deadline_at,
         output_dir=settings.data_dir / str(conversation.id),
+        app_settings=app,
     )
 
 

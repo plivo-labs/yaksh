@@ -27,7 +27,9 @@ RETRIES = "rc=5&amp;ct=2000&amp;rd=1000&amp;rp=5xx,ct"
 @pytest.fixture
 async def served() -> AsyncIterator[tuple[StreamRegistry, PlivoServer]]:
     registry = StreamRegistry()
-    server = PlivoServer(create_app(registry, PUBLIC_URL, PLIVO_TOKEN, refuse_calls), port=0)
+    server = PlivoServer(
+        create_app(registry, PUBLIC_URL, lambda: PLIVO_TOKEN, refuse_calls), port=0
+    )
     await server.start()
     yield registry, server
     await server.stop(2.0)
@@ -50,7 +52,9 @@ async def test_the_answer_xml_streams_a_waiting_conversation_and_hangs_up_others
     conversation_id = uuid.uuid4()
     entry = registry.expect(conversation_id)
     async with AsyncClient(
-        transport=ASGITransport(app=create_app(registry, PUBLIC_URL, PLIVO_TOKEN, refuse_calls)),
+        transport=ASGITransport(
+            app=create_app(registry, PUBLIC_URL, lambda: PLIVO_TOKEN, refuse_calls)
+        ),
         base_url="http://worker",
     ) as client:
         answer = await post(
@@ -80,7 +84,9 @@ async def test_call_reports_reach_the_waiting_conversation_and_stream_events_do_
     conversation_id = uuid.uuid4()
     entry = registry.expect(conversation_id)
     async with AsyncClient(
-        transport=ASGITransport(app=create_app(registry, PUBLIC_URL, PLIVO_TOKEN, refuse_calls)),
+        transport=ASGITransport(
+            app=create_app(registry, PUBLIC_URL, lambda: PLIVO_TOKEN, refuse_calls)
+        ),
         base_url="http://worker",
     ) as client:
         known = await post(
@@ -140,7 +146,7 @@ async def test_sockets_for_unknown_or_already_streaming_conversations_are_refuse
 async def test_the_server_does_not_replace_the_process_signal_handlers() -> None:
     before = signal.getsignal(signal.SIGTERM), signal.getsignal(signal.SIGINT)
     server = PlivoServer(
-        create_app(StreamRegistry(), PUBLIC_URL, PLIVO_TOKEN, refuse_calls), port=0
+        create_app(StreamRegistry(), PUBLIC_URL, lambda: PLIVO_TOKEN, refuse_calls), port=0
     )
     await server.start()
     try:
@@ -160,7 +166,9 @@ async def test_requests_plivo_did_not_sign_are_refused_and_never_reach_a_call(
     forged = plivo_signed(PUBLIC_URL + path, {"CallStatus": "completed"})
 
     async with AsyncClient(
-        transport=ASGITransport(app=create_app(registry, PUBLIC_URL, PLIVO_TOKEN, refuse_calls)),
+        transport=ASGITransport(
+            app=create_app(registry, PUBLIC_URL, lambda: PLIVO_TOKEN, refuse_calls)
+        ),
         base_url="http://worker",
     ) as client:
         unsigned = await client.post(path, data=fields)
@@ -191,7 +199,7 @@ async def test_an_admitted_incoming_call_streams_with_a_plivo_side_time_limit() 
     waiting = uuid.uuid4()
     entry = registry.expect(waiting)
     seen: list[IncomingCall] = []
-    app = create_app(registry, PUBLIC_URL, PLIVO_TOKEN, admitting(waiting, seen))
+    app = create_app(registry, PUBLIC_URL, lambda: PLIVO_TOKEN, admitting(waiting, seen))
 
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://worker") as client:
         answered = await post(client, "/incoming", CALL)
@@ -210,7 +218,7 @@ async def test_the_hangup_report_of_an_admitted_call_reaches_it() -> None:
     registry = StreamRegistry()
     waiting = uuid.uuid4()
     entry = registry.expect(waiting)
-    app = create_app(registry, PUBLIC_URL, PLIVO_TOKEN, admitting(waiting))
+    app = create_app(registry, PUBLIC_URL, lambda: PLIVO_TOKEN, admitting(waiting))
     hangup = {"CallUUID": "call-7", "Event": "Hangup", "HangupSource": "Caller"}
 
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://worker") as client:
@@ -234,7 +242,7 @@ async def test_incoming_calls_that_cannot_stream_are_rejected(
     registry = StreamRegistry()
     if expecting:
         registry.expect(uuid.uuid4())
-    app = create_app(registry, PUBLIC_URL, PLIVO_TOKEN, accept)
+    app = create_app(registry, PUBLIC_URL, lambda: PLIVO_TOKEN, accept)
 
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://worker") as client:
         rejected = await post(client, "/incoming", CALL)
@@ -242,3 +250,27 @@ async def test_incoming_calls_that_cannot_stream_are_rejected(
 
     assert rejected.text == REJECT_XML
     assert unsigned.status_code == 403
+
+
+async def test_without_a_saved_auth_token_even_a_signed_request_is_refused() -> None:
+    registry = StreamRegistry()
+    conversation_id = uuid.uuid4()
+    entry = registry.expect(conversation_id)
+    path = f"/callbacks/{conversation_id}"
+    fields = {"CallStatus": "ringing"}
+    token: str | None = None
+
+    async with AsyncClient(
+        transport=ASGITransport(app=create_app(registry, PUBLIC_URL, lambda: token, refuse_calls)),
+        base_url="http://worker",
+    ) as client:
+        before = await client.post(
+            path, data=fields, headers=plivo_signed(PUBLIC_URL + path, fields)
+        )
+        token = PLIVO_TOKEN
+        after = await client.post(
+            path, data=fields, headers=plivo_signed(PUBLIC_URL + path, fields)
+        )
+
+    assert (before.status_code, after.status_code) == (403, 200)
+    assert entry.callbacks.qsize() == 1

@@ -5,19 +5,21 @@ description: What each judge reads, where the text goes, and what it answers.
 
 After a call, the evaluator measures it in code and then judges it. This page lists each judge: what it reads, where that text goes, and what it answers.
 
-Only completed calls that no one stopped are judged, and only while `JUDGE_LLM_MODEL` is not `off` and the judge model has a key. Every judge's text goes to the judge model at `JUDGE_OPENAI_BASE_URL` (or `OPENAI_BASE_URL`). With `TYPESAFE_API_KEY`, the transcript also goes to TypeSafe for the Jev first pass.
+Only completed calls that no one stopped are judged, and only while the LLM provider key is saved in Settings. A call evaluated without the key gets the code metrics and phrase rules only. Every judge's text goes to the judge model at the LLM provider. With a TypeSafe key, the transcript also goes to TypeSafe for the Jev first pass.
 
 ## Settings
 
-| Variable | Purpose |
+The judges' settings are on the **Models** tab of Settings. A change applies to the next evaluation.
+
+| Setting | Purpose |
 | --- | --- |
-| `JUDGE_LLM_MODEL` | The judge model, default `gpt-6-luna`. `off` turns the judges off. |
-| `JUDGE_LLM_REASONING_EFFORT` | Default `medium`. |
-| `JUDGE_OPENAI_API_KEY`, `JUDGE_OPENAI_BASE_URL` | The judge's key and address; the caller's `OPENAI_API_KEY` and `OPENAI_BASE_URL` when unset. |
-| `JUDGE_MAX_INPUT_CHARS` | The most text one judge request holds, default 400,000 characters. |
-| `TYPESAFE_API_KEY` | Optional. Makes judging cheaper: Jev, TypeSafe's classifier, answers each criterion and LLM rule first. Call transcripts are sent to TypeSafe. Most accurate in English. |
-| `JEV_PASS_BAR` | How sure Jev must be that an item is met to publish it as a pass, default 0.95. |
-| `JUDGE_SOURCES_TIMEOUT_S` | How long one request of the instruction adherence and hallucination judges may take, default 180 s. They get one try; a failure is their item's error. |
+| Model | The judge model, default `gpt-6-luna`. |
+| Reasoning effort | Default `medium`. |
+| Input characters | The most text one judge request holds, default 400,000 characters. |
+| Timeout with instructions or documents | How long one request of the instruction adherence and hallucination judges may take, default 180 s. They get one try; a failure is their item's error. |
+| Jev pass bar | How sure Jev must be that an item is met to publish it as a pass, default 0.95. |
+
+The TypeSafe key, on the **Providers** tab, is optional. It makes judging cheaper: Jev, TypeSafe's classifier, answers each criterion and LLM rule first. Call transcripts are sent to TypeSafe. Jev is most accurate in English.
 
 ## What each judge reads
 
@@ -40,7 +42,7 @@ The caller check counts only a wrong fact, an act against the goal, an invented 
 
 Optional TypeSafe AI key. Makes judging cheaper. Call transcripts are sent to TypeSafe. Most accurate in English.
 
-With the key, Jev, TypeSafe's classifier, answers every criterion and LLM rule of a call in one request, before the judge model. Each item is one choice: meets, fails, not applicable or cannot tell. Jev publishes only a pass, when it chooses meets with a probability of at least `JEV_PASS_BAR` (default 0.95); that pass has no reason and costs no model call. Every other item goes to the judge model, which does not see Jev's answer. Jev's model is pinned, since the pass bar was chosen for it.
+With the key, Jev, TypeSafe's classifier, answers every criterion and LLM rule of a call in one request, before the judge model. Each item is one choice: meets, fails, not applicable or cannot tell. Jev publishes only a pass, when it chooses meets with a probability of at least the Jev pass bar (default 0.95); that pass has no reason and costs no model call. Every other item goes to the judge model, which does not see Jev's answer. Jev's model is pinned, since the pass bar was chosen for it.
 
 ## Judge versions
 

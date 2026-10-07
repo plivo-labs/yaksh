@@ -47,7 +47,6 @@ from yaksha.caller.transcript import (
     TranscriptBuilder,
 )
 from yaksha.caller.usage import UsageMeter
-from yaksha.config import Settings
 from yaksha.diagnostics import describe_exception
 from yaksha.domain.conversations import (
     CallerSettings,
@@ -59,6 +58,7 @@ from yaksha.domain.conversations import (
 )
 from yaksha.domain.languages import Language
 from yaksha.domain.latency import VAD_CONFIDENCE, VAD_START_S, VAD_STOP_S
+from yaksha.domain.settings import AppSettings
 from yaksha.integrations import elevenlabs
 
 log = logging.getLogger(__name__)
@@ -102,30 +102,39 @@ SILENT_END = (
 )
 
 
-def provider_keys(settings: Settings) -> dict[str, str]:
-    keys = {
-        "DEEPGRAM_API_KEY": settings.deepgram_api_key,
-        "ELEVENLABS_API_KEY": settings.elevenlabs_api_key,
-        "OPENAI_API_KEY": settings.openai_api_key,
-    }
-    missing = [name for name, value in keys.items() if value is None]
-    if missing:
-        raise ValueError(f"the caller needs {', '.join(missing)}")
-    return {name: value.get_secret_value() for name, value in keys.items() if value}
+@dataclass(frozen=True)
+class CallerKeys:
+    llm: str
+    deepgram: str
+    elevenlabs: str
+
+
+def caller_keys(settings: AppSettings) -> CallerKeys:
+    """The keys of a call; raises ValueError naming each one that is not saved."""
+    if settings.missing_caller_keys:
+        missing = ", ".join(settings.missing_caller_keys)
+        raise ValueError(f"the caller needs the {missing} key; add it in Settings")
+    secrets = settings.secrets
+    assert secrets.llm_api_key and secrets.deepgram_api_key and secrets.elevenlabs_api_key
+    return CallerKeys(
+        llm=secrets.llm_api_key.get_secret_value(),
+        deepgram=secrets.deepgram_api_key.get_secret_value(),
+        elevenlabs=secrets.elevenlabs_api_key.get_secret_value(),
+    )
 
 
 def llm_service(
-    settings: Settings, keys: dict[str, str], instructions: str
+    settings: AppSettings, keys: CallerKeys, instructions: str
 ) -> OpenAIResponsesHttpLLMService:
     """The persona's model over the Responses API. With no effort configured, Pipecat asks a
     reasoning model that accepts it for effort none, for the fastest first word; other models
     get no effort. A reply calls at most one tool, so it can end the call only once."""
-    effort = settings.persona_llm_reasoning_effort
+    effort = settings.caller.reasoning_effort
     return OpenAIResponsesHttpLLMService(
-        api_key=keys["OPENAI_API_KEY"],
-        base_url=settings.openai_base_url,
+        api_key=keys.llm,
+        base_url=settings.llm.base_url,
         settings=OpenAIResponsesHttpLLMService.Settings(
-            model=settings.persona_llm_model,
+            model=settings.caller.model,
             system_instruction=instructions,
             reasoning=OpenAIResponsesHttpLLMService.ReasoningConfig(effort=effort)
             if effort
@@ -292,8 +301,7 @@ class Persona:
 
     def __init__(
         self,
-        settings: Settings,
-        keys: dict[str, str],
+        keys: CallerKeys,
         request: CallRequest,
         clock: Clock,
         observer: CallObserver,
@@ -306,26 +314,27 @@ class Persona:
         before_output: Sequence[FrameProcessor] = (),
         observers: Sequence[BaseObserver] = (),
     ) -> None:
+        settings = request.app_settings
         self.llm = llm_service(settings, keys, request.instructions)
         self.settings = CallerSettings(
-            llm_model=settings.persona_llm_model,
-            reasoning_effort=settings.persona_llm_reasoning_effort,
-            stt_model=settings.deepgram_model,
+            llm_model=settings.caller.model,
+            reasoning_effort=settings.caller.reasoning_effort,
+            stt_model=settings.deepgram.model,
             tts_model=elevenlabs.MODEL,
             voice=request.voice,
         )
         metrics = ServiceMetricsObserver()
         self.usage = UsageMeter(metrics)
         self.stt = DeepgramSTTService(
-            api_key=keys["DEEPGRAM_API_KEY"],
-            base_url=settings.deepgram_base_url,
+            api_key=keys.deepgram,
+            base_url=settings.deepgram.base_url,
             sample_rate=SAMPLE_RATE,
             settings=DeepgramSTTService.Settings(
-                model=settings.deepgram_model, language=DEEPGRAM_LANGUAGES[request.agent.language]
+                model=settings.deepgram.model, language=DEEPGRAM_LANGUAGES[request.agent.language]
             ),
         )
         self.tts = ElevenLabsTTSService(
-            api_key=keys["ELEVENLABS_API_KEY"],
+            api_key=keys.elevenlabs,
             sample_rate=SAMPLE_RATE,
             settings=ElevenLabsTTSService.Settings(
                 model=elevenlabs.MODEL,

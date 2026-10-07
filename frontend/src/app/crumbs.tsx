@@ -63,6 +63,7 @@ export const ConversationsCrumbs = () => <Trail steps={[{ label: "Conversations"
 export const PersonasCrumbs = () => <Trail steps={[{ label: "Personas" }]} />;
 export const VoicesCrumbs = () => <Trail steps={[{ label: "Voices" }]} />;
 export const NumbersCrumbs = () => <Trail steps={[{ label: "Numbers" }]} />;
+export const SettingsCrumbs = () => <Trail steps={[{ label: "Settings" }]} />;
 export const NewAgentCrumbs = () => <Trail steps={[AGENTS, { label: "New agent" }]} />;
 
 export function AgentCrumbs() {

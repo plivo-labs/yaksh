@@ -1044,3 +1044,67 @@ export const LABEL_REASONS: { value: LabelReason; label: string; example: string
   { value: "line_or_audio", label: "Line or audio", example: "The agent's audio dropped for 3s." },
   { value: "other", label: "Other", example: "Needs a note." },
 ];
+
+export interface SettingsValues {
+  llm: { base_url: string };
+  deepgram: { base_url: string; model: string };
+  caller: { model: string; reasoning_effort: string | null };
+  generation: { model: string | null; reasoning_effort: string | null; timeout_s: number };
+  judges: {
+    model: string;
+    reasoning_effort: string | null;
+    timeout_s: number;
+    sources_timeout_s: number;
+    max_output_tokens: number;
+    max_input_chars: number;
+    jev_pass_bar: number;
+  };
+  audit: { sample_rate: number; weekly_budget: number };
+  phone: { ring_timeout_s: number; number_rest_s: number; timezone: string };
+  limits: {
+    default_max_turns: number;
+    default_max_duration_s: number;
+    max_run_conversations: number;
+    max_run_repeats: number;
+    max_run_retries: number;
+    max_run_start_interval_s: number;
+  };
+}
+
+export type SecretName =
+  | "llm_api_key"
+  | "deepgram_api_key"
+  | "elevenlabs_api_key"
+  | "typesafe_api_key"
+  | "plivo_auth_id"
+  | "plivo_auth_token"
+  | "trigger_signing_key";
+
+/** A saved secret, never its value. */
+export interface SecretState {
+  /** The last 4 characters; null for a short value. */
+  hint: string | null;
+}
+
+export interface AppSettings {
+  version: number;
+  values: SettingsValues;
+  /** Each saved secret; one that is not saved is left out. */
+  secrets: Partial<Record<SecretName, SecretState>>;
+  /** Each saved trigger secret, by the name a template uses as {{secrets.NAME}}. */
+  trigger_secrets: Record<string, SecretState>;
+}
+
+export type SettingsProvider = "llm" | "deepgram" | "elevenlabs" | "typesafe" | "plivo";
+
+export interface ProviderTest {
+  provider: SettingsProvider;
+  ok: boolean;
+  detail: string;
+}
+
+export interface ImportResult {
+  changes: string[];
+  skipped: string[];
+  settings: AppSettings;
+}

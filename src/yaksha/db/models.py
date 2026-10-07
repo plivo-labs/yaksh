@@ -633,3 +633,16 @@ class RunningWorker(Base):
     outbound_problem: Mapped[str | None] = mapped_column(Text)
     """Why the worker runs no outbound tests, when it was set up for them."""
     seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class StoredSettings(Base):
+    """The one row of settings changed on the Settings page: the values that differ from the
+    defaults, and the secrets, each encrypted. version grows with every change."""
+
+    __tablename__ = "app_settings"
+    __table_args__ = (CheckConstraint("id = 1", name="one_row"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    version: Mapped[int] = mapped_column(Integer, server_default="0")
+    values: Mapped[dict[str, Any]] = mapped_column(JSONB, server_default=text("'{}'::jsonb"))
+    secrets: Mapped[dict[str, str]] = mapped_column(JSONB, server_default=text("'{}'::jsonb"))

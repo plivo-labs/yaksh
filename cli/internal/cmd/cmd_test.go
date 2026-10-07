@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"sync"
@@ -536,5 +537,71 @@ func TestVersionShowsBothVersions(t *testing.T) {
 
 	if code != 0 || stdout != "{\n  \"cli\": \"0.1.0\",\n  \"server\": \"0.4.2\"\n}\n" {
 		t.Fatalf("code = %d, stdout = %q", code, stdout)
+	}
+}
+
+func TestSettingsApplySendsTheValuesOfTheVariablesTheFileNames(t *testing.T) {
+	f := newFakeAPI(t, map[string]http.HandlerFunc{
+		"POST /api/v1/settings/import": reply(200, `{"changes":["llm_api_key: added"],"skipped":[]}`),
+	})
+	file := filepath.Join(t.TempDir(), "settings.yaml")
+	document := "# A secret is ${NAME}.\ncaller:\n  model: gpt-6-luna\nsecrets:\n  llm_api_key: ${LLM_API_KEY}\n"
+	if err := os.WriteFile(file, []byte(document), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	vars := against(f)
+	vars["LLM_API_KEY"] = "sk-test"
+
+	code, _, stderr := run(t, context.Background(), vars, "", "settings", "apply", "-f", file)
+
+	if code != 0 || stderr != "" {
+		t.Fatalf("code = %d, stderr = %q", code, stderr)
+	}
+	var sent struct {
+		Document string            `json:"document"`
+		Env      map[string]string `json:"env"`
+		DryRun   bool              `json:"dry_run"`
+	}
+	if err := json.Unmarshal(f.requests("POST", "/api/v1/settings/import")[0].body, &sent); err != nil {
+		t.Fatal(err)
+	}
+	if sent.Document != document || sent.Env["LLM_API_KEY"] != "sk-test" || len(sent.Env) != 1 || sent.DryRun {
+		t.Fatalf("sent = %+v", sent)
+	}
+}
+
+func TestSettingsApplyStopsBeforeTheServerWhenAVariableIsNotSet(t *testing.T) {
+	f := newFakeAPI(t, map[string]http.HandlerFunc{
+		"POST /api/v1/settings/import": reply(200, `{}`),
+	})
+	file := filepath.Join(t.TempDir(), "settings.yaml")
+	document := "secrets:\n  llm_api_key: ${LLM_API_KEY}\n  deepgram_api_key: ${DEEPGRAM_API_KEY}\n"
+	if err := os.WriteFile(file, []byte(document), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	code, _, stderr := run(t, context.Background(), against(f), "", "settings", "apply", "-f", file)
+
+	if code != 1 || !strings.Contains(stderr, "DEEPGRAM_API_KEY, LLM_API_KEY") {
+		t.Fatalf("code = %d, stderr = %q", code, stderr)
+	}
+	if n := len(f.requests("POST", "/api/v1/settings/import")); n != 0 {
+		t.Fatalf("the server got %d requests", n)
+	}
+}
+
+func TestSettingsApplyDryRunSendsTheFileWhenAVariableIsNotSet(t *testing.T) {
+	f := newFakeAPI(t, map[string]http.HandlerFunc{
+		"POST /api/v1/settings/import": reply(200, `{"changes":[],"skipped":["llm_api_key (${LLM_API_KEY})"]}`),
+	})
+	file := filepath.Join(t.TempDir(), "settings.yaml")
+	if err := os.WriteFile(file, []byte("secrets:\n  llm_api_key: ${LLM_API_KEY}\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	code, _, stderr := run(t, context.Background(), against(f), "", "settings", "apply", "-f", file, "--dry-run")
+
+	if code != 0 || stderr != "" || len(f.requests("POST", "/api/v1/settings/import")) != 1 {
+		t.Fatalf("code = %d, stderr = %q", code, stderr)
 	}
 }

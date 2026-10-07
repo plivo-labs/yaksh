@@ -2,8 +2,8 @@
 
 A placeholder is `{{kind.name}}` inside a header value, a query parameter value or a JSON string
 value of the body: `{{yaksha.number}}`, `{{yaksha.conversation_id}}`,
-`{{agent_data.<fact name>}}` and `{{env.YAKSHA_TRIGGER_<NAME>}}`. The URL, query parameter names
-and JSON keys take none.
+`{{agent_data.<fact name>}}` and `{{secrets.<NAME>}}`, a trigger secret from Settings. The URL,
+query parameter names and JSON keys take none.
 """
 
 import json
@@ -28,12 +28,12 @@ from yarl import URL
 from yaksha.domain.errors import ValidationError
 from yaksha.domain.numbers import E164
 from yaksha.domain.scenarios import Fact, ScenarioConfig, normalized
+from yaksha.domain.settings import TRIGGER_SECRET_NAME
 
 SEND_TIMEOUT_S = 15
 """How long Yaksha waits for the trigger's response; the call may arrive before it ends."""
 PLACEHOLDER = re.compile(r"\{\{([^{}]*)\}\}")
 YAKSHA_VALUES = frozenset({"yaksha.number", "yaksha.conversation_id"})
-ENV_NAME = re.compile(r"YAKSHA_TRIGGER_[A-Z0-9_]+")
 HEADER_NAME = re.compile(r"[!#$%&'*+.^_`|~0-9A-Za-z-]+")
 RESERVED_HEADERS = frozenset({"content-type", "content-length", "host"})
 
@@ -58,10 +58,13 @@ def check_placeholder(name: str) -> None:
         return
     if kind == "agent_data" and rest.strip():
         return
-    if kind == "env" and ENV_NAME.fullmatch(rest):
+    if kind == "secrets" and TRIGGER_SECRET_NAME.fullmatch(rest):
         return
-    if kind == "env":
-        raise ValueError(f"{{{{{name}}}}}: only environment variables named YAKSHA_TRIGGER_*")
+    if kind == "secrets":
+        raise ValueError(
+            f"{{{{{name}}}}}: a secret name uses capital letters, digits and _, "
+            "starting with a letter"
+        )
     raise ValueError(f"unknown placeholder {{{{{name}}}}}")
 
 
@@ -227,7 +230,7 @@ class RenderedTrigger:
     body: bytes
     """Empty for a GET."""
     secrets: tuple[str, ...]
-    """The environment values the request carries, to mask wherever it is stored."""
+    """The secret values the request carries, to mask wherever it is stored."""
 
 
 def render(
@@ -236,12 +239,12 @@ def render(
     number: str,
     conversation_id: str,
     agent_data: list[Fact],
-    env: Mapping[str, str],
+    secrets: Mapping[str, str],
 ) -> RenderedTrigger:
     """The request with every placeholder replaced. Values go inside JSON strings of the parsed
     body, or are percent-encoded into query values, so no value can change the request's shape."""
     facts = {normalized(fact.name): fact.value for fact in agent_data}
-    secrets: list[str] = []
+    carried: list[str] = []
 
     def value_of(name: str) -> str:
         kind, _, rest = name.partition(".")
@@ -253,10 +256,10 @@ def render(
             if normalized(rest) not in facts:
                 raise RenderError(f"the scenario has no agent data named {rest!r}")
             return facts[normalized(rest)]
-        if rest not in env:
-            raise RenderError(f"the environment variable {rest} is not set")
-        secrets.append(env[rest])
-        return env[rest]
+        if rest not in secrets:
+            raise RenderError(f"the trigger secret {rest} is not set; add it in Settings")
+        carried.append(secrets[rest])
+        return secrets[rest]
 
     def fill(value: Any) -> Any:
         if isinstance(value, str):
@@ -280,7 +283,7 @@ def render(
     url = str(URL(url, encoded=True))
     body = b"" if trigger.body is None else json.dumps(fill(trigger.body)).encode()
     # A secret in a query value travels percent-encoded, and an echo of the URL shows it that way.
-    masked = {*secrets, *(quote_plus(secret) for secret in secrets)}
+    masked = {*carried, *(quote_plus(secret) for secret in carried)}
     return RenderedTrigger(trigger.method, url, headers, body, tuple(masked))
 
 

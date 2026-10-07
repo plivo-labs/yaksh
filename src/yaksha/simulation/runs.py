@@ -30,6 +30,7 @@ from yaksha.domain.runs import (
     run_status,
     waiting_reason,
 )
+from yaksha.domain.settings import AppSettings, Limits
 from yaksha.simulation.agents import get_agent
 from yaksha.simulation.starts import Inputs, snapshot
 
@@ -54,39 +55,43 @@ ENDED = (
 """What the retry step reads from a conversation that just ended."""
 
 
-def with_defaults(settings: Settings, command: RunCreate) -> RunCreate:
+def with_defaults(limits: Limits, command: RunCreate) -> RunCreate:
     """The request with the operator's defaults in place of the fields it leaves out."""
     return command.model_copy(
         update={
-            "max_duration_s": command.max_duration_s or settings.default_max_duration_s,
-            "max_turns": command.max_turns or settings.default_max_turns,
+            "max_duration_s": command.max_duration_s or limits.default_max_duration_s,
+            "max_turns": command.max_turns or limits.default_max_turns,
             "max_retries": (
-                settings.default_max_retries if command.max_retries is None else command.max_retries
+                limits.default_max_retries if command.max_retries is None else command.max_retries
             ),
         }
     )
 
 
-def check_limits(settings: Settings, command: RunCreate) -> None:
-    if command.repeats > settings.max_run_repeats:
-        raise ValidationError(f"repeats: at most {settings.max_run_repeats}")
-    if (command.max_retries or 0) > settings.max_run_retries:
-        raise ValidationError(f"max_retries: at most {settings.max_run_retries}")
-    if (command.max_parallel or 0) > settings.max_run_conversations:
-        raise ValidationError(f"max_parallel: at most {settings.max_run_conversations}")
+def check_limits(limits: Limits, command: RunCreate) -> None:
+    if command.repeats > limits.max_run_repeats:
+        raise ValidationError(f"repeats: at most {limits.max_run_repeats}")
+    if (command.max_retries or 0) > limits.max_run_retries:
+        raise ValidationError(f"max_retries: at most {limits.max_run_retries}")
+    if (command.max_parallel or 0) > limits.max_run_conversations:
+        raise ValidationError(f"max_parallel: at most {limits.max_run_conversations}")
     interval = command.start_interval_s or 0
-    if interval > settings.max_run_start_interval_s:
-        raise ValidationError(f"start_interval_s: at most {settings.max_run_start_interval_s}")
+    if interval > limits.max_run_start_interval_s:
+        raise ValidationError(f"start_interval_s: at most {limits.max_run_start_interval_s}")
     count = len(command.scenario_ids) * command.repeats
-    if count > settings.max_run_conversations:
+    if count > limits.max_run_conversations:
         raise ValidationError(
-            f"a run starts at most {settings.max_run_conversations} conversations;"
+            f"a run starts at most {limits.max_run_conversations} conversations;"
             f" {len(command.scenario_ids)} scenarios and {command.repeats} repeats make {count}"
         )
 
 
 async def create_run(
-    session: AsyncSession, settings: Settings, command: RunCreate, request_key: str | None
+    session: AsyncSession,
+    settings: Settings,
+    app: AppSettings,
+    command: RunCreate,
+    request_key: str | None,
 ) -> Run:
     """Start a conversation for each repeat of each scenario, all of them or none, in the order
     repeat, then scenario. A repeated request with the same idempotency key returns the run it
@@ -97,15 +102,15 @@ async def create_run(
     earlier = await earlier_run(session, request_key, request_hash)
     if earlier is not None:
         return earlier
-    command = with_defaults(settings, command)
-    check_limits(settings, command)
+    command = with_defaults(app.limits, command)
+    check_limits(app.limits, command)
     agent = await get_agent(session, command.agent_id, lock=True)
     earlier = await earlier_run(session, request_key, request_hash)
     if earlier is not None:
         await session.commit()
         return earlier
     inputs = await snapshot(
-        session, settings, agent, command.scenario_ids, command.background_noise
+        session, settings, app, agent, command.scenario_ids, command.background_noise
     )
     noise = command.background_noise
     run = Run(

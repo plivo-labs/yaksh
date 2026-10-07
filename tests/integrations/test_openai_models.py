@@ -4,10 +4,10 @@ import pytest
 from pydantic import SecretStr
 
 from tests.conftest import FakeProvider, response_body
-from yaksha.api.app import generation_model
-from yaksha.config import Settings
+from yaksha.api.providers import Providers
 from yaksha.domain.errors import UnavailableError
 from yaksha.domain.language_models import ModelCallError
+from yaksha.domain.settings import AppSettings, Llm, Secrets
 from yaksha.integrations.openai_models import OpenAIJsonModel
 
 SCHEMA = {
@@ -52,23 +52,33 @@ async def test_the_responses_api_is_asked_for_the_strict_schema(
     assert body["store"] is False
 
 
-async def test_scenario_generation_asks_the_configured_openai_base_url(
-    provider: tuple[str, FakeProvider], settings: Settings
+async def test_scenario_generation_follows_the_saved_llm_provider_without_a_restart(
+    provider: tuple[str, FakeProvider],
 ) -> None:
     base, fake = provider
-    configured = settings.model_copy(
-        update={
-            "openai_api_key": SecretStr("sk-test"),
-            "openai_base_url": f"{base}/gateway/v1",
-        }
+    providers = Providers()
+    first = AppSettings(
+        llm=Llm(base_url=f"{base}/gateway/v1"), secrets=Secrets(llm_api_key=SecretStr("sk-test"))
+    )
+    moved = first.model_copy(update={"llm": Llm(base_url=f"{base}/other/v1"), "version": 1})
+
+    model = providers.generation_model(first)
+    assert isinstance(model, OpenAIJsonModel)
+    assert await ask(model) == {"answer": "yes"}
+    moved_model = providers.generation_model(moved)
+    assert isinstance(moved_model, OpenAIJsonModel)
+    await ask(moved_model)
+    await providers.close()
+
+    paths = [request[0] for request in fake.requests]
+    assert set(paths) == {"/gateway/v1/responses", "/other/v1/responses"}
+    assert paths.index("/other/v1/responses") > max(
+        i for i, path in enumerate(paths) if path == "/gateway/v1/responses"
     )
 
-    model = generation_model(configured)
-    assert isinstance(model, OpenAIJsonModel)
-    answer = await ask(model)
 
-    assert answer == {"answer": "yes"}
-    assert fake.requests[0][0] == "/gateway/v1/responses"
+async def test_scenario_generation_is_off_without_a_saved_key() -> None:
+    assert Providers().generation_model(AppSettings()) is None
 
 
 @pytest.mark.parametrize(

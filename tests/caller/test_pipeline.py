@@ -1,5 +1,4 @@
 import asyncio
-from pathlib import Path
 from types import SimpleNamespace
 from typing import cast
 
@@ -24,10 +23,11 @@ from pipecat.tests.utils import SleepFrame, run_test
 from pipecat.turns.user_stop import SpeechTimeoutUserTurnStopStrategy
 from pipecat.turns.user_turn_strategies import UserTurnStrategies
 
-from tests.conftest import FakeProvider, make_settings
+from tests.conftest import FakeProvider
 from yaksha.caller import pipeline
 from yaksha.caller.audio import Clock
 from yaksha.caller.pipeline import (
+    CallerKeys,
     CallState,
     Ending,
     Persona,
@@ -36,19 +36,13 @@ from yaksha.caller.pipeline import (
     watch_silence,
 )
 from yaksha.caller.transcript import TranscriptBuilder
-from yaksha.config import Settings
 from yaksha.domain.conversations import CallObserver, CallRequest, EndReason, WireEvent
+from yaksha.domain.settings import AppSettings, CallerModel, Llm
 
-KEYS = ("deepgram_api_key", "elevenlabs_api_key", "openai_api_key")
 
-
-def model_settings(tmp_path: Path, base: str, model: str, effort: str | None) -> Settings:
-    return make_settings(
-        tmp_path,
-        **dict.fromkeys(KEYS, "test"),
-        openai_base_url=f"{base}/v1",
-        persona_llm_model=model,
-        persona_llm_reasoning_effort=effort,
+def model_settings(base: str, model: str, effort: str | None) -> AppSettings:
+    return AppSettings(
+        llm=Llm(base_url=f"{base}/v1"), caller=CallerModel(model=model, reasoning_effort=effort)
     )
 
 
@@ -114,14 +108,13 @@ async def test_a_call_that_is_ending_gets_no_nudge() -> None:
 )
 async def test_the_persona_asks_the_responses_api_with_reasoning_off_unless_configured(
     provider: tuple[str, FakeProvider],
-    tmp_path: Path,
     model: str,
     effort: str | None,
     reasoning: dict | None,
 ) -> None:
     base, fake = provider
-    settings = model_settings(tmp_path, base, model, effort)
-    llm = llm_service(settings, {"OPENAI_API_KEY": "test"}, "Be a caller.")
+    settings = model_settings(base, model, effort)
+    llm = llm_service(settings, CallerKeys(llm="test", deepgram="", elevenlabs=""), "Be a caller.")
 
     await llm.run_inference(LLMContext(messages=[{"role": "user", "content": "Hello."}]))
 

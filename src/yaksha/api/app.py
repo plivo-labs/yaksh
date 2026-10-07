@@ -9,6 +9,7 @@ from fastapi import APIRouter, FastAPI, HTTPException, status
 from yaksha import __version__
 from yaksha.api.body_limit import BodySizeLimit
 from yaksha.api.errors import CLIENT_ERRORS, register_error_handlers
+from yaksha.api.providers import Providers
 from yaksha.api.routes import (
     agents,
     conversations,
@@ -24,17 +25,18 @@ from yaksha.api.routes import (
     scenarios,
     voices,
 )
+from yaksha.api.routes import (
+    settings as settings_routes,
+)
 from yaksha.config import Settings
 from yaksha.db.migrate import upgrade_to_head
 from yaksha.db.session import create_engine, create_sessionmaker
 from yaksha.domain.documents import MAX_FILE_BYTES, FileStore
-from yaksha.domain.language_models import JsonModel
-from yaksha.domain.voices import VoiceProvider
-from yaksha.integrations.elevenlabs import ElevenLabsClient
-from yaksha.integrations.openai_models import OpenAIJsonModel
 from yaksha.integrations.s3 import S3FileStore
+from yaksha.settings.cipher import Cipher, SecretUnreadableError
+from yaksha.settings.store import SettingsSource
 from yaksha.simulation.personas import seed_builtin_personas
-from yaksha.simulation.voices import VoiceClients, seed_builtin_voices
+from yaksha.simulation.voices import seed_builtin_voices
 
 log = logging.getLogger(__name__)
 
@@ -49,6 +51,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     settings.data_dir.mkdir(parents=True, exist_ok=True)
     if not os.access(settings.data_dir, os.W_OK):
         raise RuntimeError(f"data directory is not writable: {settings.data_dir}")
+    try:
+        await app.state.source.current()
+    except SecretUnreadableError as error:
+        raise RuntimeError(f"cannot read the stored settings: {error}") from None
     async with app.state.sessionmaker() as session:
         voices = await seed_builtin_voices(session)
         personas = await seed_builtin_personas(session)
@@ -57,17 +63,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     if personas:
         log.info("seeded built-in personas: %s", ", ".join(personas))
     yield
-    if app.state.generation_model is not None:
-        await app.state.generation_model.close()
+    await app.state.providers.close()
     await app.state.engine.dispose()
-
-
-def voice_clients(settings: Settings) -> VoiceClients:
-    if settings.elevenlabs_api_key is None:
-        return {}
-    return {
-        VoiceProvider.ELEVENLABS: ElevenLabsClient(settings.elevenlabs_api_key.get_secret_value())
-    }
 
 
 def file_store(settings: Settings) -> FileStore | None:
@@ -86,29 +83,17 @@ def file_store(settings: Settings) -> FileStore | None:
     )
 
 
-def generation_model(settings: Settings) -> JsonModel | None:
-    """The OpenAI-compatible API at OPENAI_BASE_URL, as for the caller."""
-    model = settings.generation_llm_model or settings.persona_llm_model
-    if settings.openai_api_key is None:
-        return None
-    return OpenAIJsonModel.openai(
-        settings.openai_api_key.get_secret_value(),
-        model,
-        base_url=settings.openai_base_url,
-        timeout_s=settings.generation_llm_timeout_s,
-        reasoning_effort=settings.generation_llm_reasoning_effort,
-    )
-
-
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or Settings()
     app = FastAPI(title="Yaksha", version=__version__, lifespan=lifespan)
     app.state.settings = settings
     app.state.engine = create_engine(str(settings.database_url))
     app.state.sessionmaker = create_sessionmaker(app.state.engine)
-    app.state.voice_clients = voice_clients(settings)
+    app.state.source = SettingsSource(
+        app.state.sessionmaker, Cipher(settings.encryption_key.get_secret_value())
+    )
+    app.state.providers = Providers()
     app.state.file_store = file_store(settings)
-    app.state.generation_model = generation_model(settings)
     register_error_handlers(app)
     app.add_middleware(BodySizeLimit, max_bytes=MAX_REQUEST_BYTES)
 
@@ -125,6 +110,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     api.include_router(review.router)
     api.include_router(runs.router)
     api.include_router(scenarios.router)
+    api.include_router(settings_routes.router)
     api.include_router(voices.router)
     app.include_router(api)
 

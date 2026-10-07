@@ -135,7 +135,7 @@ async def test_a_rendered_url_is_signed_in_the_form_the_agent_receives(
     base, seen = agent_system
     trigger = Trigger.model_validate({"method": "GET", "url": f"{base}/start?"})
     rendered = render(
-        trigger, number="+15716535187", conversation_id="c-1", agent_data=list[Fact](), env={}
+        trigger, number="+15716535187", conversation_id="c-1", agent_data=list[Fact](), secrets={}
     )
 
     await send_trigger(rendered, "conv-4", signing_key="signing", allow_private=True)
@@ -174,7 +174,7 @@ def test_a_secret_sent_in_a_query_value_is_masked_in_its_encoded_form() -> None:
         {
             "method": "GET",
             "url": "https://agents.example.com/calls",
-            "query": [{"name": "key", "value": "{{env.YAKSHA_TRIGGER_KEY}}"}],
+            "query": [{"name": "key", "value": "{{secrets.KEY}}"}],
         }
     )
     rendered = render(
@@ -182,7 +182,7 @@ def test_a_secret_sent_in_a_query_value_is_masked_in_its_encoded_form() -> None:
         number="+15716535187",
         conversation_id="c-1",
         agent_data=list[Fact](),
-        env={"YAKSHA_TRIGGER_KEY": "abc+def/ghi="},
+        secrets={"KEY": "abc+def/ghi="},
     )
 
     assert mask(f"echo: {rendered.url}", rendered.secrets) == (

@@ -4,10 +4,10 @@ import asyncio
 import base64
 import json
 import logging
-import os
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from functools import partial
 from typing import Any
 
 import audioop
@@ -46,10 +46,11 @@ from yaksha.caller.audio import (
 from yaksha.caller.lag import LagSampler
 from yaksha.caller.listen import AudioTap, LiveAudio
 from yaksha.caller.pipeline import (
+    CallerKeys,
     CallState,
     Persona,
+    caller_keys,
     converse,
-    provider_keys,
 )
 from yaksha.caller.plivo_server import (
     CALLBACK_RETRIES,
@@ -680,19 +681,37 @@ class PhoneCaller:
     """Dials the agent and talks over the stream Plivo opens. A stream that dies without a close
     frame ends with the conversation's duration limit."""
 
-    def __init__(self, settings: Settings, registry: StreamRegistry, api: PlivoApi) -> None:
+    def __init__(
+        self,
+        settings: Settings,
+        registry: StreamRegistry,
+        plivo_api: Callable[[str, str], PlivoApi] = PlivoApi,
+    ) -> None:
+        """plivo_api makes the Plivo client from the Auth ID and Auth token of a call's
+        settings."""
         if settings.public_url is None:
             raise ValueError("phone calls need YAKSHA_PUBLIC_URL, the address Plivo can reach")
-        self._keys = provider_keys(settings)
         self._settings = settings
+        self._public_url = settings.public_url
         self._registry = registry
-        self._api = api
-        self._dialer = Dialer(api, settings.public_url, settings.ring_timeout_s)
+        self._plivo_api = plivo_api
         self._receiver = Receiver()
 
     async def run(
         self, request: CallRequest, observer: CallObserver, stop: asyncio.Event
     ) -> CallOutcome:
+        """The Plivo account and provider keys come from the settings the call started with."""
+        credentials = request.app_settings.plivo_credentials
+        if credentials is None:
+            return unreached(
+                EndReason.ERROR, "phone calls are off: add the Plivo Auth ID and Auth token"
+            )
+        try:
+            keys = caller_keys(request.app_settings)
+        except ValueError as error:
+            return unreached(EndReason.ERROR, str(error))
+        api = self._plivo_api(*credentials)
+        hang_up = partial(self._hang_up, api)
         clock = Clock()
         observer.wire_event(WireEvent(kind=WireEventKind.CONNECT_STARTED, at_ms=clock.ms()))
         entry = self._registry.expect(request.conversation_id)
@@ -700,19 +719,20 @@ class PhoneCaller:
         live = LiveAudio(str(self._settings.database_url), request.conversation_id)
         try:
             if request.agent.outbound is None:
-                dialed = await self._dialer.dial(request, entry, observer, clock.ms, stop)
+                dialer = Dialer(api, self._public_url, request.app_settings.phone.ring_timeout_s)
+                dialed = await dialer.dial(request, entry, observer, clock.ms, stop)
             else:
                 trigger = asyncio.ensure_future(self._send_trigger(request, observer, clock))
                 dialed = await self._receiver.receive(
                     request, entry, observer, clock.ms, stop, trigger
                 )
                 if isinstance(dialed, CallOutcome) and dialed.call_uuid is not None:
-                    await self._hang_up(dialed.call_uuid)
+                    await hang_up(dialed.call_uuid)
             if isinstance(dialed, CallOutcome):
                 return dialed
-            line = Line(dialed.call_uuid, entry.callbacks, self._hang_up)
+            line = Line(dialed.call_uuid, entry.callbacks, hang_up)
             try:
-                return await self._talk(request, observer, stop, clock, dialed, line, live)
+                return await self._talk(request, keys, observer, stop, clock, dialed, line, live)
             finally:
                 await line.hang_up()
         finally:
@@ -733,12 +753,15 @@ class PhoneCaller:
                 number=request.caller_number,
                 conversation_id=str(request.conversation_id),
                 agent_data=request.agent_data,
-                env=os.environ,
+                secrets={
+                    name: value.get_secret_value()
+                    for name, value in request.app_settings.secrets.triggers.items()
+                },
             )
         except RenderError as error:
             outcome = TriggerOutcome(TriggerResult.NOT_SENT, str(error))
         else:
-            key = self._settings.webhook_signing_key
+            key = request.app_settings.secrets.trigger_signing_key
             outcome = await send_trigger(
                 rendered,
                 str(request.conversation_id),
@@ -753,6 +776,7 @@ class PhoneCaller:
     async def _talk(
         self,
         request: CallRequest,
+        keys: CallerKeys,
         observer: CallObserver,
         stop: asyncio.Event,
         clock: Clock,
@@ -764,7 +788,7 @@ class PhoneCaller:
         observer.wire_event(WireEvent(kind=WireEventKind.CONNECTED, at_ms=connected_ms))
         lag = LagSampler(clock.ms)
         try:
-            spoken = await self._converse(request, observer, stop, clock, dialed, live)
+            spoken = await self._converse(request, keys, observer, stop, clock, dialed, live)
         finally:
             loop_lag = lag.stop()
         ended_ms = clock.ms()
@@ -812,6 +836,7 @@ class PhoneCaller:
     async def _converse(
         self,
         request: CallRequest,
+        keys: CallerKeys,
         observer: CallObserver,
         stop: asyncio.Event,
         clock: Clock,
@@ -850,8 +875,7 @@ class PhoneCaller:
         state = CallState()
         disconnected = asyncio.Event()
         persona = Persona(
-            self._settings,
-            self._keys,
+            keys,
             request,
             clock,
             observer,
@@ -892,8 +916,9 @@ class PhoneCaller:
                 greeting.cancel()
         return Spoken(state, persona, recording, marks, serializer)
 
-    async def _hang_up(self, call_id: str) -> None:
+    @staticmethod
+    async def _hang_up(api: PlivoApi, call_id: str) -> None:
         try:
-            await asyncio.wait_for(self._api.hang_up(call_id), HANGUP_TIMEOUT_S)
+            await asyncio.wait_for(api.hang_up(call_id), HANGUP_TIMEOUT_S)
         except (PlivoError, TimeoutError) as error:
             log.warning("could not hang up call %s: %r", call_id, error)

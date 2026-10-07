@@ -52,8 +52,8 @@ async def test_the_direction_decides_which_settings_an_agent_needs(
     ("changes", "reason"),
     [
         ({"body": {"to": "{{yaksha.phone}}"}}, "unknown placeholder"),
-        ({"body": {"to": "{{env.OPENAI_API_KEY}}"}}, "YAKSHA_TRIGGER_"),
-        ({"body": {"to": "{{env.YAKSHA_WEBHOOK_SIGNING_KEY}}"}}, "YAKSHA_TRIGGER_"),
+        ({"body": {"to": "{{env.YAKSHA_TRIGGER_KEY}}"}}, "unknown placeholder"),
+        ({"body": {"to": "{{secrets.api_key}}"}}, "capital letters"),
         ({"body": {"to": "{{yaksha.number}"}}, "unmatched braces"),
         ({"body": {"{{yaksha.number}}": "x"}}, "JSON keys"),
         ({"url": "https://example.com/{{yaksha.number}}"}, "URL"),

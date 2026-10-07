@@ -1,7 +1,7 @@
 # 0002 Trigger secrets come from environment variables
 
 Date: 2026-09-29
-Status: accepted
+Status: replaced by 0027 (trigger secrets on the Settings page)
 
 ## Decision
 

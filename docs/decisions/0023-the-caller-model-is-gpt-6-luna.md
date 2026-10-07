@@ -1,7 +1,7 @@
 # 0023 The caller model is gpt-6-luna
 
 Date: 2026-10-05
-Status: accepted
+Status: accepted, changed by 0027 (the model is on the Settings page)
 
 ## Decision
 

@@ -5,12 +5,11 @@ import uuid
 
 import pytest
 
-from tests.conftest import FakeCaller
+from tests.conftest import FakeCaller, FixedSource, make_worker
 from yaksha.config import Settings
 from yaksha.db.session import create_engine, create_sessionmaker
 from yaksha.domain.conversations import EndReason
 from yaksha.simulation.calls import LiveCall
-from yaksha.worker.worker import Worker
 
 
 async def survives_cancellation() -> bool:
@@ -23,11 +22,12 @@ async def survives_cancellation() -> bool:
 async def test_cancelling_the_worker_while_it_abandons_a_stuck_write_marks_it_fatal(
     offline_settings: Settings,
 ) -> None:
-    worker = Worker(
+    worker = make_worker(
         create_sessionmaker(create_engine(offline_settings.database_url.encoded_string())),
         FakeCaller(),
         offline_settings,
         worker_id="unit",
+        source=FixedSource(),
     )
     write = asyncio.ensure_future(survives_cancellation())
     abandon = asyncio.ensure_future(worker._abandon(write, "write"))
@@ -54,11 +54,12 @@ async def test_a_poll_that_survives_cancellation_marks_the_worker_fatal(
 
     monkeypatch.setattr("yaksha.simulation.conversations.reap_expired", stuck)
     settings = offline_settings.model_copy(update={"end_timeout_s": 0.1})
-    worker = Worker(
+    worker = make_worker(
         create_sessionmaker(create_engine(settings.database_url.encoded_string())),
         FakeCaller(),
         settings,
         worker_id="unit",
+        source=FixedSource(),
     )
     stop = asyncio.Event()
     run = asyncio.ensure_future(worker.run(stop))
@@ -82,11 +83,12 @@ async def test_a_renewal_that_survives_cancellation_stops_the_call_and_marks_fat
     settings = offline_settings.model_copy(
         update={"worker_lease_s": 0.2, "worker_heartbeat_s": 0.02, "end_timeout_s": 0.1}
     )
-    worker = Worker(
+    worker = make_worker(
         create_sessionmaker(create_engine(settings.database_url.encoded_string())),
         FakeCaller(),
         settings,
         worker_id="unit",
+        source=FixedSource(),
     )
     live = LiveCall()
 
@@ -108,11 +110,12 @@ async def test_cancelling_maintenance_during_a_stuck_renewal_abandons_it(
     settings = offline_settings.model_copy(
         update={"worker_lease_s": 5, "worker_heartbeat_s": 0.02, "end_timeout_s": 0.1}
     )
-    worker = Worker(
+    worker = make_worker(
         create_sessionmaker(create_engine(settings.database_url.encoded_string())),
         FakeCaller(),
         settings,
         worker_id="unit",
+        source=FixedSource(),
     )
     maintenance = asyncio.ensure_future(
         worker._maintain(uuid.uuid4(), LiveCall(), time.monotonic())
@@ -139,11 +142,12 @@ async def test_the_lease_is_measured_from_when_a_renewal_was_sent(
     settings = offline_settings.model_copy(
         update={"worker_lease_s": 1.0, "worker_heartbeat_s": 0.05, "end_timeout_s": 0.1}
     )
-    worker = Worker(
+    worker = make_worker(
         create_sessionmaker(create_engine(settings.database_url.encoded_string())),
         FakeCaller(),
         settings,
         worker_id="unit",
+        source=FixedSource(),
     )
     live = LiveCall()
     started = time.monotonic()
@@ -168,11 +172,12 @@ async def test_a_stalled_poll_is_cancelled_and_retried_without_a_shutdown_signal
     settings = offline_settings.model_copy(
         update={"worker_lease_s": 0.2, "worker_poll_interval_s": 0.02, "end_timeout_s": 0.1}
     )
-    worker = Worker(
+    worker = make_worker(
         create_sessionmaker(create_engine(settings.database_url.encoded_string())),
         FakeCaller(),
         settings,
         worker_id="unit",
+        source=FixedSource(),
     )
     stop = asyncio.Event()
     run = asyncio.ensure_future(worker.run(stop))

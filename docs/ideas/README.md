@@ -8,4 +8,3 @@
 - [Sign in with ChatGPT for the models](sign-in-with-chatgpt.md)
 - [Sound events, own sound files and line problems](sound-events-and-line-problems.md)
 - [Symmetric silence timer](symmetric-silence-timer.md)
-- [Trigger secrets in the UI](trigger-secrets-in-ui.md)

@@ -351,16 +351,16 @@ func (e LabelReason) Valid() bool {
 
 // Defines values for Lane.
 const (
-	AdHoc Lane = "ad_hoc"
-	Audit Lane = "audit"
+	LaneAdHoc Lane = "ad_hoc"
+	LaneAudit Lane = "audit"
 )
 
 // Valid indicates whether the value is a known member of the Lane enum.
 func (e Lane) Valid() bool {
 	switch e {
-	case AdHoc:
+	case LaneAdHoc:
 		return true
-	case Audit:
+	case LaneAudit:
 		return true
 	default:
 		return false
@@ -634,6 +634,33 @@ func (e Provenance) Valid() bool {
 	}
 }
 
+// Defines values for Provider.
+const (
+	ProviderDeepgram   Provider = "deepgram"
+	ProviderElevenlabs Provider = "elevenlabs"
+	ProviderLlm        Provider = "llm"
+	ProviderPlivo      Provider = "plivo"
+	ProviderTypesafe   Provider = "typesafe"
+)
+
+// Valid indicates whether the value is a known member of the Provider enum.
+func (e Provider) Valid() bool {
+	switch e {
+	case ProviderDeepgram:
+		return true
+	case ProviderElevenlabs:
+		return true
+	case ProviderLlm:
+		return true
+	case ProviderPlivo:
+		return true
+	case ProviderTypesafe:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for Role.
 const (
 	RoleAgent  Role = "agent"
@@ -697,15 +724,48 @@ func (e RunStatus) Valid() bool {
 	}
 }
 
+// Defines values for SecretName.
+const (
+	DeepgramApiKey    SecretName = "deepgram_api_key"
+	ElevenlabsApiKey  SecretName = "elevenlabs_api_key"
+	LlmApiKey         SecretName = "llm_api_key"
+	PlivoAuthId       SecretName = "plivo_auth_id"
+	PlivoAuthToken    SecretName = "plivo_auth_token"
+	TriggerSigningKey SecretName = "trigger_signing_key"
+	TypesafeApiKey    SecretName = "typesafe_api_key"
+)
+
+// Valid indicates whether the value is a known member of the SecretName enum.
+func (e SecretName) Valid() bool {
+	switch e {
+	case DeepgramApiKey:
+		return true
+	case ElevenlabsApiKey:
+		return true
+	case LlmApiKey:
+		return true
+	case PlivoAuthId:
+		return true
+	case PlivoAuthToken:
+		return true
+	case TriggerSigningKey:
+		return true
+	case TypesafeApiKey:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for Transport.
 const (
-	Phone Transport = "phone"
+	TransportPhone Transport = "phone"
 )
 
 // Valid indicates whether the value is a known member of the Transport enum.
 func (e Transport) Valid() bool {
 	switch e {
-	case Phone:
+	case TransportPhone:
 		return true
 	default:
 		return false
@@ -795,13 +855,13 @@ func (e VoiceGender) Valid() bool {
 
 // Defines values for VoiceProvider.
 const (
-	Elevenlabs VoiceProvider = "elevenlabs"
+	VoiceProviderElevenlabs VoiceProvider = "elevenlabs"
 )
 
 // Valid indicates whether the value is a known member of the VoiceProvider enum.
 func (e VoiceProvider) Valid() bool {
 	switch e {
-	case Elevenlabs:
+	case VoiceProviderElevenlabs:
 		return true
 	default:
 		return false
@@ -1012,6 +1072,12 @@ type AssignPersona struct {
 	ScenarioIds []openapi_types.UUID `json:"scenario_ids"`
 }
 
+// Audit defines model for Audit.
+type Audit struct {
+	SampleRate   *float32 `json:"sample_rate,omitempty"`
+	WeeklyBudget *int     `json:"weekly_budget,omitempty"`
+}
+
 // BackgroundNoise The sound behind the caller.
 type BackgroundNoise struct {
 	// Level How loud the background is, as the caller's speech level above the noise.
@@ -1037,6 +1103,12 @@ type CallerFidelity struct {
 	Likely   int    `json:"likely"`
 	Persona  string `json:"persona"`
 	Possible int    `json:"possible"`
+}
+
+// CallerModel defines model for CallerModel.
+type CallerModel struct {
+	Model           *string `json:"model,omitempty"`
+	ReasoningEffort *string `json:"reasoning_effort,omitempty"`
 }
 
 // Category What kind of situation a scenario tests. How the caller talks comes from the persona.
@@ -1178,6 +1250,12 @@ type CriterionCounts struct {
 // DecidedBy defines model for DecidedBy.
 type DecidedBy string
 
+// Deepgram defines model for Deepgram.
+type Deepgram struct {
+	BaseUrl *string `json:"base_url,omitempty"`
+	Model   *string `json:"model,omitempty"`
+}
+
 // Defaults What the server uses for a field that a request leaves out.
 type Defaults struct {
 	FirstWords   map[string]string `json:"first_words"`
@@ -1212,6 +1290,12 @@ type DocumentSummary struct {
 	Name       string             `json:"name"`
 	Pages      *int               `json:"pages"`
 	SizeBytes  *int               `json:"size_bytes"`
+}
+
+// Efforts defines model for Efforts.
+type Efforts struct {
+	Efforts []string `json:"efforts"`
+	Model   string   `json:"model"`
 }
 
 // EndReason Who or what ended the conversation, as Yaksha observed it.
@@ -1268,6 +1352,13 @@ type GenerateScenarios struct {
 // GenerationMode defines model for GenerationMode.
 type GenerationMode string
 
+// GenerationModel defines model for GenerationModel.
+type GenerationModel struct {
+	Model           *string  `json:"model,omitempty"`
+	ReasoningEffort *string  `json:"reasoning_effort,omitempty"`
+	TimeoutS        *float32 `json:"timeout_s,omitempty"`
+}
+
 // GenerationRead defines model for GenerationRead.
 type GenerationRead struct {
 	CreatedAt time.Time          `json:"created_at"`
@@ -1290,6 +1381,13 @@ type Header struct {
 type HealthResponse struct {
 	Status  string `json:"status"`
 	Version string `json:"version"`
+}
+
+// ImportResult defines model for ImportResult.
+type ImportResult struct {
+	Changes  []string     `json:"changes"`
+	Settings SettingsRead `json:"settings"`
+	Skipped  []string     `json:"skipped"`
 }
 
 // ItemRead defines model for ItemRead.
@@ -1331,6 +1429,17 @@ type JudgeAgreement struct {
 	// interval.
 	OfferedCalls Share              `json:"offered_calls"`
 	Versions     []VersionAgreement `json:"versions"`
+}
+
+// JudgeModel defines model for JudgeModel.
+type JudgeModel struct {
+	JevPassBar      *float32 `json:"jev_pass_bar,omitempty"`
+	MaxInputChars   *int     `json:"max_input_chars,omitempty"`
+	MaxOutputTokens *int     `json:"max_output_tokens,omitempty"`
+	Model           *string  `json:"model,omitempty"`
+	ReasoningEffort *string  `json:"reasoning_effort,omitempty"`
+	SourcesTimeoutS *float32 `json:"sources_timeout_s,omitempty"`
+	TimeoutS        *float32 `json:"timeout_s,omitempty"`
 }
 
 // JudgeVersionUsed defines model for JudgeVersionUsed.
@@ -1418,6 +1527,22 @@ type LatencySummary struct {
 	TalkedOver int  `json:"talked_over"`
 }
 
+// Limits defines model for Limits.
+type Limits struct {
+	DefaultMaxDurationS  *int `json:"default_max_duration_s,omitempty"`
+	DefaultMaxTurns      *int `json:"default_max_turns,omitempty"`
+	MaxRunConversations  *int `json:"max_run_conversations,omitempty"`
+	MaxRunRepeats        *int `json:"max_run_repeats,omitempty"`
+	MaxRunRetries        *int `json:"max_run_retries,omitempty"`
+	MaxRunStartIntervalS *int `json:"max_run_start_interval_s,omitempty"`
+}
+
+// Llm Any API with OpenAI's Responses endpoint. The caller, scenario writing and the judges
+// use it.
+type Llm struct {
+	BaseUrl *string `json:"base_url,omitempty"`
+}
+
 // LlmRule defines model for LlmRule.
 type LlmRule struct {
 	AppliesWhen string `json:"applies_when"`
@@ -1440,6 +1565,11 @@ type LlmRuleKind string
 type Metric struct {
 	Flags *[]string              `json:"flags,omitempty"`
 	Value map[string]interface{} `json:"value"`
+}
+
+// Models defines model for Models.
+type Models struct {
+	Models []string `json:"models"`
 }
 
 // NoiseLevel How loud the background is, as the caller's speech level above the noise.
@@ -1621,6 +1751,13 @@ type PersonaVersionRead struct {
 	Version   int                `json:"version"`
 }
 
+// Phone defines model for Phone.
+type Phone struct {
+	NumberRestS  *int    `json:"number_rest_s,omitempty"`
+	RingTimeoutS *int    `json:"ring_timeout_s,omitempty"`
+	Timezone     *string `json:"timezone,omitempty"`
+}
+
 // PhoneNumberRead defines model for PhoneNumberRead.
 type PhoneNumberRead struct {
 	Alias                 *string     `json:"alias"`
@@ -1663,8 +1800,24 @@ type PhraseRuleKind string
 // PhraseWhere defines model for PhraseWhere.
 type PhraseWhere string
 
+// PlivoAccount defines model for PlivoAccount.
+type PlivoAccount struct {
+	AuthId    string `json:"auth_id"`
+	AuthToken string `json:"auth_token"`
+}
+
 // Provenance defines model for Provenance.
 type Provenance string
+
+// Provider defines model for Provider.
+type Provider string
+
+// ProviderTest defines model for ProviderTest.
+type ProviderTest struct {
+	Detail   string   `json:"detail"`
+	Ok       bool     `json:"ok"`
+	Provider Provider `json:"provider"`
+}
 
 // ProviderVoice A voice as its provider describes it. `listed_languages` are the languages the provider
 // lists for the voice in any model; the model decides what the voice can really speak.
@@ -1989,6 +2142,51 @@ type ScenarioVersionRead struct {
 	Version    int                `json:"version"`
 }
 
+// SecretName defines model for SecretName.
+type SecretName string
+
+// SecretState A saved secret, never its value.
+type SecretState struct {
+	Hint *string `json:"hint"`
+}
+
+// SecretWrite defines model for SecretWrite.
+type SecretWrite struct {
+	Value string `json:"value"`
+}
+
+// SettingsImport defines model for SettingsImport.
+type SettingsImport struct {
+	Document string             `json:"document"`
+	DryRun   *bool              `json:"dry_run,omitempty"`
+	Env      *map[string]string `json:"env,omitempty"`
+}
+
+// SettingsRead defines model for SettingsRead.
+type SettingsRead struct {
+	Secrets        map[string]SecretState `json:"secrets"`
+	TriggerSecrets map[string]SecretState `json:"trigger_secrets"`
+
+	// Values Every setting that is not a secret.
+	Values  SettingsValues `json:"values"`
+	Version int            `json:"version"`
+}
+
+// SettingsValues Every setting that is not a secret.
+type SettingsValues struct {
+	Audit      *Audit           `json:"audit,omitempty"`
+	Caller     *CallerModel     `json:"caller,omitempty"`
+	Deepgram   *Deepgram        `json:"deepgram,omitempty"`
+	Generation *GenerationModel `json:"generation,omitempty"`
+	Judges     *JudgeModel      `json:"judges,omitempty"`
+	Limits     *Limits          `json:"limits,omitempty"`
+
+	// Llm Any API with OpenAI's Responses endpoint. The caller, scenario writing and the judges
+	// use it.
+	Llm   *Llm   `json:"llm,omitempty"`
+	Phone *Phone `json:"phone,omitempty"`
+}
+
 // Share How many of a total, with the 95% Wilson interval of the rate: few calls give a wide
 // interval.
 type Share struct {
@@ -1996,6 +2194,11 @@ type Share struct {
 	High  *float32 `json:"high"`
 	Low   *float32 `json:"low"`
 	Total int      `json:"total"`
+}
+
+// SigningKey defines model for SigningKey.
+type SigningKey struct {
+	Key string `json:"key"`
 }
 
 // TextDocumentCreate defines model for TextDocumentCreate.
@@ -2260,6 +2463,21 @@ type CreateRunApiV1RunsPostJSONRequestBody = RunCreate
 
 // UpdateScenarioApiV1ScenariosScenarioIdPatchJSONRequestBody defines body for UpdateScenarioApiV1ScenariosScenarioIdPatch for application/json ContentType.
 type UpdateScenarioApiV1ScenariosScenarioIdPatchJSONRequestBody = ScenarioUpdate
+
+// ImportSettingsApiV1SettingsImportPostJSONRequestBody defines body for ImportSettingsApiV1SettingsImportPost for application/json ContentType.
+type ImportSettingsApiV1SettingsImportPostJSONRequestBody = SettingsImport
+
+// PutPlivoAccountApiV1SettingsPlivoPutJSONRequestBody defines body for PutPlivoAccountApiV1SettingsPlivoPut for application/json ContentType.
+type PutPlivoAccountApiV1SettingsPlivoPutJSONRequestBody = PlivoAccount
+
+// PutSecretApiV1SettingsSecretsNamePutJSONRequestBody defines body for PutSecretApiV1SettingsSecretsNamePut for application/json ContentType.
+type PutSecretApiV1SettingsSecretsNamePutJSONRequestBody = SecretWrite
+
+// PutTriggerSecretApiV1SettingsTriggerSecretsNamePutJSONRequestBody defines body for PutTriggerSecretApiV1SettingsTriggerSecretsNamePut for application/json ContentType.
+type PutTriggerSecretApiV1SettingsTriggerSecretsNamePutJSONRequestBody = SecretWrite
+
+// PutValuesApiV1SettingsValuesPutJSONRequestBody defines body for PutValuesApiV1SettingsValuesPut for application/json ContentType.
+type PutValuesApiV1SettingsValuesPutJSONRequestBody = SettingsValues
 
 // CreateVoiceApiV1VoicesPostJSONRequestBody defines body for CreateVoiceApiV1VoicesPost for application/json ContentType.
 type CreateVoiceApiV1VoicesPostJSONRequestBody = VoiceCreate
@@ -3252,6 +3470,156 @@ type ClientInterface interface {
 	//
 	// Corresponds with GET /api/v1/scenarios/{scenario_id}/versions/{version} (the `GetVersionApiV1ScenariosScenarioIdVersionsVersionGet` operationId).
 	GetVersionApiV1ScenariosScenarioIdVersionsVersionGet(ctx context.Context, scenarioId openapi_types.UUID, version int, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetSettingsApiV1SettingsGet Get Settings
+	//
+	// Corresponds with GET /api/v1/settings (the `GetSettingsApiV1SettingsGet` operationId).
+	GetSettingsApiV1SettingsGet(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ExportSettingsApiV1SettingsExportGet Export Settings
+	//
+	// The values that differ from the defaults, and each saved secret as a ${NAME}
+	// placeholder; never a secret's value.
+	//
+	// Corresponds with GET /api/v1/settings/export (the `ExportSettingsApiV1SettingsExportGet` operationId).
+	ExportSettingsApiV1SettingsExportGet(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ImportSettingsApiV1SettingsImportPostWithBody Import Settings
+	//
+	// Apply a YAML settings document: every key is checked with its provider first, and
+	// nothing is saved unless every check passes.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /api/v1/settings/import (the `ImportSettingsApiV1SettingsImportPost` operationId).
+	ImportSettingsApiV1SettingsImportPostWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ImportSettingsApiV1SettingsImportPost Import Settings
+	//
+	// Apply a YAML settings document: every key is checked with its provider first, and
+	// nothing is saved unless every check passes.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /api/v1/settings/import (the `ImportSettingsApiV1SettingsImportPost` operationId).
+	ImportSettingsApiV1SettingsImportPost(ctx context.Context, body ImportSettingsApiV1SettingsImportPostJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListModelsApiV1SettingsModelsGet List Models
+	//
+	// The models the LLM provider lists. A deployment name the list lacks, as on Azure,
+	// can still be saved.
+	//
+	// Corresponds with GET /api/v1/settings/models (the `ListModelsApiV1SettingsModelsGet` operationId).
+	ListModelsApiV1SettingsModelsGet(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ModelEffortsApiV1SettingsModelsModelEffortsGet Model Efforts
+	//
+	// The reasoning efforts the model takes. It sends one short request for each effort.
+	//
+	// Corresponds with GET /api/v1/settings/models/{model}/efforts (the `ModelEffortsApiV1SettingsModelsModelEffortsGet` operationId).
+	ModelEffortsApiV1SettingsModelsModelEffortsGet(ctx context.Context, model string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PutPlivoAccountApiV1SettingsPlivoPutWithBody Put Plivo Account
+	//
+	// Save the Auth ID and Auth token of a Plivo account together, after Plivo accepts them;
+	// this is how to move to another account.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PUT /api/v1/settings/plivo (the `PutPlivoAccountApiV1SettingsPlivoPut` operationId).
+	PutPlivoAccountApiV1SettingsPlivoPutWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PutPlivoAccountApiV1SettingsPlivoPut Put Plivo Account
+	//
+	// Save the Auth ID and Auth token of a Plivo account together, after Plivo accepts them;
+	// this is how to move to another account.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PUT /api/v1/settings/plivo (the `PutPlivoAccountApiV1SettingsPlivoPut` operationId).
+	PutPlivoAccountApiV1SettingsPlivoPut(ctx context.Context, body PutPlivoAccountApiV1SettingsPlivoPutJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// TestProviderApiV1SettingsProvidersProviderTestPost Test Provider
+	//
+	// Use the saved settings of one provider for a small piece of real work. The provider
+	// may charge for it.
+	//
+	// Corresponds with POST /api/v1/settings/providers/{provider}/test (the `TestProviderApiV1SettingsProvidersProviderTestPost` operationId).
+	TestProviderApiV1SettingsProvidersProviderTestPost(ctx context.Context, provider Provider, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeleteSecretApiV1SettingsSecretsNameDelete Delete Secret
+	//
+	// Corresponds with DELETE /api/v1/settings/secrets/{name} (the `DeleteSecretApiV1SettingsSecretsNameDelete` operationId).
+	DeleteSecretApiV1SettingsSecretsNameDelete(ctx context.Context, name SecretName, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PutSecretApiV1SettingsSecretsNamePutWithBody Put Secret
+	//
+	// Check the key with its provider, then save it. A key the provider refuses is not
+	// saved.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PUT /api/v1/settings/secrets/{name} (the `PutSecretApiV1SettingsSecretsNamePut` operationId).
+	PutSecretApiV1SettingsSecretsNamePutWithBody(ctx context.Context, name SecretName, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PutSecretApiV1SettingsSecretsNamePut Put Secret
+	//
+	// Check the key with its provider, then save it. A key the provider refuses is not
+	// saved.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PUT /api/v1/settings/secrets/{name} (the `PutSecretApiV1SettingsSecretsNamePut` operationId).
+	PutSecretApiV1SettingsSecretsNamePut(ctx context.Context, name SecretName, body PutSecretApiV1SettingsSecretsNamePutJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// NewSigningKeyApiV1SettingsSigningKeyPost New Signing Key
+	//
+	// Make a new key that signs every outbound trigger, replacing the old one. The response
+	// is the only time the key is shown.
+	//
+	// Corresponds with POST /api/v1/settings/signing-key (the `NewSigningKeyApiV1SettingsSigningKeyPost` operationId).
+	NewSigningKeyApiV1SettingsSigningKeyPost(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeleteTriggerSecretApiV1SettingsTriggerSecretsNameDelete Delete Trigger Secret
+	//
+	// Corresponds with DELETE /api/v1/settings/trigger-secrets/{name} (the `DeleteTriggerSecretApiV1SettingsTriggerSecretsNameDelete` operationId).
+	DeleteTriggerSecretApiV1SettingsTriggerSecretsNameDelete(ctx context.Context, name string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PutTriggerSecretApiV1SettingsTriggerSecretsNamePutWithBody Put Trigger Secret
+	//
+	// A value a trigger template uses as {{secrets.NAME}}.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PUT /api/v1/settings/trigger-secrets/{name} (the `PutTriggerSecretApiV1SettingsTriggerSecretsNamePut` operationId).
+	PutTriggerSecretApiV1SettingsTriggerSecretsNamePutWithBody(ctx context.Context, name string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PutTriggerSecretApiV1SettingsTriggerSecretsNamePut Put Trigger Secret
+	//
+	// A value a trigger template uses as {{secrets.NAME}}.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PUT /api/v1/settings/trigger-secrets/{name} (the `PutTriggerSecretApiV1SettingsTriggerSecretsNamePut` operationId).
+	PutTriggerSecretApiV1SettingsTriggerSecretsNamePut(ctx context.Context, name string, body PutTriggerSecretApiV1SettingsTriggerSecretsNamePutJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PutValuesApiV1SettingsValuesPutWithBody Put Values
+	//
+	// Replace every setting that is not a secret. A change applies to the next call.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PUT /api/v1/settings/values (the `PutValuesApiV1SettingsValuesPut` operationId).
+	PutValuesApiV1SettingsValuesPutWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PutValuesApiV1SettingsValuesPut Put Values
+	//
+	// Replace every setting that is not a secret. A change applies to the next call.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PUT /api/v1/settings/values (the `PutValuesApiV1SettingsValuesPut` operationId).
+	PutValuesApiV1SettingsValuesPut(ctx context.Context, body PutValuesApiV1SettingsValuesPutJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListVoicesApiV1VoicesGet List Voices
 	//
@@ -4426,6 +4794,336 @@ func (c *Client) ListVersionsApiV1ScenariosScenarioIdVersionsGet(ctx context.Con
 // Corresponds with GET /api/v1/scenarios/{scenario_id}/versions/{version} (the `GetVersionApiV1ScenariosScenarioIdVersionsVersionGet` operationId).
 func (c *Client) GetVersionApiV1ScenariosScenarioIdVersionsVersionGet(ctx context.Context, scenarioId openapi_types.UUID, version int, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetVersionApiV1ScenariosScenarioIdVersionsVersionGetRequest(c.Server, scenarioId, version)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetSettingsApiV1SettingsGet Get Settings
+//
+// Corresponds with GET /api/v1/settings (the `GetSettingsApiV1SettingsGet` operationId).
+func (c *Client) GetSettingsApiV1SettingsGet(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetSettingsApiV1SettingsGetRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ExportSettingsApiV1SettingsExportGet Export Settings
+//
+// The values that differ from the defaults, and each saved secret as a ${NAME}
+// placeholder; never a secret's value.
+//
+// Corresponds with GET /api/v1/settings/export (the `ExportSettingsApiV1SettingsExportGet` operationId).
+func (c *Client) ExportSettingsApiV1SettingsExportGet(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewExportSettingsApiV1SettingsExportGetRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ImportSettingsApiV1SettingsImportPostWithBody Import Settings
+//
+// Apply a YAML settings document: every key is checked with its provider first, and
+// nothing is saved unless every check passes.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /api/v1/settings/import (the `ImportSettingsApiV1SettingsImportPost` operationId).
+func (c *Client) ImportSettingsApiV1SettingsImportPostWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewImportSettingsApiV1SettingsImportPostRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ImportSettingsApiV1SettingsImportPost Import Settings
+//
+// Apply a YAML settings document: every key is checked with its provider first, and
+// nothing is saved unless every check passes.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /api/v1/settings/import (the `ImportSettingsApiV1SettingsImportPost` operationId).
+func (c *Client) ImportSettingsApiV1SettingsImportPost(ctx context.Context, body ImportSettingsApiV1SettingsImportPostJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewImportSettingsApiV1SettingsImportPostRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListModelsApiV1SettingsModelsGet List Models
+//
+// The models the LLM provider lists. A deployment name the list lacks, as on Azure,
+// can still be saved.
+//
+// Corresponds with GET /api/v1/settings/models (the `ListModelsApiV1SettingsModelsGet` operationId).
+func (c *Client) ListModelsApiV1SettingsModelsGet(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListModelsApiV1SettingsModelsGetRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ModelEffortsApiV1SettingsModelsModelEffortsGet Model Efforts
+//
+// The reasoning efforts the model takes. It sends one short request for each effort.
+//
+// Corresponds with GET /api/v1/settings/models/{model}/efforts (the `ModelEffortsApiV1SettingsModelsModelEffortsGet` operationId).
+func (c *Client) ModelEffortsApiV1SettingsModelsModelEffortsGet(ctx context.Context, model string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewModelEffortsApiV1SettingsModelsModelEffortsGetRequest(c.Server, model)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PutPlivoAccountApiV1SettingsPlivoPutWithBody Put Plivo Account
+//
+// Save the Auth ID and Auth token of a Plivo account together, after Plivo accepts them;
+// this is how to move to another account.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PUT /api/v1/settings/plivo (the `PutPlivoAccountApiV1SettingsPlivoPut` operationId).
+func (c *Client) PutPlivoAccountApiV1SettingsPlivoPutWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPutPlivoAccountApiV1SettingsPlivoPutRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PutPlivoAccountApiV1SettingsPlivoPut Put Plivo Account
+//
+// Save the Auth ID and Auth token of a Plivo account together, after Plivo accepts them;
+// this is how to move to another account.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PUT /api/v1/settings/plivo (the `PutPlivoAccountApiV1SettingsPlivoPut` operationId).
+func (c *Client) PutPlivoAccountApiV1SettingsPlivoPut(ctx context.Context, body PutPlivoAccountApiV1SettingsPlivoPutJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPutPlivoAccountApiV1SettingsPlivoPutRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// TestProviderApiV1SettingsProvidersProviderTestPost Test Provider
+//
+// Use the saved settings of one provider for a small piece of real work. The provider
+// may charge for it.
+//
+// Corresponds with POST /api/v1/settings/providers/{provider}/test (the `TestProviderApiV1SettingsProvidersProviderTestPost` operationId).
+func (c *Client) TestProviderApiV1SettingsProvidersProviderTestPost(ctx context.Context, provider Provider, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewTestProviderApiV1SettingsProvidersProviderTestPostRequest(c.Server, provider)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DeleteSecretApiV1SettingsSecretsNameDelete Delete Secret
+//
+// Corresponds with DELETE /api/v1/settings/secrets/{name} (the `DeleteSecretApiV1SettingsSecretsNameDelete` operationId).
+func (c *Client) DeleteSecretApiV1SettingsSecretsNameDelete(ctx context.Context, name SecretName, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteSecretApiV1SettingsSecretsNameDeleteRequest(c.Server, name)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PutSecretApiV1SettingsSecretsNamePutWithBody Put Secret
+//
+// Check the key with its provider, then save it. A key the provider refuses is not
+// saved.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PUT /api/v1/settings/secrets/{name} (the `PutSecretApiV1SettingsSecretsNamePut` operationId).
+func (c *Client) PutSecretApiV1SettingsSecretsNamePutWithBody(ctx context.Context, name SecretName, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPutSecretApiV1SettingsSecretsNamePutRequestWithBody(c.Server, name, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PutSecretApiV1SettingsSecretsNamePut Put Secret
+//
+// Check the key with its provider, then save it. A key the provider refuses is not
+// saved.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PUT /api/v1/settings/secrets/{name} (the `PutSecretApiV1SettingsSecretsNamePut` operationId).
+func (c *Client) PutSecretApiV1SettingsSecretsNamePut(ctx context.Context, name SecretName, body PutSecretApiV1SettingsSecretsNamePutJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPutSecretApiV1SettingsSecretsNamePutRequest(c.Server, name, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// NewSigningKeyApiV1SettingsSigningKeyPost New Signing Key
+//
+// Make a new key that signs every outbound trigger, replacing the old one. The response
+// is the only time the key is shown.
+//
+// Corresponds with POST /api/v1/settings/signing-key (the `NewSigningKeyApiV1SettingsSigningKeyPost` operationId).
+func (c *Client) NewSigningKeyApiV1SettingsSigningKeyPost(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewNewSigningKeyApiV1SettingsSigningKeyPostRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DeleteTriggerSecretApiV1SettingsTriggerSecretsNameDelete Delete Trigger Secret
+//
+// Corresponds with DELETE /api/v1/settings/trigger-secrets/{name} (the `DeleteTriggerSecretApiV1SettingsTriggerSecretsNameDelete` operationId).
+func (c *Client) DeleteTriggerSecretApiV1SettingsTriggerSecretsNameDelete(ctx context.Context, name string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteTriggerSecretApiV1SettingsTriggerSecretsNameDeleteRequest(c.Server, name)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PutTriggerSecretApiV1SettingsTriggerSecretsNamePutWithBody Put Trigger Secret
+//
+// A value a trigger template uses as {{secrets.NAME}}.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PUT /api/v1/settings/trigger-secrets/{name} (the `PutTriggerSecretApiV1SettingsTriggerSecretsNamePut` operationId).
+func (c *Client) PutTriggerSecretApiV1SettingsTriggerSecretsNamePutWithBody(ctx context.Context, name string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPutTriggerSecretApiV1SettingsTriggerSecretsNamePutRequestWithBody(c.Server, name, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PutTriggerSecretApiV1SettingsTriggerSecretsNamePut Put Trigger Secret
+//
+// A value a trigger template uses as {{secrets.NAME}}.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PUT /api/v1/settings/trigger-secrets/{name} (the `PutTriggerSecretApiV1SettingsTriggerSecretsNamePut` operationId).
+func (c *Client) PutTriggerSecretApiV1SettingsTriggerSecretsNamePut(ctx context.Context, name string, body PutTriggerSecretApiV1SettingsTriggerSecretsNamePutJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPutTriggerSecretApiV1SettingsTriggerSecretsNamePutRequest(c.Server, name, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PutValuesApiV1SettingsValuesPutWithBody Put Values
+//
+// Replace every setting that is not a secret. A change applies to the next call.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PUT /api/v1/settings/values (the `PutValuesApiV1SettingsValuesPut` operationId).
+func (c *Client) PutValuesApiV1SettingsValuesPutWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPutValuesApiV1SettingsValuesPutRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PutValuesApiV1SettingsValuesPut Put Values
+//
+// Replace every setting that is not a secret. A change applies to the next call.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PUT /api/v1/settings/values (the `PutValuesApiV1SettingsValuesPut` operationId).
+func (c *Client) PutValuesApiV1SettingsValuesPut(ctx context.Context, body PutValuesApiV1SettingsValuesPutJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPutValuesApiV1SettingsValuesPutRequest(c.Server, body)
 	if err != nil {
 		return nil, err
 	}
@@ -7120,6 +7818,464 @@ func NewGetVersionApiV1ScenariosScenarioIdVersionsVersionGetRequest(server strin
 	return req, nil
 }
 
+// NewGetSettingsApiV1SettingsGetRequest constructs an http.Request for the GetSettingsApiV1SettingsGet method
+func NewGetSettingsApiV1SettingsGetRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/settings")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewExportSettingsApiV1SettingsExportGetRequest constructs an http.Request for the ExportSettingsApiV1SettingsExportGet method
+func NewExportSettingsApiV1SettingsExportGetRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/settings/export")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewImportSettingsApiV1SettingsImportPostRequest calls the generic ImportSettingsApiV1SettingsImportPost builder with application/json body
+func NewImportSettingsApiV1SettingsImportPostRequest(server string, body ImportSettingsApiV1SettingsImportPostJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewImportSettingsApiV1SettingsImportPostRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewImportSettingsApiV1SettingsImportPostRequestWithBody constructs an http.Request for the ImportSettingsApiV1SettingsImportPost method, with any body, and a specified content type
+func NewImportSettingsApiV1SettingsImportPostRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/settings/import")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewListModelsApiV1SettingsModelsGetRequest constructs an http.Request for the ListModelsApiV1SettingsModelsGet method
+func NewListModelsApiV1SettingsModelsGetRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/settings/models")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewModelEffortsApiV1SettingsModelsModelEffortsGetRequest constructs an http.Request for the ModelEffortsApiV1SettingsModelsModelEffortsGet method
+func NewModelEffortsApiV1SettingsModelsModelEffortsGetRequest(server string, model string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "model", model, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/settings/models/%s/efforts", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewPutPlivoAccountApiV1SettingsPlivoPutRequest calls the generic PutPlivoAccountApiV1SettingsPlivoPut builder with application/json body
+func NewPutPlivoAccountApiV1SettingsPlivoPutRequest(server string, body PutPlivoAccountApiV1SettingsPlivoPutJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewPutPlivoAccountApiV1SettingsPlivoPutRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewPutPlivoAccountApiV1SettingsPlivoPutRequestWithBody constructs an http.Request for the PutPlivoAccountApiV1SettingsPlivoPut method, with any body, and a specified content type
+func NewPutPlivoAccountApiV1SettingsPlivoPutRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/settings/plivo")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPut, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewTestProviderApiV1SettingsProvidersProviderTestPostRequest constructs an http.Request for the TestProviderApiV1SettingsProvidersProviderTestPost method
+func NewTestProviderApiV1SettingsProvidersProviderTestPostRequest(server string, provider Provider) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "provider", provider, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/settings/providers/%s/test", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewDeleteSecretApiV1SettingsSecretsNameDeleteRequest constructs an http.Request for the DeleteSecretApiV1SettingsSecretsNameDelete method
+func NewDeleteSecretApiV1SettingsSecretsNameDeleteRequest(server string, name SecretName) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "name", name, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/settings/secrets/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewPutSecretApiV1SettingsSecretsNamePutRequest calls the generic PutSecretApiV1SettingsSecretsNamePut builder with application/json body
+func NewPutSecretApiV1SettingsSecretsNamePutRequest(server string, name SecretName, body PutSecretApiV1SettingsSecretsNamePutJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewPutSecretApiV1SettingsSecretsNamePutRequestWithBody(server, name, "application/json", bodyReader)
+}
+
+// NewPutSecretApiV1SettingsSecretsNamePutRequestWithBody constructs an http.Request for the PutSecretApiV1SettingsSecretsNamePut method, with any body, and a specified content type
+func NewPutSecretApiV1SettingsSecretsNamePutRequestWithBody(server string, name SecretName, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "name", name, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/settings/secrets/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPut, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewNewSigningKeyApiV1SettingsSigningKeyPostRequest constructs an http.Request for the NewSigningKeyApiV1SettingsSigningKeyPost method
+func NewNewSigningKeyApiV1SettingsSigningKeyPostRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/settings/signing-key")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewDeleteTriggerSecretApiV1SettingsTriggerSecretsNameDeleteRequest constructs an http.Request for the DeleteTriggerSecretApiV1SettingsTriggerSecretsNameDelete method
+func NewDeleteTriggerSecretApiV1SettingsTriggerSecretsNameDeleteRequest(server string, name string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "name", name, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/settings/trigger-secrets/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewPutTriggerSecretApiV1SettingsTriggerSecretsNamePutRequest calls the generic PutTriggerSecretApiV1SettingsTriggerSecretsNamePut builder with application/json body
+func NewPutTriggerSecretApiV1SettingsTriggerSecretsNamePutRequest(server string, name string, body PutTriggerSecretApiV1SettingsTriggerSecretsNamePutJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewPutTriggerSecretApiV1SettingsTriggerSecretsNamePutRequestWithBody(server, name, "application/json", bodyReader)
+}
+
+// NewPutTriggerSecretApiV1SettingsTriggerSecretsNamePutRequestWithBody constructs an http.Request for the PutTriggerSecretApiV1SettingsTriggerSecretsNamePut method, with any body, and a specified content type
+func NewPutTriggerSecretApiV1SettingsTriggerSecretsNamePutRequestWithBody(server string, name string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "name", name, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/settings/trigger-secrets/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPut, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewPutValuesApiV1SettingsValuesPutRequest calls the generic PutValuesApiV1SettingsValuesPut builder with application/json body
+func NewPutValuesApiV1SettingsValuesPutRequest(server string, body PutValuesApiV1SettingsValuesPutJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewPutValuesApiV1SettingsValuesPutRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewPutValuesApiV1SettingsValuesPutRequestWithBody constructs an http.Request for the PutValuesApiV1SettingsValuesPut method, with any body, and a specified content type
+func NewPutValuesApiV1SettingsValuesPutRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/settings/values")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPut, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 // NewListVoicesApiV1VoicesGetRequest constructs an http.Request for the ListVoicesApiV1VoicesGet method
 func NewListVoicesApiV1VoicesGetRequest(server string, params *ListVoicesApiV1VoicesGetParams) (*http.Request, error) {
 	var err error
@@ -7985,6 +9141,172 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with GET /api/v1/scenarios/{scenario_id}/versions/{version} (the `GetVersionApiV1ScenariosScenarioIdVersionsVersionGet` operationId).
 	GetVersionApiV1ScenariosScenarioIdVersionsVersionGetWithResponse(ctx context.Context, scenarioId openapi_types.UUID, version int, reqEditors ...RequestEditorFn) (*GetVersionApiV1ScenariosScenarioIdVersionsVersionGetResponse, error)
+
+	// GetSettingsApiV1SettingsGetWithResponse Get Settings
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/settings (the `GetSettingsApiV1SettingsGet` operationId).
+	GetSettingsApiV1SettingsGetWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetSettingsApiV1SettingsGetResponse, error)
+
+	// ExportSettingsApiV1SettingsExportGetWithResponse Export Settings
+	//
+	// The values that differ from the defaults, and each saved secret as a ${NAME}
+	// placeholder; never a secret's value.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/settings/export (the `ExportSettingsApiV1SettingsExportGet` operationId).
+	ExportSettingsApiV1SettingsExportGetWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ExportSettingsApiV1SettingsExportGetResponse, error)
+
+	// ImportSettingsApiV1SettingsImportPostWithBodyWithResponse Import Settings
+	//
+	// Apply a YAML settings document: every key is checked with its provider first, and
+	// nothing is saved unless every check passes.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/settings/import (the `ImportSettingsApiV1SettingsImportPost` operationId).
+	ImportSettingsApiV1SettingsImportPostWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ImportSettingsApiV1SettingsImportPostResponse, error)
+
+	// ImportSettingsApiV1SettingsImportPostWithResponse Import Settings
+	//
+	// Apply a YAML settings document: every key is checked with its provider first, and
+	// nothing is saved unless every check passes.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/settings/import (the `ImportSettingsApiV1SettingsImportPost` operationId).
+	ImportSettingsApiV1SettingsImportPostWithResponse(ctx context.Context, body ImportSettingsApiV1SettingsImportPostJSONRequestBody, reqEditors ...RequestEditorFn) (*ImportSettingsApiV1SettingsImportPostResponse, error)
+
+	// ListModelsApiV1SettingsModelsGetWithResponse List Models
+	//
+	// The models the LLM provider lists. A deployment name the list lacks, as on Azure,
+	// can still be saved.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/settings/models (the `ListModelsApiV1SettingsModelsGet` operationId).
+	ListModelsApiV1SettingsModelsGetWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListModelsApiV1SettingsModelsGetResponse, error)
+
+	// ModelEffortsApiV1SettingsModelsModelEffortsGetWithResponse Model Efforts
+	//
+	// The reasoning efforts the model takes. It sends one short request for each effort.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/settings/models/{model}/efforts (the `ModelEffortsApiV1SettingsModelsModelEffortsGet` operationId).
+	ModelEffortsApiV1SettingsModelsModelEffortsGetWithResponse(ctx context.Context, model string, reqEditors ...RequestEditorFn) (*ModelEffortsApiV1SettingsModelsModelEffortsGetResponse, error)
+
+	// PutPlivoAccountApiV1SettingsPlivoPutWithBodyWithResponse Put Plivo Account
+	//
+	// Save the Auth ID and Auth token of a Plivo account together, after Plivo accepts them;
+	// this is how to move to another account.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /api/v1/settings/plivo (the `PutPlivoAccountApiV1SettingsPlivoPut` operationId).
+	PutPlivoAccountApiV1SettingsPlivoPutWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PutPlivoAccountApiV1SettingsPlivoPutResponse, error)
+
+	// PutPlivoAccountApiV1SettingsPlivoPutWithResponse Put Plivo Account
+	//
+	// Save the Auth ID and Auth token of a Plivo account together, after Plivo accepts them;
+	// this is how to move to another account.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /api/v1/settings/plivo (the `PutPlivoAccountApiV1SettingsPlivoPut` operationId).
+	PutPlivoAccountApiV1SettingsPlivoPutWithResponse(ctx context.Context, body PutPlivoAccountApiV1SettingsPlivoPutJSONRequestBody, reqEditors ...RequestEditorFn) (*PutPlivoAccountApiV1SettingsPlivoPutResponse, error)
+
+	// TestProviderApiV1SettingsProvidersProviderTestPostWithResponse Test Provider
+	//
+	// Use the saved settings of one provider for a small piece of real work. The provider
+	// may charge for it.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/settings/providers/{provider}/test (the `TestProviderApiV1SettingsProvidersProviderTestPost` operationId).
+	TestProviderApiV1SettingsProvidersProviderTestPostWithResponse(ctx context.Context, provider Provider, reqEditors ...RequestEditorFn) (*TestProviderApiV1SettingsProvidersProviderTestPostResponse, error)
+
+	// DeleteSecretApiV1SettingsSecretsNameDeleteWithResponse Delete Secret
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with DELETE /api/v1/settings/secrets/{name} (the `DeleteSecretApiV1SettingsSecretsNameDelete` operationId).
+	DeleteSecretApiV1SettingsSecretsNameDeleteWithResponse(ctx context.Context, name SecretName, reqEditors ...RequestEditorFn) (*DeleteSecretApiV1SettingsSecretsNameDeleteResponse, error)
+
+	// PutSecretApiV1SettingsSecretsNamePutWithBodyWithResponse Put Secret
+	//
+	// Check the key with its provider, then save it. A key the provider refuses is not
+	// saved.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /api/v1/settings/secrets/{name} (the `PutSecretApiV1SettingsSecretsNamePut` operationId).
+	PutSecretApiV1SettingsSecretsNamePutWithBodyWithResponse(ctx context.Context, name SecretName, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PutSecretApiV1SettingsSecretsNamePutResponse, error)
+
+	// PutSecretApiV1SettingsSecretsNamePutWithResponse Put Secret
+	//
+	// Check the key with its provider, then save it. A key the provider refuses is not
+	// saved.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /api/v1/settings/secrets/{name} (the `PutSecretApiV1SettingsSecretsNamePut` operationId).
+	PutSecretApiV1SettingsSecretsNamePutWithResponse(ctx context.Context, name SecretName, body PutSecretApiV1SettingsSecretsNamePutJSONRequestBody, reqEditors ...RequestEditorFn) (*PutSecretApiV1SettingsSecretsNamePutResponse, error)
+
+	// NewSigningKeyApiV1SettingsSigningKeyPostWithResponse New Signing Key
+	//
+	// Make a new key that signs every outbound trigger, replacing the old one. The response
+	// is the only time the key is shown.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/settings/signing-key (the `NewSigningKeyApiV1SettingsSigningKeyPost` operationId).
+	NewSigningKeyApiV1SettingsSigningKeyPostWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*NewSigningKeyApiV1SettingsSigningKeyPostResponse, error)
+
+	// DeleteTriggerSecretApiV1SettingsTriggerSecretsNameDeleteWithResponse Delete Trigger Secret
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with DELETE /api/v1/settings/trigger-secrets/{name} (the `DeleteTriggerSecretApiV1SettingsTriggerSecretsNameDelete` operationId).
+	DeleteTriggerSecretApiV1SettingsTriggerSecretsNameDeleteWithResponse(ctx context.Context, name string, reqEditors ...RequestEditorFn) (*DeleteTriggerSecretApiV1SettingsTriggerSecretsNameDeleteResponse, error)
+
+	// PutTriggerSecretApiV1SettingsTriggerSecretsNamePutWithBodyWithResponse Put Trigger Secret
+	//
+	// A value a trigger template uses as {{secrets.NAME}}.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /api/v1/settings/trigger-secrets/{name} (the `PutTriggerSecretApiV1SettingsTriggerSecretsNamePut` operationId).
+	PutTriggerSecretApiV1SettingsTriggerSecretsNamePutWithBodyWithResponse(ctx context.Context, name string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PutTriggerSecretApiV1SettingsTriggerSecretsNamePutResponse, error)
+
+	// PutTriggerSecretApiV1SettingsTriggerSecretsNamePutWithResponse Put Trigger Secret
+	//
+	// A value a trigger template uses as {{secrets.NAME}}.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /api/v1/settings/trigger-secrets/{name} (the `PutTriggerSecretApiV1SettingsTriggerSecretsNamePut` operationId).
+	PutTriggerSecretApiV1SettingsTriggerSecretsNamePutWithResponse(ctx context.Context, name string, body PutTriggerSecretApiV1SettingsTriggerSecretsNamePutJSONRequestBody, reqEditors ...RequestEditorFn) (*PutTriggerSecretApiV1SettingsTriggerSecretsNamePutResponse, error)
+
+	// PutValuesApiV1SettingsValuesPutWithBodyWithResponse Put Values
+	//
+	// Replace every setting that is not a secret. A change applies to the next call.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /api/v1/settings/values (the `PutValuesApiV1SettingsValuesPut` operationId).
+	PutValuesApiV1SettingsValuesPutWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PutValuesApiV1SettingsValuesPutResponse, error)
+
+	// PutValuesApiV1SettingsValuesPutWithResponse Put Values
+	//
+	// Replace every setting that is not a secret. A change applies to the next call.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /api/v1/settings/values (the `PutValuesApiV1SettingsValuesPut` operationId).
+	PutValuesApiV1SettingsValuesPutWithResponse(ctx context.Context, body PutValuesApiV1SettingsValuesPutJSONRequestBody, reqEditors ...RequestEditorFn) (*PutValuesApiV1SettingsValuesPutResponse, error)
 
 	// ListVoicesApiV1VoicesGetWithResponse List Voices
 	//
@@ -10657,6 +11979,637 @@ func (r GetVersionApiV1ScenariosScenarioIdVersionsVersionGetResponse) ContentTyp
 	return ""
 }
 
+type GetSettingsApiV1SettingsGetResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *SettingsRead
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetSettingsApiV1SettingsGetResponse) GetJSON200() *SettingsRead {
+	return r.JSON200
+}
+
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r GetSettingsApiV1SettingsGetResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
+}
+
+// GetBody returns the raw response body bytes
+func (r GetSettingsApiV1SettingsGetResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetSettingsApiV1SettingsGetResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetSettingsApiV1SettingsGetResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetSettingsApiV1SettingsGetResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type ExportSettingsApiV1SettingsExportGetResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
+}
+
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r ExportSettingsApiV1SettingsExportGetResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
+}
+
+// GetBody returns the raw response body bytes
+func (r ExportSettingsApiV1SettingsExportGetResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ExportSettingsApiV1SettingsExportGetResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ExportSettingsApiV1SettingsExportGetResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ExportSettingsApiV1SettingsExportGetResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type ImportSettingsApiV1SettingsImportPostResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *ImportResult
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ImportSettingsApiV1SettingsImportPostResponse) GetJSON200() *ImportResult {
+	return r.JSON200
+}
+
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r ImportSettingsApiV1SettingsImportPostResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
+}
+
+// GetBody returns the raw response body bytes
+func (r ImportSettingsApiV1SettingsImportPostResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ImportSettingsApiV1SettingsImportPostResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ImportSettingsApiV1SettingsImportPostResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ImportSettingsApiV1SettingsImportPostResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type ListModelsApiV1SettingsModelsGetResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *Models
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *ErrorResponse
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListModelsApiV1SettingsModelsGetResponse) GetJSON200() *Models {
+	return r.JSON200
+}
+
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r ListModelsApiV1SettingsModelsGetResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r ListModelsApiV1SettingsModelsGetResponse) GetJSON503() *ErrorResponse {
+	return r.JSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r ListModelsApiV1SettingsModelsGetResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListModelsApiV1SettingsModelsGetResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListModelsApiV1SettingsModelsGetResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListModelsApiV1SettingsModelsGetResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type ModelEffortsApiV1SettingsModelsModelEffortsGetResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *Efforts
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *ErrorResponse
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ModelEffortsApiV1SettingsModelsModelEffortsGetResponse) GetJSON200() *Efforts {
+	return r.JSON200
+}
+
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r ModelEffortsApiV1SettingsModelsModelEffortsGetResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r ModelEffortsApiV1SettingsModelsModelEffortsGetResponse) GetJSON503() *ErrorResponse {
+	return r.JSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r ModelEffortsApiV1SettingsModelsModelEffortsGetResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ModelEffortsApiV1SettingsModelsModelEffortsGetResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ModelEffortsApiV1SettingsModelsModelEffortsGetResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ModelEffortsApiV1SettingsModelsModelEffortsGetResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type PutPlivoAccountApiV1SettingsPlivoPutResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *SettingsRead
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r PutPlivoAccountApiV1SettingsPlivoPutResponse) GetJSON200() *SettingsRead {
+	return r.JSON200
+}
+
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r PutPlivoAccountApiV1SettingsPlivoPutResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
+}
+
+// GetBody returns the raw response body bytes
+func (r PutPlivoAccountApiV1SettingsPlivoPutResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r PutPlivoAccountApiV1SettingsPlivoPutResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r PutPlivoAccountApiV1SettingsPlivoPutResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r PutPlivoAccountApiV1SettingsPlivoPutResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type TestProviderApiV1SettingsProvidersProviderTestPostResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *ProviderTest
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r TestProviderApiV1SettingsProvidersProviderTestPostResponse) GetJSON200() *ProviderTest {
+	return r.JSON200
+}
+
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r TestProviderApiV1SettingsProvidersProviderTestPostResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
+}
+
+// GetBody returns the raw response body bytes
+func (r TestProviderApiV1SettingsProvidersProviderTestPostResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r TestProviderApiV1SettingsProvidersProviderTestPostResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r TestProviderApiV1SettingsProvidersProviderTestPostResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r TestProviderApiV1SettingsProvidersProviderTestPostResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type DeleteSecretApiV1SettingsSecretsNameDeleteResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *SettingsRead
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r DeleteSecretApiV1SettingsSecretsNameDeleteResponse) GetJSON200() *SettingsRead {
+	return r.JSON200
+}
+
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r DeleteSecretApiV1SettingsSecretsNameDeleteResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
+}
+
+// GetBody returns the raw response body bytes
+func (r DeleteSecretApiV1SettingsSecretsNameDeleteResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r DeleteSecretApiV1SettingsSecretsNameDeleteResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeleteSecretApiV1SettingsSecretsNameDeleteResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r DeleteSecretApiV1SettingsSecretsNameDeleteResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type PutSecretApiV1SettingsSecretsNamePutResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *SettingsRead
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r PutSecretApiV1SettingsSecretsNamePutResponse) GetJSON200() *SettingsRead {
+	return r.JSON200
+}
+
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r PutSecretApiV1SettingsSecretsNamePutResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
+}
+
+// GetBody returns the raw response body bytes
+func (r PutSecretApiV1SettingsSecretsNamePutResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r PutSecretApiV1SettingsSecretsNamePutResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r PutSecretApiV1SettingsSecretsNamePutResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r PutSecretApiV1SettingsSecretsNamePutResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type NewSigningKeyApiV1SettingsSigningKeyPostResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON201 the response for an HTTP 201 `application/json` response
+	JSON201 *SigningKey
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
+}
+
+// GetJSON201 returns the response for an HTTP 201 `application/json` response
+func (r NewSigningKeyApiV1SettingsSigningKeyPostResponse) GetJSON201() *SigningKey {
+	return r.JSON201
+}
+
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r NewSigningKeyApiV1SettingsSigningKeyPostResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
+}
+
+// GetBody returns the raw response body bytes
+func (r NewSigningKeyApiV1SettingsSigningKeyPostResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r NewSigningKeyApiV1SettingsSigningKeyPostResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r NewSigningKeyApiV1SettingsSigningKeyPostResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r NewSigningKeyApiV1SettingsSigningKeyPostResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type DeleteTriggerSecretApiV1SettingsTriggerSecretsNameDeleteResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *SettingsRead
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r DeleteTriggerSecretApiV1SettingsTriggerSecretsNameDeleteResponse) GetJSON200() *SettingsRead {
+	return r.JSON200
+}
+
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r DeleteTriggerSecretApiV1SettingsTriggerSecretsNameDeleteResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
+}
+
+// GetBody returns the raw response body bytes
+func (r DeleteTriggerSecretApiV1SettingsTriggerSecretsNameDeleteResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r DeleteTriggerSecretApiV1SettingsTriggerSecretsNameDeleteResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeleteTriggerSecretApiV1SettingsTriggerSecretsNameDeleteResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r DeleteTriggerSecretApiV1SettingsTriggerSecretsNameDeleteResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type PutTriggerSecretApiV1SettingsTriggerSecretsNamePutResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *SettingsRead
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r PutTriggerSecretApiV1SettingsTriggerSecretsNamePutResponse) GetJSON200() *SettingsRead {
+	return r.JSON200
+}
+
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r PutTriggerSecretApiV1SettingsTriggerSecretsNamePutResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
+}
+
+// GetBody returns the raw response body bytes
+func (r PutTriggerSecretApiV1SettingsTriggerSecretsNamePutResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r PutTriggerSecretApiV1SettingsTriggerSecretsNamePutResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r PutTriggerSecretApiV1SettingsTriggerSecretsNamePutResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r PutTriggerSecretApiV1SettingsTriggerSecretsNamePutResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type PutValuesApiV1SettingsValuesPutResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *SettingsRead
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r PutValuesApiV1SettingsValuesPutResponse) GetJSON200() *SettingsRead {
+	return r.JSON200
+}
+
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r PutValuesApiV1SettingsValuesPutResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
+}
+
+// GetBody returns the raw response body bytes
+func (r PutValuesApiV1SettingsValuesPutResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r PutValuesApiV1SettingsValuesPutResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r PutValuesApiV1SettingsValuesPutResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r PutValuesApiV1SettingsValuesPutResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type ListVoicesApiV1VoicesGetResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -11883,6 +13836,280 @@ func (c *ClientWithResponses) GetVersionApiV1ScenariosScenarioIdVersionsVersionG
 		return nil, err
 	}
 	return ParseGetVersionApiV1ScenariosScenarioIdVersionsVersionGetResponse(rsp)
+}
+
+// GetSettingsApiV1SettingsGetWithResponse Get Settings
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/settings (the `GetSettingsApiV1SettingsGet` operationId).
+func (c *ClientWithResponses) GetSettingsApiV1SettingsGetWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetSettingsApiV1SettingsGetResponse, error) {
+	rsp, err := c.GetSettingsApiV1SettingsGet(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetSettingsApiV1SettingsGetResponse(rsp)
+}
+
+// ExportSettingsApiV1SettingsExportGetWithResponse Export Settings
+//
+// The values that differ from the defaults, and each saved secret as a ${NAME}
+// placeholder; never a secret's value.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/settings/export (the `ExportSettingsApiV1SettingsExportGet` operationId).
+func (c *ClientWithResponses) ExportSettingsApiV1SettingsExportGetWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ExportSettingsApiV1SettingsExportGetResponse, error) {
+	rsp, err := c.ExportSettingsApiV1SettingsExportGet(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseExportSettingsApiV1SettingsExportGetResponse(rsp)
+}
+
+// ImportSettingsApiV1SettingsImportPostWithBodyWithResponse Import Settings
+//
+// Apply a YAML settings document: every key is checked with its provider first, and
+// nothing is saved unless every check passes.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/settings/import (the `ImportSettingsApiV1SettingsImportPost` operationId).
+func (c *ClientWithResponses) ImportSettingsApiV1SettingsImportPostWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ImportSettingsApiV1SettingsImportPostResponse, error) {
+	rsp, err := c.ImportSettingsApiV1SettingsImportPostWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseImportSettingsApiV1SettingsImportPostResponse(rsp)
+}
+
+// ImportSettingsApiV1SettingsImportPostWithResponse Import Settings
+//
+// Apply a YAML settings document: every key is checked with its provider first, and
+// nothing is saved unless every check passes.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/settings/import (the `ImportSettingsApiV1SettingsImportPost` operationId).
+func (c *ClientWithResponses) ImportSettingsApiV1SettingsImportPostWithResponse(ctx context.Context, body ImportSettingsApiV1SettingsImportPostJSONRequestBody, reqEditors ...RequestEditorFn) (*ImportSettingsApiV1SettingsImportPostResponse, error) {
+	rsp, err := c.ImportSettingsApiV1SettingsImportPost(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseImportSettingsApiV1SettingsImportPostResponse(rsp)
+}
+
+// ListModelsApiV1SettingsModelsGetWithResponse List Models
+//
+// The models the LLM provider lists. A deployment name the list lacks, as on Azure,
+// can still be saved.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/settings/models (the `ListModelsApiV1SettingsModelsGet` operationId).
+func (c *ClientWithResponses) ListModelsApiV1SettingsModelsGetWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListModelsApiV1SettingsModelsGetResponse, error) {
+	rsp, err := c.ListModelsApiV1SettingsModelsGet(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListModelsApiV1SettingsModelsGetResponse(rsp)
+}
+
+// ModelEffortsApiV1SettingsModelsModelEffortsGetWithResponse Model Efforts
+//
+// The reasoning efforts the model takes. It sends one short request for each effort.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/settings/models/{model}/efforts (the `ModelEffortsApiV1SettingsModelsModelEffortsGet` operationId).
+func (c *ClientWithResponses) ModelEffortsApiV1SettingsModelsModelEffortsGetWithResponse(ctx context.Context, model string, reqEditors ...RequestEditorFn) (*ModelEffortsApiV1SettingsModelsModelEffortsGetResponse, error) {
+	rsp, err := c.ModelEffortsApiV1SettingsModelsModelEffortsGet(ctx, model, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseModelEffortsApiV1SettingsModelsModelEffortsGetResponse(rsp)
+}
+
+// PutPlivoAccountApiV1SettingsPlivoPutWithBodyWithResponse Put Plivo Account
+//
+// Save the Auth ID and Auth token of a Plivo account together, after Plivo accepts them;
+// this is how to move to another account.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /api/v1/settings/plivo (the `PutPlivoAccountApiV1SettingsPlivoPut` operationId).
+func (c *ClientWithResponses) PutPlivoAccountApiV1SettingsPlivoPutWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PutPlivoAccountApiV1SettingsPlivoPutResponse, error) {
+	rsp, err := c.PutPlivoAccountApiV1SettingsPlivoPutWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePutPlivoAccountApiV1SettingsPlivoPutResponse(rsp)
+}
+
+// PutPlivoAccountApiV1SettingsPlivoPutWithResponse Put Plivo Account
+//
+// Save the Auth ID and Auth token of a Plivo account together, after Plivo accepts them;
+// this is how to move to another account.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /api/v1/settings/plivo (the `PutPlivoAccountApiV1SettingsPlivoPut` operationId).
+func (c *ClientWithResponses) PutPlivoAccountApiV1SettingsPlivoPutWithResponse(ctx context.Context, body PutPlivoAccountApiV1SettingsPlivoPutJSONRequestBody, reqEditors ...RequestEditorFn) (*PutPlivoAccountApiV1SettingsPlivoPutResponse, error) {
+	rsp, err := c.PutPlivoAccountApiV1SettingsPlivoPut(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePutPlivoAccountApiV1SettingsPlivoPutResponse(rsp)
+}
+
+// TestProviderApiV1SettingsProvidersProviderTestPostWithResponse Test Provider
+//
+// Use the saved settings of one provider for a small piece of real work. The provider
+// may charge for it.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/settings/providers/{provider}/test (the `TestProviderApiV1SettingsProvidersProviderTestPost` operationId).
+func (c *ClientWithResponses) TestProviderApiV1SettingsProvidersProviderTestPostWithResponse(ctx context.Context, provider Provider, reqEditors ...RequestEditorFn) (*TestProviderApiV1SettingsProvidersProviderTestPostResponse, error) {
+	rsp, err := c.TestProviderApiV1SettingsProvidersProviderTestPost(ctx, provider, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseTestProviderApiV1SettingsProvidersProviderTestPostResponse(rsp)
+}
+
+// DeleteSecretApiV1SettingsSecretsNameDeleteWithResponse Delete Secret
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /api/v1/settings/secrets/{name} (the `DeleteSecretApiV1SettingsSecretsNameDelete` operationId).
+func (c *ClientWithResponses) DeleteSecretApiV1SettingsSecretsNameDeleteWithResponse(ctx context.Context, name SecretName, reqEditors ...RequestEditorFn) (*DeleteSecretApiV1SettingsSecretsNameDeleteResponse, error) {
+	rsp, err := c.DeleteSecretApiV1SettingsSecretsNameDelete(ctx, name, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeleteSecretApiV1SettingsSecretsNameDeleteResponse(rsp)
+}
+
+// PutSecretApiV1SettingsSecretsNamePutWithBodyWithResponse Put Secret
+//
+// Check the key with its provider, then save it. A key the provider refuses is not
+// saved.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /api/v1/settings/secrets/{name} (the `PutSecretApiV1SettingsSecretsNamePut` operationId).
+func (c *ClientWithResponses) PutSecretApiV1SettingsSecretsNamePutWithBodyWithResponse(ctx context.Context, name SecretName, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PutSecretApiV1SettingsSecretsNamePutResponse, error) {
+	rsp, err := c.PutSecretApiV1SettingsSecretsNamePutWithBody(ctx, name, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePutSecretApiV1SettingsSecretsNamePutResponse(rsp)
+}
+
+// PutSecretApiV1SettingsSecretsNamePutWithResponse Put Secret
+//
+// Check the key with its provider, then save it. A key the provider refuses is not
+// saved.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /api/v1/settings/secrets/{name} (the `PutSecretApiV1SettingsSecretsNamePut` operationId).
+func (c *ClientWithResponses) PutSecretApiV1SettingsSecretsNamePutWithResponse(ctx context.Context, name SecretName, body PutSecretApiV1SettingsSecretsNamePutJSONRequestBody, reqEditors ...RequestEditorFn) (*PutSecretApiV1SettingsSecretsNamePutResponse, error) {
+	rsp, err := c.PutSecretApiV1SettingsSecretsNamePut(ctx, name, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePutSecretApiV1SettingsSecretsNamePutResponse(rsp)
+}
+
+// NewSigningKeyApiV1SettingsSigningKeyPostWithResponse New Signing Key
+//
+// Make a new key that signs every outbound trigger, replacing the old one. The response
+// is the only time the key is shown.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/settings/signing-key (the `NewSigningKeyApiV1SettingsSigningKeyPost` operationId).
+func (c *ClientWithResponses) NewSigningKeyApiV1SettingsSigningKeyPostWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*NewSigningKeyApiV1SettingsSigningKeyPostResponse, error) {
+	rsp, err := c.NewSigningKeyApiV1SettingsSigningKeyPost(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseNewSigningKeyApiV1SettingsSigningKeyPostResponse(rsp)
+}
+
+// DeleteTriggerSecretApiV1SettingsTriggerSecretsNameDeleteWithResponse Delete Trigger Secret
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /api/v1/settings/trigger-secrets/{name} (the `DeleteTriggerSecretApiV1SettingsTriggerSecretsNameDelete` operationId).
+func (c *ClientWithResponses) DeleteTriggerSecretApiV1SettingsTriggerSecretsNameDeleteWithResponse(ctx context.Context, name string, reqEditors ...RequestEditorFn) (*DeleteTriggerSecretApiV1SettingsTriggerSecretsNameDeleteResponse, error) {
+	rsp, err := c.DeleteTriggerSecretApiV1SettingsTriggerSecretsNameDelete(ctx, name, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeleteTriggerSecretApiV1SettingsTriggerSecretsNameDeleteResponse(rsp)
+}
+
+// PutTriggerSecretApiV1SettingsTriggerSecretsNamePutWithBodyWithResponse Put Trigger Secret
+//
+// A value a trigger template uses as {{secrets.NAME}}.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /api/v1/settings/trigger-secrets/{name} (the `PutTriggerSecretApiV1SettingsTriggerSecretsNamePut` operationId).
+func (c *ClientWithResponses) PutTriggerSecretApiV1SettingsTriggerSecretsNamePutWithBodyWithResponse(ctx context.Context, name string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PutTriggerSecretApiV1SettingsTriggerSecretsNamePutResponse, error) {
+	rsp, err := c.PutTriggerSecretApiV1SettingsTriggerSecretsNamePutWithBody(ctx, name, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePutTriggerSecretApiV1SettingsTriggerSecretsNamePutResponse(rsp)
+}
+
+// PutTriggerSecretApiV1SettingsTriggerSecretsNamePutWithResponse Put Trigger Secret
+//
+// A value a trigger template uses as {{secrets.NAME}}.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /api/v1/settings/trigger-secrets/{name} (the `PutTriggerSecretApiV1SettingsTriggerSecretsNamePut` operationId).
+func (c *ClientWithResponses) PutTriggerSecretApiV1SettingsTriggerSecretsNamePutWithResponse(ctx context.Context, name string, body PutTriggerSecretApiV1SettingsTriggerSecretsNamePutJSONRequestBody, reqEditors ...RequestEditorFn) (*PutTriggerSecretApiV1SettingsTriggerSecretsNamePutResponse, error) {
+	rsp, err := c.PutTriggerSecretApiV1SettingsTriggerSecretsNamePut(ctx, name, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePutTriggerSecretApiV1SettingsTriggerSecretsNamePutResponse(rsp)
+}
+
+// PutValuesApiV1SettingsValuesPutWithBodyWithResponse Put Values
+//
+// Replace every setting that is not a secret. A change applies to the next call.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /api/v1/settings/values (the `PutValuesApiV1SettingsValuesPut` operationId).
+func (c *ClientWithResponses) PutValuesApiV1SettingsValuesPutWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PutValuesApiV1SettingsValuesPutResponse, error) {
+	rsp, err := c.PutValuesApiV1SettingsValuesPutWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePutValuesApiV1SettingsValuesPutResponse(rsp)
+}
+
+// PutValuesApiV1SettingsValuesPutWithResponse Put Values
+//
+// Replace every setting that is not a secret. A change applies to the next call.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /api/v1/settings/values (the `PutValuesApiV1SettingsValuesPut` operationId).
+func (c *ClientWithResponses) PutValuesApiV1SettingsValuesPutWithResponse(ctx context.Context, body PutValuesApiV1SettingsValuesPutJSONRequestBody, reqEditors ...RequestEditorFn) (*PutValuesApiV1SettingsValuesPutResponse, error) {
+	rsp, err := c.PutValuesApiV1SettingsValuesPut(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePutValuesApiV1SettingsValuesPutResponse(rsp)
 }
 
 // ListVoicesApiV1VoicesGetWithResponse List Voices
@@ -13788,6 +16015,442 @@ func ParseGetVersionApiV1ScenariosScenarioIdVersionsVersionGetResponse(rsp *http
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest ScenarioVersionRead
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetSettingsApiV1SettingsGetResponse parses an HTTP response from a GetSettingsApiV1SettingsGetWithResponse call
+func ParseGetSettingsApiV1SettingsGetResponse(rsp *http.Response) (*GetSettingsApiV1SettingsGetResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetSettingsApiV1SettingsGetResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest SettingsRead
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseExportSettingsApiV1SettingsExportGetResponse parses an HTTP response from a ExportSettingsApiV1SettingsExportGetWithResponse call
+func ParseExportSettingsApiV1SettingsExportGetResponse(rsp *http.Response) (*ExportSettingsApiV1SettingsExportGetResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ExportSettingsApiV1SettingsExportGetResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseImportSettingsApiV1SettingsImportPostResponse parses an HTTP response from a ImportSettingsApiV1SettingsImportPostWithResponse call
+func ParseImportSettingsApiV1SettingsImportPostResponse(rsp *http.Response) (*ImportSettingsApiV1SettingsImportPostResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ImportSettingsApiV1SettingsImportPostResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ImportResult
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListModelsApiV1SettingsModelsGetResponse parses an HTTP response from a ListModelsApiV1SettingsModelsGetWithResponse call
+func ParseListModelsApiV1SettingsModelsGetResponse(rsp *http.Response) (*ListModelsApiV1SettingsModelsGetResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListModelsApiV1SettingsModelsGetResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Models
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseModelEffortsApiV1SettingsModelsModelEffortsGetResponse parses an HTTP response from a ModelEffortsApiV1SettingsModelsModelEffortsGetWithResponse call
+func ParseModelEffortsApiV1SettingsModelsModelEffortsGetResponse(rsp *http.Response) (*ModelEffortsApiV1SettingsModelsModelEffortsGetResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ModelEffortsApiV1SettingsModelsModelEffortsGetResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Efforts
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParsePutPlivoAccountApiV1SettingsPlivoPutResponse parses an HTTP response from a PutPlivoAccountApiV1SettingsPlivoPutWithResponse call
+func ParsePutPlivoAccountApiV1SettingsPlivoPutResponse(rsp *http.Response) (*PutPlivoAccountApiV1SettingsPlivoPutResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &PutPlivoAccountApiV1SettingsPlivoPutResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest SettingsRead
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseTestProviderApiV1SettingsProvidersProviderTestPostResponse parses an HTTP response from a TestProviderApiV1SettingsProvidersProviderTestPostWithResponse call
+func ParseTestProviderApiV1SettingsProvidersProviderTestPostResponse(rsp *http.Response) (*TestProviderApiV1SettingsProvidersProviderTestPostResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &TestProviderApiV1SettingsProvidersProviderTestPostResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ProviderTest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseDeleteSecretApiV1SettingsSecretsNameDeleteResponse parses an HTTP response from a DeleteSecretApiV1SettingsSecretsNameDeleteWithResponse call
+func ParseDeleteSecretApiV1SettingsSecretsNameDeleteResponse(rsp *http.Response) (*DeleteSecretApiV1SettingsSecretsNameDeleteResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeleteSecretApiV1SettingsSecretsNameDeleteResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest SettingsRead
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParsePutSecretApiV1SettingsSecretsNamePutResponse parses an HTTP response from a PutSecretApiV1SettingsSecretsNamePutWithResponse call
+func ParsePutSecretApiV1SettingsSecretsNamePutResponse(rsp *http.Response) (*PutSecretApiV1SettingsSecretsNamePutResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &PutSecretApiV1SettingsSecretsNamePutResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest SettingsRead
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseNewSigningKeyApiV1SettingsSigningKeyPostResponse parses an HTTP response from a NewSigningKeyApiV1SettingsSigningKeyPostWithResponse call
+func ParseNewSigningKeyApiV1SettingsSigningKeyPostResponse(rsp *http.Response) (*NewSigningKeyApiV1SettingsSigningKeyPostResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &NewSigningKeyApiV1SettingsSigningKeyPostResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest SigningKey
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseDeleteTriggerSecretApiV1SettingsTriggerSecretsNameDeleteResponse parses an HTTP response from a DeleteTriggerSecretApiV1SettingsTriggerSecretsNameDeleteWithResponse call
+func ParseDeleteTriggerSecretApiV1SettingsTriggerSecretsNameDeleteResponse(rsp *http.Response) (*DeleteTriggerSecretApiV1SettingsTriggerSecretsNameDeleteResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeleteTriggerSecretApiV1SettingsTriggerSecretsNameDeleteResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest SettingsRead
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParsePutTriggerSecretApiV1SettingsTriggerSecretsNamePutResponse parses an HTTP response from a PutTriggerSecretApiV1SettingsTriggerSecretsNamePutWithResponse call
+func ParsePutTriggerSecretApiV1SettingsTriggerSecretsNamePutResponse(rsp *http.Response) (*PutTriggerSecretApiV1SettingsTriggerSecretsNamePutResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &PutTriggerSecretApiV1SettingsTriggerSecretsNamePutResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest SettingsRead
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParsePutValuesApiV1SettingsValuesPutResponse parses an HTTP response from a PutValuesApiV1SettingsValuesPutWithResponse call
+func ParsePutValuesApiV1SettingsValuesPutResponse(rsp *http.Response) (*PutValuesApiV1SettingsValuesPutResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &PutValuesApiV1SettingsValuesPutResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest SettingsRead
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}

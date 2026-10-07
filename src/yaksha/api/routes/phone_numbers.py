@@ -3,7 +3,7 @@ from datetime import UTC, datetime
 from fastapi import APIRouter, Depends
 
 from yaksha.api.auth import require_token
-from yaksha.api.deps import SessionDep, SettingsDep
+from yaksha.api.deps import AppSettingsDep, SessionDep, SettingsDep
 from yaksha.api.schemas.phone_numbers import NumberState, PhoneNumberRead, PhoneNumbers
 from yaksha.db.models import PhoneNumber
 from yaksha.simulation import numbers
@@ -23,7 +23,9 @@ router = APIRouter(
 
 
 @router.get("")
-async def list_phone_numbers(session: SessionDep, settings: SettingsDep) -> PhoneNumbers:
+async def list_phone_numbers(
+    session: SessionDep, settings: SettingsDep, app: AppSettingsDep
+) -> PhoneNumbers:
     """The numbers Yaksha may use, as the worker last synced them from the Plivo account."""
     app_id = settings.plivo_app_id
     rows = await numbers.enabled_pool(session)
@@ -41,6 +43,6 @@ async def list_phone_numbers(session: SessionDep, settings: SettingsDep) -> Phon
             )
             for row in rows
         ],
-        outbound_problem=await numbers.outbound_problem(session, settings),
-        rest_s=settings.number_rest_s,
+        outbound_problem=await numbers.outbound_problem(session, settings, app),
+        rest_s=app.phone.number_rest_s,
     )

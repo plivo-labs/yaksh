@@ -12,6 +12,8 @@ from tests.conftest import (
     create_scenario,
     eventually,
     finish,
+    make_evaluator,
+    save_settings,
     start_run,
 )
 from yaksha.config import Settings
@@ -29,7 +31,6 @@ from yaksha.domain.evaluations import DecidedBy, EvaluationState, MetricKey, Out
 from yaksha.domain.language_models import ModelAnswer, ModelCallError
 from yaksha.evaluation import judging
 from yaksha.evaluation.evaluations import MAX_ATTEMPTS
-from yaksha.worker.evaluator import Evaluator
 
 TURNS = [
     Turn(role=Role.AGENT, text="Thanks for calling, this is Ava.", started_at_ms=0, ended_at_ms=1),
@@ -137,8 +138,8 @@ async def test_a_completed_call_is_judged_and_a_stopped_one_gets_only_code_check
     )
     judge = Judge()
     stop = asyncio.Event()
-    every_call = settings.model_copy(update={"audit_sample_rate": 1.0})
-    evaluator = asyncio.create_task(Evaluator(db, every_call, judge).run(stop))
+    await save_settings(db, {"audit": {"sample_rate": 1.0}})
+    evaluator = asyncio.create_task(make_evaluator(db, settings, judge).run(stop))
 
     async def evaluations() -> list[Evaluation]:
         async with db() as session:
@@ -187,7 +188,6 @@ async def test_a_completed_call_is_judged_and_a_stopped_one_gets_only_code_check
         "criterion",
         "hallucination",
         "instructions",
-        "probe",
     ]
     assert {(call.input_tokens, call.model_returned) for call in calls} == {(900, "judge-1")}
     assert len(calls) == 5
@@ -218,7 +218,7 @@ async def test_rule_results_count_only_the_calls_that_ran_the_rule_as_written(
             outcome = CallOutcome(connected=True, end_reason=EndReason.AGENT_HANGUP)
             await finish(db, conversation, outcome, transcript=CALL)
         stop = asyncio.Event()
-        evaluator = asyncio.create_task(Evaluator(db, settings, judge).run(stop))
+        evaluator = asyncio.create_task(make_evaluator(db, settings, judge).run(stop))
 
         async def states() -> list[EvaluationState]:
             async with db() as session:
@@ -260,13 +260,11 @@ async def test_rule_results_count_only_the_calls_that_ran_the_rule_as_written(
 
 
 class Busy:
-    """Answers the first check at start, then is rate limited on every judge call."""
+    """Rate limited on every judge call."""
 
     async def complete_json(
         self, *, system: str, user: str, name: str, schema: dict[str, Any]
     ) -> ModelAnswer:
-        if name == "probe":
-            return ModelAnswer(data={"yes": True}, model="judge-1", input_tokens=1, output_tokens=1)
         raise ModelCallError("the model call failed: HTTP 429", temporary=True)
 
     async def close(self) -> None:
@@ -290,7 +288,7 @@ async def test_a_busy_judge_puts_the_evaluation_off_and_its_last_attempt_keeps_t
 
     async def evaluate_once() -> Evaluation:
         stop = asyncio.Event()
-        evaluator = asyncio.create_task(Evaluator(db, settings, Busy()).run(stop))
+        evaluator = asyncio.create_task(make_evaluator(db, settings, Busy()).run(stop))
 
         async def found() -> Evaluation:
             async with db() as session:

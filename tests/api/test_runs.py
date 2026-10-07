@@ -1,17 +1,14 @@
 import asyncio
 import uuid
-from collections.abc import AsyncGenerator
-from contextlib import asynccontextmanager
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
 import pytest
-from httpx import ASGITransport, AsyncClient
+from httpx import AsyncClient
 from sqlalchemy import func, select, update
 
 from tests.conftest import (
-    TOKEN,
     Db,
     FakeCaller,
     claim,
@@ -20,16 +17,14 @@ from tests.conftest import (
     create_scenario,
     evaluate_queued,
     finish,
-    make_settings,
     new_run,
     run_conversations,
+    save_settings,
     start,
     start_run,
     wait_for_lock_waiters,
     wait_for_run,
 )
-from yaksha.api import create_app
-from yaksha.config import Settings
 from yaksha.db.models import Conversation, Persona, Run, Scenario
 from yaksha.domain.conversations import (
     CallerSettings,
@@ -60,16 +55,18 @@ NO_OUTCOMES = dict.fromkeys(
 )
 
 
-@pytest.fixture
-def settings(database_url: str, tmp_path: Path) -> Settings:
-    return make_settings(
-        tmp_path,
-        database_url=database_url,
-        max_run_conversations=6,
-        max_run_repeats=3,
-        max_run_retries=2,
-        max_run_start_interval_s=60,
-    )
+LIMITS = {
+    "max_run_conversations": 6,
+    "max_run_repeats": 3,
+    "max_run_retries": 2,
+    "max_run_start_interval_s": 60,
+}
+
+
+@pytest.fixture(autouse=True)
+async def limits(client: AsyncClient, db: Db) -> None:
+    """Small run limits, saved as an operator saves them in Settings."""
+    await save_settings(db, {"limits": LIMITS})
 
 
 async def test_a_run_starts_each_repeat_of_every_scenario_in_order_with_its_persona(
@@ -268,14 +265,16 @@ async def test_a_repeated_request_returns_its_run_and_its_key_cannot_start_anoth
 
 
 async def test_a_repeated_request_returns_its_run_after_the_operator_changes_the_defaults(
-    client: AsyncClient, settings: Settings
+    client: AsyncClient, db: Db
 ) -> None:
     agent = await create_agent_id(client)
     scenario = (await create_scenario(client, agent))["id"]
     first = await start_run(client, agent, [scenario], key="nightly-3")
 
-    async with client_with(settings, default_max_duration_s=600, max_run_retries=0) as changed:
-        again = await start_run(changed, agent, [scenario], key="nightly-3")
+    await save_settings(
+        db, {"limits": {**LIMITS, "default_max_duration_s": 600, "max_run_retries": 0}}
+    )
+    again = await start_run(client, agent, [scenario], key="nightly-3")
 
     assert again.status_code == 202 and again.json()["id"] == first.json()["id"]
     assert (await client.get("/api/v1/conversations")).json()["total"] == 1
@@ -593,20 +592,19 @@ async def test_the_date_filter_lists_the_runs_created_in_the_range(
 
 
 async def test_omitted_fields_take_the_operators_defaults_as_the_api_reports_them(
-    client: AsyncClient, settings: Settings
+    client: AsyncClient, db: Db
 ) -> None:
     agent = await create_agent_id(client)
     scenario = (await create_scenario(client, agent))["id"]
     standard = (await client.get("/api/v1/defaults")).json()
 
-    async with client_with(
-        settings, default_max_duration_s=120, default_max_turns=8, max_run_retries=0
-    ) as strict:
-        reported = (await strict.get("/api/v1/defaults")).json()
-        started = await start_run(strict, agent, [scenario])
-        chosen = await start_run(strict, agent, [scenario], max_turns=3)
-        refused = await start_run(strict, agent, [scenario], max_retries=1)
-        calls = [await run_conversations(strict, r.json()["id"]) for r in (started, chosen)]
+    strict = {"default_max_duration_s": 120, "default_max_turns": 8, "max_run_retries": 0}
+    await save_settings(db, {"limits": {**LIMITS, **strict}})
+    reported = (await client.get("/api/v1/defaults")).json()
+    started = await start_run(client, agent, [scenario])
+    chosen = await start_run(client, agent, [scenario], max_turns=3)
+    refused = await start_run(client, agent, [scenario], max_retries=1)
+    calls = [await run_conversations(client, r.json()["id"]) for r in (started, chosen)]
 
     openings = {"en": "Hello", "hinglish": "Hello"}
     assert standard == {
@@ -629,20 +627,6 @@ async def test_omitted_fields_take_the_operators_defaults_as_the_api_reports_the
     assert refused.status_code == 422 and refused.json()["error"]["message"] == (
         "max_retries: at most 0"
     )
-
-
-@asynccontextmanager
-async def client_with(settings: Settings, **changes: Any) -> AsyncGenerator[AsyncClient]:
-    """A client of a second app on the same database, with other operator settings."""
-    app = create_app(settings.model_copy(update=changes))
-    headers = {"Authorization": f"Bearer {TOKEN}"}
-    try:
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test", headers=headers
-        ) as client:
-            yield client
-    finally:
-        await app.state.engine.dispose()
 
 
 async def test_response_times_reach_the_turns_the_list_and_the_run(

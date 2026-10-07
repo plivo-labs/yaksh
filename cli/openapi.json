@@ -3142,6 +3142,616 @@
         }
       }
     },
+    "/api/v1/settings": {
+      "get": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Get Settings",
+        "operationId": "get_settings_api_v1_settings_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingsRead"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "The request failed. The error tells why.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/settings/values": {
+      "put": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Put Values",
+        "description": "Replace every setting that is not a secret. A change applies to the next call.",
+        "operationId": "put_values_api_v1_settings_values_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SettingsValues"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingsRead"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "The request failed. The error tells why.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/settings/secrets/{name}": {
+      "put": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Put Secret",
+        "description": "Check the key with its provider, then save it. A key the provider refuses is not\nsaved.",
+        "operationId": "put_secret_api_v1_settings_secrets__name__put",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/SecretName"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SecretWrite"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingsRead"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "The request failed. The error tells why.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Delete Secret",
+        "operationId": "delete_secret_api_v1_settings_secrets__name__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/SecretName"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingsRead"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "The request failed. The error tells why.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/settings/plivo": {
+      "put": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Put Plivo Account",
+        "description": "Save the Auth ID and Auth token of a Plivo account together, after Plivo accepts them;\nthis is how to move to another account.",
+        "operationId": "put_plivo_account_api_v1_settings_plivo_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlivoAccount"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingsRead"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "The request failed. The error tells why.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/settings/trigger-secrets/{name}": {
+      "put": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Put Trigger Secret",
+        "description": "A value a trigger template uses as {{secrets.NAME}}.",
+        "operationId": "put_trigger_secret_api_v1_settings_trigger_secrets__name__put",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "[A-Z][A-Z0-9_]{0,63}$",
+              "title": "Name"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SecretWrite"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingsRead"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "The request failed. The error tells why.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Delete Trigger Secret",
+        "operationId": "delete_trigger_secret_api_v1_settings_trigger_secrets__name__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "[A-Z][A-Z0-9_]{0,63}$",
+              "title": "Name"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingsRead"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "The request failed. The error tells why.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/settings/signing-key": {
+      "post": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "New Signing Key",
+        "description": "Make a new key that signs every outbound trigger, replacing the old one. The response\nis the only time the key is shown.",
+        "operationId": "new_signing_key_api_v1_settings_signing_key_post",
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SigningKey"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "The request failed. The error tells why.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/settings/providers/{provider}/test": {
+      "post": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Test Provider",
+        "description": "Use the saved settings of one provider for a small piece of real work. The provider\nmay charge for it.",
+        "operationId": "test_provider_api_v1_settings_providers__provider__test_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "provider",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Provider"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProviderTest"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "The request failed. The error tells why.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/settings/models": {
+      "get": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "List Models",
+        "description": "The models the LLM provider lists. A deployment name the list lacks, as on Azure,\ncan still be saved.",
+        "operationId": "list_models_api_v1_settings_models_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Models"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "The request failed. The error tells why.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "An outside service is not set up, or it did not answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/settings/models/{model}/efforts": {
+      "get": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Model Efforts",
+        "description": "The reasoning efforts the model takes. It sends one short request for each effort.",
+        "operationId": "model_efforts_api_v1_settings_models__model__efforts_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "model",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Model"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Efforts"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "The request failed. The error tells why.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "An outside service is not set up, or it did not answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/settings/export": {
+      "get": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Export Settings",
+        "description": "The values that differ from the defaults, and each saved secret as a ${NAME}\nplaceholder; never a secret's value.",
+        "operationId": "export_settings_api_v1_settings_export_get",
+        "responses": {
+          "200": {
+            "description": "The settings as YAML.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "application/yaml": {}
+            }
+          },
+          "4XX": {
+            "description": "The request failed. The error tells why.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/settings/import": {
+      "post": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Import Settings",
+        "description": "Apply a YAML settings document: every key is checked with its provider first, and\nnothing is saved unless every check passes.",
+        "operationId": "import_settings_api_v1_settings_import_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SettingsImport"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportResult"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "The request failed. The error tells why.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/voices": {
       "get": {
         "tags": [
@@ -4161,6 +4771,27 @@
         "title": "AssignPersona",
         "description": "One persona for several scenarios of one agent: all of them, or none if one is missing."
       },
+      "Audit": {
+        "properties": {
+          "sample_rate": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Sample Rate",
+            "default": 0.1
+          },
+          "weekly_budget": {
+            "type": "integer",
+            "maximum": 10000.0,
+            "minimum": 0.0,
+            "title": "Weekly Budget",
+            "default": 30
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "Audit"
+      },
       "BackgroundNoise": {
         "properties": {
           "sound": {
@@ -4248,6 +4879,32 @@
           "possible"
         ],
         "title": "CallerFidelity"
+      },
+      "CallerModel": {
+        "properties": {
+          "model": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Model",
+            "default": "gpt-6-luna"
+          },
+          "reasoning_effort": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-z]{1,20}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning Effort"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "CallerModel"
       },
       "Category": {
         "type": "string",
@@ -5072,6 +5729,26 @@
         ],
         "title": "DecidedBy"
       },
+      "Deepgram": {
+        "properties": {
+          "base_url": {
+            "type": "string",
+            "pattern": "^https?://\\S+$",
+            "title": "Base Url",
+            "default": "https://api.deepgram.com"
+          },
+          "model": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Model",
+            "default": "nova-3"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "Deepgram"
+      },
       "Defaults": {
         "properties": {
           "max_duration_s": {
@@ -5277,6 +5954,27 @@
         "title": "DocumentSummary",
         "description": "A document without its text, for lists and upload results."
       },
+      "Efforts": {
+        "properties": {
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "efforts": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Efforts"
+          }
+        },
+        "type": "object",
+        "required": [
+          "model",
+          "efforts"
+        ],
+        "title": "Efforts"
+      },
       "EndReason": {
         "type": "string",
         "enum": [
@@ -5463,6 +6161,46 @@
         ],
         "title": "GenerationMode"
       },
+      "GenerationModel": {
+        "properties": {
+          "model": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "reasoning_effort": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-z]{1,20}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning Effort",
+            "default": "max"
+          },
+          "timeout_s": {
+            "type": "number",
+            "maximum": 3600.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Timeout S",
+            "default": 300.0
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "GenerationModel"
+      },
       "GenerationRead": {
         "properties": {
           "id": {
@@ -5545,6 +6283,34 @@
           "version"
         ],
         "title": "HealthResponse"
+      },
+      "ImportResult": {
+        "properties": {
+          "changes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Changes"
+          },
+          "skipped": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Skipped"
+          },
+          "settings": {
+            "$ref": "#/components/schemas/SettingsRead"
+          }
+        },
+        "type": "object",
+        "required": [
+          "changes",
+          "skipped",
+          "settings"
+        ],
+        "title": "ImportResult"
       },
       "ItemRead": {
         "properties": {
@@ -5703,6 +6469,68 @@
         ],
         "title": "JudgeAgreement",
         "description": "How often blind audit labels agree with the machine. A judge version with no such labels\nis not listed: it is not yet measured on your agents."
+      },
+      "JudgeModel": {
+        "properties": {
+          "model": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Model",
+            "default": "gpt-6-luna"
+          },
+          "reasoning_effort": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-z]{1,20}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning Effort",
+            "default": "medium"
+          },
+          "timeout_s": {
+            "type": "number",
+            "maximum": 3600.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Timeout S",
+            "default": 60.0
+          },
+          "sources_timeout_s": {
+            "type": "number",
+            "maximum": 3600.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Sources Timeout S",
+            "default": 180.0
+          },
+          "max_output_tokens": {
+            "type": "integer",
+            "maximum": 200000.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Max Output Tokens",
+            "default": 8000
+          },
+          "max_input_chars": {
+            "type": "integer",
+            "maximum": 10000000.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Max Input Chars",
+            "default": 400000
+          },
+          "jev_pass_bar": {
+            "type": "number",
+            "maximum": 1.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Jev Pass Bar",
+            "default": 0.95
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "JudgeModel"
       },
       "JudgeVersionUsed": {
         "properties": {
@@ -6086,6 +6914,69 @@
         "title": "LatencySummary",
         "description": "The agent's response times in one call: nearest-rank percentiles over the measured\nreplies, how many replies there were, and how many of them talked over the caller."
       },
+      "Limits": {
+        "properties": {
+          "default_max_turns": {
+            "type": "integer",
+            "maximum": 100.0,
+            "minimum": 1.0,
+            "title": "Default Max Turns",
+            "default": 20
+          },
+          "default_max_duration_s": {
+            "type": "integer",
+            "maximum": 1800.0,
+            "minimum": 10.0,
+            "title": "Default Max Duration S",
+            "default": 300
+          },
+          "max_run_conversations": {
+            "type": "integer",
+            "maximum": 10000.0,
+            "minimum": 1.0,
+            "title": "Max Run Conversations",
+            "default": 200
+          },
+          "max_run_repeats": {
+            "type": "integer",
+            "maximum": 1000.0,
+            "minimum": 1.0,
+            "title": "Max Run Repeats",
+            "default": 10
+          },
+          "max_run_retries": {
+            "type": "integer",
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Max Run Retries",
+            "default": 3
+          },
+          "max_run_start_interval_s": {
+            "type": "integer",
+            "maximum": 86400.0,
+            "minimum": 1.0,
+            "title": "Max Run Start Interval S",
+            "default": 600
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "Limits"
+      },
+      "Llm": {
+        "properties": {
+          "base_url": {
+            "type": "string",
+            "pattern": "^https?://\\S+$",
+            "title": "Base Url",
+            "default": "https://api.openai.com/v1"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "Llm",
+        "description": "Any API with OpenAI's Responses endpoint. The caller, scenario writing and the judges\nuse it."
+      },
       "LlmRule": {
         "properties": {
           "kind": {
@@ -6178,6 +7069,22 @@
         ],
         "title": "Metric",
         "description": "One metric's value and the flags it raised."
+      },
+      "Models": {
+        "properties": {
+          "models": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Models"
+          }
+        },
+        "type": "object",
+        "required": [
+          "models"
+        ],
+        "title": "Models"
       },
       "NoiseLevel": {
         "type": "string",
@@ -6850,6 +7757,32 @@
         ],
         "title": "PersonaVersionRead"
       },
+      "Phone": {
+        "properties": {
+          "ring_timeout_s": {
+            "type": "integer",
+            "maximum": 300.0,
+            "minimum": 1.0,
+            "title": "Ring Timeout S",
+            "default": 30
+          },
+          "number_rest_s": {
+            "type": "integer",
+            "maximum": 86400.0,
+            "minimum": 0.0,
+            "title": "Number Rest S",
+            "default": 300
+          },
+          "timezone": {
+            "type": "string",
+            "title": "Timezone",
+            "default": "UTC"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "Phone"
+      },
       "PhoneNumberRead": {
         "properties": {
           "number": {
@@ -7028,6 +7961,28 @@
         ],
         "title": "PhraseWhere"
       },
+      "PlivoAccount": {
+        "properties": {
+          "auth_id": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Auth Id"
+          },
+          "auth_token": {
+            "type": "string",
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Auth Token"
+          }
+        },
+        "type": "object",
+        "required": [
+          "auth_id",
+          "auth_token"
+        ],
+        "title": "PlivoAccount"
+      },
       "Provenance": {
         "type": "string",
         "enum": [
@@ -7036,6 +7991,39 @@
           "unconfirmed"
         ],
         "title": "Provenance"
+      },
+      "Provider": {
+        "type": "string",
+        "enum": [
+          "llm",
+          "deepgram",
+          "elevenlabs",
+          "typesafe",
+          "plivo"
+        ],
+        "title": "Provider"
+      },
+      "ProviderTest": {
+        "properties": {
+          "provider": {
+            "$ref": "#/components/schemas/Provider"
+          },
+          "ok": {
+            "type": "boolean",
+            "title": "Ok"
+          },
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "provider",
+          "ok",
+          "detail"
+        ],
+        "title": "ProviderTest"
       },
       "ProviderVoice": {
         "properties": {
@@ -8826,6 +9814,190 @@
         ],
         "title": "ScenarioVersionRead"
       },
+      "SecretName": {
+        "type": "string",
+        "enum": [
+          "llm_api_key",
+          "deepgram_api_key",
+          "elevenlabs_api_key",
+          "typesafe_api_key",
+          "plivo_auth_id",
+          "plivo_auth_token",
+          "trigger_signing_key"
+        ],
+        "title": "SecretName"
+      },
+      "SecretState": {
+        "properties": {
+          "hint": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hint"
+          }
+        },
+        "type": "object",
+        "required": [
+          "hint"
+        ],
+        "title": "SecretState",
+        "description": "A saved secret, never its value."
+      },
+      "SecretWrite": {
+        "properties": {
+          "value": {
+            "type": "string",
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Value"
+          }
+        },
+        "type": "object",
+        "required": [
+          "value"
+        ],
+        "title": "SecretWrite"
+      },
+      "SettingsImport": {
+        "properties": {
+          "document": {
+            "type": "string",
+            "maxLength": 200000,
+            "title": "Document"
+          },
+          "env": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Env",
+            "default": {}
+          },
+          "dry_run": {
+            "type": "boolean",
+            "title": "Dry Run",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "document"
+        ],
+        "title": "SettingsImport"
+      },
+      "SettingsRead": {
+        "properties": {
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "values": {
+            "$ref": "#/components/schemas/SettingsValues"
+          },
+          "secrets": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/SecretState"
+            },
+            "propertyNames": {
+              "$ref": "#/components/schemas/SecretName"
+            },
+            "type": "object",
+            "title": "Secrets"
+          },
+          "trigger_secrets": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/SecretState"
+            },
+            "type": "object",
+            "title": "Trigger Secrets"
+          }
+        },
+        "type": "object",
+        "required": [
+          "version",
+          "values",
+          "secrets",
+          "trigger_secrets"
+        ],
+        "title": "SettingsRead"
+      },
+      "SettingsValues": {
+        "properties": {
+          "llm": {
+            "$ref": "#/components/schemas/Llm",
+            "default": {
+              "base_url": "https://api.openai.com/v1"
+            }
+          },
+          "deepgram": {
+            "$ref": "#/components/schemas/Deepgram",
+            "default": {
+              "base_url": "https://api.deepgram.com",
+              "model": "nova-3"
+            }
+          },
+          "caller": {
+            "$ref": "#/components/schemas/CallerModel",
+            "default": {
+              "model": "gpt-6-luna"
+            }
+          },
+          "generation": {
+            "$ref": "#/components/schemas/GenerationModel",
+            "default": {
+              "reasoning_effort": "max",
+              "timeout_s": 300.0
+            }
+          },
+          "judges": {
+            "$ref": "#/components/schemas/JudgeModel",
+            "default": {
+              "model": "gpt-6-luna",
+              "reasoning_effort": "medium",
+              "timeout_s": 60.0,
+              "sources_timeout_s": 180.0,
+              "max_output_tokens": 8000,
+              "max_input_chars": 400000,
+              "jev_pass_bar": 0.95
+            }
+          },
+          "audit": {
+            "$ref": "#/components/schemas/Audit",
+            "default": {
+              "sample_rate": 0.1,
+              "weekly_budget": 30
+            }
+          },
+          "phone": {
+            "$ref": "#/components/schemas/Phone",
+            "default": {
+              "ring_timeout_s": 30,
+              "number_rest_s": 300,
+              "timezone": "UTC"
+            }
+          },
+          "limits": {
+            "$ref": "#/components/schemas/Limits",
+            "default": {
+              "default_max_turns": 20,
+              "default_max_duration_s": 300,
+              "max_run_conversations": 200,
+              "max_run_repeats": 10,
+              "max_run_retries": 3,
+              "max_run_start_interval_s": 600
+            }
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "SettingsValues",
+        "description": "Every setting that is not a secret."
+      },
       "Share": {
         "properties": {
           "count": {
@@ -8868,6 +10040,19 @@
         ],
         "title": "Share",
         "description": "How many of a total, with the 95% Wilson interval of the rate: few calls give a wide\ninterval."
+      },
+      "SigningKey": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key"
+        ],
+        "title": "SigningKey"
       },
       "TextDocumentCreate": {
         "properties": {

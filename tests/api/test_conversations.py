@@ -14,6 +14,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from tests.conftest import (
+    APP_SETTINGS,
     FINAL,
     OUTBOUND_AGENT,
     PERSONA,
@@ -25,6 +26,7 @@ from tests.conftest import (
     create_persona,
     create_scenario,
     eventually,
+    make_worker,
     start,
     start_run,
     wait_for,
@@ -38,6 +40,7 @@ from yaksha.domain.background_noise import NoiseLevel, NoiseMix, NoiseSound
 from yaksha.domain.conversations import CallRequest, ConversationStatus
 from yaksha.domain.languages import Language
 from yaksha.domain.runs import RunCreate
+from yaksha.domain.settings import Phone
 from yaksha.simulation import conversations, runs
 from yaksha.simulation.background_noise import sound_path, volume
 from yaksha.simulation.calls import STOP_IGNORED
@@ -160,7 +163,7 @@ async def test_two_workers_never_run_the_same_conversation_twice(
     ids = [(await start(client, agent_id))["id"] for _ in range(3)]
     engine = create_engine(settings.database_url.encoded_string())
     sessionmaker = create_sessionmaker(engine)
-    workers = [Worker(sessionmaker, caller, settings, worker_id=f"w{n}") for n in range(2)]
+    workers = [make_worker(sessionmaker, caller, settings, worker_id=f"w{n}") for n in range(2)]
     stop = asyncio.Event()
     tasks = [asyncio.create_task(worker.run(stop)) for worker in workers]
 
@@ -326,7 +329,7 @@ async def test_capacity_queues_extra_conversations(
     first, second = await start(client, agent_id), await start(client, agent_id)
     engine = create_engine(settings.database_url.encoded_string())
     limited = settings.model_copy(update={"max_active_conversations": 1})
-    worker = Worker(create_sessionmaker(engine), caller, limited, worker_id="one-at-a-time")
+    worker = make_worker(create_sessionmaker(engine), caller, limited, worker_id="one-at-a-time")
     stop = asyncio.Event()
     task = asyncio.create_task(worker.run(stop))
 
@@ -389,7 +392,7 @@ async def test_worker_shutdown_stops_the_caller_and_keeps_the_evidence(
     started = await start(client, agent_id)
     unhurried = settings.model_copy(update={"worker_lease_s": 30})
     engine = create_engine(settings.database_url.encoded_string())
-    worker = Worker(create_sessionmaker(engine), caller, unhurried, worker_id="shutting-down")
+    worker = make_worker(create_sessionmaker(engine), caller, unhurried, worker_id="shutting-down")
     stop = asyncio.Event()
     task = asyncio.create_task(worker.run(stop))
     await wait_for_event(client, started["id"], "connected")
@@ -432,7 +435,7 @@ async def test_shutdown_waits_while_result_writes_time_out_and_unwind_slowly(
     started = await start(client, agent_id)
     unhurried = settings.model_copy(update={"worker_lease_s": 30})
     engine = create_engine(settings.database_url.encoded_string())
-    worker = Worker(create_sessionmaker(engine), caller, unhurried, worker_id="shutting-down")
+    worker = make_worker(create_sessionmaker(engine), caller, unhurried, worker_id="shutting-down")
     stop = asyncio.Event()
     task = asyncio.create_task(worker.run(stop))
     await wait_for_event(client, started["id"], "connected")
@@ -664,7 +667,7 @@ async def test_a_stalled_result_write_does_not_hold_capacity(
     await start(client, agent_id)
     engine = create_engine(settings.database_url.encoded_string())
     limited = settings.model_copy(update={"max_active_conversations": 1})
-    worker = Worker(create_sessionmaker(engine), caller, limited, worker_id="one-at-a-time")
+    worker = make_worker(create_sessionmaker(engine), caller, limited, worker_id="one-at-a-time")
     stop = asyncio.Event()
     task = asyncio.create_task(worker.run(stop))
 
@@ -719,7 +722,12 @@ async def call_request_of(settings: Settings, conversation_id: str) -> CallReque
             row = await conversations.get_conversation(session, uuid.UUID(conversation_id))
             agent = await session.get_one(AgentVersion, row.agent_version_id)
             return await conversations.call_request(
-                session, settings, row, "+15550100000", AgentConfig.model_validate(agent.config)
+                session,
+                settings,
+                APP_SETTINGS,
+                row,
+                "+15550100000",
+                AgentConfig.model_validate(agent.config),
             )
     finally:
         await engine.dispose()
@@ -792,11 +800,11 @@ async def test_the_caller_knows_its_facts_and_today_but_never_the_criteria(
     agent_id = await create_agent_id(client)
     scenario = await create_scenario(client, agent_id)
     command = RunCreate.model_validate({"agent_id": agent_id, "scenario_ids": [scenario["id"]]})
-    zoned = settings.model_copy(update={"timezone": timezone})
+    zoned = APP_SETTINGS.model_copy(update={"phone": Phone(timezone=timezone)})
 
     engine = create_engine(settings.database_url.encoded_string())
     async with create_sessionmaker(engine)() as session:
-        run = await runs.create_run(session, zoned, command, None)
+        run = await runs.create_run(session, settings, zoned, command, None)
         conversation = (
             await session.scalars(select(Conversation).where(Conversation.run_id == run.id))
         ).one()
@@ -850,7 +858,7 @@ async def test_a_queued_conversation_still_runs_after_its_persona_is_deleted(
     await client.delete(f"/api/v1/personas/{started['persona_id']}")
 
     engine = create_engine(settings.database_url.encoded_string())
-    worker = Worker(create_sessionmaker(engine), caller, settings, worker_id="late-worker")
+    worker = make_worker(create_sessionmaker(engine), caller, settings, worker_id="late-worker")
     stop = asyncio.Event()
     task = asyncio.create_task(worker.run(stop))
     try:

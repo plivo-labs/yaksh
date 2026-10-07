@@ -14,6 +14,7 @@ from tests.conftest import (
     OUTBOUND_AGENT,
     TOKEN,
     FakeJsonModel,
+    FakeProviders,
     create_agent,
     create_scenario,
     new_persona_id,
@@ -260,7 +261,7 @@ async def test_stopping_keeps_what_was_saved_and_records_the_stop(
             GenerateScenarios(count=4, persona_ids=await persona_ids(client)),
         )
 
-    events = generation.generate(sessionmaker, generation_model, prepared)
+    events = generation.generate(sessionmaker, prepared)
     started = await anext(events)
     assert isinstance(started, generation.Started)
     await anext(events)
@@ -384,7 +385,7 @@ async def test_a_disconnect_during_planning_still_records_the_stop(
 
     async def console() -> None:
         with scope:
-            events = generation.generate(sessionmaker, generation_model, prepared)
+            events = generation.generate(sessionmaker, prepared)
             async with aclosing(events):
                 async for event in events:
                     seen.append(event)
@@ -411,7 +412,7 @@ async def test_a_disconnect_while_an_event_waits_to_be_sent_still_records_the_st
     agent = await create_agent(client, brief=BRIEF)
     generation_model.capabilities = [capability("Reschedule", "Reschedules missed clinic visits.")]
     app = create_app(settings)
-    app.state.generation_model = generation_model
+    app.state.providers = FakeProviders({}, generation_model)
     first_chunk, gone = asyncio.Event(), asyncio.Event()
     body = json.dumps({"count": 4, "persona_ids": await persona_ids(client)}).encode()
     requested = False
@@ -552,9 +553,7 @@ async def test_a_persona_deleted_during_a_generation_ends_it_with_the_reason(
         )
     await client.delete(f"/api/v1/personas/{persona}")
 
-    events = [
-        event async for event in generation.generate(sessionmaker, generation_model, prepared)
-    ]
+    events = [event async for event in generation.generate(sessionmaker, prepared)]
     await engine.dispose()
 
     finished = events[-1]

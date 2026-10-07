@@ -17,9 +17,11 @@ from pipecat.frames.frames import (
     TTSTextFrame,
 )
 from pipecat.tests.utils import run_test
+from pydantic import SecretStr
 
 from tests.conftest import (
     AGENT,
+    APP_SETTINGS,
     CALLER,
     OUTBOUND_AGENT,
     PLIVO_TOKEN,
@@ -41,10 +43,19 @@ from yaksha.domain.conversations import (
     LineFacts,
     WireEventKind,
 )
+from yaksha.domain.settings import Phone
 from yaksha.integrations.plivo import PlivoApi
 from yaksha.integrations.trigger import TriggerOutcome, TriggerResult
 
-PROVIDERS = ("deepgram_api_key", "elevenlabs_api_key", "openai_api_key")
+CALL_SETTINGS = APP_SETTINGS.model_copy(
+    update={
+        "phone": Phone(ring_timeout_s=1),
+        "secrets": APP_SETTINGS.secrets.model_copy(
+            update={"triggers": {"KEY": SecretStr("sk_test")}}
+        ),
+    }
+)
+"""A short ring, and the trigger secret the outbound agent's template names."""
 
 AGENT_NUMBER = "+14155550100"
 POOL_NUMBER = "+17862242321"
@@ -65,15 +76,8 @@ class Rig:
         self.dialer = Dialer(self.api, self.public_url, ring_timeout_s=1)
 
     def caller(self, tmp_path: Path) -> PhoneCaller:
-        settings = make_settings(
-            tmp_path,
-            **dict.fromkeys(PROVIDERS, "test"),
-            plivo_auth_id="MAXXXX",
-            plivo_auth_token="token",
-            public_url=self.public_url,
-            ring_timeout_s=1,
-        )
-        return PhoneCaller(settings, self.registry, self.api)
+        settings = make_settings(tmp_path, public_url=self.public_url)
+        return PhoneCaller(settings, self.registry, lambda *_credentials: self.api)
 
     async def report(self, conversation_id: uuid.UUID, **fields: str) -> None:
         path = f"/callbacks/{conversation_id}"
@@ -107,7 +111,9 @@ async def rig(monkeypatch: pytest.MonkeyPatch) -> AsyncIterator[Rig]:
     monkeypatch.setattr(phone, "STREAM_GRACE_S", 0.5)
     fake = FastAPI()
     registry = StreamRegistry()
-    worker = PlivoServer(create_app(registry, SIGNED_URL, PLIVO_TOKEN, refuse_calls), port=0)
+    worker = PlivoServer(
+        create_app(registry, SIGNED_URL, lambda: PLIVO_TOKEN, refuse_calls), port=0
+    )
     plivo = PlivoServer(fake, port=0)
     await worker.start()
     await plivo.start()
@@ -141,6 +147,7 @@ def request(tmp_path: Path) -> CallRequest:
         caller_number=POOL_NUMBER,
         max_duration_s=120,
         output_dir=tmp_path,
+        app_settings=CALL_SETTINGS,
     )
 
 
@@ -429,6 +436,7 @@ def outbound_request(tmp_path: Path, window_s: float = 5) -> CallRequest:
         max_duration_s=120,
         accept_calls_until=datetime.now(UTC) + timedelta(seconds=window_s),
         output_dir=tmp_path,
+        app_settings=CALL_SETTINGS,
     )
 
 
@@ -531,9 +539,8 @@ async def test_an_agent_that_hangs_up_before_the_stream_opens_is_named(
 
 
 async def test_a_trigger_that_cannot_be_rendered_is_recorded_as_not_sent(
-    rig: Rig, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    rig: Rig, tmp_path: Path
 ) -> None:
-    monkeypatch.setenv("YAKSHA_TRIGGER_KEY", "sk_test")
     observer = Observer()
     call = outbound_request(tmp_path)
 

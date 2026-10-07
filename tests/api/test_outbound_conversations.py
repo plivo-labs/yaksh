@@ -8,6 +8,7 @@ from httpx import AsyncClient, Response
 from sqlalchemy import func, insert, select, update
 
 from tests.conftest import (
+    APP_SETTINGS,
     OUTBOUND_AGENT,
     Db,
     FakeCaller,
@@ -16,6 +17,7 @@ from tests.conftest import (
     create_scenario,
     expire_leases,
     make_settings,
+    make_worker,
     reap,
     run_conversations,
     start,
@@ -26,7 +28,6 @@ from yaksha.db.models import Conversation, PhoneNumber, RunningWorker
 from yaksha.db.session import create_engine, create_sessionmaker
 from yaksha.simulation import conversations
 from yaksha.simulation.workers import report_worker
-from yaksha.worker.worker import Worker
 
 APP_ID = "31216907353261579"
 RECEIVING = "+15716535187"
@@ -133,7 +134,9 @@ async def test_preparing_the_call_opens_the_dial_window_and_keeps_the_pinned_dat
 
     async with db() as session:
         conversation = await session.get_one(Conversation, uuid.UUID(claimed))
-        request = await conversations.prepare_call(session, settings, conversation, APP_ID)
+        request = await conversations.prepare_call(
+            session, settings, APP_SETTINGS, conversation, APP_ID
+        )
         window = await session.scalar(
             select(Conversation.dial_deadline_at - func.now()).where(
                 Conversation.id == conversation.id
@@ -169,7 +172,9 @@ async def test_the_numbers_page_shows_the_outbound_numbers_and_their_rest(
 
     receiving = next(n for n in listed["items"] if n["number"] == RECEIVING)
     others = [n for n in listed["items"] if n["number"] != RECEIVING]
-    assert listed["outbound_problem"] is None and listed["rest_s"] == settings.number_rest_s
+    assert (
+        listed["outbound_problem"] is None and listed["rest_s"] == APP_SETTINGS.phone.number_rest_s
+    )
     assert receiving["on_outbound_application"] and receiving["state"] == "resting"
     assert others and not any(n["on_outbound_application"] for n in others)
 
@@ -194,7 +199,9 @@ async def test_an_outbound_start_needs_a_running_worker_that_receives_its_calls(
     await engine.dispose()
     stopped = await start_outbound(client, agent_data=AGENT_DATA)
     engine = create_engine(settings.database_url.encoded_string())
-    worker = Worker(create_sessionmaker(engine), FakeCaller(), settings, receiving_app_id=APP_ID)
+    worker = make_worker(
+        create_sessionmaker(engine), FakeCaller(), settings, receiving_app_id=APP_ID
+    )
     await worker.poll()
     await engine.dispose()
     running = await start_outbound(client, agent_data=AGENT_DATA)

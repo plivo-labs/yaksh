@@ -6,7 +6,16 @@ from pathlib import Path
 from httpx import AsyncClient
 from sqlalchemy import func, select, update
 
-from tests.conftest import Db, claim, eventually, expire_leases, finish, new_run, reap
+from tests.conftest import (
+    Db,
+    claim,
+    eventually,
+    expire_leases,
+    finish,
+    make_evaluator,
+    new_run,
+    reap,
+)
 from yaksha.config import Settings
 from yaksha.db.models import Conversation, Evaluation, MetricValue
 from yaksha.domain.conversations import CallOutcome, EndReason, Transcript, WireEvent, WireEventKind
@@ -14,7 +23,6 @@ from yaksha.domain.evaluations import EvaluationState, Metric, MetricKey
 from yaksha.domain.latency import CallerReplyWindow
 from yaksha.evaluation import evaluations
 from yaksha.evaluation.evaluations import MAX_ATTEMPTS, Evaluated
-from yaksha.worker.evaluator import Evaluator
 
 HUNG_UP = CallOutcome(connected=True, end_reason=EndReason.AGENT_HANGUP)
 RATE = 8000
@@ -171,7 +179,7 @@ def write_wav(path: Path, channels: int, seconds: float) -> None:
 async def run_evaluator(db: Db, settings: Settings) -> Evaluation:
     """Run an evaluator until the one queued evaluation is done or has failed once."""
     stop = asyncio.Event()
-    evaluator = asyncio.create_task(Evaluator(db, settings).run(stop))
+    evaluator = asyncio.create_task(make_evaluator(db, settings).run(stop))
     try:
         [evaluation] = await eventually(
             lambda: queued(db),

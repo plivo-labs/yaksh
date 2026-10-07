@@ -15,7 +15,9 @@ docker compose -f docker/compose.yaml logs worker
 
 | Message | Cause and action |
 | --- | --- |
-| `phone calls are off: set PLIVO_AUTH_ID, PLIVO_AUTH_TOKEN and YAKSHA_PUBLIC_URL` | The API does not have these variables. Set them in `docker/.env`. Then make the API and worker containers again. |
+| `phone calls are off: add the Plivo Auth ID and Auth token in Settings` | Save the Plivo Auth ID and Auth token on the **Phone** tab of Settings. |
+| `phone calls are off: set YAKSHA_PUBLIC_URL to the address Plivo can reach` | Set `YAKSHA_PUBLIC_URL` in `docker/.env`. Then make the API and worker containers again. |
+| `the caller needs the ... key; add it in Settings` | Save the key that the message names on the **Providers** tab of Settings. |
 | `outbound tests are off: ...` | The outbound setup is not complete. The **Numbers** page shows the cause. Refer to [Outbound agents](/docs/outbound-agents). |
 
 ## The conversation stays queued
@@ -33,7 +35,7 @@ docker compose -f docker/compose.yaml logs worker
 | `the agent did not answer: ...` | The agent did not answer the call. Examine the number of the agent. |
 | `phone calls are off: ...` | The worker does not have the phone variables. Set them. Then make the worker container again. |
 
-If the log of the worker shows `refused an unsigned request`, the worker could not verify the Plivo signature of a request. Make sure that `YAKSHA_PUBLIC_URL` is the URL that Plivo uses, and that `PLIVO_AUTH_TOKEN` is the token of the account. After a change, make the API and worker containers again.
+If the log of the worker shows `refused an unsigned request`, the worker could not verify the Plivo signature of a request. Make sure that `YAKSHA_PUBLIC_URL` is the URL that Plivo uses, and that the Plivo Auth token in Settings is the token of the account. After a change of `YAKSHA_PUBLIC_URL`, make the API and worker containers again. A change in Settings applies at once.
 
 ## Outbound tests
 

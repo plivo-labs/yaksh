@@ -11,7 +11,9 @@ SPEC_PATH = REPO_ROOT / "cli" / "openapi.json"
 
 def main() -> None:
     settings = Settings(
-        api_token="unused", database_url="postgresql+asyncpg://unused@localhost/unused"
+        api_token="unused",
+        database_url="postgresql+asyncpg://unused@localhost/unused",
+        encryption_key="unused" * 6,
     )
     spec = create_app(settings).openapi()
     SPEC_PATH.parent.mkdir(exist_ok=True)

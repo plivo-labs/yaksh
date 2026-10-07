@@ -10,6 +10,7 @@ import pytest
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from httpx import ASGITransport, AsyncClient, Response
+from pydantic import SecretStr
 from sqlalchemy import ColumnElement, func, text, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from testcontainers.community.postgres import PostgresContainer
@@ -40,18 +41,44 @@ from yaksha.domain.evaluations import Metric, MetricKey
 from yaksha.domain.language_models import ModelAnswer, ModelCallError
 from yaksha.domain.languages import Language
 from yaksha.domain.numbers import AccountNumber
+from yaksha.domain.settings import AppSettings, SecretName, Secrets
 from yaksha.domain.voices import ProviderVoice, VoiceGender, VoiceProvider, VoiceSettings
 from yaksha.evaluation import evaluations
 from yaksha.evaluation.evaluations import Evaluated
 from yaksha.integrations.elevenlabs import as_wav
 from yaksha.integrations.plivo_signature import signature, signed_text
+from yaksha.settings import store
+from yaksha.settings.cipher import Cipher
+from yaksha.settings.store import SettingsSource
 from yaksha.simulation import conversations, numbers
+from yaksha.worker.evaluator import Evaluator, JudgeClients
+from yaksha.worker.phone_account import PhoneAccount
 from yaksha.worker.worker import Worker
 
 type Db = async_sessionmaker[AsyncSession]
 
 TOKEN = "test-token"
+PLIVO_AUTH_ID = "MAXXXX"
 PLIVO_TOKEN = "token"
+ENCRYPTION_KEY = "test-encryption-key-of-at-least-32-chars"
+STORED_SECRETS: dict[str, str | None] = {
+    SecretName.PLIVO_AUTH_ID: PLIVO_AUTH_ID,
+    SecretName.PLIVO_AUTH_TOKEN: PLIVO_TOKEN,
+    SecretName.LLM_API_KEY: "llm-test-key",
+    SecretName.DEEPGRAM_API_KEY: "deepgram-test-key",
+    SecretName.ELEVENLABS_API_KEY: "elevenlabs-test-key",
+}
+"""The secrets every API test starts with, so runs can start."""
+APP_SETTINGS = AppSettings(
+    secrets=Secrets(
+        plivo_auth_id=SecretStr(PLIVO_AUTH_ID),
+        plivo_auth_token=SecretStr(PLIVO_TOKEN),
+        llm_api_key=SecretStr("llm-test-key"),
+        deepgram_api_key=SecretStr("deepgram-test-key"),
+        elevenlabs_api_key=SecretStr("elevenlabs-test-key"),
+    )
+)
+"""Stored settings for a call request built without the database."""
 POOL = [AccountNumber(number=f"+1555010{n:04d}") for n in range(8)]
 OFFLINE_DATABASE_URL = "postgresql+asyncpg://yaksha:yaksha@localhost:5432/yaksha"
 FINAL = {"completed", "failed", "invalid", "cancelled"}
@@ -76,7 +103,7 @@ OUTBOUND_AGENT: dict[str, Any] = {
     "outbound": {
         "trigger": {
             "url": "https://agents.example.com/calls",
-            "headers": [{"name": "Authorization", "value": "Bearer {{env.YAKSHA_TRIGGER_KEY}}"}],
+            "headers": [{"name": "Authorization", "value": "Bearer {{secrets.KEY}}"}],
             "body": {
                 "to": "{{yaksha.number}}",
                 "customer": {"name": "{{agent_data.Customer name}}"},
@@ -369,6 +396,98 @@ def plivo_signed(
     }
 
 
+class FakeProviders:
+    """The API's provider clients, whatever the stored settings say."""
+
+    def __init__(self, voice_clients: Any, generation_model: Any) -> None:
+        self.voice_clients_ = voice_clients
+        self.generation_model_ = generation_model
+
+    def voice_clients(self, _settings: AppSettings) -> Any:
+        return self.voice_clients_
+
+    def generation_model(self, _settings: AppSettings) -> Any:
+        return self.generation_model_
+
+    async def close(self) -> None:
+        pass
+
+
+class FixedAccount(PhoneAccount):
+    """A Plivo account that is never asked: the worker receives on receiving_app_id."""
+
+    def __init__(
+        self,
+        sessionmaker: Db,
+        settings: Settings,
+        receiving_app_id: str | None,
+        problem: str | None,
+    ) -> None:
+        super().__init__(sessionmaker, settings)
+        self.receiving_app_id = receiving_app_id
+        self.outbound_problem = problem
+
+    async def refresh(self, app: AppSettings) -> None:
+        pass
+
+
+class FixedSource(SettingsSource):
+    """Stored settings that never change, for a worker without a database."""
+
+    def __init__(self, settings: AppSettings = APP_SETTINGS) -> None:
+        self._fixed = settings
+
+    async def current(self) -> AppSettings:
+        return self._fixed
+
+
+def make_worker(
+    sessionmaker: Db,
+    caller: Any,
+    settings: Settings,
+    *,
+    worker_id: str | None = None,
+    receiving_app_id: str | None = None,
+    outbound_problem: str | None = None,
+    source: SettingsSource | None = None,
+) -> Worker:
+    return Worker(
+        sessionmaker,
+        caller,
+        settings,
+        source or SettingsSource(sessionmaker, Cipher(ENCRYPTION_KEY)),
+        FixedAccount(sessionmaker, settings, receiving_app_id, outbound_problem),
+        worker_id=worker_id,
+    )
+
+
+def make_evaluator(
+    sessionmaker: Db,
+    settings: Settings,
+    model: Any = None,
+    *,
+    sources_model: Any = None,
+    jev: Any = None,
+) -> Evaluator:
+    """An evaluator that judges with these clients, whatever the stored settings say."""
+    return Evaluator(
+        sessionmaker,
+        settings,
+        SettingsSource(sessionmaker, Cipher(ENCRYPTION_KEY)),
+        clients=lambda _settings: JudgeClients(model, sources_model, jev),
+    )
+
+
+async def save_settings(
+    sessionmaker: Db,
+    values: dict[str, Any] | None = None,
+    secrets: dict[str, str | None] | None = None,
+) -> AppSettings:
+    """Change the stored settings, as the Settings page does."""
+    async with sessionmaker() as session:
+        return await store.change(session, Cipher(ENCRYPTION_KEY), values=values, secrets=secrets)
+
+
 def make_settings(tmp_path: Path, **overrides: Any) -> Settings:
     values: dict[str, Any] = {
         "api_token": TOKEN,
@@ -379,9 +498,8 @@ def make_settings(tmp_path: Path, **overrides: Any) -> Settings:
         "worker_heartbeat_s": 0.05,
         "worker_lease_s": 2,
         "end_timeout_s": 0.5,
-        "plivo_auth_id": "MAXXXX",
-        "plivo_auth_token": "token",
         "public_url": "http://yaksha.test",
+        "encryption_key": ENCRYPTION_KEY,
     }
     return Settings.model_validate({**values, **overrides})
 
@@ -669,9 +787,10 @@ async def client(
 ) -> AsyncIterator[AsyncClient]:
     """An API client whose voices list holds the English and the Hindi test voice."""
     app = create_app(settings)
-    app.state.voice_clients = voice_clients
+    app.state.providers = FakeProviders(voice_clients, generation_model)
     app.state.file_store = file_store
-    app.state.generation_model = generation_model
+    async with create_sessionmaker(app.state.engine)() as session:
+        await store.change(session, app.state.source.cipher, secrets=STORED_SECRETS)
     async with create_sessionmaker(app.state.engine)() as session:
         await numbers.sync_numbers(session, POOL, [], {})
         session.add(listed_voice(ENGLISH_VOICE, Language.EN))
@@ -692,6 +811,9 @@ async def client(
                 " scenario_versions, scenarios, workers, documents, scenario_generations"
             )
         )
+        await connection.execute(
+            text("UPDATE app_settings SET values = '{}', secrets = '{}', version = version + 1")
+        )
     await engine.dispose()
 
 
@@ -705,7 +827,7 @@ async def worker(
     client: AsyncClient, settings: Settings, caller: FakeCaller
 ) -> AsyncIterator[Worker]:
     engine = create_engine(settings.database_url.encoded_string())
-    worker = Worker(create_sessionmaker(engine), caller, settings, worker_id="test-worker")
+    worker = make_worker(create_sessionmaker(engine), caller, settings, worker_id="test-worker")
     stop = asyncio.Event()
     task = asyncio.create_task(worker.run(stop))
     yield worker

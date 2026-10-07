@@ -11,10 +11,10 @@ from tests.conftest import (
     create_agent_id,
     create_scenario,
     finish,
+    save_settings,
     start_run,
     wait_for_lock_waiters,
 )
-from yaksha.config import Settings
 from yaksha.db.models import Evaluation, EvaluationItem
 from yaksha.domain.conversations import CallOutcome, EndReason
 from yaksha.domain.evaluations import DecidedBy, ItemRole, Outcome, Verdict
@@ -185,9 +185,9 @@ async def test_agreement_counts_each_item_once_and_skips_items_the_judge_did_not
 
 
 async def test_a_sampled_call_beyond_the_weekly_budget_takes_only_ad_hoc_labels(
-    client: AsyncClient, db: Db, settings: Settings
+    client: AsyncClient, db: Db
 ) -> None:
-    settings.audit_weekly_budget = 1
+    await save_settings(db, {"audit": {"weekly_budget": 1}})
     calls = await judged_calls(client, db, 2, audit=True)
     beyond = max(calls, key=lambda call: labels.hash_fraction(uuid.UUID(call)))
     dana = await labeler(client, "dana")

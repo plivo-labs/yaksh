@@ -8,7 +8,8 @@ Yaksha is open source and self-hosted: users run it on their own infrastructure.
 
 ```
 src/yaksha/
-  config.py     process settings from environment variables
+  config.py     what a process needs to start, from environment variables
+  settings/     the Settings page's settings: one database row, its secrets encrypted, read again when its version changes
   domain/       shared data models and interfaces
   caller/       runs the simulated caller and connects to the customer's agent
   integrations/ clients for outside services: Plivo, ElevenLabs
@@ -42,7 +43,8 @@ Imported call:    api -> queued evaluation -> evaluator -> evaluation -> saved m
 - Business logic lives in `simulation/` and `evaluation/`; `worker/` and `api/` only call it. Evaluation never depends on simulation; evaluator execution errors may retry evaluation, never the call. A valid failing verdict or low score is a result, not a retryable error.
 - The database is the store; files are the interchange format for scenarios, personas and rubrics.
 - Default prompts and starter personas ship inside the package. User edits live in the database and are never overwritten by upgrades.
-- Process settings come from environment variables via `config.py`; per-record choices (voice, model) are fields on the record. Secrets exist only in the environment.
+- What a process needs to start comes from environment variables via `config.py`. Every other setting is on the Settings page: `domain/settings.py` defines it with its default, and `settings/store.py` keeps the values that differ from the defaults in the `app_settings` row. A process reads that row again when its version changes, and a call carries the settings it started with. Per-record choices (voice, model) are fields on the record.
+- Secrets are encrypted in the `app_settings` row with AES-256-GCM under `YAKSHA_ENCRYPTION_KEY`. The API never returns one. See `docs/decisions/0027-settings-in-the-database.md`.
 - Runtime output goes to configurable storage, default `data/`, gitignored.
 - Locks are taken in one order: an agent, then its scenarios, then personas, each set in id order; a run before its conversations; a conversation before phone numbers; an evaluation before its items. Starting conversations share-locks the scenarios and personas, so transactions that only reference them do not wait.
 - A time that is written or compared after a possible lock wait uses `statement_timestamp()`. Creation times keep `now()`, the time of the transaction, so the rows one transaction creates share one time.

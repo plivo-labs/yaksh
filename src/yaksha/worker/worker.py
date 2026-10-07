@@ -23,10 +23,13 @@ from yaksha.domain.conversations import (
     IncomingCall,
     Transcript,
 )
+from yaksha.domain.settings import AppSettings
 from yaksha.domain.triggers import SEND_TIMEOUT_S
+from yaksha.settings.store import SettingsSource
 from yaksha.simulation import conversations
 from yaksha.simulation.calls import CallerUnresponsiveError, LiveCall, run_call
 from yaksha.simulation.workers import report_worker
+from yaksha.worker.phone_account import PhoneAccount
 
 log = logging.getLogger(__name__)
 
@@ -56,22 +59,23 @@ class Worker:
         sessionmaker: async_sessionmaker[AsyncSession],
         caller: Caller,
         settings: Settings,
+        source: SettingsSource,
+        account: PhoneAccount,
         *,
         worker_id: str | None = None,
-        receiving_app_id: str | None = None,
-        outbound_problem: str | None = None,
     ) -> None:
-        """receiving_app_id is the Plivo application that sends outbound agents' calls to this
-        worker; without it the worker runs only inbound conversations, and outbound_problem
-        says why."""
+        """source gives the stored settings, read again at each poll when they changed; account
+        follows the Plivo account in them."""
         self.worker_id = worker_id or f"{socket.gethostname()}:{os.getpid()}:{uuid.uuid4().hex[:8]}"
         self.fatal = asyncio.Event()
         self._stop = asyncio.Event()
         self._sessionmaker = sessionmaker
         self._caller = caller
         self._settings = settings
-        self._receiving_app_id = receiving_app_id
-        self._outbound_problem = outbound_problem
+        self._source = source
+        self._account = account
+        self._app = AppSettings()
+        """The stored settings as of the latest poll."""
         self._reported_at = -math.inf
         self._tasks: dict[uuid.UUID, asyncio.Task[None]] = {}
         self._live: dict[uuid.UUID, LiveCall] = {}
@@ -109,8 +113,10 @@ class Worker:
             await self.drain()
 
     async def poll(self) -> int:
+        self._app = await self._source.current()
+        await self._account.refresh(self._app)
         async with self._sessionmaker() as session:
-            reaped = await conversations.reap_expired(session, self._settings.number_rest_s)
+            reaped = await conversations.reap_expired(session, self._app.phone.number_rest_s)
         if reaped:
             log.warning("marked %d conversations failed after their lease expired", reaped)
         await self._report_if_due()
@@ -120,7 +126,7 @@ class Worker:
             await self._report_if_due()
             async with self._sessionmaker() as session:
                 conversation = await conversations.claim_next(
-                    session, self.worker_id, lease_s, self._receiving_app_id
+                    session, self.worker_id, lease_s, self._account.receiving_app_id
                 )
             if conversation is None:
                 break
@@ -164,8 +170,8 @@ class Worker:
             await report_worker(
                 session,
                 self.worker_id,
-                receiving_app_id=self._receiving_app_id,
-                outbound_problem=self._outbound_problem,
+                receiving_app_id=self._account.receiving_app_id,
+                outbound_problem=self._account.outbound_problem,
                 lease_s=self._settings.worker_lease_s,
             )
         self._reported_at = time.monotonic()
@@ -173,7 +179,7 @@ class Worker:
     async def _prepare(self, conversation: Conversation) -> CallRequest:
         async with self._sessionmaker() as session:
             return await conversations.prepare_call(
-                session, self._settings, conversation, self._receiving_app_id
+                session, self._settings, self._app, conversation, self._account.receiving_app_id
             )
 
     async def _requeue(self, conversation_id: uuid.UUID) -> None:
@@ -274,7 +280,7 @@ class Worker:
         its trigger and dial window."""
         outbound = request.agent.outbound
         if outbound is None:
-            return self._settings.ring_timeout_s + DIAL_MARGIN_S
+            return request.app_settings.phone.ring_timeout_s + DIAL_MARGIN_S
         return SEND_TIMEOUT_S + outbound.dial_window_s + DIAL_MARGIN_S
 
     async def _record_failure(self, conversation_id: uuid.UUID, exc: Exception) -> None:
@@ -323,7 +329,7 @@ class Worker:
                 self.worker_id,
                 outcome,
                 transcript,
-                self._settings.number_rest_s,
+                self._app.phone.number_rest_s,
             )
 
     async def _maintain(

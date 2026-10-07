@@ -2,11 +2,11 @@ import asyncio
 import logging
 import os
 import signal
+from functools import partial
 
 import typer
 import uvicorn
-from dotenv import load_dotenv
-from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
+from sqlalchemy.ext.asyncio import AsyncEngine
 from uvicorn.config import LOGGING_CONFIG
 
 from yaksha.caller.plivo_server import PlivoServer, StreamRegistry, create_app
@@ -15,9 +15,9 @@ from yaksha.config import Settings
 from yaksha.db.migrate import upgrade_to_head
 from yaksha.db.session import create_engine, create_sessionmaker
 from yaksha.domain.conversations import Caller
-from yaksha.domain.numbers import AccountNumber
-from yaksha.integrations.plivo import PlivoApi, PlivoError
-from yaksha.simulation.numbers import UnknownNumbersError, enabled_numbers, sync_numbers
+from yaksha.settings.cipher import Cipher, SecretUnreadableError
+from yaksha.settings.store import SettingsSource
+from yaksha.worker.phone_account import PhoneAccount
 from yaksha.worker.worker import Worker
 
 cli = typer.Typer(no_args_is_help=True, add_completion=False)
@@ -29,13 +29,6 @@ API_LOGGING = {
         "yaksha": {"handlers": ["default"], "level": "INFO", "propagate": False},
     },
 }
-
-
-@cli.callback()
-def main_callback() -> None:
-    """Load .env into the environment, where triggers read their YAKSHA_TRIGGER_* secrets;
-    variables already set win."""
-    load_dotenv(".env")
 
 
 @cli.command()
@@ -62,13 +55,7 @@ def worker() -> None:
     settings = Settings()
     upgrade_to_head(str(settings.database_url))
     registry = StreamRegistry()
-    api = plivo_api(settings)
-    caller = callers(settings, registry, api)
-    try:
-        asyncio.run(run_worker(settings, caller, registry, api))
-    except UnknownNumbersError as error:
-        logging.critical("YAKSHA_PLIVO_NUMBERS: %s", error)
-        raise SystemExit(1) from None
+    asyncio.run(run_worker(settings, caller_of(settings, registry), registry))
 
 
 @cli.command()
@@ -80,125 +67,76 @@ def evaluator() -> None:
     asyncio.run(run_evaluator(settings))
 
 
+async def settings_source(settings: Settings, engine: AsyncEngine) -> SettingsSource:
+    """The stored settings, read once now: a YAKSHA_ENCRYPTION_KEY that cannot decrypt them
+    stops the process here, not at its first call."""
+    source = SettingsSource(
+        create_sessionmaker(engine), Cipher(settings.encryption_key.get_secret_value())
+    )
+    try:
+        await source.current()
+    except SecretUnreadableError as error:
+        logging.critical("cannot read the stored settings: %s", error)
+        raise SystemExit(1) from None
+    return source
+
+
 async def run_evaluator(settings: Settings) -> None:
-    from yaksha.worker.evaluator import Evaluator, jev_first_pass, judge_model
+    from yaksha.worker.evaluator import Evaluator
 
     engine = create_engine(str(settings.database_url))
-    model = judge_model(settings)
-    sources_model = judge_model(settings, sources=True)
-    jev = jev_first_pass(settings)
+    source = await settings_source(settings, engine)
     stop = asyncio.Event()
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGINT, signal.SIGTERM):
         loop.add_signal_handler(sig, stop.set)
+    evaluator = Evaluator(create_sessionmaker(engine), settings, source)
     try:
-        await Evaluator(create_sessionmaker(engine), settings, model, sources_model, jev).run(stop)
+        await evaluator.run(stop)
     finally:
-        for client in (model, sources_model, jev):
-            if client is not None:
-                await client.close()
+        await evaluator.close()
         if not await bounded_dispose(engine, settings.end_timeout_s):
             logging.shutdown()
             os._exit(1)
 
 
-def plivo_api(settings: Settings) -> PlivoApi | None:
-    if settings.plivo_auth_id is None or settings.plivo_auth_token is None:
-        return None
-    return PlivoApi(
-        settings.plivo_auth_id.get_secret_value(), settings.plivo_auth_token.get_secret_value()
-    )
-
-
-def callers(settings: Settings, registry: StreamRegistry, api: PlivoApi | None) -> Caller:
+def caller_of(settings: Settings, registry: StreamRegistry) -> Caller:
     from yaksha.caller.phone import PhoneCaller
 
-    if api is None:
-        reason = "phone calls are off: set PLIVO_AUTH_ID and PLIVO_AUTH_TOKEN"
-    elif settings.public_url is None:
+    if settings.public_url is None:
         reason = "phone calls are off: set YAKSHA_PUBLIC_URL to the address Plivo can reach"
-    else:
-        return PhoneCaller(settings, registry, api)
-    logging.warning(reason)
-    return UnavailableCaller(reason)
+        logging.warning(reason)
+        return UnavailableCaller(reason)
+    return PhoneCaller(settings, registry)
 
 
-async def application_names(
-    api: PlivoApi, numbers: list[AccountNumber], allowlist: list[str]
-) -> dict[str, str]:
-    """The names of the Applications linked to the numbers Yaksha may use, for the Numbers
-    page; a name that cannot be read is left out."""
-    enabled = set(enabled_numbers(numbers, allowlist))
-    linked = {n.application_id for n in numbers if n.number in enabled and n.application_id}
-    names: dict[str, str] = {}
-    for app_id in sorted(linked):
-        try:
-            names[app_id] = (await api.get_application(app_id)).name
-        except PlivoError as error:
-            logging.warning("could not read the name of application %s: %s", app_id, error)
-    return names
+def plivo_auth_token(source: SettingsSource) -> str | None:
+    """The token Plivo signs its requests with, from the settings as last read."""
+    latest = source.latest
+    credentials = None if latest is None else latest.plivo_credentials
+    return None if credentials is None else credentials[1]
 
 
-def outbound_off(problem: str) -> tuple[None, str]:
-    logging.error("outbound tests are off: %s", problem)
-    return None, problem
-
-
-async def check_receiving(api: PlivoApi, settings: Settings) -> tuple[str | None, str | None]:
-    """The Plivo application whose calls this worker receives, so it runs outbound
-    conversations; or, when outbound tests are set up, why it does not."""
-    if settings.plivo_app_id is None or settings.public_url is None:
-        return None, None
-    try:
-        application = await api.get_application(settings.plivo_app_id)
-    except PlivoError as error:
-        return outbound_off(str(error))
-    problems = application.problems(settings.public_url)
-    if problems:
-        return outbound_off("; ".join(problems))
-    logging.info("outbound tests: application %s sends calls here", application.name)
-    return application.app_id, None
-
-
-async def sync_pool(
-    sessionmaker: async_sessionmaker[AsyncSession], api: PlivoApi, allowlist: list[str]
-) -> None:
-    """Refresh the number pool from the account; when Plivo cannot be reached, the last synced
-    pool stands."""
-    try:
-        numbers = await api.list_numbers()
-    except PlivoError as error:
-        logging.warning("keeping the last synced number pool: %s", error)
-        return
-    if not numbers:
-        logging.warning("keeping the last synced number pool: the account listed no numbers")
-        return
-    names = await application_names(api, numbers, allowlist)
-    async with sessionmaker() as session:
-        enabled = await sync_numbers(session, numbers, allowlist, names)
-    logging.info(
-        "number pool: %d of %d account numbers enabled: %s",
-        len(enabled),
-        len(numbers),
-        ", ".join(enabled[:10]) + (", ..." if len(enabled) > 10 else ""),
-    )
-
-
-async def run_worker(
-    settings: Settings, caller: Caller, registry: StreamRegistry, api: PlivoApi | None
-) -> None:
+async def run_worker(settings: Settings, caller: Caller, registry: StreamRegistry) -> None:
     engine = create_engine(str(settings.database_url))
     sessionmaker = create_sessionmaker(engine)
-    if api is not None:
-        await sync_pool(sessionmaker, api, settings.plivo_numbers)
-    app_id, problem = (None, None) if api is None else await check_receiving(api, settings)
+    source = await settings_source(settings, engine)
     worker = Worker(
-        sessionmaker, caller, settings, receiving_app_id=app_id, outbound_problem=problem
+        sessionmaker,
+        caller,
+        settings,
+        source,
+        PhoneAccount(sessionmaker, settings),
     )
     server = None
-    if settings.public_url and api is not None:
+    if settings.public_url is not None:
         server = PlivoServer(
-            create_app(registry, settings.public_url, api.auth_token, worker.accept_incoming),
+            create_app(
+                registry,
+                settings.public_url,
+                partial(plivo_auth_token, source),
+                worker.accept_incoming,
+            ),
             settings.stream_port,
         )
         await server.start()

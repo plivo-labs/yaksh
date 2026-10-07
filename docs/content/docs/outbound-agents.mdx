@@ -18,7 +18,7 @@ An outbound agent calls Yaksha. Yaksha sends the trigger of the agent: a POST or
 
 4. Add an agent with the direction `outbound`. Give the method, the URL and the headers of its trigger. A POST trigger has a JSON body (`body`). A GET trigger has query parameters (`query`), a list of names and values, and no body. In the Yaksha console, choose **The agent calls Yaksha**. Then complete the fields in **Start request**.
 
-The worker reads the Application and its numbers only when it starts. After you change the Application or its numbers in the Plivo console, start the worker again with `docker compose -f docker/compose.yaml restart worker`. If `YAKSHA_PUBLIC_URL` changes, also change the two URLs of the Application. If outbound tests are off, the **Numbers** page of the Yaksha console shows the cause.
+The worker reads the Application and its numbers when it starts and when the Plivo keys in Settings change. After you change the Application or its numbers in the Plivo console, start the worker again with `docker compose -f docker/compose.yaml restart worker`. If `YAKSHA_PUBLIC_URL` changes, also change the two URLs of the Application. If outbound tests are off, the **Numbers** page of the Yaksha console shows the cause.
 
 ## Trigger
 
@@ -35,22 +35,22 @@ You can put placeholders in header values, in the string values of the JSON body
 | `{{yaksha.number}}` | The number that the agent must call. |
 | `{{yaksha.conversation_id}}` | The ID of the conversation. |
 | `{{agent_data.<name>}}` | A value from the agent data of the scenario. |
-| `{{env.YAKSHA_TRIGGER_<NAME>}}` | A secret from the environment of the worker. |
+| `{{secrets.<NAME>}}` | A trigger secret from the **Phone** tab of Settings. `<NAME>` has only uppercase letters, digits and underscores, and starts with a letter. |
 
 Agent data is a list of names and values in a scenario. Yaksha sends it only in the trigger. The caller does not get it. Each scenario must have each agent data name that the trigger uses. If not, Yaksha rejects the request. For a run, Yaksha starts no conversation.
 
-If the worker does not have a `YAKSHA_TRIGGER_<NAME>` variable that the trigger uses, the conversation stops with the end reason `trigger_failed`.
+Do not put the value of a secret in a trigger: Yaksha keeps the headers and the body of a trigger in the database without encryption. Save the secret in Settings and use `{{secrets.<NAME>}}`. If Settings has no trigger secret that the trigger uses, the conversation stops with the end reason `trigger_failed`.
 
 ## Signed triggers
 
 Each trigger has the header `X-Yaksha-Delivery` with the ID of the conversation. Yaksha sends each trigger only one time. Thus, a second request with the same ID is a replay.
 
-If you set `YAKSHA_WEBHOOK_SIGNING_KEY`, each trigger also has these headers:
+If Settings has a signing key, each trigger also has these headers. To make the key, click **Generate key** on the **Phone** tab of Settings. Yaksha shows the key one time; copy it to your endpoint.
 
 | Header | Value |
 | --- | --- |
 | `X-Yaksha-Timestamp` | The time of the request, in Unix seconds. |
-| `X-Yaksha-Signature` | `v1=` and then the HMAC-SHA256 of `<X-Yaksha-Delivery>.<X-Yaksha-Timestamp>.<body>` in lowercase hexadecimal. For a GET trigger, the full URL with its query, as your server receives it, takes the place of the body. The key is the value of `YAKSHA_WEBHOOK_SIGNING_KEY`. |
+| `X-Yaksha-Signature` | `v1=` and then the HMAC-SHA256 of `<X-Yaksha-Delivery>.<X-Yaksha-Timestamp>.<body>` in lowercase hexadecimal. For a GET trigger, the full URL with its query, as your server receives it, takes the place of the body. The key is the signing key from Settings. |
 
 To examine a trigger in your endpoint:
 
