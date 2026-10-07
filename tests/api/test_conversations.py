@@ -310,7 +310,9 @@ async def test_a_conversation_keeps_the_agent_version_it_started_with(
     started = await start(client, agent_id)
     await wait_for(client, started["id"], {"completed"})
 
-    patched = await client.patch(f"/api/v1/agents/{agent_id}", json={"brief": "changed"})
+    patched = await client.patch(
+        f"/api/v1/agents/{agent_id}", json={"brief": "A changed brief for the agent."}
+    )
     assert patched.json()["current_version"] == 2
 
     assert (await client.get(f"/api/v1/conversations/{started['id']}")).json()["agent_version"] == 1

@@ -19,6 +19,7 @@ from pipecat.frames.frames import (
 from pipecat.tests.utils import run_test
 
 from tests.conftest import (
+    AGENT,
     CALLER,
     OUTBOUND_AGENT,
     PLIVO_TOKEN,
@@ -135,7 +136,7 @@ async def rig(monkeypatch: pytest.MonkeyPatch) -> AsyncIterator[Rig]:
 def request(tmp_path: Path) -> CallRequest:
     return CallRequest(
         conversation_id=uuid.uuid4(),
-        agent=AgentConfig.model_validate({"agent_number": AGENT_NUMBER}),
+        agent=AgentConfig.model_validate({"agent_number": AGENT_NUMBER, "brief": AGENT["brief"]}),
         **CALLER,
         caller_number=POOL_NUMBER,
         max_duration_s=120,

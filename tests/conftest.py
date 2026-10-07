@@ -63,9 +63,14 @@ LOCK_WAITERS = text(
 )
 
 
-AGENT = {"name": "Front desk", "agent_number": "+14155550100"}
+AGENT = {
+    "name": "Front desk",
+    "agent_number": "+14155550100",
+    "brief": "Answers the front desk line and books rooms for hotel guests.",
+}
 OUTBOUND_AGENT: dict[str, Any] = {
     "name": "Payment reminders",
+    "brief": "Calls customers about overdue payments and takes a payment date.",
     "direction": "outbound",
     "agent_number": None,
     "outbound": {

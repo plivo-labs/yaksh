@@ -3,7 +3,7 @@ title: Outbound agents
 description: Do tests of an agent that calls Yaksha.
 ---
 
-An outbound agent calls Yaksha. Yaksha sends the trigger of the agent: a POST request that makes the agent call one of the Yaksha numbers. Then Yaksha answers the call.
+An outbound agent calls Yaksha. Yaksha sends the trigger of the agent: a POST or GET request that makes the agent call one of the Yaksha numbers. Then Yaksha answers the call.
 
 ## Prepare for outbound tests
 
@@ -16,7 +16,7 @@ An outbound agent calls Yaksha. Yaksha sends the trigger of the agent: a POST re
    docker compose -f docker/compose.yaml start yaksha worker
    ```
 
-4. Add an agent with the direction `outbound`. Give the URL, the headers and the JSON body of its trigger. In the Yaksha console, set **Who calls** to **The agent**. Then complete the fields in **Start request**.
+4. Add an agent with the direction `outbound`. Give the method, the URL and the headers of its trigger. A POST trigger has a JSON body (`body`). A GET trigger has query parameters (`query`), a list of names and values, and no body. In the Yaksha console, choose **The agent calls Yaksha**. Then complete the fields in **Start request**.
 
 The worker reads the Application and its numbers only when it starts. After you change the Application or its numbers in the Plivo console, start the worker again with `docker compose -f docker/compose.yaml restart worker`. If `YAKSHA_PUBLIC_URL` changes, also change the two URLs of the Application. If outbound tests are off, the **Numbers** page of the Yaksha console shows the cause.
 
@@ -28,7 +28,7 @@ The dial window (`dial_window_s`) is the time that Yaksha waits for the call of 
 
 ## Placeholders
 
-You can put placeholders in header values and in the string values of the JSON body. The URL and the names of the JSON fields cannot have placeholders.
+You can put placeholders in header values, in the string values of the JSON body and in the values of query parameters. The URL, the names of the JSON fields and the names of query parameters cannot have placeholders. Yaksha encodes each query value and adds the parameters after the query that the URL already has.
 
 | Placeholder | Value |
 | --- | --- |
@@ -50,12 +50,12 @@ If you set `YAKSHA_WEBHOOK_SIGNING_KEY`, each trigger also has these headers:
 | Header | Value |
 | --- | --- |
 | `X-Yaksha-Timestamp` | The time of the request, in Unix seconds. |
-| `X-Yaksha-Signature` | `v1=` and then the HMAC-SHA256 of `<X-Yaksha-Delivery>.<X-Yaksha-Timestamp>.<body>` in lowercase hexadecimal. The key is the value of `YAKSHA_WEBHOOK_SIGNING_KEY`. |
+| `X-Yaksha-Signature` | `v1=` and then the HMAC-SHA256 of `<X-Yaksha-Delivery>.<X-Yaksha-Timestamp>.<body>` in lowercase hexadecimal. For a GET trigger, the full URL with its query, as your server receives it, takes the place of the body. The key is the value of `YAKSHA_WEBHOOK_SIGNING_KEY`. |
 
 To examine a trigger in your endpoint:
 
 1. Reject the request if its timestamp is more than 5 minutes before or after the time of your clock.
-2. Calculate the signature from the bytes of the body that you received. Compare it with the header in constant time.
+2. Calculate the signature from the bytes of the body that you received, or from the full URL for a GET. Compare it with the header in constant time.
 3. Record the delivery ID. Reject a delivery ID that you recorded before.
 
 For the variables of outbound tests, refer to [Configuration](/docs/configuration#outbound-agents).

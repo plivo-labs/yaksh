@@ -50,6 +50,7 @@ export function AgentsPage() {
   const sort = params.get("sort") ?? "";
   const page = usePageParam();
   const agents = useAgentPage(search, sort, page);
+  const empty = agents.data?.total === 0 && !search;
   const searchFor = (text: string) => update({ q: text });
   const sortBy = (next: string) => update({ sort: next });
 
@@ -64,10 +65,12 @@ export function AgentsPage() {
           placeholder="Search by name, number or id"
           className="order-last basis-full sm:order-none sm:basis-64"
         />
-        <Button size="sm" nativeButton={false} render={<Link to="/agents/new" />}>
-          <Plus />
-          New agent
-        </Button>
+        {!empty && (
+          <Button size="sm" nativeButton={false} render={<Link to="/agents/new" />}>
+            <Plus />
+            New agent
+          </Button>
+        )}
       </div>
 
       {agents.isError ? (
@@ -75,7 +78,7 @@ export function AgentsPage() {
           <AlertTitle>Could not load agents</AlertTitle>
           <AlertDescription>{agents.error.message}</AlertDescription>
         </Alert>
-      ) : agents.data?.total === 0 && !search ? (
+      ) : empty ? (
         <Empty>
           <EmptyHeader>
             <EmptyMedia variant="icon">

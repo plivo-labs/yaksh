@@ -1,17 +1,25 @@
-import type { Header, OutboundSettings } from "@/lib/types";
+import type { Header, OutboundSettings, QueryParameter, TriggerMethod } from "@/lib/types";
 
 export interface OutboundDraft {
+  method: TriggerMethod;
   url: string;
   headers: Header[];
+  /** Kept while a GET is chosen, so switching back to POST keeps it. */
   body: string;
+  query: QueryParameter[];
   calling_numbers: string[];
   dial_window: string;
 }
 
+const EMPTY_BODY = '{\n  "to": "{{yaksha.number}}"\n}';
+const EMPTY_QUERY: QueryParameter[] = [{ name: "to", value: "{{yaksha.number}}" }];
+
 export const EMPTY_OUTBOUND: OutboundDraft = {
+  method: "POST",
   url: "",
   headers: [],
-  body: '{\n  "to": "{{yaksha.number}}"\n}',
+  body: EMPTY_BODY,
+  query: EMPTY_QUERY,
   calling_numbers: [],
   dial_window: "120",
 };
@@ -27,10 +35,13 @@ export function isPhoneNumber(typed: string): boolean {
 }
 
 export function toOutboundDraft(outbound: OutboundSettings): OutboundDraft {
+  const { trigger } = outbound;
   return {
-    url: outbound.trigger.url,
-    headers: outbound.trigger.headers,
-    body: JSON.stringify(outbound.trigger.body, null, 2),
+    method: trigger.method,
+    url: trigger.url,
+    headers: trigger.headers,
+    body: trigger.body ? JSON.stringify(trigger.body, null, 2) : EMPTY_BODY,
+    query: trigger.method === "GET" ? trigger.query : EMPTY_QUERY,
     calling_numbers: outbound.calling_numbers,
     dial_window: String(outbound.dial_window_s),
   };
@@ -53,8 +64,9 @@ function urlProblem(typed: string): string | null {
   const url = typed.trim();
   if (!url) return "Enter the URL Yaksha sends the request to.";
   if (url.includes("{{") || url.includes("}}")) {
-    return "Put placeholders in the headers or the body, not in the URL.";
+    return "Put placeholders in the headers, the body or the query parameters, not in the URL.";
   }
+  if (url.includes("#")) return "Remove the # part: Yaksha does not send it.";
   try {
     const { protocol } = new URL(url);
     return protocol === "http:" || protocol === "https:" ? null : "Use an http or https URL.";
@@ -72,7 +84,13 @@ export function outboundProblems(
   const url = urlProblem(draft.url);
   return {
     ...(url ? { url } : {}),
-    ...(parseBody(draft.body) ? {} : { body: "The body must be a JSON object." }),
+    ...(draft.method === "GET" || parseBody(draft.body)
+      ? {}
+      : { body: "The body must be a JSON object." }),
+    ...(unnamed(draft.headers) ? { headers: "Give each header a name, or remove it." } : {}),
+    ...(draft.method === "GET" && unnamed(draft.query)
+      ? { query: "Give each parameter a name, or remove it." }
+      : {}),
     ...(numbers.every(isPhoneNumber)
       ? {}
       : { calling_numbers: "Use the international format, like +14155550100." }),
@@ -85,13 +103,23 @@ export function outboundProblems(
 export function toOutbound(draft: OutboundDraft): OutboundSettings {
   return {
     trigger: {
+      method: draft.method,
       url: draft.url.trim(),
-      headers: draft.headers
-        .map((header) => ({ name: header.name.trim(), value: header.value }))
-        .filter((header) => header.name),
-      body: parseBody(draft.body) ?? {},
+      headers: named(draft.headers),
+      query: draft.method === "GET" ? named(draft.query) : [],
+      body: draft.method === "POST" ? (parseBody(draft.body) ?? {}) : null,
     },
     calling_numbers: draft.calling_numbers.map(normalizeNumber).filter(Boolean),
     dial_window_s: Number(draft.dial_window),
   };
+}
+
+/** Whether a row has a value but no name, which would be dropped. */
+function unnamed(pairs: { name: string; value: string }[]): boolean {
+  return pairs.some((pair) => !pair.name.trim() && pair.value.trim());
+}
+
+/** The pairs with a name, trimmed; a row left empty is dropped. */
+function named<T extends { name: string; value: string }>(pairs: T[]): T[] {
+  return pairs.map((pair) => ({ ...pair, name: pair.name.trim() })).filter((pair) => pair.name);
 }

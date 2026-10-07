@@ -11,11 +11,13 @@ from fastapi import FastAPI, Request, Response
 from fastapi.responses import RedirectResponse, StreamingResponse
 
 from yaksha.caller.plivo_server import PlivoServer
-from yaksha.domain.triggers import RenderedTrigger
+from yaksha.domain.scenarios import Fact
+from yaksha.domain.triggers import RenderedTrigger, Trigger, TriggerMethod, render
 from yaksha.integrations.trigger import (
     PublicOnlyResolver,
     TriggerResult,
     is_public,
+    mask,
     send_trigger,
 )
 
@@ -33,6 +35,11 @@ async def agent_system() -> AsyncIterator[tuple[str, list[Request]]]:
         seen.append(request)
         await request.body()
         return Response(f'{{"id": "call-9", "echo": "{request.headers["authorization"]}"}}')
+
+    @app.get("/start")
+    async def start(request: Request) -> Response:
+        seen.append(request)
+        return Response('{"id": "call-10"}')
 
     @app.post("/refused")
     async def refused() -> Response:
@@ -76,7 +83,9 @@ async def agent_system() -> AsyncIterator[tuple[str, list[Request]]]:
 
 
 def request(url: str) -> RenderedTrigger:
-    return RenderedTrigger(url, {"Authorization": "Bearer sk_live"}, BODY, ("sk_live",))
+    return RenderedTrigger(
+        TriggerMethod.POST, url, {"Authorization": "Bearer sk_live"}, BODY, ("sk_live",)
+    )
 
 
 async def test_a_delivered_trigger_carries_its_delivery_id_and_signature(
@@ -96,6 +105,89 @@ async def test_a_delivered_trigger_carries_its_delivery_id_and_signature(
     assert headers["x-yaksha-delivery"] == "conv-1"
     assert headers["content-type"] == "application/json"
     assert headers["x-yaksha-signature"] == f"v1={expected.hexdigest()}"
+
+
+async def test_a_get_trigger_is_sent_as_rendered_and_signed_over_its_url(
+    agent_system: tuple[str, list[Request]],
+) -> None:
+    base, seen = agent_system
+    url = f"{base}/start?source=yaksha&to=%2B15716535187&customer=Priya+%22PR%22+Raman"
+
+    outcome = await send_trigger(
+        RenderedTrigger(TriggerMethod.GET, url, {}, b"", ()),
+        "conv-2",
+        signing_key="signing",
+        allow_private=True,
+    )
+
+    received = seen[0]
+    timestamp = received.headers["x-yaksha-timestamp"]
+    expected = hmac.new(b"signing", f"conv-2.{timestamp}.{url}".encode(), hashlib.sha256)
+    assert outcome.result is TriggerResult.DELIVERED
+    assert (received.method, str(received.url)) == ("GET", url)
+    assert "content-type" not in received.headers
+    assert received.headers["x-yaksha-signature"] == f"v1={expected.hexdigest()}"
+
+
+async def test_a_rendered_url_is_signed_in_the_form_the_agent_receives(
+    agent_system: tuple[str, list[Request]],
+) -> None:
+    base, seen = agent_system
+    trigger = Trigger.model_validate({"method": "GET", "url": f"{base}/start?"})
+    rendered = render(
+        trigger, number="+15716535187", conversation_id="c-1", agent_data=list[Fact](), env={}
+    )
+
+    await send_trigger(rendered, "conv-4", signing_key="signing", allow_private=True)
+
+    received = seen[0]
+    timestamp = received.headers["x-yaksha-timestamp"]
+    signed = f"conv-4.{timestamp}.{received.url}".encode()
+    expected = hmac.new(b"signing", signed, hashlib.sha256)
+    assert received.headers["x-yaksha-signature"] == f"v1={expected.hexdigest()}"
+
+
+async def test_a_get_trigger_is_not_sent_again_after_a_dropped_connection() -> None:
+    attempts = 0
+
+    async def drop(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+        nonlocal attempts
+        attempts += 1
+        await reader.readuntil(b"\r\n\r\n")
+        writer.close()
+
+    server = await asyncio.start_server(drop, "127.0.0.1", 0)
+    port = server.sockets[0].getsockname()[1]
+    async with server:
+        outcome = await send_trigger(
+            RenderedTrigger(TriggerMethod.GET, f"http://127.0.0.1:{port}/start", {}, b"", ()),
+            "conv-3",
+            signing_key=None,
+            allow_private=True,
+        )
+
+    assert (attempts, outcome.result) == (1, TriggerResult.UNKNOWN)
+
+
+def test_a_secret_sent_in_a_query_value_is_masked_in_its_encoded_form() -> None:
+    trigger = Trigger.model_validate(
+        {
+            "method": "GET",
+            "url": "https://agents.example.com/calls",
+            "query": [{"name": "key", "value": "{{env.YAKSHA_TRIGGER_KEY}}"}],
+        }
+    )
+    rendered = render(
+        trigger,
+        number="+15716535187",
+        conversation_id="c-1",
+        agent_data=list[Fact](),
+        env={"YAKSHA_TRIGGER_KEY": "abc+def/ghi="},
+    )
+
+    assert mask(f"echo: {rendered.url}", rendered.secrets) == (
+        "echo: https://agents.example.com/calls?key=[secret]"
+    )
 
 
 @pytest.mark.parametrize(
@@ -200,7 +292,7 @@ async def test_the_excerpt_masks_secrets_before_it_is_cut(
 ) -> None:
     base, _ = agent_system
     secrets = ("abcdef", "abc")
-    long = RenderedTrigger(f"{base}/long", {}, b"{}", secrets)
+    long = RenderedTrigger(TriggerMethod.POST, f"{base}/long", {}, b"{}", secrets)
 
     outcome = await send_trigger(long, "conv-5", signing_key=None, allow_private=True)
 

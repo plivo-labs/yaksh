@@ -1,5 +1,7 @@
 import { Plus, X } from "lucide-react";
+import { useState } from "react";
 
+import { PhoneInput } from "@/components/phone-input";
 import { Button } from "@/components/ui/button";
 import {
   Field,
@@ -11,11 +13,33 @@ import {
   FieldSet,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { REVEAL } from "@/lib/motion";
 import { type OutboundDraft, outboundProblems } from "@/lib/outbound";
-import type { Header } from "@/lib/types";
+import type { Header, TriggerMethod } from "@/lib/types";
+import { cn } from "@/lib/utils";
 
-/** The start request's fields: what Yaksha sends, and how it accepts the agent's call. */
+const PLACEHOLDERS: { name: string; meaning: string }[] = [
+  { name: "{{yaksha.conversation_id}}", meaning: "the test call's ID" },
+  { name: "{{agent_data.<name>}}", meaning: "a value from the scenario's data sent to the agent" },
+  { name: "{{env.YAKSHA_TRIGGER_<NAME>}}", meaning: "a secret in Yaksha's environment" },
+];
+
+const METHODS: { value: TriggerMethod; label: string }[] = [
+  { value: "POST", label: "POST" },
+  { value: "GET", label: "GET" },
+];
+
+/** The start request: where Yaksha sends it and what it sends first, and the details most agents
+ * leave as they are folded below. The details open when one of them has a problem. */
 export function OutboundFields({
   draft,
   onChange,
@@ -25,184 +49,284 @@ export function OutboundFields({
   onChange: (next: OutboundDraft) => void;
   submitted: boolean;
 }) {
+  const [detailsOpen, setDetailsOpen] = useState(
+    draft.headers.length > 0 || draft.calling_numbers.length > 0,
+  );
   const problems = submitted ? outboundProblems(draft) : {};
+  // Opened by a problem, the details stay open while it is fixed: typing the fix must not hide them.
+  if (!detailsOpen && (problems.headers || problems.calling_numbers || problems.dial_window)) {
+    setDetailsOpen(true);
+  }
   const set = <K extends keyof OutboundDraft>(key: K, value: OutboundDraft[K]) =>
     onChange({ ...draft, [key]: value });
-  const setHeader = (index: number, next: Partial<Header>) =>
-    set(
-      "headers",
-      draft.headers.map((header, at) => (at === index ? { ...header, ...next } : header)),
-    );
   const setNumber = (index: number, value: string) =>
     set(
       "calling_numbers",
       draft.calling_numbers.map((number, at) => (at === index ? value : number)),
     );
+  const headerCount = draft.headers.length;
+  const numberCount = draft.calling_numbers.length;
+  const summary = [
+    headerCount === 0 ? "No headers" : `${headerCount} header${headerCount === 1 ? "" : "s"}`,
+    numberCount === 0
+      ? "any calling number"
+      : `${numberCount} calling number${numberCount === 1 ? "" : "s"}`,
+    `waits ${draft.dial_window || "?"} seconds`,
+  ].join(", ");
 
   return (
     <FieldGroup>
-      <div className="grid gap-7 @2xl/field-group:grid-cols-2 @2xl/field-group:gap-x-10">
-        <div className="grid content-start gap-7">
-          <Field>
-            <FieldLabel htmlFor="trigger_url">URL</FieldLabel>
-            <Input
-              id="trigger_url"
-              type="url"
-              required
-              placeholder="https://api.example.com/calls"
-              aria-invalid={Boolean(problems.url)}
-              aria-describedby={problems.url ? "trigger_url-error" : undefined}
-              value={draft.url}
-              onChange={(e) => set("url", e.target.value)}
-            />
-            {problems.url && <FieldError id="trigger_url-error">{problems.url}</FieldError>}
-          </Field>
-          <FieldSet>
-            <FieldLegend variant="label">Headers</FieldLegend>
-            {draft.headers.length > 0 && (
-              <div className="grid gap-2">
-                {draft.headers.map((header, index) => (
-                  <div key={index} className="flex items-start gap-2">
-                    <Input
-                      aria-label={`Header ${index + 1} name`}
-                      placeholder="Authorization"
-                      className="w-2/5"
-                      value={header.name}
-                      onChange={(e) => setHeader(index, { name: e.target.value })}
-                    />
-                    <Input
-                      aria-label={`Header ${index + 1} value`}
-                      placeholder="Bearer {{env.YAKSHA_TRIGGER_KEY}}"
-                      className="flex-1 font-mono text-xs-400"
-                      value={header.value}
-                      onChange={(e) => setHeader(index, { value: e.target.value })}
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      aria-label={`Remove header ${index + 1}`}
-                      onClick={() =>
-                        set(
-                          "headers",
-                          draft.headers.filter((_, at) => at !== index),
-                        )
-                      }
-                    >
-                      <X />
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            )}
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="self-start"
-              onClick={() => set("headers", [...draft.headers, { name: "", value: "" }])}
+      <Field>
+        <FieldLabel htmlFor="trigger_url">URL</FieldLabel>
+        <div className="flex">
+          <Select
+            items={METHODS}
+            value={draft.method}
+            onValueChange={(value) => value && set("method", value as TriggerMethod)}
+          >
+            <SelectTrigger
+              aria-label="Method"
+              className="w-24 rounded-r-none border-r-0 bg-muted font-mono text-xs-500"
             >
-              <Plus />
-              Add header
-            </Button>
-          </FieldSet>
-          <Field>
-            <FieldLabel htmlFor="trigger_body">Body (JSON)</FieldLabel>
-            <Textarea
-              id="trigger_body"
-              rows={8}
-              className="font-mono text-xs-400"
-              aria-invalid={Boolean(problems.body)}
-              aria-describedby={problems.body ? "trigger_body-error" : undefined}
-              value={draft.body}
-              onChange={(e) => set("body", e.target.value)}
-            />
-            {problems.body ? (
-              <FieldError id="trigger_body-error">{problems.body}</FieldError>
-            ) : (
-              <FieldDescription>
-                Use these inside string values and header values: <code>{"{{yaksha.number}}"}</code>{" "}
-                (the number to call), <code>{"{{yaksha.conversation_id}}"}</code>,{" "}
-                <code>{"{{agent_data.<name>}}"}</code> (from the scenario) and{" "}
-                <code>{"{{env.YAKSHA_TRIGGER_<NAME>}}"}</code> (a secret in Yaksha's environment).
-              </FieldDescription>
-            )}
-          </Field>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                {METHODS.map((item) => (
+                  <SelectItem key={item.value} value={item.value}>
+                    {item.label}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+          <Input
+            id="trigger_url"
+            type="url"
+            required
+            placeholder="https://api.example.com/calls"
+            className="rounded-l-none"
+            aria-invalid={Boolean(problems.url)}
+            aria-describedby={problems.url ? "trigger_url-error" : undefined}
+            value={draft.url}
+            onChange={(e) => set("url", e.target.value)}
+          />
         </div>
-        <div className="grid content-start gap-7">
-          <FieldSet>
-            <FieldLegend variant="label">Calling numbers</FieldLegend>
-            <FieldDescription>
-              The numbers the agent calls from. Leave empty to accept calls from any number.
-            </FieldDescription>
-            {draft.calling_numbers.length > 0 && (
-              <div className="grid gap-2">
-                {draft.calling_numbers.map((number, index) => (
-                  <div key={index} className="flex gap-2">
-                    <Input
-                      aria-label={`Calling number ${index + 1}`}
-                      type="tel"
-                      inputMode="tel"
-                      placeholder="+1 415 555 0100"
-                      className="flex-1"
-                      value={number}
-                      onChange={(e) => setNumber(index, e.target.value)}
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      aria-label={`Remove calling number ${index + 1}`}
-                      onClick={() =>
-                        set(
-                          "calling_numbers",
-                          draft.calling_numbers.filter((_, at) => at !== index),
-                        )
-                      }
-                    >
-                      <X />
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            )}
-            {problems.calling_numbers && <FieldError>{problems.calling_numbers}</FieldError>}
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="self-start"
-              onClick={() => set("calling_numbers", [...draft.calling_numbers, ""])}
-            >
-              <Plus />
-              Add number
-            </Button>
-          </FieldSet>
-          <Field>
-            <FieldLabel htmlFor="dial_window">Dial window</FieldLabel>
-            <div className="flex items-center gap-2">
-              <Input
-                id="dial_window"
-                type="number"
-                inputMode="numeric"
-                min={10}
-                max={600}
-                className="w-24 tabular-nums"
-                aria-invalid={Boolean(problems.dial_window)}
-                aria-describedby={problems.dial_window ? "dial_window-error" : undefined}
-                value={draft.dial_window}
-                onChange={(e) => set("dial_window", e.target.value)}
+        {problems.url && <FieldError id="trigger_url-error">{problems.url}</FieldError>}
+      </Field>
+
+      {draft.method === "POST" ? (
+        <Field>
+          <FieldLabel htmlFor="trigger_body">Body (JSON)</FieldLabel>
+          <Textarea
+            id="trigger_body"
+            rows={5}
+            className="font-mono text-xs-400"
+            aria-invalid={Boolean(problems.body)}
+            aria-describedby={problems.body ? "trigger_body-error" : "placeholder-hint"}
+            value={draft.body}
+            onChange={(e) => set("body", e.target.value)}
+          />
+          {problems.body ? (
+            <FieldError id="trigger_body-error">{problems.body}</FieldError>
+          ) : (
+            <PlaceholderHint where="string values" />
+          )}
+        </Field>
+      ) : (
+        <FieldSet>
+          <FieldLegend variant="label">Query parameters</FieldLegend>
+          <Pairs
+            pairs={draft.query}
+            noun="Parameter"
+            namePlaceholder="to"
+            valuePlaceholder="{{yaksha.number}}"
+            onChange={(next) => set("query", next)}
+          />
+          {problems.query && <FieldError>{problems.query}</FieldError>}
+          <PlaceholderHint where="parameter values" />
+        </FieldSet>
+      )}
+
+      <div className="rounded-md border">
+        <button
+          type="button"
+          aria-expanded={detailsOpen}
+          aria-controls="request-details"
+          className="flex w-full items-center justify-between gap-4 rounded-md px-4 py-3 text-left transition-colors hover:bg-hv1"
+          onClick={() => setDetailsOpen(!detailsOpen)}
+        >
+          <span className="grid gap-0.5">
+            <span className="text-s-500">Headers, calling numbers and wait time</span>
+            <span className="text-xs-400 text-muted-foreground">{summary}</span>
+          </span>
+          <span className="text-s-500">{detailsOpen ? "Hide" : "Show"}</span>
+        </button>
+        {detailsOpen && (
+          <div id="request-details" className={cn("grid gap-6 border-t px-4 py-4", REVEAL)}>
+            <FieldSet>
+              <FieldLegend variant="label">Headers</FieldLegend>
+              <Pairs
+                pairs={draft.headers}
+                noun="Header"
+                namePlaceholder="Authorization"
+                valuePlaceholder="Bearer {{env.YAKSHA_TRIGGER_KEY}}"
+                onChange={(next) => set("headers", next)}
               />
-              <span className="text-p-400 text-muted-foreground">seconds</span>
-            </div>
-            {problems.dial_window ? (
-              <FieldError id="dial_window-error">{problems.dial_window}</FieldError>
-            ) : (
-              <FieldDescription>How long Yaksha waits for the agent to call.</FieldDescription>
-            )}
-          </Field>
-        </div>
+              {problems.headers && <FieldError>{problems.headers}</FieldError>}
+            </FieldSet>
+
+            <FieldSet>
+              <FieldLegend variant="label">Calling numbers</FieldLegend>
+              <FieldDescription>
+                The numbers the agent calls from. Leave empty to accept a call from any number.
+              </FieldDescription>
+              {draft.calling_numbers.map((number, index) => (
+                <div key={index} className="flex gap-2">
+                  <PhoneInput
+                    aria-label={`Calling number ${index + 1}`}
+                    className="flex-1"
+                    value={number}
+                    onChange={(value) => setNumber(index, value)}
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    aria-label={`Remove calling number ${index + 1}`}
+                    onClick={() =>
+                      set(
+                        "calling_numbers",
+                        draft.calling_numbers.filter((_, at) => at !== index),
+                      )
+                    }
+                  >
+                    <X />
+                  </Button>
+                </div>
+              ))}
+              {problems.calling_numbers && <FieldError>{problems.calling_numbers}</FieldError>}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="self-start"
+                onClick={() => set("calling_numbers", [...draft.calling_numbers, ""])}
+              >
+                <Plus />
+                Add number
+              </Button>
+            </FieldSet>
+
+            <Field>
+              <FieldLabel htmlFor="dial_window">Wait for the agent's call</FieldLabel>
+              <div className="flex items-center gap-2">
+                <Input
+                  id="dial_window"
+                  type="number"
+                  inputMode="numeric"
+                  min={10}
+                  max={600}
+                  className="w-24 tabular-nums"
+                  aria-invalid={Boolean(problems.dial_window)}
+                  aria-describedby={problems.dial_window ? "dial_window-error" : undefined}
+                  value={draft.dial_window}
+                  onChange={(e) => set("dial_window", e.target.value)}
+                />
+                <span className="text-p-400 text-muted-foreground">seconds</span>
+              </div>
+              {problems.dial_window && (
+                <FieldError id="dial_window-error">{problems.dial_window}</FieldError>
+              )}
+            </Field>
+          </div>
+        )}
       </div>
     </FieldGroup>
+  );
+}
+
+/** Name and value rows, for headers or query parameters; values may hold placeholders. */
+function Pairs({
+  pairs,
+  noun,
+  namePlaceholder,
+  valuePlaceholder,
+  onChange,
+}: {
+  pairs: Header[];
+  noun: string;
+  namePlaceholder: string;
+  valuePlaceholder: string;
+  onChange: (pairs: Header[]) => void;
+}) {
+  const setPair = (index: number, next: Partial<Header>) =>
+    onChange(pairs.map((pair, at) => (at === index ? { ...pair, ...next } : pair)));
+  return (
+    <>
+      {pairs.map((pair, index) => (
+        <div key={index} className="flex items-start gap-2">
+          <Input
+            aria-label={`${noun} ${index + 1} name`}
+            placeholder={namePlaceholder}
+            className="w-2/5"
+            value={pair.name}
+            onChange={(e) => setPair(index, { name: e.target.value })}
+          />
+          <Input
+            aria-label={`${noun} ${index + 1} value`}
+            placeholder={valuePlaceholder}
+            className="flex-1 font-mono text-xs-400"
+            value={pair.value}
+            onChange={(e) => setPair(index, { value: e.target.value })}
+          />
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            aria-label={`Remove ${noun.toLowerCase()} ${index + 1}`}
+            onClick={() => onChange(pairs.filter((_, at) => at !== index))}
+          >
+            <X />
+          </Button>
+        </div>
+      ))}
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className="self-start"
+        onClick={() => onChange([...pairs, { name: "", value: "" }])}
+      >
+        <Plus />
+        Add {noun.toLowerCase()}
+      </Button>
+    </>
+  );
+}
+
+/** Where the number to call goes, and the other placeholders folded below. */
+function PlaceholderHint({ where }: { where: string }) {
+  return (
+    <div id="placeholder-hint" className="grid gap-1.5 text-s-400 text-muted-foreground">
+      <p>
+        Put <code className="font-mono text-foreground">{"{{yaksha.number}}"}</code> where your API
+        takes the number to call.
+      </p>
+      <details>
+        <summary className="w-fit cursor-pointer rounded-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring/50">
+          Other placeholders
+        </summary>
+        <dl className="mt-1.5 grid gap-1">
+          {PLACEHOLDERS.map((placeholder) => (
+            <div key={placeholder.name} className="flex flex-wrap gap-x-2">
+              <dt className="font-mono text-foreground">{placeholder.name}</dt>
+              <dd>{placeholder.meaning}</dd>
+            </div>
+          ))}
+        </dl>
+        <p className="mt-1.5">They work in {where} and in header values.</p>
+      </details>
+    </div>
   );
 }

@@ -88,7 +88,9 @@ async def test_a_knowledge_base_must_name_each_existing_document_once(
 
 
 async def test_text_fields_drop_nul_and_the_brief_has_a_limit(client: AsyncClient) -> None:
-    agent = await create_agent(client, brief="Books\u0000 visits.", config="Prompt\u0000.")
+    agent = await create_agent(
+        client, brief="Books\u0000 visits for the clinic.", config="Prompt\u0000."
+    )
     too_long = await client.post(
         "/api/v1/agents",
         json={
@@ -98,7 +100,7 @@ async def test_text_fields_drop_nul_and_the_brief_has_a_limit(client: AsyncClien
         },
     )
 
-    assert (agent["brief"], agent["config"]) == ("Books visits.", "Prompt.")
+    assert (agent["brief"], agent["config"]) == ("Books visits for the clinic.", "Prompt.")
     assert too_long.status_code == 422
 
 

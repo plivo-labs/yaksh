@@ -22,42 +22,20 @@ import { useCloseGuard } from "@/hooks/use-close-guard";
 import { when } from "@/lib/format";
 import { revealErrors } from "@/lib/forms";
 import { useRuleResults, useSaveRules } from "@/lib/queries";
-import { MAX_RULES, NEW_LLM, NEW_PHRASE, ROLE_TEXT, ruleProblems } from "@/lib/rules";
+import {
+  KIND,
+  MAX_RULES,
+  NEW_LLM,
+  NEW_PHRASE,
+  ROLE_TEXT,
+  ruleProblems,
+  summary,
+} from "@/lib/rules";
 import type { Agent, AgentRule, RuleResults } from "@/lib/types";
 import { RuleFields } from "@/pages/agent-rules-field";
 
-const KIND: Record<AgentRule["kind"], { label: string; note: string; edit: string }> = {
-  llm: {
-    label: "LLM rule",
-    note: "The judge model decides it on every judged call, beside the scenario's criteria.",
-    edit: "A change to its name, its text or the calls it is judged on starts its results again.",
-  },
-  phrase: {
-    label: "phrase rule",
-    note: "Code looks for it in the agent's lines on every judged call.",
-    edit: "A change to what it looks for, or where, starts its results again; a new name does not.",
-  },
-};
-
 const RESULTS_NOTE =
   "Over the judged calls that ran the rule as it is written now. A change to what a rule checks starts its results again. The judge model reads an LLM rule's name, so a new name starts an LLM rule's results again too. A change to whether a rule counts does not.";
-
-const PHRASE_VERB = {
-  phrase: { required: "Must say", forbidden: "Must not say" },
-  regex: { required: "Must match", forbidden: "Must not match" },
-} as const;
-
-/** What a rule checks, in one line. */
-function summary(rule: AgentRule): string {
-  if (rule.kind === "llm") {
-    return rule.gate === "always"
-      ? "Judge model, every call"
-      : "Judge model, calls where the agent spoke";
-  }
-  const value = rule.match === "phrase" ? `"${rule.value}"` : rule.value;
-  const where = rule.where === "first_agent_turn" ? " in its first turn" : "";
-  return `${PHRASE_VERB[rule.match][rule.expects]} ${value}${where}`;
-}
 
 /** The agent's rules with how each did, and the dialog that adds or edits one. A rule with no key
  * is not saved yet. An address that ends in `#rules` scrolls to the panel. */

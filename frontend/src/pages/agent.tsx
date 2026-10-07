@@ -216,9 +216,7 @@ function Purpose({ agent, edit }: { agent: Agent; edit: ReactNode }) {
       <dl className="grid gap-5 px-5 py-4">
         <div className="grid gap-1">
           <dt className="text-xs-400 text-muted-foreground">Brief</dt>
-          <dd className="text-p-400 whitespace-pre-wrap">
-            {agent.brief ?? <span className="text-muted-foreground">None</span>}
-          </dd>
+          <dd className="text-p-400 whitespace-pre-wrap">{agent.brief}</dd>
         </div>
         <div className="grid min-w-0 gap-1">
           <dt className="flex min-h-6 items-center gap-2 text-xs-400 text-muted-foreground">

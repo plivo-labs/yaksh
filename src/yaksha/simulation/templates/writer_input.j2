@@ -25,11 +25,9 @@ Vary it: {{ repeat_angles[slot.variant - 1] }}.
 {%- endmacro %}
 {% include "agent.j2" %}
 
-{% if brief %}
 ## Brief
 {{ brief }}
 
-{% endif %}
 ## What the agent handles
 {% for area in areas %}
 - {{ area }}

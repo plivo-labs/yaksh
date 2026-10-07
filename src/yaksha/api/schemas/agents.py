@@ -25,7 +25,7 @@ class AgentSummary(BaseModel):
     outbound: OutboundConfig | None
     agent_speaks_first: bool
     language: Language
-    brief: str | None
+    brief: str
     current_version: int
     created_at: datetime
     updated_at: datetime

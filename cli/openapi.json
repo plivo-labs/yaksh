@@ -3534,15 +3534,9 @@
             "default": "en"
           },
           "brief": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 10000
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "type": "string",
+            "maxLength": 10000,
+            "minLength": 20,
             "title": "Brief"
           },
           "config": {
@@ -3592,6 +3586,9 @@
         },
         "additionalProperties": false,
         "type": "object",
+        "required": [
+          "brief"
+        ],
         "title": "AgentConfig"
       },
       "AgentCreate": {
@@ -3636,15 +3633,9 @@
             "default": "en"
           },
           "brief": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 10000
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "type": "string",
+            "maxLength": 10000,
+            "minLength": 20,
             "title": "Brief"
           },
           "config": {
@@ -3711,6 +3702,7 @@
         "additionalProperties": false,
         "type": "object",
         "required": [
+          "brief",
           "name"
         ],
         "title": "AgentCreate"
@@ -3772,14 +3764,7 @@
             "$ref": "#/components/schemas/Language"
           },
           "brief": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "type": "string",
             "title": "Brief"
           },
           "current_version": {
@@ -3915,14 +3900,7 @@
             "$ref": "#/components/schemas/Language"
           },
           "brief": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "type": "string",
             "title": "Brief"
           },
           "current_version": {
@@ -4051,7 +4029,8 @@
             "anyOf": [
               {
                 "type": "string",
-                "maxLength": 10000
+                "maxLength": 10000,
+                "minLength": 20
               },
               {
                 "type": "null"
@@ -7106,6 +7085,28 @@
         "title": "ProviderVoice",
         "description": "A voice as its provider describes it. `listed_languages` are the languages the provider\nlists for the voice in any model; the model decides what the voice can really speak."
       },
+      "QueryParameter": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "value": {
+            "type": "string",
+            "maxLength": 2000,
+            "title": "Value"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "value"
+        ],
+        "title": "QueryParameter"
+      },
       "QueuedReview": {
         "properties": {
           "conversation_id": {
@@ -8898,6 +8899,10 @@
       },
       "Trigger": {
         "properties": {
+          "method": {
+            "$ref": "#/components/schemas/TriggerMethod",
+            "default": "POST"
+          },
           "url": {
             "type": "string",
             "maxLength": 2083,
@@ -8913,20 +8918,42 @@
             "maxItems": 30,
             "title": "Headers"
           },
+          "query": {
+            "items": {
+              "$ref": "#/components/schemas/QueryParameter"
+            },
+            "type": "array",
+            "maxItems": 30,
+            "title": "Query"
+          },
           "body": {
-            "additionalProperties": true,
-            "type": "object",
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Body"
           }
         },
         "additionalProperties": false,
         "type": "object",
         "required": [
-          "url",
-          "body"
+          "url"
         ],
         "title": "Trigger",
-        "description": "A POST with a JSON body, sent once for each conversation."
+        "description": "The request sent once for each conversation: a POST carries its values in a JSON body,\na GET in query parameters."
+      },
+      "TriggerMethod": {
+        "type": "string",
+        "enum": [
+          "POST",
+          "GET"
+        ],
+        "title": "TriggerMethod"
       },
       "TurnRead": {
         "properties": {

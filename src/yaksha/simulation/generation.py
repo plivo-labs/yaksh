@@ -141,8 +141,6 @@ async def prepare(
             raise ValidationError(f"not in the agent's knowledge base: {', '.join(foreign)}")
         chosen = command.document_ids
     else:
-        if not (config.brief or config.config or config.knowledge_base):
-            raise ValidationError("add a brief, a config or knowledge base documents first")
         chosen = list(names)
     texts = dict(
         (await session.execute(select(Document.id, Document.text).where(Document.id.in_(chosen))))

@@ -1,17 +1,29 @@
 """The HTTP request that makes an outbound agent place its call, and its placeholders.
 
-A placeholder is `{{kind.name}}` inside a header value or a JSON string value of the body:
-`{{yaksha.number}}`, `{{yaksha.conversation_id}}`, `{{agent_data.<fact name>}}` and
-`{{env.YAKSHA_TRIGGER_<NAME>}}`. The URL and JSON keys take none.
+A placeholder is `{{kind.name}}` inside a header value, a query parameter value or a JSON string
+value of the body: `{{yaksha.number}}`, `{{yaksha.conversation_id}}`,
+`{{agent_data.<fact name>}}` and `{{env.YAKSHA_TRIGGER_<NAME>}}`. The URL, query parameter names
+and JSON keys take none.
 """
 
 import json
 import re
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
+from enum import StrEnum
 from typing import Annotated, Any
+from urllib.parse import quote_plus, urlencode, urlsplit
 
-from pydantic import BaseModel, ConfigDict, Field, HttpUrl, StringConstraints, field_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    HttpUrl,
+    StringConstraints,
+    field_validator,
+    model_validator,
+)
+from yarl import URL
 
 from yaksha.domain.errors import ValidationError
 from yaksha.domain.numbers import E164
@@ -92,20 +104,60 @@ class Header(BaseModel):
         return value
 
 
+class QueryParameter(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    name: str = Field(min_length=1, max_length=100)
+    value: HeaderValue
+
+    @field_validator("name")
+    @classmethod
+    def no_placeholders(cls, name: str) -> str:
+        if "{{" in name or "}}" in name:
+            raise ValueError(f"placeholders are not allowed in query parameter names: {name!r}")
+        return name
+
+    @field_validator("value")
+    @classmethod
+    def valid_placeholders(cls, value: str) -> str:
+        placeholders(value)
+        return value
+
+
+class TriggerMethod(StrEnum):
+    POST = "POST"
+    GET = "GET"
+
+
 class Trigger(BaseModel):
-    """A POST with a JSON body, sent once for each conversation."""
+    """The request sent once for each conversation: a POST carries its values in a JSON body,
+    a GET in query parameters."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
+    method: TriggerMethod = TriggerMethod.POST
     url: HttpUrl
     headers: list[Header] = Field(default_factory=list, max_length=30)
-    body: dict[str, Any]
+    query: list[QueryParameter] = Field(default_factory=list, max_length=30)
+    body: dict[str, Any] | None = None
 
     @field_validator("url", mode="before")
     @classmethod
     def no_placeholders(cls, url: object) -> object:
         if isinstance(url, str) and ("{{" in url or "}}" in url):
             raise ValueError("placeholders are not allowed in the URL")
+        if isinstance(url, str) and "#" in url:
+            raise ValueError("the URL cannot have a fragment (#); it is never sent")
+        return url
+
+    @field_validator("url")
+    @classmethod
+    def sent_as_written(cls, url: HttpUrl) -> HttpUrl:
+        # The HTTP client moves these out of the URL it sends, so a signed URL would not match.
+        if url.username or url.password:
+            raise ValueError("the URL cannot hold a user name or password; send them in a header")
+        if (url.host or "").endswith("."):
+            raise ValueError("the URL's host cannot end with a dot")
         return url
 
     @field_validator("headers")
@@ -118,10 +170,31 @@ class Trigger(BaseModel):
 
     @field_validator("body")
     @classmethod
-    def valid_placeholders(cls, body: dict[str, Any]) -> dict[str, Any]:
+    def valid_placeholders(cls, body: dict[str, Any] | None) -> dict[str, Any] | None:
         for text in template_strings(body):
             placeholders(text)
         return body
+
+    @model_validator(mode="after")
+    def fits_method(self) -> Trigger:
+        if self.method is TriggerMethod.POST:
+            if self.body is None:
+                raise ValueError("a POST trigger needs a JSON body")
+            if self.query:
+                raise ValueError(
+                    "a POST trigger sends its values in the body; put fixed query values in the URL"
+                )
+        elif self.body is not None:
+            raise ValueError("a GET trigger has no body; send its values as query parameters")
+        return self
+
+    def template_texts(self) -> list[str]:
+        """Every string that may hold placeholders."""
+        return (
+            [header.value for header in self.headers]
+            + [parameter.value for parameter in self.query]
+            + list(template_strings(self.body))
+        )
 
 
 class OutboundConfig(BaseModel):
@@ -147,9 +220,12 @@ class RenderError(ValueError):
 
 @dataclass(frozen=True)
 class RenderedTrigger:
+    method: TriggerMethod
     url: str
+    """With the query parameters, percent-encoded; it is sent as it is."""
     headers: dict[str, str]
     body: bytes
+    """Empty for a GET."""
     secrets: tuple[str, ...]
     """The environment values the request carries, to mask wherever it is stored."""
 
@@ -163,7 +239,7 @@ def render(
     env: Mapping[str, str],
 ) -> RenderedTrigger:
     """The request with every placeholder replaced. Values go inside JSON strings of the parsed
-    body, so no value can change the JSON's shape."""
+    body, or are percent-encoded into query values, so no value can change the request's shape."""
     facts = {normalized(fact.name): fact.value for fact in agent_data}
     secrets: list[str] = []
 
@@ -195,16 +271,24 @@ def render(
     for name, value in headers.items():
         if "\r" in value or "\n" in value:
             raise RenderError(f"a placeholder puts a line break into the {name} header")
-    body = json.dumps(fill(trigger.body)).encode()
-    return RenderedTrigger(str(trigger.url), headers, body, tuple(secrets))
+    url = str(trigger.url)
+    if trigger.query:
+        query = urlencode([(parameter.name, fill(parameter.value)) for parameter in trigger.query])
+        fixed = urlsplit(url).query
+        url = urlsplit(url)._replace(query=f"{fixed}&{query}" if fixed else query).geturl()
+    # The form the HTTP client sends, so a signature over the URL matches what the agent receives.
+    url = str(URL(url, encoded=True))
+    body = b"" if trigger.body is None else json.dumps(fill(trigger.body)).encode()
+    # A secret in a query value travels percent-encoded, and an echo of the URL shows it that way.
+    masked = {*secrets, *(quote_plus(secret) for secret in secrets)}
+    return RenderedTrigger(trigger.method, url, headers, body, tuple(masked))
 
 
 def agent_data_names(trigger: Trigger) -> set[str]:
     """The agent data a scenario must provide for this trigger, by normalized fact name."""
-    texts = [header.value for header in trigger.headers] + list(template_strings(trigger.body))
     return {
         normalized(name.partition(".")[2])
-        for text in texts
+        for text in trigger.template_texts()
         for name in placeholders(text)
         if name.startswith("agent_data.")
     }

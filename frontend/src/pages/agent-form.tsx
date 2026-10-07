@@ -1,10 +1,10 @@
+import { PhoneIncoming, PhoneOutgoing } from "lucide-react";
 import { type ReactNode, type SubmitEvent, useState } from "react";
-import { Link, useNavigate } from "react-router";
+import { useNavigate } from "react-router";
 import { toast } from "sonner";
 
 import { DeleteConfirm, DiscardConfirm } from "@/components/confirm-dialogs";
-import { Panel, PanelHeader } from "@/components/panel";
-import { Segmented } from "@/components/segmented";
+import { PhoneInput } from "@/components/phone-input";
 import { Button } from "@/components/ui/button";
 import {
   Field,
@@ -30,225 +30,184 @@ import { Spinner } from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useCloseGuard } from "@/hooks/use-close-guard";
-import { useDraftKnowledgeBase } from "@/hooks/use-knowledge-base";
-import { revealErrors } from "@/lib/forms";
-import { APPEAR } from "@/lib/motion";
+import { type AgentDraft, useAgentDraft } from "@/hooks/use-agent-draft";
+import {
+  CONTEXT_NOTE,
+  MAX_BRIEF_CHARS,
+  MIN_BRIEF_CHARS,
+  toDraft,
+  toInput,
+} from "@/lib/agent-draft";
 import { useDeleteAgent, useSaveAgent } from "@/lib/queries";
-import {
-  EMPTY_OUTBOUND,
-  isPhoneNumber,
-  normalizeNumber,
-  type OutboundDraft,
-  outboundProblems,
-  toOutbound,
-  toOutboundDraft,
-} from "@/lib/outbound";
-import {
-  type Agent,
-  type AgentInput,
-  type Direction,
-  LANGUAGE_ITEMS,
-  type Language,
-} from "@/lib/types";
-import { cn } from "@/lib/utils";
-import { ConfigField, MAX_CONFIG_CHARS } from "@/pages/agent-config-field";
-import { KnowledgeBasePanel } from "@/pages/agent-knowledge-base";
+import { type Agent, type Direction, LANGUAGE_ITEMS, type Language } from "@/lib/types";
+import { ConfigField } from "@/pages/agent-config-field";
 import { OutboundFields } from "@/pages/agent-outbound-fields";
 
-interface Draft {
-  name: string;
-  external_id: string;
-  direction: Direction;
-  agent_number: string;
-  outbound: OutboundDraft;
-  agent_speaks_first: boolean;
-  language: Language;
-  brief: string;
-  config: string;
-}
-
-const EMPTY: Draft = {
-  name: "",
-  external_id: "",
-  direction: "inbound",
-  agent_number: "",
-  outbound: EMPTY_OUTBOUND,
-  agent_speaks_first: true,
-  language: "en",
-  brief: "",
-  config: "",
-};
-
-function toDraft(agent: Agent): Draft {
-  return {
-    name: agent.name,
-    external_id: agent.external_id ?? "",
-    direction: agent.direction,
-    agent_number: agent.agent_number ?? "",
-    outbound: agent.outbound ? toOutboundDraft(agent.outbound) : EMPTY_OUTBOUND,
-    agent_speaks_first: agent.agent_speaks_first,
-    language: agent.language,
-    brief: agent.brief ?? "",
-    config: agent.config ?? "",
-  };
-}
-
-const REACH_OPTIONS: { value: Direction; label: string }[] = [
-  { value: "inbound", label: "Yaksha" },
-  { value: "outbound", label: "The agent" },
+const REACH_CHOICES: {
+  value: Direction;
+  label: string;
+  hint: string;
+  icon: typeof PhoneOutgoing;
+}[] = [
+  {
+    value: "inbound",
+    label: "Yaksha calls the agent",
+    hint: "Yaksha dials the agent's phone number and plays the caller.",
+    icon: PhoneOutgoing,
+  },
+  {
+    value: "outbound",
+    label: "The agent calls Yaksha",
+    hint: "Yaksha asks the agent to call, then answers as the caller.",
+    icon: PhoneIncoming,
+  },
 ];
 
-const REQUEST_NOTE =
-  "Yaksha sends this POST request to make the agent call one of Yaksha's numbers.";
+const REQUEST_NOTE = "Yaksha sends this request to make the agent call one of Yaksha's numbers.";
 
-const REACH_HINTS: Record<Direction, string> = {
-  inbound: "Yaksha dials the agent's phone number and plays the caller.",
-  outbound: "Yaksha asks the agent to call, then answers as the caller.",
-};
-
-function toInput(draft: Draft): AgentInput {
-  const outbound = draft.direction === "outbound";
-  return {
-    name: draft.name.trim(),
-    external_id: draft.external_id.trim() || null,
-    direction: draft.direction,
-    transport: "phone",
-    agent_number: outbound ? null : normalizeNumber(draft.agent_number),
-    outbound: outbound ? toOutbound(draft.outbound) : null,
-    agent_speaks_first: draft.agent_speaks_first,
-    language: draft.language,
-    brief: draft.brief.trim() || null,
-    config: draft.config.trim() ? draft.config : null,
-  };
-}
-
-/** An agent being added or edited: the draft, what it still needs, and a check that shows the
- * problems and moves focus to the first one. */
-function useAgentDraft(agent?: Agent) {
-  const [initial] = useState<Draft>(() => (agent ? toDraft(agent) : EMPTY));
-  const [draft, setDraft] = useState(initial);
-  const [submitted, setSubmitted] = useState(false);
-  const [switched, setSwitched] = useState(false);
-  const set = <K extends keyof Draft>(key: K, value: Draft[K]) => {
-    if (key === "direction") setSwitched(true);
-    setDraft((current) => ({ ...current, [key]: value }));
-  };
-  const outbound = draft.direction === "outbound";
-  const needs = {
-    name: draft.name.trim() === "",
-    reach: outbound
-      ? Object.keys(outboundProblems(draft.outbound)).length > 0
-      : !isPhoneNumber(draft.agent_number),
-    config: draft.config.length > MAX_CONFIG_CHARS,
-  };
-  const ready = !needs.name && !needs.reach && !needs.config;
-  const check = (element: HTMLFormElement) =>
-    revealErrors(element, () => setSubmitted(true), ready);
-  /** Who calls changed, so fields that swap with it may fade in; the first render stays still. */
-  const swap = switched ? APPEAR : undefined;
-  const dirty = JSON.stringify(draft) !== JSON.stringify(initial);
-  return { draft, set, submitted, outbound, needs, check, swap, dirty };
-}
-
-type AgentDraft = ReturnType<typeof useAgentDraft>;
-
-function BasicsFields({ form }: { form: AgentDraft }) {
+export function NameField({ form }: { form: AgentDraft }) {
   const { draft, set, submitted, needs } = form;
   return (
-    <FieldGroup>
-      <Field>
-        <FieldLabel htmlFor="name">Name</FieldLabel>
-        <Input
-          id="name"
-          required
-          placeholder="Front desk"
-          aria-invalid={submitted && needs.name}
-          aria-describedby={submitted && needs.name ? "name-error" : undefined}
-          value={draft.name}
-          onChange={(e) => set("name", e.target.value)}
-        />
-        {submitted && needs.name && <FieldError id="name-error">Enter a name.</FieldError>}
-      </Field>
-      <div className="grid gap-7 @md/field-group:grid-cols-2">
-        <Field>
-          <FieldLabel htmlFor="language">Language</FieldLabel>
-          <Select
-            items={LANGUAGE_ITEMS}
-            value={draft.language}
-            onValueChange={(value) => value && set("language", value as Language)}
-          >
-            <SelectTrigger id="language" className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectGroup>
-                {LANGUAGE_ITEMS.map((item) => (
-                  <SelectItem key={item.value} value={item.value}>
-                    {item.label}
-                  </SelectItem>
-                ))}
-              </SelectGroup>
-            </SelectContent>
-          </Select>
-        </Field>
-        <Field>
-          <FieldLabel htmlFor="external_id">External id</FieldLabel>
-          <Input
-            id="external_id"
-            placeholder="Optional"
-            value={draft.external_id}
-            onChange={(e) => set("external_id", e.target.value)}
-          />
-          <FieldDescription>Your own id for this agent, for the API.</FieldDescription>
-        </Field>
-      </div>
-    </FieldGroup>
+    <Field>
+      <FieldLabel htmlFor="name">Name</FieldLabel>
+      <Input
+        id="name"
+        required
+        placeholder="Front desk"
+        aria-invalid={submitted && needs.name}
+        aria-describedby={submitted && needs.name ? "name-error" : undefined}
+        value={draft.name}
+        onChange={(e) => set("name", e.target.value)}
+      />
+      {submitted && needs.name && <FieldError id="name-error">Enter a name.</FieldError>}
+    </Field>
   );
 }
 
-function ReachFields({ form }: { form: AgentDraft }) {
-  const { draft, set, submitted, outbound, needs, swap } = form;
+/** Who calls whom, as two cards; each card is a radio button. */
+export function ReachChoice({ form }: { form: AgentDraft }) {
+  const { draft, set, submitted, needs } = form;
+  const missing = submitted && needs.direction;
+  return (
+    <FieldSet>
+      <FieldLegend variant="label">How does Yaksha reach the agent?</FieldLegend>
+      <div className="grid gap-3 sm:grid-cols-2">
+        {REACH_CHOICES.map(({ value, label, hint, icon: Icon }) => (
+          <label
+            key={value}
+            className="grid cursor-pointer content-start gap-1.5 rounded-md border bg-background px-4 py-3.5 transition-colors hover:bg-hv1 has-checked:border-foreground has-checked:ring-1 has-checked:ring-foreground has-focus-visible:ring-2 has-focus-visible:ring-ring/50"
+          >
+            <input
+              type="radio"
+              name="direction"
+              value={value}
+              className="sr-only"
+              checked={draft.direction === value}
+              aria-invalid={missing}
+              aria-describedby={missing ? "direction-error" : undefined}
+              onChange={() => set("direction", value)}
+            />
+            <Icon aria-hidden className="size-4.5" />
+            <span className="text-p-500">{label}</span>
+            <span className="text-s-400 text-muted-foreground">{hint}</span>
+          </label>
+        ))}
+      </div>
+      {missing && (
+        <FieldError id="direction-error">Choose how Yaksha reaches the agent.</FieldError>
+      )}
+    </FieldSet>
+  );
+}
+
+/** The fields for the chosen way: the agent's number, or the request that makes it call. */
+export function ReachFields({ form }: { form: AgentDraft }) {
+  const { draft, set, submitted, needs, swap } = form;
+  if (draft.direction === null) return null;
+  if (draft.direction === "outbound") {
+    return (
+      <FieldSet className={swap}>
+        <FieldLegend variant="label">Start request</FieldLegend>
+        <FieldDescription>{REQUEST_NOTE}</FieldDescription>
+        <OutboundFields
+          draft={draft.outbound}
+          onChange={(next) => set("outbound", next)}
+          submitted={submitted}
+        />
+      </FieldSet>
+    );
+  }
   const numberProblem = (submitted || draft.agent_number !== "") && needs.reach;
   return (
-    <FieldGroup>
-      <div className="grid gap-2">
-        <Segmented
-          label="Who calls"
-          value={draft.direction}
-          options={REACH_OPTIONS}
-          onChange={(value) => set("direction", value)}
-        />
-        <p className="text-p-400 text-muted-foreground">{REACH_HINTS[draft.direction]}</p>
-      </div>
-      {!outbound && (
-        <Field className={swap}>
-          <FieldLabel htmlFor="agent_number">Phone number</FieldLabel>
-          <Input
-            id="agent_number"
-            type="tel"
-            inputMode="tel"
-            required
-            placeholder="+1 415 555 0100"
-            aria-invalid={numberProblem}
-            aria-describedby={numberProblem ? "agent_number-error" : undefined}
-            value={draft.agent_number}
-            onChange={(e) => set("agent_number", e.target.value)}
-          />
-          {numberProblem && (
-            <FieldError id="agent_number-error">
-              Use the international format, like +14155550100.
-            </FieldError>
-          )}
-        </Field>
+    <Field className={swap}>
+      <FieldLabel htmlFor="agent_number">The agent's phone number</FieldLabel>
+      <PhoneInput
+        id="agent_number"
+        required
+        aria-invalid={numberProblem}
+        aria-describedby={numberProblem ? "agent_number-error" : undefined}
+        value={draft.agent_number}
+        onChange={(value) => set("agent_number", value)}
+      />
+      {numberProblem && (
+        <FieldError id="agent_number-error">
+          Use the international format, like +14155550100.
+        </FieldError>
       )}
+    </Field>
+  );
+}
+
+/** The agent's own ID, for finding it through the API. */
+export function AgentIdField({ form }: { form: AgentDraft }) {
+  const { draft, set } = form;
+  return (
+    <Field>
+      <FieldLabel htmlFor="external_id">Agent ID</FieldLabel>
+      <Input
+        id="external_id"
+        placeholder="Optional"
+        value={draft.external_id}
+        onChange={(e) => set("external_id", e.target.value)}
+      />
+      <FieldDescription>
+        The agent's ID at its provider or in your own system. Use it to find this agent through the
+        API.
+      </FieldDescription>
+    </Field>
+  );
+}
+
+/** The call's language and who speaks first. */
+export function CallOptionsFields({ form }: { form: AgentDraft }) {
+  const { draft, set } = form;
+  return (
+    <>
+      <Field>
+        <FieldLabel htmlFor="language">Language</FieldLabel>
+        <Select
+          items={LANGUAGE_ITEMS}
+          value={draft.language}
+          onValueChange={(value) => value && set("language", value as Language)}
+        >
+          <SelectTrigger id="language" className="w-full sm:w-64">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectGroup>
+              {LANGUAGE_ITEMS.map((item) => (
+                <SelectItem key={item.value} value={item.value}>
+                  {item.label}
+                </SelectItem>
+              ))}
+            </SelectGroup>
+          </SelectContent>
+        </Select>
+      </Field>
       <Field orientation="horizontal" className="rounded-md border bg-muted/40 px-3.5 py-3">
         <FieldContent>
           <FieldLabel htmlFor="agent_speaks_first">Agent speaks first</FieldLabel>
-          {outbound && (
-            <FieldDescription className={swap}>
-              When off, the caller speaks first, from its goal.
-            </FieldDescription>
-          )}
+          <FieldDescription>When off, the caller speaks first, from its goal.</FieldDescription>
         </FieldContent>
         <Switch
           id="agent_speaks_first"
@@ -256,23 +215,14 @@ function ReachFields({ form }: { form: AgentDraft }) {
           onCheckedChange={(checked) => set("agent_speaks_first", checked)}
         />
       </Field>
-    </FieldGroup>
+    </>
   );
 }
 
-function RequestFields({ form }: { form: AgentDraft }) {
-  const { draft, set, submitted } = form;
-  return (
-    <OutboundFields
-      draft={draft.outbound}
-      onChange={(next) => set("outbound", next)}
-      submitted={submitted}
-    />
-  );
-}
-
-function ContextFields({ form }: { form: AgentDraft }) {
-  const { draft, set } = form;
+/** The brief, which every agent needs, and the config. */
+export function ContextFields({ form }: { form: AgentDraft }) {
+  const { draft, set, submitted, needs } = form;
+  const briefProblem = submitted && needs.brief;
   return (
     <FieldGroup>
       <Field>
@@ -280,114 +230,34 @@ function ContextFields({ form }: { form: AgentDraft }) {
         <Textarea
           id="brief"
           rows={4}
-          maxLength={10_000}
+          required
+          maxLength={MAX_BRIEF_CHARS}
           placeholder="What this agent is supposed to do, in your words."
+          aria-invalid={briefProblem}
+          aria-describedby={briefProblem ? "brief-error" : "brief-hint"}
           value={draft.brief}
           onChange={(e) => set("brief", e.target.value)}
         />
+        {briefProblem ? (
+          <FieldError id="brief-error">
+            Write at least {MIN_BRIEF_CHARS} characters about what the agent does.
+          </FieldError>
+        ) : (
+          <FieldDescription id="brief-hint">
+            At least {MIN_BRIEF_CHARS} characters.
+          </FieldDescription>
+        )}
       </Field>
       <ConfigField value={draft.config} onChange={(value) => set("config", value)} />
     </FieldGroup>
   );
 }
 
-const CONTEXT_NOTE =
-  "Optional. Yaksha reads these and the knowledge base to write test scenarios. The judges read the config to check that the agent kept to its instructions, and the knowledge base to find statements it contradicts.";
-
-function Section({
-  title,
-  description,
-  className,
-  children,
-}: {
-  title: string;
-  description?: string;
-  className?: string;
-  children: ReactNode;
-}) {
-  return (
-    <Panel className={className}>
-      <PanelHeader title={title} />
-      <div className="grid gap-5 px-5 py-5">
-        {description && <p className="text-p-400 text-muted-foreground">{description}</p>}
-        {children}
-      </div>
-    </Panel>
-  );
-}
-
-export function NewAgentPage() {
-  const navigate = useNavigate();
-  const form = useAgentDraft();
-  const save = useSaveAgent();
-  const knowledgeBase = useDraftKnowledgeBase(save.isPending);
-  const uploading = knowledgeBase.progress !== null;
-
-  const submit = (event: SubmitEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!form.check(event.currentTarget) || uploading || save.isPending) return;
-    const entries = knowledgeBase.documents.map(({ document_id, name }) => ({ document_id, name }));
-    save.mutate(
-      { ...toInput(form.draft), knowledge_base: entries },
-      { onSuccess: (agent) => navigate(`/agents/${agent.id}`, { replace: true }) },
-    );
-  };
-
-  return (
-    <div className="grid gap-6">
-      <div className="grid gap-1">
-        <h1 className="text-h3-500">New agent</h1>
-        <p className="text-p-400 text-muted-foreground">
-          Tell Yaksha how to reach the agent and what it does.
-        </p>
-      </div>
-      <form noValidate onSubmit={submit} className="grid gap-6">
-        <div className="grid gap-6 lg:grid-cols-2">
-          <Section title="Agent">
-            <BasicsFields form={form} />
-          </Section>
-          <Section title="Calls">
-            <ReachFields form={form} />
-          </Section>
-          {form.outbound && (
-            <Section
-              title="Start request"
-              description={REQUEST_NOTE}
-              className={cn("lg:col-span-2", form.swap)}
-            >
-              <RequestFields form={form} />
-            </Section>
-          )}
-          <Section title="What it does" description={CONTEXT_NOTE}>
-            <ContextFields form={form} />
-          </Section>
-          <KnowledgeBasePanel source={knowledgeBase} />
-        </div>
-        <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-2">
-          {save.error && <FieldError className="mr-auto">{save.error.message}</FieldError>}
-          {uploading && (
-            <FieldDescription className={`mr-auto ${APPEAR}`}>
-              Wait for the documents to finish uploading.
-            </FieldDescription>
-          )}
-          <Button variant="ghost" nativeButton={false} render={<Link to="/agents" />}>
-            Cancel
-          </Button>
-          <Button type="submit" disabled={save.isPending || uploading}>
-            {save.isPending && <Spinner />}
-            Add agent
-          </Button>
-        </div>
-      </form>
-    </div>
-  );
-}
-
-/** Edits an agent. Its knowledge base is edited in its own panel, which saves at once. */
 /** The agent's settings in a sheet. It asks before it throws away unsaved changes, and calls
- * `onClosed` once it has closed. */
+ * `onClosed` once it has closed. Its knowledge base and rules are edited in their own panels. */
 export function EditAgentSheet({ agent, onClosed }: { agent: Agent; onClosed: () => void }) {
-  const form = useAgentDraft(agent);
+  const [baseline] = useState(() => toDraft(agent));
+  const form = useAgentDraft(baseline);
   const guard = useCloseGuard(form.dirty);
   return (
     <Sheet
@@ -445,23 +315,20 @@ function AgentForm({
     <form noValidate onSubmit={submit} className="grid gap-10">
       <FieldSet>
         <FieldLegend>Agent</FieldLegend>
-        <BasicsFields form={form} />
+        <FieldDescription>{CONTEXT_NOTE}</FieldDescription>
+        <FieldGroup>
+          <NameField form={form} />
+          <ContextFields form={form} />
+          <AgentIdField form={form} />
+        </FieldGroup>
       </FieldSet>
       <FieldSet>
         <FieldLegend>Calls</FieldLegend>
-        <ReachFields form={form} />
-      </FieldSet>
-      {form.outbound && (
-        <FieldSet className={form.swap}>
-          <FieldLegend>Start request</FieldLegend>
-          <FieldDescription>{REQUEST_NOTE}</FieldDescription>
-          <RequestFields form={form} />
-        </FieldSet>
-      )}
-      <FieldSet>
-        <FieldLegend>What it does</FieldLegend>
-        <FieldDescription>{CONTEXT_NOTE}</FieldDescription>
-        <ContextFields form={form} />
+        <FieldGroup>
+          <ReachChoice form={form} />
+          <ReachFields form={form} />
+          <CallOptionsFields form={form} />
+        </FieldGroup>
       </FieldSet>
 
       {(save.error || remove.error) && (

@@ -1,7 +1,7 @@
 # 0004 Triggers are signed
 
 Date: 2026-09-29
-Status: accepted
+Status: accepted, changed by 0026 (GET triggers)
 
 ## Decision
 

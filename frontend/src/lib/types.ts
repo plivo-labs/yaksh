@@ -180,10 +180,20 @@ export interface Header {
   value: string;
 }
 
+export type TriggerMethod = "POST" | "GET";
+
+export interface QueryParameter {
+  name: string;
+  value: string;
+}
+
+/** A POST carries its values in `body`; a GET in `query`, with no body. */
 export interface Trigger {
+  method: TriggerMethod;
   url: string;
   headers: Header[];
-  body: Record<string, unknown>;
+  query: QueryParameter[];
+  body: Record<string, unknown> | null;
 }
 
 export interface OutboundSettings {
@@ -202,7 +212,7 @@ export interface AgentSummary {
   outbound: OutboundSettings | null;
   agent_speaks_first: boolean;
   language: Language;
-  brief: string | null;
+  brief: string;
   current_version: number;
   created_at: string;
   updated_at: string;
@@ -290,10 +300,12 @@ export interface AgentInput {
   outbound: OutboundSettings | null;
   agent_speaks_first: boolean;
   language: Language;
-  brief: string | null;
+  brief: string;
   config: string | null;
   /** Sent only when the agent is added; later changes go through the knowledge base panel. */
   knowledge_base?: KnowledgeBaseEntry[];
+  /** Sent only when the agent is added; later changes go through the rules panel. */
+  rules?: AgentRule[];
 }
 
 export interface PhoneNumber {

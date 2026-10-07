@@ -28,7 +28,9 @@ async def test_changing_config_creates_a_version_but_renaming_does_not(
     renamed = await client.patch(url, json={"name": "Reception"})
     assert renamed.json()["current_version"] == 1
 
-    changed = await client.patch(url, json={"agent_speaks_first": False, "brief": "Books rooms"})
+    changed = await client.patch(
+        url, json={"agent_speaks_first": False, "brief": "Books rooms for guests"}
+    )
     assert changed.json()["current_version"] == 2
 
     unchanged = await client.patch(url, json={"agent_speaks_first": False})
@@ -40,7 +42,7 @@ async def test_changing_config_creates_a_version_but_renaming_does_not(
     versions = (await client.get(f"{url}/versions")).json()
     assert [v["version"] for v in versions["items"]] == [3, 2, 1]
     assert versions["items"][0]["config"]["language"] == "hinglish"
-    assert versions["items"][1]["config"]["brief"] == "Books rooms"
+    assert versions["items"][1]["config"]["brief"] == "Books rooms for guests"
 
 
 async def test_new_records_get_time_ordered_ids(client: AsyncClient) -> None:
@@ -53,8 +55,44 @@ async def test_new_records_get_time_ordered_ids(client: AsyncClient) -> None:
     assert ids[0] < ids[1]
 
 
+@pytest.mark.parametrize(
+    "brief",
+    [None, "a" * 19, " " * 40, "   Books rooms.   ", "\x00" * 25, "a" * 19 + "\x00" * 5],
+    ids=[
+        "missing",
+        "19 characters",
+        "only spaces",
+        "short after trimming",
+        "only nul",
+        "short without nul",
+    ],
+)
+async def test_an_agent_needs_a_brief_of_at_least_20_characters(
+    client: AsyncClient, brief: str | None
+) -> None:
+    body = {key: value for key, value in AGENT.items() if key != "brief"}
+    if brief is not None:
+        body["brief"] = brief
+
+    response = await client.post("/api/v1/agents", json=body)
+
+    assert response.status_code == 422
+    assert "brief" in response.json()["error"]["message"]
+
+
+async def test_a_brief_is_saved_trimmed_and_cannot_be_removed(client: AsyncClient) -> None:
+    agent = await create_agent(client, brief="  Books rooms for hotel guests.  ")
+    url = f"/api/v1/agents/{agent['id']}"
+
+    assert agent["brief"] == "Books rooms for hotel guests."
+    assert (await client.patch(url, json={"brief": None})).status_code == 422
+    assert (await client.patch(url, json={"brief": "Too short"})).status_code == 422
+
+
 async def test_invalid_updates_are_rejected_before_the_database(client: AsyncClient) -> None:
-    created = await client.post("/api/v1/agents", json={"name": "No number"})
+    created = await client.post(
+        "/api/v1/agents", json={"name": "No number", "brief": AGENT["brief"]}
+    )
     assert created.status_code == 422
     assert created.json()["error"]["code"] == "validation_error"
     assert "an inbound agent needs agent_number" in created.json()["error"]["message"]
@@ -92,10 +130,12 @@ async def test_concurrent_edits_get_distinct_versions(client: AsyncClient) -> No
     url = f"/api/v1/agents/{agent['id']}"
 
     responses = await asyncio.gather(
-        *(client.patch(url, json={"brief": f"brief {n}"}) for n in range(5))
+        *(client.patch(url, json={"brief": f"Front desk brief number {n}"}) for n in range(5))
     )
 
-    assert [response.json()["brief"] for response in responses] == [f"brief {n}" for n in range(5)]
+    assert [response.json()["brief"] for response in responses] == [
+        f"Front desk brief number {n}" for n in range(5)
+    ]
     versions = (await client.get(f"{url}/versions", params={"page_size": 10})).json()
     assert [item["version"] for item in versions["items"]] == [6, 5, 4, 3, 2, 1]
     assert (await client.get(url)).json()["current_version"] == 6
@@ -123,7 +163,7 @@ async def test_a_duplicate_copies_the_config_and_live_scenarios_but_not_the_exte
     client: AsyncClient,
 ) -> None:
     original = await create_agent(
-        client, external_id="flow-7", brief="Books rooms", config="Greet, then book."
+        client, external_id="flow-7", brief="Books rooms for guests", config="Greet, then book."
     )
     kept = await create_scenario(
         client, original["id"], category="messy_input", description="Checks a corrected date."
@@ -137,7 +177,11 @@ async def test_a_duplicate_copies_the_config_and_live_scenarios_but_not_the_exte
     assert response.status_code == 201
     copy = response.json()
     assert copy["id"] != original["id"] and copy["name"] == f"{AGENT['name']} (copy)"
-    assert (copy["external_id"], copy["brief"], copy["current_version"]) == (None, "Books rooms", 1)
+    assert (copy["external_id"], copy["brief"], copy["current_version"]) == (
+        None,
+        "Books rooms for guests",
+        1,
+    )
     assert copy["config"] == "Greet, then book."
     copied = (await client.get(f"/api/v1/agents/{copy['id']}/scenarios")).json()["items"]
     assert [
@@ -187,7 +231,9 @@ async def test_the_list_sorts_by_name_and_by_last_update(client: AsyncClient) ->
     bravo = await create_agent(client, name="bravo")
     await create_agent(client, name="Alpha")
     await create_agent(client, name="charlie")
-    await client.patch(f"/api/v1/agents/{bravo['id']}", json={"brief": "touched"})
+    await client.patch(
+        f"/api/v1/agents/{bravo['id']}", json={"brief": "Touched brief for this agent"}
+    )
 
     async def names(sort: str) -> list[str]:
         response = await client.get("/api/v1/agents", params={"sort": sort})

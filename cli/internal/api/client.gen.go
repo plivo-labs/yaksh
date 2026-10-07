@@ -712,6 +712,24 @@ func (e Transport) Valid() bool {
 	}
 }
 
+// Defines values for TriggerMethod.
+const (
+	GET  TriggerMethod = "GET"
+	POST TriggerMethod = "POST"
+)
+
+// Valid indicates whether the value is a known member of the TriggerMethod enum.
+func (e TriggerMethod) Valid() bool {
+	switch e {
+	case GET:
+		return true
+	case POST:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for UnsureKind.
 const (
 	UnsureKindHiddenAction       UnsureKind = "hidden_action"
@@ -872,7 +890,7 @@ func (e WireEventKind) Valid() bool {
 type AgentConfig struct {
 	AgentNumber      *string                   `json:"agent_number,omitempty"`
 	AgentSpeaksFirst *bool                     `json:"agent_speaks_first,omitempty"`
-	Brief            *string                   `json:"brief,omitempty"`
+	Brief            string                    `json:"brief"`
 	Config           *string                   `json:"config,omitempty"`
 	Direction        *Direction                `json:"direction,omitempty"`
 	KnowledgeBase    *[]KnowledgeBaseEntry     `json:"knowledge_base,omitempty"`
@@ -893,7 +911,7 @@ type AgentConfig_Rules_Item struct {
 type AgentCreate struct {
 	AgentNumber      *string                   `json:"agent_number,omitempty"`
 	AgentSpeaksFirst *bool                     `json:"agent_speaks_first,omitempty"`
-	Brief            *string                   `json:"brief,omitempty"`
+	Brief            string                    `json:"brief"`
 	Config           *string                   `json:"config,omitempty"`
 	Direction        *Direction                `json:"direction,omitempty"`
 	ExternalId       *string                   `json:"external_id,omitempty"`
@@ -916,7 +934,7 @@ type AgentCreate_Rules_Item struct {
 type AgentRead struct {
 	AgentNumber      *string                 `json:"agent_number"`
 	AgentSpeaksFirst bool                    `json:"agent_speaks_first"`
-	Brief            *string                 `json:"brief"`
+	Brief            string                  `json:"brief"`
 	Config           *string                 `json:"config"`
 	CreatedAt        time.Time               `json:"created_at"`
 	CurrentVersion   int                     `json:"current_version"`
@@ -943,7 +961,7 @@ type AgentRead_Rules_Item struct {
 type AgentSummary struct {
 	AgentNumber      *string            `json:"agent_number"`
 	AgentSpeaksFirst bool               `json:"agent_speaks_first"`
-	Brief            *string            `json:"brief"`
+	Brief            string             `json:"brief"`
 	CreatedAt        time.Time          `json:"created_at"`
 	CurrentVersion   int                `json:"current_version"`
 	Direction        Direction          `json:"direction"`
@@ -1447,7 +1465,8 @@ type OutboundConfig struct {
 	CallingNumbers *[]string `json:"calling_numbers,omitempty"`
 	DialWindowS    *int      `json:"dial_window_s,omitempty"`
 
-	// Trigger A POST with a JSON body, sent once for each conversation.
+	// Trigger The request sent once for each conversation: a POST carries its values in a JSON body,
+	// a GET in query parameters.
 	Trigger Trigger `json:"trigger"`
 }
 
@@ -1655,6 +1674,12 @@ type ProviderVoice struct {
 	Id              string       `json:"id"`
 	ListedLanguages *[]Language  `json:"listed_languages,omitempty"`
 	Name            string       `json:"name"`
+}
+
+// QueryParameter defines model for QueryParameter.
+type QueryParameter struct {
+	Name  string `json:"name"`
+	Value string `json:"value"`
 }
 
 // QueuedReview defines model for QueuedReview.
@@ -1982,12 +2007,18 @@ type TextDocumentCreate struct {
 // Transport How Yaksha reaches an agent; phone only today, kept as the seam for other ways.
 type Transport string
 
-// Trigger A POST with a JSON body, sent once for each conversation.
+// Trigger The request sent once for each conversation: a POST carries its values in a JSON body,
+// a GET in query parameters.
 type Trigger struct {
-	Body    map[string]interface{} `json:"body"`
-	Headers *[]Header              `json:"headers,omitempty"`
-	Url     string                 `json:"url"`
+	Body    *map[string]interface{} `json:"body,omitempty"`
+	Headers *[]Header               `json:"headers,omitempty"`
+	Method  *TriggerMethod          `json:"method,omitempty"`
+	Query   *[]QueryParameter       `json:"query,omitempty"`
+	Url     string                  `json:"url"`
 }
+
+// TriggerMethod defines model for TriggerMethod.
+type TriggerMethod string
 
 // TurnRead defines model for TurnRead.
 type TurnRead struct {

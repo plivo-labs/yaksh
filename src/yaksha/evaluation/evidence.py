@@ -26,7 +26,7 @@ ENDED_BY = {
 
 @dataclass(frozen=True)
 class CallView:
-    brief: str | None
+    brief: str
     agent_data: list[Fact]
     goal: str
     known_facts: list[Fact]
@@ -52,7 +52,7 @@ def render(view: CallView) -> str:
             "\n".join(
                 [
                     "AGENT",
-                    f"Brief: {view.brief or 'none'}",
+                    f"Brief: {view.brief}",
                     f"Agent data sent with this call: {facts(view.agent_data)}.",
                 ]
             ),

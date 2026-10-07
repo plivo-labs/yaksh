@@ -1,4 +1,4 @@
-"""Sends an outbound agent's trigger: one POST, never repeated, only to public addresses unless
+"""Sends an outbound agent's trigger: one request, never repeated, only to public addresses unless
 private ones are allowed, with its result classified by what it proves about the call."""
 
 import errno
@@ -14,9 +14,10 @@ from urllib.parse import urlsplit
 import aiohttp
 from aiohttp.abc import AbstractResolver, ResolveResult
 from aiohttp.resolver import DefaultResolver
+from yarl import URL
 
 from yaksha.diagnostics import describe_exception
-from yaksha.domain.triggers import SEND_TIMEOUT_S, RenderedTrigger
+from yaksha.domain.triggers import SEND_TIMEOUT_S, RenderedTrigger, TriggerMethod
 
 TIMEOUT = aiohttp.ClientTimeout(total=SEND_TIMEOUT_S, sock_connect=5)
 EXCERPT_CHARS = 500
@@ -79,9 +80,15 @@ class PublicOnlyResolver(AbstractResolver):
         await self._resolver.close()
 
 
-def signed_headers(key: str, delivery_id: str, body: bytes) -> dict[str, str]:
+def signed_payload(request: RenderedTrigger) -> bytes:
+    """What the signature covers after the delivery ID and timestamp: the body of a POST, and the
+    full URL of a GET, whose values are in its query."""
+    return request.url.encode() if request.method is TriggerMethod.GET else request.body
+
+
+def signed_headers(key: str, delivery_id: str, payload: bytes) -> dict[str, str]:
     timestamp = str(int(time.time()))
-    message = f"{delivery_id}.{timestamp}.".encode() + body
+    message = f"{delivery_id}.{timestamp}.".encode() + payload
     digest = hmac.new(key.encode(), message, hashlib.sha256).hexdigest()
     return {"X-Yaksha-Timestamp": timestamp, "X-Yaksha-Signature": f"v1={digest}"}
 
@@ -127,26 +134,29 @@ async def send_trigger(
     problem = address_problem(request.url, allow_private)
     if problem is not None:
         return TriggerOutcome(TriggerResult.NOT_SENT, problem)
-    headers = {
-        **request.headers,
-        "Content-Type": "application/json",
-        "X-Yaksha-Delivery": delivery_id,
-    }
+    headers = {**request.headers, "X-Yaksha-Delivery": delivery_id}
+    if request.method is TriggerMethod.POST:
+        headers["Content-Type"] = "application/json"
     if signing_key:
-        headers |= signed_headers(signing_key, delivery_id, request.body)
+        headers |= signed_headers(signing_key, delivery_id, signed_payload(request))
     resolver = None if allow_private else PublicOnlyResolver()
     status: int | None = None
     try:
-        async with (
-            aiohttp.ClientSession(
-                timeout=timeout, connector=aiohttp.TCPConnector(resolver=resolver)
-            ) as session,
-            session.post(
-                request.url, data=request.body, headers=headers, allow_redirects=False
-            ) as response,
-        ):
-            status = response.status
-            text = await read_bounded(response)
+        async with aiohttp.ClientSession(
+            timeout=timeout, connector=aiohttp.TCPConnector(resolver=resolver)
+        ) as session:
+            # aiohttp sends a GET again after a dropped connection, and a trigger must start one
+            # call only. This private switch is the one aiohttp's own test client uses.
+            session._retry_connection = False
+            async with session.request(
+                request.method,
+                URL(request.url, encoded=True),
+                data=request.body or None,
+                headers=headers,
+                allow_redirects=False,
+            ) as response:
+                status = response.status
+                text = await read_bounded(response)
     except (aiohttp.ClientConnectorError, aiohttp.ConnectionTimeoutError) as error:
         return TriggerOutcome(
             TriggerResult.NOT_SENT, mask(describe_exception(error), request.secrets)

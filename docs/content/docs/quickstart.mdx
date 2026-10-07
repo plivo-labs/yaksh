@@ -69,13 +69,13 @@ You can do these steps in the console or with the API. The commands below use th
 
    Copy the ID of one persona.
 
-3. Add your agent with its phone number:
+3. Add your agent with its phone number and a brief of at least 20 characters:
 
    ```sh
    curl -X POST localhost:8000/api/v1/agents \
      -H "Authorization: Bearer $YAKSHA_API_TOKEN" \
      -H 'Content-Type: application/json' \
-     -d '{"name": "Support line", "agent_number": "+14155550100"}'
+     -d '{"name": "Support line", "agent_number": "+14155550100", "brief": "Answers billing questions and resets passwords."}'
    ```
 
 4. Add a scenario that uses the persona:

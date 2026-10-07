@@ -5,6 +5,7 @@ from typing import Annotated, Any
 from pydantic import (
     AfterValidator,
     BaseModel,
+    BeforeValidator,
     ConfigDict,
     Field,
     StringConstraints,
@@ -31,6 +32,7 @@ class Transport(StrEnum):
     PHONE = "phone"
 
 
+MIN_BRIEF_CHARS = 20
 MAX_BRIEF_CHARS = 10_000
 MAX_CONFIG_CHARS = 1_000_000
 MAX_KNOWLEDGE_BASE_DOCUMENTS = 20
@@ -41,7 +43,18 @@ def without_nul(value: str) -> str:
     return value.replace("\x00", "")
 
 
-Brief = Annotated[str, StringConstraints(max_length=MAX_BRIEF_CHARS), AfterValidator(without_nul)]
+def without_nul_first(value: object) -> object:
+    """NUL is dropped before the length check, so twenty NULs are not a brief."""
+    return without_nul(value) if isinstance(value, str) else value
+
+
+Brief = Annotated[
+    str,
+    StringConstraints(
+        strip_whitespace=True, min_length=MIN_BRIEF_CHARS, max_length=MAX_BRIEF_CHARS
+    ),
+    BeforeValidator(without_nul_first),
+]
 ConfigText = Annotated[
     str, StringConstraints(max_length=MAX_CONFIG_CHARS), AfterValidator(without_nul)
 ]
@@ -80,7 +93,7 @@ class AgentConfig(BaseModel):
     outbound: OutboundConfig | None = None
     agent_speaks_first: bool = True
     language: Language = Language.EN
-    brief: Brief | None = None
+    brief: Brief
     """A short description of the agent, in the user's words."""
     config: ConfigText | None = None
     """The agent's full configuration as text, in any format: a prompt, a flow, an export."""
@@ -130,7 +143,7 @@ class AgentUpdate(BaseModel):
     knowledge_base: Annotated[KnowledgeBase, AfterValidator(distinct_entries)] | None = None
     rules: AgentRules | None = None
 
-    @field_validator("name", "language", "knowledge_base", "rules")
+    @field_validator("name", "language", "brief", "knowledge_base", "rules")
     @classmethod
     def cannot_be_cleared(cls, value: Any, info: ValidationInfo) -> Any:
         if value is None:

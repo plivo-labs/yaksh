@@ -237,7 +237,7 @@ export function AgentScenarios({ agent }: { agent: Agent }) {
               </Button>
               <Button variant="outline" size="sm" onClick={() => setEditing("new")}>
                 <Plus />
-                New scenario
+                Write a scenario manually
               </Button>
             </div>
           </div>
@@ -266,8 +266,8 @@ export function AgentScenarios({ agent }: { agent: Agent }) {
                   <Button
                     variant="outline"
                     size="icon-sm"
-                    aria-label="New scenario"
-                    title="New scenario"
+                    aria-label="Write a scenario manually"
+                    title="Write a scenario manually"
                     onClick={() => setEditing("new")}
                   >
                     <Plus />

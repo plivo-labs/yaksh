@@ -215,7 +215,6 @@ async def test_a_model_failure_ends_the_generation_as_failed(
 @pytest.mark.parametrize(
     ("setup", "body", "status", "message"),
     [
-        ("empty", {}, 422, "add a brief, a config or knowledge base documents first"),
         (
             "brief",
             {"mode": "knowledge_base", "document_ids": [str(uuid.UUID(int=1))]},
@@ -225,13 +224,12 @@ async def test_a_model_failure_ends_the_generation_as_failed(
         ("huge", {}, 422, "the limit is 800,000"),
         ("brief", {"count": 21}, 422, "count"),
     ],
-    ids=["no context", "foreign document", "too much context", "too many"],
+    ids=["foreign document", "too much context", "too many"],
 )
 async def test_a_generation_is_refused_before_it_starts(
     client: AsyncClient, setup: str, body: dict, status: int, message: str
 ) -> None:
     extra = {
-        "empty": {},
         "brief": {"brief": BRIEF},
         "huge": {"config": "x" * MAX_PLANNER_CHARS},
     }[setup]

@@ -64,7 +64,7 @@ class Agent(Base):
     outbound: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     agent_speaks_first: Mapped[bool] = mapped_column(Boolean, default=True)
     language: Mapped[Language] = mapped_column(pg_enum(Language, "language"))
-    brief: Mapped[str | None] = mapped_column(Text)
+    brief: Mapped[str] = mapped_column(Text)
     config: Mapped[str | None] = mapped_column(Text)
     knowledge_base: Mapped[list[dict[str, Any]]] = mapped_column(
         JSONB, default=list, server_default=text("'[]'::jsonb")

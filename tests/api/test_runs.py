@@ -127,7 +127,9 @@ async def test_every_conversation_of_a_run_pins_what_was_current_when_it_started
     run = (await start_run(client, agent, [first["id"], second["id"]], repeats=2)).json()
 
     edits = [
-        await client.patch(f"/api/v1/agents/{agent}", json={"brief": "Changed."}),
+        await client.patch(
+            f"/api/v1/agents/{agent}", json={"brief": "A changed brief for the agent."}
+        ),
         await client.patch(f"/api/v1/scenarios/{first['id']}", json={"goal": "Cancel it."}),
         await client.patch(f"/api/v1/personas/{persona}", json={"prompt": "Someone else."}),
     ]

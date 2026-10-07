@@ -50,7 +50,7 @@ Pick a persona, create the agent with its number and a scenario that runs with t
 ```sh
 curl localhost:8000/api/v1/personas -H "Authorization: Bearer $YAKSHA_API_TOKEN"
 curl -X POST localhost:8000/api/v1/agents -H "Authorization: Bearer $YAKSHA_API_TOKEN" -H 'Content-Type: application/json' \
-  -d '{"name": "Support line", "agent_number": "+14155550100"}'
+  -d '{"name": "Support line", "agent_number": "+14155550100", "brief": "Answers billing questions and resets passwords."}'
 curl -X POST localhost:8000/api/v1/agents/<agent id>/scenarios -H "Authorization: Bearer $YAKSHA_API_TOKEN" -H 'Content-Type: application/json' \
   -d '{"name": "Book a table", "persona_id": "<persona id>", "goal": "Book a table for two tonight.", "known_facts": [{"name": "Name", "value": "Priya Raman"}], "criteria": ["Reads the time and party size back before it books."]}'
 curl -X POST localhost:8000/api/v1/runs -H "Authorization: Bearer $YAKSHA_API_TOKEN" -H 'Content-Type: application/json' \
@@ -155,7 +155,7 @@ Uploaded files (PDF, TXT and MD documents about an agent) are kept in S3-compati
 
 ## Outbound agents
 
-An outbound agent calls Yaksha. Yaksha sends the agent's trigger, a POST request that makes the agent call one of Yaksha's numbers, and answers that call.
+An outbound agent calls Yaksha. Yaksha sends the agent's trigger, a POST or GET request that makes the agent call one of Yaksha's numbers, and answers that call.
 
 1. In the Plivo console, create an Application with answer URL `<YAKSHA_PUBLIC_URL>/incoming` and hangup URL `<YAKSHA_PUBLIC_URL>/incoming/hangup`, both `POST`, and link the numbers that receive test calls to it.
 2. Set the variables below, then recreate the API and the worker as in Phone: the API reads `YAKSHA_PLIVO_APP_ID` and the worker reads all of them at startup, and a restart keeps the old values. The worker reads the Application and its numbers at startup too, so restart it after a change in the Plivo console. The Numbers page says why outbound tests are off, if they are.

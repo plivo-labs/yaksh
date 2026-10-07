@@ -2,7 +2,7 @@ import asyncio
 import uuid
 from pathlib import Path
 
-from tests.conftest import CALLER
+from tests.conftest import AGENT, CALLER
 from yaksha.domain.agents import AgentConfig
 from yaksha.domain.conversations import (
     CallObserver,
@@ -16,7 +16,7 @@ from yaksha.simulation.calls import STOP_IGNORED, LiveCall, run_call
 
 REQUEST = CallRequest(
     conversation_id=uuid.uuid4(),
-    agent=AgentConfig.model_validate({"agent_number": "+14155550100"}),
+    agent=AgentConfig.model_validate({"agent_number": "+14155550100", "brief": AGENT["brief"]}),
     **CALLER,
     caller_number="+15550100000",
     max_duration_s=10,

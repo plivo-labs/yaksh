@@ -70,7 +70,7 @@ QUESTIONS_SYSTEM = render("questions_system.j2")
 SCENARIO_SYSTEM = render("scenario_system.j2")
 
 
-def context_text(brief: str | None, config: str | None, documents: list[tuple[str, str]]) -> str:
+def context_text(brief: str, config: str | None, documents: list[tuple[str, str]]) -> str:
     """What the planner reads about the agent; its quotes must come from this text."""
     return render("context.j2", brief=brief, config=config, documents=documents)
 

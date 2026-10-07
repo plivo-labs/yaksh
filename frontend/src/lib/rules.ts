@@ -30,6 +30,10 @@ export const NEW_PHRASE: PhraseRule = {
   role: "reporting",
 };
 
+/** The rules with `rule` added (`index` null) or put in place of the one at `index`. */
+export const withRule = (rules: AgentRule[], index: number | null, rule: AgentRule) =>
+  index === null ? [...rules, rule] : rules.map((saved, at) => (at === index ? rule : saved));
+
 /** What a rule still needs, by field. The server checks a regular expression. */
 export function ruleProblems(rule: AgentRule): Partial<Record<string, string>> {
   const problems: Partial<Record<string, string>> = {};
@@ -75,4 +79,35 @@ function slug(name: string): string {
     .replace(/^-+|-+$/g, "")
     .slice(0, 63);
   return found || "rule";
+}
+
+/** How each kind of rule is decided, and what a change to it does to its results. */
+export const KIND: Record<AgentRule["kind"], { label: string; note: string; edit: string }> = {
+  llm: {
+    label: "LLM rule",
+    note: "The judge model decides it on every judged call, beside the scenario's criteria.",
+    edit: "A change to its name, its text or the calls it is judged on starts its results again.",
+  },
+  phrase: {
+    label: "phrase rule",
+    note: "Code looks for it in the agent's lines on every judged call.",
+    edit: "A change to what it looks for, or where, starts its results again; a new name does not.",
+  },
+};
+
+const PHRASE_VERB = {
+  phrase: { required: "Must say", forbidden: "Must not say" },
+  regex: { required: "Must match", forbidden: "Must not match" },
+} as const;
+
+/** What a rule checks, in one line. */
+export function summary(rule: AgentRule): string {
+  if (rule.kind === "llm") {
+    return rule.gate === "always"
+      ? "Judge model, every call"
+      : "Judge model, calls where the agent spoke";
+  }
+  const value = rule.match === "phrase" ? `"${rule.value}"` : rule.value;
+  const where = rule.where === "first_agent_turn" ? " in its first turn" : "";
+  return `${PHRASE_VERB[rule.match][rule.expects]} ${value}${where}`;
 }

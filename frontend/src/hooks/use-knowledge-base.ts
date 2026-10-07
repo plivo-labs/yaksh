@@ -53,8 +53,11 @@ function fromSummary(document: DocumentSummary): KnowledgeBaseDocument {
 
 /** The knowledge base of an agent that does not exist yet. The documents are uploaded now and
  * go with the request that adds the agent; `adding` locks the list while that request runs. */
-export function useDraftKnowledgeBase(adding: boolean): KnowledgeBaseSource {
-  const [documents, setDocuments] = useState<KnowledgeBaseDocument[]>([]);
+export function useDraftKnowledgeBase(
+  adding: boolean,
+  initial: KnowledgeBaseDocument[] = [],
+): KnowledgeBaseSource {
+  const [documents, setDocuments] = useState(initial);
   const [progress, setProgress] = useState<string | null>(null);
   return {
     progress,

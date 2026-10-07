@@ -29,7 +29,7 @@ def upgrade() -> None:
         sa.Column("outbound", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
         sa.Column("agent_speaks_first", sa.Boolean(), nullable=False),
         sa.Column("language", sa.Enum("en", "hinglish", name="language"), nullable=False),
-        sa.Column("brief", sa.Text(), nullable=True),
+        sa.Column("brief", sa.Text(), nullable=False),
         sa.Column("config", sa.Text(), nullable=True),
         sa.Column(
             "knowledge_base",
