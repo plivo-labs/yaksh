@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"sync"
@@ -129,6 +130,49 @@ func TestAgentListPrintsTheServersJSON(t *testing.T) {
 	req := f.requests("GET", "/api/v1/agents")[0]
 	if req.query != "" || req.header.Get("Authorization") != "Bearer t0k" {
 		t.Fatalf("query = %q, Authorization = %q", req.query, req.header.Get("Authorization"))
+	}
+}
+
+func TestAgentImportPrintsTheDraftOrAddsTheAgent(t *testing.T) {
+	const draft = `{"provider":"plivo_cx","name":"Dental front desk","external_id":"flow-1","language":"hi","config":"{}"}`
+	file := filepath.Join(t.TempDir(), "front-desk-config.json")
+	if err := os.WriteFile(file, []byte(`{"flowId":"flow-1"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	f := newFakeAPI(t, map[string]http.HandlerFunc{
+		"POST /api/v1/agents/import": reply(200, draft),
+		"POST /api/v1/agents":        reply(201, `{"id":"`+agentID+`"}`),
+	})
+
+	printed, stdout, stderr := run(t, context.Background(), against(f), "", "agent", "import", file, "--name", "Front desk")
+	if printed != 0 || stderr != "" || !strings.Contains(stdout, `"name": "Front desk"`) || len(f.requests("POST", "/api/v1/agents")) != 0 {
+		t.Fatalf("code = %d, stdout = %q, stderr = %q", printed, stdout, stderr)
+	}
+	added, stdout, stderr := run(t, context.Background(), against(f), "",
+		"agent", "import", file, "--brief", "Books dental appointments for callers.", "--number", "+14155550100")
+	if added != 0 || stderr != "" || !strings.Contains(stdout, agentID) {
+		t.Fatalf("code = %d, stdout = %q, stderr = %q", added, stdout, stderr)
+	}
+
+	if sent := string(f.requests("POST", "/api/v1/agents/import")[0].body); sent != `{"content":"{\"flowId\":\"flow-1\"}"}` {
+		t.Fatalf("import body = %s", sent)
+	}
+	var body map[string]any
+	if err := json.Unmarshal(f.requests("POST", "/api/v1/agents")[0].body, &body); err != nil {
+		t.Fatal(err)
+	}
+	want := `{"agent_number":"+14155550100","brief":"Books dental appointments for callers.","config":"{}","external_id":"flow-1","language":"hi","name":"Dental front desk"}`
+	if got, _ := json.Marshal(body); string(got) != want {
+		t.Fatalf("create body = %s, want %s", got, want)
+	}
+}
+
+func TestAgentImportNeedsBothTheBriefAndTheNumber(t *testing.T) {
+	f := newFakeAPI(t, nil)
+	code, _, stderr := run(t, context.Background(), against(f), "", "agent", "import", "x.json", "--brief", "Books dental appointments.")
+
+	if code == 0 || !strings.Contains(stderr, "number") || len(f.seen) != 0 {
+		t.Fatalf("code = %d, stderr = %q, requests = %d", code, stderr, len(f.seen))
 	}
 }
 

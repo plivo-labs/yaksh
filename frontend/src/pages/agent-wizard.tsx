@@ -1,10 +1,12 @@
-import { ArrowLeft } from "lucide-react";
-import { type ReactNode, type SubmitEvent, useEffect, useRef, useState } from "react";
+import { ArrowLeft, FileJson } from "lucide-react";
+import { type SubmitEvent, useCallback, useEffect, useRef, useState } from "react";
 import { Link, useBlocker, useNavigate, useSearchParams } from "react-router";
 import { toast } from "sonner";
 
 import { DiscardConfirm } from "@/components/confirm-dialogs";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Panel, PanelHeader } from "@/components/panel";
+import { StepFooter } from "@/components/step-footer";
 import { type Step, Steps } from "@/components/steps";
 import { Button } from "@/components/ui/button";
 import { FieldDescription, FieldError, FieldGroup } from "@/components/ui/field";
@@ -13,11 +15,18 @@ import { useDraftKnowledgeBase } from "@/hooks/use-knowledge-base";
 import { APPEAR, STEP_BACK, STEP_FORWARD } from "@/lib/motion";
 import { useSaveAgent } from "@/lib/queries";
 import { NEW_LLM, NEW_PHRASE, ruleProblems, toRules, withRule } from "@/lib/rules";
-import { sessionDraft } from "@/lib/storage";
-import type { AgentRule, KnowledgeBaseDocument } from "@/lib/types";
+import type { AgentRule } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { useAgentDraft } from "@/hooks/use-agent-draft";
-import { CONTEXT_NOTE, type Draft, EMPTY_DRAFT, toInput } from "@/lib/agent-draft";
+import { useBriefDraft } from "@/hooks/use-brief-draft";
+import { CONTEXT_NOTE, EMPTY_DRAFT, toInput } from "@/lib/agent-draft";
+import {
+  clearStoredDraft,
+  type ImportedFrom,
+  readStoredDraft,
+  type StoredDraft,
+  writeStoredDraft,
+} from "@/lib/new-agent-draft";
 import {
   AgentIdField,
   CallOptionsFields,
@@ -36,39 +45,6 @@ const STEPS: Step[] = [
   { label: "Rules", hint: "Optional" },
 ];
 
-const DRAFT_KEY = "yaksha.new-agent-draft";
-
-/** What the wizard keeps in this tab, so a reload does not lose it. */
-interface StoredDraft {
-  draft: Draft;
-  rules: AgentRule[];
-  documents: KnowledgeBaseDocument[];
-  /** The rule in the open form, by the `rule` value in the address that opened it. */
-  openRule: { param: string; rule: AgentRule } | null;
-}
-
-/** The draft this tab kept. A draft kept by an older version of the page lacks newer fields, so
- * the defaults fill them. */
-function readStoredDraft(): StoredDraft | null {
-  const raw = sessionDraft.getItem(DRAFT_KEY);
-  if (!raw) return null;
-  try {
-    const stored = JSON.parse(raw) as Partial<StoredDraft>;
-    return {
-      draft: {
-        ...EMPTY_DRAFT,
-        ...stored.draft,
-        outbound: { ...EMPTY_DRAFT.outbound, ...stored.draft?.outbound },
-      },
-      rules: stored.rules ?? [],
-      documents: stored.documents ?? [],
-      openRule: stored.openRule ?? null,
-    };
-  } catch {
-    return null;
-  }
-}
-
 /** The address of another step; the other parameters, such as an open rule, stay. */
 function withStep(params: URLSearchParams, step: number) {
   const next = new URLSearchParams(params);
@@ -86,6 +62,10 @@ export function AgentWizardPage() {
   const form = useAgentDraft(EMPTY_DRAFT, stored?.draft);
   const [rules, setRules] = useState<AgentRule[]>(stored?.rules ?? []);
   const [ruleDraft, setRuleDraft] = useState(stored?.openRule ?? null);
+  const importedFrom = stored?.importedFrom ?? null;
+  const [briefDraftId, setBriefDraftId] = useState(stored?.briefDraftId ?? null);
+  const briefDone = useCallback(() => setBriefDraftId(null), []);
+  const brief = useBriefDraft(form, briefDraftId, briefDone);
   const save = useSaveAgent();
   const saving = save.isPending;
   const knowledgeBase = useDraftKnowledgeBase(save.isPending, stored?.documents);
@@ -135,9 +115,11 @@ export function AgentWizardPage() {
       rules,
       documents: knowledgeBase.documents,
       openRule: ruleDraft,
+      importedFrom,
+      briefDraftId,
     };
-    sessionDraft.setItem(DRAFT_KEY, JSON.stringify(kept));
-  }, [form.draft, rules, knowledgeBase.documents, ruleDraft]);
+    writeStoredDraft(kept);
+  }, [form.draft, rules, knowledgeBase.documents, ruleDraft, importedFrom, briefDraftId]);
 
   const blocker = useBlocker(
     ({ currentLocation, nextLocation }) =>
@@ -182,7 +164,7 @@ export function AgentWizardPage() {
       {
         onSuccess: (agent) => {
           done.current = true;
-          sessionDraft.removeItem(DRAFT_KEY);
+          clearStoredDraft();
           toast.success(`${agent.name} is added`);
           navigate(`/agents/${agent.id}`, { replace: true });
         },
@@ -218,26 +200,32 @@ export function AgentWizardPage() {
             onSubmit={(event) => continueFrom(event, 1)}
             className="flex flex-1 flex-col gap-6"
           >
+            {importedFrom && <ImportedNote from={importedFrom} />}
             <Panel>
               <PanelHeader title="Agent" />
               <div className="grid gap-5 px-5 py-5">
                 <p className="text-p-400 text-muted-foreground">{CONTEXT_NOTE}</p>
                 <FieldGroup>
                   <NameField form={form} />
-                  <ContextFields form={form} />
+                  <ContextFields form={form} brief={brief} />
                   <AgentIdField form={form} />
                 </FieldGroup>
               </div>
             </Panel>
-            <Footer>
+            <StepFooter>
               <Button variant="ghost" nativeButton={false} render={<Link to="/agents/new" />}>
                 <ArrowLeft />
                 Back
               </Button>
-              <Button type="submit" className="ml-auto">
+              {brief.drafting && (
+                <FieldDescription className={cn("ml-auto", APPEAR)}>
+                  Wait for the brief.
+                </FieldDescription>
+              )}
+              <Button type="submit" className="ml-auto" disabled={brief.drafting}>
                 Continue
               </Button>
-            </Footer>
+            </StepFooter>
           </form>
         )}
 
@@ -254,7 +242,7 @@ export function AgentWizardPage() {
                 <CallOptionsFields form={form} />
               </FieldGroup>
             </Panel>
-            <Footer>
+            <StepFooter>
               <Button type="button" variant="ghost" onClick={() => goTo(1)}>
                 <ArrowLeft />
                 Back
@@ -262,7 +250,7 @@ export function AgentWizardPage() {
               <Button type="submit" className="ml-auto">
                 Continue
               </Button>
-            </Footer>
+            </StepFooter>
           </form>
         )}
 
@@ -274,7 +262,7 @@ export function AgentWizardPage() {
               tab.
             </p>
             <KnowledgeBasePanel source={knowledgeBase} />
-            <Footer>
+            <StepFooter>
               <Button type="button" variant="ghost" onClick={() => goTo(2)}>
                 <ArrowLeft />
                 Back
@@ -287,7 +275,7 @@ export function AgentWizardPage() {
               <Button className="ml-auto" disabled={uploading} onClick={() => goTo(4)}>
                 {knowledgeBase.documents.length === 0 ? "Skip" : "Continue"}
               </Button>
-            </Footer>
+            </StepFooter>
           </div>
         )}
 
@@ -310,7 +298,7 @@ export function AgentWizardPage() {
                 !saving && ruleParam && setRuleDraft({ param: ruleParam, rule })
               }
             />
-            <Footer>
+            <StepFooter>
               <Button type="button" variant="ghost" disabled={saving} onClick={() => goTo(3)}>
                 <ArrowLeft />
                 Back
@@ -337,7 +325,7 @@ export function AgentWizardPage() {
                   Add agent
                 </Button>
               </div>
-            </Footer>
+            </StepFooter>
           </div>
         )}
       </div>
@@ -348,7 +336,7 @@ export function AgentWizardPage() {
         onOpenChange={(open) => !open && blocker.reset?.()}
         onDiscard={() => {
           done.current = true;
-          sessionDraft.removeItem(DRAFT_KEY);
+          clearStoredDraft();
           blocker.proceed?.();
         }}
       />
@@ -375,13 +363,17 @@ function openRule(
   return opened && typed?.param === param ? { ...opened, rule: typed.rule } : opened;
 }
 
-/** The step's buttons, kept in view at the bottom of the page. The shell's scroll area keeps a
- * bottom padding that a sticky element stops above, so the shadow fills it and nothing scrolls
- * into view below the buttons. */
-function Footer({ children }: { children: ReactNode }) {
+/** Where the draft came from, and what is left to fill in. */
+function ImportedNote({ from }: { from: ImportedFrom }) {
   return (
-    <div className="sticky bottom-0 z-10 mt-auto flex flex-wrap items-center gap-x-3 gap-y-2 border-t bg-background py-4 shadow-[0_1.25rem_0_0_var(--color-background)]">
-      {children}
-    </div>
+    <Alert role="status">
+      <FileJson />
+      <AlertTitle>Filled from {from.file}</AlertTitle>
+      <AlertDescription>
+        {from.recognized
+          ? "Yaksha filled the name, the agent ID, the language and the config from the file, and drafted the brief from it. Check the brief, then add the phone number in the next step."
+          : "The whole file is the config, and Yaksha drafted the brief from it. Check the brief, then fill in the other fields."}
+      </AlertDescription>
+    </Alert>
   );
 }

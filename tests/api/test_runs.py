@@ -608,7 +608,7 @@ async def test_omitted_fields_take_the_operators_defaults_as_the_api_reports_the
         refused = await start_run(strict, agent, [scenario], max_retries=1)
         calls = [await run_conversations(strict, r.json()["id"]) for r in (started, chosen)]
 
-    openings = {"en": "Hello", "hinglish": "Hello"}
+    openings = {"en": "Hello", "hi": "Hello"}
     assert standard == {
         "max_duration_s": 300,
         "max_turns": 20,

@@ -51,6 +51,14 @@ If the judges failed a call, these commands show why:
 
 The instruction adherence judge reads the `config` of the agent in Yaksha. After you change the prompt or the flow of the agent, update this copy with `yaksha agent update <agent id> --config-file prompt.md`.
 
+To add an agent from a Plivo CX agent download (the `{name}-config.json` file from the Plivo CX console), use this command:
+
+```sh
+yaksha agent import front-desk-config.json --brief "Books dental appointments for callers." --number +14155550100
+```
+
+Yaksha takes the name, the agent ID and the language from the file, and keeps the whole file as the config. If the first language of the flow is not English or Hindi, the agent gets English. Without `--brief` and `--number`, the command shows what Yaksha reads from the file and adds no agent. In the console, choose **Import from a JSON file** on the **New agent** page.
+
 `yaksha guide` shows how a coding agent uses the CLI to do tests of a voice agent. The same text is the skill in `cli/skill/yaksha/SKILL.md`. To add the skill for all your projects, use `npx skills add plivo-labs/yaksha -g`. Without `-g`, the skill goes only into the project in the current folder.
 
 `yaksha --help` and `yaksha <command> --help` show all commands and flags.

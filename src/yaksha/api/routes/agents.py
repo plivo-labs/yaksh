@@ -1,17 +1,22 @@
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query, Request, status
 
 from yaksha.api.auth import require_token
 from yaksha.api.deps import SessionDep
+from yaksha.api.errors import UNAVAILABLE
 from yaksha.api.pagination import Page, PageDep
 from yaksha.api.schemas.agents import AgentRead, AgentSummary, AgentVersionRead
 from yaksha.db.models import Agent
-from yaksha.domain.agents import AgentCreate, AgentUpdate, Direction
+from yaksha.domain.agent_import import AgentDraft, AgentFile, CurlCommand, StartRequestDraft
+from yaksha.domain.agents import AgentCreate, AgentUpdate, BriefDraft, BriefSource, Direction
 from yaksha.domain.evaluations import RuleResults
 from yaksha.evaluation import rule_results
 from yaksha.simulation import agents
+from yaksha.simulation.agent_import import import_agent
+from yaksha.simulation.briefs import draft_brief
+from yaksha.simulation.curl_import import start_request_from_curl
 
 SORT_PATTERN = f"^-?({'|'.join(agents.SORT_KEYS)})$"
 
@@ -26,6 +31,28 @@ router = APIRouter(prefix="/agents", tags=["agents"], dependencies=[Depends(requ
 @router.post("", status_code=status.HTTP_201_CREATED)
 async def create_agent(command: AgentCreate, session: SessionDep) -> AgentRead:
     return await agent_read(session, await agents.create_agent(session, command))
+
+
+@router.post("/import")
+async def import_agent_file(file: AgentFile) -> AgentDraft:
+    """Read an agent file from another platform into a draft. Nothing is saved. A file in a format
+    that Yaksha does not read fails with the code `not_recognized`; it can still be the config."""
+    return import_agent(file.content)
+
+
+@router.post("/start-request-from-curl")
+async def read_curl_command(curl: CurlCommand) -> StartRequestDraft:
+    """Read a cURL command into a start request, for an agent that calls Yaksha. Nothing is
+    saved. A body field or query parameter that looks like the number to call gets
+    `{{yaksha.number}}`."""
+    return start_request_from_curl(curl.command)
+
+
+@router.post("/draft-brief", responses=UNAVAILABLE)
+async def draft_agent_brief(source: BriefSource, request: Request) -> BriefDraft:
+    """Draft a brief from an agent's config, for the person to check and change. Nothing is
+    saved."""
+    return BriefDraft(brief=await draft_brief(request.app.state.brief_model, source.config))
 
 
 @router.get("")

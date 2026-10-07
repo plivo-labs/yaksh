@@ -119,6 +119,14 @@ class AgentConfig(BaseModel):
         return self
 
 
+class BriefSource(BaseModel):
+    config: ConfigText
+
+
+class BriefDraft(BaseModel):
+    brief: str
+
+
 class AgentCreate(AgentConfig):
     name: str = Field(min_length=1)
     external_id: str | None = None

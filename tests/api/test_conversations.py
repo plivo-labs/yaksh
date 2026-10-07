@@ -730,7 +730,7 @@ async def test_a_conversation_freezes_its_persona_scenario_and_prompt(
 ) -> None:
     agent_id = await create_agent_id(client)
     persona = await create_persona(
-        client, language="hinglish", background_noise={"sound": "cafe", "level": "busy"}
+        client, language="hi", background_noise={"sound": "cafe", "level": "busy"}
     )
     scenario = await create_scenario(
         client, agent_id, first_words="Haan, bolo?", persona_id=persona["id"]
@@ -759,7 +759,7 @@ async def test_a_conversation_freezes_its_persona_scenario_and_prompt(
 
     assert (detail["persona_name"], detail["persona_version"]) == (persona["name"], 1)
     assert (detail["scenario_name"], detail["scenario_version"]) == ("Renamed", 1)
-    assert detail["scenario"]["goal"] == SCENARIO["goal"] and detail["language"] == "hinglish"
+    assert detail["scenario"]["goal"] == SCENARIO["goal"] and detail["language"] == "hi"
     assert (
         PERSONA["prompt"] in detail["instructions"] and "Someone else." not in request.instructions
     )

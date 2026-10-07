@@ -26,13 +26,13 @@ async def voices(client: AsyncClient, **params: str | int) -> dict[str, Any]:
 
 async def test_languages_read_back_and_filter_the_list(client: AsyncClient) -> None:
     everyone = await voices(client)
-    hinglish = await voices(client, language="hinglish")
+    hindi = await voices(client, language="hi")
     first, second = await voices(client, page_size=1), await voices(client, page_size=1, page=2)
 
     by_id = {voice["provider_voice_id"]: voice for voice in everyone["items"]}
-    assert by_id[HINDI_VOICE.id]["languages"] == ["en", "hinglish"]
+    assert by_id[HINDI_VOICE.id]["languages"] == ["en", "hi"]
     assert by_id[ENGLISH_VOICE.id]["languages"] == ["en"]
-    assert [voice["provider_voice_id"] for voice in hinglish["items"]] == [HINDI_VOICE.id]
+    assert [voice["provider_voice_id"] for voice in hindi["items"]] == [HINDI_VOICE.id]
     assert first["total"] == second["total"] == 2
     assert first["items"][0]["id"] != second["items"][0]["id"]
 
@@ -60,7 +60,7 @@ async def test_a_lookup_shows_the_provider_details_and_saves_nothing(
 
 
 async def test_adding_a_voice_takes_the_provider_details(client: AsyncClient) -> None:
-    added = await client.post("/api/v1/voices", json={**NEW_VOICE, "languages": ["hinglish"]})
+    added = await client.post("/api/v1/voices", json={**NEW_VOICE, "languages": ["hi"]})
     named = await client.post(
         "/api/v1/voices",
         json={
@@ -75,7 +75,7 @@ async def test_adding_a_voice_takes_the_provider_details(client: AsyncClient) ->
     body = added.json()
     assert (body["name"], body["gender"], body["accent"]) == ("Riya", "female", "indian")
     assert (body["languages"], body["listed_languages"], body["builtin"]) == (
-        ["hinglish"],
+        ["hi"],
         [],
         False,
     )
@@ -125,17 +125,17 @@ async def test_nothing_is_added_for_an_unknown_voice_or_a_provider_that_is_down(
 async def test_an_edit_changes_name_and_languages_but_never_to_empty(client: AsyncClient) -> None:
     url = f"/api/v1/voices/{await listed_voice_id(client, ENGLISH_VOICE.id)}"
 
-    edited = await client.patch(url, json={"name": "Chris (calm)", "languages": ["hinglish", "en"]})
-    relabeled = await client.patch(url, json={"languages": ["hinglish"]})
+    edited = await client.patch(url, json={"name": "Chris (calm)", "languages": ["hi", "en"]})
+    relabeled = await client.patch(url, json={"languages": ["hi"]})
     no_languages = await client.patch(url, json={"languages": []})
     cleared = await client.patch(url, json={"name": None})
     moved = await client.patch(url, json={"provider_voice_id": HINDI_VOICE.id})
 
     assert edited.json()["name"] == "Chris (calm)"
-    assert edited.json()["languages"] == ["en", "hinglish"]
+    assert edited.json()["languages"] == ["en", "hi"]
     assert (relabeled.json()["name"], relabeled.json()["languages"]) == (
         "Chris (calm)",
-        ["hinglish"],
+        ["hi"],
     )
     assert no_languages.status_code == cleared.status_code == moved.status_code == 422
 
@@ -145,19 +145,17 @@ async def test_a_preview_speaks_the_language_sample_with_the_call_settings(
 ) -> None:
     voice = {"provider": "elevenlabs", "id": HINDI_VOICE.id, "speed": 1.15, "stability": 0.3}
 
-    heard = await client.post(
-        "/api/v1/voices/preview", json={"voice": voice, "language": "hinglish"}
-    )
+    heard = await client.post("/api/v1/voices/preview", json={"voice": voice, "language": "hi"})
     unknown = await client.post(
         "/api/v1/voices/preview",
-        json={"voice": {**voice, "id": "nope"}, "language": "hinglish"},
+        json={"voice": {**voice, "id": "nope"}, "language": "hi"},
     )
 
     assert heard.status_code == 200 and heard.headers["content-type"] == "audio/wav"
     assert heard.content == SPOKEN
     spoken_voice, language, text = voice_client.spoken[0]
-    assert (spoken_voice.speed, spoken_voice.stability, language) == (1.15, 0.3, Language.HINGLISH)
-    assert text == LANGUAGES[Language.HINGLISH].sample
+    assert (spoken_voice.speed, spoken_voice.stability, language) == (1.15, 0.3, Language.HI)
+    assert text == LANGUAGES[Language.HI].sample
     assert unknown.status_code == 422
 
     voice_client.down = True

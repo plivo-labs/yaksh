@@ -4,7 +4,7 @@
   gender: male
   accent: american
   languages: [en]
-  listed_languages: [en, hinglish]
+  listed_languages: [en, hi]
 - provider: elevenlabs
   provider_voice_id: cjVigY5qzO86Huf0OWal
   name: Eric - Smooth, Trustworthy
@@ -25,18 +25,18 @@
   gender: female
   accent: american
   languages: [en]
-  listed_languages: [en, hinglish]
+  listed_languages: [en, hi]
 - provider: elevenlabs
   provider_voice_id: TX3LPaxmHKxFdv7VOQHJ
   name: Liam - Energetic, Social Media Creator
   gender: male
   accent: american
   languages: [en]
-  listed_languages: [en, hinglish]
+  listed_languages: [en, hi]
 - provider: elevenlabs
   provider_voice_id: Xb7hH8MSUJpSbSDYk0k2
   name: Alice - Clear, Engaging Educator
   gender: female
   accent: british
-  languages: [en, hinglish]
-  listed_languages: [en, hinglish]
+  languages: [en, hi]
+  listed_languages: [en, hi]

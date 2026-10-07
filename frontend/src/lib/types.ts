@@ -40,7 +40,7 @@ export const END_REASON_LABELS: Record<EndReason, string> = {
 };
 
 type Role = "agent" | "caller";
-export type Language = "en" | "hinglish";
+export type Language = "en" | "hi";
 export type VoiceGender = "male" | "female" | "neutral";
 type Provenance = "transmitted" | "cut" | "unconfirmed";
 type WireEventKind =
@@ -118,7 +118,7 @@ export const WAITING_REASON_TEXT: Record<WaitingReason, string> = {
 
 export const LANGUAGE_NAMES: Record<Language, string> = {
   en: "English",
-  hinglish: "Hinglish",
+  hi: "Hindi",
 };
 
 export const LANGUAGE_ITEMS = (Object.keys(LANGUAGE_NAMES) as Language[]).map((language) => ({
@@ -289,6 +289,26 @@ export interface DocumentSummary {
 
 export interface DocumentRead extends DocumentSummary {
   text: string;
+}
+
+/** The fields an agent file from another platform fills; nothing is saved. */
+export interface AgentDraft {
+  provider: "plivo_cx";
+  name: string | null;
+  external_id: string | null;
+  language: Language;
+  config: string;
+}
+
+/** A start request read from a cURL command; nothing is saved. */
+export interface StartRequestDraft {
+  method: TriggerMethod;
+  url: string;
+  headers: Header[];
+  query: QueryParameter[];
+  body: Record<string, unknown> | null;
+  /** The body field or query parameter that now holds {{yaksha.number}}. */
+  number_field: string | null;
 }
 
 export interface AgentInput {

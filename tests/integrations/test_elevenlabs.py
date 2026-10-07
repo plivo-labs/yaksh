@@ -77,7 +77,7 @@ async def test_a_lookup_tells_a_missing_voice_from_a_refused_request(
     plain = await client.get_voice("unlabeled")
     assert found is not None and found.name == "Chris"
     assert (found.gender, found.accent) == (VoiceGender.MALE, "american")
-    assert found.listed_languages == (Language.EN, Language.HINGLISH)
+    assert found.listed_languages == (Language.EN, Language.HI)
     assert plain is not None and (plain.gender, plain.listed_languages) == (None, ())
 
     assert await client.get_voice("gone") is None
@@ -119,14 +119,14 @@ async def test_speech_uses_the_call_model_voice_settings_and_language_pin(
     client = ElevenLabsClient(API_KEY, base_url=base_url)
     voice = VoiceSettings(provider=VoiceProvider.ELEVENLABS, id="v1", speed=0.8, stability=0.3)
 
-    hinglish = await client.speak(voice, Language.HINGLISH, "नमस्ते")
+    hindi = await client.speak(voice, Language.HI, "नमस्ते")
     await client.speak(voice, Language.EN, "Hello")
     gone = await client.speak(voice.model_copy(update={"id": "gone"}), Language.EN, "Hi")
 
-    assert gone is None and hinglish is not None
+    assert gone is None and hindi is not None
     with pytest.raises(UnavailableError, match="429"):
         await client.speak(voice.model_copy(update={"id": "busy"}), Language.EN, "Hi")
-    with wave.open(io.BytesIO(hinglish)) as audio:
+    with wave.open(io.BytesIO(hindi)) as audio:
         assert (audio.getframerate(), audio.getsampwidth(), audio.getnframes()) == (8000, 2, 800)
     assert seen[0] == {
         "speak": "v1",

@@ -64,6 +64,15 @@ export const PersonasCrumbs = () => <Trail steps={[{ label: "Personas" }]} />;
 export const VoicesCrumbs = () => <Trail steps={[{ label: "Voices" }]} />;
 export const NumbersCrumbs = () => <Trail steps={[{ label: "Numbers" }]} />;
 export const NewAgentCrumbs = () => <Trail steps={[AGENTS, { label: "New agent" }]} />;
+export const ImportAgentCrumbs = () => (
+  <Trail
+    steps={[
+      AGENTS,
+      { label: "New agent", to: "/agents/new" },
+      { label: "Import from a JSON file" },
+    ]}
+  />
+);
 
 export function AgentCrumbs() {
   const agent = useAgent(useParams().id);

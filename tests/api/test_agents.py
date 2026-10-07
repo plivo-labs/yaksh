@@ -36,12 +36,12 @@ async def test_changing_config_creates_a_version_but_renaming_does_not(
     unchanged = await client.patch(url, json={"agent_speaks_first": False})
     assert unchanged.json()["current_version"] == 2
 
-    relanguaged = await client.patch(url, json={"language": "hinglish"})
+    relanguaged = await client.patch(url, json={"language": "hi"})
     assert relanguaged.json()["current_version"] == 3
 
     versions = (await client.get(f"{url}/versions")).json()
     assert [v["version"] for v in versions["items"]] == [3, 2, 1]
-    assert versions["items"][0]["config"]["language"] == "hinglish"
+    assert versions["items"][0]["config"]["language"] == "hi"
     assert versions["items"][1]["config"]["brief"] == "Books rooms for guests"
 
 

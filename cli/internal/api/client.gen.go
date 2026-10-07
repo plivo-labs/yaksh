@@ -244,6 +244,21 @@ func (e GenerationStatus) Valid() bool {
 	}
 }
 
+// Defines values for ImportProvider.
+const (
+	PlivoCx ImportProvider = "plivo_cx"
+)
+
+// Valid indicates whether the value is a known member of the ImportProvider enum.
+func (e ImportProvider) Valid() bool {
+	switch e {
+	case PlivoCx:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ItemRole.
 const (
 	Deciding  ItemRole = "deciding"
@@ -369,8 +384,8 @@ func (e Lane) Valid() bool {
 
 // Defines values for Language.
 const (
-	En       Language = "en"
-	Hinglish Language = "hinglish"
+	En Language = "en"
+	Hi Language = "hi"
 )
 
 // Valid indicates whether the value is a known member of the Language enum.
@@ -378,7 +393,7 @@ func (e Language) Valid() bool {
 	switch e {
 	case En:
 		return true
-	case Hinglish:
+	case Hi:
 		return true
 	default:
 		return false
@@ -930,6 +945,21 @@ type AgentCreate_Rules_Item struct {
 	union json.RawMessage
 }
 
+// AgentDraft The fields an agent file fills. Nothing is saved: the person adds the rest, such as the
+// brief and how Yaksha reaches the agent, then creates the agent.
+type AgentDraft struct {
+	Config     string         `json:"config"`
+	ExternalId *string        `json:"external_id"`
+	Language   Language       `json:"language"`
+	Name       *string        `json:"name"`
+	Provider   ImportProvider `json:"provider"`
+}
+
+// AgentFile defines model for AgentFile.
+type AgentFile struct {
+	Content string `json:"content"`
+}
+
 // AgentRead defines model for AgentRead.
 type AgentRead struct {
 	AgentNumber      *string                 `json:"agent_number"`
@@ -1022,6 +1052,16 @@ type BackgroundNoise struct {
 // BodyUploadDocumentApiV1DocumentsUploadPost defines model for Body_upload_document_api_v1_documents_upload_post.
 type BodyUploadDocumentApiV1DocumentsUploadPost struct {
 	File openapi_types.File `json:"file"`
+}
+
+// BriefDraft defines model for BriefDraft.
+type BriefDraft struct {
+	Brief string `json:"brief"`
+}
+
+// BriefSource defines model for BriefSource.
+type BriefSource struct {
+	Config string `json:"config"`
 }
 
 // CallVerdict defines model for CallVerdict.
@@ -1175,6 +1215,11 @@ type CriterionCounts struct {
 	Text       string             `json:"text"`
 }
 
+// CurlCommand defines model for CurlCommand.
+type CurlCommand struct {
+	Command string `json:"command"`
+}
+
 // DecidedBy defines model for DecidedBy.
 type DecidedBy string
 
@@ -1291,6 +1336,9 @@ type HealthResponse struct {
 	Status  string `json:"status"`
 	Version string `json:"version"`
 }
+
+// ImportProvider defines model for ImportProvider.
+type ImportProvider string
 
 // ItemRead defines model for ItemRead.
 type ItemRead struct {
@@ -1555,6 +1603,12 @@ type PageVoiceRead struct {
 	Page     int         `json:"page"`
 	PageSize int         `json:"page_size"`
 	Total    int         `json:"total"`
+}
+
+// Pair defines model for Pair.
+type Pair struct {
+	Name  string `json:"name"`
+	Value string `json:"value"`
 }
 
 // PersonaConfig What a persona version pins: the settings plus the voice gender from the voices list.
@@ -1998,6 +2052,18 @@ type Share struct {
 	Total int      `json:"total"`
 }
 
+// StartRequestDraft A start request read from a cURL command, for the person to check. `number_field` names
+// the body field or query parameter that now holds `{{yaksha.number}}`, if one looked like the
+// number to call.
+type StartRequestDraft struct {
+	Body        *map[string]interface{} `json:"body"`
+	Headers     []Pair                  `json:"headers"`
+	Method      TriggerMethod           `json:"method"`
+	NumberField *string                 `json:"number_field"`
+	Query       []Pair                  `json:"query"`
+	Url         string                  `json:"url"`
+}
+
 // TextDocumentCreate defines model for TextDocumentCreate.
 type TextDocumentCreate struct {
 	Name string `json:"name"`
@@ -2221,6 +2287,15 @@ type LookupVoiceApiV1VoicesLookupGetParams struct {
 
 // CreateAgentApiV1AgentsPostJSONRequestBody defines body for CreateAgentApiV1AgentsPost for application/json ContentType.
 type CreateAgentApiV1AgentsPostJSONRequestBody = AgentCreate
+
+// DraftAgentBriefApiV1AgentsDraftBriefPostJSONRequestBody defines body for DraftAgentBriefApiV1AgentsDraftBriefPost for application/json ContentType.
+type DraftAgentBriefApiV1AgentsDraftBriefPostJSONRequestBody = BriefSource
+
+// ImportAgentFileApiV1AgentsImportPostJSONRequestBody defines body for ImportAgentFileApiV1AgentsImportPost for application/json ContentType.
+type ImportAgentFileApiV1AgentsImportPostJSONRequestBody = AgentFile
+
+// ReadCurlCommandApiV1AgentsStartRequestFromCurlPostJSONRequestBody defines body for ReadCurlCommandApiV1AgentsStartRequestFromCurlPost for application/json ContentType.
+type ReadCurlCommandApiV1AgentsStartRequestFromCurlPostJSONRequestBody = CurlCommand
 
 // UpdateAgentApiV1AgentsAgentIdPatchJSONRequestBody defines body for UpdateAgentApiV1AgentsAgentIdPatch for application/json ContentType.
 type UpdateAgentApiV1AgentsAgentIdPatchJSONRequestBody = AgentUpdate
@@ -2829,6 +2904,68 @@ type ClientInterface interface {
 	// Corresponds with POST /api/v1/agents (the `CreateAgentApiV1AgentsPost` operationId).
 	CreateAgentApiV1AgentsPost(ctx context.Context, body CreateAgentApiV1AgentsPostJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// DraftAgentBriefApiV1AgentsDraftBriefPostWithBody Draft Agent Brief
+	//
+	// Draft a brief from an agent's config, for the person to check and change. Nothing is
+	// saved.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /api/v1/agents/draft-brief (the `DraftAgentBriefApiV1AgentsDraftBriefPost` operationId).
+	DraftAgentBriefApiV1AgentsDraftBriefPostWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DraftAgentBriefApiV1AgentsDraftBriefPost Draft Agent Brief
+	//
+	// Draft a brief from an agent's config, for the person to check and change. Nothing is
+	// saved.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /api/v1/agents/draft-brief (the `DraftAgentBriefApiV1AgentsDraftBriefPost` operationId).
+	DraftAgentBriefApiV1AgentsDraftBriefPost(ctx context.Context, body DraftAgentBriefApiV1AgentsDraftBriefPostJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ImportAgentFileApiV1AgentsImportPostWithBody Import Agent File
+	//
+	// Read an agent file from another platform into a draft. Nothing is saved. A file in a format
+	// that Yaksha does not read fails with the code `not_recognized`; it can still be the config.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /api/v1/agents/import (the `ImportAgentFileApiV1AgentsImportPost` operationId).
+	ImportAgentFileApiV1AgentsImportPostWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ImportAgentFileApiV1AgentsImportPost Import Agent File
+	//
+	// Read an agent file from another platform into a draft. Nothing is saved. A file in a format
+	// that Yaksha does not read fails with the code `not_recognized`; it can still be the config.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /api/v1/agents/import (the `ImportAgentFileApiV1AgentsImportPost` operationId).
+	ImportAgentFileApiV1AgentsImportPost(ctx context.Context, body ImportAgentFileApiV1AgentsImportPostJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ReadCurlCommandApiV1AgentsStartRequestFromCurlPostWithBody Read Curl Command
+	//
+	// Read a cURL command into a start request, for an agent that calls Yaksha. Nothing is
+	// saved. A body field or query parameter that looks like the number to call gets
+	// `{{yaksha.number}}`.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /api/v1/agents/start-request-from-curl (the `ReadCurlCommandApiV1AgentsStartRequestFromCurlPost` operationId).
+	ReadCurlCommandApiV1AgentsStartRequestFromCurlPostWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ReadCurlCommandApiV1AgentsStartRequestFromCurlPost Read Curl Command
+	//
+	// Read a cURL command into a start request, for an agent that calls Yaksha. Nothing is
+	// saved. A body field or query parameter that looks like the number to call gets
+	// `{{yaksha.number}}`.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /api/v1/agents/start-request-from-curl (the `ReadCurlCommandApiV1AgentsStartRequestFromCurlPost` operationId).
+	ReadCurlCommandApiV1AgentsStartRequestFromCurlPost(ctx context.Context, body ReadCurlCommandApiV1AgentsStartRequestFromCurlPostJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// DeleteAgentApiV1AgentsAgentIdDelete Delete Agent
 	//
 	// Corresponds with DELETE /api/v1/agents/{agent_id} (the `DeleteAgentApiV1AgentsAgentIdDelete` operationId).
@@ -3352,6 +3489,128 @@ func (c *Client) CreateAgentApiV1AgentsPostWithBody(ctx context.Context, content
 // Corresponds with POST /api/v1/agents (the `CreateAgentApiV1AgentsPost` operationId).
 func (c *Client) CreateAgentApiV1AgentsPost(ctx context.Context, body CreateAgentApiV1AgentsPostJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCreateAgentApiV1AgentsPostRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DraftAgentBriefApiV1AgentsDraftBriefPostWithBody Draft Agent Brief
+//
+// Draft a brief from an agent's config, for the person to check and change. Nothing is
+// saved.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /api/v1/agents/draft-brief (the `DraftAgentBriefApiV1AgentsDraftBriefPost` operationId).
+func (c *Client) DraftAgentBriefApiV1AgentsDraftBriefPostWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDraftAgentBriefApiV1AgentsDraftBriefPostRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DraftAgentBriefApiV1AgentsDraftBriefPost Draft Agent Brief
+//
+// Draft a brief from an agent's config, for the person to check and change. Nothing is
+// saved.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /api/v1/agents/draft-brief (the `DraftAgentBriefApiV1AgentsDraftBriefPost` operationId).
+func (c *Client) DraftAgentBriefApiV1AgentsDraftBriefPost(ctx context.Context, body DraftAgentBriefApiV1AgentsDraftBriefPostJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDraftAgentBriefApiV1AgentsDraftBriefPostRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ImportAgentFileApiV1AgentsImportPostWithBody Import Agent File
+//
+// Read an agent file from another platform into a draft. Nothing is saved. A file in a format
+// that Yaksha does not read fails with the code `not_recognized`; it can still be the config.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /api/v1/agents/import (the `ImportAgentFileApiV1AgentsImportPost` operationId).
+func (c *Client) ImportAgentFileApiV1AgentsImportPostWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewImportAgentFileApiV1AgentsImportPostRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ImportAgentFileApiV1AgentsImportPost Import Agent File
+//
+// Read an agent file from another platform into a draft. Nothing is saved. A file in a format
+// that Yaksha does not read fails with the code `not_recognized`; it can still be the config.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /api/v1/agents/import (the `ImportAgentFileApiV1AgentsImportPost` operationId).
+func (c *Client) ImportAgentFileApiV1AgentsImportPost(ctx context.Context, body ImportAgentFileApiV1AgentsImportPostJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewImportAgentFileApiV1AgentsImportPostRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ReadCurlCommandApiV1AgentsStartRequestFromCurlPostWithBody Read Curl Command
+//
+// Read a cURL command into a start request, for an agent that calls Yaksha. Nothing is
+// saved. A body field or query parameter that looks like the number to call gets
+// `{{yaksha.number}}`.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /api/v1/agents/start-request-from-curl (the `ReadCurlCommandApiV1AgentsStartRequestFromCurlPost` operationId).
+func (c *Client) ReadCurlCommandApiV1AgentsStartRequestFromCurlPostWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewReadCurlCommandApiV1AgentsStartRequestFromCurlPostRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ReadCurlCommandApiV1AgentsStartRequestFromCurlPost Read Curl Command
+//
+// Read a cURL command into a start request, for an agent that calls Yaksha. Nothing is
+// saved. A body field or query parameter that looks like the number to call gets
+// `{{yaksha.number}}`.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /api/v1/agents/start-request-from-curl (the `ReadCurlCommandApiV1AgentsStartRequestFromCurlPost` operationId).
+func (c *Client) ReadCurlCommandApiV1AgentsStartRequestFromCurlPost(ctx context.Context, body ReadCurlCommandApiV1AgentsStartRequestFromCurlPostJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewReadCurlCommandApiV1AgentsStartRequestFromCurlPostRequest(c.Server, body)
 	if err != nil {
 		return nil, err
 	}
@@ -4720,6 +4979,126 @@ func NewCreateAgentApiV1AgentsPostRequestWithBody(server string, contentType str
 	}
 
 	operationPath := fmt.Sprintf("/api/v1/agents")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewDraftAgentBriefApiV1AgentsDraftBriefPostRequest calls the generic DraftAgentBriefApiV1AgentsDraftBriefPost builder with application/json body
+func NewDraftAgentBriefApiV1AgentsDraftBriefPostRequest(server string, body DraftAgentBriefApiV1AgentsDraftBriefPostJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewDraftAgentBriefApiV1AgentsDraftBriefPostRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewDraftAgentBriefApiV1AgentsDraftBriefPostRequestWithBody constructs an http.Request for the DraftAgentBriefApiV1AgentsDraftBriefPost method, with any body, and a specified content type
+func NewDraftAgentBriefApiV1AgentsDraftBriefPostRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/agents/draft-brief")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewImportAgentFileApiV1AgentsImportPostRequest calls the generic ImportAgentFileApiV1AgentsImportPost builder with application/json body
+func NewImportAgentFileApiV1AgentsImportPostRequest(server string, body ImportAgentFileApiV1AgentsImportPostJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewImportAgentFileApiV1AgentsImportPostRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewImportAgentFileApiV1AgentsImportPostRequestWithBody constructs an http.Request for the ImportAgentFileApiV1AgentsImportPost method, with any body, and a specified content type
+func NewImportAgentFileApiV1AgentsImportPostRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/agents/import")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewReadCurlCommandApiV1AgentsStartRequestFromCurlPostRequest calls the generic ReadCurlCommandApiV1AgentsStartRequestFromCurlPost builder with application/json body
+func NewReadCurlCommandApiV1AgentsStartRequestFromCurlPostRequest(server string, body ReadCurlCommandApiV1AgentsStartRequestFromCurlPostJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewReadCurlCommandApiV1AgentsStartRequestFromCurlPostRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewReadCurlCommandApiV1AgentsStartRequestFromCurlPostRequestWithBody constructs an http.Request for the ReadCurlCommandApiV1AgentsStartRequestFromCurlPost method, with any body, and a specified content type
+func NewReadCurlCommandApiV1AgentsStartRequestFromCurlPostRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/agents/start-request-from-curl")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -7482,6 +7861,68 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with POST /api/v1/agents (the `CreateAgentApiV1AgentsPost` operationId).
 	CreateAgentApiV1AgentsPostWithResponse(ctx context.Context, body CreateAgentApiV1AgentsPostJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateAgentApiV1AgentsPostResponse, error)
 
+	// DraftAgentBriefApiV1AgentsDraftBriefPostWithBodyWithResponse Draft Agent Brief
+	//
+	// Draft a brief from an agent's config, for the person to check and change. Nothing is
+	// saved.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/agents/draft-brief (the `DraftAgentBriefApiV1AgentsDraftBriefPost` operationId).
+	DraftAgentBriefApiV1AgentsDraftBriefPostWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*DraftAgentBriefApiV1AgentsDraftBriefPostResponse, error)
+
+	// DraftAgentBriefApiV1AgentsDraftBriefPostWithResponse Draft Agent Brief
+	//
+	// Draft a brief from an agent's config, for the person to check and change. Nothing is
+	// saved.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/agents/draft-brief (the `DraftAgentBriefApiV1AgentsDraftBriefPost` operationId).
+	DraftAgentBriefApiV1AgentsDraftBriefPostWithResponse(ctx context.Context, body DraftAgentBriefApiV1AgentsDraftBriefPostJSONRequestBody, reqEditors ...RequestEditorFn) (*DraftAgentBriefApiV1AgentsDraftBriefPostResponse, error)
+
+	// ImportAgentFileApiV1AgentsImportPostWithBodyWithResponse Import Agent File
+	//
+	// Read an agent file from another platform into a draft. Nothing is saved. A file in a format
+	// that Yaksha does not read fails with the code `not_recognized`; it can still be the config.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/agents/import (the `ImportAgentFileApiV1AgentsImportPost` operationId).
+	ImportAgentFileApiV1AgentsImportPostWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ImportAgentFileApiV1AgentsImportPostResponse, error)
+
+	// ImportAgentFileApiV1AgentsImportPostWithResponse Import Agent File
+	//
+	// Read an agent file from another platform into a draft. Nothing is saved. A file in a format
+	// that Yaksha does not read fails with the code `not_recognized`; it can still be the config.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/agents/import (the `ImportAgentFileApiV1AgentsImportPost` operationId).
+	ImportAgentFileApiV1AgentsImportPostWithResponse(ctx context.Context, body ImportAgentFileApiV1AgentsImportPostJSONRequestBody, reqEditors ...RequestEditorFn) (*ImportAgentFileApiV1AgentsImportPostResponse, error)
+
+	// ReadCurlCommandApiV1AgentsStartRequestFromCurlPostWithBodyWithResponse Read Curl Command
+	//
+	// Read a cURL command into a start request, for an agent that calls Yaksha. Nothing is
+	// saved. A body field or query parameter that looks like the number to call gets
+	// `{{yaksha.number}}`.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/agents/start-request-from-curl (the `ReadCurlCommandApiV1AgentsStartRequestFromCurlPost` operationId).
+	ReadCurlCommandApiV1AgentsStartRequestFromCurlPostWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ReadCurlCommandApiV1AgentsStartRequestFromCurlPostResponse, error)
+
+	// ReadCurlCommandApiV1AgentsStartRequestFromCurlPostWithResponse Read Curl Command
+	//
+	// Read a cURL command into a start request, for an agent that calls Yaksha. Nothing is
+	// saved. A body field or query parameter that looks like the number to call gets
+	// `{{yaksha.number}}`.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/agents/start-request-from-curl (the `ReadCurlCommandApiV1AgentsStartRequestFromCurlPost` operationId).
+	ReadCurlCommandApiV1AgentsStartRequestFromCurlPostWithResponse(ctx context.Context, body ReadCurlCommandApiV1AgentsStartRequestFromCurlPostJSONRequestBody, reqEditors ...RequestEditorFn) (*ReadCurlCommandApiV1AgentsStartRequestFromCurlPostResponse, error)
+
 	// DeleteAgentApiV1AgentsAgentIdDeleteWithResponse Delete Agent
 	//
 	// Returns a wrapper object for the known response body format(s).
@@ -8142,6 +8583,157 @@ func (r CreateAgentApiV1AgentsPostResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r CreateAgentApiV1AgentsPostResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type DraftAgentBriefApiV1AgentsDraftBriefPostResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *BriefDraft
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *ErrorResponse
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r DraftAgentBriefApiV1AgentsDraftBriefPostResponse) GetJSON200() *BriefDraft {
+	return r.JSON200
+}
+
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r DraftAgentBriefApiV1AgentsDraftBriefPostResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r DraftAgentBriefApiV1AgentsDraftBriefPostResponse) GetJSON503() *ErrorResponse {
+	return r.JSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r DraftAgentBriefApiV1AgentsDraftBriefPostResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r DraftAgentBriefApiV1AgentsDraftBriefPostResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DraftAgentBriefApiV1AgentsDraftBriefPostResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r DraftAgentBriefApiV1AgentsDraftBriefPostResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type ImportAgentFileApiV1AgentsImportPostResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *AgentDraft
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ImportAgentFileApiV1AgentsImportPostResponse) GetJSON200() *AgentDraft {
+	return r.JSON200
+}
+
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r ImportAgentFileApiV1AgentsImportPostResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
+}
+
+// GetBody returns the raw response body bytes
+func (r ImportAgentFileApiV1AgentsImportPostResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ImportAgentFileApiV1AgentsImportPostResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ImportAgentFileApiV1AgentsImportPostResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ImportAgentFileApiV1AgentsImportPostResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type ReadCurlCommandApiV1AgentsStartRequestFromCurlPostResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *StartRequestDraft
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ReadCurlCommandApiV1AgentsStartRequestFromCurlPostResponse) GetJSON200() *StartRequestDraft {
+	return r.JSON200
+}
+
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r ReadCurlCommandApiV1AgentsStartRequestFromCurlPostResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
+}
+
+// GetBody returns the raw response body bytes
+func (r ReadCurlCommandApiV1AgentsStartRequestFromCurlPostResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ReadCurlCommandApiV1AgentsStartRequestFromCurlPostResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ReadCurlCommandApiV1AgentsStartRequestFromCurlPostResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ReadCurlCommandApiV1AgentsStartRequestFromCurlPostResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -10991,6 +11583,104 @@ func (c *ClientWithResponses) CreateAgentApiV1AgentsPostWithResponse(ctx context
 	return ParseCreateAgentApiV1AgentsPostResponse(rsp)
 }
 
+// DraftAgentBriefApiV1AgentsDraftBriefPostWithBodyWithResponse Draft Agent Brief
+//
+// Draft a brief from an agent's config, for the person to check and change. Nothing is
+// saved.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/agents/draft-brief (the `DraftAgentBriefApiV1AgentsDraftBriefPost` operationId).
+func (c *ClientWithResponses) DraftAgentBriefApiV1AgentsDraftBriefPostWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*DraftAgentBriefApiV1AgentsDraftBriefPostResponse, error) {
+	rsp, err := c.DraftAgentBriefApiV1AgentsDraftBriefPostWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDraftAgentBriefApiV1AgentsDraftBriefPostResponse(rsp)
+}
+
+// DraftAgentBriefApiV1AgentsDraftBriefPostWithResponse Draft Agent Brief
+//
+// Draft a brief from an agent's config, for the person to check and change. Nothing is
+// saved.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/agents/draft-brief (the `DraftAgentBriefApiV1AgentsDraftBriefPost` operationId).
+func (c *ClientWithResponses) DraftAgentBriefApiV1AgentsDraftBriefPostWithResponse(ctx context.Context, body DraftAgentBriefApiV1AgentsDraftBriefPostJSONRequestBody, reqEditors ...RequestEditorFn) (*DraftAgentBriefApiV1AgentsDraftBriefPostResponse, error) {
+	rsp, err := c.DraftAgentBriefApiV1AgentsDraftBriefPost(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDraftAgentBriefApiV1AgentsDraftBriefPostResponse(rsp)
+}
+
+// ImportAgentFileApiV1AgentsImportPostWithBodyWithResponse Import Agent File
+//
+// Read an agent file from another platform into a draft. Nothing is saved. A file in a format
+// that Yaksha does not read fails with the code `not_recognized`; it can still be the config.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/agents/import (the `ImportAgentFileApiV1AgentsImportPost` operationId).
+func (c *ClientWithResponses) ImportAgentFileApiV1AgentsImportPostWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ImportAgentFileApiV1AgentsImportPostResponse, error) {
+	rsp, err := c.ImportAgentFileApiV1AgentsImportPostWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseImportAgentFileApiV1AgentsImportPostResponse(rsp)
+}
+
+// ImportAgentFileApiV1AgentsImportPostWithResponse Import Agent File
+//
+// Read an agent file from another platform into a draft. Nothing is saved. A file in a format
+// that Yaksha does not read fails with the code `not_recognized`; it can still be the config.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/agents/import (the `ImportAgentFileApiV1AgentsImportPost` operationId).
+func (c *ClientWithResponses) ImportAgentFileApiV1AgentsImportPostWithResponse(ctx context.Context, body ImportAgentFileApiV1AgentsImportPostJSONRequestBody, reqEditors ...RequestEditorFn) (*ImportAgentFileApiV1AgentsImportPostResponse, error) {
+	rsp, err := c.ImportAgentFileApiV1AgentsImportPost(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseImportAgentFileApiV1AgentsImportPostResponse(rsp)
+}
+
+// ReadCurlCommandApiV1AgentsStartRequestFromCurlPostWithBodyWithResponse Read Curl Command
+//
+// Read a cURL command into a start request, for an agent that calls Yaksha. Nothing is
+// saved. A body field or query parameter that looks like the number to call gets
+// `{{yaksha.number}}`.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/agents/start-request-from-curl (the `ReadCurlCommandApiV1AgentsStartRequestFromCurlPost` operationId).
+func (c *ClientWithResponses) ReadCurlCommandApiV1AgentsStartRequestFromCurlPostWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ReadCurlCommandApiV1AgentsStartRequestFromCurlPostResponse, error) {
+	rsp, err := c.ReadCurlCommandApiV1AgentsStartRequestFromCurlPostWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseReadCurlCommandApiV1AgentsStartRequestFromCurlPostResponse(rsp)
+}
+
+// ReadCurlCommandApiV1AgentsStartRequestFromCurlPostWithResponse Read Curl Command
+//
+// Read a cURL command into a start request, for an agent that calls Yaksha. Nothing is
+// saved. A body field or query parameter that looks like the number to call gets
+// `{{yaksha.number}}`.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/agents/start-request-from-curl (the `ReadCurlCommandApiV1AgentsStartRequestFromCurlPost` operationId).
+func (c *ClientWithResponses) ReadCurlCommandApiV1AgentsStartRequestFromCurlPostWithResponse(ctx context.Context, body ReadCurlCommandApiV1AgentsStartRequestFromCurlPostJSONRequestBody, reqEditors ...RequestEditorFn) (*ReadCurlCommandApiV1AgentsStartRequestFromCurlPostResponse, error) {
+	rsp, err := c.ReadCurlCommandApiV1AgentsStartRequestFromCurlPost(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseReadCurlCommandApiV1AgentsStartRequestFromCurlPostResponse(rsp)
+}
+
 // DeleteAgentApiV1AgentsAgentIdDeleteWithResponse Delete Agent
 //
 // Returns a wrapper object for the known response body format(s).
@@ -12057,6 +12747,112 @@ func ParseCreateAgentApiV1AgentsPostResponse(rsp *http.Response) (*CreateAgentAp
 			return nil, err
 		}
 		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseDraftAgentBriefApiV1AgentsDraftBriefPostResponse parses an HTTP response from a DraftAgentBriefApiV1AgentsDraftBriefPostWithResponse call
+func ParseDraftAgentBriefApiV1AgentsDraftBriefPostResponse(rsp *http.Response) (*DraftAgentBriefApiV1AgentsDraftBriefPostResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DraftAgentBriefApiV1AgentsDraftBriefPostResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest BriefDraft
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseImportAgentFileApiV1AgentsImportPostResponse parses an HTTP response from a ImportAgentFileApiV1AgentsImportPostWithResponse call
+func ParseImportAgentFileApiV1AgentsImportPostResponse(rsp *http.Response) (*ImportAgentFileApiV1AgentsImportPostResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ImportAgentFileApiV1AgentsImportPostResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest AgentDraft
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseReadCurlCommandApiV1AgentsStartRequestFromCurlPostResponse parses an HTTP response from a ReadCurlCommandApiV1AgentsStartRequestFromCurlPostWithResponse call
+func ParseReadCurlCommandApiV1AgentsStartRequestFromCurlPostResponse(rsp *http.Response) (*ReadCurlCommandApiV1AgentsStartRequestFromCurlPostResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ReadCurlCommandApiV1AgentsStartRequestFromCurlPostResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest StartRequestDraft
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
 		var dest ErrorResponse

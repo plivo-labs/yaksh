@@ -8,7 +8,13 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from starlette.exceptions import HTTPException
 
-from yaksha.domain.errors import ConflictError, NotFoundError, UnavailableError, ValidationError
+from yaksha.domain.errors import (
+    ConflictError,
+    NotFoundError,
+    UnavailableError,
+    UnrecognizedFileError,
+    ValidationError,
+)
 
 REQUEST_PARTS = frozenset({"body", "query", "path", "header", "cookie"})
 
@@ -73,9 +79,12 @@ def error_response(
     *,
     details: Any = None,
     headers: Mapping[str, str] | None = None,
+    code: str | None = None,
 ) -> JSONResponse:
+    """`code` names an error more exactly than its status does, for a client that acts on it."""
+    code = code or CODES.get(status_code, "error")
     body = ErrorResponse.model_validate(
-        {"error": {"code": CODES.get(status_code, "error"), "message": message, "details": details}}
+        {"error": {"code": code, "message": message, "details": details}}
     )
     return JSONResponse(
         body.model_dump(mode="json", exclude_none=True), status_code=status_code, headers=headers
@@ -102,6 +111,12 @@ def register_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(ConflictError)
     async def conflict(_: Request, exc: ConflictError) -> JSONResponse:
         return error_response(status.HTTP_409_CONFLICT, str(exc))
+
+    @app.exception_handler(UnrecognizedFileError)
+    async def unrecognized(_: Request, exc: UnrecognizedFileError) -> JSONResponse:
+        return error_response(
+            status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc), code="not_recognized"
+        )
 
     @app.exception_handler(ValidationError)
     async def invalid(_: Request, exc: ValidationError) -> JSONResponse:

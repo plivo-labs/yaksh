@@ -5,7 +5,7 @@ import { Link } from "react-router";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
-/** How to add an agent. Only entering the details works for now; the imports come later. */
+/** How to add an agent. Import from a provider comes later. */
 export function NewAgentPage() {
   return (
     <div className="mx-auto grid w-full max-w-3xl gap-6">
@@ -25,9 +25,10 @@ export function NewAgentPage() {
         </li>
         <li>
           <Choice
+            to="/agents/new/json"
             icon={<FileJson />}
             title="Import from a JSON file"
-            hint="An agent file from one of these providers."
+            hint="A Plivo CX agent download. ElevenLabs, Vapi and Retell files are coming soon."
           />
         </li>
         <li>

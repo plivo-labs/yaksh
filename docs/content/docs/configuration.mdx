@@ -48,6 +48,9 @@ For phone calls, the worker must have `DEEPGRAM_API_KEY`, `ELEVENLABS_API_KEY` a
 | `GENERATION_LLM_MODEL` | The model that writes scenarios. The default is the persona model. |
 | `GENERATION_LLM_REASONING_EFFORT` | The reasoning effort when the model writes scenarios. The default is `max`. Yaksha sends it only if the model accepts it. |
 | `GENERATION_LLM_TIMEOUT_S` | The maximum time of one model request when the model writes scenarios. The default is 300. If a request has a timeout or an error at the provider, Yaksha sends it one more time. At `xhigh`, one scenario uses approximately 90 seconds. |
+| `BRIEF_LLM_MODEL` | The model that drafts the brief of an agent from its config, while you wait. The default is `gpt-6-luna`. |
+| `BRIEF_LLM_REASONING_EFFORT` | The reasoning effort when the model drafts a brief. The default is `low`. |
+| `BRIEF_LLM_TIMEOUT_S` | The maximum time of one request when the model drafts a brief. The default is 60. |
 
 ## Phone
 

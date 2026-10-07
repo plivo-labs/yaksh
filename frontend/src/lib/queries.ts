@@ -13,7 +13,9 @@ import {
   ACTIVE_RUN_STATUSES,
   ACTIVE_STATUSES,
   type Agent,
+  type AgentDraft,
   type AgentInput,
+  type StartRequestDraft,
   type AgentRule,
   type AgentSummary,
   type BackgroundNoise,
@@ -55,6 +57,7 @@ import {
 export const keys = {
   agents: ["agents"] as const,
   agent: (id: string) => ["agents", id] as const,
+  briefDraft: (id: string) => ["brief-draft", id] as const,
   ruleResults: (id: string) => ["agents", id, "rule-results"] as const,
   conversations: (filters: Record<string, string>) => ["conversations", filters] as const,
   conversation: (id: string) => ["conversations", "one", id] as const,
@@ -327,6 +330,34 @@ export function useSaveAgent(id?: string) {
         ? api<Agent>(`/agents/${id}`, { method: "PATCH", json: input })
         : api<Agent>("/agents", { method: "POST", json: input }),
     onSuccess: () => client.invalidateQueries({ queryKey: keys.agents }),
+  });
+}
+
+/** Reads a cURL command into a start request. */
+export function useStartRequestFromCurl() {
+  return useMutation({
+    mutationFn: (command: string) =>
+      api<StartRequestDraft>("/agents/start-request-from-curl", {
+        method: "POST",
+        json: { command },
+      }),
+  });
+}
+
+/** A brief written by a model from the agent's config, for the person to check. */
+export async function draftBrief(config: string): Promise<string> {
+  const { brief } = await api<{ brief: string }>("/agents/draft-brief", {
+    method: "POST",
+    json: { config },
+  });
+  return brief;
+}
+
+/** Reads an agent file into a draft. A file Yaksha does not read fails with `not_recognized`. */
+export function useImportAgentFile() {
+  return useMutation({
+    mutationFn: (content: string) =>
+      api<AgentDraft>("/agents/import", { method: "POST", json: { content } }),
   });
 }
 

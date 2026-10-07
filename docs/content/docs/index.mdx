@@ -29,7 +29,7 @@ Yaksha does tests of AI voice agents. A simulated caller speaks with your agent 
 
 1. Yaksha makes the instructions for the caller from the scenario and the persona.
 2. The worker calls the agent. For an outbound agent, the worker sends a trigger, and the agent calls Yaksha.
-3. The caller speaks with the agent. When the caller speaks first, it says the first words of the scenario, with no model call. The caller also says them when an agent that should speak first says nothing for 15 seconds. A scenario without first words uses the default of the persona's language, "Hello" for English and Hinglish. The call stops when the caller completes its goal or when the agent disconnects. The call also stops if the agent does not speak, or if you stop the call. Limits on the duration and on the number of turns also stop the call.
+3. The caller speaks with the agent. When the caller speaks first, it says the first words of the scenario, with no model call. The caller also says them when an agent that should speak first says nothing for 15 seconds. A scenario without first words uses the default of the persona's language, "Hello" for English and Hindi. The call stops when the caller completes its goal or when the agent disconnects. The call also stops if the agent does not speak, or if you stop the call. Limits on the duration and on the number of turns also stop the call.
 4. Yaksha keeps the conversation and measures the [response time](/docs/response-time) of the agent.
 
 Yaksha does not give a pass or fail result at this time. To find if the agent did its tasks correctly, compare the transcript with the criteria of the scenario.

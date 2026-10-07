@@ -1,5 +1,5 @@
 import { Download, FileText, Plus, Upload } from "lucide-react";
-import { type DragEvent, useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { DeleteConfirm, DiscardConfirm } from "@/components/confirm-dialogs";
@@ -18,6 +18,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
+import { useFileDrop } from "@/hooks/use-file-drop";
 import { useCloseGuard } from "@/hooks/use-close-guard";
 import { textSize } from "@/lib/format";
 import { type KnowledgeBaseSource, useSavedKnowledgeBase } from "@/hooks/use-knowledge-base";
@@ -49,10 +50,6 @@ function suffix(name: string): string {
 
 function supported(name: string): boolean {
   return EXTENSIONS.includes(suffix(name));
-}
-
-function carriesFiles(event: DragEvent): boolean {
-  return event.dataTransfer.types.includes("Files");
 }
 
 const TYPE_LABELS: Record<string, string> = {
@@ -89,28 +86,11 @@ export function KnowledgeBasePanel({ source }: { source: KnowledgeBaseSource }) 
   const { documents, progress, setProgress } = source;
   const busy = progress !== null || source.saving;
   const room = MAX_DOCUMENTS - documents.length;
-  const depth = useRef(0);
-  const [dragging, setDragging] = useState(false);
   const refusal = busy
     ? "Wait for the current upload to finish."
     : room <= 0
       ? `The knowledge base holds at most ${MAX_DOCUMENTS} documents.`
       : null;
-
-  // A file dropped next to the panel would make the browser open it and lose the page.
-  useEffect(() => {
-    const refuse = (event: globalThis.DragEvent) => {
-      if (event.defaultPrevented || !event.dataTransfer?.types.includes("Files")) return;
-      event.preventDefault();
-      event.dataTransfer.dropEffect = "none";
-    };
-    window.addEventListener("dragover", refuse);
-    window.addEventListener("drop", refuse);
-    return () => {
-      window.removeEventListener("dragover", refuse);
-      window.removeEventListener("drop", refuse);
-    };
-  }, []);
 
   const addFiles = async (picked: File[]) => {
     const readable = picked.filter((file) => supported(file.name));
@@ -171,31 +151,7 @@ export function KnowledgeBasePanel({ source }: { source: KnowledgeBaseSource }) 
     }
   };
 
-  const dropTarget = {
-    onDragEnter: (event: DragEvent<HTMLElement>) => {
-      if (!carriesFiles(event)) return;
-      event.preventDefault();
-      depth.current += 1;
-      setDragging(true);
-    },
-    onDragOver: (event: DragEvent<HTMLElement>) => {
-      if (!carriesFiles(event)) return;
-      event.preventDefault();
-      event.dataTransfer.dropEffect = refusal ? "none" : "copy";
-    },
-    onDragLeave: (event: DragEvent<HTMLElement>) => {
-      if (!carriesFiles(event)) return;
-      depth.current = Math.max(0, depth.current - 1);
-      if (depth.current === 0) setDragging(false);
-    },
-    onDrop: (event: DragEvent<HTMLElement>) => {
-      if (!carriesFiles(event)) return;
-      event.preventDefault();
-      depth.current = 0;
-      setDragging(false);
-      if (!refusal) void addFiles(Array.from(event.dataTransfer.files));
-    },
-  };
+  const { dragging, target: dropTarget } = useFileDrop((picked) => void addFiles(picked), refusal);
 
   const addButtons = (
     <div className="flex gap-2">

@@ -28,7 +28,7 @@ LANGUAGES: dict[Language, LanguagePolicy] = {
         sample="Hi, I'm calling about my booking for next Tuesday. Can you check it for me?",
         goodbye="Okay, thanks. I have to go now. Bye.",
     ),
-    Language.HINGLISH: LanguagePolicy(
+    Language.HI: LanguagePolicy(
         instruction="Speak Hinglish: Devanagari script, with common English words such as "
         "appointment or confirm kept in English.",
         first_words="Hello",

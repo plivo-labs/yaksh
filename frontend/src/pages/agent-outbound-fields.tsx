@@ -1,5 +1,5 @@
 import { Plus, X } from "lucide-react";
-import { useState } from "react";
+import { type ClipboardEvent, useEffect, useRef, useState } from "react";
 
 import { PhoneInput } from "@/components/phone-input";
 import { Button } from "@/components/ui/button";
@@ -21,9 +21,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
-import { REVEAL } from "@/lib/motion";
+import { APPEAR, REVEAL } from "@/lib/motion";
 import { type OutboundDraft, outboundProblems } from "@/lib/outbound";
+import { useStartRequestFromCurl } from "@/lib/queries";
 import type { Header, TriggerMethod } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -59,6 +61,42 @@ export function OutboundFields({
   }
   const set = <K extends keyof OutboundDraft>(key: K, value: OutboundDraft[K]) =>
     onChange({ ...draft, [key]: value });
+  const curl = useStartRequestFromCurl();
+  /** The draft as it is when a pasted command's answer arrives, not as it was at the paste. */
+  const latest = useRef(draft);
+  useEffect(() => {
+    latest.current = draft;
+  }, [draft]);
+  /** After a cURL paste: the field that now holds the number to call, or null for none. */
+  const [fromCurl, setFromCurl] = useState<{ numberField: string | null } | null>(null);
+  /** A cURL command pasted into the URL fills the method, the URL, the headers and the body. */
+  const pasteCurl = (event: ClipboardEvent<HTMLInputElement>) => {
+    const text = event.clipboardData.getData("text");
+    if (!/^\s*curl\s/.test(text)) return;
+    event.preventDefault();
+    setFromCurl(null);
+    curl.mutate(text, {
+      onSuccess: (request) => {
+        const current = latest.current;
+        onChange({
+          ...current,
+          method: request.method,
+          url: request.url,
+          headers: request.headers,
+          body: request.body ? JSON.stringify(request.body, null, 2) : current.body,
+          query: request.method === "GET" ? request.query : current.query,
+        });
+        setFromCurl({ numberField: request.number_field });
+      },
+    });
+  };
+  const urlNote = curl.error
+    ? "error"
+    : problems.url
+      ? "problem"
+      : curl.isPending || fromCurl
+        ? "curl"
+        : "hint";
   const setNumber = (index: number, value: string) =>
     set(
       "calling_numbers",
@@ -104,15 +142,57 @@ export function OutboundFields({
             id="trigger_url"
             type="url"
             required
-            placeholder="https://api.example.com/calls"
+            placeholder="https://api.example.com/calls, or paste a cURL command"
             className="rounded-l-none"
-            aria-invalid={Boolean(problems.url)}
-            aria-describedby={problems.url ? "trigger_url-error" : undefined}
+            readOnly={curl.isPending}
+            aria-invalid={Boolean(problems.url || curl.error)}
+            aria-describedby="trigger_url-note"
             value={draft.url}
-            onChange={(e) => set("url", e.target.value)}
+            onPaste={pasteCurl}
+            onChange={(e) => {
+              curl.reset();
+              set("url", e.target.value);
+            }}
           />
         </div>
-        {problems.url && <FieldError id="trigger_url-error">{problems.url}</FieldError>}
+        <p role="status" className="sr-only">
+          {fromCurl ? "Yaksha filled the start request from the cURL command." : ""}
+        </p>
+        {urlNote === "error" && (
+          <FieldError id="trigger_url-note">
+            Yaksha could not read the cURL command: {curl.error?.message}
+          </FieldError>
+        )}
+        {urlNote === "problem" && <FieldError id="trigger_url-note">{problems.url}</FieldError>}
+        {urlNote === "curl" && (
+          <FieldDescription id="trigger_url-note" className={APPEAR}>
+            {curl.isPending ? (
+              <span className="flex items-center gap-2">
+                <Spinner />
+                Reading the cURL command
+              </span>
+            ) : fromCurl?.numberField ? (
+              <>
+                Filled from the cURL command.{" "}
+                <code className="font-mono text-foreground">{"{{yaksha.number}}"}</code> is now in{" "}
+                <code className="font-mono text-foreground">{fromCurl.numberField}</code>. Check the
+                other values.
+              </>
+            ) : (
+              <>
+                Filled from the cURL command. No field looked like the number to call: put{" "}
+                <code className="font-mono text-foreground">{"{{yaksha.number}}"}</code> where your
+                API takes it.
+              </>
+            )}
+          </FieldDescription>
+        )}
+        {urlNote === "hint" && (
+          <FieldDescription id="trigger_url-note">
+            Or paste the cURL command that your agent platform shows. Yaksha fills the request from
+            it and keeps the headers as they are, credentials too.
+          </FieldDescription>
+        )}
       </Field>
 
       {draft.method === "POST" ? (

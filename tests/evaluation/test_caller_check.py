@@ -137,7 +137,7 @@ async def test_the_check_reads_the_caller_side_and_names_criteria_that_exist() -
 def test_a_call_in_another_language_gets_no_phrase_facts() -> None:
     hindi = Transcript(turns=[turn(Role.AGENT, "ठीक है, धन्यवाद। अलविदा!", 0)])
 
-    assert facts(hindi, EndReason.CALLER_HANGUP, Language.HINGLISH) == []
+    assert facts(hindi, EndReason.CALLER_HANGUP, Language.HI) == []
 
 
 def test_a_failed_check_blocks_nothing_except_unmet_criteria_on_a_limit_call() -> None:

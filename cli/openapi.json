@@ -201,6 +201,157 @@
         }
       }
     },
+    "/api/v1/agents/import": {
+      "post": {
+        "tags": [
+          "agents"
+        ],
+        "summary": "Import Agent File",
+        "description": "Read an agent file from another platform into a draft. Nothing is saved. A file in a format\nthat Yaksha does not read fails with the code `not_recognized`; it can still be the config.",
+        "operationId": "import_agent_file_api_v1_agents_import_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentFile"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentDraft"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "The request failed. The error tells why.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/agents/start-request-from-curl": {
+      "post": {
+        "tags": [
+          "agents"
+        ],
+        "summary": "Read Curl Command",
+        "description": "Read a cURL command into a start request, for an agent that calls Yaksha. Nothing is\nsaved. A body field or query parameter that looks like the number to call gets\n`{{yaksha.number}}`.",
+        "operationId": "read_curl_command_api_v1_agents_start_request_from_curl_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CurlCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StartRequestDraft"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "The request failed. The error tells why.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/agents/draft-brief": {
+      "post": {
+        "tags": [
+          "agents"
+        ],
+        "summary": "Draft Agent Brief",
+        "description": "Draft a brief from an agent's config, for the person to check and change. Nothing is\nsaved.",
+        "operationId": "draft_agent_brief_api_v1_agents_draft_brief_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BriefSource"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BriefDraft"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "The request failed. The error tells why.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "An outside service is not set up, or it did not answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/agents/{agent_id}": {
       "get": {
         "tags": [
@@ -3707,6 +3858,65 @@
         ],
         "title": "AgentCreate"
       },
+      "AgentDraft": {
+        "properties": {
+          "provider": {
+            "$ref": "#/components/schemas/ImportProvider"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "external_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "External Id"
+          },
+          "language": {
+            "$ref": "#/components/schemas/Language"
+          },
+          "config": {
+            "type": "string",
+            "title": "Config"
+          }
+        },
+        "type": "object",
+        "required": [
+          "provider",
+          "name",
+          "external_id",
+          "language",
+          "config"
+        ],
+        "title": "AgentDraft",
+        "description": "The fields an agent file fills. Nothing is saved: the person adds the rest, such as the\nbrief and how Yaksha reaches the agent, then creates the agent."
+      },
+      "AgentFile": {
+        "properties": {
+          "content": {
+            "type": "string",
+            "title": "Content"
+          }
+        },
+        "type": "object",
+        "required": [
+          "content"
+        ],
+        "title": "AgentFile"
+      },
       "AgentRead": {
         "properties": {
           "id": {
@@ -4190,6 +4400,33 @@
           "file"
         ],
         "title": "Body_upload_document_api_v1_documents_upload_post"
+      },
+      "BriefDraft": {
+        "properties": {
+          "brief": {
+            "type": "string",
+            "title": "Brief"
+          }
+        },
+        "type": "object",
+        "required": [
+          "brief"
+        ],
+        "title": "BriefDraft"
+      },
+      "BriefSource": {
+        "properties": {
+          "config": {
+            "type": "string",
+            "maxLength": 1000000,
+            "title": "Config"
+          }
+        },
+        "type": "object",
+        "required": [
+          "config"
+        ],
+        "title": "BriefSource"
       },
       "CallVerdict": {
         "properties": {
@@ -5063,6 +5300,20 @@
         ],
         "title": "CriterionCounts"
       },
+      "CurlCommand": {
+        "properties": {
+          "command": {
+            "type": "string",
+            "maxLength": 100000,
+            "title": "Command"
+          }
+        },
+        "type": "object",
+        "required": [
+          "command"
+        ],
+        "title": "CurlCommand"
+      },
       "DecidedBy": {
         "type": "string",
         "enum": [
@@ -5545,6 +5796,13 @@
           "version"
         ],
         "title": "HealthResponse"
+      },
+      "ImportProvider": {
+        "type": "string",
+        "enum": [
+          "plivo_cx"
+        ],
+        "title": "ImportProvider"
       },
       "ItemRead": {
         "properties": {
@@ -6039,7 +6297,7 @@
         "type": "string",
         "enum": [
           "en",
-          "hinglish"
+          "hi"
         ],
         "title": "Language"
       },
@@ -6595,6 +6853,24 @@
           "page_size"
         ],
         "title": "Page[VoiceRead]"
+      },
+      "Pair": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "value": {
+            "type": "string",
+            "title": "Value"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "value"
+        ],
+        "title": "Pair"
       },
       "PersonaConfig": {
         "properties": {
@@ -8868,6 +9144,65 @@
         ],
         "title": "Share",
         "description": "How many of a total, with the 95% Wilson interval of the rate: few calls give a wide\ninterval."
+      },
+      "StartRequestDraft": {
+        "properties": {
+          "method": {
+            "$ref": "#/components/schemas/TriggerMethod"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "headers": {
+            "items": {
+              "$ref": "#/components/schemas/Pair"
+            },
+            "type": "array",
+            "title": "Headers"
+          },
+          "query": {
+            "items": {
+              "$ref": "#/components/schemas/Pair"
+            },
+            "type": "array",
+            "title": "Query"
+          },
+          "body": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Body"
+          },
+          "number_field": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Number Field"
+          }
+        },
+        "type": "object",
+        "required": [
+          "method",
+          "url",
+          "headers",
+          "query",
+          "body",
+          "number_field"
+        ],
+        "title": "StartRequestDraft",
+        "description": "A start request read from a cURL command, for the person to check. `number_field` names\nthe body field or query parameter that now holds `{{yaksha.number}}`, if one looked like the\nnumber to call."
       },
       "TextDocumentCreate": {
         "properties": {

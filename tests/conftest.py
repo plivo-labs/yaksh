@@ -98,7 +98,7 @@ HINDI_VOICE = ProviderVoice(
     name="Ananya",
     gender=VoiceGender.FEMALE,
     accent="indian",
-    listed_languages=(Language.EN, Language.HINGLISH),
+    listed_languages=(Language.EN, Language.HI),
 )
 UNLISTED_VOICE = ProviderVoice(
     id="voice-new", name="Riya", gender=VoiceGender.FEMALE, accent="indian"
@@ -490,6 +490,7 @@ class FakeJsonModel:
         self.capabilities: list[dict[str, Any]] = []
         self.questions: dict[str, Any] = {"answered": [], "unanswered": []}
         self.write: Callable[[str], dict[str, Any]] = written_scenario
+        self.brief = "Books, moves and cancels dental appointments for callers."
         self.down = False
 
     async def complete_json(
@@ -502,6 +503,8 @@ class FakeJsonModel:
             data = {"capabilities": self.capabilities}
         elif name == "questions":
             data = self.questions
+        elif name == "brief":
+            data = {"brief": self.brief}
         else:
             data = self.write(user)
         return ModelAnswer(data=data, model="fake", input_tokens=None, output_tokens=None)
@@ -672,10 +675,11 @@ async def client(
     app.state.voice_clients = voice_clients
     app.state.file_store = file_store
     app.state.generation_model = generation_model
+    app.state.brief_model = generation_model
     async with create_sessionmaker(app.state.engine)() as session:
         await numbers.sync_numbers(session, POOL, [], {})
         session.add(listed_voice(ENGLISH_VOICE, Language.EN))
-        session.add(listed_voice(HINDI_VOICE, Language.EN, Language.HINGLISH))
+        session.add(listed_voice(HINDI_VOICE, Language.EN, Language.HI))
         await session.commit()
     transport = ASGITransport(app=app)
     headers = {"Authorization": f"Bearer {TOKEN}"}

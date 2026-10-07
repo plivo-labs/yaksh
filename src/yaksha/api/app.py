@@ -57,8 +57,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     if personas:
         log.info("seeded built-in personas: %s", ", ".join(personas))
     yield
-    if app.state.generation_model is not None:
-        await app.state.generation_model.close()
+    for model in (app.state.generation_model, app.state.brief_model):
+        if model is not None:
+            await model.close()
     await app.state.engine.dispose()
 
 
@@ -100,6 +101,19 @@ def generation_model(settings: Settings) -> JsonModel | None:
     )
 
 
+def brief_model(settings: Settings) -> JsonModel | None:
+    """A fast model at the same API: the person waits for the brief."""
+    if settings.openai_api_key is None:
+        return None
+    return OpenAIJsonModel.openai(
+        settings.openai_api_key.get_secret_value(),
+        settings.brief_llm_model,
+        base_url=settings.openai_base_url,
+        timeout_s=settings.brief_llm_timeout_s,
+        reasoning_effort=settings.brief_llm_reasoning_effort,
+    )
+
+
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or Settings()
     app = FastAPI(title="Yaksha", version=__version__, lifespan=lifespan)
@@ -109,6 +123,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.voice_clients = voice_clients(settings)
     app.state.file_store = file_store(settings)
     app.state.generation_model = generation_model(settings)
+    app.state.brief_model = brief_model(settings)
     register_error_handlers(app)
     app.add_middleware(BodySizeLimit, max_bytes=MAX_REQUEST_BYTES)
 

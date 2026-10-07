@@ -72,6 +72,12 @@ class Settings(BaseSettings):
         default=300.0, gt=0, validation_alias="GENERATION_LLM_TIMEOUT_S"
     )
     """One model call while writing scenarios; high reasoning effort takes minutes."""
+    brief_llm_model: str = Field(default="gpt-6-luna", validation_alias="BRIEF_LLM_MODEL")
+    """The model that drafts an agent's brief from its config while the person waits."""
+    brief_llm_reasoning_effort: str = Field(
+        default="low", validation_alias="BRIEF_LLM_REASONING_EFFORT"
+    )
+    brief_llm_timeout_s: float = Field(default=60.0, gt=0, validation_alias="BRIEF_LLM_TIMEOUT_S")
     judge_llm_model: str = Field(default="gpt-6-luna", validation_alias="JUDGE_LLM_MODEL")
     """The model that judges calls; "off" turns the judges off."""
     judge_llm_reasoning_effort: str | None = Field(

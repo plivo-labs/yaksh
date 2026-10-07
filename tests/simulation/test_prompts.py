@@ -22,10 +22,10 @@ def instructions(persona: PersonaConfig) -> str:
 
 
 def test_hindi_speakers_use_the_grammatical_forms_of_their_voice() -> None:
-    male_hindi = instructions(persona(Language.HINGLISH, VoiceGender.MALE))
-    female_hindi = instructions(persona(Language.HINGLISH, VoiceGender.FEMALE))
+    male_hindi = instructions(persona(Language.HI, VoiceGender.MALE))
+    female_hindi = instructions(persona(Language.HI, VoiceGender.FEMALE))
     english = instructions(persona(Language.EN, VoiceGender.MALE))
-    neutral = instructions(persona(Language.HINGLISH, VoiceGender.NEUTRAL))
+    neutral = instructions(persona(Language.HI, VoiceGender.NEUTRAL))
 
     male, female = HINDI_FORMS[VoiceGender.MALE], HINDI_FORMS[VoiceGender.FEMALE]
     assert male in male_hindi and female not in male_hindi

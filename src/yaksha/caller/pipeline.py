@@ -75,10 +75,10 @@ VAD = VADParams(confidence=VAD_CONFIDENCE, start_secs=VAD_START_S, stop_secs=VAD
 IDLE_S = 15.0
 IDLE_NUDGES = 2
 # Deepgram language per agent language: Yaksha hears the agent in the language the agent
-# speaks. Hinglish uses the Hindi model, which also transcribes the English words in it.
+# speaks. The Hindi model also transcribes the English words that Hindi speakers mix in.
 DEEPGRAM_LANGUAGES: dict[Language, str] = {
     Language.EN: "en",
-    Language.HINGLISH: "hi",
+    Language.HI: "hi",
 }
 
 END_CALL = FunctionSchema(

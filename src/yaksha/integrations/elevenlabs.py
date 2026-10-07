@@ -22,7 +22,7 @@ CALL_AUDIO = "pcm_8000"
 
 LANGUAGE_PINS: dict[Language, str] = {
     Language.EN: "en",
-    Language.HINGLISH: "hi",
+    Language.HI: "hi",
 }
 
 

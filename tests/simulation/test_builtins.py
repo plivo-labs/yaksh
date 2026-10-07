@@ -31,7 +31,7 @@ async def test_seeding_adds_each_builtin_voice_once_and_keeps_user_changes(
         listed["Alice - Clear, Engaging Educator"],
         listed["Bill - Wise, Mature, Balanced"],
     )
-    assert alice["builtin"] and alice["languages"] == ["en", "hinglish"]
+    assert alice["builtin"] and alice["languages"] == ["en", "hi"]
     await client.patch(f"/api/v1/voices/{alice['id']}", json={"name": "Alice"})
     await client.delete(f"/api/v1/voices/{bill['id']}")
 

@@ -14,6 +14,7 @@ import {
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
+import { randomKey } from "@/lib/random-key";
 import { counted } from "@/lib/format";
 import { usePersonaNames } from "@/hooks/use-persona-names";
 import { revealErrors } from "@/lib/forms";
@@ -25,13 +26,6 @@ function whole(value: string): number | null {
   if (value.trim() === "") return null;
   const number = Number(value);
   return Number.isInteger(number) ? number : Number.NaN;
-}
-
-/** 128 random bits as hex. crypto.randomUUID exists only in a secure context, which a plain
- * HTTP host other than localhost is not. */
-function newRequestKey(): string {
-  const bytes = crypto.getRandomValues(new Uint8Array(16));
-  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
 function text(value: number | null | undefined): string {
@@ -52,7 +46,7 @@ export function RunDialog({
   onClosed: () => void;
 }) {
   const [open, setOpen] = useState(true);
-  const [requestKey] = useState(newRequestKey);
+  const [requestKey] = useState(randomKey);
   const [name, setName] = useState(earlier?.name ?? "");
   const [repeats, setRepeats] = useState(() => text(earlier?.repeats ?? 1));
   /** Null until the user types: the field then shows the server's default. */

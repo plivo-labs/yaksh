@@ -1,4 +1,4 @@
-import { PhoneIncoming, PhoneOutgoing } from "lucide-react";
+import { PhoneIncoming, PhoneOutgoing, Sparkles } from "lucide-react";
 import { type ReactNode, type SubmitEvent, useState } from "react";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";
@@ -31,6 +31,7 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useCloseGuard } from "@/hooks/use-close-guard";
 import { type AgentDraft, useAgentDraft } from "@/hooks/use-agent-draft";
+import { type BriefDrafter, useBriefDraft } from "@/hooks/use-brief-draft";
 import {
   CONTEXT_NOTE,
   MAX_BRIEF_CHARS,
@@ -220,19 +221,39 @@ export function CallOptionsFields({ form }: { form: AgentDraft }) {
 }
 
 /** The brief, which every agent needs, and the config. */
-export function ContextFields({ form }: { form: AgentDraft }) {
+export function ContextFields({ form, brief }: { form: AgentDraft; brief: BriefDrafter }) {
   const { draft, set, submitted, needs } = form;
-  const briefProblem = submitted && needs.brief;
+  const briefProblem = submitted && needs.brief && !brief.drafting;
   return (
     <FieldGroup>
       <Field>
-        <FieldLabel htmlFor="brief">Brief</FieldLabel>
+        <div className="flex items-center justify-between gap-3">
+          <FieldLabel htmlFor="brief">Brief</FieldLabel>
+          {brief.canDraft && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              disabled={brief.drafting}
+              onClick={brief.draft}
+            >
+              {brief.drafting ? <Spinner /> : <Sparkles />}
+              Draft from config
+            </Button>
+          )}
+        </div>
         <Textarea
           id="brief"
           rows={4}
           required
+          readOnly={brief.drafting}
           maxLength={MAX_BRIEF_CHARS}
-          placeholder="What this agent is supposed to do, in your words."
+          placeholder={
+            brief.drafting
+              ? "Yaksha is drafting the brief from the config."
+              : "What this agent is supposed to do, in your words."
+          }
+          aria-busy={brief.drafting}
           aria-invalid={briefProblem}
           aria-describedby={briefProblem ? "brief-error" : "brief-hint"}
           value={draft.brief}
@@ -242,9 +263,12 @@ export function ContextFields({ form }: { form: AgentDraft }) {
           <FieldError id="brief-error">
             Write at least {MIN_BRIEF_CHARS} characters about what the agent does.
           </FieldError>
+        ) : brief.error ? (
+          <FieldError id="brief-hint">Yaksha could not draft the brief: {brief.error}</FieldError>
         ) : (
           <FieldDescription id="brief-hint">
-            At least {MIN_BRIEF_CHARS} characters.
+            At least {MIN_BRIEF_CHARS} characters. Check a drafted brief: it should say what the
+            agent is for, in your words.
           </FieldDescription>
         )}
       </Field>
@@ -301,6 +325,7 @@ function AgentForm({
   onSaved: (agent: Agent) => void;
   cancel: ReactNode;
 }) {
+  const brief = useBriefDraft(form);
   const navigate = useNavigate();
   const save = useSaveAgent(agent.id);
   const remove = useDeleteAgent();
@@ -318,7 +343,7 @@ function AgentForm({
         <FieldDescription>{CONTEXT_NOTE}</FieldDescription>
         <FieldGroup>
           <NameField form={form} />
-          <ContextFields form={form} />
+          <ContextFields form={form} brief={brief} />
           <AgentIdField form={form} />
         </FieldGroup>
       </FieldSet>
@@ -351,7 +376,7 @@ function AgentForm({
           }
         />
         {cancel}
-        <Button type="submit" disabled={save.isPending}>
+        <Button type="submit" disabled={save.isPending || brief.drafting}>
           {save.isPending && <Spinner />}
           Save changes
         </Button>
