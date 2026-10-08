@@ -1,6 +1,7 @@
 import {
   type QueryClient,
   keepPreviousData,
+  useInfiniteQuery,
   useMutation,
   useQueries,
   useQuery,
@@ -16,6 +17,9 @@ import {
   type AgentDraft,
   type AppSettings,
   type AgentInput,
+  type PlivoCxAccount,
+  type PlivoCxDraft,
+  type PlivoCxFlowPage,
   type StartRequestDraft,
   type AgentRule,
   type AgentSummary,
@@ -365,6 +369,36 @@ export function useSaveAgent(id?: string) {
         ? api<Agent>(`/agents/${id}`, { method: "PATCH", json: input })
         : api<Agent>("/agents", { method: "POST", json: input }),
     onSuccess: () => client.invalidateQueries({ queryKey: keys.agents }),
+  });
+}
+
+/** A Plivo CX account's agent flows, 20 a page, searched by name. `connection` is new each time
+ * the person connects, so connecting again reads the flows again and checks the credentials;
+ * the credentials stay out of the query key. */
+export function usePlivoCxFlows(account: PlivoCxAccount | null, connection: string, name: string) {
+  return useInfiniteQuery({
+    queryKey: ["plivo-cx-flows", connection, name] as const,
+    queryFn: ({ pageParam }) =>
+      api<PlivoCxFlowPage>("/agents/import/plivo-cx/flows", {
+        method: "POST",
+        json: { ...account, name: name || null, offset: pageParam },
+      }),
+    initialPageParam: 0,
+    getNextPageParam: (last) => last.next_offset ?? undefined,
+    enabled: account !== null,
+    retry: false,
+    staleTime: Infinity,
+  });
+}
+
+/** Reads one Plivo CX agent flow into a draft. */
+export function useImportPlivoCxFlow() {
+  return useMutation({
+    mutationFn: ({ account, flowId }: { account: PlivoCxAccount; flowId: string }) =>
+      api<PlivoCxDraft>("/agents/import/plivo-cx/flow", {
+        method: "POST",
+        json: { ...account, flow_id: flowId },
+      }),
   });
 }
 

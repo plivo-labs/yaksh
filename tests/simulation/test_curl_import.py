@@ -1,6 +1,9 @@
+import json
+
 import pytest
 
 from yaksha.domain.errors import ValidationError
+from yaksha.domain.scenarios import MAX_FACTS
 from yaksha.simulation.curl_import import start_request_from_curl, without_continuations
 
 PLIVO_CX = """curl --location 'https://agentflow.example.com/v1/account/MA0000/flow/c7a9' \\
@@ -22,7 +25,10 @@ def test_a_post_command_keeps_its_url_headers_and_body_and_calls_yaksha() -> Non
     assert [(pair.name, pair.value) for pair in draft.headers] == [
         ("Authorization", "Basic dXNlcjpzZWNyZXQ=")
     ]
-    assert draft.body == {"company_name": "<fill_your_data>", "phone_number": "{{yaksha.number}}"}
+    assert draft.body == {
+        "company_name": "{{agent_data.company_name}}",
+        "phone_number": "{{yaksha.number}}",
+    }
     assert draft.number_field == "phone_number" and draft.query == []
 
 
@@ -62,6 +68,18 @@ def test_options_read_as_curl_reads_them() -> None:
     assert (draft.method, draft.url) == ("POST", "https://agents.example.com/start")
     assert [(pair.name, pair.value) for pair in draft.headers] == [("Accept", "application/json")]
     assert draft.body == {"mobile": "{{yaksha.number}}"}
+
+
+def test_a_query_value_to_fill_comes_from_each_scenario() -> None:
+    draft = start_request_from_curl(
+        "curl 'https://agents.example.com/start?to=1&campaign=%3Cfill_your_data%3E&lang=en'"
+    )
+
+    assert [(pair.name, pair.value) for pair in draft.query] == [
+        ("to", "{{yaksha.number}}"),
+        ("campaign", "{{agent_data.campaign}}"),
+        ("lang", "en"),
+    ]
 
 
 def test_only_the_first_number_parameter_is_replaced() -> None:
@@ -121,3 +139,57 @@ def test_a_line_end_backslash_joins_lines_except_inside_single_quotes() -> None:
 def test_a_command_that_cannot_be_read_says_why(command: str, message: str) -> None:
     with pytest.raises(ValidationError, match=message):
         start_request_from_curl(command)
+
+
+def test_every_field_to_fill_gets_its_own_safe_name() -> None:
+    body = {
+        "lead_source": "<fill_your_data>",
+        "lead": {"source": "<fill_your_data>"},
+        "Name": "<fill_your_data>",
+        "name": "<fill_your_data>",
+        "items": ["<fill_your_data>", {"sku": "<fill_your_data>"}],
+        "": "<fill_your_data>",
+        "{odd}": "<fill_your_data>",
+    }
+
+    draft = start_request_from_curl(
+        f"curl https://agents.example.com/calls -d '{json.dumps(body)}'"
+    )
+
+    assert draft.body == {
+        "lead_source": "{{agent_data.lead_source}}",
+        "lead": {"source": "{{agent_data.lead_source_2}}"},
+        "Name": "{{agent_data.Name}}",
+        "name": "{{agent_data.name_2}}",
+        "items": ["{{agent_data.items_0}}", {"sku": "{{agent_data.items_1_sku}}"}],
+        "": "{{agent_data.field}}",
+        "{odd}": "{{agent_data.odd}}",
+    }
+
+
+def test_more_fields_to_fill_than_a_scenario_holds_are_refused() -> None:
+    body = {f"field_{at}": "<fill_your_data>" for at in range(MAX_FACTS + 1)}
+
+    with pytest.raises(ValidationError, match="at most 30"):
+        start_request_from_curl(f"curl https://agents.example.com/calls -d '{json.dumps(body)}'")
+
+
+def test_placeholders_already_in_the_request_keep_their_names_and_count() -> None:
+    body = {"origin": "{{agent_data.lead_source}}", "lead": {"source": "<fill_your_data>"}}
+    command = (
+        "curl https://agents.example.com/calls -H 'X-Campaign: {{agent_data.campaign}}' "
+        f"-d '{json.dumps(body)}'"
+    )
+    full = {f"field_{at}": "<fill_your_data>" for at in range(MAX_FACTS)}
+
+    draft = start_request_from_curl(command)
+
+    assert draft.body == {
+        "origin": "{{agent_data.lead_source}}",
+        "lead": {"source": "{{agent_data.lead_source_2}}"},
+    }
+    with pytest.raises(ValidationError, match="31 fields"):
+        start_request_from_curl(
+            "curl https://agents.example.com/calls -H 'X-Campaign: {{\tagent_data.campaign}}' "
+            f"-d '{json.dumps(full)}'"
+        )

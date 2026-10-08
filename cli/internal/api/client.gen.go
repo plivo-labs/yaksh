@@ -1890,6 +1890,48 @@ type PlivoAccount struct {
 	AuthToken string `json:"auth_token"`
 }
 
+// PlivoCxDraft The fields a Plivo CX agent flow fills. A flow that a call starts gives the numbers that
+// reach it; a flow that a request starts gives the start request instead.
+type PlivoCxDraft struct {
+	AgentNumbers []string           `json:"agent_numbers"`
+	Config       string             `json:"config"`
+	Direction    Direction          `json:"direction"`
+	ExternalId   string             `json:"external_id"`
+	Language     Language           `json:"language"`
+	Name         *string            `json:"name"`
+	StartRequest *StartRequestDraft `json:"start_request"`
+}
+
+// PlivoCxFlow defines model for PlivoCxFlow.
+type PlivoCxFlow struct {
+	Id        string     `json:"id"`
+	Name      string     `json:"name"`
+	State     *string    `json:"state"`
+	Type      *string    `json:"type"`
+	UpdatedAt *time.Time `json:"updated_at"`
+}
+
+// PlivoCxFlowChoice defines model for PlivoCxFlowChoice.
+type PlivoCxFlowChoice struct {
+	AuthId    string             `json:"auth_id"`
+	AuthToken string             `json:"auth_token"`
+	FlowId    openapi_types.UUID `json:"flow_id"`
+}
+
+// PlivoCxFlowPage defines model for PlivoCxFlowPage.
+type PlivoCxFlowPage struct {
+	Items      []PlivoCxFlow `json:"items"`
+	NextOffset *int          `json:"next_offset"`
+}
+
+// PlivoCxFlowSearch defines model for PlivoCxFlowSearch.
+type PlivoCxFlowSearch struct {
+	AuthId    string  `json:"auth_id"`
+	AuthToken string  `json:"auth_token"`
+	Name      *string `json:"name,omitempty"`
+	Offset    *int    `json:"offset,omitempty"`
+}
+
 // Provenance defines model for Provenance.
 type Provenance string
 
@@ -2583,6 +2625,12 @@ type DraftAgentBriefApiV1AgentsDraftBriefPostJSONRequestBody = BriefSource
 // ImportAgentFileApiV1AgentsImportPostJSONRequestBody defines body for ImportAgentFileApiV1AgentsImportPost for application/json ContentType.
 type ImportAgentFileApiV1AgentsImportPostJSONRequestBody = AgentFile
 
+// ImportPlivoCxFlowApiV1AgentsImportPlivoCxFlowPostJSONRequestBody defines body for ImportPlivoCxFlowApiV1AgentsImportPlivoCxFlowPost for application/json ContentType.
+type ImportPlivoCxFlowApiV1AgentsImportPlivoCxFlowPostJSONRequestBody = PlivoCxFlowChoice
+
+// ListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPostJSONRequestBody defines body for ListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPost for application/json ContentType.
+type ListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPostJSONRequestBody = PlivoCxFlowSearch
+
 // ReadCurlCommandApiV1AgentsStartRequestFromCurlPostJSONRequestBody defines body for ReadCurlCommandApiV1AgentsStartRequestFromCurlPost for application/json ContentType.
 type ReadCurlCommandApiV1AgentsStartRequestFromCurlPostJSONRequestBody = CurlCommand
 
@@ -3250,6 +3298,46 @@ type ClientInterface interface {
 	//
 	// Corresponds with POST /api/v1/agents/import (the `ImportAgentFileApiV1AgentsImportPost` operationId).
 	ImportAgentFileApiV1AgentsImportPost(ctx context.Context, body ImportAgentFileApiV1AgentsImportPostJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ImportPlivoCxFlowApiV1AgentsImportPlivoCxFlowPostWithBody Import Plivo Cx Flow
+	//
+	// Read one Plivo CX agent flow into a draft agent. Nothing is saved. A flow that a request
+	// starts gets a start request that carries the credentials, as Plivo CX's "Copy cURL" does.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /api/v1/agents/import/plivo-cx/flow (the `ImportPlivoCxFlowApiV1AgentsImportPlivoCxFlowPost` operationId).
+	ImportPlivoCxFlowApiV1AgentsImportPlivoCxFlowPostWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ImportPlivoCxFlowApiV1AgentsImportPlivoCxFlowPost Import Plivo Cx Flow
+	//
+	// Read one Plivo CX agent flow into a draft agent. Nothing is saved. A flow that a request
+	// starts gets a start request that carries the credentials, as Plivo CX's "Copy cURL" does.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /api/v1/agents/import/plivo-cx/flow (the `ImportPlivoCxFlowApiV1AgentsImportPlivoCxFlowPost` operationId).
+	ImportPlivoCxFlowApiV1AgentsImportPlivoCxFlowPost(ctx context.Context, body ImportPlivoCxFlowApiV1AgentsImportPlivoCxFlowPostJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPostWithBody List Plivo Cx Flows
+	//
+	// One page of a Plivo CX account's agent flows. The credentials are used for this call
+	// only.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /api/v1/agents/import/plivo-cx/flows (the `ListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPost` operationId).
+	ListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPostWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPost List Plivo Cx Flows
+	//
+	// One page of a Plivo CX account's agent flows. The credentials are used for this call
+	// only.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /api/v1/agents/import/plivo-cx/flows (the `ListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPost` operationId).
+	ListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPost(ctx context.Context, body ListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPostJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ReadCurlCommandApiV1AgentsStartRequestFromCurlPostWithBody Read Curl Command
 	//
@@ -4060,6 +4148,86 @@ func (c *Client) ImportAgentFileApiV1AgentsImportPostWithBody(ctx context.Contex
 // Corresponds with POST /api/v1/agents/import (the `ImportAgentFileApiV1AgentsImportPost` operationId).
 func (c *Client) ImportAgentFileApiV1AgentsImportPost(ctx context.Context, body ImportAgentFileApiV1AgentsImportPostJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewImportAgentFileApiV1AgentsImportPostRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ImportPlivoCxFlowApiV1AgentsImportPlivoCxFlowPostWithBody Import Plivo Cx Flow
+//
+// Read one Plivo CX agent flow into a draft agent. Nothing is saved. A flow that a request
+// starts gets a start request that carries the credentials, as Plivo CX's "Copy cURL" does.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /api/v1/agents/import/plivo-cx/flow (the `ImportPlivoCxFlowApiV1AgentsImportPlivoCxFlowPost` operationId).
+func (c *Client) ImportPlivoCxFlowApiV1AgentsImportPlivoCxFlowPostWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewImportPlivoCxFlowApiV1AgentsImportPlivoCxFlowPostRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ImportPlivoCxFlowApiV1AgentsImportPlivoCxFlowPost Import Plivo Cx Flow
+//
+// Read one Plivo CX agent flow into a draft agent. Nothing is saved. A flow that a request
+// starts gets a start request that carries the credentials, as Plivo CX's "Copy cURL" does.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /api/v1/agents/import/plivo-cx/flow (the `ImportPlivoCxFlowApiV1AgentsImportPlivoCxFlowPost` operationId).
+func (c *Client) ImportPlivoCxFlowApiV1AgentsImportPlivoCxFlowPost(ctx context.Context, body ImportPlivoCxFlowApiV1AgentsImportPlivoCxFlowPostJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewImportPlivoCxFlowApiV1AgentsImportPlivoCxFlowPostRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPostWithBody List Plivo Cx Flows
+//
+// One page of a Plivo CX account's agent flows. The credentials are used for this call
+// only.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /api/v1/agents/import/plivo-cx/flows (the `ListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPost` operationId).
+func (c *Client) ListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPostWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPostRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPost List Plivo Cx Flows
+//
+// One page of a Plivo CX account's agent flows. The credentials are used for this call
+// only.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /api/v1/agents/import/plivo-cx/flows (the `ListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPost` operationId).
+func (c *Client) ListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPost(ctx context.Context, body ListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPostJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPostRequest(c.Server, body)
 	if err != nil {
 		return nil, err
 	}
@@ -5954,6 +6122,86 @@ func NewImportAgentFileApiV1AgentsImportPostRequestWithBody(server string, conte
 	}
 
 	operationPath := fmt.Sprintf("/api/v1/agents/import")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewImportPlivoCxFlowApiV1AgentsImportPlivoCxFlowPostRequest calls the generic ImportPlivoCxFlowApiV1AgentsImportPlivoCxFlowPost builder with application/json body
+func NewImportPlivoCxFlowApiV1AgentsImportPlivoCxFlowPostRequest(server string, body ImportPlivoCxFlowApiV1AgentsImportPlivoCxFlowPostJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewImportPlivoCxFlowApiV1AgentsImportPlivoCxFlowPostRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewImportPlivoCxFlowApiV1AgentsImportPlivoCxFlowPostRequestWithBody constructs an http.Request for the ImportPlivoCxFlowApiV1AgentsImportPlivoCxFlowPost method, with any body, and a specified content type
+func NewImportPlivoCxFlowApiV1AgentsImportPlivoCxFlowPostRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/agents/import/plivo-cx/flow")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPostRequest calls the generic ListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPost builder with application/json body
+func NewListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPostRequest(server string, body ListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPostJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPostRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPostRequestWithBody constructs an http.Request for the ListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPost method, with any body, and a specified content type
+func NewListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPostRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/agents/import/plivo-cx/flows")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -9362,6 +9610,46 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with POST /api/v1/agents/import (the `ImportAgentFileApiV1AgentsImportPost` operationId).
 	ImportAgentFileApiV1AgentsImportPostWithResponse(ctx context.Context, body ImportAgentFileApiV1AgentsImportPostJSONRequestBody, reqEditors ...RequestEditorFn) (*ImportAgentFileApiV1AgentsImportPostResponse, error)
 
+	// ImportPlivoCxFlowApiV1AgentsImportPlivoCxFlowPostWithBodyWithResponse Import Plivo Cx Flow
+	//
+	// Read one Plivo CX agent flow into a draft agent. Nothing is saved. A flow that a request
+	// starts gets a start request that carries the credentials, as Plivo CX's "Copy cURL" does.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/agents/import/plivo-cx/flow (the `ImportPlivoCxFlowApiV1AgentsImportPlivoCxFlowPost` operationId).
+	ImportPlivoCxFlowApiV1AgentsImportPlivoCxFlowPostWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ImportPlivoCxFlowApiV1AgentsImportPlivoCxFlowPostResponse, error)
+
+	// ImportPlivoCxFlowApiV1AgentsImportPlivoCxFlowPostWithResponse Import Plivo Cx Flow
+	//
+	// Read one Plivo CX agent flow into a draft agent. Nothing is saved. A flow that a request
+	// starts gets a start request that carries the credentials, as Plivo CX's "Copy cURL" does.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/agents/import/plivo-cx/flow (the `ImportPlivoCxFlowApiV1AgentsImportPlivoCxFlowPost` operationId).
+	ImportPlivoCxFlowApiV1AgentsImportPlivoCxFlowPostWithResponse(ctx context.Context, body ImportPlivoCxFlowApiV1AgentsImportPlivoCxFlowPostJSONRequestBody, reqEditors ...RequestEditorFn) (*ImportPlivoCxFlowApiV1AgentsImportPlivoCxFlowPostResponse, error)
+
+	// ListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPostWithBodyWithResponse List Plivo Cx Flows
+	//
+	// One page of a Plivo CX account's agent flows. The credentials are used for this call
+	// only.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/agents/import/plivo-cx/flows (the `ListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPost` operationId).
+	ListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPostWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPostResponse, error)
+
+	// ListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPostWithResponse List Plivo Cx Flows
+	//
+	// One page of a Plivo CX account's agent flows. The credentials are used for this call
+	// only.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/agents/import/plivo-cx/flows (the `ListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPost` operationId).
+	ListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPostWithResponse(ctx context.Context, body ListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPostJSONRequestBody, reqEditors ...RequestEditorFn) (*ListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPostResponse, error)
+
 	// ReadCurlCommandApiV1AgentsStartRequestFromCurlPostWithBodyWithResponse Read Curl Command
 	//
 	// Read a cURL command into a start request, for an agent that calls Yaksha. Nothing is
@@ -10351,6 +10639,116 @@ func (r ImportAgentFileApiV1AgentsImportPostResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r ImportAgentFileApiV1AgentsImportPostResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type ImportPlivoCxFlowApiV1AgentsImportPlivoCxFlowPostResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *PlivoCxDraft
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *ErrorResponse
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ImportPlivoCxFlowApiV1AgentsImportPlivoCxFlowPostResponse) GetJSON200() *PlivoCxDraft {
+	return r.JSON200
+}
+
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r ImportPlivoCxFlowApiV1AgentsImportPlivoCxFlowPostResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r ImportPlivoCxFlowApiV1AgentsImportPlivoCxFlowPostResponse) GetJSON503() *ErrorResponse {
+	return r.JSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r ImportPlivoCxFlowApiV1AgentsImportPlivoCxFlowPostResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ImportPlivoCxFlowApiV1AgentsImportPlivoCxFlowPostResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ImportPlivoCxFlowApiV1AgentsImportPlivoCxFlowPostResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ImportPlivoCxFlowApiV1AgentsImportPlivoCxFlowPostResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type ListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPostResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *PlivoCxFlowPage
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *ErrorResponse
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPostResponse) GetJSON200() *PlivoCxFlowPage {
+	return r.JSON200
+}
+
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r ListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPostResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r ListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPostResponse) GetJSON503() *ErrorResponse {
+	return r.JSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r ListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPostResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPostResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPostResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPostResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -14080,6 +14478,70 @@ func (c *ClientWithResponses) ImportAgentFileApiV1AgentsImportPostWithResponse(c
 	return ParseImportAgentFileApiV1AgentsImportPostResponse(rsp)
 }
 
+// ImportPlivoCxFlowApiV1AgentsImportPlivoCxFlowPostWithBodyWithResponse Import Plivo Cx Flow
+//
+// Read one Plivo CX agent flow into a draft agent. Nothing is saved. A flow that a request
+// starts gets a start request that carries the credentials, as Plivo CX's "Copy cURL" does.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/agents/import/plivo-cx/flow (the `ImportPlivoCxFlowApiV1AgentsImportPlivoCxFlowPost` operationId).
+func (c *ClientWithResponses) ImportPlivoCxFlowApiV1AgentsImportPlivoCxFlowPostWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ImportPlivoCxFlowApiV1AgentsImportPlivoCxFlowPostResponse, error) {
+	rsp, err := c.ImportPlivoCxFlowApiV1AgentsImportPlivoCxFlowPostWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseImportPlivoCxFlowApiV1AgentsImportPlivoCxFlowPostResponse(rsp)
+}
+
+// ImportPlivoCxFlowApiV1AgentsImportPlivoCxFlowPostWithResponse Import Plivo Cx Flow
+//
+// Read one Plivo CX agent flow into a draft agent. Nothing is saved. A flow that a request
+// starts gets a start request that carries the credentials, as Plivo CX's "Copy cURL" does.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/agents/import/plivo-cx/flow (the `ImportPlivoCxFlowApiV1AgentsImportPlivoCxFlowPost` operationId).
+func (c *ClientWithResponses) ImportPlivoCxFlowApiV1AgentsImportPlivoCxFlowPostWithResponse(ctx context.Context, body ImportPlivoCxFlowApiV1AgentsImportPlivoCxFlowPostJSONRequestBody, reqEditors ...RequestEditorFn) (*ImportPlivoCxFlowApiV1AgentsImportPlivoCxFlowPostResponse, error) {
+	rsp, err := c.ImportPlivoCxFlowApiV1AgentsImportPlivoCxFlowPost(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseImportPlivoCxFlowApiV1AgentsImportPlivoCxFlowPostResponse(rsp)
+}
+
+// ListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPostWithBodyWithResponse List Plivo Cx Flows
+//
+// One page of a Plivo CX account's agent flows. The credentials are used for this call
+// only.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/agents/import/plivo-cx/flows (the `ListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPost` operationId).
+func (c *ClientWithResponses) ListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPostWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPostResponse, error) {
+	rsp, err := c.ListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPostWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPostResponse(rsp)
+}
+
+// ListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPostWithResponse List Plivo Cx Flows
+//
+// One page of a Plivo CX account's agent flows. The credentials are used for this call
+// only.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/agents/import/plivo-cx/flows (the `ListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPost` operationId).
+func (c *ClientWithResponses) ListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPostWithResponse(ctx context.Context, body ListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPostJSONRequestBody, reqEditors ...RequestEditorFn) (*ListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPostResponse, error) {
+	rsp, err := c.ListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPost(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPostResponse(rsp)
+}
+
 // ReadCurlCommandApiV1AgentsStartRequestFromCurlPostWithBodyWithResponse Read Curl Command
 //
 // Read a cURL command into a start request, for an agent that calls Yaksha. Nothing is
@@ -15596,6 +16058,86 @@ func ParseImportAgentFileApiV1AgentsImportPostResponse(rsp *http.Response) (*Imp
 			return nil, err
 		}
 		response.JSON4XX = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseImportPlivoCxFlowApiV1AgentsImportPlivoCxFlowPostResponse parses an HTTP response from a ImportPlivoCxFlowApiV1AgentsImportPlivoCxFlowPostWithResponse call
+func ParseImportPlivoCxFlowApiV1AgentsImportPlivoCxFlowPostResponse(rsp *http.Response) (*ImportPlivoCxFlowApiV1AgentsImportPlivoCxFlowPostResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ImportPlivoCxFlowApiV1AgentsImportPlivoCxFlowPostResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest PlivoCxDraft
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPostResponse parses an HTTP response from a ListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPostWithResponse call
+func ParseListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPostResponse(rsp *http.Response) (*ListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPostResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPostResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest PlivoCxFlowPage
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
 
 	}
 

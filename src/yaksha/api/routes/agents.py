@@ -1,7 +1,7 @@
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query, Request, status
 
 from yaksha.api.auth import require_token
 from yaksha.api.deps import BriefModelDep, SessionDep
@@ -9,11 +9,20 @@ from yaksha.api.errors import UNAVAILABLE
 from yaksha.api.pagination import Page, PageDep
 from yaksha.api.schemas.agents import AgentRead, AgentSummary, AgentVersionRead
 from yaksha.db.models import Agent
-from yaksha.domain.agent_import import AgentDraft, AgentFile, CurlCommand, StartRequestDraft
+from yaksha.domain.agent_import import (
+    AgentDraft,
+    AgentFile,
+    CurlCommand,
+    PlivoCxDraft,
+    PlivoCxFlowChoice,
+    PlivoCxFlowPage,
+    PlivoCxFlowSearch,
+    StartRequestDraft,
+)
 from yaksha.domain.agents import AgentCreate, AgentUpdate, BriefDraft, BriefSource, Direction
 from yaksha.domain.evaluations import RuleResults
 from yaksha.evaluation import rule_results
-from yaksha.simulation import agents
+from yaksha.simulation import agents, plivo_cx_import
 from yaksha.simulation.agent_import import import_agent
 from yaksha.simulation.briefs import draft_brief
 from yaksha.simulation.curl_import import start_request_from_curl
@@ -38,6 +47,22 @@ async def import_agent_file(file: AgentFile) -> AgentDraft:
     """Read an agent file from another platform into a draft. Nothing is saved. A file in a format
     that Yaksha does not read fails with the code `not_recognized`; it can still be the config."""
     return import_agent(file.content)
+
+
+@router.post("/import/plivo-cx/flows", responses=UNAVAILABLE)
+async def list_plivo_cx_flows(search: PlivoCxFlowSearch, request: Request) -> PlivoCxFlowPage:
+    """One page of a Plivo CX account's agent flows. The credentials are used for this call
+    only."""
+    api = request.app.state.providers.plivo_cx(search.auth_id, search.auth_token)
+    return await plivo_cx_import.list_flows(api, search)
+
+
+@router.post("/import/plivo-cx/flow", responses=UNAVAILABLE)
+async def import_plivo_cx_flow(choice: PlivoCxFlowChoice, request: Request) -> PlivoCxDraft:
+    """Read one Plivo CX agent flow into a draft agent. Nothing is saved. A flow that a request
+    starts gets a start request that carries the credentials, as Plivo CX's "Copy cURL" does."""
+    api = request.app.state.providers.plivo_cx(choice.auth_id, choice.auth_token)
+    return await plivo_cx_import.import_flow(api, choice.flow_id)
 
 
 @router.post("/start-request-from-curl")

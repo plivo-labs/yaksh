@@ -46,6 +46,7 @@ from yaksha.domain.voices import ProviderVoice, VoiceGender, VoiceProvider, Voic
 from yaksha.evaluation import evaluations
 from yaksha.evaluation.evaluations import Evaluated
 from yaksha.integrations.elevenlabs import as_wav
+from yaksha.integrations.plivo import PlivoApi
 from yaksha.integrations.plivo_signature import signature, signed_text
 from yaksha.settings import store
 from yaksha.settings.cipher import Cipher
@@ -411,6 +412,12 @@ class FakeProviders:
 
     def brief_model(self, _settings: AppSettings) -> Any:
         return self.generation_model_
+
+    plivo_api_url = "http://127.0.0.1:9"
+    """Where plivo_cx clients go: nowhere, until a test points it at its stand-in for Plivo."""
+
+    def plivo_cx(self, auth_id: str, auth_token: str) -> PlivoApi:
+        return PlivoApi(auth_id, auth_token, base_url=self.plivo_api_url)
 
     async def close(self) -> None:
         pass
@@ -783,15 +790,19 @@ def generation_model() -> FakeJsonModel:
 
 
 @pytest.fixture
+def providers(
+    voice_clients: dict[VoiceProvider, FakeVoiceClient], generation_model: FakeJsonModel
+) -> FakeProviders:
+    return FakeProviders(voice_clients, generation_model)
+
+
+@pytest.fixture
 async def client(
-    settings: Settings,
-    voice_clients: dict[VoiceProvider, FakeVoiceClient],
-    file_store: FakeFileStore,
-    generation_model: FakeJsonModel,
+    settings: Settings, providers: FakeProviders, file_store: FakeFileStore
 ) -> AsyncIterator[AsyncClient]:
     """An API client whose voices list holds the English and the Hindi test voice."""
     app = create_app(settings)
-    app.state.providers = FakeProviders(voice_clients, generation_model)
+    app.state.providers = providers
     app.state.file_store = file_store
     async with create_sessionmaker(app.state.engine)() as session:
         await store.change(session, app.state.source.cipher, secrets=STORED_SECRETS)

@@ -24,7 +24,12 @@ import {
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { APPEAR, REVEAL } from "@/lib/motion";
-import { type OutboundDraft, outboundProblems } from "@/lib/outbound";
+import {
+  type OutboundDraft,
+  outboundProblems,
+  scenarioFields,
+  withStartRequest,
+} from "@/lib/outbound";
 import { useStartRequestFromCurl } from "@/lib/queries";
 import type { Header, TriggerMethod } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -67,8 +72,12 @@ export function OutboundFields({
   useEffect(() => {
     latest.current = draft;
   }, [draft]);
-  /** After a cURL paste: the field that now holds the number to call, or null for none. */
-  const [fromCurl, setFromCurl] = useState<{ numberField: string | null } | null>(null);
+  /** After a cURL paste: the field that now holds the number to call, and whether other fields
+   * now come from each scenario. */
+  const [fromCurl, setFromCurl] = useState<{
+    numberField: string | null;
+    fromScenarios: boolean;
+  } | null>(null);
   /** A cURL command pasted into the URL fills the method, the URL, the headers and the body. */
   const pasteCurl = (event: ClipboardEvent<HTMLInputElement>) => {
     const text = event.clipboardData.getData("text");
@@ -77,16 +86,11 @@ export function OutboundFields({
     setFromCurl(null);
     curl.mutate(text, {
       onSuccess: (request) => {
-        const current = latest.current;
-        onChange({
-          ...current,
-          method: request.method,
-          url: request.url,
-          headers: request.headers,
-          body: request.body ? JSON.stringify(request.body, null, 2) : current.body,
-          query: request.method === "GET" ? request.query : current.query,
+        onChange(withStartRequest(latest.current, request));
+        setFromCurl({
+          numberField: request.number_field,
+          fromScenarios: scenarioFields(request).length > 0,
         });
-        setFromCurl({ numberField: request.number_field });
       },
     });
   };
@@ -175,8 +179,8 @@ export function OutboundFields({
               <>
                 Filled from the cURL command.{" "}
                 <code className="font-mono text-foreground">{"{{yaksha.number}}"}</code> is now in{" "}
-                <code className="font-mono text-foreground">{fromCurl.numberField}</code>. Check the
-                other values.
+                <code className="font-mono text-foreground">{fromCurl.numberField}</code>.
+                {fromCurl.fromScenarios && " The other fields come from each scenario."}
               </>
             ) : (
               <>

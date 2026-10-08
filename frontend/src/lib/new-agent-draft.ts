@@ -4,11 +4,14 @@ import { type AgentRule, type KnowledgeBaseDocument, LANGUAGE_NAMES } from "@/li
 
 const DRAFT_KEY = "yaksha.new-agent-draft";
 
-/** The file a new agent's draft came from. A file Yaksha does not read gave only the config. */
+/** Where a new agent's draft came from: a file Yaksha read, a file it only kept as the config, or
+ * a Plivo CX agent flow. */
 export interface ImportedFrom {
-  file: string;
-  recognized: boolean;
+  source: string;
+  kind: "file" | "config-only" | "plivo-cx";
 }
+
+const IMPORT_KINDS: ReadonlySet<string> = new Set(["file", "config-only", "plivo-cx"]);
 
 /** What the new-agent wizard keeps in this tab, so a reload does not lose it. */
 export interface StoredDraft {
@@ -41,7 +44,10 @@ export function readStoredDraft(): StoredDraft | null {
       rules: stored.rules ?? [],
       documents: stored.documents ?? [],
       openRule: stored.openRule ?? null,
-      importedFrom: stored.importedFrom ?? null,
+      importedFrom:
+        stored.importedFrom && IMPORT_KINDS.has(stored.importedFrom.kind)
+          ? stored.importedFrom
+          : null,
       briefDraftId: stored.briefDraftId ?? null,
     };
   } catch {

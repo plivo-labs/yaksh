@@ -1,4 +1,4 @@
-import { Bot, Copy, CopyPlus, Ellipsis, Plus, Trash2 } from "lucide-react";
+import { Bot, Copy, CopyPlus, Ellipsis, Link2, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router";
 
@@ -66,10 +66,21 @@ export function AgentsPage() {
           className="order-last basis-full sm:order-none sm:basis-64"
         />
         {!empty && (
-          <Button size="sm" nativeButton={false} render={<Link to="/agents/new" />}>
-            <Plus />
-            New agent
-          </Button>
+          <>
+            <Button
+              variant="outline"
+              size="sm"
+              nativeButton={false}
+              render={<Link to="/agents/new/provider" />}
+            >
+              <Link2 />
+              Import from a provider
+            </Button>
+            <Button size="sm" nativeButton={false} render={<Link to="/agents/new" />}>
+              <Plus />
+              New agent
+            </Button>
+          </>
         )}
       </div>
 
@@ -90,10 +101,18 @@ export function AgentsPage() {
               phones it with a simulated caller.
             </EmptyDescription>
           </EmptyHeader>
-          <EmptyContent>
+          <EmptyContent className="flex-row flex-wrap justify-center">
             <Button nativeButton={false} render={<Link to="/agents/new" />}>
               <Plus />
               Add your first agent
+            </Button>
+            <Button
+              variant="outline"
+              nativeButton={false}
+              render={<Link to="/agents/new/provider" />}
+            >
+              <Link2 />
+              Import from a provider
             </Button>
           </EmptyContent>
         </Empty>
