@@ -108,7 +108,7 @@ function Form({
   return (
     <>
       <Tabs value={tab} onValueChange={(next) => onTab(next as Tab)} className="gap-5">
-        <TabsList variant="line">
+        <TabsList variant="line" className="sticky -top-5 z-10 bg-background">
           {TABS.map((item) => (
             <TabsTrigger key={item.value} value={item.value}>
               {item.label}
