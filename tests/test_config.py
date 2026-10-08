@@ -17,6 +17,11 @@ def test_an_empty_variable_counts_as_not_set(monkeypatch: pytest.MonkeyPatch) ->
     assert settings.public_url is None
 
 
+def test_yaksha_refuses_to_start_with_an_empty_api_token() -> None:
+    with pytest.raises(pydantic.ValidationError, match="api_token"):
+        Settings(_env_file=None, **{**REQUIRED, "api_token": ""})
+
+
 @pytest.mark.parametrize("key", [None, "k" * 31])
 def test_yaksha_refuses_to_start_without_a_long_enough_encryption_key(key: str | None) -> None:
     values = {**REQUIRED, "encryption_key": key} if key else REQUIRED.copy()

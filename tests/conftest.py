@@ -678,13 +678,11 @@ def written_scenario(prompt: str) -> dict[str, Any]:
 class FakeFileStore:
     def __init__(self) -> None:
         self.files: dict[str, tuple[bytes, str]] = {}
-        self.puts = 0
         self.down = False
 
     async def put(self, key: str, data: bytes, media_type: str) -> None:
         if self.down:
             raise UnavailableError("file storage refused the upload")
-        self.puts += 1
         self.files[key] = (data, media_type)
 
     async def stream(self, key: str) -> AsyncGenerator[bytes]:

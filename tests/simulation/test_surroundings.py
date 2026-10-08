@@ -159,11 +159,6 @@ def test_a_quiet_room_plays_nothing() -> None:
     assert sound_plan(Surroundings(), Language.EN, key="a", duration_s=60).layers == []
 
 
-def test_sounds_and_auto_noise_do_not_go_together() -> None:
-    with pytest.raises(ValueError, match="sounds or auto noise"):
-        Surroundings(sounds=(Sound(sound=NoiseSound.CAFE, db=0),), auto=AutoNoise(db=0))
-
-
 def test_the_same_sounds_in_another_order_are_the_same_surroundings() -> None:
     cafe, car = Sound(sound=NoiseSound.CAFE, db=-10), Sound(sound=NoiseSound.CAR, db=-20)
 

@@ -43,6 +43,7 @@ def test_placeholders_are_filled_inside_json_strings_without_changing_the_json()
     }
     assert rendered.headers == {"Authorization": "Bearer sk_live"}
     assert rendered.secrets == ("sk_live",)
+    assert agent_data_names(TRIGGER) == {"customer name"}
 
 
 @pytest.mark.parametrize(
@@ -54,10 +55,6 @@ def test_a_missing_value_is_named_instead_of_sent_empty(
 ) -> None:
     with pytest.raises(RenderError, match=missing):
         render(TRIGGER, number="+1", conversation_id="c", agent_data=facts, secrets=secrets)
-
-
-def test_the_agent_data_a_trigger_needs_is_known_before_it_is_sent() -> None:
-    assert agent_data_names(TRIGGER) == {"customer name"}
 
 
 def test_a_value_that_would_break_a_header_is_refused() -> None:

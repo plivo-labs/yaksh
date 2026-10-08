@@ -3,7 +3,6 @@ import uuid
 
 import pytest
 from httpx import AsyncClient
-from pydantic import ValidationError
 
 from tests.conftest import (
     AGENT,
@@ -14,7 +13,6 @@ from tests.conftest import (
     create_scenario,
     wait_for_lock_waiters,
 )
-from yaksha.config import Settings
 from yaksha.db.models import Scenario
 
 
@@ -150,13 +148,6 @@ async def test_requests_without_a_valid_token_are_rejected(client: AsyncClient) 
         "error": {"code": "unauthorized", "message": "missing or invalid bearer token"}
     }
     assert wrong.headers["www-authenticate"] == "Bearer"
-
-
-def test_an_empty_token_is_refused_at_startup() -> None:
-    with pytest.raises(ValidationError):
-        Settings.model_validate(
-            {"api_token": "", "database_url": "postgresql+asyncpg://yaksha:yaksha@db/yaksha"}
-        )
 
 
 async def test_a_duplicate_copies_the_config_and_live_scenarios_but_not_the_external_id(
