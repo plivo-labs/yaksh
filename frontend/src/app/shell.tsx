@@ -10,6 +10,7 @@ import {
   PhoneCall,
   SlidersHorizontal,
   SunMedium,
+  TriangleAlert,
   UserRound,
 } from "lucide-react";
 import type { ComponentType, CSSProperties } from "react";
@@ -22,7 +23,6 @@ import { useToken } from "@/app/use-token";
 import { API_TOKEN } from "@/lib/api";
 import { useSettings } from "@/lib/queries";
 import type { AppSettings } from "@/lib/types";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   Sidebar,
   SidebarContent,
@@ -167,6 +167,7 @@ export function Shell() {
           <SidebarRail />
         </Sidebar>
         <SidebarInset className="h-svh max-h-svh overflow-clip">
+          <MissingKeys />
           <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4">
             <SidebarTrigger />
             {page && Crumbs && (
@@ -180,7 +181,6 @@ export function Shell() {
             )}
           </header>
           <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
-            {!pathname.startsWith("/settings") && <MissingKeys />}
             <Outlet />
           </div>
         </SidebarInset>
@@ -204,31 +204,32 @@ export function Shell() {
 function missingKeys(settings: AppSettings): string[] {
   const secrets = settings.secrets;
   return [
-    !secrets.llm_api_key && "the LLM provider key",
-    !secrets.deepgram_api_key && "the Deepgram key",
-    !secrets.elevenlabs_api_key && "the ElevenLabs key",
-    !(secrets.plivo_auth_id && secrets.plivo_auth_token) && "the Plivo Auth ID and Auth token",
+    !secrets.llm_api_key && "LLM provider",
+    !secrets.deepgram_api_key && "Deepgram",
+    !secrets.elevenlabs_api_key && "ElevenLabs",
+    !(secrets.plivo_auth_id && secrets.plivo_auth_token) && "Plivo",
   ].filter((name): name is string => Boolean(name));
 }
 
+/** A strip across the top of every page while calls cannot start. */
 function MissingKeys() {
   const settings = useSettings();
   if (!settings.data) return null;
   const missing = missingKeys(settings.data);
   if (missing.length === 0) return null;
   return (
-    <Alert className="mb-5">
-      <AlertTitle>Calls cannot start yet</AlertTitle>
-      <AlertDescription>
-        <p>
-          Add {missing.join(", ")} in{" "}
-          <Link to="/settings" className="underline">
-            Settings
-          </Link>
-          .
-        </p>
-      </AlertDescription>
-    </Alert>
+    <div
+      role="alert"
+      className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 border-b bg-warning px-4 py-2 text-s-400 text-warning-foreground"
+    >
+      <TriangleAlert className="size-4 shrink-0" aria-hidden />
+      <span>
+        <span className="text-s-500">Calls can't start.</span> Missing keys: {missing.join(", ")}.
+      </span>
+      <Link to="/settings" className="text-s-500 underline underline-offset-2">
+        Open Settings
+      </Link>
+    </div>
   );
 }
 
