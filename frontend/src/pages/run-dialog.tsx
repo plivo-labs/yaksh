@@ -31,8 +31,9 @@ function text(value: number | null | undefined): string {
   return value === null || value === undefined ? "" : String(value);
 }
 
-/** Starts a run of the scenarios, in the order given. For "Run again", `earlier` fills the
- * fields, and scenarios deleted since are left out. */
+/** Starts a run of the scenarios, in the order given, or of every scenario of the agent when
+ * `scenarioIds` is absent. For "Run again", `earlier` fills the fields, and scenarios deleted
+ * since are left out. */
 export function RunDialog({
   agent,
   scenarioIds,
@@ -40,7 +41,7 @@ export function RunDialog({
   onClosed,
 }: {
   agent: AgentSummary;
-  scenarioIds: string[];
+  scenarioIds?: string[];
   earlier?: RunSummary;
   onClosed: () => void;
 }) {

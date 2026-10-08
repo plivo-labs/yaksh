@@ -1,22 +1,18 @@
 import {
-  AudioLines,
   BookOpen,
-  Bot,
   ClipboardCheck,
-  Hash,
   KeyRound,
-  ListChecks,
   MoonStar,
-  PhoneCall,
   SlidersHorizontal,
   SunMedium,
   TriangleAlert,
-  UserRound,
 } from "lucide-react";
 import type { ComponentType, CSSProperties } from "react";
 import { Link, Navigate, NavLink, Outlet, useLocation, useMatches } from "react-router";
 import { Toaster } from "sonner";
 
+import { CommandMenu } from "@/app/command-menu";
+import { DOCS_URL, NAV_GROUPS } from "@/app/nav";
 import { TokenGate } from "@/app/token";
 import { useDarkMode } from "@/app/use-dark-mode";
 import { useToken } from "@/app/use-token";
@@ -41,25 +37,6 @@ import {
 } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
 import { TooltipProvider } from "@/components/ui/tooltip";
-
-const groups: { label: string; links: { to: string; label: string; icon: typeof Bot }[] }[] = [
-  {
-    label: "Test",
-    links: [
-      { to: "/agents", label: "Agents", icon: Bot },
-      { to: "/runs", label: "Runs", icon: ListChecks },
-      { to: "/conversations", label: "Conversations", icon: PhoneCall },
-    ],
-  },
-  {
-    label: "Callers",
-    links: [
-      { to: "/personas", label: "Personas", icon: UserRound },
-      { to: "/voices", label: "Voices", icon: AudioLines },
-      { to: "/numbers", label: "Numbers", icon: Hash },
-    ],
-  },
-];
 
 const sidebarOpen = () => !document.cookie.split("; ").includes("sidebar_state=false");
 
@@ -90,7 +67,7 @@ export function Shell() {
             </SidebarMenu>
           </SidebarHeader>
           <SidebarContent>
-            {groups.map((group) => (
+            {NAV_GROUPS.map((group) => (
               <SidebarGroup key={group.label}>
                 <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
                 <SidebarGroupContent>
@@ -136,13 +113,7 @@ export function Shell() {
               <SidebarMenuItem>
                 <SidebarMenuButton
                   tooltip="Docs"
-                  render={
-                    <a
-                      href="https://github.com/plivo-labs/yaksha/tree/dev/docs/content/docs"
-                      target="_blank"
-                      rel="noreferrer"
-                    />
-                  }
+                  render={<a href={DOCS_URL} target="_blank" rel="noreferrer" />}
                 >
                   <BookOpen />
                   <span>
@@ -185,6 +156,7 @@ export function Shell() {
           </div>
         </SidebarInset>
       </SidebarProvider>
+      <CommandMenu dark={dark} onToggleDark={toggleDark} onChangeToken={() => setToken("")} />
       <Toaster
         theme={dark ? "dark" : "light"}
         position="bottom-right"
