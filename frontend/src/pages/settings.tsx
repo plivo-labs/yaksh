@@ -1,5 +1,5 @@
 import { ChevronRight } from "lucide-react";
-import { useEffect, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import { useSearchParams } from "react-router";
 import { toast } from "sonner";
 
@@ -47,12 +47,15 @@ export function SettingsPage() {
   const settings = useSettings();
   const [params, setParams] = useSearchParams();
   const tab: Tab = TABS.find((item) => item.value === params.get("tab"))?.value ?? "providers";
+  const header = (
+    <div className="flex min-h-[30px] flex-wrap items-center gap-x-2 gap-y-4">
+      <h1 className="mr-auto text-h3-500">Settings</h1>
+      <ImportExport />
+    </div>
+  );
   return (
-    <div className="grid max-w-5xl gap-6">
-      <div className="flex min-h-[30px] flex-wrap items-center gap-x-2 gap-y-4">
-        <h1 className="mr-auto text-h3-500">Settings</h1>
-        <ImportExport />
-      </div>
+    <div className="flex min-h-full max-w-5xl flex-col gap-6">
+      {settings.data === undefined && header}
       {settings.isError ? (
         <Alert variant="destructive">
           <AlertTitle>Could not load the settings</AlertTitle>
@@ -67,6 +70,7 @@ export function SettingsPage() {
       ) : (
         <Form
           settings={settings.data}
+          header={header}
           tab={tab}
           onTab={(next) => setParams({ tab: next }, { replace: true })}
         />
@@ -77,10 +81,12 @@ export function SettingsPage() {
 
 function Form({
   settings,
+  header,
   tab,
   onTab,
 }: {
   settings: AppSettings;
+  header: ReactNode;
   tab: Tab;
   onTab: (tab: Tab) => void;
 }) {
@@ -108,13 +114,18 @@ function Form({
   return (
     <>
       <Tabs value={tab} onValueChange={(next) => onTab(next as Tab)} className="gap-5">
-        <TabsList variant="line" className="sticky -top-5 z-10 bg-background">
-          {TABS.map((item) => (
-            <TabsTrigger key={item.value} value={item.value}>
-              {item.label}
-            </TabsTrigger>
-          ))}
-        </TabsList>
+        {/* The title and the tabs stay in view; only the panels below them scroll. The negative
+            margins reach over the shell's padding, so nothing shows above the header. */}
+        <div className="sticky -top-5 z-10 -mx-6 -mt-5 grid gap-4 bg-background px-6 pt-5">
+          {header}
+          <TabsList variant="line">
+            {TABS.map((item) => (
+              <TabsTrigger key={item.value} value={item.value}>
+                {item.label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </div>
 
         <TabsContent value="providers" className="grid gap-5">
           <ProviderPanel
@@ -175,7 +186,7 @@ function Form({
           </ProviderPanel>
           <ProviderPanel
             title="ElevenLabs"
-            description="Text to speech. Also used for voice previews."
+            description="Text to speech."
             provider="elevenlabs"
             canTest={Boolean(secrets.elevenlabs_api_key)}
           >
@@ -228,7 +239,7 @@ function Form({
                 model={draft.caller.model}
                 value={draft.caller.reasoning_effort}
                 onValueChange={(effort) => change("caller", "reasoning_effort", effort)}
-                unset="none, the fastest"
+                unset="none"
                 hidden={["none"]}
               />
             </SettingRow>
@@ -249,7 +260,7 @@ function Form({
                 model={draft.generation.model ?? draft.caller.model}
                 value={draft.generation.reasoning_effort}
                 onValueChange={(effort) => change("generation", "reasoning_effort", effort)}
-                unset="the model's default"
+                unset="default"
               />
             </SettingRow>
             <NumberRow
@@ -279,7 +290,7 @@ function Form({
                 model={draft.brief.model}
                 value={draft.brief.reasoning_effort}
                 onValueChange={(effort) => change("brief", "reasoning_effort", effort)}
-                unset="the model's default"
+                unset="default"
               />
             </SettingRow>
             <NumberRow
@@ -306,7 +317,7 @@ function Form({
                 model={draft.judges.model}
                 value={draft.judges.reasoning_effort}
                 onValueChange={(effort) => change("judges", "reasoning_effort", effort)}
-                unset="the model's default"
+                unset="default"
               />
             </SettingRow>
             <details className="group border-t">
@@ -495,13 +506,10 @@ function Form({
         <div
           role="region"
           aria-label="Unsaved changes"
-          className={`sticky bottom-0 z-20 -mx-6 -mb-5 border-t bg-background ${RISE}`}
+          className={`sticky -bottom-5 z-20 -mx-6 -mb-5 mt-auto border-t bg-background ${RISE}`}
         >
           <div className="flex flex-wrap items-center gap-3 px-6 py-3">
             <span className="text-s-500">You have unsaved changes.</span>
-            <span className="text-s-400 text-muted-foreground">
-              Saved changes apply to the next call.
-            </span>
             {save.isError && (
               <span className="text-s-400 text-destructive">{save.error.message}</span>
             )}

@@ -57,8 +57,11 @@ async def check_llm(base_url: str, api_key: str, model: str, effort: str | None)
 
 
 async def reasoning_efforts(base_url: str, api_key: str, model: str) -> list[str]:
-    """The reasoning efforts the model takes; empty for a model without reasoning. Raises when
-    any answer stays open, so a timeout never reads as a refusal."""
+    """The reasoning efforts the model takes; empty for a model without reasoning. A plain
+    request goes first, so a model the provider cannot serve, such as an Azure model with no
+    deployment, fails with the provider's reason instead of as an effort the model refuses.
+    Raises when any answer stays open, so a timeout never reads as a refusal."""
+    await check_llm(base_url, api_key, model, None)
     client = llm_client(base_url, api_key)
     try:
         answers = await asyncio.gather(

@@ -226,6 +226,20 @@ async def test_the_efforts_of_a_model_come_from_the_provider(
     assert plain == {"model": "gpt-4.1", "efforts": []}
 
 
+async def test_a_model_the_provider_cannot_serve_reports_the_providers_reason(
+    client: AsyncClient, db: Db, provider: tuple[str, FakeProvider]
+) -> None:
+    base, fake = provider
+    await save_settings(db, {"llm": {"base_url": f"{base}/v1"}}, {"llm_api_key": LLM_KEY})
+    fake.reply = (404, {"error": {"code": "DeploymentNotFound", "message": "not deployed"}})
+
+    refused = await client.get("/api/v1/settings/models/claude-opus-5/efforts")
+
+    assert refused.status_code == 503
+    assert "HTTP 404 DeploymentNotFound" in refused.json()["error"]["message"]
+    assert len(fake.requests) == 1
+
+
 async def test_an_export_names_each_saved_secret_and_never_holds_its_value(
     client: AsyncClient, db: Db
 ) -> None:
