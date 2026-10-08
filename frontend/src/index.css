@@ -10,6 +10,21 @@
 @import "@plivo/tokens/colors.css" layer(base);
 @import "@plivo/tokens/type.css" layer(components);
 
+/* The console tracks the mono label at 0.08em; the token package still ships 0.14em. */
+@layer components {
+  .text-label {
+    letter-spacing: 0.08em;
+  }
+}
+
+/* Browsers reset text-transform on buttons, so a sort button in an uppercase header row would
+ * stay in sentence case. */
+@layer base {
+  button {
+    text-transform: inherit;
+  }
+}
+
 /* fontsource registers the variable fonts as "<family> Variable", and the token font stacks name
  * the static families, so each role lists the loaded font first. */
 :root {
@@ -145,6 +160,25 @@
   }
 
   --animate-shimmer: shimmer 1.8s linear infinite;
+
+  --animate-glint: glint 1.4s ease-in-out;
+  --background-image-glint: linear-gradient(
+    105deg,
+    transparent 42%,
+    rgba(255, 255, 255, 0.08) 47%,
+    rgba(255, 255, 255, 0.22) 50%,
+    rgba(255, 255, 255, 0.08) 53%,
+    transparent 58%
+  );
+
+  @keyframes glint {
+    from {
+      background-position: 200% 0;
+    }
+    to {
+      background-position: -100% 0;
+    }
+  }
 
   @keyframes shimmer {
     from {

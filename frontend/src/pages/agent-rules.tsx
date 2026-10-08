@@ -91,7 +91,7 @@ export function AgentRules({ agent }: { agent: Agent }) {
         </p>
       ) : (
         <>
-          <div className="grid grid-cols-[minmax(0,1fr)_6rem_3rem] gap-x-3 border-b px-5 py-2 text-s-500 text-muted-foreground">
+          <div className="grid grid-cols-[minmax(0,1fr)_6rem_3rem] gap-x-3 border-b px-5 py-2 text-label text-secondary">
             <span>Rule</span>
             <span className="col-span-2">
               <Explained hint={RESULTS_NOTE}>Results</Explained>

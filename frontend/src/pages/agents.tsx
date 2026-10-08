@@ -102,7 +102,7 @@ export function AgentsPage() {
           aria-busy={agents.isFetching}
           className={`transition-opacity duration-150 ${agents.isPlaceholderData ? "opacity-60" : ""}`}
         >
-          <div className={`${ROW} hidden border-b pb-3 text-s-500 text-muted-foreground md:grid`}>
+          <div className={`${ROW} hidden border-b pb-3 text-label text-secondary md:grid`}>
             <SortHeader label="Agent" field="name" sort={sort} onSort={sortBy} />
             <SortHeader label="Language" field="language" sort={sort} onSort={sortBy} />
             <span>Scenarios</span>
