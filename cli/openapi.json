@@ -9873,11 +9873,11 @@
       },
       "ScenarioConfig": {
         "properties": {
-          "goal": {
+          "instructions": {
             "type": "string",
-            "maxLength": 2000,
+            "maxLength": 4000,
             "minLength": 1,
-            "title": "Goal"
+            "title": "Instructions"
           },
           "known_facts": {
             "items": {
@@ -9933,19 +9933,19 @@
         "additionalProperties": false,
         "type": "object",
         "required": [
-          "goal",
+          "instructions",
           "criteria"
         ],
         "title": "ScenarioConfig",
-        "description": "What a scenario version pins. The goal and the facts go to the caller. The criteria never\ndo: they are what the agent must say or do on the call. Agent data goes only to the agent,\nin an outbound agent's trigger."
+        "description": "What a scenario version pins. The instructions and the facts go to the caller. The\ncriteria never do: they are what the agent must say or do on the call. Agent data goes only\nto the agent, in an outbound agent's trigger."
       },
       "ScenarioCreate": {
         "properties": {
-          "goal": {
+          "instructions": {
             "type": "string",
-            "maxLength": 2000,
+            "maxLength": 4000,
             "minLength": 1,
-            "title": "Goal"
+            "title": "Instructions"
           },
           "known_facts": {
             "items": {
@@ -10028,7 +10028,7 @@
         "additionalProperties": false,
         "type": "object",
         "required": [
-          "goal",
+          "instructions",
           "criteria",
           "name",
           "persona_id"
@@ -10103,9 +10103,9 @@
             ],
             "title": "Generation Id"
           },
-          "goal": {
+          "instructions": {
             "type": "string",
-            "title": "Goal"
+            "title": "Instructions"
           },
           "known_facts": {
             "items": {
@@ -10170,7 +10170,7 @@
           "category",
           "description",
           "generation_id",
-          "goal",
+          "instructions",
           "known_facts",
           "unknown_facts",
           "criteria",
@@ -10231,18 +10231,18 @@
             ],
             "title": "Persona Id"
           },
-          "goal": {
+          "instructions": {
             "anyOf": [
               {
                 "type": "string",
-                "maxLength": 2000,
+                "maxLength": 4000,
                 "minLength": 1
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Goal"
+            "title": "Instructions"
           },
           "known_facts": {
             "anyOf": [

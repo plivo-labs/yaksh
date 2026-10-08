@@ -264,7 +264,7 @@ def call_view(
     return CallView(
         brief=agent.brief,
         agent_data=list(scenario.agent_data) if agent.direction is Direction.OUTBOUND else [],
-        goal=scenario.goal,
+        instructions=scenario.instructions,
         known_facts=list(scenario.known_facts),
         unknown_facts=list(scenario.unknown_facts),
         today=conversation.today,

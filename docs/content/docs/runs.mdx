@@ -52,7 +52,7 @@ Without `max_parallel` and `start_interval_s`, the run sets no limit and no mini
 
 ## Stop of a call
 
-At the turn after `max_turns`, the caller tells the agent goodbye and then does not speak again. The end reason of the conversation is `turn_limit`. Before this limit, the caller stops a call only when it completes its goal. Thus, this limit stops the calls in which the caller does not complete its goal.
+At the turn after `max_turns`, the caller tells the agent goodbye and then does not speak again. The end reason of the conversation is `turn_limit`. Before this limit, the caller stops a call only when it completes its instructions. Thus, this limit stops the calls in which the caller does not complete its instructions.
 
 If the caller tries to stop the call without words, the call does not stop. The caller gets one more reply to answer the agent and to say goodbye. This occurs only one time in each call. If the caller tries again to stop the call without words, Yaksha says the goodbye for the caller. Then Yaksha stops the call.
 

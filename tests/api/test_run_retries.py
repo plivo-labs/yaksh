@@ -181,7 +181,7 @@ async def test_a_retry_and_an_edit_of_its_scenario_at_the_same_moment_both_go_th
         editing = asyncio.create_task(
             client.patch(
                 f"/api/v1/scenarios/{queued['scenario_id']}",
-                json={"goal": "Cancel the cleaning.", "persona_id": queued["persona_id"]},
+                json={"instructions": "Cancel the cleaning.", "persona_id": queued["persona_id"]},
             )
         )
         await wait_for_lock_waiters(db, 1)

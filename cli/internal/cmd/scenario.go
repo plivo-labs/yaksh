@@ -9,7 +9,7 @@ import (
 func (a *app) scenarioCmd() *cobra.Command {
 	scenario := &cobra.Command{
 		Use:   "scenario",
-		Short: "The test cases of an agent: a goal, facts and criteria",
+		Short: "The test cases of an agent: caller instructions, facts and criteria",
 	}
 	scenario.AddCommand(a.scenarioListCmd(), a.scenarioViewCmd())
 	return scenario
@@ -61,7 +61,7 @@ func (a *app) scenarioListCmd() *cobra.Command {
 func (a *app) scenarioViewCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "view <id>",
-		Short: "Show one scenario: its goal, facts and criteria",
+		Short: "Show one scenario: its instructions, facts and criteria",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			id, err := parseID("scenario", args[0])

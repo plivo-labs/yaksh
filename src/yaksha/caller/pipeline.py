@@ -84,8 +84,9 @@ DEEPGRAM_LANGUAGES: dict[Language, str] = {
 END_CALL = FunctionSchema(
     name="end_call",
     description=(
-        "End the call. Call it only when the agent's latest turn shows that your goal is "
-        "achieved; never in a normal turn."
+        "End the call. Call it only when the agent's latest turn shows that it has done what "
+        "your instructions ask for, or shows the point where they tell you to end; never in a "
+        "normal turn."
     ),
     properties={
         "reason": {

@@ -17,7 +17,7 @@ class ScenarioRead(BaseModel):
     category: Category
     description: str | None
     generation_id: uuid.UUID | None
-    goal: str
+    instructions: str
     known_facts: list[Fact]
     unknown_facts: list[str]
     criteria: list[str]

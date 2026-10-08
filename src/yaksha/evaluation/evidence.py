@@ -28,7 +28,7 @@ ENDED_BY = {
 class CallView:
     brief: str
     agent_data: list[Fact]
-    goal: str
+    instructions: str
     known_facts: list[Fact]
     unknown_facts: list[str]
     today: date
@@ -59,7 +59,7 @@ def render(view: CallView) -> str:
             "\n".join(
                 [
                     "CALLER",
-                    f"Goal: {view.goal}",
+                    f"Instructions: {view.instructions}",
                     f"Known facts: {facts(view.known_facts)}.",
                     f"Facts the caller does not know: {', '.join(view.unknown_facts) or 'none'}.",
                 ]

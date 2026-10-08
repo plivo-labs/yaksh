@@ -34,7 +34,7 @@ The outcome group comes from the status and the end reason. If you stopped a con
 
 | End reason | Description |
 | --- | --- |
-| `caller_hangup` | The caller stopped the call. The caller does this when it decides that it completed its goal. This end reason does not show that the goal is complete. |
+| `caller_hangup` | The caller stopped the call. The caller does this when it decides that it completed its instructions. This end reason does not show that the instructions are complete. |
 | `agent_hangup` | The agent disconnected the call. |
 | `agent_silent` | The agent did not speak. After 15 seconds of silence, the caller asks if the agent is there. After two such questions in one silence, the next silence stops the call. When the agent speaks, the count starts again. |
 | `turn_limit` | The caller answered `max_turns` agent turns, said goodbye and stopped the call. |

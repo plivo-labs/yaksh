@@ -149,7 +149,9 @@ PERSONA = {
 }
 SCENARIO: dict[str, Any] = {
     "name": "Reschedule a cleaning",
-    "goal": "Move your cleaning to an evening next week; if none is free, keep the current one.",
+    "instructions": (
+        "Move your cleaning to an evening next week; if none is free, keep the current one."
+    ),
     "known_facts": [
         {"name": "Name", "value": "Priya Raman"},
         {"name": "Current appointment", "value": "next Thursday, 10:30 am"},
@@ -667,7 +669,7 @@ def written_scenario(prompt: str) -> dict[str, Any]:
     return {
         "name": subject[:60],
         "description": f"Tests {subject}.",
-        "goal": "Get the request done, then end the call.",
+        "instructions": "Get the request done, then end the call.",
         "known_facts": [{"name": "Name", "value": "Priya Raman"}],
         "unknown_facts": [],
         "criteria": ["The agent confirms the name Priya Raman."],

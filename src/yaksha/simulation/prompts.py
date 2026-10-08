@@ -15,14 +15,14 @@ def spoken_date(day: date) -> str:
 def caller_instructions(
     persona: PersonaConfig,
     *,
-    goal: str,
+    instructions: str,
     known_facts: Sequence[Fact],
     unknown_facts: Sequence[str],
     today: date,
     direction: Direction = Direction.INBOUND,
 ) -> str:
-    """The caller's system prompt. It takes the scenario's goal and facts, never the scenario
-    itself, so the criteria cannot reach the caller."""
+    """The caller's system prompt. It takes the scenario's instructions and facts, never the
+    scenario itself, so the criteria cannot reach the caller."""
     language = [LANGUAGES[persona.language].instruction]
     forms = gender_line(persona.language, persona.voice_gender)
     if forms is not None:
@@ -32,7 +32,7 @@ def caller_instructions(
         outbound=direction is Direction.OUTBOUND,
         persona=persona.prompt.strip(),
         today=spoken_date(today),
-        goal=goal.strip(),
+        instructions=instructions.strip(),
         known_facts=known_facts,
         unknown_facts=unknown_facts,
         language=language,

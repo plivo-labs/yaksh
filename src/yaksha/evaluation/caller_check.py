@@ -116,7 +116,7 @@ async def check_caller(
     slots: asyncio.Semaphore,
     retry_later: bool,
 ) -> ItemResult:
-    """`persona` is how the caller talks; the caller's goal and facts come from the view."""
+    """`persona` is how the caller talks; the caller's instructions and facts come from the view."""
     numbered = "\n".join(f"{number}. {text}" for number, text in enumerate(criteria, 1))
     found = "\n".join(f"- {fact}" for fact in facts(transcript, end_reason, language)) or "- none"
     user = (

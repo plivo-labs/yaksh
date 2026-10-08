@@ -758,7 +758,7 @@ async def test_a_conversation_freezes_its_persona_scenario_and_prompt(
         f"/api/v1/scenarios/{scenario['id']}",
         json={
             "name": "Renamed",
-            "goal": "Cancel the cleaning.",
+            "instructions": "Cancel the cleaning.",
             "known_facts": [],
             "first_words": None,
         },
@@ -769,11 +769,14 @@ async def test_a_conversation_freezes_its_persona_scenario_and_prompt(
 
     assert (detail["persona_name"], detail["persona_version"]) == (persona["name"], 1)
     assert (detail["scenario_name"], detail["scenario_version"]) == ("Renamed", 1)
-    assert detail["scenario"]["goal"] == SCENARIO["goal"] and detail["language"] == "hi"
+    assert (
+        detail["scenario"]["instructions"] == SCENARIO["instructions"]
+        and detail["language"] == "hi"
+    )
     assert (
         PERSONA["prompt"] in detail["instructions"] and "Someone else." not in request.instructions
     )
-    assert SCENARIO["goal"] in request.instructions and "Cancel" not in request.instructions
+    assert SCENARIO["instructions"] in request.instructions and "Cancel" not in request.instructions
     assert "- Name: Priya Raman" in request.instructions and "Hinglish" in request.instructions
     assert request.voice.speed == 1.0 and request.nudge == "हेलो? आप वहाँ हैं?"
     assert request.first_words == detail["scenario"]["first_words"] == "Haan, bolo?"

@@ -25,12 +25,12 @@ async def test_a_config_change_writes_a_version_but_a_rename_does_not(
     assert scenario["known_facts"] == SCENARIO["known_facts"]
 
     renamed = await client.patch(url, json={"name": "Move a cleaning"})
-    same = await client.patch(url, json={"goal": SCENARIO["goal"]})
+    same = await client.patch(url, json={"instructions": SCENARIO["instructions"]})
     changed = await client.patch(url, json={"criteria": ["Offers only evening slots."]})
 
     assert renamed.json()["current_version"] == same.json()["current_version"] == 1
     assert changed.json()["current_version"] == 2
-    assert changed.json()["goal"] == SCENARIO["goal"]
+    assert changed.json()["instructions"] == SCENARIO["instructions"]
     versions = (await client.get(f"{url}/versions")).json()["items"]
     assert [v["version"] for v in versions] == [2, 1]
     first = (await client.get(f"{url}/versions/1")).json()
@@ -69,12 +69,12 @@ async def test_facts_and_criteria_must_be_distinct_after_normalization(
     both = await rejected(unknown_facts=["  name "])
     await rejected(known_facts=[{"name": "Name", "value": "A"}, {"name": "NAME", "value": "B"}])
     await rejected(criteria=["Greets the caller.", "greets  the caller."])
-    await rejected(goal="   ")
+    await rejected(instructions="   ")
 
     assert both == "a fact cannot be both known and unknown: name"
     assert (await rejected(criteria=[])).startswith("criteria: ")
     missing = await client.post(f"/api/v1/agents/{agent}/scenarios", json={"name": "Only a name"})
-    assert missing.json()["error"]["message"] == "goal: Field required (and 2 more errors)"
+    assert missing.json()["error"]["message"] == "instructions: Field required (and 2 more errors)"
     assert (await client.get(f"/api/v1/agents/{agent}/scenarios")).json()["total"] == 0
 
 
