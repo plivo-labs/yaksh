@@ -10,7 +10,14 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Explained, Meter, Stat } from "@/components/verdict-ui";
-import { BAND_TEXT, counted, noiseLabel, percent, responseBand, seconds } from "@/lib/format";
+import {
+  BAND_TEXT,
+  counted,
+  percent,
+  responseBand,
+  seconds,
+  surroundingsLabel,
+} from "@/lib/format";
 import { useRunMetrics } from "@/lib/queries";
 import { CATEGORY_LABELS, FLAG_TEXT, type RunNumbers, type Share } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -54,7 +61,7 @@ export function RunMetricsPanel({ runId, active }: { runId: string; active: bool
       </p>
     );
   }
-  const { overall, by_category, by_noise } = metrics.data;
+  const { overall, by_category, by_surroundings } = metrics.data;
   const flags = Object.entries(overall.flags);
   return (
     <Panel className="overflow-hidden">
@@ -171,8 +178,11 @@ export function RunMetricsPanel({ runId, active }: { runId: string; active: bool
         rows={by_category.map((group) => [CATEGORY_LABELS[group.category], group.numbers])}
       />
       <Breakdown
-        title="Background noise"
-        rows={by_noise.map((group) => [noiseLabel(group.noise) ?? "None", group.numbers])}
+        title="Surroundings"
+        rows={by_surroundings.map((group) => [
+          surroundingsLabel(group.surroundings, true) ?? "Quiet",
+          group.numbers,
+        ])}
       />
     </Panel>
   );

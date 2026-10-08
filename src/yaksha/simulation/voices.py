@@ -1,4 +1,3 @@
-import asyncio
 import uuid
 from collections.abc import Collection, Mapping
 from datetime import UTC, datetime
@@ -12,7 +11,6 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from yaksha.db.models import Voice
-from yaksha.domain.background_noise import BackgroundNoise
 from yaksha.domain.errors import ConflictError, NotFoundError, UnavailableError, ValidationError
 from yaksha.domain.languages import Language
 from yaksha.domain.voices import (
@@ -25,7 +23,6 @@ from yaksha.domain.voices import (
     VoiceSettings,
     VoiceUpdate,
 )
-from yaksha.simulation.background_noise import with_noise
 from yaksha.simulation.languages import LANGUAGES
 
 LIVE_INDEX = "ix_voices_provider_voice_live"
@@ -60,19 +57,19 @@ async def preview_voice(
     clients: VoiceClients,
     voice: VoiceSettings,
     language: Language,
-    noise: BackgroundNoise | None = None,
+    sample_line: str | None = None,
 ) -> bytes:
-    """The language's sample sentence, spoken with the same model, voice settings and 8 kHz
-    format as a call. A call streams through a websocket and this is one request, so the
-    delivery can differ a little. With noise, the sentence plays over it as a call sends it."""
+    """The sample line, else the language's sample sentence, spoken with the same model, voice
+    settings and 8 kHz format as a call. A call streams through a websocket and this is one
+    request, so the delivery can differ a little."""
     audio = await client_for(clients, voice.provider).speak(
-        voice, language, LANGUAGES[language].sample
+        voice, language, sample_line or LANGUAGES[language].sample
     )
     if audio is None:
         raise ValidationError(
             f"voice {voice.id} was not found on the {voice.provider.label} account"
         )
-    return await asyncio.to_thread(with_noise, audio, noise)
+    return audio
 
 
 async def flush(session: AsyncSession) -> None:

@@ -1,7 +1,6 @@
 import { type SubmitEvent, useState } from "react";
 import { useNavigate } from "react-router";
 
-import { BackgroundNoiseField } from "@/components/background-noise-field";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -18,7 +17,7 @@ import { counted } from "@/lib/format";
 import { usePersonaNames } from "@/hooks/use-persona-names";
 import { revealErrors } from "@/lib/forms";
 import { useDefaults, usePhoneNumbers, useRunScenarios, useStartRun } from "@/lib/queries";
-import type { AgentSummary, BackgroundNoise, RunSummary } from "@/lib/types";
+import type { AgentSummary, RunSummary } from "@/lib/types";
 
 /** A whole number from an input, null when it is empty, NaN when it is not a whole number. */
 function whole(value: string): number | null {
@@ -62,7 +61,6 @@ export function RunDialog({
   const [delay, setDelay] = useState(() => text(earlier?.start_interval_s));
   const [retries, setRetries] = useState(earlier ? text(earlier.max_retries) : null);
   /** Null plays each persona's own setting. */
-  const [noise, setNoise] = useState<BackgroundNoise | null>(earlier?.background_noise ?? null);
   const [submitted, setSubmitted] = useState(false);
   const { scenarios, leftOut, ready, error: loadError } = useRunScenarios(agent.id, scenarioIds);
   const { personas, name: personaName } = usePersonaNames();
@@ -126,7 +124,6 @@ export function RunDialog({
         max_parallel: parallel,
         start_interval_s: interval,
         max_retries: retries === null ? null : retryCount,
-        background_noise: noise,
         name: name.trim() || null,
       },
       { onSuccess: (run) => navigate(`/runs/${run.id}`) },
@@ -302,13 +299,6 @@ export function RunDialog({
                 <FieldError>Enter a whole number from 1 to 100, or none.</FieldError>
               )}
             </Field>
-
-            <BackgroundNoiseField
-              id="run-noise"
-              value={noise}
-              onChange={setNoise}
-              inherit="Each persona's setting"
-            />
 
             <Field>
               <FieldLabel htmlFor="run-retries">Retries</FieldLabel>

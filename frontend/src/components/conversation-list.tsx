@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
 import { copyText } from "@/lib/clipboard";
-import { duration, noiseLabel, when } from "@/lib/format";
+import { duration, surroundingsLabel, when } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import {
   ACTIVE_STATUSES,
@@ -185,8 +185,8 @@ function ConversationRow({
           {conversation.attempt > 1 && (
             <Badge className="shrink-0">Attempt {conversation.attempt}</Badge>
           )}
-          {noiseLabel(conversation.background_noise) && (
-            <Badge className="shrink-0">{noiseLabel(conversation.background_noise)}</Badge>
+          {surroundingsLabel(conversation.surroundings) && (
+            <Badge className="shrink-0">{surroundingsLabel(conversation.surroundings)}</Badge>
           )}
         </span>
         <span className="truncate text-s-400 text-muted-foreground">
@@ -241,8 +241,8 @@ function label(conversation: ConversationSummary): string {
     `repeat ${conversation.repeat}`,
   ];
   if (conversation.attempt > 1) parts.push(`attempt ${conversation.attempt}`);
-  const noise = noiseLabel(conversation.background_noise);
-  if (noise) parts.push(`background noise ${noise}`);
+  const surroundings = surroundingsLabel(conversation.surroundings);
+  if (surroundings) parts.push(`surroundings: ${surroundings}`);
   parts.push(conversation.status, when(conversation.started_at ?? conversation.created_at));
   parts.push(`id ${conversation.id.slice(-8)}`);
   return parts.join(", ");

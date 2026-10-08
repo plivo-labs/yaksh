@@ -6,6 +6,7 @@ import { Link, useParams, useSearchParams } from "react-router";
 
 import { CallMetricsCard } from "@/components/call-metrics";
 import { CallResults } from "@/components/call-results";
+import { CallSounds } from "@/components/call-sounds";
 import { EndCallDialog } from "@/components/confirm-dialogs";
 import { CopyId } from "@/components/copy-id";
 import { Fact } from "@/components/panel";
@@ -51,7 +52,7 @@ import {
   BAND_WASH,
   clock,
   duration,
-  noiseLabel,
+  surroundingsLabel,
   phone,
   responseBand,
   seconds,
@@ -222,9 +223,9 @@ function ConversationView({ id }: { id: string }) {
                         {LANGUAGE_NAMES[data.language]}, <CallerLine conversation={data} />, up to{" "}
                         {data.max_turns} turns and {data.max_duration_s}s once connected
                       </CardDescription>
-                      {noiseLabel(data.background_noise) && (
+                      {surroundingsLabel(data.surroundings) && (
                         <CardDescription>
-                          Background noise: {noiseLabel(data.background_noise)}
+                          Surroundings: {surroundingsLabel(data.surroundings)}
                         </CardDescription>
                       )}
                     </CardHeader>
@@ -232,6 +233,10 @@ function ConversationView({ id }: { id: string }) {
                       <CallerPrompt instructions={data.instructions} />
                     </CardContent>
                   </Card>
+                  <CallSounds
+                    sounds={data.sounds}
+                    lengthS={data.talk_ms ? data.talk_ms / 1000 : data.max_duration_s}
+                  />
                 </TabsContent>
                 <TabsContent value="wire">
                   <WireEvents

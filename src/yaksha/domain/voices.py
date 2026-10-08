@@ -1,9 +1,15 @@
 from enum import StrEnum
-from typing import Any, Protocol
+from typing import Annotated, Any, Protocol
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    StringConstraints,
+    ValidationInfo,
+    field_validator,
+)
 
-from yaksha.domain.background_noise import BackgroundNoise
 from yaksha.domain.languages import Language
 
 PROVIDER_VOICE_ID = r"^[A-Za-z0-9_-]+$"
@@ -76,12 +82,17 @@ class VoiceUpdate(BaseModel):
         return self.model_dump(exclude_unset=True)
 
 
+SampleLine = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
+"""What a preview says in a voice; calls never use it."""
+
+
 class VoicePreview(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     voice: VoiceSettings
     language: Language
-    background_noise: BackgroundNoise | None = None
+    sample_line: SampleLine | None = None
+    """None says the language's sample sentence."""
 
 
 class VoiceClient(Protocol):

@@ -1,0 +1,208 @@
+# Background speaker clips: 8 kHz 16-bit mono WAV, active speech at -20 dBFS.
+# scripts/make_speaker_clips.py builds each file from its lines and fills in seconds and start_s.
+voices:
+  woman: pFZP5JQG7iQjIQuC4Bku
+  man: JBFqnCBsd6RMkjVDRZzb
+  news: onwK4e9ZLuTAKqWW03F9
+  woman2: XrExE9yKIg1WjnnlVkGX
+clips:
+  - id: en_talks_to_caller_1
+    language: en
+    kind: talks_to_caller
+    voice: woman
+    pauses: [1.2, 2.0, 1.6, 2.4, 1.4]
+    seconds: 21.84
+    lines:
+      - start_s: 0.0
+        text: "[calling from another room] Who is it?"
+      - start_s: 2.56
+        text: "[suspicious] Is that the bank again?"
+      - start_s: 6.48
+        text: "[annoyed] Tell them we already paid. We paid last week!"
+      - start_s: 12.24
+        text: "Ask them about the refund."
+      - start_s: 16.64
+        text: "[shouting from the kitchen] And dinner is ready, come on."
+      - start_s: 19.96
+        text: "[impatient] Are you still on the phone?"
+  - id: en_talks_to_caller_2
+    language: en
+    kind: talks_to_caller
+    voice: man
+    pauses: [1.5, 2.2, 1.3, 2.0]
+    seconds: 19.84
+    lines:
+      - start_s: 0.0
+        text: "[calling out] Hey, where did you keep the car keys?"
+      - start_s: 3.5
+        text: "[frustrated] The car keys. I can't find them."
+      - start_s: 7.86
+        text: "[relieved] Never mind, got them."
+      - start_s: 11.96
+        text: "[hurried] Tell them your date of birth is the twelfth, not the twentieth."
+      - start_s: 17.4
+        text: "[shouting from the door] I'm leaving, okay? Bye."
+  - id: en_own_phone_call_1
+    language: en
+    kind: own_phone_call
+    voice: man
+    pauses: [1.5, 1.2, 2.0, 1.5, 1.8]
+    seconds: 24.44
+    lines:
+      - start_s: 0.0
+        text: "[distracted] Yeah, hi. I'm on another call right now."
+      - start_s: 3.82
+        text: "[firm] No, no. Tell him Thursday, not Tuesday."
+      - start_s: 7.9
+        text: "[slowly] Thursday."
+      - start_s: 11.18
+        text: "Okay, and the number is nine eight two, four four one."
+      - start_s: 17.16
+        text: "Yes, the account ends in seven seven."
+      - start_s: 21.36
+        text: "[sighs] Fine. I'll send it to you. Bye."
+  - id: en_own_phone_call_2
+    language: en
+    kind: own_phone_call
+    voice: woman2
+    pauses: [1.4, 2.0, 1.6, 1.3]
+    seconds: 18.58
+    lines:
+      - start_s: 0.0
+        text: "Hello? Yes, I can hear you."
+      - start_s: 3.8
+        text: "[annoyed] No, cancel the order. Cancel it."
+      - start_s: 8.28
+        text: "[exasperated] Because it was the wrong size, I told you."
+      - start_s: 12.36
+        text: "My email? It's priya at gmail dot com."
+      - start_s: 16.62
+        text: "[dismissive] Okay, okay. Call me later."
+  - id: en_tv_1
+    language: en
+    kind: tv
+    voice: news
+    pauses: [0.6, 0.8, 0.6, 0.9]
+    seconds: 24.14
+    lines:
+      - start_s: 0.0
+        text: "[news anchor] Good evening, and welcome to the news at nine."
+      - start_s: 4.2
+        text: "Heavy rain is expected across the city tomorrow, with flights delayed at the airport."
+      - start_s: 9.72
+        text: "In business news, interest rates stay at six and a half percent."
+      - start_s: 15.6
+        text: "Banks say new card fees will start from the first of next month."
+      - start_s: 20.42
+        text: "[upbeat] Stay with us. After the break, the latest scores."
+  - id: en_tv_2
+    language: en
+    kind: tv
+    voice: woman2
+    pauses: [0.5, 0.7, 0.6]
+    seconds: 12.08
+    lines:
+      - start_s: 0.0
+        text: "[excited] Tired of high bills? Switch today and save fifty percent!"
+      - start_s: 4.26
+        text: "[fast] Call now on one eight hundred, two two two, three three three."
+      - start_s: 8.16
+        text: "Offer valid until Sunday only."
+      - start_s: 10.68
+        text: "[fast, quiet] Terms and conditions apply."
+  - id: hi_talks_to_caller_1
+    language: hi
+    kind: talks_to_caller
+    voice: woman
+    pauses: [1.2, 2.0, 1.6, 2.2]
+    seconds: 17.60
+    lines:
+      - start_s: 0.0
+        text: "[calling from another room] कौन है?"
+      - start_s: 2.8
+        text: "[suspicious] फिर से बैंक वाले हैं क्या?"
+      - start_s: 6.88
+        text: "[annoyed] बोलो हमने पैसे भर दिए हैं। पिछले हफ्ते ही भरे थे!"
+      - start_s: 11.92
+        text: "रिफंड के बारे में पूछो।"
+      - start_s: 15.64
+        text: "[shouting from the kitchen] खाना तैयार है, जल्दी आओ।"
+  - id: hi_talks_to_caller_2
+    language: hi
+    kind: talks_to_caller
+    voice: man
+    pauses: [1.5, 2.0, 1.4, 2.0]
+    seconds: 17.34
+    lines:
+      - start_s: 0.0
+        text: "[calling out] अरे, गाड़ी की चाबी कहाँ रखी है?"
+      - start_s: 3.26
+        text: "[frustrated] चाबी नहीं मिल रही।"
+      - start_s: 6.86
+        text: "[relieved] रहने दो, मिल गई।"
+      - start_s: 10.66
+        text: "[hurried] उन्हें बोलो जन्म तारीख बारह है, बीस नहीं।"
+      - start_s: 15.78
+        text: "[shouting from the door] मैं निकल रहा हूँ, ठीक है?"
+  - id: hi_own_phone_call_1
+    language: hi
+    kind: own_phone_call
+    voice: man
+    pauses: [1.5, 1.2, 2.0, 1.6]
+    seconds: 20.34
+    lines:
+      - start_s: 0.0
+        text: "[distracted] हाँ, बोलो। मैं दूसरी कॉल पर हूँ।"
+      - start_s: 3.74
+        text: "[firm] नहीं नहीं, उसे बोलो गुरुवार, मंगलवार नहीं।"
+      - start_s: 8.22
+        text: "[slowly] गुरुवार।"
+      - start_s: 12.38
+        text: "ठीक है, नंबर है नौ आठ दो, चार चार एक।"
+      - start_s: 17.82
+        text: "[sighs] हाँ, भेज दूँगा। चलो, बाय।"
+  - id: hi_own_phone_call_2
+    language: hi
+    kind: own_phone_call
+    voice: woman2
+    pauses: [1.4, 2.0, 1.5]
+    seconds: 13.90
+    lines:
+      - start_s: 0.0
+        text: "हैलो? हाँ, सुनाई दे रहा है।"
+      - start_s: 3.56
+        text: "[annoyed] नहीं, ऑर्डर कैंसल कर दो।"
+      - start_s: 8.36
+        text: "[exasperated] साइज़ गलत था, बताया था ना।"
+      - start_s: 11.78
+        text: "[dismissive] अच्छा ठीक है, बाद में फोन करना।"
+  - id: hi_tv_1
+    language: hi
+    kind: tv
+    voice: news
+    pauses: [0.6, 0.8, 0.7]
+    seconds: 16.38
+    lines:
+      - start_s: 0.0
+        text: "[news anchor] नमस्कार, आप देख रहे हैं रात नौ बजे की खबरें।"
+      - start_s: 4.68
+        text: "कल पूरे शहर में भारी बारिश की संभावना है।"
+      - start_s: 8.36
+        text: "बैंकों ने कहा है कि नए कार्ड शुल्क अगले महीने से लागू होंगे।"
+      - start_s: 12.98
+        text: "[upbeat] बने रहिए हमारे साथ, ब्रेक के बाद खेल की खबरें।"
+  - id: hi_tv_2
+    language: hi
+    kind: tv
+    voice: woman2
+    pauses: [0.5, 0.7, 0.6]
+    seconds: 14.32
+    lines:
+      - start_s: 0.0
+        text: "[excited] बिजली का बिल ज़्यादा आता है? आज ही बदलिए और पचास प्रतिशत बचाइए!"
+      - start_s: 5.86
+        text: "[fast] अभी कॉल कीजिए, एक आठ सौ, दो दो दो, तीन तीन तीन।"
+      - start_s: 10.8
+        text: "ऑफर सिर्फ रविवार तक।"
+      - start_s: 12.76
+        text: "[fast, quiet] शर्तें लागू।"

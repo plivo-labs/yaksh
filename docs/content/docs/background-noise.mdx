@@ -1,17 +1,28 @@
 ---
-title: Background noise
-description: Mix background noise into the audio of the caller.
+title: Surroundings
+description: Noise and a person who talks behind the caller.
 ---
 
-A persona can have background noise. The noise plays for the full call, also when the caller does not speak. The recording includes the noise. The speech to text of Yaksha hears only the agent. Thus, the noise changes only the audio that the agent hears.
+A persona has surroundings: what the agent hears behind the caller. Use them to test whether the agent still understands the caller, ignores other voices, and does not stop at a sudden sound. The surroundings play during the full call, also when the caller does not speak. The recording includes them. The speech to text of Yaksha hears only the agent, so the surroundings change only what the agent hears.
 
-| Field | Values |
+All levels are in dB relative to the voice of the caller: 0 dB is as loud as the caller, -10 dB is clearly quieter, and +6 dB is louder. The levels are from -30 to +10 dB.
+
+| Field | Meaning |
 | --- | --- |
-| `sound` | `none`, `street`, `cafe`, `office`, `car`, `tv`, `crowd`, `kitchen`, `wind`. The default is `none`. |
-| `level` | `light`, `busy`, `loud`. The default is `busy`. At these levels, the voice of the caller is approximately 20, 10 or 5 dB more than the noise. These values are for the built-in voices. |
+| `sounds` | Noise loops that play during the full call, each at its own level, for example `[{"sound": "cafe", "db": -10}]`. The sounds are `street`, `cafe`, `office`, `car`, `tv`, `crowd`, `kitchen` and `wind`. |
+| `auto` | Auto noise, for example `{"db": -10, "seed": 1}`. One sound plays during the full call, and other sounds start and stop at random times. Use `sounds` or `auto`, not both. A different `seed` gives a different mix. |
+| `speaker` | A person who talks behind the caller, for example `{"kind": "talks_to_caller", "db": -6, "start_s": 5}`. `kind` is `talks_to_caller`, `own_phone_call` or `tv`. The person starts at `start_s` seconds and talks with short pauses until the call ends. The person speaks the language of the persona; a Hinglish persona gets Hindi speech. |
 
-If you set `background_noise` when you start a run, each conversation of the run uses it and not the setting of the persona. For example, use `{"sound": "none"}` for no noise, or `{"sound": "street", "level": "loud"}`. Always set `sound`, because a setting without `sound` plays no noise. With the CLI, always give `--noise-sound`. To use the setting of the persona, do not send `background_noise`.
+No `sounds`, no `auto` and no `speaker` is a quiet room.
 
-Yaksha keeps the setting when it makes the conversation, and a retry uses the same setting. Refer to [Runs](/docs/runs).
+## When each sound plays
 
-The sound files are loops in `src/yaksha/simulation/sounds/`. The README in that folder gives the prompts and the steps for each file.
+When a run starts a conversation, Yaksha plans the sounds of the call. The plan comes from the surroundings, the scenario version and the repeat number. Thus, the same scenario and repeat play the same sounds in each run, and a fix can be checked under the same conditions. Two repeats of one run play different sounds. A retry plays the same plan.
+
+On the page of a call, the **Behind the caller** card in the **Caller** tab shows when each sound played and what the other person said.
+
+Each persona has its own page in the console. In its **Surroundings** card, **Preview** plays the voice of the caller with its surroundings in a 30-second loop, with a time line of what plays when. The preview follows each change. The caller says the persona's **Sample line**, a short line that matches how the persona behaves, or a default sentence for its language. Calls do not use the sample line.
+
+The run results group the calls by their surroundings, so you can compare a quiet persona with a noisy one. Refer to [Results](/docs/results).
+
+The sound files are in `src/yaksha/simulation/sounds/`. The README in that folder tells how the noise loops were made, and `scripts/make_speaker_clips.py` makes the speaker clips from `speakers.yaml`.

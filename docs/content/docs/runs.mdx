@@ -41,7 +41,6 @@ The run makes one conversation for each repeat of each scenario. It makes all of
 | `start_interval_s` | The minimum time between the starts of two conversations. |
 | `max_duration_s` | The time limit of each call, 10 to 1800 seconds. The default is the value of `YAKSHA_DEFAULT_MAX_DURATION_S` (300). |
 | `max_turns` | How many agent turns the caller answers, 1 to 100. The default is the value of `YAKSHA_DEFAULT_MAX_TURNS` (20). |
-| `background_noise` | One background noise setting for all conversations of the run, for example `{"sound": "none"}` for no noise. Use this field to compare a run with noise and a run without noise. If you do not set it, each conversation uses the setting of its persona. |
 | `max_retries` | The maximum number of retries for a conversation that stops with an error in Yaksha or in the phone connection. The default is 1, or 0 if `YAKSHA_MAX_RUN_RETRIES` is 0. To prevent retries, set this field to 0. |
 | `name` | This field is optional. It is a name for the run, 1 to 80 characters. |
 

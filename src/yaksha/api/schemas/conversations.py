@@ -5,7 +5,6 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict
 
 from yaksha.domain.agents import Direction
-from yaksha.domain.background_noise import BackgroundNoise
 from yaksha.domain.conversations import (
     Channel,
     ConversationStatus,
@@ -26,6 +25,8 @@ from yaksha.domain.evaluations import (
 from yaksha.domain.languages import Language
 from yaksha.domain.latency import Latency, Reply
 from yaksha.domain.scenarios import ScenarioConfig
+from yaksha.domain.surroundings import Layer, NoiseSound, SoundPlan, SpeakerKind, Surroundings
+from yaksha.simulation.surroundings import clip_by_file
 
 
 class LatencySummary(BaseModel):
@@ -78,7 +79,7 @@ class ConversationSummary(BaseModel):
     call_uuid: str | None
     max_duration_s: int
     max_turns: int
-    background_noise: BackgroundNoise
+    surroundings: Surroundings
     status: ConversationStatus
     end_reason: EndReason | None
     failure_reason: str | None
@@ -99,8 +100,51 @@ class ConversationSummary(BaseModel):
     created_at: datetime
 
 
+class SpokenLine(BaseModel):
+    at_s: float
+    """When the line starts, in seconds from the start of the call's audio."""
+    text: str
+
+
+class SoundRead(BaseModel):
+    """One sound the call played behind the caller."""
+
+    file: str
+    sound: NoiseSound | None
+    """The noise that played, or None for a second speaker's clip."""
+    speaker: SpeakerKind | None
+    start_s: float
+    end_s: float | None
+    """None: until the call ended."""
+    speaker_lines: list[SpokenLine]
+    """For a background speaker's clip, what it says; empty for a noise."""
+
+    @classmethod
+    def of(cls, layer: Layer) -> SoundRead:
+        clip = clip_by_file(layer.file)
+        return cls(
+            file=layer.file,
+            sound=layer.sound,
+            speaker=layer.speaker,
+            start_s=layer.start_s,
+            end_s=layer.end_s,
+            speaker_lines=[]
+            if clip is None
+            else [
+                SpokenLine(at_s=layer.start_s + line.start_s, text=line.text) for line in clip.lines
+            ],
+        )
+
+    @classmethod
+    def all_of(cls, saved: dict[str, Any]) -> list[SoundRead]:
+        return [cls.of(layer) for layer in SoundPlan.model_validate(saved).layers]
+
+
 class ConversationRead(ConversationSummary):
     instructions: str
+    sounds: list[SoundRead]
+    """What the call played behind the caller, as planned before it started; sounds planned
+    after the call ended were not heard."""
     scenario: ScenarioConfig
     transcript: list[TurnRead]
     replies: list[Reply]

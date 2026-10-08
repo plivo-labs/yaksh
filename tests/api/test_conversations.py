@@ -34,13 +34,13 @@ from yaksha.config import Settings
 from yaksha.db.models import AgentVersion, Conversation, RunningWorker, ScenarioVersion
 from yaksha.db.session import create_engine, create_sessionmaker
 from yaksha.domain.agents import AgentConfig
-from yaksha.domain.background_noise import NoiseLevel, NoiseMix, NoiseSound
 from yaksha.domain.conversations import CallRequest, ConversationStatus
 from yaksha.domain.languages import Language
 from yaksha.domain.runs import RunCreate
+from yaksha.domain.surroundings import Layer, NoiseSound, SoundPlan
 from yaksha.simulation import conversations, runs
-from yaksha.simulation.background_noise import sound_path, volume
 from yaksha.simulation.calls import STOP_IGNORED
+from yaksha.simulation.surroundings import NOISE_DBFS, SOUNDS, gain
 from yaksha.worker.worker import FINALIZE_ATTEMPTS, Worker
 
 
@@ -235,8 +235,8 @@ async def test_an_expired_lease_is_marked_failed_while_a_live_one_is_not(
                 caller_number="+15550100000",
                 max_duration_s=60,
                 max_turns=20,
-                background_noise_sound=NoiseSound.NONE,
-                background_noise_level=NoiseLevel.BUSY,
+                surroundings={},
+                sound_plan={},
                 status=ConversationStatus.RUNNING,
                 claimed_by="dead-worker",
                 lease_expires_at=datetime.now(UTC) - timedelta(seconds=1),
@@ -586,8 +586,10 @@ async def test_a_call_whose_sound_file_is_broken_fails_with_the_reason(
         stereo.setsampwidth(2)
         stereo.setframerate(8000)
         stereo.writeframes(bytes(1280))
-    monkeypatch.setattr("yaksha.simulation.background_noise.SOUNDS", tmp_path)
-    persona = await create_persona(client, background_noise={"sound": "street"})
+    monkeypatch.setattr("yaksha.simulation.surroundings.SOUNDS", tmp_path)
+    persona = await create_persona(
+        client, surroundings={"sounds": [{"sound": "street", "db": -10}]}
+    )
     agent_id = await create_agent_id(client)
 
     started = await start(client, agent_id, persona_id=persona["id"])
@@ -730,7 +732,7 @@ async def test_a_conversation_freezes_its_persona_scenario_and_prompt(
 ) -> None:
     agent_id = await create_agent_id(client)
     persona = await create_persona(
-        client, language="hinglish", background_noise={"sound": "cafe", "level": "busy"}
+        client, language="hinglish", surroundings={"sounds": [{"sound": "cafe", "db": -10}]}
     )
     scenario = await create_scenario(
         client, agent_id, first_words="Haan, bolo?", persona_id=persona["id"]
@@ -741,7 +743,7 @@ async def test_a_conversation_freezes_its_persona_scenario_and_prompt(
         json={
             "prompt": "Someone else.",
             "voice": {**persona["voice"], "speed": 1.2},
-            "background_noise": {"sound": "none"},
+            "surroundings": {},
         },
     )
     cleared = await client.patch(
@@ -768,9 +770,17 @@ async def test_a_conversation_freezes_its_persona_scenario_and_prompt(
     assert request.voice.speed == 1.0 and request.nudge == "हेलो? आप वहाँ हैं?"
     assert request.first_words == detail["scenario"]["first_words"] == "Haan, bolo?"
     assert cleared.json()["first_words"] is None
-    assert detail["background_noise"] == {"sound": "cafe", "level": "busy"}
-    assert request.background_noise == NoiseMix(
-        path=sound_path(NoiseSound.CAFE), volume=volume(NoiseLevel.BUSY)
+    assert detail["surroundings"]["sounds"] == [{"sound": "cafe", "db": -10}]
+    assert request.sound_plan == SoundPlan(
+        layers=[
+            Layer(
+                file=str(SOUNDS / "cafe.wav"),
+                sound=NoiseSound.CAFE,
+                gain=gain(-10, NOISE_DBFS),
+                start_s=0,
+                loop=True,
+            )
+        ]
     )
 
 

@@ -27,7 +27,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { useFilterParams } from "@/hooks/use-filter-params";
 import { usePageParam } from "@/hooks/use-page-param";
-import { duration, noiseLabel, runFinished, runTitle, runTotal, when } from "@/lib/format";
+import { duration, runFinished, runTitle, runTotal, when } from "@/lib/format";
 import {
   CONVERSATIONS_PAGE,
   useAgent,
@@ -172,11 +172,6 @@ function Overview({ run }: { run: Run }) {
           {run.start_interval_s === null ? "None" : `${run.start_interval_s} s`}
         </Setting>
         <Setting label="Retries">Up to {run.max_retries}</Setting>
-        <Setting label="Noise">
-          {run.background_noise
-            ? (noiseLabel(run.background_noise) ?? "None")
-            : "Each persona's setting"}
-        </Setting>
         <Setting label="Median talk">{duration(run.median_talk_ms) || "None yet"}</Setting>
         <Setting label="Run id">
           <CopyId id={run.id} label="run id" />

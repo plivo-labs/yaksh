@@ -1752,6 +1752,59 @@
         }
       }
     },
+    "/api/v1/personas/{persona_id}/scenarios": {
+      "get": {
+        "tags": [
+          "personas"
+        ],
+        "summary": "List Persona Scenarios",
+        "description": "The live scenarios that use the persona; a persona is deleted only when none does.",
+        "operationId": "list_persona_scenarios_api_v1_personas__persona_id__scenarios_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "persona_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Persona Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PersonaScenario"
+                  },
+                  "title": "Response List Persona Scenarios Api V1 Personas  Persona Id  Scenarios Get"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "The request failed. The error tells why.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/personas/{persona_id}/versions": {
       "get": {
         "tags": [
@@ -3142,6 +3195,98 @@
         }
       }
     },
+    "/api/v1/sounds/plan": {
+      "post": {
+        "tags": [
+          "sounds"
+        ],
+        "summary": "Preview Plan",
+        "description": "The sounds a call with these surroundings plays, as a persona's preview loops them. A call\nplans with its own scenario and repeat, so its random sounds differ from the preview's.",
+        "operationId": "preview_plan_api_v1_sounds_plan_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlanPreview"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SoundPlan"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "The request failed. The error tells why.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/sounds/{file}": {
+      "get": {
+        "tags": [
+          "sounds"
+        ],
+        "summary": "Sound File",
+        "description": "A sound file of a plan, 8 kHz 16-bit mono WAV.",
+        "operationId": "sound_file_api_v1_sounds__file__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "file",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z0-9_]+(/[a-z0-9_]+)?\\.wav$",
+              "title": "File"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "audio/wav": {}
+            }
+          },
+          "4XX": {
+            "description": "The request failed. The error tells why.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/voices": {
       "get": {
         "tags": [
@@ -4161,21 +4306,28 @@
         "title": "AssignPersona",
         "description": "One persona for several scenarios of one agent: all of them, or none if one is missing."
       },
-      "BackgroundNoise": {
+      "AutoNoise": {
         "properties": {
-          "sound": {
-            "$ref": "#/components/schemas/NoiseSound",
-            "default": "none"
+          "db": {
+            "type": "integer",
+            "maximum": 10.0,
+            "minimum": -30.0,
+            "title": "Db"
           },
-          "level": {
-            "$ref": "#/components/schemas/NoiseLevel",
-            "default": "busy"
+          "seed": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Seed",
+            "default": 1
           }
         },
         "additionalProperties": false,
         "type": "object",
-        "title": "BackgroundNoise",
-        "description": "The sound behind the caller."
+        "required": [
+          "db"
+        ],
+        "title": "AutoNoise",
+        "description": "Sounds that start and stop at random: one under the whole call and a few that come and\ngo. The seed fixes which ones and when."
       },
       "Body_upload_document_api_v1_documents_upload_post": {
         "properties": {
@@ -4484,8 +4636,8 @@
             "type": "integer",
             "title": "Max Turns"
           },
-          "background_noise": {
-            "$ref": "#/components/schemas/BackgroundNoise"
+          "surroundings": {
+            "$ref": "#/components/schemas/Surroundings"
           },
           "status": {
             "$ref": "#/components/schemas/ConversationStatus"
@@ -4622,6 +4774,13 @@
             "type": "string",
             "title": "Instructions"
           },
+          "sounds": {
+            "items": {
+              "$ref": "#/components/schemas/SoundRead"
+            },
+            "type": "array",
+            "title": "Sounds"
+          },
           "scenario": {
             "$ref": "#/components/schemas/ScenarioConfig"
           },
@@ -4692,7 +4851,7 @@
           "call_uuid",
           "max_duration_s",
           "max_turns",
-          "background_noise",
+          "surroundings",
           "status",
           "end_reason",
           "failure_reason",
@@ -4709,6 +4868,7 @@
           "retry_of",
           "created_at",
           "instructions",
+          "sounds",
           "scenario",
           "transcript",
           "replies",
@@ -4842,8 +5002,8 @@
             "type": "integer",
             "title": "Max Turns"
           },
-          "background_noise": {
-            "$ref": "#/components/schemas/BackgroundNoise"
+          "surroundings": {
+            "$ref": "#/components/schemas/Surroundings"
           },
           "status": {
             "$ref": "#/components/schemas/ConversationStatus"
@@ -5000,7 +5160,7 @@
           "call_uuid",
           "max_duration_s",
           "max_turns",
-          "background_noise",
+          "surroundings",
           "status",
           "end_reason",
           "failure_reason",
@@ -5095,6 +5255,16 @@
             },
             "type": "object",
             "title": "First Words"
+          },
+          "sample_lines": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "propertyNames": {
+              "$ref": "#/components/schemas/Language"
+            },
+            "type": "object",
+            "title": "Sample Lines"
           }
         },
         "type": "object",
@@ -5102,7 +5272,8 @@
           "max_duration_s",
           "max_turns",
           "max_retries",
-          "first_words"
+          "first_words",
+          "sample_lines"
         ],
         "title": "Defaults",
         "description": "What the server uses for a field that a request leaves out."
@@ -6086,6 +6257,69 @@
         "title": "LatencySummary",
         "description": "The agent's response times in one call: nearest-rank percentiles over the measured\nreplies, how many replies there were, and how many of them talked over the caller."
       },
+      "Layer": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "title": "File"
+          },
+          "sound": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NoiseSound"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "speaker": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SpeakerKind"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "gain": {
+            "type": "number",
+            "exclusiveMinimum": 0.0,
+            "title": "Gain"
+          },
+          "start_s": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Start S"
+          },
+          "end_s": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End S"
+          },
+          "loop": {
+            "type": "boolean",
+            "title": "Loop"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "file",
+          "gain",
+          "start_s",
+          "loop"
+        ],
+        "title": "Layer",
+        "description": "One sound file in a call: from start_s to end_s of the call, at a gain, looped or once.\nA layer with no end plays until the call ends."
+      },
       "LlmRule": {
         "properties": {
           "kind": {
@@ -6179,36 +6413,9 @@
         "title": "Metric",
         "description": "One metric's value and the flags it raised."
       },
-      "NoiseLevel": {
-        "type": "string",
-        "enum": [
-          "light",
-          "busy",
-          "loud"
-        ],
-        "title": "NoiseLevel",
-        "description": "How loud the background is, as the caller's speech level above the noise."
-      },
-      "NoiseNumbers": {
-        "properties": {
-          "noise": {
-            "$ref": "#/components/schemas/BackgroundNoise"
-          },
-          "numbers": {
-            "$ref": "#/components/schemas/RunNumbers"
-          }
-        },
-        "type": "object",
-        "required": [
-          "noise",
-          "numbers"
-        ],
-        "title": "NoiseNumbers"
-      },
       "NoiseSound": {
         "type": "string",
         "enum": [
-          "none",
           "street",
           "cafe",
           "office",
@@ -6611,12 +6818,24 @@
           "voice": {
             "$ref": "#/components/schemas/VoiceSettings"
           },
-          "background_noise": {
-            "$ref": "#/components/schemas/BackgroundNoise",
+          "surroundings": {
+            "$ref": "#/components/schemas/Surroundings",
             "default": {
-              "sound": "none",
-              "level": "busy"
+              "sounds": []
             }
+          },
+          "sample_line": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sample Line"
           },
           "voice_gender": {
             "anyOf": [
@@ -6653,12 +6872,24 @@
           "voice": {
             "$ref": "#/components/schemas/VoiceSettings"
           },
-          "background_noise": {
-            "$ref": "#/components/schemas/BackgroundNoise",
+          "surroundings": {
+            "$ref": "#/components/schemas/Surroundings",
             "default": {
-              "sound": "none",
-              "level": "busy"
+              "sounds": []
             }
+          },
+          "sample_line": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sample Line"
           },
           "name": {
             "type": "string",
@@ -6718,8 +6949,19 @@
               }
             ]
           },
-          "background_noise": {
-            "$ref": "#/components/schemas/BackgroundNoise"
+          "surroundings": {
+            "$ref": "#/components/schemas/Surroundings"
+          },
+          "sample_line": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sample Line"
           },
           "current_version": {
             "type": "integer",
@@ -6745,12 +6987,44 @@
           "language",
           "voice",
           "voice_gender",
-          "background_noise",
+          "surroundings",
+          "sample_line",
           "current_version",
           "created_at",
           "updated_at"
         ],
         "title": "PersonaRead"
+      },
+      "PersonaScenario": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "agent_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Agent Id"
+          },
+          "agent_name": {
+            "type": "string",
+            "title": "Agent Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "agent_id",
+          "agent_name"
+        ],
+        "title": "PersonaScenario",
+        "description": "A live scenario that uses the persona."
       },
       "PersonaUpdate": {
         "properties": {
@@ -6800,15 +7074,28 @@
               }
             ]
           },
-          "background_noise": {
+          "surroundings": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/BackgroundNoise"
+                "$ref": "#/components/schemas/Surroundings"
               },
               {
                 "type": "null"
               }
             ]
+          },
+          "sample_line": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sample Line"
           }
         },
         "additionalProperties": false,
@@ -7027,6 +7314,30 @@
           "any_agent_turn"
         ],
         "title": "PhraseWhere"
+      },
+      "PlanPreview": {
+        "properties": {
+          "surroundings": {
+            "$ref": "#/components/schemas/Surroundings"
+          },
+          "language": {
+            "$ref": "#/components/schemas/Language"
+          },
+          "duration_s": {
+            "type": "integer",
+            "maximum": 600.0,
+            "minimum": 10.0,
+            "title": "Duration S",
+            "default": 60
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "surroundings",
+          "language"
+        ],
+        "title": "PlanPreview"
       },
       "Provenance": {
         "type": "string",
@@ -7497,16 +7808,6 @@
             ],
             "title": "Max Retries"
           },
-          "background_noise": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/BackgroundNoise"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
           "name": {
             "anyOf": [
               {
@@ -7542,12 +7843,12 @@
             "type": "array",
             "title": "By Category"
           },
-          "by_noise": {
+          "by_surroundings": {
             "items": {
-              "$ref": "#/components/schemas/NoiseNumbers"
+              "$ref": "#/components/schemas/SurroundingsNumbers"
             },
             "type": "array",
-            "title": "By Noise"
+            "title": "By Surroundings"
           },
           "verdicts": {
             "$ref": "#/components/schemas/RunVerdicts"
@@ -7557,7 +7858,7 @@
         "required": [
           "overall",
           "by_category",
-          "by_noise",
+          "by_surroundings",
           "verdicts"
         ],
         "title": "RunMetrics"
@@ -7806,16 +8107,6 @@
             "type": "integer",
             "title": "Max Retries"
           },
-          "background_noise": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/BackgroundNoise"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
           "created_at": {
             "type": "string",
             "format": "date-time",
@@ -7875,7 +8166,6 @@
           "max_parallel",
           "start_interval_s",
           "max_retries",
-          "background_noise",
           "created_at",
           "response_p50_ms",
           "response_p90_ms",
@@ -8052,16 +8342,6 @@
             "type": "integer",
             "title": "Max Retries"
           },
-          "background_noise": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/BackgroundNoise"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
           "created_at": {
             "type": "string",
             "format": "date-time",
@@ -8113,7 +8393,6 @@
           "max_parallel",
           "start_interval_s",
           "max_retries",
-          "background_noise",
           "created_at",
           "response_p50_ms",
           "response_p90_ms"
@@ -8869,6 +9148,212 @@
         "title": "Share",
         "description": "How many of a total, with the 95% Wilson interval of the rate: few calls give a wide\ninterval."
       },
+      "Sound": {
+        "properties": {
+          "sound": {
+            "$ref": "#/components/schemas/NoiseSound"
+          },
+          "db": {
+            "type": "integer",
+            "maximum": 10.0,
+            "minimum": -30.0,
+            "title": "Db"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "sound",
+          "db"
+        ],
+        "title": "Sound"
+      },
+      "SoundPlan": {
+        "properties": {
+          "layers": {
+            "items": {
+              "$ref": "#/components/schemas/Layer"
+            },
+            "type": "array",
+            "title": "Layers",
+            "default": []
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "SoundPlan",
+        "description": "Every sound a call plays behind the caller, decided before the call starts. A retry\nplays the same plan."
+      },
+      "SoundRead": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "title": "File"
+          },
+          "sound": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NoiseSound"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "speaker": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SpeakerKind"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "start_s": {
+            "type": "number",
+            "title": "Start S"
+          },
+          "end_s": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End S"
+          },
+          "speaker_lines": {
+            "items": {
+              "$ref": "#/components/schemas/SpokenLine"
+            },
+            "type": "array",
+            "title": "Speaker Lines"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file",
+          "sound",
+          "speaker",
+          "start_s",
+          "end_s",
+          "speaker_lines"
+        ],
+        "title": "SoundRead",
+        "description": "One sound the call played behind the caller."
+      },
+      "Speaker": {
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/SpeakerKind"
+          },
+          "db": {
+            "type": "integer",
+            "maximum": 10.0,
+            "minimum": -30.0,
+            "title": "Db"
+          },
+          "start_s": {
+            "type": "number",
+            "maximum": 600.0,
+            "minimum": 0.0,
+            "title": "Start S",
+            "default": 5
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "kind",
+          "db"
+        ],
+        "title": "Speaker",
+        "description": "A person who talks behind the caller, in the caller's language, from start_s on."
+      },
+      "SpeakerKind": {
+        "type": "string",
+        "enum": [
+          "talks_to_caller",
+          "own_phone_call",
+          "tv"
+        ],
+        "title": "SpeakerKind",
+        "description": "What the person behind the caller does."
+      },
+      "SpokenLine": {
+        "properties": {
+          "at_s": {
+            "type": "number",
+            "title": "At S"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          }
+        },
+        "type": "object",
+        "required": [
+          "at_s",
+          "text"
+        ],
+        "title": "SpokenLine"
+      },
+      "Surroundings": {
+        "properties": {
+          "sounds": {
+            "items": {
+              "$ref": "#/components/schemas/Sound"
+            },
+            "type": "array",
+            "maxItems": 8,
+            "title": "Sounds",
+            "default": []
+          },
+          "auto": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AutoNoise"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "speaker": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Speaker"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "Surroundings",
+        "description": "What the agent hears behind the caller. No sounds and no auto noise is a quiet room."
+      },
+      "SurroundingsNumbers": {
+        "properties": {
+          "surroundings": {
+            "$ref": "#/components/schemas/Surroundings"
+          },
+          "numbers": {
+            "$ref": "#/components/schemas/RunNumbers"
+          }
+        },
+        "type": "object",
+        "required": [
+          "surroundings",
+          "numbers"
+        ],
+        "title": "SurroundingsNumbers"
+      },
       "TextDocumentCreate": {
         "properties": {
           "name": {
@@ -9137,15 +9622,18 @@
           "language": {
             "$ref": "#/components/schemas/Language"
           },
-          "background_noise": {
+          "sample_line": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/BackgroundNoise"
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
               },
               {
                 "type": "null"
               }
-            ]
+            ],
+            "title": "Sample Line"
           }
         },
         "additionalProperties": false,

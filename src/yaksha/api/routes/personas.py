@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, status
 from yaksha.api.auth import require_token
 from yaksha.api.deps import SessionDep
 from yaksha.api.pagination import Page, PageDep
-from yaksha.api.schemas.personas import PersonaRead, PersonaVersionRead
+from yaksha.api.schemas.personas import PersonaRead, PersonaScenario, PersonaVersionRead
 from yaksha.domain.personas import PersonaCreate, PersonaUpdate
 from yaksha.simulation import personas
 
@@ -38,6 +38,19 @@ async def update_persona(
 @router.delete("/{persona_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_persona(persona_id: uuid.UUID, session: SessionDep) -> None:
     await personas.delete_persona(session, persona_id)
+
+
+@router.get("/{persona_id}/scenarios")
+async def list_persona_scenarios(
+    persona_id: uuid.UUID, session: SessionDep
+) -> list[PersonaScenario]:
+    """The live scenarios that use the persona; a persona is deleted only when none does."""
+    return [
+        PersonaScenario(
+            id=scenario.id, name=scenario.name, agent_id=scenario.agent_id, agent_name=agent_name
+        )
+        for scenario, agent_name in await personas.persona_scenarios(session, persona_id)
+    ]
 
 
 @router.get("/{persona_id}/versions")

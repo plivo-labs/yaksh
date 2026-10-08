@@ -1,8 +1,5 @@
-import io
-import wave
 from typing import Any
 
-import audioop
 from httpx import AsyncClient
 
 from tests.conftest import (
@@ -140,7 +137,7 @@ async def test_an_edit_changes_name_and_languages_but_never_to_empty(client: Asy
     assert no_languages.status_code == cleared.status_code == moved.status_code == 422
 
 
-async def test_a_preview_speaks_the_language_sample_with_the_call_settings(
+async def test_a_preview_speaks_the_sample_line_or_the_language_sample_with_the_call_settings(
     client: AsyncClient, voice_client: FakeVoiceClient
 ) -> None:
     voice = {"provider": "elevenlabs", "id": HINDI_VOICE.id, "speed": 1.15, "stability": 0.3}
@@ -160,28 +157,16 @@ async def test_a_preview_speaks_the_language_sample_with_the_call_settings(
     assert text == LANGUAGES[Language.HINGLISH].sample
     assert unknown.status_code == 422
 
+    await client.post(
+        "/api/v1/voices/preview",
+        json={
+            "voice": voice,
+            "language": "hinglish",
+            "sample_line": "Haan ji, booking ke baare mein.",
+        },
+    )
+    assert voice_client.spoken[-1][2] == "Haan ji, booking ke baare mein."
+
     voice_client.down = True
     down = await client.post("/api/v1/voices/preview", json={"voice": voice, "language": "en"})
     assert down.status_code == 503
-
-
-async def test_a_preview_with_background_noise_plays_the_noise_around_the_voice(
-    client: AsyncClient,
-) -> None:
-    voice = {"provider": "elevenlabs", "id": ENGLISH_VOICE.id}
-
-    noisy = await client.post(
-        "/api/v1/voices/preview",
-        json={"voice": voice, "language": "en", "background_noise": {"sound": "cafe"}},
-    )
-    quiet = await client.post(
-        "/api/v1/voices/preview",
-        json={"voice": voice, "language": "en", "background_noise": {"sound": "none"}},
-    )
-    with wave.open(io.BytesIO(noisy.content)) as mixed, wave.open(io.BytesIO(SPOKEN)) as spoken:
-        added_s = (mixed.getnframes() - spoken.getnframes()) / mixed.getframerate()
-        lead = mixed.readframes(mixed.getframerate())
-
-    assert noisy.status_code == 200 and added_s == 1.5
-    assert audioop.rms(lead, 2) > 0
-    assert quiet.content == SPOKEN

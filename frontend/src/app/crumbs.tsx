@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/breadcrumb";
 import { Skeleton } from "@/components/ui/skeleton";
 import { runTitle } from "@/lib/format";
-import { useAgent, useConversation, useRun } from "@/lib/queries";
+import { useAgent, useConversation, usePersona, useRun } from "@/lib/queries";
 
 /** One step of the trail. The last step is the current page; a step before it links to `to`. A
  * name that is still loading is undefined. */
@@ -61,6 +61,13 @@ export const AgentsCrumbs = () => <Trail steps={[{ label: "Agents" }]} />;
 export const RunsCrumbs = () => <Trail steps={[{ label: "Runs" }]} />;
 export const ConversationsCrumbs = () => <Trail steps={[{ label: "Conversations" }]} />;
 export const PersonasCrumbs = () => <Trail steps={[{ label: "Personas" }]} />;
+const PERSONAS = { label: "Personas", to: "/personas" };
+export const NewPersonaCrumbs = () => <Trail steps={[PERSONAS, { label: "New persona" }]} />;
+
+export function PersonaCrumbs() {
+  const persona = usePersona(useParams().id);
+  return <Trail steps={[PERSONAS, { label: persona.data?.name }]} />;
+}
 export const VoicesCrumbs = () => <Trail steps={[{ label: "Voices" }]} />;
 export const NumbersCrumbs = () => <Trail steps={[{ label: "Numbers" }]} />;
 export const NewAgentCrumbs = () => <Trail steps={[AGENTS, { label: "New agent" }]} />;

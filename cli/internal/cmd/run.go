@@ -47,7 +47,7 @@ type runStartFlags struct {
 	scenarios                                                                []string
 	all, wait                                                                bool
 	repeats, maxDurationS, maxTurns, maxParallel, startIntervalS, maxRetries int
-	noiseSound, noiseLevel, name, idempotencyKey                             string
+	name, idempotencyKey                                                     string
 	timeout                                                                  time.Duration
 }
 
@@ -71,8 +71,6 @@ func (a *app) runStartCmd() *cobra.Command {
 	fl.IntVar(&f.maxParallel, "max-parallel", 0, "how many calls of the run can be on the line at once")
 	fl.IntVar(&f.startIntervalS, "start-interval-s", 0, "the least time between two call starts, in seconds")
 	fl.IntVar(&f.maxRetries, "max-retries", 0, "extra tries for a call that fails on Yaksha's side or on the line")
-	fl.StringVar(&f.noiseSound, "noise-sound", "", "background noise for every call, for example cafe; none turns it off")
-	fl.StringVar(&f.noiseLevel, "noise-level", "", "the noise level: light, busy or loud")
 	fl.StringVar(&f.name, "name", "", "a name for the run")
 	fl.StringVar(&f.idempotencyKey, "idempotency-key", "", "the same key and body return the first run instead of a new one")
 	fl.BoolVar(&f.wait, "wait", false, "wait for the run to end and for its verdicts; Ctrl-C or SIGTERM then cancels a run that is still going")
@@ -107,16 +105,15 @@ func (a *app) startRun(cmd *cobra.Command, f runStartFlags) error {
 		}
 	}
 	body := api.RunCreate{
-		AgentId:         agentID,
-		ScenarioIds:     scenarioIDs,
-		Repeats:         changed(cmd, "repeats", f.repeats),
-		MaxDurationS:    changed(cmd, "max-duration-s", f.maxDurationS),
-		MaxTurns:        changed(cmd, "max-turns", f.maxTurns),
-		MaxParallel:     changed(cmd, "max-parallel", f.maxParallel),
-		StartIntervalS:  changed(cmd, "start-interval-s", f.startIntervalS),
-		MaxRetries:      changed(cmd, "max-retries", f.maxRetries),
-		Name:            changed(cmd, "name", f.name),
-		BackgroundNoise: noise(cmd, f.noiseSound, f.noiseLevel),
+		AgentId:        agentID,
+		ScenarioIds:    scenarioIDs,
+		Repeats:        changed(cmd, "repeats", f.repeats),
+		MaxDurationS:   changed(cmd, "max-duration-s", f.maxDurationS),
+		MaxTurns:       changed(cmd, "max-turns", f.maxTurns),
+		MaxParallel:    changed(cmd, "max-parallel", f.maxParallel),
+		StartIntervalS: changed(cmd, "start-interval-s", f.startIntervalS),
+		MaxRetries:     changed(cmd, "max-retries", f.maxRetries),
+		Name:           changed(cmd, "name", f.name),
 	}
 	params := api.CreateRunApiV1RunsPostParams{
 		IdempotencyKey: changed(cmd, "idempotency-key", f.idempotencyKey),
@@ -138,16 +135,6 @@ func (a *app) startRun(cmd *cobra.Command, f runStartFlags) error {
 	}
 	fmt.Fprintf(cmd.ErrOrStderr(), "run %s started\n", id)
 	return a.waitForRun(cmd, c, id, f.timeout, true)
-}
-
-// noise is the background noise of the flags, or nil when neither flag was set.
-func noise(cmd *cobra.Command, sound, level string) *api.BackgroundNoise {
-	s := changed(cmd, "noise-sound", api.NoiseSound(sound))
-	l := changed(cmd, "noise-level", api.NoiseLevel(level))
-	if s == nil && l == nil {
-		return nil
-	}
-	return &api.BackgroundNoise{Sound: s, Level: l}
 }
 
 // allScenarios lists every scenario of the agent, page by page.

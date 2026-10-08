@@ -126,28 +126,67 @@ export const LANGUAGE_ITEMS = (Object.keys(LANGUAGE_NAMES) as Language[]).map((l
   label: LANGUAGE_NAMES[language],
 }));
 
-export type NoiseSound =
-  | "none"
-  | "street"
-  | "cafe"
-  | "office"
-  | "car"
-  | "tv"
-  | "crowd"
-  | "kitchen"
-  | "wind";
-export type NoiseLevel = "light" | "busy" | "loud";
+export type NoiseSound = "street" | "cafe" | "office" | "car" | "tv" | "crowd" | "kitchen" | "wind";
+export type SpeakerKind = "talks_to_caller" | "own_phone_call" | "tv";
 
-/** The sound behind the caller. With the sound "none", the level is always "busy". */
-export interface BackgroundNoise {
+/** A level relative to the caller's speech: 0 is as loud as the caller. */
+export const MIN_DB = -30;
+export const MAX_DB = 10;
+
+export interface Sound {
   sound: NoiseSound;
-  level: NoiseLevel;
+  db: number;
 }
 
-export const NO_NOISE: BackgroundNoise = { sound: "none", level: "busy" };
+export interface AutoNoise {
+  db: number;
+  seed: number;
+}
+
+export interface Speaker {
+  kind: SpeakerKind;
+  db: number;
+  start_s: number;
+}
+
+/** What the agent hears behind the caller: sounds or auto noise, and a person who talks.
+ * Nothing is a quiet room. */
+export interface Surroundings {
+  sounds: Sound[];
+  auto: AutoNoise | null;
+  speaker: Speaker | null;
+}
+
+export const QUIET: Surroundings = { sounds: [], auto: null, speaker: null };
+
+/** One sound file in a call or a preview, from start_s to end_s, looped or once. */
+export interface Layer {
+  file: string;
+  /** What plays: a noise, or a second speaker's clip. */
+  sound: NoiseSound | null;
+  speaker: SpeakerKind | null;
+  gain: number;
+  start_s: number;
+  end_s: number | null;
+  loop: boolean;
+}
+
+export interface SoundPlan {
+  layers: Layer[];
+}
+
+/** A sound a call played behind the caller, with what a background speaker said. */
+export interface PlayedSound {
+  file: string;
+  /** The noise that played, or null for a second speaker's clip. */
+  sound: NoiseSound | null;
+  speaker: SpeakerKind | null;
+  start_s: number;
+  end_s: number | null;
+  speaker_lines: { at_s: number; text: string }[];
+}
 
 export const NOISE_SOUND_ITEMS: { value: NoiseSound; label: string }[] = [
-  { value: "none", label: "None" },
   { value: "street", label: "Street" },
   { value: "cafe", label: "Cafe" },
   { value: "office", label: "Office" },
@@ -162,10 +201,21 @@ export const NOISE_SOUND_LABELS = Object.fromEntries(
   NOISE_SOUND_ITEMS.map((item) => [item.value, item.label]),
 ) as Record<NoiseSound, string>;
 
-export const NOISE_LEVEL_ITEMS: { value: NoiseLevel; label: string }[] = [
-  { value: "light", label: "Light" },
-  { value: "busy", label: "Busy" },
-  { value: "loud", label: "Loud" },
+export const SPEAKER_KIND_ITEMS: { value: SpeakerKind; label: string }[] = [
+  { value: "talks_to_caller", label: "Talks to the caller" },
+  { value: "own_phone_call", label: "On their own phone call" },
+  { value: "tv", label: "TV" },
+];
+
+export const SPEAKER_KIND_LABELS = Object.fromEntries(
+  SPEAKER_KIND_ITEMS.map((item) => [item.value, item.label]),
+) as Record<SpeakerKind, string>;
+
+/** Auto noise levels, as the persona form offers them. */
+export const AUTO_LEVELS: { value: number; label: string }[] = [
+  { value: -20, label: "Light" },
+  { value: -10, label: "Busy" },
+  { value: -5, label: "Loud" },
 ];
 
 export interface Page<T> {
@@ -373,7 +423,17 @@ export interface PersonaInput {
   prompt: string;
   language: Language;
   voice: VoiceSettings;
-  background_noise: BackgroundNoise;
+  surroundings: Surroundings;
+  /** What the persona's previews say; null says its language's sample sentence. */
+  sample_line: string | null;
+}
+
+/** A live scenario that uses a persona. */
+export interface PersonaScenario {
+  id: string;
+  name: string;
+  agent_id: string;
+  agent_name: string;
 }
 
 export interface Persona {
@@ -384,7 +444,8 @@ export interface Persona {
   language: Language;
   voice: VoiceSettings;
   voice_gender: VoiceGender | null;
-  background_noise: BackgroundNoise;
+  surroundings: Surroundings;
+  sample_line: string | null;
   current_version: number;
   created_at: string;
   updated_at: string;
@@ -502,7 +563,7 @@ export interface ConversationSummary {
   call_uuid: string | null;
   max_duration_s: number;
   max_turns: number;
-  background_noise: BackgroundNoise;
+  surroundings: Surroundings;
   status: ConversationStatus;
   end_reason: EndReason | null;
   failure_reason: string | null;
@@ -526,6 +587,8 @@ export interface ConversationSummary {
 
 export interface Conversation extends ConversationSummary {
   instructions: string;
+  /** What the call played behind the caller, as planned before it started. */
+  sounds: PlayedSound[];
   scenario: ScenarioConfig;
   transcript: Turn[];
   replies: Reply[];
@@ -551,8 +614,6 @@ export interface RunInput {
   /** How many times a conversation that ends with an error is tried again; the server
    * default when null. */
   max_retries: number | null;
-  /** Played in every conversation of the run; each persona's own setting when null. */
-  background_noise: BackgroundNoise | null;
   name: string | null;
 }
 
@@ -569,8 +630,6 @@ export interface RunSummary {
   max_parallel: number | null;
   start_interval_s: number | null;
   max_retries: number;
-  /** Each persona's own setting when null. */
-  background_noise: BackgroundNoise | null;
   status: RunStatus;
   /** The latest attempt of each repeat of each scenario, by outcome group. */
   counts: Record<OutcomeGroup, number>;
@@ -606,6 +665,8 @@ export interface Defaults {
   max_retries: number;
   /** What the caller says first, by the persona's language, when a scenario sets none. */
   first_words: Record<Language, string>;
+  /** What a voice preview says, by language, when the persona sets no sample line. */
+  sample_lines: Record<Language, string>;
 }
 
 export interface GenerateInput {
@@ -834,7 +895,7 @@ export interface RunMetrics {
   overall: RunNumbers;
   /** By the scenario's category as it is now; a category is not versioned. */
   by_category: { category: Category; numbers: RunNumbers }[];
-  by_noise: { noise: BackgroundNoise; numbers: RunNumbers }[];
+  by_surroundings: { surroundings: Surroundings; numbers: RunNumbers }[];
   verdicts: RunVerdicts;
 }
 

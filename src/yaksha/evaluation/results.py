@@ -11,20 +11,20 @@ from sqlalchemy import ColumnElement, and_, case, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from yaksha.db.models import Conversation, Evaluation, EvaluationItem, MetricValue, Scenario
-from yaksha.domain.background_noise import BackgroundNoise, NoiseLevel, NoiseSound
 from yaksha.domain.conversations import OutcomeGroup, WireEventKind, outcome_group
 from yaksha.domain.evaluations import (
     CategoryNumbers,
     EvaluationState,
     Metric,
     MetricKey,
-    NoiseNumbers,
     RunMetrics,
     RunNumbers,
     Share,
+    SurroundingsNumbers,
 )
 from yaksha.domain.latency import Latency, pooled
 from yaksha.domain.scenarios import Category
+from yaksha.domain.surroundings import Surroundings
 from yaksha.evaluation.run_verdicts import run_verdicts
 
 
@@ -98,7 +98,7 @@ class CallFacts:
     group: OutcomeGroup
     connected: bool
     category: Category
-    noise: BackgroundNoise
+    surroundings: Surroundings
     state: EvaluationState | None
     flags: frozenset[str]
     turn_taking: dict[str, Any] | None
@@ -116,7 +116,7 @@ async def run_metrics(
     seed: int,
 ) -> RunMetrics:
     """The run numbers over these conversations, overall, by scenario category and by
-    background noise, and the verdict numbers of the judged ones, by scenario in the run's
+    surroundings, and the verdict numbers of the judged ones, by scenario in the run's
     order. seed, the run's, fixes the verdicts' interval."""
     ids = set(conversation_ids)
     values = await session.execute(
@@ -143,8 +143,7 @@ async def run_metrics(
             Conversation.transcript["wire_events"]
             .contains([{"kind": WireEventKind.CONNECTED}])
             .label("connected"),
-            Conversation.background_noise_sound,
-            Conversation.background_noise_level,
+            Conversation.surroundings,
             Scenario.category,
             Evaluation.state,
         )
@@ -160,9 +159,7 @@ async def run_metrics(
                 group=outcome_group(row.status, row.end_reason),
                 connected=bool(row.connected),
                 category=row.category,
-                noise=BackgroundNoise(
-                    sound=row.background_noise_sound, level=row.background_noise_level
-                ),
+                surroundings=Surroundings.model_validate(row.surroundings),
                 state=row.state,
                 flags=frozenset(flags[row.id]),
                 turn_taking=summed.get((row.id, MetricKey.TURN_TAKING)),
@@ -175,9 +172,11 @@ async def run_metrics(
             CategoryNumbers(category=category, numbers=numbers(group))
             for category, group in grouped(calls, lambda call: call.category, list(Category).index)
         ],
-        by_noise=[
-            NoiseNumbers(noise=noise, numbers=numbers(group))
-            for noise, group in grouped(calls, lambda call: call.noise, noise_order)
+        by_surroundings=[
+            SurroundingsNumbers(surroundings=surroundings, numbers=numbers(group))
+            for surroundings, group in grouped(
+                calls, lambda call: call.surroundings, surroundings_order
+            )
         ],
         verdicts=await run_verdicts(session, conversation_ids, scenario_order, seed),
     )
@@ -192,8 +191,9 @@ def grouped[K](
     return sorted(groups.items(), key=lambda item: order(item[0]))
 
 
-def noise_order(noise: BackgroundNoise) -> tuple[int, int]:
-    return list(NoiseSound).index(noise.sound), list(NoiseLevel).index(noise.level)
+def surroundings_order(surroundings: Surroundings) -> tuple[bool, str]:
+    """A quiet room first, then the rest in a fixed order."""
+    return surroundings != Surroundings(), surroundings.model_dump_json()
 
 
 def numbers(calls: Sequence[CallFacts]) -> RunNumbers:

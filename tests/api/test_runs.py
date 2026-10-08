@@ -53,6 +53,7 @@ from yaksha.domain.latency import (
     waits,
 )
 from yaksha.domain.voices import VoiceProvider, VoiceSettings
+from yaksha.simulation.languages import LANGUAGES
 from yaksha.worker.worker import Worker
 
 NO_OUTCOMES = dict.fromkeys(
@@ -206,48 +207,53 @@ async def test_starting_and_deleting_an_agent_cannot_both_succeed(client: AsyncC
     assert (started.status_code, deleted.status_code) in {(202, 409), (404, 204)}
 
 
-async def test_a_run_replaces_the_noise_of_every_conversation_or_keeps_each_personas(
+async def test_each_call_plans_its_personas_surroundings_and_a_new_run_plays_the_same_plan(
     client: AsyncClient,
 ) -> None:
     agent = await create_agent_id(client)
-    street = await create_persona(
-        client, name="Street caller", background_noise={"sound": "street"}
+    surroundings = {
+        "auto": {"db": -10, "seed": 1},
+        "speaker": {"kind": "tv", "db": -6, "start_s": 5},
+    }
+    busy = await create_persona(client, name="Busy caller", surroundings=surroundings)
+    scenario = (await create_scenario(client, agent, persona_id=busy["id"]))["id"]
+
+    first = (await start_run(client, agent, [scenario], repeats=2)).json()
+    await client.patch(f"/api/v1/personas/{busy['id']}", json={"surroundings": {}})
+    second = (await start_run(client, agent, [scenario], repeats=2, key="again")).json()
+
+    async def sounds(run: dict[str, Any]) -> list[list[dict[str, Any]]]:
+        return [
+            (await client.get(f"/api/v1/conversations/{c['id']}")).json()["sounds"]
+            for c in await run_conversations(client, run["id"])
+        ]
+
+    one, two = await sounds(first)
+    quiet = await sounds(second)
+    speaker = [sound for sound in one if sound["file"].startswith("speakers/en_tv_")]
+    assert one != two and len(one) > 5
+    assert speaker[0]["start_s"] == 5 and speaker[0]["speaker_lines"][0]["at_s"] == 5
+    assert quiet == [[], []]
+    assert (await run_conversations(client, first["id"]))[0]["surroundings"]["auto"] == (
+        surroundings["auto"]
     )
-    quiet = await create_persona(client, name="Quiet caller")
-    scenarios = [
-        (await create_scenario(client, agent, persona_id=street["id"]))["id"],
-        (await create_scenario(client, agent, name="Cancel a cleaning", persona_id=quiet["id"]))[
-            "id"
-        ],
+
+
+async def test_the_same_scenario_and_repeat_plan_the_same_sounds_in_another_run(
+    client: AsyncClient,
+) -> None:
+    agent = await create_agent_id(client)
+    busy = await create_persona(client, name="Busy caller", surroundings={"auto": {"db": -10}})
+    scenario = (await create_scenario(client, agent, persona_id=busy["id"]))["id"]
+
+    runs = [(await start_run(client, agent, [scenario], key=key)).json() for key in ("a", "b")]
+    plans = [
+        (await client.get(f"/api/v1/conversations/{c['id']}")).json()["sounds"]
+        for run in runs
+        for c in await run_conversations(client, run["id"])
     ]
 
-    own = (await start_run(client, agent, scenarios)).json()
-    loud = {"sound": "cafe", "level": "loud"}
-    replaced = (
-        await start_run(client, agent, scenarios, key="noisy", background_noise=loud)
-    ).json()
-    other = await start_run(
-        client, agent, scenarios, key="noisy", background_noise={"sound": "none"}
-    )
-    silent = (
-        await start_run(client, agent, scenarios, key="silent", background_noise={"sound": "none"})
-    ).json()
-
-    assert own["background_noise"] is None
-    assert [c["background_noise"] for c in await run_conversations(client, own["id"])] == [
-        {"sound": "street", "level": "busy"},
-        {"sound": "none", "level": "busy"},
-    ]
-    assert replaced["background_noise"] == loud
-    assert [c["background_noise"] for c in await run_conversations(client, replaced["id"])] == [
-        loud,
-        loud,
-    ]
-    assert other.status_code == 409
-    assert [c["background_noise"] for c in await run_conversations(client, silent["id"])] == [
-        {"sound": "none", "level": "busy"},
-        {"sound": "none", "level": "busy"},
-    ]
+    assert plans[0] == plans[1] != []
 
 
 async def test_a_repeated_request_returns_its_run_and_its_key_cannot_start_another(
@@ -609,17 +615,20 @@ async def test_omitted_fields_take_the_operators_defaults_as_the_api_reports_the
         calls = [await run_conversations(strict, r.json()["id"]) for r in (started, chosen)]
 
     openings = {"en": "Hello", "hinglish": "Hello"}
+    samples = {language.value: policy.sample for language, policy in LANGUAGES.items()}
     assert standard == {
         "max_duration_s": 300,
         "max_turns": 20,
         "max_retries": 1,
         "first_words": openings,
+        "sample_lines": samples,
     }
     assert reported == {
         "max_duration_s": 120,
         "max_turns": 8,
         "max_retries": 0,
         "first_words": openings,
+        "sample_lines": samples,
     }
     assert started.status_code == 202
     run = started.json()

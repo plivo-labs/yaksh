@@ -215,3 +215,13 @@
     scrollbar-color: hsl(var(--input)) transparent;
   }
 }
+
+/* The preview time line's playhead: it crosses the loop once per 30 s loop. */
+@keyframes playhead {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}

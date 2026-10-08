@@ -11,7 +11,6 @@ from tests.conftest import OUTBOUND_AGENT, create_agent, create_scenario
 from yaksha.config import Settings
 from yaksha.db.models import Conversation, PhoneNumber, RefusedCall, Run
 from yaksha.db.session import create_engine, create_sessionmaker
-from yaksha.domain.background_noise import NoiseLevel, NoiseSound
 from yaksha.domain.conversations import (
     Admission,
     CallOutcome,
@@ -80,8 +79,8 @@ async def waiting_conversation(
                 time_zone="UTC",
                 max_duration_s=120,
                 max_turns=20,
-                background_noise_sound=NoiseSound.NONE,
-                background_noise_level=NoiseLevel.BUSY,
+                surroundings={},
+                sound_plan={},
                 status=ConversationStatus.RUNNING,
                 claimed_by="w1",
                 lease_expires_at=now + timedelta(seconds=60),

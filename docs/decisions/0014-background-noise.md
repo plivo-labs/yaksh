@@ -1,7 +1,7 @@
 # 0014 Background noise is a persona setting that a call or a run can replace
 
 Date: 2026-10-02
-Status: accepted
+Status: replaced by 0027 (surroundings)
 
 ## Decision
 

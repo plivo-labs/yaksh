@@ -4,9 +4,9 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict
 
 from yaksha.db.models import Persona
-from yaksha.domain.background_noise import BackgroundNoise
 from yaksha.domain.languages import Language
 from yaksha.domain.personas import PersonaConfig
+from yaksha.domain.surroundings import Surroundings
 from yaksha.domain.voices import VoiceGender, VoiceSettings
 from yaksha.simulation.personas import config_of
 
@@ -19,7 +19,8 @@ class PersonaRead(BaseModel):
     language: Language
     voice: VoiceSettings
     voice_gender: VoiceGender | None
-    background_noise: BackgroundNoise
+    surroundings: Surroundings
+    sample_line: str | None
     current_version: int
     created_at: datetime
     updated_at: datetime
@@ -35,6 +36,15 @@ class PersonaRead(BaseModel):
             created_at=persona.created_at,
             updated_at=persona.updated_at,
         )
+
+
+class PersonaScenario(BaseModel):
+    """A live scenario that uses the persona."""
+
+    id: uuid.UUID
+    name: str
+    agent_id: uuid.UUID
+    agent_name: str
 
 
 class PersonaVersionRead(BaseModel):

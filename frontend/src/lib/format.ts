@@ -1,8 +1,9 @@
 import {
   type AgentSummary,
-  type BackgroundNoise,
   NOISE_SOUND_LABELS,
   type OutcomeGroup,
+  type SpeakerKind,
+  type Surroundings,
 } from "@/lib/types";
 
 export function clock(ms: number): string {
@@ -31,9 +32,35 @@ export function when(iso: string | null): string {
   });
 }
 
-/** "Cafe, busy", or null when there is no noise. */
-export function noiseLabel(noise: BackgroundNoise): string | null {
-  return noise.sound === "none" ? null : `${NOISE_SOUND_LABELS[noise.sound]}, ${noise.level}`;
+const SPEAKER_PHRASES: Record<SpeakerKind, string> = {
+  talks_to_caller: "talks to the caller",
+  own_phone_call: "on their own phone call",
+  tv: "TV",
+};
+
+/** A level relative to the caller, as "−10 dB". */
+export function decibels(db: number): string {
+  return db === 0 ? "0 dB" : `${db > 0 ? "+" : "−"}${Math.abs(db)} dB`;
+}
+
+/** "Cafe and car, second speaker (TV)", or null for a quiet room. With `exact`, every setting
+ * that tells two surroundings apart: "Cafe −10 dB, second speaker (TV) −6 dB from 5 s". */
+export function surroundingsLabel(surroundings: Surroundings, exact = false): string | null {
+  const level = (db: number) => (exact ? ` ${decibels(db)}` : "");
+  const parts = [];
+  if (surroundings.sounds.length > 0)
+    parts.push(
+      surroundings.sounds.map((s) => `${NOISE_SOUND_LABELS[s.sound]}${level(s.db)}`).join(" and "),
+    );
+  const { auto, speaker } = surroundings;
+  if (auto) parts.push(`auto noise${level(auto.db)}${exact ? ` (mix ${auto.seed})` : ""}`);
+  if (speaker)
+    parts.push(
+      `second speaker (${SPEAKER_PHRASES[speaker.kind]})${level(speaker.db)}${exact ? ` from ${speaker.start_s} s` : ""}`,
+    );
+  if (parts.length === 0) return null;
+  const label = parts.join(", ");
+  return label[0].toUpperCase() + label.slice(1);
 }
 
 export function words(value: string): string {
