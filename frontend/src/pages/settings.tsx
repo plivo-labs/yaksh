@@ -371,6 +371,7 @@ function Form({
             />
             <NumberRow
               id="audit-rate"
+              help="Judged calls picked for people to review, to measure how often the judges agree with them."
               label="Audit sample"
               unit="% of judged calls"
               min={0}
@@ -380,6 +381,7 @@ function Form({
             />
             <NumberRow
               id="audit-budget"
+              help="The most of those calls the review queue offers each week."
               label="Weekly audit budget"
               unit="conversations a week"
               value={draft.audit.weekly_budget}
