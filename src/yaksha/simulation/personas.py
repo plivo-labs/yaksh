@@ -12,10 +12,10 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from yaksha.db.models import Persona, PersonaVersion, Scenario, Voice
-from yaksha.domain.background_noise import BackgroundNoise
+from yaksha.db.models import Agent, Persona, PersonaVersion, Scenario, Voice
 from yaksha.domain.errors import ConflictError, NotFoundError, ValidationError
 from yaksha.domain.personas import PersonaConfig, PersonaCreate, PersonaSettings, PersonaUpdate
+from yaksha.domain.surroundings import Surroundings
 from yaksha.domain.voices import VoiceSettings
 from yaksha.simulation.voices import builtin_voices, live_voice
 
@@ -33,9 +33,8 @@ def config_of(persona: Persona) -> PersonaConfig:
             stability=persona.voice_stability,
         ),
         voice_gender=persona.voice_gender,
-        background_noise=BackgroundNoise(
-            sound=persona.background_noise_sound, level=persona.background_noise_level
-        ),
+        surroundings=Surroundings.model_validate(persona.surroundings),
+        sample_line=persona.sample_line,
     )
 
 
@@ -48,8 +47,8 @@ def config_columns(config: PersonaConfig) -> dict[str, Any]:
         "voice_speed": config.voice.speed,
         "voice_stability": config.voice.stability,
         "voice_gender": config.voice_gender,
-        "background_noise_sound": config.background_noise.sound,
-        "background_noise_level": config.background_noise.level,
+        "surroundings": config.surroundings.model_dump(mode="json"),
+        "sample_line": config.sample_line,
     }
 
 
@@ -186,6 +185,21 @@ async def delete_persona(session: AsyncSession, persona_id: uuid.UUID) -> None:
         )
     persona.deleted_at = datetime.now(UTC)
     await session.commit()
+
+
+async def persona_scenarios(
+    session: AsyncSession, persona_id: uuid.UUID
+) -> list[tuple[Scenario, str]]:
+    """The live scenarios that use the persona, with their agent's name, by agent then scenario
+    name: the ones that keep it from being deleted."""
+    persona = await get_persona(session, persona_id)
+    rows = await session.execute(
+        select(Scenario, Agent.name)
+        .join(Agent, Agent.id == Scenario.agent_id)
+        .where(Scenario.persona_id == persona.id, Scenario.deleted_at.is_(None))
+        .order_by(Agent.name, Scenario.name, Scenario.id)
+    )
+    return [(scenario, agent_name) for scenario, agent_name in rows.tuples()]
 
 
 async def list_versions(

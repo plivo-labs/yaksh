@@ -2,6 +2,7 @@ import { Toggle } from "@base-ui/react/toggle";
 import { ToggleGroup } from "@base-ui/react/toggle-group";
 import { ChevronDown, Pencil, Play, Plus, Sparkles, Trash2, X } from "lucide-react";
 import { Fragment, type ReactNode, useRef, useState } from "react";
+import { useSearchParams } from "react-router";
 import { toast } from "sonner";
 
 import { DeleteConfirm, DeleteDialog } from "@/components/confirm-dialogs";
@@ -135,7 +136,8 @@ export function AgentScenarios({ agent }: { agent: Agent }) {
   const [batch, setBatch] = useState<string | null>(null);
   const [category, setCategory] = useState<Category | typeof ALL>(ALL);
   const [search, setSearch] = useState("");
-  const [openId, setOpenId] = useState<string | null>(null);
+  const [params] = useSearchParams();
+  const [openId, setOpenId] = useState<string | null>(() => params.get("scenario"));
   const generations = useGenerations(agent.id);
   const shownBatch = generations.data?.some((item) => item.id === batch) ? batch : null;
   const scenarios = useScenarios(agent.id, true, shownBatch);

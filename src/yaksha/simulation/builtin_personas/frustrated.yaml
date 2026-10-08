@@ -5,6 +5,7 @@ voice:
   id: cjVigY5qzO86Huf0OWal
   speed: 1.0
   stability: 0.5
+sample_line: "Look, this is the third time I'm calling about my booking. Can someone just fix it?"
 prompt: |
   You have had a bad experience before and your patience is thin. Start calm, but
   become short and blunt each time the agent asks something again or does not

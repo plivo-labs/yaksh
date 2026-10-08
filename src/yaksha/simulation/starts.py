@@ -4,6 +4,7 @@ import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date, datetime
+from typing import Any
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import select
@@ -12,7 +13,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from yaksha.config import Settings
 from yaksha.db.models import Agent, AgentVersion, Persona, PersonaVersion, Scenario, ScenarioVersion
 from yaksha.domain.agents import Direction
-from yaksha.domain.background_noise import BackgroundNoise, NoiseLevel, NoiseSound
 from yaksha.domain.errors import NotFoundError, ValidationError
 from yaksha.domain.languages import Language
 from yaksha.domain.settings import AppSettings
@@ -44,8 +44,8 @@ class Inputs:
     today: date
     """The date the caller is told is today; a judge must use the same one."""
     time_zone: str
-    background_noise_sound: NoiseSound
-    background_noise_level: NoiseLevel
+    surroundings: dict[str, Any]
+    """The persona's `Surroundings`, as JSON."""
 
 
 async def snapshot(
@@ -54,12 +54,10 @@ async def snapshot(
     app: AppSettings,
     agent: Agent,
     scenario_ids: Sequence[uuid.UUID],
-    background_noise: BackgroundNoise | None,
 ) -> list[Inputs]:
     """Check that conversations of the agent's scenarios can start now, and read what they pin,
     once for all of them: the current agent, scenario and persona versions, and today. Each
-    scenario runs with its own persona, and plays background_noise when one is given, else its
-    persona's. The caller holds the agent's lock.
+    scenario runs with its own persona. The caller holds the agent's lock.
     A refusal about a scenario names it."""
     problem = phone_problem(settings, app)
     if problem is not None:
@@ -111,7 +109,6 @@ async def snapshot(
     for scenario in scenarios:
         persona = personas[scenario.persona_id]
         config = persona_config_of(persona)
-        noise = background_noise if background_noise is not None else config.background_noise
         wants = scenario_config_of(scenario)
         if outbound is not None:
             check_agent_data(outbound.trigger, wants, scenario.name)
@@ -136,8 +133,7 @@ async def snapshot(
                 nudge=LANGUAGES[config.language].nudge,
                 today=today,
                 time_zone=app.phone.timezone,
-                background_noise_sound=noise.sound,
-                background_noise_level=noise.level,
+                surroundings=config.surroundings.model_dump(mode="json"),
             )
         )
     return inputs

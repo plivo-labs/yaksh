@@ -25,7 +25,6 @@ from sqlalchemy.orm import Mapped, MappedColumn, mapped_column
 
 from yaksha.db.base import Base
 from yaksha.domain.agents import Direction, Transport
-from yaksha.domain.background_noise import NoiseLevel, NoiseSound
 from yaksha.domain.conversations import Channel, ConversationStatus, EndReason
 from yaksha.domain.evaluations import (
     DecidedBy,
@@ -122,13 +121,6 @@ class Run(Base):
     """The least time between two call starts of the run; None is no wait."""
     max_retries: Mapped[int] = mapped_column(Integer)
     """How many times a conversation that ends with an error is tried again."""
-    background_noise_sound: Mapped[NoiseSound | None] = mapped_column(
-        pg_enum(NoiseSound, "noise_sound")
-    )
-    """None plays each persona's own setting."""
-    background_noise_level: Mapped[NoiseLevel | None] = mapped_column(
-        pg_enum(NoiseLevel, "noise_level")
-    )
     request_key: Mapped[str | None] = mapped_column(Text, unique=True)
     """The client's idempotency key: the same request with it returns this run."""
     request_hash: Mapped[str | None] = mapped_column(Text)
@@ -142,10 +134,6 @@ class Run(Base):
         ),
         UniqueConstraint("id", "agent_id"),
         CheckConstraint("(request_key IS NULL) = (request_hash IS NULL)", name="request_together"),
-        CheckConstraint(
-            "(background_noise_sound IS NULL) = (background_noise_level IS NULL)",
-            name="background_noise_together",
-        ),
         Index("ix_runs_agent_created", "agent_id", text("created_at DESC")),
     )
 
@@ -178,8 +166,10 @@ class Conversation(Base):
     """Outbound only: the number the agent called from."""
     max_duration_s: Mapped[int] = mapped_column(Integer)
     max_turns: Mapped[int] = mapped_column(Integer)
-    background_noise_sound: Mapped[NoiseSound] = mapped_column(pg_enum(NoiseSound, "noise_sound"))
-    background_noise_level: Mapped[NoiseLevel] = mapped_column(pg_enum(NoiseLevel, "noise_level"))
+    surroundings: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    """The persona's `Surroundings` when the conversation was created."""
+    sound_plan: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    """The `SoundPlan` the call plays behind the caller."""
     status: Mapped[ConversationStatus] = mapped_column(
         pg_enum(ConversationStatus, "conversation_status"), default=ConversationStatus.QUEUED
     )
@@ -436,8 +426,8 @@ class Persona(Base):
     voice_speed: Mapped[float] = mapped_column(Float)
     voice_stability: Mapped[float] = mapped_column(Float)
     voice_gender: Mapped[VoiceGender | None] = mapped_column(pg_enum(VoiceGender, "voice_gender"))
-    background_noise_sound: Mapped[NoiseSound] = mapped_column(pg_enum(NoiseSound, "noise_sound"))
-    background_noise_level: Mapped[NoiseLevel] = mapped_column(pg_enum(NoiseLevel, "noise_level"))
+    surroundings: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    sample_line: Mapped[str | None] = mapped_column(Text)
     current_version: Mapped[int] = mapped_column(Integer, default=1)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(

@@ -1,0 +1,16 @@
+name: Caller with the TV on
+language: en
+voice:
+  provider: elevenlabs
+  id: cgSgspJ2msm6clMCkdW9
+  speed: 1.0
+  stability: 0.5
+sample_line: "Hello, I'm calling about my booking. Do you have a minute?"
+prompt: |
+  You are at home with the TV on in the same room. You answer the agent's questions
+  normally and do not mention the TV.
+surroundings:
+  speaker:
+    kind: tv
+    db: -8
+    start_s: 0

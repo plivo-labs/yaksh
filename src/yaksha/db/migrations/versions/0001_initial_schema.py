@@ -80,27 +80,8 @@ def upgrade() -> None:
         sa.Column(
             "voice_gender", sa.Enum("male", "female", "neutral", name="voice_gender"), nullable=True
         ),
-        sa.Column(
-            "background_noise_sound",
-            sa.Enum(
-                "none",
-                "street",
-                "cafe",
-                "office",
-                "car",
-                "tv",
-                "crowd",
-                "kitchen",
-                "wind",
-                name="noise_sound",
-            ),
-            nullable=False,
-        ),
-        sa.Column(
-            "background_noise_level",
-            sa.Enum("light", "busy", "loud", name="noise_level"),
-            nullable=False,
-        ),
+        sa.Column("surroundings", postgresql.JSONB(astext_type=sa.Text()), nullable=False),
+        sa.Column("sample_line", sa.Text(), nullable=True),
         sa.Column("current_version", sa.Integer(), nullable=False),
         sa.Column(
             "created_at",
@@ -332,27 +313,6 @@ def upgrade() -> None:
         sa.Column("max_parallel", sa.Integer(), nullable=True),
         sa.Column("start_interval_s", sa.Integer(), nullable=True),
         sa.Column("max_retries", sa.Integer(), nullable=False),
-        sa.Column(
-            "background_noise_sound",
-            sa.Enum(
-                "none",
-                "street",
-                "cafe",
-                "office",
-                "car",
-                "tv",
-                "crowd",
-                "kitchen",
-                "wind",
-                name="noise_sound",
-            ),
-            nullable=True,
-        ),
-        sa.Column(
-            "background_noise_level",
-            sa.Enum("light", "busy", "loud", name="noise_level"),
-            nullable=True,
-        ),
         sa.Column("request_key", sa.Text(), nullable=True),
         sa.Column("request_hash", sa.Text(), nullable=True),
         sa.Column(
@@ -365,10 +325,6 @@ def upgrade() -> None:
         sa.CheckConstraint(
             "(request_key IS NULL) = (request_hash IS NULL)",
             name=op.f("ck_runs_request_together"),
-        ),
-        sa.CheckConstraint(
-            "(background_noise_sound IS NULL) = (background_noise_level IS NULL)",
-            name=op.f("ck_runs_background_noise_together"),
         ),
         sa.ForeignKeyConstraint(["agent_id"], ["agents.id"], name=op.f("fk_runs_agent_id_agents")),
         sa.ForeignKeyConstraint(
@@ -410,27 +366,8 @@ def upgrade() -> None:
         sa.Column("agent_caller_id", sa.Text(), nullable=True),
         sa.Column("max_duration_s", sa.Integer(), nullable=False),
         sa.Column("max_turns", sa.Integer(), nullable=False),
-        sa.Column(
-            "background_noise_sound",
-            sa.Enum(
-                "none",
-                "street",
-                "cafe",
-                "office",
-                "car",
-                "tv",
-                "crowd",
-                "kitchen",
-                "wind",
-                name="noise_sound",
-            ),
-            nullable=False,
-        ),
-        sa.Column(
-            "background_noise_level",
-            sa.Enum("light", "busy", "loud", name="noise_level"),
-            nullable=False,
-        ),
+        sa.Column("surroundings", postgresql.JSONB(astext_type=sa.Text()), nullable=False),
+        sa.Column("sound_plan", postgresql.JSONB(astext_type=sa.Text()), nullable=False),
         sa.Column(
             "status",
             sa.Enum(
@@ -935,8 +872,6 @@ def downgrade() -> None:
         "scenario_category",
         "generation_mode",
         "generation_status",
-        "noise_sound",
-        "noise_level",
         "evaluation_state",
         "verdict",
         "outcome",

@@ -95,7 +95,7 @@ async def test_only_the_error_group_is_tried_again(
 async def test_a_lost_lease_is_tried_again_with_the_inputs_and_nothing_else(
     client: AsyncClient, db: Db
 ) -> None:
-    run = await new_run(client, background_noise={"sound": "street", "level": "loud"})
+    run = await new_run(client)
     lost = await claim(db)
     assert lost is not None
     async with db.begin() as session:

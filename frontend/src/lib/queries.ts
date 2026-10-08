@@ -19,7 +19,6 @@ import {
   type StartRequestDraft,
   type AgentRule,
   type AgentSummary,
-  type BackgroundNoise,
   type DocumentRead,
   type DocumentSummary,
   type KnowledgeBaseEntry,
@@ -42,6 +41,7 @@ import {
   type PhoneNumbers,
   type ProviderTest,
   type PersonaInput,
+  type PersonaScenario,
   type ProviderVoice,
   type Run,
   type RunInput,
@@ -50,6 +50,8 @@ import {
   type RunSummary,
   type RuleResults,
   type Scenario,
+  type SoundPlan,
+  type Surroundings,
   type ScenarioInput,
   type SecretName,
   type SettingsProvider,
@@ -70,6 +72,8 @@ export const keys = {
   conversationEvaluation: (id: string, evaluation: EvaluationState | null) =>
     ["conversations", "evaluation", id, evaluation ?? "none"] as const,
   personas: ["personas"] as const,
+  persona: (id: string) => ["personas", id] as const,
+  personaScenarios: (id: string) => ["personas", id, "scenarios"] as const,
   scenario: (id: string) => ["scenarios", "one", id] as const,
   scenarios: (agentId: string) => ["agents", agentId, "scenarios"] as const,
   scenariosOf: (agentId: string, generationId: string | null) =>
@@ -142,6 +146,22 @@ export function useDefaults() {
 
 export function usePersonas() {
   return useQuery({ queryKey: keys.personas, queryFn: () => all<Persona>("/personas") });
+}
+
+export function usePersona(id: string | undefined) {
+  return useQuery({
+    queryKey: keys.persona(id ?? ""),
+    queryFn: () => api<Persona>(`/personas/${id}`),
+    enabled: Boolean(id),
+  });
+}
+
+export function usePersonaScenarios(id: string | undefined) {
+  return useQuery({
+    queryKey: keys.personaScenarios(id ?? ""),
+    queryFn: () => api<PersonaScenario[]>(`/personas/${id}/scenarios`),
+    enabled: Boolean(id),
+  });
 }
 
 export function useSavePersona(id?: string) {
@@ -270,8 +290,15 @@ export function usePreviewVoice() {
     mutationFn: (input: {
       voice: VoiceSettings;
       language: Language;
-      background_noise?: BackgroundNoise;
+      sample_line?: string | null;
     }) => apiBlob("/voices/preview", { method: "POST", json: input }),
+  });
+}
+
+export function usePreviewPlan() {
+  return useMutation({
+    mutationFn: (input: { surroundings: Surroundings; language: Language; duration_s: number }) =>
+      api<SoundPlan>("/sounds/plan", { method: "POST", json: input }),
   });
 }
 

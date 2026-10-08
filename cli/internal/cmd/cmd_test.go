@@ -249,7 +249,7 @@ func TestRunStartSendsOnlyTheFieldsThatWereSet(t *testing.T) {
 	})
 	code, stdout, stderr := run(t, context.Background(), against(f), "",
 		"run", "start", "--agent", agentID, "--scenario", scenA+","+scenB, "--repeats", "2",
-		"--noise-sound", "cafe", "--idempotency-key", "ci-41")
+		"--idempotency-key", "ci-41")
 
 	if code != 0 || !strings.Contains(stdout, `"status": "queued"`) || stderr != "next: yaksha run wait "+runID+"\n" {
 		t.Fatalf("code = %d, stdout = %q, stderr = %q", code, stdout, stderr)
@@ -259,7 +259,7 @@ func TestRunStartSendsOnlyTheFieldsThatWereSet(t *testing.T) {
 	if err := json.Unmarshal(req.body, &body); err != nil {
 		t.Fatal(err)
 	}
-	want := fmt.Sprintf(`{"agent_id":"%s","background_noise":{"sound":"cafe"},"repeats":2,"scenario_ids":["%s","%s"]}`, agentID, scenA, scenB)
+	want := fmt.Sprintf(`{"agent_id":"%s","repeats":2,"scenario_ids":["%s","%s"]}`, agentID, scenA, scenB)
 	if got, _ := json.Marshal(body); string(got) != want {
 		t.Fatalf("body = %s, want %s", got, want)
 	}

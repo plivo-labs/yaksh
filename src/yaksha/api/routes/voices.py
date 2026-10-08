@@ -66,6 +66,6 @@ async def delete_voice(voice_id: uuid.UUID, session: SessionDep) -> None:
 )
 async def preview_voice(command: VoicePreview, clients: VoiceClientsDep) -> Response:
     audio = await voices.preview_voice(
-        clients, command.voice, command.language, command.background_noise
+        clients, command.voice, command.language, command.sample_line
     )
     return Response(content=audio, media_type="audio/wav")

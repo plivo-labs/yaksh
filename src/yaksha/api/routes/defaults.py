@@ -17,6 +17,8 @@ class Defaults(BaseModel):
     """Of a run."""
     first_words: dict[Language, str]
     """What the caller says first, by the persona's language, when a scenario sets none."""
+    sample_lines: dict[Language, str]
+    """What a voice preview says, by language, when the persona sets no sample line."""
 
 
 @router.get("/defaults")
@@ -26,4 +28,5 @@ async def defaults(settings: AppSettingsDep) -> Defaults:
         max_turns=settings.limits.default_max_turns,
         max_retries=settings.limits.default_max_retries,
         first_words={language: policy.first_words for language, policy in LANGUAGES.items()},
+        sample_lines={language: policy.sample for language, policy in LANGUAGES.items()},
     )

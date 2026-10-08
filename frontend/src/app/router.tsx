@@ -7,7 +7,9 @@ import {
   ConversationsCrumbs,
   ImportAgentCrumbs,
   NewAgentCrumbs,
+  NewPersonaCrumbs,
   NumbersCrumbs,
+  PersonaCrumbs,
   PersonasCrumbs,
   RunCrumbs,
   RunsCrumbs,
@@ -25,6 +27,7 @@ import { AgentWizardPage } from "@/pages/agent-wizard";
 import { NewAgentPage } from "@/pages/new-agent";
 import { NotFoundPage } from "@/pages/not-found";
 import { NumbersPage } from "@/pages/numbers";
+import { PersonaPage } from "@/pages/persona";
 import { PersonasPage } from "@/pages/personas";
 import { ReviewPage, ReviewQueuePage, ReviewShell } from "@/pages/review";
 import { RunPage } from "@/pages/run";
@@ -50,6 +53,12 @@ export const router = createBrowserRouter([
         handle: { crumbs: ConversationCrumbs },
       },
       { path: "personas", element: <PersonasPage />, handle: { crumbs: PersonasCrumbs } },
+      {
+        path: "personas/new",
+        element: <PersonaPage key="new" />,
+        handle: { crumbs: NewPersonaCrumbs },
+      },
+      { path: "personas/:id", element: <PersonaPage />, handle: { crumbs: PersonaCrumbs } },
       { path: "voices", element: <VoicesPage />, handle: { crumbs: VoicesCrumbs } },
       { path: "agents", element: <AgentsPage />, handle: { crumbs: AgentsCrumbs } },
       { path: "agents/new", element: <NewAgentPage />, handle: { crumbs: NewAgentCrumbs } },

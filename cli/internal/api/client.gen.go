@@ -415,60 +415,36 @@ func (e LlmRuleKind) Valid() bool {
 	}
 }
 
-// Defines values for NoiseLevel.
-const (
-	Busy  NoiseLevel = "busy"
-	Light NoiseLevel = "light"
-	Loud  NoiseLevel = "loud"
-)
-
-// Valid indicates whether the value is a known member of the NoiseLevel enum.
-func (e NoiseLevel) Valid() bool {
-	switch e {
-	case Busy:
-		return true
-	case Light:
-		return true
-	case Loud:
-		return true
-	default:
-		return false
-	}
-}
-
 // Defines values for NoiseSound.
 const (
-	Cafe    NoiseSound = "cafe"
-	Car     NoiseSound = "car"
-	Crowd   NoiseSound = "crowd"
-	Kitchen NoiseSound = "kitchen"
-	None    NoiseSound = "none"
-	Office  NoiseSound = "office"
-	Street  NoiseSound = "street"
-	Tv      NoiseSound = "tv"
-	Wind    NoiseSound = "wind"
+	NoiseSoundCafe    NoiseSound = "cafe"
+	NoiseSoundCar     NoiseSound = "car"
+	NoiseSoundCrowd   NoiseSound = "crowd"
+	NoiseSoundKitchen NoiseSound = "kitchen"
+	NoiseSoundOffice  NoiseSound = "office"
+	NoiseSoundStreet  NoiseSound = "street"
+	NoiseSoundTv      NoiseSound = "tv"
+	NoiseSoundWind    NoiseSound = "wind"
 )
 
 // Valid indicates whether the value is a known member of the NoiseSound enum.
 func (e NoiseSound) Valid() bool {
 	switch e {
-	case Cafe:
+	case NoiseSoundCafe:
 		return true
-	case Car:
+	case NoiseSoundCar:
 		return true
-	case Crowd:
+	case NoiseSoundCrowd:
 		return true
-	case Kitchen:
+	case NoiseSoundKitchen:
 		return true
-	case None:
+	case NoiseSoundOffice:
 		return true
-	case Office:
+	case NoiseSoundStreet:
 		return true
-	case Street:
+	case NoiseSoundTv:
 		return true
-	case Tv:
-		return true
-	case Wind:
+	case NoiseSoundWind:
 		return true
 	default:
 		return false
@@ -766,6 +742,27 @@ func (e SecretName) Valid() bool {
 	case TriggerSigningKey:
 		return true
 	case TypesafeApiKey:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for SpeakerKind.
+const (
+	SpeakerKindOwnPhoneCall  SpeakerKind = "own_phone_call"
+	SpeakerKindTalksToCaller SpeakerKind = "talks_to_caller"
+	SpeakerKindTv            SpeakerKind = "tv"
+)
+
+// Valid indicates whether the value is a known member of the SpeakerKind enum.
+func (e SpeakerKind) Valid() bool {
+	switch e {
+	case SpeakerKindOwnPhoneCall:
+		return true
+	case SpeakerKindTalksToCaller:
+		return true
+	case SpeakerKindTv:
 		return true
 	default:
 		return false
@@ -1108,11 +1105,11 @@ type Audit struct {
 	WeeklyBudget *int     `json:"weekly_budget,omitempty"`
 }
 
-// BackgroundNoise The sound behind the caller.
-type BackgroundNoise struct {
-	// Level How loud the background is, as the caller's speech level above the noise.
-	Level *NoiseLevel `json:"level,omitempty"`
-	Sound *NoiseSound `json:"sound,omitempty"`
+// AutoNoise Sounds that start and stop at random: one under the whole call and a few that come and
+// go. The seed fixes which ones and when.
+type AutoNoise struct {
+	Db   int  `json:"db"`
+	Seed *int `json:"seed,omitempty"`
 }
 
 // BodyUploadDocumentApiV1DocumentsUploadPost defines model for Body_upload_document_api_v1_documents_upload_post.
@@ -1187,15 +1184,12 @@ type ConversationEvaluation struct {
 
 // ConversationRead defines model for ConversationRead.
 type ConversationRead struct {
-	AgentCallerId  *string            `json:"agent_caller_id"`
-	AgentId        openapi_types.UUID `json:"agent_id"`
-	AgentName      string             `json:"agent_name"`
-	AgentVersion   int                `json:"agent_version"`
-	AgentVersionId openapi_types.UUID `json:"agent_version_id"`
-	Attempt        int                `json:"attempt"`
-
-	// BackgroundNoise The sound behind the caller.
-	BackgroundNoise  BackgroundNoise     `json:"background_noise"`
+	AgentCallerId    *string             `json:"agent_caller_id"`
+	AgentId          openapi_types.UUID  `json:"agent_id"`
+	AgentName        string              `json:"agent_name"`
+	AgentVersion     int                 `json:"agent_version"`
+	AgentVersionId   openapi_types.UUID  `json:"agent_version_id"`
+	Attempt          int                 `json:"attempt"`
 	CallUuid         *string             `json:"call_uuid"`
 	CallerNumber     *string             `json:"caller_number"`
 	CallerReason     *string             `json:"caller_reason"`
@@ -1231,12 +1225,16 @@ type ConversationRead struct {
 	ScenarioName      string             `json:"scenario_name"`
 	ScenarioVersion   int                `json:"scenario_version"`
 	ScenarioVersionId openapi_types.UUID `json:"scenario_version_id"`
+	Sounds            []SoundRead        `json:"sounds"`
 	StartedAt         *time.Time         `json:"started_at"`
 	Status            ConversationStatus `json:"status"`
-	TalkMs            *int               `json:"talk_ms"`
-	Transcript        []TurnRead         `json:"transcript"`
-	Validity          *Validity          `json:"validity"`
-	WireEvents        []WireEvent        `json:"wire_events"`
+
+	// Surroundings What the agent hears behind the caller. No sounds and no auto noise is a quiet room.
+	Surroundings Surroundings `json:"surroundings"`
+	TalkMs       *int         `json:"talk_ms"`
+	Transcript   []TurnRead   `json:"transcript"`
+	Validity     *Validity    `json:"validity"`
+	WireEvents   []WireEvent  `json:"wire_events"`
 }
 
 // ConversationStatus defines model for ConversationStatus.
@@ -1244,15 +1242,12 @@ type ConversationStatus string
 
 // ConversationSummary defines model for ConversationSummary.
 type ConversationSummary struct {
-	AgentCallerId  *string            `json:"agent_caller_id"`
-	AgentId        openapi_types.UUID `json:"agent_id"`
-	AgentName      string             `json:"agent_name"`
-	AgentVersion   int                `json:"agent_version"`
-	AgentVersionId openapi_types.UUID `json:"agent_version_id"`
-	Attempt        int                `json:"attempt"`
-
-	// BackgroundNoise The sound behind the caller.
-	BackgroundNoise   BackgroundNoise     `json:"background_noise"`
+	AgentCallerId     *string             `json:"agent_caller_id"`
+	AgentId           openapi_types.UUID  `json:"agent_id"`
+	AgentName         string              `json:"agent_name"`
+	AgentVersion      int                 `json:"agent_version"`
+	AgentVersionId    openapi_types.UUID  `json:"agent_version_id"`
+	Attempt           int                 `json:"attempt"`
 	CallUuid          *string             `json:"call_uuid"`
 	CallerNumber      *string             `json:"caller_number"`
 	CallerReason      *string             `json:"caller_reason"`
@@ -1282,7 +1277,10 @@ type ConversationSummary struct {
 	ScenarioVersionId openapi_types.UUID  `json:"scenario_version_id"`
 	StartedAt         *time.Time          `json:"started_at"`
 	Status            ConversationStatus  `json:"status"`
-	TalkMs            *int                `json:"talk_ms"`
+
+	// Surroundings What the agent hears behind the caller. No sounds and no auto noise is a quiet room.
+	Surroundings Surroundings `json:"surroundings"`
+	TalkMs       *int         `json:"talk_ms"`
 }
 
 // CriterionCounts defines model for CriterionCounts.
@@ -1314,6 +1312,7 @@ type Defaults struct {
 	MaxDurationS int               `json:"max_duration_s"`
 	MaxRetries   int               `json:"max_retries"`
 	MaxTurns     int               `json:"max_turns"`
+	SampleLines  map[string]string `json:"sample_lines"`
 }
 
 // Direction defines model for Direction.
@@ -1582,6 +1581,18 @@ type LatencySummary struct {
 	TalkedOver int  `json:"talked_over"`
 }
 
+// Layer One sound file in a call: from start_s to end_s of the call, at a gain, looped or once.
+// A layer with no end plays until the call ends.
+type Layer struct {
+	EndS    *float32     `json:"end_s,omitempty"`
+	File    string       `json:"file"`
+	Gain    float32      `json:"gain"`
+	Loop    bool         `json:"loop"`
+	Sound   *NoiseSound  `json:"sound,omitempty"`
+	Speaker *SpeakerKind `json:"speaker,omitempty"`
+	StartS  float32      `json:"start_s"`
+}
+
 // Limits defines model for Limits.
 type Limits struct {
 	DefaultMaxDurationS  *int `json:"default_max_duration_s,omitempty"`
@@ -1625,18 +1636,6 @@ type Metric struct {
 // Models defines model for Models.
 type Models struct {
 	Models []string `json:"models"`
-}
-
-// NoiseLevel How loud the background is, as the caller's speech level above the noise.
-type NoiseLevel string
-
-// NoiseNumbers defines model for NoiseNumbers.
-type NoiseNumbers struct {
-	// Noise The sound behind the caller.
-	Noise BackgroundNoise `json:"noise"`
-
-	// Numbers What the evaluations found over some of a run's conversations.
-	Numbers RunNumbers `json:"numbers"`
 }
 
 // NoiseSound defines model for NoiseSound.
@@ -1750,10 +1749,12 @@ type Pair struct {
 
 // PersonaConfig What a persona version pins: the settings plus the voice gender from the voices list.
 type PersonaConfig struct {
-	// BackgroundNoise The sound behind the caller.
-	BackgroundNoise *BackgroundNoise `json:"background_noise,omitempty"`
-	Language        *Language        `json:"language,omitempty"`
-	Prompt          string           `json:"prompt"`
+	Language   *Language `json:"language,omitempty"`
+	Prompt     string    `json:"prompt"`
+	SampleLine *string   `json:"sample_line,omitempty"`
+
+	// Surroundings What the agent hears behind the caller. No sounds and no auto noise is a quiet room.
+	Surroundings *Surroundings `json:"surroundings,omitempty"`
 
 	// Voice A voice of one text-to-speech provider and how it speaks; the id means nothing
 	// outside that provider. The id goes into provider URLs, so dots and slashes are refused.
@@ -1763,11 +1764,13 @@ type PersonaConfig struct {
 
 // PersonaCreate defines model for PersonaCreate.
 type PersonaCreate struct {
-	// BackgroundNoise The sound behind the caller.
-	BackgroundNoise *BackgroundNoise `json:"background_noise,omitempty"`
-	Language        *Language        `json:"language,omitempty"`
-	Name            string           `json:"name"`
-	Prompt          string           `json:"prompt"`
+	Language   *Language `json:"language,omitempty"`
+	Name       string    `json:"name"`
+	Prompt     string    `json:"prompt"`
+	SampleLine *string   `json:"sample_line,omitempty"`
+
+	// Surroundings What the agent hears behind the caller. No sounds and no auto noise is a quiet room.
+	Surroundings *Surroundings `json:"surroundings,omitempty"`
 
 	// Voice A voice of one text-to-speech provider and how it speaks; the id means nothing
 	// outside that provider. The id goes into provider URLs, so dots and slashes are refused.
@@ -1776,16 +1779,18 @@ type PersonaCreate struct {
 
 // PersonaRead defines model for PersonaRead.
 type PersonaRead struct {
-	// BackgroundNoise The sound behind the caller.
-	BackgroundNoise BackgroundNoise    `json:"background_noise"`
-	BuiltinKey      *string            `json:"builtin_key"`
-	CreatedAt       time.Time          `json:"created_at"`
-	CurrentVersion  int                `json:"current_version"`
-	Id              openapi_types.UUID `json:"id"`
-	Language        Language           `json:"language"`
-	Name            string             `json:"name"`
-	Prompt          string             `json:"prompt"`
-	UpdatedAt       time.Time          `json:"updated_at"`
+	BuiltinKey     *string            `json:"builtin_key"`
+	CreatedAt      time.Time          `json:"created_at"`
+	CurrentVersion int                `json:"current_version"`
+	Id             openapi_types.UUID `json:"id"`
+	Language       Language           `json:"language"`
+	Name           string             `json:"name"`
+	Prompt         string             `json:"prompt"`
+	SampleLine     *string            `json:"sample_line"`
+
+	// Surroundings What the agent hears behind the caller. No sounds and no auto noise is a quiet room.
+	Surroundings Surroundings `json:"surroundings"`
+	UpdatedAt    time.Time    `json:"updated_at"`
 
 	// Voice A voice of one text-to-speech provider and how it speaks; the id means nothing
 	// outside that provider. The id goes into provider URLs, so dots and slashes are refused.
@@ -1793,13 +1798,22 @@ type PersonaRead struct {
 	VoiceGender *VoiceGender  `json:"voice_gender"`
 }
 
+// PersonaScenario A live scenario that uses the persona.
+type PersonaScenario struct {
+	AgentId   openapi_types.UUID `json:"agent_id"`
+	AgentName string             `json:"agent_name"`
+	Id        openapi_types.UUID `json:"id"`
+	Name      string             `json:"name"`
+}
+
 // PersonaUpdate defines model for PersonaUpdate.
 type PersonaUpdate struct {
-	BackgroundNoise *BackgroundNoise `json:"background_noise,omitempty"`
-	Language        *Language        `json:"language,omitempty"`
-	Name            *string          `json:"name,omitempty"`
-	Prompt          *string          `json:"prompt,omitempty"`
-	Voice           *VoiceSettings   `json:"voice,omitempty"`
+	Language     *Language      `json:"language,omitempty"`
+	Name         *string        `json:"name,omitempty"`
+	Prompt       *string        `json:"prompt,omitempty"`
+	SampleLine   *string        `json:"sample_line,omitempty"`
+	Surroundings *Surroundings  `json:"surroundings,omitempty"`
+	Voice        *VoiceSettings `json:"voice,omitempty"`
 }
 
 // PersonaVersionRead defines model for PersonaVersionRead.
@@ -1860,6 +1874,15 @@ type PhraseRuleKind string
 
 // PhraseWhere defines model for PhraseWhere.
 type PhraseWhere string
+
+// PlanPreview defines model for PlanPreview.
+type PlanPreview struct {
+	DurationS *int     `json:"duration_s,omitempty"`
+	Language  Language `json:"language"`
+
+	// Surroundings What the agent hears behind the caller. No sounds and no auto noise is a quiet room.
+	Surroundings Surroundings `json:"surroundings"`
+}
 
 // PlivoAccount defines model for PlivoAccount.
 type PlivoAccount struct {
@@ -1969,22 +1992,21 @@ type RuleResults struct {
 // RunCreate Limits that an operator sets, such as the most repeats, are checked where the settings
 // are known.
 type RunCreate struct {
-	AgentId         openapi_types.UUID   `json:"agent_id"`
-	BackgroundNoise *BackgroundNoise     `json:"background_noise,omitempty"`
-	MaxDurationS    *int                 `json:"max_duration_s,omitempty"`
-	MaxParallel     *int                 `json:"max_parallel,omitempty"`
-	MaxRetries      *int                 `json:"max_retries,omitempty"`
-	MaxTurns        *int                 `json:"max_turns,omitempty"`
-	Name            *string              `json:"name,omitempty"`
-	Repeats         *int                 `json:"repeats,omitempty"`
-	ScenarioIds     []openapi_types.UUID `json:"scenario_ids"`
-	StartIntervalS  *int                 `json:"start_interval_s,omitempty"`
+	AgentId        openapi_types.UUID   `json:"agent_id"`
+	MaxDurationS   *int                 `json:"max_duration_s,omitempty"`
+	MaxParallel    *int                 `json:"max_parallel,omitempty"`
+	MaxRetries     *int                 `json:"max_retries,omitempty"`
+	MaxTurns       *int                 `json:"max_turns,omitempty"`
+	Name           *string              `json:"name,omitempty"`
+	Repeats        *int                 `json:"repeats,omitempty"`
+	ScenarioIds    []openapi_types.UUID `json:"scenario_ids"`
+	StartIntervalS *int                 `json:"start_interval_s,omitempty"`
 }
 
 // RunMetrics defines model for RunMetrics.
 type RunMetrics struct {
-	ByCategory []CategoryNumbers `json:"by_category"`
-	ByNoise    []NoiseNumbers    `json:"by_noise"`
+	ByCategory     []CategoryNumbers     `json:"by_category"`
+	BySurroundings []SurroundingsNumbers `json:"by_surroundings"`
 
 	// Overall What the evaluations found over some of a run's conversations.
 	Overall RunNumbers `json:"overall"`
@@ -2027,32 +2049,31 @@ type RunNumbers struct {
 
 // RunRead defines model for RunRead.
 type RunRead struct {
-	AgentId         openapi_types.UUID   `json:"agent_id"`
-	AgentName       string               `json:"agent_name"`
-	AgentVersion    int                  `json:"agent_version"`
-	AgentVersionId  openapi_types.UUID   `json:"agent_version_id"`
-	BackgroundNoise *BackgroundNoise     `json:"background_noise"`
-	CancelledAt     *time.Time           `json:"cancelled_at"`
-	Counts          map[string]int       `json:"counts"`
-	CreatedAt       time.Time            `json:"created_at"`
-	EndReasons      map[string]int       `json:"end_reasons"`
-	EndedAt         *time.Time           `json:"ended_at"`
-	Id              openapi_types.UUID   `json:"id"`
-	MaxDurationS    int                  `json:"max_duration_s"`
-	MaxParallel     *int                 `json:"max_parallel"`
-	MaxRetries      int                  `json:"max_retries"`
-	MaxTurns        int                  `json:"max_turns"`
-	MedianTalkMs    *int                 `json:"median_talk_ms"`
-	Name            *string              `json:"name"`
-	Repeats         int                  `json:"repeats"`
-	ResponseP50Ms   *int                 `json:"response_p50_ms"`
-	ResponseP90Ms   *int                 `json:"response_p90_ms"`
-	Retries         int                  `json:"retries"`
-	ScenarioIds     []openapi_types.UUID `json:"scenario_ids"`
-	StartIntervalS  *int                 `json:"start_interval_s"`
-	StartedAt       *time.Time           `json:"started_at"`
-	Status          RunStatus            `json:"status"`
-	WaitingReason   *WaitingReason       `json:"waiting_reason"`
+	AgentId        openapi_types.UUID   `json:"agent_id"`
+	AgentName      string               `json:"agent_name"`
+	AgentVersion   int                  `json:"agent_version"`
+	AgentVersionId openapi_types.UUID   `json:"agent_version_id"`
+	CancelledAt    *time.Time           `json:"cancelled_at"`
+	Counts         map[string]int       `json:"counts"`
+	CreatedAt      time.Time            `json:"created_at"`
+	EndReasons     map[string]int       `json:"end_reasons"`
+	EndedAt        *time.Time           `json:"ended_at"`
+	Id             openapi_types.UUID   `json:"id"`
+	MaxDurationS   int                  `json:"max_duration_s"`
+	MaxParallel    *int                 `json:"max_parallel"`
+	MaxRetries     int                  `json:"max_retries"`
+	MaxTurns       int                  `json:"max_turns"`
+	MedianTalkMs   *int                 `json:"median_talk_ms"`
+	Name           *string              `json:"name"`
+	Repeats        int                  `json:"repeats"`
+	ResponseP50Ms  *int                 `json:"response_p50_ms"`
+	ResponseP90Ms  *int                 `json:"response_p90_ms"`
+	Retries        int                  `json:"retries"`
+	ScenarioIds    []openapi_types.UUID `json:"scenario_ids"`
+	StartIntervalS *int                 `json:"start_interval_s"`
+	StartedAt      *time.Time           `json:"started_at"`
+	Status         RunStatus            `json:"status"`
+	WaitingReason  *WaitingReason       `json:"waiting_reason"`
 }
 
 // RunStatus defines model for RunStatus.
@@ -2060,31 +2081,30 @@ type RunStatus string
 
 // RunSummary defines model for RunSummary.
 type RunSummary struct {
-	AgentId         openapi_types.UUID `json:"agent_id"`
-	AgentName       string             `json:"agent_name"`
-	AgentVersion    int                `json:"agent_version"`
-	AgentVersionId  openapi_types.UUID `json:"agent_version_id"`
-	BackgroundNoise *BackgroundNoise   `json:"background_noise"`
-	CancelledAt     *time.Time         `json:"cancelled_at"`
-	Counts          map[string]int     `json:"counts"`
-	CreatedAt       time.Time          `json:"created_at"`
-	EndReasons      map[string]int     `json:"end_reasons"`
-	EndedAt         *time.Time         `json:"ended_at"`
-	Id              openapi_types.UUID `json:"id"`
-	MaxDurationS    int                `json:"max_duration_s"`
-	MaxParallel     *int               `json:"max_parallel"`
-	MaxRetries      int                `json:"max_retries"`
-	MaxTurns        int                `json:"max_turns"`
-	MedianTalkMs    *int               `json:"median_talk_ms"`
-	Name            *string            `json:"name"`
-	Repeats         int                `json:"repeats"`
-	ResponseP50Ms   *int               `json:"response_p50_ms"`
-	ResponseP90Ms   *int               `json:"response_p90_ms"`
-	Retries         int                `json:"retries"`
-	StartIntervalS  *int               `json:"start_interval_s"`
-	StartedAt       *time.Time         `json:"started_at"`
-	Status          RunStatus          `json:"status"`
-	WaitingReason   *WaitingReason     `json:"waiting_reason"`
+	AgentId        openapi_types.UUID `json:"agent_id"`
+	AgentName      string             `json:"agent_name"`
+	AgentVersion   int                `json:"agent_version"`
+	AgentVersionId openapi_types.UUID `json:"agent_version_id"`
+	CancelledAt    *time.Time         `json:"cancelled_at"`
+	Counts         map[string]int     `json:"counts"`
+	CreatedAt      time.Time          `json:"created_at"`
+	EndReasons     map[string]int     `json:"end_reasons"`
+	EndedAt        *time.Time         `json:"ended_at"`
+	Id             openapi_types.UUID `json:"id"`
+	MaxDurationS   int                `json:"max_duration_s"`
+	MaxParallel    *int               `json:"max_parallel"`
+	MaxRetries     int                `json:"max_retries"`
+	MaxTurns       int                `json:"max_turns"`
+	MedianTalkMs   *int               `json:"median_talk_ms"`
+	Name           *string            `json:"name"`
+	Repeats        int                `json:"repeats"`
+	ResponseP50Ms  *int               `json:"response_p50_ms"`
+	ResponseP90Ms  *int               `json:"response_p90_ms"`
+	Retries        int                `json:"retries"`
+	StartIntervalS *int               `json:"start_interval_s"`
+	StartedAt      *time.Time         `json:"started_at"`
+	Status         RunStatus          `json:"status"`
+	WaitingReason  *WaitingReason     `json:"waiting_reason"`
 }
 
 // RunVerdicts The run's verdict numbers over its judged calls: completed calls that no one stopped,
@@ -2265,6 +2285,46 @@ type SigningKey struct {
 	Key string `json:"key"`
 }
 
+// Sound defines model for Sound.
+type Sound struct {
+	Db    int        `json:"db"`
+	Sound NoiseSound `json:"sound"`
+}
+
+// SoundPlan Every sound a call plays behind the caller, decided before the call starts. A retry
+// plays the same plan.
+type SoundPlan struct {
+	Layers *[]Layer `json:"layers,omitempty"`
+}
+
+// SoundRead One sound the call played behind the caller.
+type SoundRead struct {
+	EndS         *float32     `json:"end_s"`
+	File         string       `json:"file"`
+	Sound        *NoiseSound  `json:"sound"`
+	Speaker      *SpeakerKind `json:"speaker"`
+	SpeakerLines []SpokenLine `json:"speaker_lines"`
+	StartS       float32      `json:"start_s"`
+}
+
+// Speaker A person who talks behind the caller, in the caller's language, from start_s on.
+type Speaker struct {
+	Db int `json:"db"`
+
+	// Kind What the person behind the caller does.
+	Kind   SpeakerKind `json:"kind"`
+	StartS *float32    `json:"start_s,omitempty"`
+}
+
+// SpeakerKind What the person behind the caller does.
+type SpeakerKind string
+
+// SpokenLine defines model for SpokenLine.
+type SpokenLine struct {
+	AtS  float32 `json:"at_s"`
+	Text string  `json:"text"`
+}
+
 // StartRequestDraft A start request read from a cURL command, for the person to check. `number_field` names
 // the body field or query parameter that now holds `{{yaksha.number}}`, if one looked like the
 // number to call.
@@ -2275,6 +2335,22 @@ type StartRequestDraft struct {
 	NumberField *string                 `json:"number_field"`
 	Query       []Pair                  `json:"query"`
 	Url         string                  `json:"url"`
+}
+
+// Surroundings What the agent hears behind the caller. No sounds and no auto noise is a quiet room.
+type Surroundings struct {
+	Auto    *AutoNoise `json:"auto,omitempty"`
+	Sounds  *[]Sound   `json:"sounds,omitempty"`
+	Speaker *Speaker   `json:"speaker,omitempty"`
+}
+
+// SurroundingsNumbers defines model for SurroundingsNumbers.
+type SurroundingsNumbers struct {
+	// Numbers What the evaluations found over some of a run's conversations.
+	Numbers RunNumbers `json:"numbers"`
+
+	// Surroundings What the agent hears behind the caller. No sounds and no auto noise is a quiet room.
+	Surroundings Surroundings `json:"surroundings"`
 }
 
 // TextDocumentCreate defines model for TextDocumentCreate.
@@ -2346,8 +2422,8 @@ type VoiceGender string
 
 // VoicePreview defines model for VoicePreview.
 type VoicePreview struct {
-	BackgroundNoise *BackgroundNoise `json:"background_noise,omitempty"`
-	Language        Language         `json:"language"`
+	Language   Language `json:"language"`
+	SampleLine *string  `json:"sample_line,omitempty"`
 
 	// Voice A voice of one text-to-speech provider and how it speaks; the id means nothing
 	// outside that provider. The id goes into provider URLs, so dots and slashes are refused.
@@ -2563,6 +2639,9 @@ type PutTriggerSecretApiV1SettingsTriggerSecretsNamePutJSONRequestBody = SecretW
 
 // PutValuesApiV1SettingsValuesPutJSONRequestBody defines body for PutValuesApiV1SettingsValuesPut for application/json ContentType.
 type PutValuesApiV1SettingsValuesPutJSONRequestBody = SettingsValues
+
+// PreviewPlanApiV1SoundsPlanPostJSONRequestBody defines body for PreviewPlanApiV1SoundsPlanPost for application/json ContentType.
+type PreviewPlanApiV1SoundsPlanPostJSONRequestBody = PlanPreview
 
 // CreateVoiceApiV1VoicesPostJSONRequestBody defines body for CreateVoiceApiV1VoicesPost for application/json ContentType.
 type CreateVoiceApiV1VoicesPostJSONRequestBody = VoiceCreate
@@ -3488,6 +3567,13 @@ type ClientInterface interface {
 	// Corresponds with PATCH /api/v1/personas/{persona_id} (the `UpdatePersonaApiV1PersonasPersonaIdPatch` operationId).
 	UpdatePersonaApiV1PersonasPersonaIdPatch(ctx context.Context, personaId openapi_types.UUID, body UpdatePersonaApiV1PersonasPersonaIdPatchJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// ListPersonaScenariosApiV1PersonasPersonaIdScenariosGet List Persona Scenarios
+	//
+	// The live scenarios that use the persona; a persona is deleted only when none does.
+	//
+	// Corresponds with GET /api/v1/personas/{persona_id}/scenarios (the `ListPersonaScenariosApiV1PersonasPersonaIdScenariosGet` operationId).
+	ListPersonaScenariosApiV1PersonasPersonaIdScenariosGet(ctx context.Context, personaId openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// ListVersionsApiV1PersonasPersonaIdVersionsGet List Versions
 	//
 	// Corresponds with GET /api/v1/personas/{persona_id}/versions (the `ListVersionsApiV1PersonasPersonaIdVersionsGet` operationId).
@@ -3767,6 +3853,33 @@ type ClientInterface interface {
 	//
 	// Corresponds with PUT /api/v1/settings/values (the `PutValuesApiV1SettingsValuesPut` operationId).
 	PutValuesApiV1SettingsValuesPut(ctx context.Context, body PutValuesApiV1SettingsValuesPutJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PreviewPlanApiV1SoundsPlanPostWithBody Preview Plan
+	//
+	// The sounds a call with these surroundings plays, as a persona's preview loops them. A call
+	// plans with its own scenario and repeat, so its random sounds differ from the preview's.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /api/v1/sounds/plan (the `PreviewPlanApiV1SoundsPlanPost` operationId).
+	PreviewPlanApiV1SoundsPlanPostWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PreviewPlanApiV1SoundsPlanPost Preview Plan
+	//
+	// The sounds a call with these surroundings plays, as a persona's preview loops them. A call
+	// plans with its own scenario and repeat, so its random sounds differ from the preview's.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /api/v1/sounds/plan (the `PreviewPlanApiV1SoundsPlanPost` operationId).
+	PreviewPlanApiV1SoundsPlanPost(ctx context.Context, body PreviewPlanApiV1SoundsPlanPostJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SoundFileApiV1SoundsFileGet Sound File
+	//
+	// A sound file of a plan, 8 kHz 16-bit mono WAV.
+	//
+	// Corresponds with GET /api/v1/sounds/{file} (the `SoundFileApiV1SoundsFileGet` operationId).
+	SoundFileApiV1SoundsFileGet(ctx context.Context, file string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListVoicesApiV1VoicesGet List Voices
 	//
@@ -4743,6 +4856,23 @@ func (c *Client) UpdatePersonaApiV1PersonasPersonaIdPatch(ctx context.Context, p
 	return c.Client.Do(req)
 }
 
+// ListPersonaScenariosApiV1PersonasPersonaIdScenariosGet List Persona Scenarios
+//
+// The live scenarios that use the persona; a persona is deleted only when none does.
+//
+// Corresponds with GET /api/v1/personas/{persona_id}/scenarios (the `ListPersonaScenariosApiV1PersonasPersonaIdScenariosGet` operationId).
+func (c *Client) ListPersonaScenariosApiV1PersonasPersonaIdScenariosGet(ctx context.Context, personaId openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListPersonaScenariosApiV1PersonasPersonaIdScenariosGetRequest(c.Server, personaId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // ListVersionsApiV1PersonasPersonaIdVersionsGet List Versions
 //
 // Corresponds with GET /api/v1/personas/{persona_id}/versions (the `ListVersionsApiV1PersonasPersonaIdVersionsGet` operationId).
@@ -5393,6 +5523,63 @@ func (c *Client) PutValuesApiV1SettingsValuesPutWithBody(ctx context.Context, co
 // Corresponds with PUT /api/v1/settings/values (the `PutValuesApiV1SettingsValuesPut` operationId).
 func (c *Client) PutValuesApiV1SettingsValuesPut(ctx context.Context, body PutValuesApiV1SettingsValuesPutJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewPutValuesApiV1SettingsValuesPutRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PreviewPlanApiV1SoundsPlanPostWithBody Preview Plan
+//
+// The sounds a call with these surroundings plays, as a persona's preview loops them. A call
+// plans with its own scenario and repeat, so its random sounds differ from the preview's.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /api/v1/sounds/plan (the `PreviewPlanApiV1SoundsPlanPost` operationId).
+func (c *Client) PreviewPlanApiV1SoundsPlanPostWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPreviewPlanApiV1SoundsPlanPostRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PreviewPlanApiV1SoundsPlanPost Preview Plan
+//
+// The sounds a call with these surroundings plays, as a persona's preview loops them. A call
+// plans with its own scenario and repeat, so its random sounds differ from the preview's.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /api/v1/sounds/plan (the `PreviewPlanApiV1SoundsPlanPost` operationId).
+func (c *Client) PreviewPlanApiV1SoundsPlanPost(ctx context.Context, body PreviewPlanApiV1SoundsPlanPostJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPreviewPlanApiV1SoundsPlanPostRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// SoundFileApiV1SoundsFileGet Sound File
+//
+// A sound file of a plan, 8 kHz 16-bit mono WAV.
+//
+// Corresponds with GET /api/v1/sounds/{file} (the `SoundFileApiV1SoundsFileGet` operationId).
+func (c *Client) SoundFileApiV1SoundsFileGet(ctx context.Context, file string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSoundFileApiV1SoundsFileGetRequest(c.Server, file)
 	if err != nil {
 		return nil, err
 	}
@@ -7397,6 +7584,40 @@ func NewUpdatePersonaApiV1PersonasPersonaIdPatchRequestWithBody(server string, p
 	return req, nil
 }
 
+// NewListPersonaScenariosApiV1PersonasPersonaIdScenariosGetRequest constructs an http.Request for the ListPersonaScenariosApiV1PersonasPersonaIdScenariosGet method
+func NewListPersonaScenariosApiV1PersonasPersonaIdScenariosGetRequest(server string, personaId openapi_types.UUID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "persona_id", personaId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/personas/%s/scenarios", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewListVersionsApiV1PersonasPersonaIdVersionsGetRequest constructs an http.Request for the ListVersionsApiV1PersonasPersonaIdVersionsGet method
 func NewListVersionsApiV1PersonasPersonaIdVersionsGetRequest(server string, personaId openapi_types.UUID, params *ListVersionsApiV1PersonasPersonaIdVersionsGetParams) (*http.Request, error) {
 	var err error
@@ -8665,6 +8886,80 @@ func NewPutValuesApiV1SettingsValuesPutRequestWithBody(server string, contentTyp
 	return req, nil
 }
 
+// NewPreviewPlanApiV1SoundsPlanPostRequest calls the generic PreviewPlanApiV1SoundsPlanPost builder with application/json body
+func NewPreviewPlanApiV1SoundsPlanPostRequest(server string, body PreviewPlanApiV1SoundsPlanPostJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewPreviewPlanApiV1SoundsPlanPostRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewPreviewPlanApiV1SoundsPlanPostRequestWithBody constructs an http.Request for the PreviewPlanApiV1SoundsPlanPost method, with any body, and a specified content type
+func NewPreviewPlanApiV1SoundsPlanPostRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/sounds/plan")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewSoundFileApiV1SoundsFileGetRequest constructs an http.Request for the SoundFileApiV1SoundsFileGet method
+func NewSoundFileApiV1SoundsFileGetRequest(server string, file string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "file", file, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/sounds/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewListVoicesApiV1VoicesGetRequest constructs an http.Request for the ListVoicesApiV1VoicesGet method
 func NewListVoicesApiV1VoicesGetRequest(server string, params *ListVoicesApiV1VoicesGetParams) (*http.Request, error) {
 	var err error
@@ -9435,6 +9730,15 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with PATCH /api/v1/personas/{persona_id} (the `UpdatePersonaApiV1PersonasPersonaIdPatch` operationId).
 	UpdatePersonaApiV1PersonasPersonaIdPatchWithResponse(ctx context.Context, personaId openapi_types.UUID, body UpdatePersonaApiV1PersonasPersonaIdPatchJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdatePersonaApiV1PersonasPersonaIdPatchResponse, error)
 
+	// ListPersonaScenariosApiV1PersonasPersonaIdScenariosGetWithResponse List Persona Scenarios
+	//
+	// The live scenarios that use the persona; a persona is deleted only when none does.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/personas/{persona_id}/scenarios (the `ListPersonaScenariosApiV1PersonasPersonaIdScenariosGet` operationId).
+	ListPersonaScenariosApiV1PersonasPersonaIdScenariosGetWithResponse(ctx context.Context, personaId openapi_types.UUID, reqEditors ...RequestEditorFn) (*ListPersonaScenariosApiV1PersonasPersonaIdScenariosGetResponse, error)
+
 	// ListVersionsApiV1PersonasPersonaIdVersionsGetWithResponse List Versions
 	//
 	// Returns a wrapper object for the known response body format(s).
@@ -9758,6 +10062,35 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with PUT /api/v1/settings/values (the `PutValuesApiV1SettingsValuesPut` operationId).
 	PutValuesApiV1SettingsValuesPutWithResponse(ctx context.Context, body PutValuesApiV1SettingsValuesPutJSONRequestBody, reqEditors ...RequestEditorFn) (*PutValuesApiV1SettingsValuesPutResponse, error)
+
+	// PreviewPlanApiV1SoundsPlanPostWithBodyWithResponse Preview Plan
+	//
+	// The sounds a call with these surroundings plays, as a persona's preview loops them. A call
+	// plans with its own scenario and repeat, so its random sounds differ from the preview's.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/sounds/plan (the `PreviewPlanApiV1SoundsPlanPost` operationId).
+	PreviewPlanApiV1SoundsPlanPostWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PreviewPlanApiV1SoundsPlanPostResponse, error)
+
+	// PreviewPlanApiV1SoundsPlanPostWithResponse Preview Plan
+	//
+	// The sounds a call with these surroundings plays, as a persona's preview loops them. A call
+	// plans with its own scenario and repeat, so its random sounds differ from the preview's.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/sounds/plan (the `PreviewPlanApiV1SoundsPlanPost` operationId).
+	PreviewPlanApiV1SoundsPlanPostWithResponse(ctx context.Context, body PreviewPlanApiV1SoundsPlanPostJSONRequestBody, reqEditors ...RequestEditorFn) (*PreviewPlanApiV1SoundsPlanPostResponse, error)
+
+	// SoundFileApiV1SoundsFileGetWithResponse Sound File
+	//
+	// A sound file of a plan, 8 kHz 16-bit mono WAV.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/sounds/{file} (the `SoundFileApiV1SoundsFileGet` operationId).
+	SoundFileApiV1SoundsFileGetWithResponse(ctx context.Context, file string, reqEditors ...RequestEditorFn) (*SoundFileApiV1SoundsFileGetResponse, error)
 
 	// ListVoicesApiV1VoicesGetWithResponse List Voices
 	//
@@ -11765,6 +12098,54 @@ func (r UpdatePersonaApiV1PersonasPersonaIdPatchResponse) ContentType() string {
 	return ""
 }
 
+type ListPersonaScenariosApiV1PersonasPersonaIdScenariosGetResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *[]PersonaScenario
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListPersonaScenariosApiV1PersonasPersonaIdScenariosGetResponse) GetJSON200() *[]PersonaScenario {
+	return r.JSON200
+}
+
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r ListPersonaScenariosApiV1PersonasPersonaIdScenariosGetResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
+}
+
+// GetBody returns the raw response body bytes
+func (r ListPersonaScenariosApiV1PersonasPersonaIdScenariosGetResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListPersonaScenariosApiV1PersonasPersonaIdScenariosGetResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListPersonaScenariosApiV1PersonasPersonaIdScenariosGetResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListPersonaScenariosApiV1PersonasPersonaIdScenariosGetResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type ListVersionsApiV1PersonasPersonaIdVersionsGetResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -13212,6 +13593,95 @@ func (r PutValuesApiV1SettingsValuesPutResponse) ContentType() string {
 	return ""
 }
 
+type PreviewPlanApiV1SoundsPlanPostResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *SoundPlan
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r PreviewPlanApiV1SoundsPlanPostResponse) GetJSON200() *SoundPlan {
+	return r.JSON200
+}
+
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r PreviewPlanApiV1SoundsPlanPostResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
+}
+
+// GetBody returns the raw response body bytes
+func (r PreviewPlanApiV1SoundsPlanPostResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r PreviewPlanApiV1SoundsPlanPostResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r PreviewPlanApiV1SoundsPlanPostResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r PreviewPlanApiV1SoundsPlanPostResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type SoundFileApiV1SoundsFileGetResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
+}
+
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r SoundFileApiV1SoundsFileGetResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
+}
+
+// GetBody returns the raw response body bytes
+func (r SoundFileApiV1SoundsFileGetResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r SoundFileApiV1SoundsFileGetResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r SoundFileApiV1SoundsFileGetResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r SoundFileApiV1SoundsFileGetResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type ListVoicesApiV1VoicesGetResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -14260,6 +14730,21 @@ func (c *ClientWithResponses) UpdatePersonaApiV1PersonasPersonaIdPatchWithRespon
 	return ParseUpdatePersonaApiV1PersonasPersonaIdPatchResponse(rsp)
 }
 
+// ListPersonaScenariosApiV1PersonasPersonaIdScenariosGetWithResponse List Persona Scenarios
+//
+// The live scenarios that use the persona; a persona is deleted only when none does.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/personas/{persona_id}/scenarios (the `ListPersonaScenariosApiV1PersonasPersonaIdScenariosGet` operationId).
+func (c *ClientWithResponses) ListPersonaScenariosApiV1PersonasPersonaIdScenariosGetWithResponse(ctx context.Context, personaId openapi_types.UUID, reqEditors ...RequestEditorFn) (*ListPersonaScenariosApiV1PersonasPersonaIdScenariosGetResponse, error) {
+	rsp, err := c.ListPersonaScenariosApiV1PersonasPersonaIdScenariosGet(ctx, personaId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListPersonaScenariosApiV1PersonasPersonaIdScenariosGetResponse(rsp)
+}
+
 // ListVersionsApiV1PersonasPersonaIdVersionsGetWithResponse List Versions
 //
 // Returns a wrapper object for the known response body format(s).
@@ -14810,6 +15295,53 @@ func (c *ClientWithResponses) PutValuesApiV1SettingsValuesPutWithResponse(ctx co
 		return nil, err
 	}
 	return ParsePutValuesApiV1SettingsValuesPutResponse(rsp)
+}
+
+// PreviewPlanApiV1SoundsPlanPostWithBodyWithResponse Preview Plan
+//
+// The sounds a call with these surroundings plays, as a persona's preview loops them. A call
+// plans with its own scenario and repeat, so its random sounds differ from the preview's.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/sounds/plan (the `PreviewPlanApiV1SoundsPlanPost` operationId).
+func (c *ClientWithResponses) PreviewPlanApiV1SoundsPlanPostWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PreviewPlanApiV1SoundsPlanPostResponse, error) {
+	rsp, err := c.PreviewPlanApiV1SoundsPlanPostWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePreviewPlanApiV1SoundsPlanPostResponse(rsp)
+}
+
+// PreviewPlanApiV1SoundsPlanPostWithResponse Preview Plan
+//
+// The sounds a call with these surroundings plays, as a persona's preview loops them. A call
+// plans with its own scenario and repeat, so its random sounds differ from the preview's.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/sounds/plan (the `PreviewPlanApiV1SoundsPlanPost` operationId).
+func (c *ClientWithResponses) PreviewPlanApiV1SoundsPlanPostWithResponse(ctx context.Context, body PreviewPlanApiV1SoundsPlanPostJSONRequestBody, reqEditors ...RequestEditorFn) (*PreviewPlanApiV1SoundsPlanPostResponse, error) {
+	rsp, err := c.PreviewPlanApiV1SoundsPlanPost(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePreviewPlanApiV1SoundsPlanPostResponse(rsp)
+}
+
+// SoundFileApiV1SoundsFileGetWithResponse Sound File
+//
+// A sound file of a plan, 8 kHz 16-bit mono WAV.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/sounds/{file} (the `SoundFileApiV1SoundsFileGet` operationId).
+func (c *ClientWithResponses) SoundFileApiV1SoundsFileGetWithResponse(ctx context.Context, file string, reqEditors ...RequestEditorFn) (*SoundFileApiV1SoundsFileGetResponse, error) {
+	rsp, err := c.SoundFileApiV1SoundsFileGet(ctx, file, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSoundFileApiV1SoundsFileGetResponse(rsp)
 }
 
 // ListVoicesApiV1VoicesGetWithResponse List Voices
@@ -16274,6 +16806,39 @@ func ParseUpdatePersonaApiV1PersonasPersonaIdPatchResponse(rsp *http.Response) (
 	return response, nil
 }
 
+// ParseListPersonaScenariosApiV1PersonasPersonaIdScenariosGetResponse parses an HTTP response from a ListPersonaScenariosApiV1PersonasPersonaIdScenariosGetWithResponse call
+func ParseListPersonaScenariosApiV1PersonasPersonaIdScenariosGetResponse(rsp *http.Response) (*ListPersonaScenariosApiV1PersonasPersonaIdScenariosGetResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListPersonaScenariosApiV1PersonasPersonaIdScenariosGetResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest []PersonaScenario
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseListVersionsApiV1PersonasPersonaIdVersionsGetResponse parses an HTTP response from a ListVersionsApiV1PersonasPersonaIdVersionsGetWithResponse call
 func ParseListVersionsApiV1PersonasPersonaIdVersionsGetResponse(rsp *http.Response) (*ListVersionsApiV1PersonasPersonaIdVersionsGetResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -17262,6 +17827,65 @@ func ParsePutValuesApiV1SettingsValuesPutResponse(rsp *http.Response) (*PutValue
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParsePreviewPlanApiV1SoundsPlanPostResponse parses an HTTP response from a PreviewPlanApiV1SoundsPlanPostWithResponse call
+func ParsePreviewPlanApiV1SoundsPlanPostResponse(rsp *http.Response) (*PreviewPlanApiV1SoundsPlanPostResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &PreviewPlanApiV1SoundsPlanPostResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest SoundPlan
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseSoundFileApiV1SoundsFileGetResponse parses an HTTP response from a SoundFileApiV1SoundsFileGetWithResponse call
+func ParseSoundFileApiV1SoundsFileGetResponse(rsp *http.Response) (*SoundFileApiV1SoundsFileGetResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &SoundFileApiV1SoundsFileGetResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
 		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {

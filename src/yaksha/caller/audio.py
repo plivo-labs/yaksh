@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import audioop
+from pipecat.audio.mixers.base_audio_mixer import BaseAudioMixer
 from pipecat.frames.frames import (
     Frame,
     LLMFullResponseEndFrame,
@@ -18,6 +19,7 @@ from pipecat.frames.frames import (
 )
 
 from yaksha.domain.latency import AgentMedia, CallerReplyWindow, Span
+from yaksha.domain.surroundings import Layer, SoundPlan
 
 SAMPLE_RATE = 8000
 FRAME_BYTES = 320
@@ -241,3 +243,61 @@ def bytes_ms(size: int) -> int:
 
 def ms_bytes(ms: int) -> int:
     return max(0, ms) * SAMPLE_RATE // 1000 * 2
+
+
+class PlanMixer(BaseAudioMixer):
+    """Adds every layer of a sound plan to the caller's audio, on a clock of the samples sent
+    since the stream started, through the caller's pauses too. A layer sounds from its start
+    to its end, looped or once; the sum is clipped to 16 bits."""
+
+    def __init__(self, plan: SoundPlan) -> None:
+        self._plan = plan
+        self._sounds: list[tuple[Layer, bytes]] = []
+        self._sent = 0
+
+    async def start(self, sample_rate: int) -> None:
+        if sample_rate != SAMPLE_RATE:
+            raise ValueError(f"the sounds are {SAMPLE_RATE} Hz, the output is {sample_rate} Hz")
+        self._sounds = [(layer, read_pcm(Path(layer.file))) for layer in self._plan.layers]
+
+    async def stop(self) -> None:
+        pass
+
+    async def process_frame(self, frame: object) -> None:
+        pass
+
+    async def mix(self, audio: bytes) -> bytes:
+        begin = self._sent
+        self._sent += len(audio)
+        for layer, sound in self._sounds:
+            part = sounding(layer, sound, begin, len(audio))
+            if part is not None:
+                audio = audioop.add(audio, audioop.mul(part, 2, layer.gain), 2)
+        return audio
+
+
+def sounding(layer: Layer, sound: bytes, begin: int, size: int) -> bytes | None:
+    """The layer's bytes under the output bytes [begin, begin + size) of the call, with
+    silence where the layer is quiet; None when it is quiet for all of them."""
+    start = 2 * round(layer.start_s * SAMPLE_RATE)
+    end = start + len(sound) if not layer.loop else None
+    if layer.end_s is not None:
+        planned = 2 * round(layer.end_s * SAMPLE_RATE)
+        end = planned if end is None else min(end, planned)
+    first, last = max(begin, start), begin + size if end is None else min(begin + size, end)
+    if first >= last or not sound:
+        return None
+    out = bytearray(size)
+    at = first
+    while at < last:
+        offset = (at - start) % len(sound)
+        take = min(last - at, len(sound) - offset)
+        out[at - begin : at - begin + take] = sound[offset : offset + take]
+        at += take
+    return bytes(out)
+
+
+def read_pcm(path: Path) -> bytes:
+    """The samples of a sound file that the plan checked to be in the call's format."""
+    with wave.open(str(path)) as file:
+        return file.readframes(file.getnframes())

@@ -31,14 +31,17 @@ from yaksha.domain.runs import (
     waiting_reason,
 )
 from yaksha.domain.settings import AppSettings, Limits
+from yaksha.domain.surroundings import Surroundings
 from yaksha.simulation.agents import get_agent
 from yaksha.simulation.starts import Inputs, snapshot
+from yaksha.simulation.surroundings import sound_plan
 
 REQUEST_KEY_INDEX = "uq_runs_request_key"
 INPUTS = (
     *(getattr(Conversation, field.name) for field in fields(Inputs)),
     Conversation.max_duration_s,
     Conversation.max_turns,
+    Conversation.sound_plan,
     Conversation.run_id,
     Conversation.repeat,
 )
@@ -109,10 +112,7 @@ async def create_run(
     if earlier is not None:
         await session.commit()
         return earlier
-    inputs = await snapshot(
-        session, settings, app, agent, command.scenario_ids, command.background_noise
-    )
-    noise = command.background_noise
+    inputs = await snapshot(session, settings, app, agent, command.scenario_ids)
     run = Run(
         agent_id=agent.id,
         agent_version_id=inputs[0].agent_version_id,
@@ -123,8 +123,6 @@ async def create_run(
         max_parallel=command.max_parallel,
         start_interval_s=command.start_interval_s,
         max_retries=command.max_retries,
-        background_noise_sound=None if noise is None else noise.sound,
-        background_noise_level=None if noise is None else noise.level,
         request_key=request_key,
         request_hash=request_hash,
     )
@@ -145,6 +143,12 @@ async def create_run(
                 **asdict(item),
                 "max_duration_s": run.max_duration_s,
                 "max_turns": run.max_turns,
+                "sound_plan": sound_plan(
+                    Surroundings.model_validate(item.surroundings),
+                    item.language,
+                    key=f"{item.scenario_version_id}/{n}",
+                    duration_s=run.max_duration_s,
+                ).model_dump(mode="json"),
                 "run_id": run.id,
                 "repeat": n,
             }

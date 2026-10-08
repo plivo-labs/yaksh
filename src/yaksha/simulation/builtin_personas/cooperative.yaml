@@ -5,6 +5,7 @@ voice:
   id: iP95p4xoKVk53GoZ742B
   speed: 1.0
   stability: 0.5
+sample_line: "Hello, I'm calling about my booking. I can give you my details now."
 prompt: |
   You are polite and easy to help. Answer each question directly and completely,
   give one piece of information at a time, and follow the agent's lead.

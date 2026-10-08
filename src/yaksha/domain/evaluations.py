@@ -9,8 +9,8 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
-from yaksha.domain.background_noise import BackgroundNoise
 from yaksha.domain.scenarios import Category
+from yaksha.domain.surroundings import Surroundings
 
 
 class MetricKey(StrEnum):
@@ -192,9 +192,9 @@ class CategoryNumbers(BaseModel):
     numbers: RunNumbers
 
 
-class NoiseNumbers(BaseModel):
-    noise: BackgroundNoise
-    """The background noise the calls played."""
+class SurroundingsNumbers(BaseModel):
+    surroundings: Surroundings
+    """What the calls played behind the caller."""
     numbers: RunNumbers
 
 
@@ -312,7 +312,7 @@ class RunMetrics(BaseModel):
 
     overall: RunNumbers
     by_category: list[CategoryNumbers]
-    by_noise: list[NoiseNumbers]
+    by_surroundings: list[SurroundingsNumbers]
     verdicts: RunVerdicts
 
 

@@ -18,10 +18,10 @@ from yaksha.api.schemas.conversations import (
     ConversationSummary,
     ItemRead,
     LatencySummary,
+    SoundRead,
     TurnRead,
 )
 from yaksha.db.models import Conversation
-from yaksha.domain.background_noise import BackgroundNoise
 from yaksha.domain.conversations import (
     ACTIVE_STATUSES,
     LIVE_STATUSES,
@@ -80,9 +80,6 @@ async def summaries(
         latency = evaluation.latency if evaluation else None
         data["latency"] = LatencySummary.of(latency) if latency and latency.replies else None
         data["evaluation"] = evaluation.state if evaluation else None
-        data["background_noise"] = BackgroundNoise(
-            sound=row.background_noise_sound, level=row.background_noise_level
-        )
         items.append(ConversationSummary.model_validate(data))
     return items
 
@@ -122,6 +119,7 @@ async def detail(session: AsyncSession, conversation: Conversation) -> Conversat
     return ConversationRead(
         **base.model_dump(),
         instructions=conversation.instructions,
+        sounds=SoundRead.all_of(conversation.sound_plan),
         scenario=await conversations.pinned_scenario_config(session, conversation),
         transcript=turns_with_replies(transcript, latency),
         replies=latency.replies if latency else [],

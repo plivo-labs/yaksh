@@ -58,17 +58,17 @@ curl -X POST localhost:8000/api/v1/runs -H "Authorization: Bearer $YAKSHA_API_TO
   -d '{"agent_id": "<agent id>", "scenario_ids": ["<scenario id>"]}'
 ```
 
-## Background noise
+## Surroundings
 
-A persona can have background noise: street, cafe, office, car, TV, crowd, kitchen or wind, at a light, busy or loud level. At these levels the caller's voice is about 20, 10 or 5 dB above the noise. The noise plays for the whole call, also when the caller is silent, and the recording includes it. Yaksha's own speech to text hears only the agent, so the noise changes only what the agent hears.
+A persona's `surroundings` are what the agent hears behind the caller: noise `sounds` (street, cafe, office, car, TV, crowd, kitchen, wind, each at its own level), or `auto` noise that comes and goes, and a `speaker`, a person who talks behind the caller (talks to the caller, on their own phone call, or a TV). Levels are in dB relative to the caller's voice: 0 dB is as loud as the caller. The surroundings play for the whole call and the recording includes them. Yaksha's own speech to text hears only the agent, so they change only what the agent hears.
 
-`background_noise` on a run replaces the persona's setting for each of its calls, for example `{"sound": "none"}` for no noise or `{"sound": "street", "level": "loud"}`. A conversation keeps the setting it started with, and so does its retry. The sound files are loops in `src/yaksha/simulation/sounds/`; their README says how they were made. See `docs/decisions/0014-background-noise.md`.
+When a run creates a conversation, Yaksha plans its sounds from the surroundings, the scenario version and the repeat, so the same scenario and repeat play the same sounds in every run. A retry plays the same plan. The call page shows when each sound played and what the speaker said. The sound files are in `src/yaksha/simulation/sounds/`. See `docs/decisions/0027-surroundings.md`.
 
 ## Response time
 
 After each call is saved, the evaluator measures how long the agent made the caller wait. For each caller reply, the response time runs from the end of the caller's speech to the start of the agent's first speech after it. When the agent was still speaking at the end of the caller's speech, the time starts where the agent stopped. Before the caller has spoken, the time runs from the moment Yaksha's stream opened, so a slow greeting shows too. An agent that was already speaking then gets no value for the call's start, and neither does a call that Yaksha's caller opens. When the agent starts before the caller finishes, the reply is a talk-over and has no response time. A reply that the agent does not answer before the caller speaks again has no response time either, so the percentiles leave that wait out. The caller's goodbye and a wait over a gap in the agent's media get no value.
 
-- The end of the caller's speech is where the voice detector last finds speech in the reply's own TTS audio, before Yaksha mixes in background noise. The TTS puts 0.03 to 0.35 s of quiet audio after the last word; this end leaves it out. A reply cut off before its TTS finished ends when Yaksha sent its last audio, the `caller_audio_end` wire event.
+- The end of the caller's speech is where the voice detector last finds speech in the reply's own TTS audio, before Yaksha mixes in the surroundings. The TTS puts 0.03 to 0.35 s of quiet audio after the last word; this end leaves it out. A reply cut off before its TTS finished ends when Yaksha sent its last audio, the `caller_audio_end` wire event.
 - The agent's speech comes from the voice detector of the live call, Pipecat's Silero VAD, with the same settings, run over the agent channel of the recording. A spoken "hmm" counts as speech. In tests, an agent's quiet "thinking" sound did not.
 - Yaksha measures at its own connection, so the number includes the path between Yaksha and the agent's system, both ways. For a phone call, that is the path to Plivo, about 0.2 s through the development tunnel, and the phone path to the agent.
 
@@ -88,7 +88,7 @@ After each call, the evaluator also computes metrics from what the call saved. `
 | `capture_faults` | Faults on Yaksha's side: a caller error, caller turns that Plivo did not confirm as played before the last reply, a missing recording, no media or gaps in the media from the agent's side, a worker stall over 100 ms. A call whose worker stopped before it saved the call in full gets only `incomplete_record`. Read the other metrics of such a call with care. | one for each fault |
 | `usage` | The caller's models and what they used, Plivo's billed duration, and the time from the call's start to ringing, answer and stream open. | |
 
-`GET /api/v1/runs/<run id>/metrics` pools the metrics of the run's counted conversations: the latest attempt of each repeat, unless it was cancelled. It gives these numbers for the whole run, for each scenario category and for each background noise:
+`GET /api/v1/runs/<run id>/metrics` pools the metrics of the run's counted conversations: the latest attempt of each repeat, unless it was cancelled. It gives these numbers for the whole run, for each scenario category and for each persona surroundings:
 
 - How many conversations are evaluated, pending or failed.
 - The connection rate: calls whose audio started, of the calls that connected or did not connect. A call that failed after its audio started counts as connected. Yaksha's own errors before a call connected are counted on their own.
@@ -126,7 +126,7 @@ A share of the judged calls, the audit sample in Settings (default 0.1), is chos
 
 ## Listen to a live call
 
-On the page of a live call, **Listen** in the **Audio** card plays the call in stereo: the agent on the left, the caller on the right, with the caller's background noise. The audio is about half a second behind the call. While it plays, the card draws it in the same lanes as the recording, from the first audio after Listen. **Stop listening** removes the drawing. After the call, the recording takes its place. It stops when the call ends, on a second click, or when you leave the page. Several people can listen to one call.
+On the page of a live call, **Listen** in the **Audio** card plays the call in stereo: the agent on the left, the caller on the right, with the caller's surroundings. The audio is about half a second behind the call. While it plays, the card draws it in the same lanes as the recording, from the first audio after Listen. **Stop listening** removes the drawing. After the call, the recording takes its place. It stops when the call ends, on a second click, or when you leave the page. Several people can listen to one call.
 
 - The worker takes the audio inside its Pipecat pipeline with an observer, so it does not depend on Plivo, and a slow listener cannot slow the call.
 - The worker sends a call's audio to the API with Postgres `NOTIFY`, only while someone listens: the API asks for it every 5 seconds while a listener stays.
@@ -175,7 +175,6 @@ curl -X POST localhost:8000/api/v1/runs -H "Authorization: Bearer $YAKSHA_API_TO
 - `max_parallel` sets how many conversations of the run can be in progress at once, from the moment a worker takes one until it ends, so ringing and the wait for an outbound agent's call count too. `start_interval_s` sets the least time between two conversation starts; a conversation starts when a worker takes it. When Yaksha calls the agent, the call follows a few seconds later; when the agent calls Yaksha, the start sends the trigger, and the call can come up to the agent's dial window later. Without them, the run has no limit and no delay of its own. Both protect the agent under test.
 - `max_duration_s` is the time limit of each call, 10 to 1800 seconds, default the call length in Settings (300).
 - `max_turns` is how many agent turns the caller answers, 1 to 100, default the turns per call in Settings (20). At the next turn the caller says goodbye and says nothing more, and the conversation ends with `turn_limit`. The caller ends the call on its own only when its goal is achieved, so this limit ends the calls that go nowhere. When the caller ends the call, Yaksha waits until both sides are quiet for 8 seconds before it hangs up, so the agent can close the call. See `docs/decisions/0013-close-before-hang-up.md`. A reply that ends the call without a word does not end it: the caller gets one more reply to speak in, and after that Yaksha says the goodbye for it. See `docs/decisions/0020-the-caller-speaks-before-it-ends-the-call.md`.
-- `background_noise` plays one background in every conversation of the run, for example `{"sound": "none"}` to compare a run with and without noise. Left out, each conversation plays its persona's setting.
 - `max_retries`, default 1 (0 when the retries limit in Settings is 0), is the number of extra attempts for a conversation that ends with an error on Yaksha's side or on the line. 0 turns retries off. Conversations in the "did not connect" group are not tried again.
 - `GET /api/v1/defaults` returns the values the server uses when a request leaves these fields out: `max_duration_s`, `max_turns`, and `max_retries` of a run. The console fills its forms with them.
 - The same `Idempotency-Key` with the same body returns the first run, so a client can send a request again safely. The same key with another body is refused.

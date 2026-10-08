@@ -23,6 +23,7 @@ from yaksha.api.routes import (
     review,
     runs,
     scenarios,
+    sounds,
     voices,
 )
 from yaksha.api.routes import (
@@ -111,6 +112,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     api.include_router(runs.router)
     api.include_router(scenarios.router)
     api.include_router(settings_routes.router)
+    api.include_router(sounds.router)
     api.include_router(voices.router)
     app.include_router(api)
 

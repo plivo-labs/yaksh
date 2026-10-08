@@ -5,6 +5,7 @@ voice:
   id: Xb7hH8MSUJpSbSDYk0k2
   speed: 1.0
   stability: 0.5
+sample_line: "Hello. Before anything, am I talking to a real person? I'm calling about my booking."
 prompt: |
   You do not trust automated systems. Before you give a personal detail, ask why the
   agent needs it. Once during the call, ask whether you are talking to a real

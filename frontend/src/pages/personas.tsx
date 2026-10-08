@@ -1,5 +1,5 @@
 import { Play, Plus, Square, UserRound } from "lucide-react";
-import { useState } from "react";
+import { Link } from "react-router";
 
 import { GenderBadge } from "@/components/gender-badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -23,24 +23,20 @@ import {
 } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
-import { useVoicePreview } from "@/hooks/use-voice-preview";
-import { noiseLabel } from "@/lib/format";
+import { useSurroundingsPreview } from "@/hooks/use-surroundings-preview";
+import { surroundingsLabel } from "@/lib/format";
 import { usePersonas } from "@/lib/queries";
-import { LANGUAGE_NAMES, type Persona } from "@/lib/types";
-import { PersonaDialog } from "@/pages/persona-dialog";
+import { LANGUAGE_NAMES } from "@/lib/types";
 
 export function PersonasPage() {
   const personas = usePersonas();
-  const preview = useVoicePreview();
-  const [editing, setEditing] = useState<Persona | "new" | null>(null);
-  const persona = editing === "new" ? undefined : (editing ?? undefined);
-  const close = () => setEditing(null);
+  const preview = useSurroundingsPreview();
 
   return (
     <div className="grid gap-6">
       <div className="flex min-h-[30px] flex-wrap items-center gap-x-2 gap-y-4">
         <h1 className="mr-auto text-h3-500">Personas</h1>
-        <Button size="sm" onClick={() => setEditing("new")}>
+        <Button size="sm" render={<Link to="/personas/new" />}>
           <Plus />
           New persona
         </Button>
@@ -68,7 +64,7 @@ export function PersonasPage() {
             </EmptyDescription>
           </EmptyHeader>
           <EmptyContent>
-            <Button onClick={() => setEditing("new")}>
+            <Button render={<Link to="/personas/new" />}>
               <Plus />
               New persona
             </Button>
@@ -81,21 +77,20 @@ export function PersonasPage() {
               <Card className="relative h-full transition-colors has-[[data-slot=card-link]:focus-visible]:ring-2 has-[[data-slot=card-link]:focus-visible]:ring-ring/50 hover:bg-hv1 has-[[data-slot=card-link]:active]:bg-muted/70">
                 <CardHeader>
                   <CardTitle>
-                    <button
-                      type="button"
+                    <Link
+                      to={`/personas/${item.id}`}
                       data-slot="card-link"
-                      onClick={() => setEditing(item)}
                       className="text-left outline-none after:absolute after:inset-0 after:rounded-[inherit]"
                     >
                       {item.name}
-                    </button>
+                    </Link>
                   </CardTitle>
                   <CardDescription className="flex flex-wrap items-center gap-1.5">
                     <span className="mr-1">{LANGUAGE_NAMES[item.language]}</span>
                     {item.voice_gender && <GenderBadge gender={item.voice_gender} />}
                     {item.builtin_key && <Badge>Built-in</Badge>}
-                    {noiseLabel(item.background_noise) && (
-                      <Badge>{noiseLabel(item.background_noise)}</Badge>
+                    {surroundingsLabel(item.surroundings) && (
+                      <Badge>{surroundingsLabel(item.surroundings)}</Badge>
                     )}
                   </CardDescription>
                   <CardAction>
@@ -109,7 +104,12 @@ export function PersonasPage() {
                       }
                       aria-busy={preview.isLoading(item.id)}
                       onClick={() =>
-                        preview.toggle(item.id, item.voice, item.language, item.background_noise)
+                        preview.toggle(item.id, {
+                          voice: item.voice,
+                          language: item.language,
+                          surroundings: item.surroundings,
+                          sampleLine: item.sample_line,
+                        })
                       }
                     >
                       {preview.isLoading(item.id) ? (
@@ -134,15 +134,6 @@ export function PersonasPage() {
             </li>
           ))}
         </ul>
-      )}
-
-      {editing !== null && (
-        <PersonaDialog
-          key={persona?.id ?? "new"}
-          persona={persona}
-          preview={preview}
-          onClosed={close}
-        />
       )}
     </div>
   );

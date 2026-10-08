@@ -110,8 +110,8 @@ async def test_run_numbers_pool_the_counted_calls_overall_and_by_category(
         (group["category"], group["numbers"]["conversations"]) for group in found["by_category"]
     ] == [("happy_path", 2), ("edge_case", 1)]
     assert found["by_category"][0]["numbers"]["connected"] == share(1, 2)
-    assert found["by_noise"] == [
-        {"noise": {"sound": "none", "level": "busy"}, "numbers": found["overall"]}
+    assert found["by_surroundings"] == [
+        {"surroundings": {"sounds": [], "auto": None, "speaker": None}, "numbers": found["overall"]}
     ]
     run_read = (await client.get(f"/api/v1/runs/{run['id']}")).json()
     assert (run_read["response_p50_ms"], run_read["response_p90_ms"]) == (1_000, 2_500)
@@ -121,7 +121,7 @@ async def test_run_numbers_count_what_each_call_got_to(client: AsyncClient, db: 
     agent = await create_agent_id(client, name="Shop")
     quiet = await create_scenario(client, agent, name="Quiet")
     street = await create_persona(
-        client, name="Street caller", background_noise={"sound": "street", "level": "loud"}
+        client, name="Street caller", surroundings={"sounds": [{"sound": "street", "db": -5}]}
     )
     loud = await create_scenario(client, agent, name="Loud", persona_id=street["id"])
     run = (
@@ -174,10 +174,11 @@ async def test_run_numbers_count_what_each_call_got_to(client: AsyncClient, db: 
     }
     assert (overall["connected"], overall["errors_before_connect"]) == (share(1, 2), 0)
     assert [
-        (group["noise"]["sound"], group["numbers"]["conversations"]) for group in found["by_noise"]
+        ([s["sound"] for s in group["surroundings"]["sounds"]], group["numbers"]["conversations"])
+        for group in found["by_surroundings"]
     ] == [
-        ("none", 2),
-        ("street", 1),
+        ([], 2),
+        (["street"], 1),
     ]
     # The call stopped by the user is not counted, so its slow response is not either.
     run_read = (await client.get(f"/api/v1/runs/{run['id']}")).json()

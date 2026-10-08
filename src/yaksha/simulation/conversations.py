@@ -24,7 +24,6 @@ from yaksha.db.models import (
     ScenarioVersion,
 )
 from yaksha.domain.agents import AgentConfig, Direction
-from yaksha.domain.background_noise import BackgroundNoise
 from yaksha.domain.conversations import (
     ACTIVE_STATUSES,
     LIVE_STATUSES,
@@ -43,9 +42,9 @@ from yaksha.domain.errors import NotFoundError
 from yaksha.domain.personas import PersonaConfig
 from yaksha.domain.scenarios import ScenarioConfig
 from yaksha.domain.settings import AppSettings
+from yaksha.domain.surroundings import SoundPlan
 from yaksha.domain.triggers import SEND_TIMEOUT_S
 from yaksha.evaluation import evaluations, results
-from yaksha.simulation.background_noise import noise_mix
 from yaksha.simulation.languages import LANGUAGES
 from yaksha.simulation.numbers import free_numbers, lease_number, release_numbers
 from yaksha.simulation.runs import (
@@ -57,6 +56,7 @@ from yaksha.simulation.runs import (
     run_full,
     run_waiting,
 )
+from yaksha.simulation.surroundings import with_full_paths
 
 LEASE_LOST = "worker lost its lease on the conversation; outcome unknown"
 WORKER_STOPPED = "worker stopped during the call; outcome unknown"
@@ -344,12 +344,7 @@ async def call_request(
         nudge=conversation.nudge,
         caller_language=conversation.language,
         voice=PersonaConfig.model_validate(persona_version.config).voice,
-        background_noise=noise_mix(
-            BackgroundNoise(
-                sound=conversation.background_noise_sound,
-                level=conversation.background_noise_level,
-            )
-        ),
+        sound_plan=with_full_paths(SoundPlan.model_validate(conversation.sound_plan)),
         caller_number=number,
         max_duration_s=conversation.max_duration_s,
         max_turns=conversation.max_turns,

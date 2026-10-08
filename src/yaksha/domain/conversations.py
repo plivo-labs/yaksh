@@ -8,11 +8,11 @@ from typing import Protocol
 from pydantic import BaseModel, ConfigDict, Field
 
 from yaksha.domain.agents import AgentConfig
-from yaksha.domain.background_noise import NoiseMix
 from yaksha.domain.languages import Language
 from yaksha.domain.latency import AgentMedia, CallerReplyWindow, LoopLag
 from yaksha.domain.scenarios import Fact
 from yaksha.domain.settings import AppSettings
+from yaksha.domain.surroundings import SoundPlan
 from yaksha.domain.voices import VoiceSettings
 
 
@@ -255,8 +255,8 @@ class CallRequest(BaseModel):
     nudge: str
     caller_language: Language
     voice: VoiceSettings
-    background_noise: NoiseMix | None = None
-    """The sound the caller's audio is mixed with; None sends the voice alone."""
+    sound_plan: SoundPlan = SoundPlan()
+    """The sounds mixed under the caller's voice, with full file paths."""
     caller_number: str
     max_duration_s: int
     max_turns: int

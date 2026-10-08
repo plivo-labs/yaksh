@@ -160,7 +160,9 @@ async def test_the_voice_gender_comes_from_the_voices_list_and_follows_the_voice
     assert claimed.status_code == 422
 
 
-async def test_a_persona_that_scenarios_use_cannot_be_deleted(client: AsyncClient) -> None:
+async def test_a_persona_lists_the_scenarios_that_use_it_and_cannot_be_deleted_while_any_do(
+    client: AsyncClient,
+) -> None:
     agent = await create_agent_id(client)
     persona = await create_persona(client)
     other = await create_persona(client, name="Calm caller")
@@ -170,12 +172,18 @@ async def test_a_persona_that_scenarios_use_cannot_be_deleted(client: AsyncClien
     )
     url = f"/api/v1/personas/{persona['id']}"
 
+    listed_twice = (await client.get(f"{url}/scenarios")).json()
     used_twice = await client.delete(url)
     await client.delete(f"/api/v1/scenarios/{dropped['id']}")
+    listed_once = (await client.get(f"{url}/scenarios")).json()
     used_once = await client.delete(url)
     await client.patch(f"/api/v1/scenarios/{kept['id']}", json={"persona_id": other["id"]})
     deleted = await client.delete(url)
 
+    assert [(s["name"], s["agent_id"]) for s in listed_twice] == sorted(
+        [("Cancel a cleaning", agent), (kept["name"], agent)]
+    )
+    assert [s["id"] for s in listed_once] == [kept["id"]]
     assert used_twice.status_code == 409
     assert used_twice.json()["error"]["message"] == (
         "2 scenarios use this persona; give them another persona first"
@@ -185,35 +193,69 @@ async def test_a_persona_that_scenarios_use_cannot_be_deleted(client: AsyncClien
     )
     assert deleted.status_code == 204
     assert (await client.get(url)).status_code == 404
+    assert (await client.get(f"{url}/scenarios")).status_code == 404
 
 
-async def test_a_persona_keeps_its_background_noise_and_a_change_makes_a_version(
+async def test_a_persona_keeps_its_surroundings_and_a_change_makes_a_version(
     client: AsyncClient,
 ) -> None:
     quiet = await create_persona(client)
-    noisy = await create_persona(
-        client, name="Street caller", background_noise={"sound": "street", "level": "loud"}
-    )
+    street = {"sounds": [{"sound": "street", "db": -5}]}
+    noisy = await create_persona(client, name="Street caller", surroundings=street)
     url = f"/api/v1/personas/{noisy['id']}"
+    speaker = {"kind": "talks_to_caller", "db": -6, "start_s": 5}
 
-    softer = await client.patch(
-        url, json={"background_noise": {"sound": "street", "level": "light"}}
+    busy = await client.patch(
+        url, json={"surroundings": {"auto": {"db": -10, "seed": 2}, "speaker": speaker}}
     )
-    cleared = await client.patch(url, json={"background_noise": None})
-    off = await client.patch(url, json={"background_noise": {"sound": "none", "level": "loud"}})
-    off_again = await client.patch(url, json={"background_noise": {"sound": "none"}})
+    both = await client.patch(url, json={"surroundings": {**street, "auto": {"db": -10}}})
+    cleared = await client.patch(url, json={"surroundings": None})
+    off = await client.patch(url, json={"surroundings": {}})
+    off_again = await client.patch(url, json={"surroundings": {"sounds": []}})
     versions = (await client.get(f"{url}/versions")).json()["items"]
 
-    assert quiet["background_noise"] == {"sound": "none", "level": "busy"}
-    assert noisy["background_noise"] == {"sound": "street", "level": "loud"}
-    assert softer.json()["current_version"] == 2
+    assert quiet["surroundings"] == {"sounds": [], "auto": None, "speaker": None}
+    assert noisy["surroundings"]["sounds"] == street["sounds"]
+    assert busy.json()["current_version"] == 2
+    assert busy.json()["surroundings"]["speaker"] == speaker
+    assert both.status_code == 422 and "sounds or auto noise" in both.json()["error"]["message"]
     assert cleared.status_code == 422 and cleared.json()["error"]["message"] == (
-        "background_noise: background_noise cannot be null"
+        "surroundings: surroundings cannot be null"
     )
-    assert off.json()["background_noise"] == {"sound": "none", "level": "busy"}
+    assert off.json()["surroundings"] == {"sounds": [], "auto": None, "speaker": None}
     assert off.json()["current_version"] == off_again.json()["current_version"] == 3
-    assert [v["config"]["background_noise"] for v in versions] == [
-        {"sound": "none", "level": "busy"},
-        {"sound": "street", "level": "light"},
-        {"sound": "street", "level": "loud"},
+    assert [v["config"]["surroundings"]["auto"] for v in versions] == [
+        None,
+        {"db": -10, "seed": 2},
+        None,
     ]
+
+
+async def test_spaces_around_the_behavior_are_not_a_change(client: AsyncClient) -> None:
+    persona = await create_persona(client, prompt="  You are calm.\n")
+    url = f"/api/v1/personas/{persona['id']}"
+
+    same = await client.patch(url, json={"prompt": "You are calm."})
+
+    assert persona["prompt"] == "You are calm."
+    assert same.json()["current_version"] == 1
+
+
+async def test_a_sample_line_is_kept_and_cleared_like_any_setting(client: AsyncClient) -> None:
+    plain = await create_persona(client)
+    persona = await create_persona(
+        client, name="Caller with a line", sample_line="  Quick one, please. "
+    )
+    url = f"/api/v1/personas/{persona['id']}"
+
+    changed = await client.patch(url, json={"sample_line": "Hi, I have no time."})
+    cleared = await client.patch(url, json={"sample_line": None})
+    too_long = await client.patch(url, json={"sample_line": "x" * 201})
+
+    assert plain["sample_line"] is None
+    assert persona["sample_line"] == "Quick one, please."
+    assert changed.json()["sample_line"] == "Hi, I have no time."
+    assert changed.json()["current_version"] == 2
+    assert cleared.json()["sample_line"] is None
+    assert cleared.json()["current_version"] == 3
+    assert too_long.status_code == 422

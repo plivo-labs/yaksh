@@ -12,7 +12,6 @@ from typing import Any
 
 import audioop
 from fastapi import WebSocket, WebSocketDisconnect
-from pipecat.audio.mixers.soundfile_mixer import SoundfileMixer
 from pipecat.frames.frames import (
     AudioRawFrame,
     BotStartedSpeakingFrame,
@@ -39,6 +38,7 @@ from yaksha.caller.audio import (
     CallerReply,
     CallRecording,
     Clock,
+    PlanMixer,
     Playout,
     Stamper,
     save_caller_voice,
@@ -60,7 +60,6 @@ from yaksha.caller.plivo_server import (
 )
 from yaksha.caller.transcript import TranscriptBuilder, WireTap
 from yaksha.config import Settings
-from yaksha.domain.background_noise import NoiseMix
 from yaksha.domain.conversations import (
     CallObserver,
     CallOutcome,
@@ -551,15 +550,6 @@ class AudioMarks(FrameProcessor):
         return at
 
 
-def mixer(noise: NoiseMix | None) -> SoundfileMixer | None:
-    """The background noise, looped under the caller's voice and through its pauses."""
-    if noise is None:
-        return None
-    return SoundfileMixer(
-        sound_files={"noise": str(noise.path)}, default_sound="noise", volume=noise.volume
-    )
-
-
 class Receiver:
     """Waits for the call an outbound agent places to the leased number, and hands over its
     stream. The trigger that makes the agent call runs beside the wait: the call may arrive
@@ -869,7 +859,9 @@ class PhoneCaller:
                 audio_out_sample_rate=SAMPLE_RATE,
                 audio_out_10ms_chunks=2,
                 audio_out_end_silence_secs=0,
-                audio_out_mixer=mixer(request.background_noise),
+                audio_out_mixer=PlanMixer(request.sound_plan)
+                if request.sound_plan.layers
+                else None,
             ),
         )
         state = CallState()

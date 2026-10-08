@@ -9,7 +9,7 @@ import (
 func (a *app) personaCmd() *cobra.Command {
 	persona := &cobra.Command{
 		Use:   "persona",
-		Short: "The callers Yaksha plays: a prompt, a voice and background noise",
+		Short: "The callers Yaksha plays: a prompt, a voice and their surroundings",
 	}
 	persona.AddCommand(a.personaListCmd())
 	return persona
