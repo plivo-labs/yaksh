@@ -197,13 +197,15 @@ export function useScenarios(agentId: string, enabled = true, generationId: stri
 
 /** The scenarios of a run to start, in the order asked. The agent's list gives most of them. An
  * id the list lacks is looked up alone, because a list read in pages can miss a row while
- * scenarios change; a scenario that is gone is left out. Nothing is ready until every fetch has
- * finished, so cached or partial data never decides what runs. */
-export function useRunScenarios(agentId: string, scenarioIds: string[]) {
+ * scenarios change; a scenario that is gone is left out. Without ids, every scenario of the agent
+ * runs. Nothing is ready until every fetch has finished, so cached or partial data never decides
+ * what runs. */
+export function useRunScenarios(agentId: string, scenarioIds?: string[]) {
   const list = useScenarios(agentId);
   const listed = new Map((list.data ?? []).map((scenario) => [scenario.id, scenario]));
   const listSettled = list.isSuccess && list.fetchStatus === "idle";
-  const unlisted = listSettled ? scenarioIds.filter((id) => !listed.has(id)) : [];
+  const ids = scenarioIds ?? (listSettled ? [...listed.keys()] : []);
+  const unlisted = listSettled ? ids.filter((id) => !listed.has(id)) : [];
   const lookups = useQueries({
     queries: unlisted.map((id) => ({
       queryKey: keys.scenario(id),
@@ -221,10 +223,10 @@ export function useRunScenarios(agentId: string, scenarioIds: string[]) {
   for (const lookup of lookups) if (lookup.data) found.set(lookup.data.id, lookup.data);
   const ready =
     listSettled && lookups.every((lookup) => lookup.isSuccess && lookup.fetchStatus === "idle");
-  const scenarios = ready ? scenarioIds.flatMap((id) => found.get(id) ?? []) : [];
+  const scenarios = ready ? ids.flatMap((id) => found.get(id) ?? []) : [];
   return {
     scenarios,
-    leftOut: ready ? scenarioIds.length - scenarios.length : 0,
+    leftOut: ready ? ids.length - scenarios.length : 0,
     ready,
     error: list.error ?? lookups.find((lookup) => lookup.error)?.error ?? null,
   };
