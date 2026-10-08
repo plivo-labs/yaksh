@@ -1,4 +1,4 @@
-import { type SubmitEvent, useState } from "react";
+import { type SubmitEvent, useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -19,6 +19,7 @@ import {
   FieldLegend,
   FieldSet,
 } from "@/components/ui/field";
+import { PersonaPicker } from "@/components/persona-picker";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -33,7 +34,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { revealErrors } from "@/lib/forms";
 import { APPEAR } from "@/lib/motion";
 import { usePersonas } from "@/lib/queries";
-import { type Agent, type GenerateInput, type GenerationMode, MAX_GENERATED } from "@/lib/types";
+import {
+  type Agent,
+  type GenerateInput,
+  type GenerationMode,
+  MAX_GENERATED,
+  type Persona,
+} from "@/lib/types";
 
 const MODES: { value: GenerationMode; label: string; hint: string }[] = [
   {
@@ -47,6 +54,16 @@ const MODES: { value: GenerationMode; label: string; hint: string }[] = [
     hint: "Questions a caller could ask that the chosen documents answer, and some they do not.",
   },
 ];
+
+const DEFAULT_PERSONAS = 5;
+
+function randomIds(personas: Persona[], count: number): string[] {
+  return personas
+    .map((persona) => ({ id: persona.id, order: Math.random() }))
+    .toSorted((a, b) => a.order - b.order)
+    .slice(0, count)
+    .map((persona) => persona.id);
+}
 
 export function GenerateDialog({
   agent,
@@ -64,17 +81,21 @@ export function GenerateDialog({
   const [documentIds, setDocumentIds] = useState(() =>
     agent.knowledge_base.map((entry) => entry.document_id),
   );
-  /** Null until the user changes the choice: then the first persona is checked. */
-  const [checkedPersonas, setCheckedPersonas] = useState<ReadonlySet<string> | null>(null);
+  /** Null until the personas load: then up to five random ones are picked, once. */
+  const [pickedPersonas, setPickedPersonas] = useState<string[] | null>(null);
   const [submitted, setSubmitted] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const personas = usePersonas();
-  const personaList = personas.data ?? [];
-  const checked = checkedPersonas ?? new Set(personaList.slice(0, 1).map((persona) => persona.id));
-  const personaIds = personaList
-    .filter((persona) => checked.has(persona.id))
-    .map((persona) => persona.id);
+  const personaList = useMemo(() => personas.data ?? [], [personas.data]);
+  if (pickedPersonas === null && personas.data) {
+    setPickedPersonas(randomIds(personas.data, DEFAULT_PERSONAS));
+  }
+  /** The picked personas that still exist: one deleted meanwhile is dropped. */
+  const personaIds = useMemo(
+    () => (pickedPersonas ?? []).filter((id) => personaList.some((persona) => persona.id === id)),
+    [pickedPersonas, personaList],
+  );
   const personasValid = personaIds.length > 0 && personaIds.length <= MAX_GENERATED;
 
   const number = Number(count);
@@ -82,13 +103,6 @@ export function GenerateDialog({
   const knowledgeBase = mode === "knowledge_base";
   const documentsValid = !knowledgeBase || documentIds.length > 0;
   const hasDocuments = agent.knowledge_base.length > 0;
-
-  const togglePersona = (id: string, on: boolean) => {
-    const next = new Set(checked);
-    if (on) next.add(id);
-    else next.delete(id);
-    setCheckedPersonas(next);
-  };
 
   const toggleDocument = (id: string, on: boolean) =>
     setDocumentIds((current) =>
@@ -194,10 +208,10 @@ export function GenerateDialog({
               </FieldSet>
             )}
 
-            <FieldSet>
-              <FieldLegend variant="label">Personas</FieldLegend>
+            <Field>
+              <FieldLabel htmlFor="generate-personas">Personas</FieldLabel>
               <FieldDescription>
-                A job or question gets a checked persona again only after it got all of them.
+                A job or question gets a picked persona again only after it got all of them.
               </FieldDescription>
               {personas.isPending && (
                 <p className="text-p-400 text-muted-foreground">Loading personas</p>
@@ -205,24 +219,16 @@ export function GenerateDialog({
               {personas.isError && (
                 <FieldError>Could not load the personas: {personas.error.message}</FieldError>
               )}
-              <ul className="grid gap-2">
-                {personaList.map((persona) => (
-                  <li key={persona.id} className="flex items-center gap-3">
-                    <Checkbox
-                      id={`generate-persona-${persona.id}`}
-                      checked={checked.has(persona.id)}
-                      onCheckedChange={(on) => togglePersona(persona.id, on)}
-                    />
-                    <label
-                      htmlFor={`generate-persona-${persona.id}`}
-                      className="min-w-0 flex-1 truncate text-p-400"
-                    >
-                      {persona.name}
-                    </label>
-                  </li>
-                ))}
-              </ul>
-              {submitted && personas.isSuccess && !personasValid && (
+              {personas.data && (
+                <PersonaPicker
+                  id="generate-personas"
+                  personas={personaList}
+                  value={personaIds}
+                  onValueChange={setPickedPersonas}
+                  invalid={submitted && !personasValid}
+                />
+              )}
+              {submitted && personas.data && !personasValid && (
                 <FieldError>
                   {personaList.length === 0
                     ? "Create a persona first."
@@ -231,7 +237,7 @@ export function GenerateDialog({
                       : `Pick at most ${MAX_GENERATED} personas.`}
                 </FieldError>
               )}
-            </FieldSet>
+            </Field>
 
             <Field>
               <FieldLabel htmlFor="generate-count">Number of scenarios</FieldLabel>
