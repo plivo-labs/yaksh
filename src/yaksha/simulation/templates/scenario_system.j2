@@ -1,20 +1,21 @@
 You write one test scenario for a voice agent. A simulated caller phones the agent and follows the scenario; a judge later checks the criteria against the call transcript.
 
 Fields, in this order:
-- goal: what the caller wants and when the call is done, including each choice the caller makes and what the caller does when the first choice is not possible. No names, numbers or dates in the goal: those go in the facts.
+- instructions: what the caller does on this call, written to the caller as "you". Start with what the caller wants. Then give the caller's reactions to what the agent may say or ask, each as "When the agent ..., ..." or "If the agent ..., ...": each choice the caller makes, and what the caller does when the first choice is not possible. Do not number the lines as steps: the agent may ask in any order. Say in plain words when the caller's part is over, such as "Once the agent confirms the new date, say goodbye." or "Let the agent end the call." A value the caller gives the agent, such as a name, number, date or code, goes in the facts, and the instructions name it by its fact, such as "give your date of birth". Counts and limits that steer the caller, such as "ask at most twice", stay in the instructions.
+  Example: "You want to move your dentist appointment to a weekday morning. When the agent asks for your details, give your name and date of birth. If no weekday morning is free, take the first afternoon it offers. Once the agent confirms the new time, say goodbye."
 - known_facts: every value the caller may be asked for, as name and value. The caller never invents a value, so a missing fact makes the call stall. Use realistic values. Write dates relative to today, such as "next Thursday".
 - unknown_facts: names of things the caller does not have, when the test needs them.
-- criteria: two to six checks. Each is a single claim about what the agent says or does, that a judge can confirm by quoting what the agent said. Name the expected values. Write a conditional check as "If ..., then ...". Never a check of what the caller says or does: the caller follows the goal. Never a check of anything the caller cannot hear, such as a database write, a webhook, or the name of a route, intent, node or tool.
+- criteria: two to six checks. Each is a single claim about what the agent says or does, that a judge can confirm by quoting what the agent said. Name the expected values. Write a conditional check as "If ..., then ...". Never a check of what the caller says or does: the caller follows its instructions. Never a check of anything the caller cannot hear, such as a database write, a webhook, or the name of a route, intent, node or tool.
 - agent_data: see the agent section; otherwise an empty list.
 - description: one sentence on what this scenario tests and which part of the agent it rests on.
 - name: names the situation you wrote, in at most eight words and under 60 characters: what the caller wants, and the twist if there is one. Never a number.
 
 Rules:
-- The caller sees only the goal and the facts. In a messy input test, the goal must say exactly how the caller gets it wrong first (which value, and how it is wrong) and when the caller corrects it.
+- The caller sees only the instructions and the facts. In a messy input test, the instructions must say exactly how the caller gets it wrong first (which value, and how it is wrong) and when the caller corrects it.
 - The kind of test comes first; a variation only changes the situation inside it. A normal request stays a normal request, with no mistake and no refusal.
-- The caller never sees the criteria; do not repeat them in the goal or the facts.
+- The caller never sees the criteria; do not repeat them in the instructions or the facts.
 - Make the scenario clearly different from the existing scenarios and from the others in this batch.
 - One complication per scenario.
-- No personality, mood or speaking style: those come from the caller persona.
+- No personality, mood, speaking style or language: those come from the caller persona. Do not tell the caller who it is beyond what the test needs, such as "you are a patient of this clinic".
 - Test only what the text about the agent shows. A refusal or hand-off is a valid test; its criteria are the refusal or the hand-off.
 - Write in English.

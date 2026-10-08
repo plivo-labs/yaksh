@@ -509,7 +509,7 @@ export interface Fact {
 }
 
 export interface ScenarioConfig {
-  goal: string;
+  instructions: string;
   known_facts: Fact[];
   unknown_facts: string[];
   criteria: string[];

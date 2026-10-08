@@ -124,7 +124,7 @@ async def snapshot(
                 language=config.language,
                 instructions=caller_instructions(
                     config,
-                    goal=wants.goal,
+                    instructions=wants.instructions,
                     known_facts=wants.known_facts,
                     unknown_facts=wants.unknown_facts,
                     today=today,

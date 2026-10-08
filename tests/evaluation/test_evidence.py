@@ -32,7 +32,7 @@ LINES = [
 MAPLE_DENTAL = CallView(
     brief="Books, moves and cancels dental appointments for Maple Dental.",
     agent_data=[],
-    goal="Book a cleaning for next Tuesday afternoon as a new patient.",
+    instructions="Book a cleaning for next Tuesday afternoon as a new patient.",
     known_facts=[
         Fact(name="full name", value="Jordan Lee"),
         Fact(name="date of birth", value="14 March 1990"),

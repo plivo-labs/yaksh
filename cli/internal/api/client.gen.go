@@ -1217,9 +1217,9 @@ type ConversationRead struct {
 	RetryOf          *openapi_types.UUID `json:"retry_of"`
 	RunId            openapi_types.UUID  `json:"run_id"`
 
-	// Scenario What a scenario version pins. The goal and the facts go to the caller. The criteria never
-	// do: they are what the agent must say or do on the call. Agent data goes only to the agent,
-	// in an outbound agent's trigger.
+	// Scenario What a scenario version pins. The instructions and the facts go to the caller. The
+	// criteria never do: they are what the agent must say or do on the call. Agent data goes only
+	// to the agent, in an outbound agent's trigger.
 	Scenario          ScenarioConfig     `json:"scenario"`
 	ScenarioId        openapi_types.UUID `json:"scenario_id"`
 	ScenarioName      string             `json:"scenario_name"`
@@ -2172,14 +2172,14 @@ type RunVerdicts struct {
 	Worst             *float32             `json:"worst"`
 }
 
-// ScenarioConfig What a scenario version pins. The goal and the facts go to the caller. The criteria never
-// do: they are what the agent must say or do on the call. Agent data goes only to the agent,
-// in an outbound agent's trigger.
+// ScenarioConfig What a scenario version pins. The instructions and the facts go to the caller. The
+// criteria never do: they are what the agent must say or do on the call. Agent data goes only
+// to the agent, in an outbound agent's trigger.
 type ScenarioConfig struct {
 	AgentData    *[]Fact   `json:"agent_data,omitempty"`
 	Criteria     []string  `json:"criteria"`
 	FirstWords   *string   `json:"first_words,omitempty"`
-	Goal         string    `json:"goal"`
+	Instructions string    `json:"instructions"`
 	KnownFacts   *[]Fact   `json:"known_facts,omitempty"`
 	UnknownFacts *[]string `json:"unknown_facts,omitempty"`
 }
@@ -2193,7 +2193,7 @@ type ScenarioCreate struct {
 	Criteria     []string           `json:"criteria"`
 	Description  *string            `json:"description,omitempty"`
 	FirstWords   *string            `json:"first_words,omitempty"`
-	Goal         string             `json:"goal"`
+	Instructions string             `json:"instructions"`
 	KnownFacts   *[]Fact            `json:"known_facts,omitempty"`
 	Name         string             `json:"name"`
 	PersonaId    openapi_types.UUID `json:"persona_id"`
@@ -2218,8 +2218,8 @@ type ScenarioRead struct {
 	Description    *string             `json:"description"`
 	FirstWords     *string             `json:"first_words"`
 	GenerationId   *openapi_types.UUID `json:"generation_id"`
-	Goal           string              `json:"goal"`
 	Id             openapi_types.UUID  `json:"id"`
+	Instructions   string              `json:"instructions"`
 	KnownFacts     []Fact              `json:"known_facts"`
 	Name           string              `json:"name"`
 	PersonaId      openapi_types.UUID  `json:"persona_id"`
@@ -2234,7 +2234,7 @@ type ScenarioUpdate struct {
 	Criteria     *[]string           `json:"criteria,omitempty"`
 	Description  *string             `json:"description,omitempty"`
 	FirstWords   *string             `json:"first_words,omitempty"`
-	Goal         *string             `json:"goal,omitempty"`
+	Instructions *string             `json:"instructions,omitempty"`
 	KnownFacts   *[]Fact             `json:"known_facts,omitempty"`
 	Name         *string             `json:"name,omitempty"`
 	PersonaId    *openapi_types.UUID `json:"persona_id,omitempty"`
@@ -2255,9 +2255,9 @@ type ScenarioVerdicts struct {
 
 // ScenarioVersionRead defines model for ScenarioVersionRead.
 type ScenarioVersionRead struct {
-	// Config What a scenario version pins. The goal and the facts go to the caller. The criteria never
-	// do: they are what the agent must say or do on the call. Agent data goes only to the agent,
-	// in an outbound agent's trigger.
+	// Config What a scenario version pins. The instructions and the facts go to the caller. The
+	// criteria never do: they are what the agent must say or do on the call. Agent data goes only
+	// to the agent, in an outbound agent's trigger.
 	Config     ScenarioConfig     `json:"config"`
 	CreatedAt  time.Time          `json:"created_at"`
 	Id         openapi_types.UUID `json:"id"`

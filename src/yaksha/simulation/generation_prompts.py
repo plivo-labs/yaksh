@@ -53,7 +53,7 @@ QUESTIONS_SCHEMA = strict_object(
 
 SCENARIO_SCHEMA = strict_object(
     {
-        "goal": TEXT,
+        "instructions": TEXT,
         "known_facts": FACTS,
         "unknown_facts": TEXTS,
         "criteria": TEXTS,

@@ -72,7 +72,7 @@ class Prepared:
     documents: list[tuple[str, str]]
     """Name and text of each document the planner reads."""
     existing: list[tuple[str, str]]
-    """Name and goal of each scenario the agent has."""
+    """Name and instructions of each scenario the agent has."""
 
     def context(self) -> str:
         """What the planner reads: in knowledge base mode, the brief and the chosen documents
@@ -158,7 +158,7 @@ async def prepare(
         agent=config,
         documents=[(names[document_id], texts[document_id]) for document_id in chosen],
         existing=[
-            (row.name, row.config["goal"])
+            (row.name, row.config["instructions"])
             for row in await session.scalars(
                 select(Scenario)
                 .where(Scenario.agent_id == agent.id, Scenario.deleted_at.is_(None))

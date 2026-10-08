@@ -335,7 +335,7 @@ function PersonaEditor({ persona }: { persona?: Persona }) {
                     <FieldError>Describe how this caller behaves.</FieldError>
                   )}
                   <FieldDescription>
-                    Do not put a goal or facts here; the scenario gives them.
+                    Do not put instructions or facts here; the scenario gives them.
                   </FieldDescription>
                 </Field>
                 <Field>

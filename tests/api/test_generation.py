@@ -166,7 +166,7 @@ async def test_a_scenario_that_fails_its_check_twice_is_dropped_with_the_reason(
     generation_model.write = lambda prompt: {
         "name": "No criteria",
         "description": "",
-        "goal": "Reschedule.",
+        "instructions": "Reschedule.",
         "known_facts": [],
         "unknown_facts": [],
         "criteria": [],

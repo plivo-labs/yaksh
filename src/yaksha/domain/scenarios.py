@@ -12,7 +12,9 @@ from pydantic import (
     model_validator,
 )
 
-Goal = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=2000)]
+Instructions = Annotated[
+    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=4000)
+]
 MAX_FACT_NAME_CHARS = 80
 MAX_FACTS = 30
 """The most known facts, and the most agent data values, that a scenario holds."""
@@ -52,13 +54,13 @@ class Fact(BaseModel):
 
 
 class ScenarioConfig(BaseModel):
-    """What a scenario version pins. The goal and the facts go to the caller. The criteria never
-    do: they are what the agent must say or do on the call. Agent data goes only to the agent,
-    in an outbound agent's trigger."""
+    """What a scenario version pins. The instructions and the facts go to the caller. The
+    criteria never do: they are what the agent must say or do on the call. Agent data goes only
+    to the agent, in an outbound agent's trigger."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    goal: Goal
+    instructions: Instructions
     known_facts: list[Fact] = Field(default_factory=list, max_length=MAX_FACTS)
     unknown_facts: list[FactName] = Field(default_factory=list, max_length=20)
     criteria: list[Criterion] = Field(min_length=1, max_length=10)
@@ -115,7 +117,7 @@ class ScenarioUpdate(BaseModel):
     category: Category | None = None
     description: Description | None = None
     persona_id: uuid.UUID | None = None
-    goal: Goal | None = None
+    instructions: Instructions | None = None
     known_facts: list[Fact] | None = Field(default=None, max_length=MAX_FACTS)
     unknown_facts: list[FactName] | None = Field(default=None, max_length=20)
     criteria: list[Criterion] | None = Field(default=None, min_length=1, max_length=10)
@@ -127,7 +129,7 @@ class ScenarioUpdate(BaseModel):
         "name",
         "category",
         "persona_id",
-        "goal",
+        "instructions",
         "known_facts",
         "unknown_facts",
         "criteria",

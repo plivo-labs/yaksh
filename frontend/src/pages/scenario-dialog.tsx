@@ -51,7 +51,7 @@ const EMPTY: ScenarioInput = {
   category: "happy_path",
   description: null,
   persona_id: "",
-  goal: "",
+  instructions: "",
   known_facts: [],
   unknown_facts: [],
   criteria: [""],
@@ -65,7 +65,7 @@ function toDraft(scenario: Scenario): ScenarioInput {
     category: scenario.category,
     description: scenario.description,
     persona_id: scenario.persona_id,
-    goal: scenario.goal,
+    instructions: scenario.instructions,
     known_facts: scenario.known_facts,
     unknown_facts: scenario.unknown_facts,
     criteria: scenario.criteria,
@@ -87,7 +87,7 @@ function toInput(draft: ScenarioInput): ScenarioInput {
     category: draft.category,
     description: draft.description?.trim() || null,
     persona_id: draft.persona_id,
-    goal: draft.goal.trim(),
+    instructions: draft.instructions.trim(),
     known_facts: trimFacts(draft.known_facts),
     unknown_facts: draft.unknown_facts.map((name) => name.trim()).filter(Boolean),
     criteria: draft.criteria.map((text) => text.trim()).filter(Boolean),
@@ -237,7 +237,7 @@ export function ScenarioDialog({
     const valid =
       Boolean(input.name) &&
       Boolean(input.persona_id) &&
-      Boolean(input.goal) &&
+      Boolean(input.instructions) &&
       input.criteria.length > 0 &&
       !halfKnown &&
       !halfAgentData;
@@ -342,19 +342,24 @@ export function ScenarioDialog({
             </Field>
 
             <Field>
-              <FieldLabel htmlFor="scenario-goal">Goal</FieldLabel>
+              <FieldLabel htmlFor="scenario-instructions">Instructions</FieldLabel>
               <Textarea
-                id="scenario-goal"
+                id="scenario-instructions"
                 required
-                aria-invalid={submitted && !input.goal}
-                rows={4}
-                maxLength={2000}
-                placeholder="Move your cleaning to an evening next week. If there is none, keep your current appointment."
-                value={draft.goal}
-                onChange={(e) => change(() => ({ goal: e.target.value }))}
+                aria-invalid={submitted && !input.instructions}
+                rows={6}
+                maxLength={4000}
+                placeholder="You want to move your cleaning to an evening next week. When the agent asks for your details, give your name and date of birth. If no evening is free, keep your current appointment. Once the agent confirms, say goodbye."
+                value={draft.instructions}
+                onChange={(e) => change(() => ({ instructions: e.target.value }))}
               />
-              <FieldDescription>Put names, numbers and dates in the facts below.</FieldDescription>
-              {submitted && !input.goal && <FieldError>Describe what the caller wants.</FieldError>}
+              <FieldDescription>
+                What the caller wants and how it reacts to the agent, written to the caller as
+                “you”. Put names, numbers and dates in the facts below, and mood in the persona.
+              </FieldDescription>
+              {submitted && !input.instructions && (
+                <FieldError>Tell the caller what to do on this call.</FieldError>
+              )}
             </Field>
 
             <Field>

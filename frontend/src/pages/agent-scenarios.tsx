@@ -83,7 +83,7 @@ function progressMessage(progress: GenerationProgress): string {
 
 function matches(scenario: Scenario, text: string): boolean {
   const needle = text.toLowerCase();
-  return [scenario.name, scenario.description ?? "", scenario.goal].some((field) =>
+  return [scenario.name, scenario.description ?? "", scenario.instructions].some((field) =>
     field.toLowerCase().includes(needle),
   );
 }
@@ -628,8 +628,8 @@ function ScenarioDetail({
             <span className="text-muted-foreground">The default for the persona's language</span>
           )}
         </Section>
-        <Section label="Goal" wide>
-          {scenario.goal}
+        <Section label="Instructions" wide>
+          {scenario.instructions}
         </Section>
         <Section label="What the caller knows">
           <FactList facts={scenario.known_facts} />

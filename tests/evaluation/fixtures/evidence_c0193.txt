@@ -3,7 +3,7 @@ Brief: Books, moves and cancels dental appointments for Maple Dental.
 Agent data sent with this call: none.
 
 CALLER
-Goal: Book a cleaning for next Tuesday afternoon as a new patient.
+Instructions: Book a cleaning for next Tuesday afternoon as a new patient.
 Known facts: full name = Jordan Lee; date of birth = 14 March 1990; phone number = 555 0142.
 Facts the caller does not know: insurance member ID.
 

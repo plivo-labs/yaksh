@@ -1,6 +1,6 @@
 ## Existing scenarios
-{% for name, goal in existing %}
-- {{ name }}: {{ goal }}
+{% for name, instructions in existing %}
+- {{ name }}: {{ instructions }}
 {% else %}
 None.
 {% endfor %}

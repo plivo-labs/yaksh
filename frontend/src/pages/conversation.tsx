@@ -521,7 +521,7 @@ export function ScenarioCard({ name, scenario }: { name: string; scenario: Scena
     <Card>
       <CardHeader>
         <RailTitle role="Scenario" name={name} />
-        <CardDescription className="whitespace-pre-wrap">{scenario.goal}</CardDescription>
+        <CardDescription className="whitespace-pre-wrap">{scenario.instructions}</CardDescription>
       </CardHeader>
       <CardContent>
         <dl className="grid gap-3 text-p-400">

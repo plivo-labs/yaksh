@@ -17,7 +17,11 @@ def persona(language: Language, gender: VoiceGender | None) -> PersonaConfig:
 
 def instructions(persona: PersonaConfig) -> str:
     return caller_instructions(
-        persona, goal="Pay a bill.", known_facts=[], unknown_facts=[], today=date(2026, 9, 29)
+        persona,
+        instructions="Pay a bill.",
+        known_facts=[],
+        unknown_facts=[],
+        today=date(2026, 9, 29),
     )
 
 

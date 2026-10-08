@@ -208,7 +208,9 @@ export function CallOptionsFields({ form }: { form: AgentDraft }) {
       <Field orientation="horizontal" className="rounded-md border bg-muted/40 px-3.5 py-3">
         <FieldContent>
           <FieldLabel htmlFor="agent_speaks_first">Agent speaks first</FieldLabel>
-          <FieldDescription>When off, the caller speaks first, from its goal.</FieldDescription>
+          <FieldDescription>
+            When off, the caller speaks first, from its instructions.
+          </FieldDescription>
         </FieldContent>
         <Switch
           id="agent_speaks_first"
