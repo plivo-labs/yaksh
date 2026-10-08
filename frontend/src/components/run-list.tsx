@@ -59,9 +59,7 @@ export function RunList({
         query.isPlaceholderData && "opacity-60",
       )}
     >
-      <div
-        className={cn(grid, "hidden border-b py-3 text-s-500 text-muted-foreground @3xl/runs:grid")}
-      >
+      <div className={cn(grid, "hidden border-b py-3 text-label text-secondary @3xl/runs:grid")}>
         <span>Status</span>
         <span>Run</span>
         {showAgent && <span>Agent</span>}

@@ -216,7 +216,7 @@ function ScenarioList({ verdicts }: { verdicts: RunVerdicts }) {
       </div>
       <div
         aria-hidden
-        className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-6 border-b px-5 pb-2 text-s-500 text-muted-foreground sm:grid-cols-[minmax(0,1fr)_auto_8rem]"
+        className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-6 border-b px-5 pb-2 text-label text-secondary sm:grid-cols-[minmax(0,1fr)_auto_8rem]"
       >
         <span className="pl-6">Scenario</span>
         <span>{repeats === 1 ? "Call" : `Repeats 1 to ${repeats}`}</span>

@@ -42,7 +42,7 @@ export function NumbersPage() {
             </Alert>
           )}
           <div>
-            <div className={`${ROW} border-b pb-3 text-s-500 text-muted-foreground`}>
+            <div className={`${ROW} border-b pb-3 text-label text-secondary`}>
               <span>Number</span>
               <span>Name</span>
               <span>Region</span>

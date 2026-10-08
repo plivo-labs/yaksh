@@ -76,7 +76,7 @@ export function ConversationList({
       <div
         className={cn(
           grid,
-          "hidden border-b py-3 text-s-500 text-muted-foreground @3xl/conversations:grid",
+          "hidden border-b py-3 text-label text-secondary @3xl/conversations:grid",
         )}
       >
         <span>Status</span>
