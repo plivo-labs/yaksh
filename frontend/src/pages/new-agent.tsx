@@ -2,10 +2,9 @@ import { ChevronRight, FileJson, Link2, PencilLine } from "lucide-react";
 import type { ReactNode } from "react";
 import { Link } from "react-router";
 
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
-/** How to add an agent. Import from a provider comes later. */
+/** How to add an agent: import it, or enter its details. */
 export function NewAgentPage() {
   return (
     <div className="mx-auto grid w-full max-w-3xl gap-6">
@@ -18,6 +17,7 @@ export function NewAgentPage() {
       <ul className="grid gap-3">
         <li>
           <Choice
+            to="/agents/new/provider"
             icon={<Link2 />}
             title="Import from a provider"
             hint="Plivo CX, Vapi, Retell or ElevenLabs. Yaksha reads the agent and fills in what it can."
@@ -28,7 +28,7 @@ export function NewAgentPage() {
             to="/agents/new/json"
             icon={<FileJson />}
             title="Import from a JSON file"
-            hint="A Plivo CX agent download. ElevenLabs, Vapi and Retell files are coming soon."
+            hint="An agent file from your provider. Yaksha fills in what it can."
           />
         </li>
         <li>
@@ -49,46 +49,30 @@ export function NewAgentPage() {
   );
 }
 
-/** One way to add an agent: a link to its first page, or a card marked "Coming soon". */
+/** One way to add an agent: a card that opens its first page. */
 function Choice({
   to,
   icon,
   title,
   hint,
 }: {
-  to?: string;
+  to: string;
   icon: ReactNode;
   title: string;
   hint: string;
 }) {
-  const body = (
-    <>
+  return (
+    <Link
+      to={to}
+      className="flex items-start gap-3.5 rounded-lg border bg-card px-4.5 py-4 outline-none transition-colors hover:bg-hv1 focus-visible:ring-2 focus-visible:ring-ring/50"
+    >
       <span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-muted [&>svg]:size-4.5">
         {icon}
       </span>
       <span className="grid min-w-0 flex-1 gap-0.5">
-        <span className="flex items-center gap-2 text-p-500">
-          {title}
-          {!to && <Badge>Coming soon</Badge>}
-        </span>
+        <span className="text-p-500">{title}</span>
         <span className="text-s-400 text-muted-foreground">{hint}</span>
       </span>
-    </>
-  );
-  const frame = "flex items-start gap-3.5 rounded-lg border bg-card px-4.5 py-4";
-  if (!to) {
-    return (
-      <div aria-disabled="true" className={`${frame} opacity-60`}>
-        {body}
-      </div>
-    );
-  }
-  return (
-    <Link
-      to={to}
-      className={`${frame} outline-none transition-colors hover:bg-hv1 focus-visible:ring-2 focus-visible:ring-ring/50`}
-    >
-      {body}
       <ChevronRight aria-hidden className="mt-2 size-4 text-muted-foreground" />
     </Link>
   );

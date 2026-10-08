@@ -1,4 +1,10 @@
-import type { Header, OutboundSettings, QueryParameter, TriggerMethod } from "@/lib/types";
+import type {
+  Header,
+  OutboundSettings,
+  QueryParameter,
+  StartRequestDraft,
+  TriggerMethod,
+} from "@/lib/types";
 
 export interface OutboundDraft {
   method: TriggerMethod;
@@ -23,6 +29,28 @@ export const EMPTY_OUTBOUND: OutboundDraft = {
   calling_numbers: [],
   dial_window: "120",
 };
+
+/** The draft with the method, URL, headers and body or query of a start request read from a
+ * cURL command or an import; the calling numbers and the wait time stay. */
+export function withStartRequest(draft: OutboundDraft, request: StartRequestDraft): OutboundDraft {
+  return {
+    ...draft,
+    method: request.method,
+    url: request.url,
+    headers: request.headers,
+    body: request.body ? JSON.stringify(request.body, null, 2) : draft.body,
+    query: request.method === "GET" ? request.query : draft.query,
+  };
+}
+
+/** The fields a start request takes from each scenario: the names in its {{agent_data.<name>}}
+ * placeholders, in order, once each. */
+export function scenarioFields(request: StartRequestDraft): string[] {
+  const text = JSON.stringify([request.body, request.query]);
+  return [
+    ...new Set(Array.from(text.matchAll(/\{\{agent_data\.([^{}]+)\}\}/g), (found) => found[1])),
+  ];
+}
 
 const E164 = /^\+[1-9]\d{6,14}$/;
 

@@ -364,16 +364,18 @@ function openRule(
 }
 
 /** Where the draft came from, and what is left to fill in. */
+const IMPORTED_NOTES: Record<ImportedFrom["kind"], string> = {
+  file: "Check the drafted brief, then add the phone number in the next step.",
+  "config-only": "The file is the config. Check the drafted brief, then fill in the rest.",
+  "plivo-cx": "Check the drafted brief and the language.",
+};
+
 function ImportedNote({ from }: { from: ImportedFrom }) {
   return (
     <Alert role="status">
       <FileJson />
-      <AlertTitle>Filled from {from.file}</AlertTitle>
-      <AlertDescription>
-        {from.recognized
-          ? "Yaksha filled the name, the agent ID, the language and the config from the file, and drafted the brief from it. Check the brief, then add the phone number in the next step."
-          : "The whole file is the config, and Yaksha drafted the brief from it. Check the brief, then fill in the other fields."}
-      </AlertDescription>
+      <AlertTitle>Filled from {from.source}</AlertTitle>
+      <AlertDescription>{IMPORTED_NOTES[from.kind]}</AlertDescription>
     </Alert>
   );
 }

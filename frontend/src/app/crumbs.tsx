@@ -82,6 +82,12 @@ export const ImportAgentCrumbs = () => (
   />
 );
 
+export const ProviderImportCrumbs = () => (
+  <Trail
+    steps={[AGENTS, { label: "New agent", to: "/agents/new" }, { label: "Import from a provider" }]}
+  />
+);
+
 export function AgentCrumbs() {
   const agent = useAgent(useParams().id);
   return <Trail steps={[AGENTS, { label: agent.data?.name }]} />;

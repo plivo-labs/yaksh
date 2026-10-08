@@ -84,7 +84,7 @@ export function AgentImportJsonPage() {
             config: draft.config,
           }
         : { config: file.content },
-      { file: file.name, recognized },
+      { source: file.name, kind: recognized ? "file" : "config-only" },
       file.briefDraftId,
     );
     if (started) navigate("/agents/new/details?step=1");
@@ -99,7 +99,7 @@ export function AgentImportJsonPage() {
       <div className="grid gap-1">
         <h1 className="text-h3-500">Import from a JSON file</h1>
         <p className="text-p-400 text-muted-foreground">
-          Yaksha reads a Plivo CX agent download. ElevenLabs, Vapi and Retell files are coming soon.
+          Choose the agent file from your provider. Yaksha fills in what it can.
         </p>
       </div>
       <input

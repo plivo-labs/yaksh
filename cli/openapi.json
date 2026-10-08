@@ -248,6 +248,120 @@
         ]
       }
     },
+    "/api/v1/agents/import/plivo-cx/flows": {
+      "post": {
+        "tags": [
+          "agents"
+        ],
+        "summary": "List Plivo Cx Flows",
+        "description": "One page of a Plivo CX account's agent flows. The credentials are used for this call\nonly.",
+        "operationId": "list_plivo_cx_flows_api_v1_agents_import_plivo_cx_flows_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlivoCxFlowSearch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlivoCxFlowPage"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "The request failed. The error tells why.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "An outside service is not set up, or it did not answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/agents/import/plivo-cx/flow": {
+      "post": {
+        "tags": [
+          "agents"
+        ],
+        "summary": "Import Plivo Cx Flow",
+        "description": "Read one Plivo CX agent flow into a draft agent. Nothing is saved. A flow that a request\nstarts gets a start request that carries the credentials, as Plivo CX's \"Copy cURL\" does.",
+        "operationId": "import_plivo_cx_flow_api_v1_agents_import_plivo_cx_flow_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlivoCxFlowChoice"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlivoCxDraft"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "The request failed. The error tells why.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "An outside service is not set up, or it did not answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/agents/start-request-from-curl": {
       "post": {
         "tags": [
@@ -8604,6 +8718,214 @@
           "auth_token"
         ],
         "title": "PlivoAccount"
+      },
+      "PlivoCxDraft": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "external_id": {
+            "type": "string",
+            "title": "External Id"
+          },
+          "language": {
+            "$ref": "#/components/schemas/Language"
+          },
+          "config": {
+            "type": "string",
+            "title": "Config"
+          },
+          "direction": {
+            "$ref": "#/components/schemas/Direction"
+          },
+          "agent_numbers": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Agent Numbers"
+          },
+          "start_request": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StartRequestDraft"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "external_id",
+          "language",
+          "config",
+          "direction",
+          "agent_numbers",
+          "start_request"
+        ],
+        "title": "PlivoCxDraft",
+        "description": "The fields a Plivo CX agent flow fills. A flow that a call starts gives the numbers that\nreach it; a flow that a request starts gives the start request instead."
+      },
+      "PlivoCxFlow": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "State"
+          },
+          "type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Type"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "state",
+          "type",
+          "updated_at"
+        ],
+        "title": "PlivoCxFlow"
+      },
+      "PlivoCxFlowChoice": {
+        "properties": {
+          "auth_id": {
+            "type": "string",
+            "pattern": "^[MS]A[A-Z0-9]{18}$",
+            "title": "Auth Id"
+          },
+          "auth_token": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Auth Token"
+          },
+          "flow_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Flow Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "auth_id",
+          "auth_token",
+          "flow_id"
+        ],
+        "title": "PlivoCxFlowChoice"
+      },
+      "PlivoCxFlowPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PlivoCxFlow"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "next_offset": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Offset"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "next_offset"
+        ],
+        "title": "PlivoCxFlowPage"
+      },
+      "PlivoCxFlowSearch": {
+        "properties": {
+          "auth_id": {
+            "type": "string",
+            "pattern": "^[MS]A[A-Z0-9]{18}$",
+            "title": "Auth Id"
+          },
+          "auth_token": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Auth Token"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "offset": {
+            "type": "integer",
+            "maximum": 1000000.0,
+            "minimum": 0.0,
+            "title": "Offset",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "auth_id",
+          "auth_token"
+        ],
+        "title": "PlivoCxFlowSearch"
       },
       "Provenance": {
         "type": "string",

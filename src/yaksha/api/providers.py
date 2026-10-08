@@ -6,6 +6,7 @@ from yaksha.domain.settings import AppSettings, reveal
 from yaksha.domain.voices import VoiceProvider
 from yaksha.integrations.elevenlabs import ElevenLabsClient
 from yaksha.integrations.openai_models import OpenAIJsonModel
+from yaksha.integrations.plivo import PlivoApi
 from yaksha.simulation.voices import VoiceClients
 
 
@@ -43,6 +44,11 @@ class Providers:
         """A fast model that drafts an agent's brief while the person waits."""
         brief = settings.brief
         return self._model("brief", settings, brief.model, brief.timeout_s, brief.reasoning_effort)
+
+    def plivo_cx(self, auth_id: str, auth_token: str) -> PlivoApi:
+        """A client for a Plivo account that someone imports an agent from; its credentials come
+        with the request and are not stored."""
+        return PlivoApi(auth_id, auth_token)
 
     def _model(
         self,

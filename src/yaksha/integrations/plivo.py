@@ -1,5 +1,5 @@
 """The Plivo REST calls Yaksha makes: list numbers, read an application, place a call, cancel
-one still ringing, hang one up."""
+one still ringing, hang one up; and, to import agents, read the account's Plivo CX agent flows."""
 
 import json
 import logging
@@ -10,6 +10,7 @@ import aiohttp
 from pydantic import ValidationError
 
 from yaksha.diagnostics import describe_exception
+from yaksha.domain.errors import ProviderCallError
 from yaksha.domain.numbers import AccountNumber, PlivoApplication
 
 log = logging.getLogger(__name__)
@@ -19,7 +20,7 @@ TIMEOUT = aiohttp.ClientTimeout(total=10)
 MAX_PAGES = 100
 
 
-class PlivoError(Exception):
+class PlivoError(ProviderCallError):
     pass
 
 
@@ -89,7 +90,8 @@ class PlivoApi:
                         body = await response.text()
                         if response.status >= 400:
                             raise PlivoError(
-                                f"listing numbers failed with {response.status}: {body}"
+                                f"listing numbers failed with {response.status}: {body}",
+                                status=response.status,
                             )
                     page = json.loads(body)
                     numbers.extend(account_numbers(page.get("objects") or []))
@@ -102,6 +104,53 @@ class PlivoApi:
         if url is not None:
             raise PlivoError(f"listing numbers did not end after {MAX_PAGES} pages")
         return numbers
+
+    async def list_agent_flows(self, *, name: str | None, offset: int) -> dict[str, Any]:
+        """One page of the account's active Plivo CX agent flows, newest first, as Plivo returns
+        it. A draft or paused flow takes no calls, so it is left out."""
+        params: dict[str, str | int] = {"limit": 20, "offset": offset, "state": "ACTIVE"}
+        if name:
+            params["name"] = name
+        return json.loads(await self._get(f"{self._account}/AgentFlow/", params, "listing flows"))
+
+    async def get_agent_flow(self, flow_id: str) -> str:
+        """One Plivo CX agent flow with its nodes, as the text Plivo returns."""
+        return await self._get(f"{self._account}/AgentFlow/{flow_id}/", {}, "reading the flow")
+
+    async def agent_flow_applications(self) -> dict[str, str]:
+        """The answer URL of each application that sends a number's calls to a Plivo CX agent
+        flow, by application id. Plivo CX makes them internal, and only internal=true lists
+        them."""
+        found: dict[str, str] = {}
+        params: dict[str, str | int] = {"app_name": "agent_flow_", "internal": "true", "limit": 20}
+        for page in range(MAX_PAGES):
+            listed = json.loads(
+                await self._get(
+                    f"{self._account}/Application/",
+                    {**params, "offset": page * 20},
+                    "listing applications",
+                )
+            )
+            for entry in listed.get("objects") or []:
+                found[str(entry.get("app_id"))] = str(entry.get("answer_url") or "")
+            if not (listed.get("meta") or {}).get("next"):
+                return found
+        raise PlivoError(f"listing applications did not end after {MAX_PAGES} pages")
+
+    async def _get(self, url: str, params: dict[str, str | int], doing: str) -> str:
+        try:
+            async with (
+                aiohttp.ClientSession(headers=self._headers, timeout=TIMEOUT) as session,
+                session.get(url, params=params) as response,
+            ):
+                body = await response.text()
+        except (aiohttp.ClientError, TimeoutError) as error:
+            raise PlivoError(f"{doing} did not reach Plivo: {describe_exception(error)}") from error
+        if response.status >= 400:
+            raise PlivoError(
+                f"{doing} failed with {response.status}: {body}", status=response.status
+            )
+        return body
 
     async def get_application(self, app_id: str) -> PlivoApplication:
         url = f"{self._account}/Application/{app_id}/"

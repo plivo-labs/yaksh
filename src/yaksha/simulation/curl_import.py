@@ -12,9 +12,12 @@ import pydantic
 
 from yaksha.domain.agent_import import Pair, StartRequestDraft
 from yaksha.domain.errors import ValidationError
-from yaksha.domain.triggers import RESERVED_HEADERS, Trigger, TriggerMethod
+from yaksha.domain.scenarios import MAX_FACT_NAME_CHARS, MAX_FACTS, normalized
+from yaksha.domain.triggers import PLACEHOLDER, RESERVED_HEADERS, Trigger, TriggerMethod
 
 NUMBER = "{{yaksha.number}}"
+FILL = "<fill_your_data>"
+"""What Plivo CX's "Copy cURL" puts in each field for the person to fill."""
 DATA = {"-d", "--data", "--data-raw", "--data-binary", "--data-ascii", "--json"}
 WITH_VALUE = {"-X", "--request", "-H", "--header", "-u", "--user", "--url", *DATA}
 # Options that do not change the request Yaksha sends.
@@ -150,6 +153,9 @@ def draft(method: str, url: str, headers: list[Pair], data: str | None) -> Start
         at = next((i for i, pair in enumerate(query) if NUMBER_NAME.search(pair.name)), None)
         if at is not None:
             query[at] = Pair(name=query[at].name, value=NUMBER)
+        names = ScenarioNames([pair.value for pair in query], [pair.value for pair in headers])
+        query = [Pair(name=pair.name, value=names.fill(pair.value, (pair.name,))) for pair in query]
+        names.check()
         return StartRequestDraft(
             method=TriggerMethod.GET,
             url=parts._replace(query="").geturl(),
@@ -163,8 +169,70 @@ def draft(method: str, url: str, headers: list[Pair], data: str | None) -> Start
     if field is not None:
         body[field] = NUMBER
     return StartRequestDraft(
-        method=TriggerMethod.POST, url=url, headers=headers, query=[], body=body, number_field=field
+        method=TriggerMethod.POST,
+        url=url,
+        headers=headers,
+        query=[],
+        body=scenario_body(body, headers),
+        number_field=field,
     )
+
+
+class ScenarioNames:
+    """Turns each field still marked to fill into a value that every scenario gives,
+    {{agent_data.<name>}}: scenario generation writes one that fits the caller, and a scenario
+    without it is refused. A field is named by its path, such as lead_source or items_0; names
+    are made safe for a placeholder and unique, and `check` refuses more values than a scenario
+    holds."""
+
+    def __init__(self, *used: Any) -> None:
+        """`used` holds the request's other parts: the agent data names they already use count
+        toward the limit, and a new name never takes one of them."""
+        self.taken: set[str] = agent_data_names_in(used)
+
+    def fill(self, item: Any, path: tuple[str, ...] = ()) -> Any:
+        if isinstance(item, dict):
+            return {key: self.fill(child, (*path, key)) for key, child in item.items()}
+        if isinstance(item, list):
+            return [self.fill(child, (*path, str(at))) for at, child in enumerate(item)]
+        return f"{{{{agent_data.{self.name(path)}}}}}" if item == FILL else item
+
+    def name(self, path: tuple[str, ...]) -> str:
+        parts = [" ".join(part.replace("{", "").replace("}", "").split()) for part in path]
+        base = "_".join(part for part in parts if part)[:MAX_FACT_NAME_CHARS] or "field"
+        name, count = base, 1
+        while normalized(name) in self.taken:
+            count += 1
+            suffix = f"_{count}"
+            name = base[: MAX_FACT_NAME_CHARS - len(suffix)] + suffix
+        self.taken.add(normalized(name))
+        return name
+
+    def check(self) -> None:
+        if len(self.taken) > MAX_FACTS:
+            raise ValidationError(
+                f"the start request has {len(self.taken)} fields to fill, and a scenario holds at "
+                f"most {MAX_FACTS} values; fill some of them in the command"
+            )
+
+
+def scenario_body(body: dict[str, Any], headers: list[Pair]) -> dict[str, Any]:
+    names = ScenarioNames(body, [pair.value for pair in headers])
+    filled = names.fill(body)
+    names.check()
+    return filled
+
+
+def agent_data_names_in(value: Any) -> set[str]:
+    """The agent data names that placeholders anywhere in `value` use, as scenarios compare them."""
+    if isinstance(value, dict):
+        return set().union(*(agent_data_names_in(item) for item in value.values()))
+    if isinstance(value, list | tuple):
+        return set().union(*(agent_data_names_in(item) for item in value))
+    if not isinstance(value, str):
+        return set()
+    found = (match.strip().partition(".") for match in PLACEHOLDER.findall(value))
+    return {normalized(rest) for kind, _, rest in found if kind == "agent_data" and rest.strip()}
 
 
 def json_body(data: str | None) -> dict[str, Any]:

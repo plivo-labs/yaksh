@@ -361,6 +361,38 @@ export interface StartRequestDraft {
   number_field: string | null;
 }
 
+/** A Plivo account's credentials, sent with each import call and never stored. */
+export interface PlivoCxAccount {
+  auth_id: string;
+  auth_token: string;
+}
+
+export interface PlivoCxFlow {
+  id: string;
+  name: string;
+  state: string | null;
+  /** Plivo CX's flow type, such as incoming_call or api_request. */
+  type: string | null;
+  updated_at: string | null;
+}
+
+export interface PlivoCxFlowPage {
+  items: PlivoCxFlow[];
+  /** Where the next page starts, or null after the last. */
+  next_offset: number | null;
+}
+
+/** The fields a Plivo CX agent flow fills; nothing is saved. */
+export interface PlivoCxDraft {
+  name: string | null;
+  external_id: string;
+  language: Language;
+  config: string;
+  direction: Direction;
+  agent_numbers: string[];
+  start_request: StartRequestDraft | null;
+}
+
 export interface AgentInput {
   name: string;
   external_id: string | null;

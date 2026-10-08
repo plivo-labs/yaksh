@@ -13,7 +13,12 @@ from pydantic import (
 )
 
 Goal = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=2000)]
-FactName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=80)]
+MAX_FACT_NAME_CHARS = 80
+MAX_FACTS = 30
+"""The most known facts, and the most agent data values, that a scenario holds."""
+FactName = Annotated[
+    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=MAX_FACT_NAME_CHARS)
+]
 FactValue = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=500)]
 Criterion = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=500)]
 Name = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=80)]
@@ -54,10 +59,10 @@ class ScenarioConfig(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     goal: Goal
-    known_facts: list[Fact] = Field(default_factory=list, max_length=30)
+    known_facts: list[Fact] = Field(default_factory=list, max_length=MAX_FACTS)
     unknown_facts: list[FactName] = Field(default_factory=list, max_length=20)
     criteria: list[Criterion] = Field(min_length=1, max_length=10)
-    agent_data: list[Fact] = Field(default_factory=list, max_length=30)
+    agent_data: list[Fact] = Field(default_factory=list, max_length=MAX_FACTS)
     first_words: FirstWords | None = None
     """What the caller says first when it speaks first, without its model; None says its
     language's opening."""
@@ -111,10 +116,10 @@ class ScenarioUpdate(BaseModel):
     description: Description | None = None
     persona_id: uuid.UUID | None = None
     goal: Goal | None = None
-    known_facts: list[Fact] | None = Field(default=None, max_length=30)
+    known_facts: list[Fact] | None = Field(default=None, max_length=MAX_FACTS)
     unknown_facts: list[FactName] | None = Field(default=None, max_length=20)
     criteria: list[Criterion] | None = Field(default=None, min_length=1, max_length=10)
-    agent_data: list[Fact] | None = Field(default=None, max_length=30)
+    agent_data: list[Fact] | None = Field(default=None, max_length=MAX_FACTS)
     first_words: FirstWords | None = None
     """None clears it."""
 
