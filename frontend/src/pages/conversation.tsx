@@ -198,7 +198,7 @@ function ConversationView({ id }: { id: string }) {
               <TabsTrigger value="metrics">Metrics</TabsTrigger>
               <TabsTrigger value="scenario">Scenario</TabsTrigger>
               <TabsTrigger value="caller">Caller</TabsTrigger>
-              <TabsTrigger value="wire">On the wire</TabsTrigger>
+              <TabsTrigger value="events">Events</TabsTrigger>
             </TabsList>
             <ScrollArea className="min-h-0 flex-1">
               <div className="p-px pr-4 pb-6">
@@ -238,7 +238,7 @@ function ConversationView({ id }: { id: string }) {
                     lengthS={data.talk_ms ? data.talk_ms / 1000 : data.max_duration_s}
                   />
                 </TabsContent>
-                <TabsContent value="wire">
+                <TabsContent value="events">
                   <WireEvents
                     events={data.wire_events}
                     validity={data.validity}
@@ -863,7 +863,7 @@ function WireEvents({
   return (
     <Card>
       <CardHeader className="border-b">
-        <CardTitle>On the wire</CardTitle>
+        <CardTitle>Events</CardTitle>
         <CardDescription>
           Times count from the start of the call. The recording and the transcript start at
           connected.

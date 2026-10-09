@@ -23,6 +23,8 @@ import {
   type ProviderDraft,
   type ElevenLabsAccount,
   type ElevenLabsAgentPage,
+  type VapiAccount,
+  type VapiAssistantPage,
   type StartRequestDraft,
   type AgentRule,
   type AgentSummary,
@@ -449,6 +451,35 @@ export function useImportElevenLabsAgent(account: ElevenLabsAccount) {
       api<ProviderDraft>("/agents/import/elevenlabs/agent", {
         method: "POST",
         json: { ...account, agent_id: agentId },
+      }),
+  });
+}
+
+/** A Vapi organization's assistants, 100 a page, newest first. Vapi cannot search, so the server
+ * reads on through the pages for a name. */
+export function useVapiAssistants(account: VapiAccount | null, connection: string, name: string) {
+  return useInfiniteQuery({
+    queryKey: ["vapi-assistants", connection, name] as const,
+    queryFn: ({ pageParam }) =>
+      api<VapiAssistantPage>("/agents/import/vapi/assistants", {
+        method: "POST",
+        json: { ...account, name: name || null, cursor: pageParam },
+      }),
+    initialPageParam: null as string | null,
+    getNextPageParam: (last) => last.next_cursor ?? undefined,
+    enabled: account !== null,
+    retry: false,
+    staleTime: Infinity,
+  });
+}
+
+/** Reads one Vapi assistant into a draft. */
+export function useImportVapiAssistant(account: VapiAccount) {
+  return useMutation({
+    mutationFn: (assistantId: string) =>
+      api<ProviderDraft>("/agents/import/vapi/assistant", {
+        method: "POST",
+        json: { ...account, assistant_id: assistantId },
       }),
   });
 }

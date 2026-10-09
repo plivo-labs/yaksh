@@ -41,7 +41,9 @@ import {
   useElevenLabsAgents,
   useImportElevenLabsAgent,
   useImportPlivoCxFlow,
+  useImportVapiAssistant,
   usePlivoCxFlows,
+  useVapiAssistants,
 } from "@/lib/queries";
 import { randomKey } from "@/lib/random-key";
 import type {
@@ -49,16 +51,18 @@ import type {
   ElevenLabsRegion,
   PlivoCxAccount,
   ProviderDraft,
+  VapiAccount,
+  VapiRegion,
 } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-type ProviderId = "plivo-cx" | "elevenlabs";
+type ProviderId = "plivo-cx" | "elevenlabs" | "vapi";
 
 /** Each provider's own icon, as its website serves it. */
 const PROVIDERS: { id: ProviderId | null; name: string; logo: string }[] = [
   { id: "plivo-cx", name: "Plivo CX", logo: plivoCxLogo },
   { id: "elevenlabs", name: "ElevenLabs", logo: elevenLabsLogo },
-  { id: null, name: "Vapi", logo: vapiLogo },
+  { id: "vapi", name: "Vapi", logo: vapiLogo },
   { id: null, name: "Retell", logo: retellLogo },
 ];
 
@@ -67,6 +71,11 @@ const REGIONS: { value: ElevenLabsRegion; label: string }[] = [
   { value: "eu", label: "EU" },
   { value: "in", label: "India" },
   { value: "sg", label: "Singapore" },
+];
+
+const VAPI_REGIONS: { value: VapiRegion; label: string }[] = [
+  { value: "us", label: "US" },
+  { value: "eu", label: "EU" },
 ];
 
 /** How each kind of flow that Yaksha lists takes calls; the server leaves out the others. */
@@ -78,7 +87,8 @@ const CALL_TYPES: Record<string, string> = {
 
 type Connection =
   | { provider: "plivo-cx"; account: PlivoCxAccount; id: string }
-  | { provider: "elevenlabs"; account: ElevenLabsAccount; id: string };
+  | { provider: "elevenlabs"; account: ElevenLabsAccount; id: string }
+  | { provider: "vapi"; account: VapiAccount; id: string };
 
 /** Reads an agent from a provider into a draft, then opens the new-agent wizard with it. The
  * credentials stay in this page's memory: they are sent with each call and never stored. */
@@ -108,6 +118,13 @@ export function AgentImportProviderPage() {
           connection={connected.id}
           onChange={change}
         />
+      ) : connected?.provider === "vapi" ? (
+        <VapiAssistants
+          key={connected.id}
+          account={connected.account}
+          connection={connected.id}
+          onChange={change}
+        />
       ) : (
         <Credentials provider={provider} onProvider={setProvider} onConnect={setConnected} />
       )}
@@ -128,6 +145,7 @@ function Credentials({
   const [authToken, setAuthToken] = useState("");
   const [apiKey, setApiKey] = useState("");
   const [region, setRegion] = useState<ElevenLabsRegion>("global");
+  const [vapiRegion, setVapiRegion] = useState<VapiRegion>("us");
   const [submitted, setSubmitted] = useState(false);
   const idProblem = /^[MS]A[A-Z0-9]{18}$/.test(authId.trim())
     ? null
@@ -148,6 +166,9 @@ function Credentials({
     }
     if (provider === "elevenlabs" && !keyProblem) {
       onConnect({ provider, account: { api_key: apiKey.trim(), region }, id });
+    }
+    if (provider === "vapi" && !keyProblem) {
+      onConnect({ provider, account: { api_key: apiKey.trim(), region: vapiRegion }, id });
     }
   };
 
@@ -236,32 +257,26 @@ function Credentials({
                   />
                   {submitted && keyProblem && <FieldError>{keyProblem}</FieldError>}
                 </Field>
-                <Field>
-                  <FieldLabel htmlFor="region">Workspace</FieldLabel>
-                  <Select
+                {provider === "vapi" ? (
+                  <RegionField
+                    label="Organization"
+                    items={VAPI_REGIONS}
+                    value={vapiRegion}
+                    onChange={setVapiRegion}
+                  />
+                ) : (
+                  <RegionField
+                    label="Workspace"
                     items={REGIONS}
                     value={region}
-                    onValueChange={(value) => value && setRegion(value as ElevenLabsRegion)}
-                  >
-                    <SelectTrigger id="region" className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectGroup>
-                        {REGIONS.map((item) => (
-                          <SelectItem key={item.value} value={item.value}>
-                            {item.label}
-                          </SelectItem>
-                        ))}
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
-                </Field>
+                    onChange={setRegion}
+                  />
+                )}
               </div>
               <FieldDescription>
-                An API key with ElevenAgents access, from the developers page of ElevenLabs. Yaksha
-                uses it for this import and does not save it, except in the start request of an
-                agent that calls out.
+                {provider === "vapi"
+                  ? "The private API key, from the API keys page of the Vapi dashboard. Yaksha uses it for this import and does not save it, except in the start request of an assistant that calls out."
+                  : "An API key with ElevenAgents access, from the developers page of ElevenLabs. Yaksha uses it for this import and does not save it, except in the start request of an agent that calls out."}
               </FieldDescription>
             </>
           )}
@@ -273,7 +288,11 @@ function Credentials({
           Back
         </Button>
         <Button type="submit" className="ml-auto">
-          {provider === "plivo-cx" ? "Show agent flows" : "Show agents"}
+          {provider === "plivo-cx"
+            ? "Show agent flows"
+            : provider === "vapi"
+              ? "Show assistants"
+              : "Show agents"}
         </Button>
       </StepFooter>
     </form>
@@ -314,7 +333,7 @@ function PlivoCxAgents({
           id: flow.id,
           name: flow.name,
           detail: (flow.type && CALL_TYPES[flow.type]) ?? "Takes calls",
-          at: flow.updated_at,
+          when: flow.updated_at ? `Updated ${when(flow.updated_at)}` : null,
         })),
       )}
       read={read}
@@ -354,8 +373,91 @@ function ElevenLabsAgents({
         page.items.map((agent) => ({
           id: agent.id,
           name: agent.name,
-          detail: agent.last_call_at ? "Last call" : "No calls yet",
-          at: agent.last_call_at,
+          detail: null,
+          when: agent.last_call_at ? `Last call ${when(agent.last_call_at)}` : "No calls yet",
+        })),
+      )}
+      read={read}
+      onSearch={setName}
+      onChange={onChange}
+    />
+  );
+}
+
+function RegionField<Region extends string>({
+  label,
+  items,
+  value,
+  onChange,
+}: {
+  label: string;
+  items: { value: Region; label: string }[];
+  value: Region;
+  onChange: (region: Region) => void;
+}) {
+  return (
+    <Field>
+      <FieldLabel htmlFor="region">{label}</FieldLabel>
+      <Select
+        items={items}
+        value={value}
+        onValueChange={(next) => {
+          const found = items.find((item) => item.value === next);
+          if (found) onChange(found.value);
+        }}
+      >
+        <SelectTrigger id="region" className="w-full">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectGroup>
+            {items.map((item) => (
+              <SelectItem key={item.value} value={item.value}>
+                {item.label}
+              </SelectItem>
+            ))}
+          </SelectGroup>
+        </SelectContent>
+      </Select>
+    </Field>
+  );
+}
+
+function VapiAssistants({
+  account,
+  connection,
+  onChange,
+}: {
+  account: VapiAccount;
+  connection: string;
+  onChange: () => void;
+}) {
+  const [name, setName] = useState("");
+  const assistants = useVapiAssistants(account, connection, name);
+  const read = useImportVapiAssistant(account);
+  const region = VAPI_REGIONS.find(({ value }) => value === account.region)?.label;
+  return (
+    <AgentChoice
+      account={<>Vapi, {region}</>}
+      words={{
+        one: "assistant",
+        reading: "Reading the assistants",
+        shown: ["assistant", "assistants"],
+        none: "This organization has no assistants.",
+        noMatch: (search) => `No assistant has "${search}" in its name.`,
+        source: (title) => `the Vapi assistant ${title}`,
+      }}
+      kind="vapi"
+      list={assistants}
+      rows={(assistants.data?.pages ?? []).flatMap((page) =>
+        page.items.map((assistant) => ({
+          id: assistant.id,
+          name: assistant.name,
+          detail:
+            assistant.numbers.length > 0
+              ? `Answers ${assistant.numbers.map(phone).join(", ")}`
+              : "No number: calls out",
+          when: assistant.updated_at ? `Updated ${when(assistant.updated_at)}` : null,
         })),
       )}
       read={read}
@@ -368,8 +470,9 @@ function ElevenLabsAgents({
 interface Row {
   id: string;
   name: string;
-  detail: string;
-  at: string | null;
+  detail: string | null;
+  /** The row's time with what it is, such as "Updated Oct 9, 12:28 PM". */
+  when: string | null;
 }
 
 /** The parts of a provider's agent list that the choice shows. */
@@ -463,6 +566,7 @@ function AgentChoice({
         config: draft.config,
         direction: draft.direction,
         agent_number: number ?? "",
+        agent_speaks_first: draft.agent_speaks_first,
         outbound,
       },
       { source: words.source(chosen.name), kind },
@@ -533,7 +637,11 @@ function AgentChoice({
                   />
                   <span className="grid min-w-0">
                     <span className="truncate text-p-500">{row.name}</span>
-                    <span className="truncate text-s-400 text-muted-foreground">{row.detail}</span>
+                    {row.detail && (
+                      <span className="truncate text-s-400 text-muted-foreground">
+                        {row.detail}
+                      </span>
+                    )}
                   </span>
                   {reading ? (
                     <span
@@ -546,9 +654,9 @@ function AgentChoice({
                       Reading
                     </span>
                   ) : (
-                    row.at && (
+                    row.when && (
                       <span className="text-s-400 text-muted-foreground tabular-nums">
-                        {when(row.at)}
+                        {row.when}
                       </span>
                     )
                   )}

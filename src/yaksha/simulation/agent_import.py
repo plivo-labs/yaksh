@@ -2,12 +2,21 @@
 fixed paths, and the whole file becomes the agent's config, which the judges read."""
 
 import json
+from collections.abc import Awaitable, Generator, Iterable
+from contextlib import contextmanager
 from typing import Any, NoReturn
 
 from yaksha.domain.agent_import import AgentDraft, ImportProvider
 from yaksha.domain.agents import MAX_CONFIG_CHARS
-from yaksha.domain.errors import UnrecognizedFileError, ValidationError
+from yaksha.domain.errors import (
+    NotFoundError,
+    ProviderCallError,
+    UnavailableError,
+    UnrecognizedFileError,
+    ValidationError,
+)
 from yaksha.domain.languages import Language
+from yaksha.simulation.curl_import import FILL, ScenarioNames
 
 
 def import_agent(content: str) -> AgentDraft:
@@ -104,3 +113,69 @@ def empty(value: Any) -> bool:
 
 def contract(key: str) -> bool:
     return key in CONTRACTS or key.endswith("schema")
+
+
+def without(value: Any, keys: frozenset[str]) -> Any:
+    """`value` without `keys` at any depth, schemas too: a provider keeps credentials in them. The
+    property names of a JSON schema stay: they are what a tool takes, such as a headers field."""
+    if isinstance(value, dict):
+        return {
+            key: (
+                {name: without(item_, keys) for name, item_ in item.items()}
+                if key == "properties" and isinstance(item, dict)
+                else without(item, keys)
+            )
+            for key, item in value.items()
+            if key not in keys
+        }
+    if isinstance(value, list):
+        return [without(item, keys) for item in value]
+    return value
+
+
+async def unless_missing(read: Awaitable[dict[str, Any]]) -> dict[str, Any] | None:
+    """An agent can name a tool that was deleted; the provider answers 404 for it."""
+    try:
+        return await read
+    except ProviderCallError as error:
+        if error.status == 404:
+            return None
+        raise
+
+
+def scenario_variables(names: Iterable[str]) -> dict[str, str]:
+    """Each of an agent's variables as agent data that every scenario fills, named for itself."""
+    taken = ScenarioNames()
+    variables = {name: taken.fill(FILL, (name,)) for name in names}
+    taken.check()
+    return variables
+
+
+@contextmanager
+def provider_errors(provider: str, *, refused: str, forbidden: str) -> Generator[None]:
+    """A provider's failed call as an error the person can act on. The provider's reply stays out
+    of the message: the client sees only its status."""
+    try:
+        yield
+    except ProviderCallError as error:
+        match error.status:
+            case 401:
+                raise ValidationError(refused) from None
+            case 403:
+                raise ValidationError(forbidden) from None
+            case 404:
+                raise NotFoundError(f"{provider} has no agent or tool with this ID") from None
+            case 429:
+                raise UnavailableError(
+                    f"{provider} refused more requests for now; wait a minute, then try again"
+                ) from None
+            case None:
+                raise UnavailableError(
+                    f"Yaksha could not reach {provider}; try again later"
+                ) from None
+            case status:
+                raise UnavailableError(
+                    f"{provider} answered with status {status}; try again later"
+                ) from None
+    except ValueError:
+        raise UnavailableError(f"{provider} answered with something that is not JSON") from None

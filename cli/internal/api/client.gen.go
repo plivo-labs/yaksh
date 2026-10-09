@@ -156,22 +156,22 @@ func (e Direction) Valid() bool {
 
 // Defines values for ElevenLabsRegion.
 const (
-	Eu     ElevenLabsRegion = "eu"
-	Global ElevenLabsRegion = "global"
-	In     ElevenLabsRegion = "in"
-	Sg     ElevenLabsRegion = "sg"
+	ElevenLabsRegionEu     ElevenLabsRegion = "eu"
+	ElevenLabsRegionGlobal ElevenLabsRegion = "global"
+	ElevenLabsRegionIn     ElevenLabsRegion = "in"
+	ElevenLabsRegionSg     ElevenLabsRegion = "sg"
 )
 
 // Valid indicates whether the value is a known member of the ElevenLabsRegion enum.
 func (e ElevenLabsRegion) Valid() bool {
 	switch e {
-	case Eu:
+	case ElevenLabsRegionEu:
 		return true
-	case Global:
+	case ElevenLabsRegionGlobal:
 		return true
-	case In:
+	case ElevenLabsRegionIn:
 		return true
-	case Sg:
+	case ElevenLabsRegionSg:
 		return true
 	default:
 		return false
@@ -868,6 +868,24 @@ func (e UnsureKind) Valid() bool {
 	case UnsureKindNotConfirmedPlayed:
 		return true
 	case UnsureKindUnclear:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for VapiRegion.
+const (
+	VapiRegionEu VapiRegion = "eu"
+	VapiRegionUs VapiRegion = "us"
+)
+
+// Valid indicates whether the value is a known member of the VapiRegion enum.
+func (e VapiRegion) Valid() bool {
+	switch e {
+	case VapiRegionEu:
+		return true
+	case VapiRegionUs:
 		return true
 	default:
 		return false
@@ -2049,13 +2067,14 @@ type Provider string
 // ProviderDraft The fields an agent read from a provider fills. An agent that answers calls gives the
 // numbers that reach it; an agent that calls out gives the start request instead.
 type ProviderDraft struct {
-	AgentNumbers []string           `json:"agent_numbers"`
-	Config       string             `json:"config"`
-	Direction    Direction          `json:"direction"`
-	ExternalId   string             `json:"external_id"`
-	Language     Language           `json:"language"`
-	Name         *string            `json:"name"`
-	StartRequest *StartRequestDraft `json:"start_request"`
+	AgentNumbers     []string           `json:"agent_numbers"`
+	AgentSpeaksFirst *bool              `json:"agent_speaks_first,omitempty"`
+	Config           string             `json:"config"`
+	Direction        Direction          `json:"direction"`
+	ExternalId       string             `json:"external_id"`
+	Language         Language           `json:"language"`
+	Name             *string            `json:"name"`
+	StartRequest     *StartRequestDraft `json:"start_request"`
 }
 
 // ProviderTest defines model for ProviderTest.
@@ -2558,6 +2577,42 @@ type Validity struct {
 	Reasons *[]string `json:"reasons,omitempty"`
 }
 
+// VapiAssistant defines model for VapiAssistant.
+type VapiAssistant struct {
+	Id        string     `json:"id"`
+	Name      string     `json:"name"`
+	Numbers   []string   `json:"numbers"`
+	UpdatedAt *time.Time `json:"updated_at"`
+}
+
+// VapiAssistantChoice defines model for VapiAssistantChoice.
+type VapiAssistantChoice struct {
+	ApiKey      string             `json:"api_key"`
+	AssistantId openapi_types.UUID `json:"assistant_id"`
+
+	// Region Where the Vapi organization is. An EU organization has its own API host and keys.
+	Region *VapiRegion `json:"region,omitempty"`
+}
+
+// VapiAssistantPage defines model for VapiAssistantPage.
+type VapiAssistantPage struct {
+	Items      []VapiAssistant `json:"items"`
+	NextCursor *time.Time      `json:"next_cursor"`
+}
+
+// VapiAssistantSearch defines model for VapiAssistantSearch.
+type VapiAssistantSearch struct {
+	ApiKey string     `json:"api_key"`
+	Cursor *time.Time `json:"cursor,omitempty"`
+	Name   *string    `json:"name,omitempty"`
+
+	// Region Where the Vapi organization is. An EU organization has its own API host and keys.
+	Region *VapiRegion `json:"region,omitempty"`
+}
+
+// VapiRegion Where the Vapi organization is. An EU organization has its own API host and keys.
+type VapiRegion string
+
 // Verdict defines model for Verdict.
 type Verdict string
 
@@ -2757,6 +2812,12 @@ type ImportPlivoCxFlowApiV1AgentsImportPlivoCxFlowPostJSONRequestBody = PlivoCxF
 
 // ListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPostJSONRequestBody defines body for ListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPost for application/json ContentType.
 type ListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPostJSONRequestBody = PlivoCxFlowSearch
+
+// ImportVapiAssistantApiV1AgentsImportVapiAssistantPostJSONRequestBody defines body for ImportVapiAssistantApiV1AgentsImportVapiAssistantPost for application/json ContentType.
+type ImportVapiAssistantApiV1AgentsImportVapiAssistantPostJSONRequestBody = VapiAssistantChoice
+
+// ListVapiAssistantsApiV1AgentsImportVapiAssistantsPostJSONRequestBody defines body for ListVapiAssistantsApiV1AgentsImportVapiAssistantsPost for application/json ContentType.
+type ListVapiAssistantsApiV1AgentsImportVapiAssistantsPostJSONRequestBody = VapiAssistantSearch
 
 // ReadCurlCommandApiV1AgentsStartRequestFromCurlPostJSONRequestBody defines body for ReadCurlCommandApiV1AgentsStartRequestFromCurlPost for application/json ContentType.
 type ReadCurlCommandApiV1AgentsStartRequestFromCurlPostJSONRequestBody = CurlCommand
@@ -3506,6 +3567,46 @@ type ClientInterface interface {
 	//
 	// Corresponds with POST /api/v1/agents/import/plivo-cx/flows (the `ListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPost` operationId).
 	ListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPost(ctx context.Context, body ListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPostJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ImportVapiAssistantApiV1AgentsImportVapiAssistantPostWithBody Import Vapi Assistant
+	//
+	// Read one Vapi assistant into a draft agent. Nothing is saved. An assistant without a
+	// number gets a start request for Vapi's outbound call, which carries the API key.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /api/v1/agents/import/vapi/assistant (the `ImportVapiAssistantApiV1AgentsImportVapiAssistantPost` operationId).
+	ImportVapiAssistantApiV1AgentsImportVapiAssistantPostWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ImportVapiAssistantApiV1AgentsImportVapiAssistantPost Import Vapi Assistant
+	//
+	// Read one Vapi assistant into a draft agent. Nothing is saved. An assistant without a
+	// number gets a start request for Vapi's outbound call, which carries the API key.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /api/v1/agents/import/vapi/assistant (the `ImportVapiAssistantApiV1AgentsImportVapiAssistantPost` operationId).
+	ImportVapiAssistantApiV1AgentsImportVapiAssistantPost(ctx context.Context, body ImportVapiAssistantApiV1AgentsImportVapiAssistantPostJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListVapiAssistantsApiV1AgentsImportVapiAssistantsPostWithBody List Vapi Assistants
+	//
+	// One page of a Vapi organization's assistants, newest first. The API key is used for this
+	// call only.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /api/v1/agents/import/vapi/assistants (the `ListVapiAssistantsApiV1AgentsImportVapiAssistantsPost` operationId).
+	ListVapiAssistantsApiV1AgentsImportVapiAssistantsPostWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListVapiAssistantsApiV1AgentsImportVapiAssistantsPost List Vapi Assistants
+	//
+	// One page of a Vapi organization's assistants, newest first. The API key is used for this
+	// call only.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /api/v1/agents/import/vapi/assistants (the `ListVapiAssistantsApiV1AgentsImportVapiAssistantsPost` operationId).
+	ListVapiAssistantsApiV1AgentsImportVapiAssistantsPost(ctx context.Context, body ListVapiAssistantsApiV1AgentsImportVapiAssistantsPostJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListAgentSourcesApiV1AgentsSourcesGet List Agent Sources
 	//
@@ -4499,6 +4600,86 @@ func (c *Client) ListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPostWithBody(ctx c
 // Corresponds with POST /api/v1/agents/import/plivo-cx/flows (the `ListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPost` operationId).
 func (c *Client) ListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPost(ctx context.Context, body ListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPostJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPostRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ImportVapiAssistantApiV1AgentsImportVapiAssistantPostWithBody Import Vapi Assistant
+//
+// Read one Vapi assistant into a draft agent. Nothing is saved. An assistant without a
+// number gets a start request for Vapi's outbound call, which carries the API key.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /api/v1/agents/import/vapi/assistant (the `ImportVapiAssistantApiV1AgentsImportVapiAssistantPost` operationId).
+func (c *Client) ImportVapiAssistantApiV1AgentsImportVapiAssistantPostWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewImportVapiAssistantApiV1AgentsImportVapiAssistantPostRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ImportVapiAssistantApiV1AgentsImportVapiAssistantPost Import Vapi Assistant
+//
+// Read one Vapi assistant into a draft agent. Nothing is saved. An assistant without a
+// number gets a start request for Vapi's outbound call, which carries the API key.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /api/v1/agents/import/vapi/assistant (the `ImportVapiAssistantApiV1AgentsImportVapiAssistantPost` operationId).
+func (c *Client) ImportVapiAssistantApiV1AgentsImportVapiAssistantPost(ctx context.Context, body ImportVapiAssistantApiV1AgentsImportVapiAssistantPostJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewImportVapiAssistantApiV1AgentsImportVapiAssistantPostRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListVapiAssistantsApiV1AgentsImportVapiAssistantsPostWithBody List Vapi Assistants
+//
+// One page of a Vapi organization's assistants, newest first. The API key is used for this
+// call only.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /api/v1/agents/import/vapi/assistants (the `ListVapiAssistantsApiV1AgentsImportVapiAssistantsPost` operationId).
+func (c *Client) ListVapiAssistantsApiV1AgentsImportVapiAssistantsPostWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListVapiAssistantsApiV1AgentsImportVapiAssistantsPostRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListVapiAssistantsApiV1AgentsImportVapiAssistantsPost List Vapi Assistants
+//
+// One page of a Vapi organization's assistants, newest first. The API key is used for this
+// call only.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /api/v1/agents/import/vapi/assistants (the `ListVapiAssistantsApiV1AgentsImportVapiAssistantsPost` operationId).
+func (c *Client) ListVapiAssistantsApiV1AgentsImportVapiAssistantsPost(ctx context.Context, body ListVapiAssistantsApiV1AgentsImportVapiAssistantsPostJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListVapiAssistantsApiV1AgentsImportVapiAssistantsPostRequest(c.Server, body)
 	if err != nil {
 		return nil, err
 	}
@@ -6620,6 +6801,86 @@ func NewListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPostRequestWithBody(server 
 	}
 
 	operationPath := fmt.Sprintf("/api/v1/agents/import/plivo-cx/flows")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewImportVapiAssistantApiV1AgentsImportVapiAssistantPostRequest calls the generic ImportVapiAssistantApiV1AgentsImportVapiAssistantPost builder with application/json body
+func NewImportVapiAssistantApiV1AgentsImportVapiAssistantPostRequest(server string, body ImportVapiAssistantApiV1AgentsImportVapiAssistantPostJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewImportVapiAssistantApiV1AgentsImportVapiAssistantPostRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewImportVapiAssistantApiV1AgentsImportVapiAssistantPostRequestWithBody constructs an http.Request for the ImportVapiAssistantApiV1AgentsImportVapiAssistantPost method, with any body, and a specified content type
+func NewImportVapiAssistantApiV1AgentsImportVapiAssistantPostRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/agents/import/vapi/assistant")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewListVapiAssistantsApiV1AgentsImportVapiAssistantsPostRequest calls the generic ListVapiAssistantsApiV1AgentsImportVapiAssistantsPost builder with application/json body
+func NewListVapiAssistantsApiV1AgentsImportVapiAssistantsPostRequest(server string, body ListVapiAssistantsApiV1AgentsImportVapiAssistantsPostJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewListVapiAssistantsApiV1AgentsImportVapiAssistantsPostRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewListVapiAssistantsApiV1AgentsImportVapiAssistantsPostRequestWithBody constructs an http.Request for the ListVapiAssistantsApiV1AgentsImportVapiAssistantsPost method, with any body, and a specified content type
+func NewListVapiAssistantsApiV1AgentsImportVapiAssistantsPostRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/agents/import/vapi/assistants")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -10173,6 +10434,46 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with POST /api/v1/agents/import/plivo-cx/flows (the `ListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPost` operationId).
 	ListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPostWithResponse(ctx context.Context, body ListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPostJSONRequestBody, reqEditors ...RequestEditorFn) (*ListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPostResponse, error)
 
+	// ImportVapiAssistantApiV1AgentsImportVapiAssistantPostWithBodyWithResponse Import Vapi Assistant
+	//
+	// Read one Vapi assistant into a draft agent. Nothing is saved. An assistant without a
+	// number gets a start request for Vapi's outbound call, which carries the API key.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/agents/import/vapi/assistant (the `ImportVapiAssistantApiV1AgentsImportVapiAssistantPost` operationId).
+	ImportVapiAssistantApiV1AgentsImportVapiAssistantPostWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ImportVapiAssistantApiV1AgentsImportVapiAssistantPostResponse, error)
+
+	// ImportVapiAssistantApiV1AgentsImportVapiAssistantPostWithResponse Import Vapi Assistant
+	//
+	// Read one Vapi assistant into a draft agent. Nothing is saved. An assistant without a
+	// number gets a start request for Vapi's outbound call, which carries the API key.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/agents/import/vapi/assistant (the `ImportVapiAssistantApiV1AgentsImportVapiAssistantPost` operationId).
+	ImportVapiAssistantApiV1AgentsImportVapiAssistantPostWithResponse(ctx context.Context, body ImportVapiAssistantApiV1AgentsImportVapiAssistantPostJSONRequestBody, reqEditors ...RequestEditorFn) (*ImportVapiAssistantApiV1AgentsImportVapiAssistantPostResponse, error)
+
+	// ListVapiAssistantsApiV1AgentsImportVapiAssistantsPostWithBodyWithResponse List Vapi Assistants
+	//
+	// One page of a Vapi organization's assistants, newest first. The API key is used for this
+	// call only.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/agents/import/vapi/assistants (the `ListVapiAssistantsApiV1AgentsImportVapiAssistantsPost` operationId).
+	ListVapiAssistantsApiV1AgentsImportVapiAssistantsPostWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ListVapiAssistantsApiV1AgentsImportVapiAssistantsPostResponse, error)
+
+	// ListVapiAssistantsApiV1AgentsImportVapiAssistantsPostWithResponse List Vapi Assistants
+	//
+	// One page of a Vapi organization's assistants, newest first. The API key is used for this
+	// call only.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/agents/import/vapi/assistants (the `ListVapiAssistantsApiV1AgentsImportVapiAssistantsPost` operationId).
+	ListVapiAssistantsApiV1AgentsImportVapiAssistantsPostWithResponse(ctx context.Context, body ListVapiAssistantsApiV1AgentsImportVapiAssistantsPostJSONRequestBody, reqEditors ...RequestEditorFn) (*ListVapiAssistantsApiV1AgentsImportVapiAssistantsPostResponse, error)
+
 	// ListAgentSourcesApiV1AgentsSourcesGetWithResponse List Agent Sources
 	//
 	// Where the live agents came from, each source once.
@@ -11409,6 +11710,116 @@ func (r ListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPostResponse) StatusCode() 
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r ListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPostResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type ImportVapiAssistantApiV1AgentsImportVapiAssistantPostResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *ProviderDraft
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *ErrorResponse
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ImportVapiAssistantApiV1AgentsImportVapiAssistantPostResponse) GetJSON200() *ProviderDraft {
+	return r.JSON200
+}
+
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r ImportVapiAssistantApiV1AgentsImportVapiAssistantPostResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r ImportVapiAssistantApiV1AgentsImportVapiAssistantPostResponse) GetJSON503() *ErrorResponse {
+	return r.JSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r ImportVapiAssistantApiV1AgentsImportVapiAssistantPostResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ImportVapiAssistantApiV1AgentsImportVapiAssistantPostResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ImportVapiAssistantApiV1AgentsImportVapiAssistantPostResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ImportVapiAssistantApiV1AgentsImportVapiAssistantPostResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type ListVapiAssistantsApiV1AgentsImportVapiAssistantsPostResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *VapiAssistantPage
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *ErrorResponse
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListVapiAssistantsApiV1AgentsImportVapiAssistantsPostResponse) GetJSON200() *VapiAssistantPage {
+	return r.JSON200
+}
+
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r ListVapiAssistantsApiV1AgentsImportVapiAssistantsPostResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r ListVapiAssistantsApiV1AgentsImportVapiAssistantsPostResponse) GetJSON503() *ErrorResponse {
+	return r.JSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r ListVapiAssistantsApiV1AgentsImportVapiAssistantsPostResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListVapiAssistantsApiV1AgentsImportVapiAssistantsPostResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListVapiAssistantsApiV1AgentsImportVapiAssistantsPostResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListVapiAssistantsApiV1AgentsImportVapiAssistantsPostResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -15367,6 +15778,70 @@ func (c *ClientWithResponses) ListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPostW
 	return ParseListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPostResponse(rsp)
 }
 
+// ImportVapiAssistantApiV1AgentsImportVapiAssistantPostWithBodyWithResponse Import Vapi Assistant
+//
+// Read one Vapi assistant into a draft agent. Nothing is saved. An assistant without a
+// number gets a start request for Vapi's outbound call, which carries the API key.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/agents/import/vapi/assistant (the `ImportVapiAssistantApiV1AgentsImportVapiAssistantPost` operationId).
+func (c *ClientWithResponses) ImportVapiAssistantApiV1AgentsImportVapiAssistantPostWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ImportVapiAssistantApiV1AgentsImportVapiAssistantPostResponse, error) {
+	rsp, err := c.ImportVapiAssistantApiV1AgentsImportVapiAssistantPostWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseImportVapiAssistantApiV1AgentsImportVapiAssistantPostResponse(rsp)
+}
+
+// ImportVapiAssistantApiV1AgentsImportVapiAssistantPostWithResponse Import Vapi Assistant
+//
+// Read one Vapi assistant into a draft agent. Nothing is saved. An assistant without a
+// number gets a start request for Vapi's outbound call, which carries the API key.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/agents/import/vapi/assistant (the `ImportVapiAssistantApiV1AgentsImportVapiAssistantPost` operationId).
+func (c *ClientWithResponses) ImportVapiAssistantApiV1AgentsImportVapiAssistantPostWithResponse(ctx context.Context, body ImportVapiAssistantApiV1AgentsImportVapiAssistantPostJSONRequestBody, reqEditors ...RequestEditorFn) (*ImportVapiAssistantApiV1AgentsImportVapiAssistantPostResponse, error) {
+	rsp, err := c.ImportVapiAssistantApiV1AgentsImportVapiAssistantPost(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseImportVapiAssistantApiV1AgentsImportVapiAssistantPostResponse(rsp)
+}
+
+// ListVapiAssistantsApiV1AgentsImportVapiAssistantsPostWithBodyWithResponse List Vapi Assistants
+//
+// One page of a Vapi organization's assistants, newest first. The API key is used for this
+// call only.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/agents/import/vapi/assistants (the `ListVapiAssistantsApiV1AgentsImportVapiAssistantsPost` operationId).
+func (c *ClientWithResponses) ListVapiAssistantsApiV1AgentsImportVapiAssistantsPostWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ListVapiAssistantsApiV1AgentsImportVapiAssistantsPostResponse, error) {
+	rsp, err := c.ListVapiAssistantsApiV1AgentsImportVapiAssistantsPostWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListVapiAssistantsApiV1AgentsImportVapiAssistantsPostResponse(rsp)
+}
+
+// ListVapiAssistantsApiV1AgentsImportVapiAssistantsPostWithResponse List Vapi Assistants
+//
+// One page of a Vapi organization's assistants, newest first. The API key is used for this
+// call only.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/agents/import/vapi/assistants (the `ListVapiAssistantsApiV1AgentsImportVapiAssistantsPost` operationId).
+func (c *ClientWithResponses) ListVapiAssistantsApiV1AgentsImportVapiAssistantsPostWithResponse(ctx context.Context, body ListVapiAssistantsApiV1AgentsImportVapiAssistantsPostJSONRequestBody, reqEditors ...RequestEditorFn) (*ListVapiAssistantsApiV1AgentsImportVapiAssistantsPostResponse, error) {
+	rsp, err := c.ListVapiAssistantsApiV1AgentsImportVapiAssistantsPost(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListVapiAssistantsApiV1AgentsImportVapiAssistantsPostResponse(rsp)
+}
+
 // ListAgentSourcesApiV1AgentsSourcesGetWithResponse List Agent Sources
 //
 // Where the live agents came from, each source once.
@@ -17070,6 +17545,86 @@ func ParseListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPostResponse(rsp *http.Re
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest PlivoCxFlowPage
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseImportVapiAssistantApiV1AgentsImportVapiAssistantPostResponse parses an HTTP response from a ImportVapiAssistantApiV1AgentsImportVapiAssistantPostWithResponse call
+func ParseImportVapiAssistantApiV1AgentsImportVapiAssistantPostResponse(rsp *http.Response) (*ImportVapiAssistantApiV1AgentsImportVapiAssistantPostResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ImportVapiAssistantApiV1AgentsImportVapiAssistantPostResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ProviderDraft
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListVapiAssistantsApiV1AgentsImportVapiAssistantsPostResponse parses an HTTP response from a ListVapiAssistantsApiV1AgentsImportVapiAssistantsPostWithResponse call
+func ParseListVapiAssistantsApiV1AgentsImportVapiAssistantsPostResponse(rsp *http.Response) (*ListVapiAssistantsApiV1AgentsImportVapiAssistantsPostResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListVapiAssistantsApiV1AgentsImportVapiAssistantsPostResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest VapiAssistantPage
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}

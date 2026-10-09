@@ -4,8 +4,7 @@ that calls out."""
 
 import asyncio
 import json
-from collections.abc import Generator
-from contextlib import contextmanager
+from contextlib import AbstractContextManager
 from datetime import UTC, datetime
 from typing import Any
 
@@ -19,15 +18,18 @@ from yaksha.domain.agent_import import (
     StartRequestDraft,
 )
 from yaksha.domain.agents import Direction
-from yaksha.domain.errors import (
-    NotFoundError,
-    ProviderCallError,
-    UnavailableError,
-    ValidationError,
-)
+from yaksha.domain.errors import ValidationError
 from yaksha.domain.triggers import TriggerMethod
-from yaksha.simulation.agent_import import language, pruned, text
-from yaksha.simulation.curl_import import FILL, NUMBER, ScenarioNames, check
+from yaksha.simulation.agent_import import (
+    language,
+    provider_errors,
+    pruned,
+    scenario_variables,
+    text,
+    unless_missing,
+    without,
+)
+from yaksha.simulation.curl_import import NUMBER, check
 
 OUTBOUND_ROUTES = {"twilio": "twilio", "sip_trunk": "sip-trunk", "exotel": "exotel"}
 """The outbound call endpoint of each kind of number, by the number's provider."""
@@ -58,7 +60,7 @@ async def list_agents(
 async def import_agent(api: ElevenLabsAccountApi, agent_id: str) -> ProviderDraft:
     with elevenlabs_errors():
         agent = await api.get_agent(agent_id)
-        found = await asyncio.gather(*(existing_tool(api, id) for id in tool_ids(agent)))
+        found = await asyncio.gather(*(unless_missing(api.get_tool(id)) for id in tool_ids(agent)))
     tools = [tool for tool in found if tool is not None]
     numbers = [
         str(number.get("phone_number"))
@@ -73,6 +75,7 @@ async def import_agent(api: ElevenLabsAccountApi, agent_id: str) -> ProviderDraf
         direction=Direction.INBOUND,
         agent_numbers=numbers,
         start_request=None,
+        agent_speaks_first=bool(settings(agent).get("first_message")),
     )
     if numbers:
         return draft
@@ -111,16 +114,6 @@ def prompt_of(owner: dict[str, Any]) -> dict[str, Any]:
     return settings(owner).get("prompt") or {}
 
 
-async def existing_tool(api: ElevenLabsAccountApi, tool_id: str) -> dict[str, Any] | None:
-    """A workflow can name a tool that was deleted; ElevenLabs answers 404 for it."""
-    try:
-        return await api.get_tool(tool_id)
-    except ProviderCallError as error:
-        if error.status == 404:
-            return None
-        raise
-
-
 def behavior(agent: dict[str, Any], tools: list[dict[str, Any]]) -> dict[str, Any]:
     """The agent as the judges read it: its prompt, first message, workflow and tools, and how
     ElevenLabs grades its calls, without voice, widget and account settings."""
@@ -131,7 +124,7 @@ def behavior(agent: dict[str, Any], tools: list[dict[str, Any]]) -> dict[str, An
         for name, node in (workflow.get("nodes") or {}).items()
     }
     return pruned(
-        without_credentials(
+        without(
             {
                 "name": agent.get("name"),
                 "agent": settings(agent),
@@ -139,21 +132,10 @@ def behavior(agent: dict[str, Any], tools: list[dict[str, Any]]) -> dict[str, An
                 "tools": [tool.get("tool_config") or tool for tool in tools],
                 "evaluation": platform.get("evaluation"),
                 "data_collection": platform.get("data_collection"),
-            }
+            },
+            CREDENTIALS,
         )
     )
-
-
-def without_credentials(value: Any) -> Any:
-    """`value` without request headers and auth connections at any depth, schemas too: a tool,
-    fetched or written inline in a prompt, can hold a credential in them."""
-    if isinstance(value, dict):
-        return {
-            key: without_credentials(item) for key, item in value.items() if key not in CREDENTIALS
-        }
-    if isinstance(value, list):
-        return [without_credentials(item) for item in value]
-    return value
 
 
 def start_request(
@@ -163,14 +145,9 @@ def start_request(
     dynamic variables for each scenario to fill."""
     placeholders = (agent.get("dynamic_variables") or {}).get("dynamic_variable_placeholders") or {}
     headers = [Pair(name="xi-api-key", value=api.api_key)]
-    # Each variable is named for itself, not for its place in the body.
-    names = ScenarioNames()
-    variables = {
-        name: names.fill(FILL, (name,))
-        for name in placeholders
-        if not name.startswith(SYSTEM_VARIABLE)
-    }
-    names.check()
+    variables = scenario_variables(
+        name for name in placeholders if not name.startswith(SYSTEM_VARIABLE)
+    )
     body: dict[str, Any] = {
         "agent_id": agent_id,
         "agent_phone_number_id": caller.get("phone_number_id"),
@@ -194,35 +171,10 @@ def moment(value: Any) -> datetime | None:
     return datetime.fromtimestamp(value, UTC) if isinstance(value, int | float) else None
 
 
-@contextmanager
-def elevenlabs_errors() -> Generator[None]:
-    try:
-        yield
-    except ProviderCallError as error:
-        match error.status:
-            case 401:
-                raise ValidationError(
-                    "ElevenLabs refused the API key; a key from an EU, India or Singapore "
-                    "workspace works only with that workspace chosen"
-                ) from None
-            case 403:
-                raise ValidationError(
-                    "the API key may not read agents; give it ElevenAgents access"
-                ) from None
-            case 404:
-                raise NotFoundError("ElevenLabs has no agent or tool with this ID") from None
-            case 429:
-                raise UnavailableError(
-                    "ElevenLabs refused more requests for now; wait a minute, then try again"
-                ) from None
-            case None:
-                raise UnavailableError(
-                    "Yaksha could not reach ElevenLabs; try again later"
-                ) from None
-            case status:
-                # ElevenLabs' reply stays out of the message: the client sees only its status.
-                raise UnavailableError(
-                    f"ElevenLabs answered with status {status}; try again later"
-                ) from None
-    except ValueError:
-        raise UnavailableError("ElevenLabs answered with something that is not JSON") from None
+def elevenlabs_errors() -> AbstractContextManager[None]:
+    return provider_errors(
+        "ElevenLabs",
+        refused="ElevenLabs refused the API key; a key from an EU, India or Singapore workspace "
+        "works only with that workspace chosen",
+        forbidden="the API key may not read agents; give it ElevenAgents access",
+    )

@@ -98,6 +98,7 @@ class ProviderDraft(BaseModel):
     direction: Direction
     agent_numbers: list[str]
     start_request: StartRequestDraft | None
+    agent_speaks_first: bool = True
 
 
 class PlivoCxAccountApi(Protocol):
@@ -174,3 +175,63 @@ class ElevenLabsAccountApi(Protocol):
     async def outbound_numbers(self) -> list[dict[str, Any]]:
         """The workspace's numbers that can place calls."""
         ...
+
+
+VAPI_PAGE_SIZE = 100
+"""The assistants in one Vapi list call; a shorter page is the last."""
+
+
+class VapiRegion(StrEnum):
+    """Where the Vapi organization is. An EU organization has its own API host and keys."""
+
+    US = "us"
+    EU = "eu"
+
+
+class VapiAccount(BaseModel):
+    """A Vapi private API key, used for one import and never stored."""
+
+    api_key: str = Field(min_length=1, max_length=200)
+    region: VapiRegion = VapiRegion.US
+
+
+class VapiAssistantSearch(VapiAccount):
+    name: str | None = Field(default=None, max_length=200)
+    cursor: datetime | None = None
+    """The creation time of the last assistant shown: the next page has older ones."""
+
+
+class VapiAssistantChoice(VapiAccount):
+    assistant_id: uuid.UUID
+
+
+class VapiAssistant(BaseModel):
+    id: str
+    name: str
+    updated_at: datetime | None
+    numbers: list[str]
+    """The numbers that reach the assistant; without one, an import makes it call out."""
+
+
+class VapiAssistantPage(BaseModel):
+    items: list[VapiAssistant]
+    next_cursor: datetime | None
+    """Where the next page starts, or None after the last."""
+
+
+class VapiAccountApi(Protocol):
+    """The Vapi calls an import makes, with the organization's own key. A failed call raises
+    ProviderCallError with Vapi's status."""
+
+    api_key: str
+    base_url: str
+
+    async def list_assistants(self, *, created_before: datetime | None) -> list[dict[str, Any]]:
+        """The newest assistants first, created before `created_before` when it is set."""
+        ...
+
+    async def get_assistant(self, assistant_id: str) -> dict[str, Any]: ...
+
+    async def get_tool(self, tool_id: str) -> dict[str, Any]: ...
+
+    async def phone_numbers(self) -> list[dict[str, Any]]: ...
