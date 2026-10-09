@@ -1,6 +1,6 @@
-import { Play, Square } from "lucide-react";
+import { Play, Sparkles, Square } from "lucide-react";
 import { type ReactNode, type SubmitEvent, useEffect, useRef, useState } from "react";
-import { Link, useBlocker, useNavigate, useParams } from "react-router";
+import { Link, useBlocker, useLocation, useNavigate, useParams } from "react-router";
 
 import { DeleteConfirm, DiscardConfirm } from "@/components/confirm-dialogs";
 import { CopyId } from "@/components/copy-id";
@@ -53,6 +53,7 @@ import {
   type Surroundings,
   type Voice,
 } from "@/lib/types";
+import type { GeneratedPersona } from "@/pages/new-persona-dialog";
 
 interface Draft {
   name: string;
@@ -154,7 +155,8 @@ function SliderField({
 export function PersonaPage() {
   const { id } = useParams();
   const persona = usePersona(id);
-  if (!id) return <PersonaEditor key="new" />;
+  const generated = (useLocation().state as GeneratedPersona | null) ?? undefined;
+  if (!id) return <PersonaEditor key="new" generated={generated} />;
   if (persona.isPending) {
     return (
       <div className="grid gap-6">
@@ -174,7 +176,24 @@ export function PersonaPage() {
   return <PersonaEditor key={`${id}-${persona.data.updated_at}`} persona={persona.data} />;
 }
 
-function PersonaEditor({ persona }: { persona?: Persona }) {
+function fromGenerated({ draft }: GeneratedPersona): Draft {
+  return {
+    ...EMPTY,
+    name: draft.name,
+    prompt: draft.prompt,
+    language: draft.language,
+    speed: draft.speed,
+    surroundings: draft.surroundings,
+  };
+}
+
+function PersonaEditor({
+  persona,
+  generated,
+}: {
+  persona?: Persona;
+  generated?: GeneratedPersona;
+}) {
   const id = persona?.id;
   const navigate = useNavigate();
   const save = useSavePersona(id);
@@ -182,7 +201,8 @@ function PersonaEditor({ persona }: { persona?: Persona }) {
   const scenarios = usePersonaScenarios(id);
   const preview = useVoicePreview();
   const [initial, setInitial] = useState<Draft>(() => (persona ? toDraft(persona) : EMPTY));
-  const [draft, setDraft] = useState<Draft>(initial);
+  const [draft, setDraft] = useState<Draft>(() => (generated ? fromGenerated(generated) : initial));
+  const [pickVoice, setPickVoice] = useState(Boolean(generated));
   const [submitted, setSubmitted] = useState(false);
   const leaving = useRef(false);
   const voices = useVoices(draft.language);
@@ -192,6 +212,13 @@ function PersonaEditor({ persona }: { persona?: Persona }) {
     save.reset();
     setDraft((current) => ({ ...current, [key]: value }));
   };
+
+  if (pickVoice && voices.data && !voices.isPlaceholderData) {
+    const gender = generated?.draft.voice_gender;
+    const match = voices.data.find((voice) => voice.gender === gender) ?? voices.data[0];
+    setPickVoice(false);
+    if (match) setDraft((current) => ({ ...current, voice_id: match.provider_voice_id }));
+  }
 
   const listed = voices.data ?? [];
   const chosen = listed.find((voice) => voice.provider_voice_id === draft.voice_id);
@@ -233,6 +260,24 @@ function PersonaEditor({ persona }: { persona?: Persona }) {
 
   return (
     <form id="persona-form" noValidate onSubmit={submit} className="grid gap-6">
+      {generated && (
+        <Alert>
+          <Sparkles />
+          <AlertDescription>
+            <p>Written from “{generated.idea}”. Check each field, then create the persona.</p>
+            {generated.draft.left_out.length > 0 && (
+              <>
+                <p>Not set from your line:</p>
+                <ul className="list-disc pl-5">
+                  {generated.draft.left_out.map((part) => (
+                    <li key={part}>{part}</li>
+                  ))}
+                </ul>
+              </>
+            )}
+          </AlertDescription>
+        </Alert>
+      )}
       <Card>
         <CardHeader>
           <CardTitle>

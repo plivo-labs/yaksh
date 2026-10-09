@@ -629,6 +629,17 @@ class FakeJsonModel:
         self.questions: dict[str, Any] = {"answered": [], "unanswered": []}
         self.write: Callable[[str], dict[str, Any]] = written_scenario
         self.brief = "Books, moves and cancels dental appointments for callers."
+        self.persona: dict[str, Any] = {
+            "name": "Asha Rao",
+            "prompt": "You are tired and short of time. Give brief answers, and sigh often.",
+            "language": "hi",
+            "voice_gender": "female",
+            "speed": "fast",
+            "noise": "street",
+            "noise_level": "normal",
+            "speaker": None,
+            "left_out": [],
+        }
         self.down = False
 
     async def complete_json(
@@ -643,6 +654,8 @@ class FakeJsonModel:
             data = self.questions
         elif name == "brief":
             data = {"brief": self.brief}
+        elif name == "persona":
+            data = self.persona
         else:
             data = self.write(user)
         return ModelAnswer(data=data, model="fake", input_tokens=None, output_tokens=None)

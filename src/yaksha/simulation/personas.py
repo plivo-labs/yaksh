@@ -123,6 +123,14 @@ async def create_persona(session: AsyncSession, command: PersonaCreate) -> Perso
     return persona
 
 
+async def persona_names(session: AsyncSession) -> list[str]:
+    """The names of the live personas, in order."""
+    rows = await session.scalars(
+        select(Persona.name).where(Persona.deleted_at.is_(None)).order_by(Persona.name)
+    )
+    return list(rows)
+
+
 async def list_personas(
     session: AsyncSession, *, offset: int, limit: int
 ) -> tuple[list[Persona], int]:

@@ -1,4 +1,5 @@
 import { Play, Plus, Square, UserRound } from "lucide-react";
+import { useState } from "react";
 import { Link } from "react-router";
 
 import { GenderBadge } from "@/components/gender-badge";
@@ -27,16 +28,18 @@ import { useSurroundingsPreview } from "@/hooks/use-surroundings-preview";
 import { surroundingsLabel } from "@/lib/format";
 import { usePersonas } from "@/lib/queries";
 import { LANGUAGE_NAMES } from "@/lib/types";
+import { NewPersonaDialog } from "@/pages/new-persona-dialog";
 
 export function PersonasPage() {
   const personas = usePersonas();
   const preview = useSurroundingsPreview();
+  const [creating, setCreating] = useState(false);
 
   return (
     <div className="grid gap-6">
       <div className="flex min-h-[30px] flex-wrap items-center gap-x-2 gap-y-4">
         <h1 className="mr-auto text-h3-500">Personas</h1>
-        <Button size="sm" render={<Link to="/personas/new" />}>
+        <Button size="sm" onClick={() => setCreating(true)}>
           <Plus />
           New persona
         </Button>
@@ -64,7 +67,7 @@ export function PersonasPage() {
             </EmptyDescription>
           </EmptyHeader>
           <EmptyContent>
-            <Button render={<Link to="/personas/new" />}>
+            <Button onClick={() => setCreating(true)}>
               <Plus />
               New persona
             </Button>
@@ -135,6 +138,7 @@ export function PersonasPage() {
           ))}
         </ul>
       )}
+      {creating && <NewPersonaDialog onClose={() => setCreating(false)} />}
     </div>
   );
 }

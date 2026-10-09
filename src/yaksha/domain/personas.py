@@ -42,6 +42,28 @@ class PersonaCreate(PersonaSettings):
         return PersonaSettings.model_validate(self.model_dump(exclude={"name"}))
 
 
+class PersonaIdea(BaseModel):
+    """A short line about the caller, such as "angry senior woman on a noisy street"."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    idea: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=500)]
+
+
+class PersonaDraft(BaseModel):
+    """A new persona's fields written from a short line, for the person to check before they
+    save it. The console picks a voice of `voice_gender` in the language."""
+
+    name: str
+    prompt: str
+    language: Language
+    voice_gender: VoiceGender
+    speed: float
+    surroundings: Surroundings
+    left_out: list[str]
+    """Parts of the line that no field can hold, each with the reason, for the person to see."""
+
+
 class PersonaUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
