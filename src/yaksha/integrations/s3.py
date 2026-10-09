@@ -1,9 +1,12 @@
 """The file store over the S3 API: SeaweedFS in the bundled compose file, or any S3-compatible
 service a deployment points it at."""
 
+import asyncio
 from collections.abc import AsyncGenerator
+from contextlib import AsyncExitStack
 
 import aiohttp
+from aiobotocore.client import AioBaseClient
 from aiobotocore.config import AioConfig
 from aiobotocore.session import get_session
 from botocore.exceptions import BotoCoreError, ClientError
@@ -11,11 +14,18 @@ from botocore.exceptions import BotoCoreError, ClientError
 from yaksha.diagnostics import describe_exception
 from yaksha.domain.errors import UnavailableError
 
-CONFIG = AioConfig(connect_timeout=5, read_timeout=30, retries={"max_attempts": 2})
+CONFIG = AioConfig(
+    connect_timeout=5, read_timeout=30, retries={"max_attempts": 2}, max_pool_connections=50
+)
+"""A request waits without a time limit for a free connection, so the pool is sized well above
+the downloads one process serves at once."""
 CHUNK_BYTES = 256 * 1024
 
 
 class S3FileStore:
+    """Holds one client, made at the first operation, so its connections are reused until
+    close()."""
+
     def __init__(
         self,
         endpoint: str,
@@ -33,13 +43,27 @@ class S3FileStore:
             "region_name": region,
             "config": CONFIG,
         }
+        self._client: AioBaseClient | None = None
+        self._opening = asyncio.Lock()
+        self._open = AsyncExitStack()
+
+    async def _connected(self) -> AioBaseClient:
+        async with self._opening:
+            if self._client is None:
+                self._client = await self._open.enter_async_context(
+                    get_session().create_client("s3", **self._client_args)
+                )
+            return self._client
+
+    async def close(self) -> None:
+        async with self._opening:
+            await self._open.aclose()
+            self._client = None
 
     async def put(self, key: str, data: bytes, media_type: str) -> None:
         try:
-            async with get_session().create_client("s3", **self._client_args) as client:
-                await client.put_object(
-                    Bucket=self.bucket, Key=key, Body=data, ContentType=media_type
-                )
+            client = await self._connected()
+            await client.put_object(Bucket=self.bucket, Key=key, Body=data, ContentType=media_type)
         except (BotoCoreError, ClientError) as error:
             raise UnavailableError(f"file storage refused the upload: {reason(error)}") from error
 
@@ -48,11 +72,11 @@ class S3FileStore:
 
     async def stream(self, key: str) -> AsyncGenerator[bytes]:
         try:
-            async with get_session().create_client("s3", **self._client_args) as client:
-                response = await client.get_object(Bucket=self.bucket, Key=key)
-                async with response["Body"] as body:
-                    async for chunk in body.iter_chunks(CHUNK_BYTES):
-                        yield chunk
+            client = await self._connected()
+            response = await client.get_object(Bucket=self.bucket, Key=key)
+            async with response["Body"] as body:
+                async for chunk in body.iter_chunks(CHUNK_BYTES):
+                    yield chunk
         except (BotoCoreError, ClientError, aiohttp.ClientError) as error:
             raise UnavailableError(
                 f"file storage could not return the file: {reason(error)}"

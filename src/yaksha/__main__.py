@@ -91,11 +91,13 @@ async def run_evaluator(settings: Settings) -> None:
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGINT, signal.SIGTERM):
         loop.add_signal_handler(sig, stop.set)
-    evaluator = Evaluator(create_sessionmaker(engine), settings, source, file_store(settings))
+    store = file_store(settings)
+    evaluator = Evaluator(create_sessionmaker(engine), settings, source, store)
     try:
         await evaluator.run(stop)
     finally:
         await evaluator.close()
+        await store.close()
         if not await bounded_dispose(engine, settings.end_timeout_s):
             logging.shutdown()
             os._exit(1)
@@ -122,13 +124,14 @@ async def run_worker(settings: Settings, caller: Caller, registry: StreamRegistr
     engine = create_engine(str(settings.database_url))
     sessionmaker = create_sessionmaker(engine)
     source = await settings_source(settings, engine)
+    store = file_store(settings)
     worker = Worker(
         sessionmaker,
         caller,
         settings,
         source,
         PhoneAccount(sessionmaker, settings),
-        file_store(settings),
+        store,
     )
     server = None
     if settings.public_url is not None:
@@ -151,6 +154,7 @@ async def run_worker(settings: Settings, caller: Caller, registry: StreamRegistr
     finally:
         if server is not None:
             await server.stop(settings.end_timeout_s)
+        await store.close()
         if worker.fatal.is_set() or not await bounded_dispose(engine, settings.end_timeout_s):
             # A leaked task would keep asyncio.run's teardown waiting forever.
             logging.shutdown()

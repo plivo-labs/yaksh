@@ -1,4 +1,4 @@
-from collections.abc import Iterator
+from collections.abc import AsyncIterator, Callable, Iterator
 
 import pytest
 from testcontainers.core.container import DockerContainer
@@ -26,8 +26,22 @@ def endpoint() -> Iterator[str]:
         yield f"http://{storage.get_container_host_ip()}:{storage.get_exposed_port(8333)}"
 
 
-async def test_a_file_comes_back_as_it_went_in(endpoint: str) -> None:
-    store = S3FileStore(endpoint, "yaksha", ACCESS_KEY, SECRET_KEY)
+@pytest.fixture
+async def stores(endpoint: str) -> AsyncIterator[Callable[[str], S3FileStore]]:
+    """Stores with the given secret key, each closed after the test."""
+    made: list[S3FileStore] = []
+
+    def store(secret_key: str = SECRET_KEY) -> S3FileStore:
+        made.append(S3FileStore(endpoint, "yaksha", ACCESS_KEY, secret_key))
+        return made[-1]
+
+    yield store
+    for store_made in made:
+        await store_made.close()
+
+
+async def test_a_file_comes_back_as_it_went_in(stores: Callable[[str], S3FileStore]) -> None:
+    store = stores(SECRET_KEY)
     data = b"%PDF-1.4 clinic hours"
 
     await store.put("documents/abc", data, "application/pdf")
@@ -38,10 +52,10 @@ async def test_a_file_comes_back_as_it_went_in(endpoint: str) -> None:
 
 
 async def test_a_wrong_key_and_a_missing_file_are_reported_as_storage_failures(
-    endpoint: str,
+    stores: Callable[[str], S3FileStore],
 ) -> None:
-    wrong = S3FileStore(endpoint, "yaksha", ACCESS_KEY, "not-the-secret")
-    store = S3FileStore(endpoint, "yaksha", ACCESS_KEY, SECRET_KEY)
+    wrong = stores("not-the-secret")
+    store = stores(SECRET_KEY)
 
     with pytest.raises(UnavailableError, match="refused the upload: SignatureDoesNotMatch"):
         await wrong.put("documents/x", b"x", "text/plain")
