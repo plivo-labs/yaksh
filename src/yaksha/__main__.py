@@ -17,6 +17,7 @@ from yaksha.db.session import create_engine, create_sessionmaker
 from yaksha.domain.conversations import Caller
 from yaksha.settings.cipher import Cipher, SecretUnreadableError
 from yaksha.settings.store import SettingsSource
+from yaksha.storage import file_store
 from yaksha.worker.phone_account import PhoneAccount
 from yaksha.worker.worker import Worker
 
@@ -90,7 +91,7 @@ async def run_evaluator(settings: Settings) -> None:
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGINT, signal.SIGTERM):
         loop.add_signal_handler(sig, stop.set)
-    evaluator = Evaluator(create_sessionmaker(engine), settings, source)
+    evaluator = Evaluator(create_sessionmaker(engine), settings, source, file_store(settings))
     try:
         await evaluator.run(stop)
     finally:
@@ -127,6 +128,7 @@ async def run_worker(settings: Settings, caller: Caller, registry: StreamRegistr
         settings,
         source,
         PhoneAccount(sessionmaker, settings),
+        file_store(settings),
     )
     server = None
     if settings.public_url is not None:

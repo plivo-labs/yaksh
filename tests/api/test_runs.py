@@ -1,7 +1,6 @@
 import asyncio
 import uuid
 from datetime import date, datetime
-from pathlib import Path
 from typing import Any
 
 import pytest
@@ -457,7 +456,6 @@ async def test_a_finished_call_keeps_the_facts_its_call_captured(
         recording_start_ms=100,
         agent_media=media,
         caller_replies=replies,
-        caller_voice_path=Path("/data/c/caller-voice.wav"),
     )
     assert await finish(db, conversation["id"], outcome)
 
@@ -472,7 +470,6 @@ async def test_a_finished_call_keeps_the_facts_its_call_captured(
         media,
         replies,
     )
-    assert row.caller_voice_path == "/data/c/caller-voice.wav"
     assert CallerSettings.model_validate(row.caller_settings) == settings
     assert CallerUsage.model_validate(row.caller_usage) == usage
     assert LineFacts.model_validate(row.line_facts) == line

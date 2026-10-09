@@ -32,6 +32,7 @@ from yaksha.domain.conversations import (
     IncomingCall,
     Provenance,
     Role,
+    StoredAudio,
     Transcript,
     Turn,
     WireEvent,
@@ -39,6 +40,7 @@ from yaksha.domain.conversations import (
 )
 from yaksha.domain.errors import UnavailableError
 from yaksha.domain.evaluations import Metric, MetricKey
+from yaksha.domain.files import FileStore
 from yaksha.domain.language_models import ModelAnswer, ModelCallError
 from yaksha.domain.languages import Language
 from yaksha.domain.numbers import AccountNumber
@@ -284,6 +286,7 @@ async def finish(
     outcome: CallOutcome,
     worker_id: str = "w1",
     transcript: Transcript | None = None,
+    audio: StoredAudio | None = None,
 ) -> bool:
     """Record the outcome of a conversation the worker claimed, as the worker does."""
     async with db() as session:
@@ -293,6 +296,7 @@ async def finish(
             worker_id,
             outcome,
             transcript or Transcript(),
+            audio or StoredAudio(),
             0,
         )
 
@@ -470,6 +474,7 @@ def make_worker(
     receiving_app_id: str | None = None,
     outbound_problem: str | None = None,
     source: SettingsSource | None = None,
+    store: FileStore | None = None,
 ) -> Worker:
     return Worker(
         sessionmaker,
@@ -477,6 +482,7 @@ def make_worker(
         settings,
         source or SettingsSource(sessionmaker, Cipher(ENCRYPTION_KEY)),
         FixedAccount(sessionmaker, settings, receiving_app_id, outbound_problem),
+        store or FakeFileStore(),
         worker_id=worker_id,
     )
 
@@ -488,12 +494,14 @@ def make_evaluator(
     *,
     sources_model: Any = None,
     jev: Any = None,
+    store: FileStore | None = None,
 ) -> Evaluator:
     """An evaluator that judges with these clients, whatever the stored settings say."""
     return Evaluator(
         sessionmaker,
         settings,
         SettingsSource(sessionmaker, Cipher(ENCRYPTION_KEY)),
+        store or FakeFileStore(),
         clients=lambda _settings: JudgeClients(model, sources_model, jev),
     )
 
@@ -512,7 +520,9 @@ def make_settings(tmp_path: Path, **overrides: Any) -> Settings:
     values: dict[str, Any] = {
         "api_token": TOKEN,
         "database_url": OFFLINE_DATABASE_URL,
-        "data_dir": tmp_path / "data",
+        "s3_endpoint": "http://storage.test",
+        "s3_access_key": "test-access-key",
+        "s3_secret_key": "test-secret-key",
         "frontend_dist": tmp_path / "missing",
         "worker_poll_interval_s": 0.05,
         "worker_heartbeat_s": 0.05,
@@ -566,7 +576,8 @@ class FakeCaller:
         self.connect_gate.set()
         self.release = asyncio.Event()
         self.release.set()
-        self.recording_path: Path | None = None
+        self.recording: bytes | None = None
+        self.caller_voice: bytes | None = None
 
     async def run(
         self, request: CallRequest, observer: CallObserver, stop: asyncio.Event
@@ -593,7 +604,8 @@ class FakeCaller:
             return CallOutcome(
                 connected=True,
                 end_reason=EndReason.USER_REQUEST,
-                recording_path=self.recording_path,
+                recording=self.recording,
+                caller_voice=self.caller_voice,
             )
         observer.turn(
             Turn(
@@ -614,7 +626,8 @@ class FakeCaller:
         return CallOutcome(
             connected=True,
             end_reason=EndReason.AGENT_HANGUP,
-            recording_path=self.recording_path,
+            recording=self.recording,
+            caller_voice=self.caller_voice,
             call_uuid="call-42",
         )
 
@@ -714,6 +727,11 @@ class FakeFileStore:
         if self.down:
             raise UnavailableError("file storage refused the upload")
         self.files[key] = (data, media_type)
+
+    async def get(self, key: str) -> bytes:
+        if self.down or key not in self.files:
+            raise UnavailableError("file storage could not return the file")
+        return self.files[key][0]
 
     async def stream(self, key: str) -> AsyncGenerator[bytes]:
         if self.down or key not in self.files:
@@ -862,10 +880,12 @@ def caller() -> FakeCaller:
 
 @pytest.fixture
 async def worker(
-    client: AsyncClient, settings: Settings, caller: FakeCaller
+    client: AsyncClient, settings: Settings, caller: FakeCaller, file_store: FakeFileStore
 ) -> AsyncIterator[Worker]:
     engine = create_engine(settings.database_url.encoded_string())
-    worker = make_worker(create_sessionmaker(engine), caller, settings, worker_id="test-worker")
+    worker = make_worker(
+        create_sessionmaker(engine), caller, settings, worker_id="test-worker", store=file_store
+    )
     stop = asyncio.Event()
     task = asyncio.create_task(worker.run(stop))
     yield worker

@@ -8,21 +8,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from yaksha.db.models import Document
 from yaksha.domain.documents import (
     MAX_FILE_BYTES,
-    FileStore,
     TextDocumentCreate,
     document_name,
     file_type,
 )
-from yaksha.domain.errors import NotFoundError, UnavailableError, ValidationError
+from yaksha.domain.errors import NotFoundError, ValidationError
+from yaksha.domain.files import FileStore
 from yaksha.simulation.extraction import extract_file
-
-STORAGE_OFF = (
-    "file storage is off: set YAKSHA_S3_ENDPOINT, YAKSHA_S3_ACCESS_KEY and YAKSHA_S3_SECRET_KEY"
-)
 
 
 async def create_file_document(
-    session: AsyncSession, store: FileStore | None, name: str, data: bytes
+    session: AsyncSession, store: FileStore, name: str, data: bytes
 ) -> Document:
     """Keep the original under its content hash, then record its text. A failure between
     the two leaves an unused object, never a document without its file."""
@@ -35,8 +31,6 @@ async def create_file_document(
         raise ValidationError("only PDF, TXT and MD files are supported")
     if len(data) > MAX_FILE_BYTES:
         raise ValidationError(f"the file is larger than {MAX_FILE_BYTES // (1024 * 1024)} MB")
-    if store is None:
-        raise UnavailableError(STORAGE_OFF)
     extracted = await extract_file(kind, data)
     sha256 = hashlib.sha256(data).hexdigest()
     storage_key = f"documents/{sha256}"
@@ -90,13 +84,9 @@ class OpenedFile:
         await self.rest.aclose()
 
 
-async def open_file(
-    session: AsyncSession, store: FileStore | None, document_id: uuid.UUID
-) -> OpenedFile:
+async def open_file(session: AsyncSession, store: FileStore, document_id: uuid.UUID) -> OpenedFile:
     document = await get_document(session, document_id)
     if document.storage_key is None:
         raise NotFoundError("the document was pasted as text and has no file")
-    if store is None:
-        raise UnavailableError(STORAGE_OFF)
     rest = store.stream(document.storage_key)
     return OpenedFile(document, await anext(rest, b""), rest)

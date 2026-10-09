@@ -12398,20 +12398,20 @@ func (r ListenApiV1ConversationsConversationIdListenGetResponse) ContentType() s
 type GetRecordingApiV1ConversationsConversationIdRecordingGetResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
-	// JSON200 the response for an HTTP 200 `application/json` response
-	JSON200 *interface{}
 	// JSON4XX the response for an HTTP 4XX `application/json` response
 	JSON4XX *ErrorResponse
-}
-
-// GetJSON200 returns the response for an HTTP 200 `application/json` response
-func (r GetRecordingApiV1ConversationsConversationIdRecordingGetResponse) GetJSON200() *interface{} {
-	return r.JSON200
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *ErrorResponse
 }
 
 // GetJSON4XX returns the response for an HTTP 4XX `application/json` response
 func (r GetRecordingApiV1ConversationsConversationIdRecordingGetResponse) GetJSON4XX() *ErrorResponse {
 	return r.JSON4XX
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r GetRecordingApiV1ConversationsConversationIdRecordingGetResponse) GetJSON503() *ErrorResponse {
+	return r.JSON503
 }
 
 // GetBody returns the raw response body bytes
@@ -13502,20 +13502,20 @@ func (r GetReviewApiV1ReviewConversationsConversationIdGetResponse) ContentType(
 type GetRecordingApiV1ReviewConversationsConversationIdRecordingGetResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
-	// JSON200 the response for an HTTP 200 `application/json` response
-	JSON200 *interface{}
 	// JSON4XX the response for an HTTP 4XX `application/json` response
 	JSON4XX *ErrorResponse
-}
-
-// GetJSON200 returns the response for an HTTP 200 `application/json` response
-func (r GetRecordingApiV1ReviewConversationsConversationIdRecordingGetResponse) GetJSON200() *interface{} {
-	return r.JSON200
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *ErrorResponse
 }
 
 // GetJSON4XX returns the response for an HTTP 4XX `application/json` response
 func (r GetRecordingApiV1ReviewConversationsConversationIdRecordingGetResponse) GetJSON4XX() *ErrorResponse {
 	return r.JSON4XX
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r GetRecordingApiV1ReviewConversationsConversationIdRecordingGetResponse) GetJSON503() *ErrorResponse {
+	return r.JSON503
 }
 
 // GetBody returns the raw response body bytes
@@ -17782,12 +17782,8 @@ func ParseGetRecordingApiV1ConversationsConversationIdRecordingGetResponse(rsp *
 	}
 
 	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest interface{}
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
+	case rsp.StatusCode == 200:
+		break // No content-type
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
 		var dest ErrorResponse
@@ -17795,6 +17791,13 @@ func ParseGetRecordingApiV1ConversationsConversationIdRecordingGetResponse(rsp *
 			return nil, err
 		}
 		response.JSON4XX = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
 
 	}
 
@@ -18550,12 +18553,8 @@ func ParseGetRecordingApiV1ReviewConversationsConversationIdRecordingGetResponse
 	}
 
 	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest interface{}
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
+	case rsp.StatusCode == 200:
+		break // No content-type
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
 		var dest ErrorResponse
@@ -18563,6 +18562,13 @@ func ParseGetRecordingApiV1ReviewConversationsConversationIdRecordingGetResponse
 			return nil, err
 		}
 		response.JSON4XX = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
 
 	}
 

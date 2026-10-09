@@ -41,7 +41,7 @@ from yaksha.caller.audio import (
     PlanMixer,
     Playout,
     Stamper,
-    save_caller_voice,
+    caller_voice,
 )
 from yaksha.caller.lag import LagSampler
 from yaksha.caller.listen import AudioTap, LiveAudio
@@ -782,7 +782,7 @@ class PhoneCaller:
         finally:
             loop_lag = lag.stop()
         ended_ms = clock.ms()
-        # The line hangs up now; its report comes while the call's audio is saved. A
+        # The line hangs up now; its report comes while the call's audio is built. A
         # stopped call has a deadline to finish, so it takes the report only if it already came.
         ending = asyncio.ensure_future(line.end(0 if stop.is_set() else HANGUP_REPORT_WAIT_S))
         await live.close()
@@ -791,13 +791,8 @@ class PhoneCaller:
             if started_ms < connected_ms:
                 observer.wire_event(WireEvent(kind=WireEventKind.CONNECTED, at_ms=started_ms))
             talk_ms = ended_ms - started_ms
-            recording_path = await asyncio.to_thread(
-                spoken.recording.save, request.output_dir / "recording.wav", started_ms
-            )
-            caller_voice_path = request.output_dir / "caller-voice.wav"
-            caller_replies = await asyncio.to_thread(
-                save_caller_voice, spoken.marks.replies, caller_voice_path
-            )
+            recording = await asyncio.to_thread(spoken.recording.to_wav, started_ms)
+            voice, caller_replies = await asyncio.to_thread(caller_voice, spoken.marks.replies)
             report = await ending
         finally:
             ending.cancel()
@@ -810,12 +805,12 @@ class PhoneCaller:
             caller_error=spoken.state.error,
             caller_reason=spoken.state.caller_reason,
             talk_ms=talk_ms,
-            recording_path=recording_path,
+            recording=recording,
             stream_opened_ms=connected_ms,
             recording_start_ms=started_ms,
             agent_media=spoken.recording.agent_media(started_ms),
             caller_replies=caller_replies,
-            caller_voice_path=caller_voice_path if caller_voice_path.is_file() else None,
+            caller_voice=voice,
             caller_settings=spoken.persona.settings,
             caller_usage=spoken.persona.usage.usage(),
             line_facts=line_facts(report) if report else None,

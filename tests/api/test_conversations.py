@@ -22,6 +22,7 @@ from tests.conftest import (
     TOKEN,
     Db,
     FakeCaller,
+    FakeFileStore,
     create_agent_id,
     create_persona,
     create_scenario,
@@ -47,14 +48,13 @@ from yaksha.simulation.surroundings import NOISE_DBFS, SOUNDS, gain
 from yaksha.worker.worker import FINALIZE_ATTEMPTS, Worker
 
 
-async def stuck_worker(kind: str, settings: Settings, data_dir: Path) -> asyncio.subprocess.Process:
+async def stuck_worker(kind: str, settings: Settings) -> asyncio.subprocess.Process:
     return await asyncio.create_subprocess_exec(
         sys.executable,
         "-m",
         "tests.stuck_workers",
         kind,
         settings.database_url.encoded_string(),
-        str(data_dir),
         cwd=Path(__file__).parents[2],
     )
 
@@ -105,6 +105,18 @@ async def test_a_conversation_runs_to_completion_with_its_transcript(
     listed = (await client.get("/api/v1/conversations", params={"agent_id": agent_id})).json()
     assert [item["status"] for item in listed["items"]] == ["completed"]
     assert caller.calls == 1
+
+
+async def test_a_call_whose_audio_upload_fails_is_saved_without_a_recording(
+    client: AsyncClient, worker: Worker, caller: FakeCaller, file_store: FakeFileStore
+) -> None:
+    caller.recording = b"RIFF"
+    file_store.down = True
+    started = await start(client, await create_agent_id(client))
+
+    done = await wait_for(client, started["id"], {"completed"})
+
+    assert done["recording_url"] is None
 
 
 async def test_the_caller_hanging_up_keeps_its_claim_apart_from_the_end_reason(
@@ -383,16 +395,22 @@ async def test_the_events_route_serves_server_sent_events(
 
 
 async def test_worker_shutdown_stops_the_caller_and_keeps_the_evidence(
-    client: AsyncClient, settings: Settings, caller: FakeCaller, tmp_path: Path
+    client: AsyncClient, settings: Settings, caller: FakeCaller, file_store: FakeFileStore
 ) -> None:
     caller.release.clear()
-    caller.recording_path = tmp_path / "recording.wav"
-    caller.recording_path.write_bytes(b"RIFF")
+    caller.recording = b"RIFF"
+    caller.caller_voice = b"VOICE"
     agent_id = await create_agent_id(client)
     started = await start(client, agent_id)
     unhurried = settings.model_copy(update={"worker_lease_s": 30})
     engine = create_engine(settings.database_url.encoded_string())
-    worker = make_worker(create_sessionmaker(engine), caller, unhurried, worker_id="shutting-down")
+    worker = make_worker(
+        create_sessionmaker(engine),
+        caller,
+        unhurried,
+        worker_id="shutting-down",
+        store=file_store,
+    )
     stop = asyncio.Event()
     task = asyncio.create_task(worker.run(stop))
     await wait_for_event(client, started["id"], "connected")
@@ -406,7 +424,9 @@ async def test_worker_shutdown_stops_the_caller_and_keeps_the_evidence(
     assert "worker stopped" in done["failure_reason"]
     assert "connected" in [event["kind"] for event in done["wire_events"]]
     assert done["transcript"][0]["role"] == "agent"
-    assert done["recording_url"] is not None
+    recording = await client.get(done["recording_url"])
+    assert recording.content == b"RIFF"
+    assert file_store.files[f"recordings/{started['id']}/caller-voice.wav"][0] == b"VOICE"
 
 
 async def test_shutdown_waits_while_result_writes_time_out_and_unwind_slowly(
@@ -542,7 +562,13 @@ async def test_an_expired_owner_can_neither_renew_nor_record(
         connected=True, end_reason=conversations.EndReason.AGENT_HANGUP
     )
     recorded = await conversations.finalize(
-        session, conversation_id, "slow-worker", outcome, conversations.Transcript(), 0
+        session,
+        conversation_id,
+        "slow-worker",
+        outcome,
+        conversations.Transcript(),
+        conversations.StoredAudio(),
+        0,
     )
     await session.close()
     await engine.dispose()
@@ -610,11 +636,11 @@ async def test_events_for_an_unknown_conversation_is_a_json_404(client: AsyncCli
 
 
 async def test_a_worker_with_an_uncancellable_caller_exits_nonzero(
-    client: AsyncClient, settings: Settings, tmp_path: Path
+    client: AsyncClient, settings: Settings
 ) -> None:
     agent_id = await create_agent_id(client)
     started = await start(client, agent_id)
-    process = await stuck_worker("immortal", settings, tmp_path)
+    process = await stuck_worker("immortal", settings)
     try:
         await wait_for_event(client, started["id"], "connected")
         await client.post(f"/api/v1/conversations/{started['id']}/end")
@@ -682,11 +708,11 @@ async def test_a_stalled_result_write_does_not_hold_capacity(
 
 
 async def test_shutdown_with_an_uncancellable_result_write_still_exits(
-    client: AsyncClient, settings: Settings, tmp_path: Path
+    client: AsyncClient, settings: Settings
 ) -> None:
     agent_id = await create_agent_id(client)
     started = await start(client, agent_id)
-    process = await stuck_worker("stuck_write", settings, tmp_path)
+    process = await stuck_worker("stuck_write", settings)
     try:
         await wait_for_event(client, started["id"], "connected")
         await asyncio.sleep(0.5)
@@ -701,9 +727,9 @@ async def test_shutdown_with_an_uncancellable_result_write_still_exits(
 
 
 async def test_shutdown_with_stuck_engine_disposal_still_exits(
-    client: AsyncClient, settings: Settings, db: Db, tmp_path: Path
+    client: AsyncClient, settings: Settings, db: Db
 ) -> None:
-    process = await stuck_worker("stuck_disposal", settings, tmp_path)
+    process = await stuck_worker("stuck_disposal", settings)
     try:
         await worker_reported(db)
         process.terminate()
@@ -725,7 +751,6 @@ async def call_request_of(settings: Settings, conversation_id: str) -> CallReque
             agent = await session.get_one(AgentVersion, row.agent_version_id)
             return await conversations.call_request(
                 session,
-                settings,
                 APP_SETTINGS,
                 row,
                 "+15550100000",

@@ -7,7 +7,6 @@ x-yaksha: &yaksha
     target: dev
   volumes:
     - ../src:/app/src
-    - yaksha_data:/app/data
   env_file:
     - path: .env
       required: false
@@ -15,7 +14,6 @@ x-yaksha: &yaksha
     YAKSHA_API_HOST: 0.0.0.0
     YAKSHA_API_PORT: 8000
     YAKSHA_DATABASE_URL: postgresql+asyncpg://yaksha:yaksha@postgres:5432/yaksha
-    YAKSHA_DATA_DIR: /app/data
     YAKSHA_S3_ENDPOINT: ${YAKSHA_S3_ENDPOINT:-http://storage:8333}
     YAKSHA_S3_BUCKET: ${YAKSHA_S3_BUCKET:-yaksha}
     YAKSHA_S3_ACCESS_KEY: ${YAKSHA_S3_ACCESS_KEY:-yaksha}
@@ -40,7 +38,7 @@ services:
     ports:
       - "8770:8770"
     # Must exceed the worker's drain bound: Worker._execute_bound plus its
-    # cancel wait plus bounded_dispose, about 120 s at the default end timeout.
+    # cancel wait plus bounded_dispose, about 130 s at the default end timeout.
     stop_grace_period: 150s
 
   evaluator:
@@ -83,6 +81,8 @@ services:
     environment:
       AWS_ACCESS_KEY_ID: yaksha
       AWS_SECRET_ACCESS_KEY: yaksha-storage
+    ports:
+      - "127.0.0.1:8333:8333"
     volumes:
       - storage:/data
 
@@ -107,5 +107,4 @@ services:
 volumes:
   pgdata:
   storage:
-  yaksha_data:
   web_node_modules:

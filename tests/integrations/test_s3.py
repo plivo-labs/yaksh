@@ -34,6 +34,7 @@ async def test_a_file_comes_back_as_it_went_in(endpoint: str) -> None:
     await store.put("documents/abc", data, "application/pdf")
 
     assert b"".join([chunk async for chunk in store.stream("documents/abc")]) == data
+    assert await store.get("documents/abc") == data
 
 
 async def test_a_wrong_key_and_a_missing_file_are_reported_as_storage_failures(
@@ -46,3 +47,5 @@ async def test_a_wrong_key_and_a_missing_file_are_reported_as_storage_failures(
         await wrong.put("documents/x", b"x", "text/plain")
     with pytest.raises(UnavailableError, match="could not return the file: NoSuchKey"):
         await anext(store.stream("documents/missing"))
+    with pytest.raises(UnavailableError, match="could not return the file: NoSuchKey"):
+        await store.get("documents/missing")

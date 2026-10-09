@@ -6,7 +6,6 @@ import uuid
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from functools import partial
-from pathlib import Path
 
 from yaksha.db.models import Conversation
 from yaksha.domain.agents import AgentConfig, Direction
@@ -20,6 +19,7 @@ from yaksha.domain.conversations import (
     Turn,
 )
 from yaksha.domain.evaluations import DecidedBy, ItemRole, Metric, MetricKey, Outcome, UnsureKind
+from yaksha.domain.files import FileStore
 from yaksha.domain.language_models import JsonModel
 from yaksha.domain.latency import Latency, Span, waits
 from yaksha.domain.rules import LlmRule, PhraseRule
@@ -67,6 +67,7 @@ JUDGES = (CRITERION, AGENT_RULE, CALLER_CHECK, *SOURCE_JUDGES)
 
 async def evaluate(
     conversation: Conversation,
+    store: FileStore,
     agent: AgentConfig,
     scenario: ScenarioConfig,
     persona: str | None,
@@ -83,7 +84,7 @@ async def evaluate(
     hallucination when it has knowledge-base documents, and last the caller check, whose
     findings can block criteria."""
     transcript = Transcript.model_validate(conversation.transcript or {})
-    found = await measure_call(conversation, agent.agent_speaks_first)
+    found = await measure_call(conversation, store, agent.agent_speaks_first)
     if not judged(conversation):
         return Evaluated(metrics=found)
     turns = transcript.turns
@@ -281,7 +282,7 @@ def call_view(
 
 
 async def measure_call(
-    conversation: Conversation, agent_speaks_first: bool
+    conversation: Conversation, store: FileStore, agent_speaks_first: bool
 ) -> dict[MetricKey, Metric]:
     """The metrics of a saved call. A call that never connected has only its usage. One that
     failed before it was saved in full, or has no recording or caller replies, has no speech
@@ -305,9 +306,9 @@ async def measure_call(
         return found
     gaps = media_gaps(transcript, opened)
     found[MetricKey.CAPTURE_FAULTS] = metrics.capture_faults(
-        transcript, conversation.recording_path is not None, gaps
+        transcript, conversation.recording_key is not None, gaps
     )
-    heard = await hear(conversation, transcript)
+    heard = await hear(conversation, transcript, store)
     if heard is None:
         return found
     goodbye = metrics.goodbye_from(transcript)
@@ -343,20 +344,22 @@ def parsed[T: (CallerSettings, CallerUsage, LineFacts)](
     return None if stored is None else model.model_validate(stored)
 
 
-async def hear(conversation: Conversation, transcript: Transcript) -> speech.Heard | None:
+async def hear(
+    conversation: Conversation, transcript: Transcript, store: FileStore
+) -> speech.Heard | None:
     """Both sides' speech; None for a call without a recording or its caller replies."""
     if (
-        conversation.recording_path is None
+        conversation.recording_key is None
         or transcript.recording_start_ms is None
         or transcript.caller_replies is None
     ):
         return None
-    agent, rate = await asyncio.to_thread(speech.read_mono, Path(conversation.recording_path))
+    recording = await store.get(conversation.recording_key)
+    agent, rate = await asyncio.to_thread(speech.read_mono, recording)
     voice = b""
-    if conversation.caller_voice_path is not None:
-        voice, voice_rate = await asyncio.to_thread(
-            speech.read_mono, Path(conversation.caller_voice_path)
-        )
+    if conversation.caller_voice_key is not None:
+        caller_voice = await store.get(conversation.caller_voice_key)
+        voice, voice_rate = await asyncio.to_thread(speech.read_mono, caller_voice)
         if voice_rate != rate:
             raise ValueError(f"the caller voice is at {voice_rate} Hz, the recording at {rate} Hz")
     return await speech.measure(

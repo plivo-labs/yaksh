@@ -7,6 +7,9 @@ REQUIRED = {
     "api_token": "token",
     "database_url": "postgresql+asyncpg://yaksha@localhost/yaksha",
     "encryption_key": "k" * 32,
+    "s3_endpoint": "http://storage.test",
+    "s3_access_key": "access",
+    "s3_secret_key": "secret",
 }
 
 

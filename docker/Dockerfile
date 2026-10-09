@@ -25,8 +25,7 @@ ENV PATH="/app/.venv/bin:$PATH" YAKSHA_API_HOST=0.0.0.0
 CMD ["yaksha-server", "api", "--reload"]
 
 FROM python:3.14-slim-trixie
-RUN groupadd --system yaksha && useradd --system --gid yaksha --home-dir /app yaksha \
-    && mkdir -p /app/data && chown yaksha:yaksha /app/data
+RUN groupadd --system yaksha && useradd --system --gid yaksha --home-dir /app yaksha
 WORKDIR /app
 COPY --from=backend --chown=yaksha:yaksha /app/.venv ./.venv
 COPY --from=frontend --chown=yaksha:yaksha /build/dist ./frontend/dist

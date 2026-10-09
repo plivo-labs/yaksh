@@ -21,7 +21,6 @@ frontend/dist/
 !.env.example
 
 # runtime data
-data/
 *.wav
 *.mp3
 *.ogg

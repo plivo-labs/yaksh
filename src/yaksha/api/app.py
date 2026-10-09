@@ -1,6 +1,5 @@
 import asyncio
 import logging
-import os
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
@@ -32,12 +31,12 @@ from yaksha.api.routes import (
 from yaksha.config import Settings
 from yaksha.db.migrate import upgrade_to_head
 from yaksha.db.session import create_engine, create_sessionmaker
-from yaksha.domain.documents import MAX_FILE_BYTES, FileStore
-from yaksha.integrations.s3 import S3FileStore
+from yaksha.domain.documents import MAX_FILE_BYTES
 from yaksha.settings.cipher import Cipher, SecretUnreadableError
 from yaksha.settings.store import SettingsSource
 from yaksha.simulation.personas import seed_builtin_personas
 from yaksha.simulation.voices import seed_builtin_voices
+from yaksha.storage import file_store
 
 log = logging.getLogger(__name__)
 
@@ -49,9 +48,6 @@ MAX_REQUEST_BYTES = MAX_FILE_BYTES + 1024 * 1024
 async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     settings: Settings = app.state.settings
     await asyncio.to_thread(upgrade_to_head, str(settings.database_url))
-    settings.data_dir.mkdir(parents=True, exist_ok=True)
-    if not os.access(settings.data_dir, os.W_OK):
-        raise RuntimeError(f"data directory is not writable: {settings.data_dir}")
     try:
         await app.state.source.current()
     except SecretUnreadableError as error:
@@ -66,22 +62,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     yield
     await app.state.providers.close()
     await app.state.engine.dispose()
-
-
-def file_store(settings: Settings) -> FileStore | None:
-    if (
-        settings.s3_endpoint is None
-        or settings.s3_access_key is None
-        or settings.s3_secret_key is None
-    ):
-        return None
-    return S3FileStore(
-        settings.s3_endpoint,
-        settings.s3_bucket,
-        settings.s3_access_key.get_secret_value(),
-        settings.s3_secret_key.get_secret_value(),
-        region=settings.s3_region,
-    )
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:

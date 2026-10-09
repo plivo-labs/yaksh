@@ -137,13 +137,13 @@ See `docs/decisions/0021-listen-to-a-running-call.md`.
 
 ## Files
 
-Uploaded files (PDF, TXT and MD documents about an agent) are kept in S3-compatible storage. The compose files run [SeaweedFS](https://github.com/seaweedfs/seaweedfs) for this, with its data in the `storage` volume. To use S3, R2 or another S3-compatible service instead, set:
+Uploaded files (PDF, TXT and MD documents about an agent) and the audio of each call are kept in S3-compatible storage. Yaksha does not start without it. The compose files run [SeaweedFS](https://github.com/seaweedfs/seaweedfs) for this, with its data in the `storage` volume. To use S3, R2 or another S3-compatible service instead, set:
 
 | Variable | Purpose |
 | --- | --- |
-| `YAKSHA_S3_ENDPOINT` | The storage URL. File uploads are off without it; pasted text still works. |
+| `YAKSHA_S3_ENDPOINT` | The storage URL. Required. |
 | `YAKSHA_S3_BUCKET` | The bucket, default `yaksha`. It must exist. |
-| `YAKSHA_S3_ACCESS_KEY`, `YAKSHA_S3_SECRET_KEY` | The credentials. |
+| `YAKSHA_S3_ACCESS_KEY`, `YAKSHA_S3_SECRET_KEY` | The credentials. Required. |
 | `YAKSHA_S3_REGION` | Default `us-east-1`. |
 
 ## Outbound agents
@@ -216,6 +216,6 @@ docker compose -f docker/compose.dev.yaml up --build
 
 Open http://localhost:5173. API and frontend changes reload in place. The worker does not reload: after a Python change, restart it with `docker compose -f docker/compose.dev.yaml restart worker`.
 
-Without Docker: `uv sync && uv run prek install`, start Postgres (`docker compose -f docker/compose.dev.yaml up -d postgres`), export `YAKSHA_API_TOKEN` and `YAKSHA_DATABASE_URL=postgresql+asyncpg://yaksha:yaksha@localhost:5433/yaksha`, then `uv run yaksha-server api --reload`, `uv run yaksha-server worker` and `uv run yaksha-server evaluator` in two more terminals with the same exports, and, in another terminal in `frontend/`, `bun install && bun run dev`. Tests start their own Postgres through Docker.
+Without Docker: `uv sync && uv run prek install`, start Postgres and the file storage (`docker compose -f docker/compose.dev.yaml up -d postgres storage`), export `YAKSHA_API_TOKEN`, `YAKSHA_DATABASE_URL=postgresql+asyncpg://yaksha:yaksha@localhost:5433/yaksha`, `YAKSHA_S3_ENDPOINT=http://localhost:8333`, `YAKSHA_S3_ACCESS_KEY=yaksha` and `YAKSHA_S3_SECRET_KEY=yaksha-storage`, then `uv run yaksha-server api --reload`, `uv run yaksha-server worker` and `uv run yaksha-server evaluator` in two more terminals with the same exports, and, in another terminal in `frontend/`, `bun install && bun run dev`. Tests start their own Postgres through Docker.
 
 The docs site is in `docs/` and uses [Fumadocs](https://fumadocs.dev): in `docs/`, `bun install && bun run dev`, then open http://localhost:3000/docs. Its API reference comes from `cli/openapi.json`.

@@ -134,9 +134,7 @@ async def test_preparing_the_call_opens_the_dial_window_and_keeps_the_pinned_dat
 
     async with db() as session:
         conversation = await session.get_one(Conversation, uuid.UUID(claimed))
-        request = await conversations.prepare_call(
-            session, settings, APP_SETTINGS, conversation, APP_ID
-        )
+        request = await conversations.prepare_call(session, APP_SETTINGS, conversation, APP_ID)
         window = await session.scalar(
             select(Conversation.dial_deadline_at - func.now()).where(
                 Conversation.id == conversation.id

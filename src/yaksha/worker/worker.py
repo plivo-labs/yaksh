@@ -21,8 +21,11 @@ from yaksha.domain.conversations import (
     ConversationStatus,
     EndReason,
     IncomingCall,
+    StoredAudio,
     Transcript,
+    audio_key,
 )
+from yaksha.domain.files import FileStore
 from yaksha.domain.settings import AppSettings
 from yaksha.domain.triggers import SEND_TIMEOUT_S
 from yaksha.settings.store import SettingsSource
@@ -36,6 +39,8 @@ log = logging.getLogger(__name__)
 FINALIZE_ATTEMPTS = 5
 FINALIZE_RETRY_S = 1.0
 FINALIZE_TIMEOUT_S = 10.0
+STORE_TIMEOUT_S = 10.0
+"""For both audio files of a call; enough for storage in the same network."""
 MAX_BACKOFF_S = 30.0
 DIAL_MARGIN_S = 60.0
 
@@ -61,6 +66,7 @@ class Worker:
         settings: Settings,
         source: SettingsSource,
         account: PhoneAccount,
+        store: FileStore,
         *,
         worker_id: str | None = None,
     ) -> None:
@@ -74,6 +80,7 @@ class Worker:
         self._settings = settings
         self._source = source
         self._account = account
+        self._store = store
         self._app = AppSettings()
         """The stored settings as of the latest poll."""
         self._reported_at = -math.inf
@@ -179,7 +186,7 @@ class Worker:
     async def _prepare(self, conversation: Conversation) -> CallRequest:
         async with self._sessionmaker() as session:
             return await conversations.prepare_call(
-                session, self._settings, self._app, conversation, self._account.receiving_app_id
+                session, self._app, conversation, self._account.receiving_app_id
             )
 
     async def _requeue(self, conversation_id: uuid.UUID) -> None:
@@ -190,7 +197,7 @@ class Worker:
 
     async def _record_cancelled(self, conversation_id: uuid.UUID) -> None:
         outcome = CallOutcome(connected=False, end_reason=EndReason.USER_REQUEST)
-        await self._record(conversation_id, outcome, Transcript())
+        await self._record(conversation_id, outcome, Transcript(), StoredAudio())
 
     async def accept_incoming(self, call: IncomingCall) -> Admission | str:
         async with self._sessionmaker() as session:
@@ -215,11 +222,17 @@ class Worker:
     def _execute_bound(self) -> float:
         """The longest _execute takes after a stop request.
 
-        A bounded call end, every result write with its cancellation cleanup and retry delay,
-        then the maintenance teardown.
+        A bounded call end, the audio upload with its cancellation cleanup, every result write
+        with its cancellation cleanup and retry delay, then the maintenance teardown.
         """
         end = self._settings.end_timeout_s
-        return end * 2 + FINALIZE_ATTEMPTS * (FINALIZE_TIMEOUT_S + end + FINALIZE_RETRY_S) + end * 2
+        return (
+            end * 2
+            + STORE_TIMEOUT_S
+            + end
+            + FINALIZE_ATTEMPTS * (FINALIZE_TIMEOUT_S + end + FINALIZE_RETRY_S)
+            + end * 2
+        )
 
     def _start(self, request: CallRequest, *, confirmed_at: float) -> None:
         live = LiveCall()
@@ -239,7 +252,8 @@ class Worker:
         )
         try:
             outcome = await self._call(request, live)
-            await self._record(request.conversation_id, outcome, live.snapshot())
+            audio = await self._store_audio(request.conversation_id, outcome)
+            await self._record(request.conversation_id, outcome, live.snapshot(), audio)
         finally:
             await self._abandon(
                 maintenance,
@@ -283,22 +297,53 @@ class Worker:
             return request.app_settings.phone.ring_timeout_s + DIAL_MARGIN_S
         return SEND_TIMEOUT_S + outbound.dial_window_s + DIAL_MARGIN_S
 
+    async def _store_audio(self, conversation_id: uuid.UUID, outcome: CallOutcome) -> StoredAudio:
+        """Upload the call's audio files side by side. A file that fails is left out, and all
+        are left out when the upload runs out of time; the call is kept either way."""
+        what = f"storing the audio of conversation {conversation_id}"
+        upload = await self._run_bounded(
+            self._upload(conversation_id, outcome), STORE_TIMEOUT_S, what
+        )
+        if upload is None:
+            log.error("%s timed out", what)
+            return StoredAudio()
+        return upload.result()
+
+    async def _upload(self, conversation_id: uuid.UUID, outcome: CallOutcome) -> StoredAudio:
+        recording_key, caller_voice_key = await asyncio.gather(
+            self._put(audio_key(conversation_id, "recording.wav"), outcome.recording),
+            self._put(audio_key(conversation_id, "caller-voice.wav"), outcome.caller_voice),
+        )
+        return StoredAudio(recording_key=recording_key, caller_voice_key=caller_voice_key)
+
+    async def _put(self, key: str, data: bytes | None) -> str | None:
+        """The key once the file is stored; None when there is no file or it failed."""
+        if data is None:
+            return None
+        try:
+            await self._store.put(key, data, "audio/wav")
+        except Exception as error:
+            log.error("storing %s failed: %r", key, error)
+            return None
+        return key
+
     async def _record_failure(self, conversation_id: uuid.UUID, exc: Exception) -> None:
         outcome = CallOutcome(
             connected=False, end_reason=EndReason.ERROR, caller_error=describe_exception(exc)
         )
-        await self._record(conversation_id, outcome, Transcript())
+        await self._record(conversation_id, outcome, Transcript(), StoredAudio())
 
     async def _record(
         self,
         conversation_id: uuid.UUID,
         outcome: CallOutcome,
         transcript: Transcript,
+        audio: StoredAudio,
     ) -> None:
         what = f"recording conversation {conversation_id}"
         for attempt in range(1, FINALIZE_ATTEMPTS + 1):
             write = await self._run_bounded(
-                self._write_result(conversation_id, outcome, transcript),
+                self._write_result(conversation_id, outcome, transcript, audio),
                 FINALIZE_TIMEOUT_S,
                 what,
             )
@@ -321,6 +366,7 @@ class Worker:
         conversation_id: uuid.UUID,
         outcome: CallOutcome,
         transcript: Transcript,
+        audio: StoredAudio,
     ) -> bool:
         async with self._sessionmaker() as session:
             return await conversations.finalize(
@@ -329,6 +375,7 @@ class Worker:
                 self.worker_id,
                 outcome,
                 transcript,
+                audio,
                 self._app.phone.number_rest_s,
             )
 

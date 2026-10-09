@@ -2,7 +2,6 @@ import asyncio
 import uuid
 from datetime import datetime
 from enum import StrEnum
-from pathlib import Path
 from typing import Protocol
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -266,7 +265,6 @@ class CallRequest(BaseModel):
     agent_data: list[Fact] = []
     accept_calls_until: datetime | None = None
     """Outbound: when the window for the agent's call closes."""
-    output_dir: Path
     app_settings: AppSettings
     """The settings when the call started; a change during the call does not reach it."""
 
@@ -282,7 +280,8 @@ class CallOutcome(BaseModel):
     call, never the caller's."""
     talk_ms: int | None = None
     """From the moment the call connected until the conversation ended, on the caller's clock."""
-    recording_path: Path | None = None
+    recording: bytes | None = Field(default=None, repr=False)
+    """The call as a stereo WAV: the agent on the left channel, the caller on the right."""
     stream_opened_ms: int | None = None
     caller_settings: CallerSettings | None = None
     caller_usage: CallerUsage | None = None
@@ -291,8 +290,23 @@ class CallOutcome(BaseModel):
     recording_start_ms: int | None = None
     agent_media: AgentMedia | None = None
     caller_replies: list[CallerReplyWindow] | None = None
-    caller_voice_path: Path | None = None
+    caller_voice: bytes | None = Field(default=None, repr=False)
+    """Each caller reply's own audio, back to back, as a mono WAV."""
     call_uuid: str | None = None
+
+
+def audio_key(conversation_id: uuid.UUID, file_name: str) -> str:
+    """Where a call's audio file is kept in the file store."""
+    return f"recordings/{conversation_id}/{file_name}"
+
+
+class StoredAudio(BaseModel):
+    """The keys of a call's audio files in the file store; None for a file not stored."""
+
+    model_config = ConfigDict(frozen=True)
+
+    recording_key: str | None = None
+    caller_voice_key: str | None = None
 
 
 class CallObserver(Protocol):

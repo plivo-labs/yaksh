@@ -1,12 +1,11 @@
 import uuid
-from pathlib import Path
 
-from fastapi import APIRouter, HTTPException, status
-from fastapi.responses import FileResponse
+from fastapi import APIRouter, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from yaksha.api.auth import LabelerDep
-from yaksha.api.deps import AppSettingsDep, SessionDep
+from yaksha.api.deps import AppSettingsDep, FileStoreDep, SessionDep
+from yaksha.api.errors import UNAVAILABLE
 from yaksha.api.routes.conversations import detail
 from yaksha.api.schemas.conversations import ItemRead
 from yaksha.api.schemas.review import (
@@ -96,18 +95,22 @@ async def get_review(
     )
 
 
-@router.get("/conversations/{conversation_id}/recording")
+@router.get(
+    "/conversations/{conversation_id}/recording", response_class=Response, responses=UNAVAILABLE
+)
 async def get_recording(
-    conversation_id: uuid.UUID, labeler: LabelerDep, session: SessionDep, settings: AppSettingsDep
-) -> FileResponse:
+    conversation_id: uuid.UUID,
+    labeler: LabelerDep,
+    session: SessionDep,
+    settings: AppSettingsDep,
+    store: FileStoreDep,
+) -> Response:
     # Only checks that the call is judged: what a labeler may see does not depend on the audio.
     await labels.review(
         session, conversation_id, labeler.id, settings.audit.weekly_budget, seen=True
     )
-    conversation = await conversations.get_conversation(session, conversation_id)
-    if conversation.recording_path is None or not Path(conversation.recording_path).is_file():
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "no recording yet")
-    return FileResponse(conversation.recording_path, media_type="audio/wav")
+    recording = await conversations.get_recording(session, store, conversation_id)
+    return Response(recording, media_type="audio/wav")
 
 
 @router.post("/items/{item_id}/labels", status_code=status.HTTP_201_CREATED)

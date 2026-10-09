@@ -1,11 +1,11 @@
 """Where each side spoke, from a saved call's audio, as the live call's voice detector finds
 it (decision 0019)."""
 
+import io
 import math
 import wave
 from collections.abc import AsyncIterator, Iterable, Sequence
 from dataclasses import dataclass
-from pathlib import Path
 
 import audioop
 from pipecat.audio.vad.silero import SileroVADAnalyzer
@@ -26,12 +26,12 @@ type Window = tuple[float, float, VADState]
 """The detector's state after one window of audio: the window's end and length in ms."""
 
 
-def read_mono(path: Path) -> tuple[bytes, int]:
+def read_mono(data: bytes) -> tuple[bytes, int]:
     """The first channel of a 16-bit WAV, and its sample rate."""
-    with wave.open(str(path)) as file:
+    with wave.open(io.BytesIO(data)) as file:
         rate, channels = file.getframerate(), file.getnchannels()
         if file.getsampwidth() != 2:
-            raise ValueError(f"{path.name} holds {8 * file.getsampwidth()}-bit samples")
+            raise ValueError(f"the WAV holds {8 * file.getsampwidth()}-bit samples")
         frames = file.readframes(file.getnframes())
     if channels == 1:
         return frames, rate

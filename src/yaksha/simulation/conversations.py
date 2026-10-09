@@ -10,7 +10,6 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from sqlalchemy.orm import defer
 
-from yaksha.config import Settings
 from yaksha.db.models import (
     Agent,
     AgentVersion,
@@ -34,11 +33,13 @@ from yaksha.domain.conversations import (
     EndReason,
     IncomingCall,
     OutcomeGroup,
+    StoredAudio,
     Transcript,
     Validity,
     outcome_group,
 )
 from yaksha.domain.errors import NotFoundError
+from yaksha.domain.files import FileStore
 from yaksha.domain.personas import PersonaConfig
 from yaksha.domain.scenarios import ScenarioConfig
 from yaksha.domain.settings import AppSettings
@@ -81,6 +82,15 @@ async def get_conversation(session: AsyncSession, conversation_id: uuid.UUID) ->
     if conversation is None:
         raise NotFoundError("conversation not found")
     return conversation
+
+
+async def get_recording(
+    session: AsyncSession, store: FileStore, conversation_id: uuid.UUID
+) -> bytes:
+    conversation = await get_conversation(session, conversation_id)
+    if conversation.recording_key is None:
+        raise NotFoundError("no recording yet")
+    return await store.get(conversation.recording_key)
 
 
 def in_group(group: OutcomeGroup) -> ColumnElement[bool]:
@@ -298,7 +308,6 @@ async def claim_next(
 
 async def prepare_call(
     session: AsyncSession,
-    settings: Settings,
     app: AppSettings,
     conversation: Conversation,
     receiving_app_id: str | None,
@@ -322,12 +331,11 @@ async def prepare_call(
     if number is None:
         raise PoolExhaustedError("no pool number is free")
     leased = await session.get_one(Conversation, conversation.id, populate_existing=True)
-    return await call_request(session, settings, app, leased, number, agent)
+    return await call_request(session, app, leased, number, agent)
 
 
 async def call_request(
     session: AsyncSession,
-    settings: Settings,
     app: AppSettings,
     conversation: Conversation,
     number: str,
@@ -351,7 +359,6 @@ async def call_request(
         goodbye=LANGUAGES[conversation.language].goodbye,
         agent_data=scenario.agent_data,
         accept_calls_until=conversation.dial_deadline_at,
-        output_dir=settings.data_dir / str(conversation.id),
         app_settings=app,
     )
 
@@ -556,6 +563,7 @@ async def finalize(
     worker_id: str,
     outcome: CallOutcome,
     transcript: Transcript,
+    audio: StoredAudio,
     number_rest_s: int,
 ) -> bool:
     """Record the terminal state; a conversation in the error group is queued again, up to its
@@ -588,10 +596,8 @@ async def finalize(
                 caller_settings=dump(outcome.caller_settings),
                 caller_usage=dump(outcome.caller_usage),
                 line_facts=dump(outcome.line_facts),
-                recording_path=str(outcome.recording_path) if outcome.recording_path else None,
-                caller_voice_path=(
-                    str(outcome.caller_voice_path) if outcome.caller_voice_path else None
-                ),
+                recording_key=audio.recording_key,
+                caller_voice_key=audio.caller_voice_key,
                 call_uuid=outcome.call_uuid,
                 agent_caller_id=Conversation.agent_caller_id if outcome.call_uuid else None,
                 claimed_by=None,

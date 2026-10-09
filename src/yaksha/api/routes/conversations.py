@@ -1,16 +1,15 @@
 import uuid
 from collections.abc import AsyncIterable, Mapping
-from pathlib import Path
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import StreamingResponse
 from fastapi.sse import EventSourceResponse, ServerSentEvent
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from yaksha.api.auth import require_token
-from yaksha.api.deps import SessionDep, SettingsDep
-from yaksha.api.errors import CLIENT_ERRORS, json_errors
+from yaksha.api.deps import FileStoreDep, SessionDep, SettingsDep
+from yaksha.api.errors import CLIENT_ERRORS, UNAVAILABLE, json_errors
 from yaksha.api.pagination import Page, PageDep
 from yaksha.api.schemas.conversations import (
     ConversationEvaluation,
@@ -45,7 +44,7 @@ STREAM_INTERVAL_S = 0.5
 
 
 def recording_url(conversation: Conversation) -> str | None:
-    if conversation.recording_path is None:
+    if conversation.recording_key is None:
         return None
     return f"/api/v1/conversations/{conversation.id}/recording"
 
@@ -184,12 +183,12 @@ async def get_evaluation(conversation_id: uuid.UUID, session: SessionDep) -> Con
     )
 
 
-@router.get("/{conversation_id}/recording")
-async def get_recording(conversation_id: uuid.UUID, session: SessionDep) -> FileResponse:
-    conversation = await conversations.get_conversation(session, conversation_id)
-    if conversation.recording_path is None or not Path(conversation.recording_path).is_file():
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "no recording yet")
-    return FileResponse(conversation.recording_path, media_type="audio/wav")
+@router.get("/{conversation_id}/recording", response_class=Response, responses=UNAVAILABLE)
+async def get_recording(
+    conversation_id: uuid.UUID, session: SessionDep, store: FileStoreDep
+) -> Response:
+    recording = await conversations.get_recording(session, store, conversation_id)
+    return Response(recording, media_type="audio/wav")
 
 
 @router.post(

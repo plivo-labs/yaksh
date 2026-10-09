@@ -25,6 +25,7 @@ from yaksha.db.models import (
 from yaksha.db.models import Document as DocumentRow
 from yaksha.diagnostics import describe_exception
 from yaksha.domain.agents import AgentConfig
+from yaksha.domain.files import FileStore
 from yaksha.domain.language_models import JsonModel
 from yaksha.domain.personas import PersonaConfig
 from yaksha.domain.scenarios import ScenarioConfig
@@ -130,12 +131,14 @@ class Evaluator:
         sessionmaker: async_sessionmaker[AsyncSession],
         settings: Settings,
         source: SettingsSource,
+        store: FileStore,
         clients: Callable[[AppSettings], JudgeClients] = judge_clients,
     ) -> None:
         """clients builds the judge clients for a version of the stored settings."""
         self._sessionmaker = sessionmaker
         self._settings = settings
         self._source = source
+        self._store = store
         self._clients = clients
         self._judging: Judging | None = None
         self._judging_inputs: tuple[object, ...] | None = None
@@ -257,6 +260,7 @@ class Evaluator:
                 documents = await knowledge_base(session, agent_config) if judged else []
             evaluated = await call.evaluate(
                 conversation,
+                self._store,
                 agent_config,
                 ScenarioConfig.model_validate(scenario.config),
                 persona,
