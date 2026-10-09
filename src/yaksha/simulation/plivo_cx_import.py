@@ -13,10 +13,10 @@ from typing import Any
 from yaksha.domain.agent_import import (
     Pair,
     PlivoCxAccountApi,
-    PlivoCxDraft,
     PlivoCxFlow,
     PlivoCxFlowPage,
     PlivoCxFlowSearch,
+    ProviderDraft,
     StartRequestDraft,
 )
 from yaksha.domain.agents import Direction
@@ -28,7 +28,7 @@ from yaksha.domain.errors import (
 )
 from yaksha.domain.languages import Language
 from yaksha.domain.triggers import TriggerMethod
-from yaksha.simulation.agent_import import text
+from yaksha.simulation.agent_import import pruned, text
 from yaksha.simulation.curl_import import FILL, NUMBER, NUMBER_NAME, check, scenario_body
 
 RUNNER = "https://agentflow.plivo.com"
@@ -66,7 +66,7 @@ async def list_flows(api: PlivoCxAccountApi, search: PlivoCxFlowSearch) -> Plivo
     )
 
 
-async def import_flow(api: PlivoCxAccountApi, flow_id: uuid.UUID) -> PlivoCxDraft:
+async def import_flow(api: PlivoCxAccountApi, flow_id: uuid.UUID) -> ProviderDraft:
     with plivo_errors():
         flow = json.loads(await api.get_agent_flow(str(flow_id)))
     if flow.get("state") != "ACTIVE":
@@ -75,12 +75,12 @@ async def import_flow(api: PlivoCxAccountApi, flow_id: uuid.UUID) -> PlivoCxDraf
             "flow takes calls; publish it in Plivo CX first"
         )
     triggers = start_model(flow).get("triggers") or []
-    draft = PlivoCxDraft(
+    draft = ProviderDraft(
         name=text(flow.get("name")),
         external_id=str(flow_id),
         # The public API has no language yet; the person sets it.
         language=Language.EN,
-        config=json.dumps(behavior(flow), indent=2),
+        config=json.dumps(behavior(flow), indent=2, ensure_ascii=False),
         direction=Direction.INBOUND,
         agent_numbers=[],
         start_request=None,
@@ -111,14 +111,6 @@ FLOW_BOOKKEEPING = frozenset(
 )
 """The flow's ID is the agent's Agent ID already; the rest describes the API record."""
 NODE_LAYOUT = frozenset({"left", "top"})
-NOT_BEHAVIOR = frozenset({"code_body"})
-"""The source code of a tool action; its description and parameters stay."""
-CONTRACTS = frozenset(
-    {"code_function_schema", "parameters", "properties", "payload_format", "schema"}
-)
-"""Schemas and payload shapes, kept exactly: an empty value or a field named code_body in one is
-part of what a tool takes."""
-REDACTED = "***REDACTED***"
 
 
 def behavior(flow: dict[str, Any]) -> dict[str, Any]:
@@ -130,25 +122,6 @@ def behavior(flow: dict[str, Any]) -> dict[str, Any]:
     ]
     kept = {key: value for key, value in flow.items() if key not in FLOW_BOOKKEEPING}
     return pruned({**kept, "nodes": nodes})
-
-
-def pruned(value: Any) -> Any:
-    """`value` without empty values, redacted secrets or tool source, at any depth except inside a
-    schema; False and 0 stay, because they mean something."""
-    if isinstance(value, dict):
-        kept = {
-            key: item if key in CONTRACTS else pruned(item)
-            for key, item in value.items()
-            if key not in NOT_BEHAVIOR
-        }
-        return {key: item for key, item in kept.items() if key in CONTRACTS or not empty(item)}
-    if isinstance(value, list):
-        return [item for item in (pruned(item) for item in value) if not empty(item)]
-    return value
-
-
-def empty(value: Any) -> bool:
-    return value is None or value in ("", REDACTED) or value == [] or value == {}
 
 
 def start_model(flow: dict[str, Any]) -> dict[str, Any]:

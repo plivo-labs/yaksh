@@ -1,4 +1,4 @@
-import { useQueryClient } from "@tanstack/react-query";
+import { type UseMutationResult, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Search } from "lucide-react";
 import { type FormEvent, type ReactNode, useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router";
@@ -21,23 +21,52 @@ import {
   FieldSet,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 import { EMPTY_DRAFT } from "@/lib/agent-draft";
 import { counted, phone, when } from "@/lib/format";
 import { APPEAR } from "@/lib/motion";
-import { startImportedDraft } from "@/lib/new-agent-draft";
+import { type ImportedFrom, startImportedDraft } from "@/lib/new-agent-draft";
 import { scenarioFields, withStartRequest } from "@/lib/outbound";
-import { draftBrief, keys, useImportPlivoCxFlow, usePlivoCxFlows } from "@/lib/queries";
+import {
+  draftBrief,
+  keys,
+  useElevenLabsAgents,
+  useImportElevenLabsAgent,
+  useImportPlivoCxFlow,
+  usePlivoCxFlows,
+} from "@/lib/queries";
 import { randomKey } from "@/lib/random-key";
-import type { PlivoCxAccount, PlivoCxDraft, PlivoCxFlow } from "@/lib/types";
+import type {
+  ElevenLabsAccount,
+  ElevenLabsRegion,
+  PlivoCxAccount,
+  ProviderDraft,
+} from "@/lib/types";
 import { cn } from "@/lib/utils";
 
+type ProviderId = "plivo-cx" | "elevenlabs";
+
 /** Each provider's own icon, as its website serves it. */
-const PROVIDERS = [
-  { name: "Plivo CX", logo: plivoCxLogo, ready: true },
-  { name: "Vapi", logo: vapiLogo, ready: false },
-  { name: "Retell", logo: retellLogo, ready: false },
-  { name: "ElevenLabs", logo: elevenLabsLogo, ready: false },
+const PROVIDERS: { id: ProviderId | null; name: string; logo: string }[] = [
+  { id: "plivo-cx", name: "Plivo CX", logo: plivoCxLogo },
+  { id: "elevenlabs", name: "ElevenLabs", logo: elevenLabsLogo },
+  { id: null, name: "Vapi", logo: vapiLogo },
+  { id: null, name: "Retell", logo: retellLogo },
+];
+
+const REGIONS: { value: ElevenLabsRegion; label: string }[] = [
+  { value: "global", label: "elevenlabs.io" },
+  { value: "eu", label: "EU" },
+  { value: "in", label: "India" },
+  { value: "sg", label: "Singapore" },
 ];
 
 /** How each kind of flow that Yaksha lists takes calls; the server leaves out the others. */
@@ -47,10 +76,16 @@ const CALL_TYPES: Record<string, string> = {
   omni: "Several channels",
 };
 
+type Connection =
+  | { provider: "plivo-cx"; account: PlivoCxAccount; id: string }
+  | { provider: "elevenlabs"; account: ElevenLabsAccount; id: string };
+
 /** Reads an agent from a provider into a draft, then opens the new-agent wizard with it. The
  * credentials stay in this page's memory: they are sent with each call and never stored. */
 export function AgentImportProviderPage() {
-  const [connected, setConnected] = useState<{ account: PlivoCxAccount; id: string } | null>(null);
+  const [provider, setProvider] = useState<ProviderId>("plivo-cx");
+  const [connected, setConnected] = useState<Connection | null>(null);
+  const change = () => setConnected(null);
   return (
     <div className="mx-auto flex min-h-full w-full max-w-3xl flex-col gap-6">
       <div className="grid gap-1">
@@ -59,33 +94,60 @@ export function AgentImportProviderPage() {
           Choose where the agent runs, and give Yaksha the credentials that can read it.
         </p>
       </div>
-      {connected ? (
-        <FlowChoice
+      {connected?.provider === "plivo-cx" ? (
+        <PlivoCxAgents
+          key={connected.id}
           account={connected.account}
           connection={connected.id}
-          onChange={() => setConnected(null)}
+          onChange={change}
+        />
+      ) : connected?.provider === "elevenlabs" ? (
+        <ElevenLabsAgents
+          key={connected.id}
+          account={connected.account}
+          connection={connected.id}
+          onChange={change}
         />
       ) : (
-        <Credentials onConnect={(account) => setConnected({ account, id: randomKey() })} />
+        <Credentials provider={provider} onProvider={setProvider} onConnect={setConnected} />
       )}
     </div>
   );
 }
 
-function Credentials({ onConnect }: { onConnect: (account: PlivoCxAccount) => void }) {
+function Credentials({
+  provider,
+  onProvider,
+  onConnect,
+}: {
+  provider: ProviderId;
+  onProvider: (provider: ProviderId) => void;
+  onConnect: (connection: Connection) => void;
+}) {
   const [authId, setAuthId] = useState("");
   const [authToken, setAuthToken] = useState("");
+  const [apiKey, setApiKey] = useState("");
+  const [region, setRegion] = useState<ElevenLabsRegion>("global");
   const [submitted, setSubmitted] = useState(false);
   const idProblem = /^[MS]A[A-Z0-9]{18}$/.test(authId.trim())
     ? null
     : "Enter the Auth ID: 20 capital letters and digits, starting with MA.";
   const tokenProblem = authToken.trim() ? null : "Enter the Auth token.";
+  const keyProblem = apiKey.trim() ? null : "Enter the API key.";
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setSubmitted(true);
-    if (!idProblem && !tokenProblem) {
-      onConnect({ auth_id: authId.trim(), auth_token: authToken.trim() });
+    const id = randomKey();
+    if (provider === "plivo-cx" && !idProblem && !tokenProblem) {
+      onConnect({
+        provider,
+        account: { auth_id: authId.trim(), auth_token: authToken.trim() },
+        id,
+      });
+    }
+    if (provider === "elevenlabs" && !keyProblem) {
+      onConnect({ provider, account: { api_key: apiKey.trim(), region }, id });
     }
   };
 
@@ -96,56 +158,113 @@ function Credentials({ onConnect }: { onConnect: (account: PlivoCxAccount) => vo
           <FieldSet>
             <FieldLegend variant="label">Provider</FieldLegend>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-              {PROVIDERS.map(({ name, logo, ready }) => (
-                <div
+              {PROVIDERS.map(({ id, name, logo }) => (
+                <label
                   key={name}
-                  aria-disabled={!ready}
+                  aria-disabled={id === null}
                   className={cn(
-                    "grid gap-2 rounded-md border px-3 py-2.5",
-                    ready ? "border-foreground ring-1 ring-foreground" : "opacity-60",
+                    "grid gap-2 rounded-md border px-3 py-2.5 transition-colors",
+                    id === null
+                      ? "opacity-60"
+                      : "cursor-pointer hover:bg-hv1 has-checked:border-foreground has-checked:ring-1 has-checked:ring-foreground has-focus-visible:ring-2 has-focus-visible:ring-ring/50",
                   )}
                 >
+                  <input
+                    type="radio"
+                    name="provider"
+                    className="sr-only"
+                    disabled={id === null}
+                    checked={provider === id}
+                    onChange={() => id && onProvider(id)}
+                  />
                   <span className="flex items-center justify-between gap-2">
                     <img src={logo} alt="" className="size-5 rounded-xs" />
-                    {!ready && <Badge>Soon</Badge>}
+                    {id === null && <Badge>Soon</Badge>}
                   </span>
                   <span className="truncate text-s-500">{name}</span>
-                </div>
+                </label>
               ))}
             </div>
           </FieldSet>
-          <div className="grid gap-5 sm:grid-cols-2">
-            <Field>
-              <FieldLabel htmlFor="auth_id">Auth ID</FieldLabel>
-              <Input
-                id="auth_id"
-                autoComplete="off"
-                spellCheck={false}
-                className="font-mono"
-                aria-invalid={submitted && Boolean(idProblem)}
-                value={authId}
-                onChange={(e) => setAuthId(e.target.value)}
-              />
-              {submitted && idProblem && <FieldError>{idProblem}</FieldError>}
-            </Field>
-            <Field>
-              <FieldLabel htmlFor="auth_token">Auth token</FieldLabel>
-              <Input
-                id="auth_token"
-                type="password"
-                autoComplete="off"
-                aria-invalid={submitted && Boolean(tokenProblem)}
-                value={authToken}
-                onChange={(e) => setAuthToken(e.target.value)}
-              />
-              {submitted && tokenProblem && <FieldError>{tokenProblem}</FieldError>}
-            </Field>
-          </div>
-          <FieldDescription>
-            From the overview page of the Plivo console. Use the main account: a subaccount cannot
-            read agent flows. Yaksha uses them for this import and does not save them, except in the
-            start request of a flow that calls out.
-          </FieldDescription>
+          {provider === "plivo-cx" ? (
+            <>
+              <div className="grid gap-5 sm:grid-cols-2">
+                <Field>
+                  <FieldLabel htmlFor="auth_id">Auth ID</FieldLabel>
+                  <Input
+                    id="auth_id"
+                    autoComplete="off"
+                    spellCheck={false}
+                    className="font-mono"
+                    aria-invalid={submitted && Boolean(idProblem)}
+                    value={authId}
+                    onChange={(e) => setAuthId(e.target.value)}
+                  />
+                  {submitted && idProblem && <FieldError>{idProblem}</FieldError>}
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="auth_token">Auth token</FieldLabel>
+                  <Input
+                    id="auth_token"
+                    type="password"
+                    autoComplete="off"
+                    aria-invalid={submitted && Boolean(tokenProblem)}
+                    value={authToken}
+                    onChange={(e) => setAuthToken(e.target.value)}
+                  />
+                  {submitted && tokenProblem && <FieldError>{tokenProblem}</FieldError>}
+                </Field>
+              </div>
+              <FieldDescription>
+                From the overview page of the Plivo console. Use the main account: a subaccount
+                cannot read agent flows. Yaksha uses them for this import and does not save them,
+                except in the start request of a flow that calls out.
+              </FieldDescription>
+            </>
+          ) : (
+            <>
+              <div className="grid gap-5 sm:grid-cols-[minmax(0,1fr)_12rem]">
+                <Field>
+                  <FieldLabel htmlFor="api_key">API key</FieldLabel>
+                  <Input
+                    id="api_key"
+                    type="password"
+                    autoComplete="off"
+                    aria-invalid={submitted && Boolean(keyProblem)}
+                    value={apiKey}
+                    onChange={(e) => setApiKey(e.target.value)}
+                  />
+                  {submitted && keyProblem && <FieldError>{keyProblem}</FieldError>}
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="region">Workspace</FieldLabel>
+                  <Select
+                    items={REGIONS}
+                    value={region}
+                    onValueChange={(value) => value && setRegion(value as ElevenLabsRegion)}
+                  >
+                    <SelectTrigger id="region" className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        {REGIONS.map((item) => (
+                          <SelectItem key={item.value} value={item.value}>
+                            {item.label}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                </Field>
+              </div>
+              <FieldDescription>
+                An API key with ElevenAgents access, from the developers page of ElevenLabs. Yaksha
+                uses it for this import and does not save it, except in the start request of an
+                agent that calls out.
+              </FieldDescription>
+            </>
+          )}
         </FieldGroup>
       </Panel>
       <StepFooter>
@@ -154,14 +273,14 @@ function Credentials({ onConnect }: { onConnect: (account: PlivoCxAccount) => vo
           Back
         </Button>
         <Button type="submit" className="ml-auto">
-          Show agent flows
+          {provider === "plivo-cx" ? "Show agent flows" : "Show agents"}
         </Button>
       </StepFooter>
     </form>
   );
 }
 
-function FlowChoice({
+function PlivoCxAgents({
   account,
   connection,
   onChange,
@@ -170,23 +289,138 @@ function FlowChoice({
   connection: string;
   onChange: () => void;
 }) {
+  const [name, setName] = useState("");
+  const flows = usePlivoCxFlows(account, connection, name);
+  const read = useImportPlivoCxFlow(account);
+  return (
+    <AgentChoice
+      account={
+        <>
+          Plivo CX, Auth ID <code className="font-mono">{account.auth_id}</code>
+        </>
+      }
+      words={{
+        one: "agent flow",
+        reading: "Reading the agent flows",
+        shown: ["active call flow", "active call flows"],
+        none: "This account has no active flows that take calls. A draft flow takes no calls: publish it in Plivo CX first.",
+        noMatch: (search) => `No active call flow has "${search}" in its name.`,
+        source: (title) => `the Plivo CX flow ${title}`,
+      }}
+      kind="plivo-cx"
+      list={flows}
+      rows={(flows.data?.pages ?? []).flatMap((page) =>
+        page.items.map((flow) => ({
+          id: flow.id,
+          name: flow.name,
+          detail: (flow.type && CALL_TYPES[flow.type]) ?? "Takes calls",
+          at: flow.updated_at,
+        })),
+      )}
+      read={read}
+      onSearch={setName}
+      onChange={onChange}
+    />
+  );
+}
+
+function ElevenLabsAgents({
+  account,
+  connection,
+  onChange,
+}: {
+  account: ElevenLabsAccount;
+  connection: string;
+  onChange: () => void;
+}) {
+  const [name, setName] = useState("");
+  const agents = useElevenLabsAgents(account, connection, name);
+  const read = useImportElevenLabsAgent(account);
+  const region = REGIONS.find(({ value }) => value === account.region)?.label;
+  return (
+    <AgentChoice
+      account={<>ElevenLabs, {region}</>}
+      words={{
+        one: "agent",
+        reading: "Reading the agents",
+        shown: ["agent", "agents"],
+        none: "This workspace has no agents.",
+        noMatch: (search) => `No agent has "${search}" in its name.`,
+        source: (title) => `the ElevenLabs agent ${title}`,
+      }}
+      kind="elevenlabs"
+      list={agents}
+      rows={(agents.data?.pages ?? []).flatMap((page) =>
+        page.items.map((agent) => ({
+          id: agent.id,
+          name: agent.name,
+          detail: agent.last_call_at ? "Last call" : "No calls yet",
+          at: agent.last_call_at,
+        })),
+      )}
+      read={read}
+      onSearch={setName}
+      onChange={onChange}
+    />
+  );
+}
+
+interface Row {
+  id: string;
+  name: string;
+  detail: string;
+  at: string | null;
+}
+
+/** The parts of a provider's agent list that the choice shows. */
+interface AgentList {
+  isPending: boolean;
+  error: Error | null;
+  hasNextPage: boolean;
+  isFetchingNextPage: boolean;
+  fetchNextPage: () => Promise<unknown>;
+}
+
+function AgentChoice({
+  account,
+  words,
+  kind,
+  list,
+  rows,
+  read,
+  onSearch,
+  onChange,
+}: {
+  account: ReactNode;
+  words: {
+    one: string;
+    reading: string;
+    shown: [string, string];
+    none: string;
+    noMatch: (search: string) => string;
+    source: (title: string) => string;
+  };
+  kind: ImportedFrom["kind"];
+  list: AgentList;
+  rows: Row[];
+  read: UseMutationResult<ProviderDraft, Error, string>;
+  onSearch: (name: string) => void;
+  onChange: () => void;
+}) {
   const navigate = useNavigate();
   const client = useQueryClient();
   const [typed, setTyped] = useState("");
-  const [name, setName] = useState("");
-  const flows = usePlivoCxFlows(account, connection, name);
-  const read = useImportPlivoCxFlow();
-  const [chosen, setChosen] = useState<PlivoCxFlow | null>(null);
+  const [searched, setSearched] = useState("");
+  const [chosen, setChosen] = useState<Row | null>(null);
   const [number, setNumber] = useState<string | null>(null);
   const [briefDraftId, setBriefDraftId] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
-  const listed = flows.data?.pages.flatMap((page) => page.items) ?? [];
 
-  /** Once a flow is read, its panel comes into view: the list can push it below the fold. */
+  /** Once an agent is read, its panel comes into view: the list can push it below the fold. */
   const fills = useRef<HTMLElement>(null);
-  const readFlow = read.data;
+  const readAgent = read.data;
   useEffect(() => {
-    if (!readFlow) return;
+    if (!readAgent) return;
     const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     // After the next frame, when the panel has its final height: started at commit, the smooth
     // scroll stopped short of it.
@@ -194,32 +428,29 @@ function FlowChoice({
       fills.current?.scrollIntoView({ block: "nearest", behavior: still ? "auto" : "smooth" }),
     );
     return () => cancelAnimationFrame(frame);
-  }, [readFlow]);
+  }, [readAgent]);
 
-  const choose = (flow: PlivoCxFlow) => {
-    setChosen(flow);
+  const choose = (row: Row) => {
+    setChosen(row);
     setNumber(null);
     setProblem(null);
-    read.mutate(
-      { account, flowId: flow.id },
-      {
-        onSuccess: (draft) => {
-          setNumber(draft.agent_numbers[0] ?? null);
-          // The brief is drafted while the person checks the flow, so it is ready sooner.
-          const id = randomKey();
-          void client.prefetchQuery({
-            queryKey: keys.briefDraft(id),
-            queryFn: () => draftBrief(draft.config),
-            staleTime: Infinity,
-            retry: false,
-          });
-          setBriefDraftId(id);
-        },
+    read.mutate(row.id, {
+      onSuccess: (draft) => {
+        setNumber(draft.agent_numbers[0] ?? null);
+        // The brief is drafted while the person checks the agent, so it is ready sooner.
+        const id = randomKey();
+        void client.prefetchQuery({
+          queryKey: keys.briefDraft(id),
+          queryFn: () => draftBrief(draft.config),
+          staleTime: Infinity,
+          retry: false,
+        });
+        setBriefDraftId(id);
       },
-    );
+    });
   };
 
-  const open = (draft: PlivoCxDraft) => {
+  const open = (draft: ProviderDraft) => {
     if (!chosen || briefDraftId === null) return;
     const outbound = draft.start_request
       ? withStartRequest(EMPTY_DRAFT.outbound, draft.start_request)
@@ -234,35 +465,34 @@ function FlowChoice({
         agent_number: number ?? "",
         outbound,
       },
-      { source: `the Plivo CX flow ${chosen.name}`, kind: "plivo-cx" },
+      { source: words.source(chosen.name), kind },
       briefDraftId,
     );
     if (started) navigate("/agents/new/details?step=1");
     else
       setProblem(
-        "The browser blocks the storage that takes the flow to the next step. Allow site data for Yaksha, then try again.",
+        `The browser blocks the storage that takes the ${words.one} to the next step. Allow site data for Yaksha, then try again.`,
       );
   };
 
   const search = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setName(typed.trim());
+    setSearched(typed.trim());
+    onSearch(typed.trim());
   };
 
   return (
     <div className="flex flex-1 flex-col gap-6">
       <Panel className="grid gap-4 px-5 py-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <span className="text-p-400">
-            Plivo CX, Auth ID <code className="font-mono">{account.auth_id}</code>
-          </span>
+          <span className="text-p-400">{account}</span>
           <Button variant="ghost" size="sm" onClick={onChange}>
             Change
           </Button>
         </div>
         <form onSubmit={search} role="search" className="flex gap-2">
           <Input
-            aria-label="Search agent flows by name"
+            aria-label={`Search ${words.shown[1]} by name`}
             placeholder="Search by name"
             value={typed}
             onChange={(e) => setTyped(e.target.value)}
@@ -272,42 +502,38 @@ function FlowChoice({
           </Button>
         </form>
 
-        {flows.isPending ? (
+        {list.isPending ? (
           <p className="flex items-center gap-2 text-p-400 text-muted-foreground">
             <Spinner />
-            Reading the agent flows
+            {words.reading}
           </p>
-        ) : flows.error ? (
-          <FieldError>{flows.error.message}</FieldError>
-        ) : listed.length === 0 && !flows.hasNextPage ? (
+        ) : list.error ? (
+          <FieldError>{list.error.message}</FieldError>
+        ) : rows.length === 0 && !list.hasNextPage ? (
           <p className="text-p-400 text-muted-foreground">
-            {name
-              ? `No active call flow has "${name}" in its name.`
-              : "This account has no active flows that take calls. A draft flow takes no calls: publish it in Plivo CX first."}
+            {searched ? words.noMatch(searched) : words.none}
           </p>
         ) : (
           <fieldset className="grid gap-2">
-            <legend className="sr-only">Agent flow</legend>
-            {listed.map((flow) => {
-              const reading = read.isPending && chosen?.id === flow.id;
+            <legend className="sr-only">{words.one}</legend>
+            {rows.map((row) => {
+              const reading = read.isPending && chosen?.id === row.id;
               return (
                 <label
-                  key={flow.id}
+                  key={row.id}
                   aria-busy={reading}
                   className="grid cursor-pointer grid-cols-[1fr_auto] items-center gap-x-4 rounded-md border px-4 py-3 transition-colors hover:bg-hv1 has-checked:border-foreground has-checked:ring-1 has-checked:ring-foreground has-focus-visible:ring-2 has-focus-visible:ring-ring/50"
                 >
                   <input
                     type="radio"
-                    name="flow"
+                    name="agent"
                     className="sr-only"
-                    checked={chosen?.id === flow.id}
-                    onChange={() => choose(flow)}
+                    checked={chosen?.id === row.id}
+                    onChange={() => choose(row)}
                   />
                   <span className="grid min-w-0">
-                    <span className="truncate text-p-500">{flow.name}</span>
-                    <span className="truncate text-s-400 text-muted-foreground">
-                      {(flow.type && CALL_TYPES[flow.type]) ?? "Takes calls"}
-                    </span>
+                    <span className="truncate text-p-500">{row.name}</span>
+                    <span className="truncate text-s-400 text-muted-foreground">{row.detail}</span>
                   </span>
                   {reading ? (
                     <span
@@ -320,9 +546,9 @@ function FlowChoice({
                       Reading
                     </span>
                   ) : (
-                    flow.updated_at && (
+                    row.at && (
                       <span className="text-s-400 text-muted-foreground tabular-nums">
-                        {when(flow.updated_at)}
+                        {when(row.at)}
                       </span>
                     )
                   )}
@@ -331,16 +557,16 @@ function FlowChoice({
             })}
             <div className="flex items-center justify-between gap-3 pt-1">
               <span className="text-s-400 text-muted-foreground tabular-nums">
-                Showing {counted(listed.length, "active call flow", "active call flows")}
+                Showing {counted(rows.length, ...words.shown)}
               </span>
-              {flows.hasNextPage && (
+              {list.hasNextPage && (
                 <Button
                   variant="outline"
                   size="sm"
-                  disabled={flows.isFetchingNextPage}
-                  onClick={() => void flows.fetchNextPage()}
+                  disabled={list.isFetchingNextPage}
+                  onClick={() => void list.fetchNextPage()}
                 >
-                  {flows.isFetchingNextPage && <Spinner />}
+                  {list.isFetchingNextPage && <Spinner />}
                   Load more
                 </Button>
               )}
@@ -362,7 +588,9 @@ function FlowChoice({
               Yaksha could not read {chosen.name}: {read.error.message}
             </FieldError>
           ) : (
-            read.data && <Fills draft={read.data} number={number} onNumber={setNumber} />
+            read.data && (
+              <Fills draft={read.data} source={words.one} number={number} onNumber={setNumber} />
+            )
           )}
         </Panel>
       )}
@@ -382,20 +610,22 @@ function FlowChoice({
           onClick={() => read.data && open(read.data)}
         >
           {read.isPending && <Spinner />}
-          {read.isPending ? "Reading the flow" : "Import"}
+          {read.isPending ? `Reading the ${words.one}` : "Import"}
         </Button>
       </StepFooter>
     </div>
   );
 }
 
-/** What the chosen flow fills, one fact a row. */
+/** What the chosen agent fills, one fact a row. */
 function Fills({
   draft,
+  source,
   number,
   onNumber,
 }: {
-  draft: PlivoCxDraft;
+  draft: ProviderDraft;
+  source: string;
   number: string | null;
   onNumber: (number: string) => void;
 }) {
@@ -403,7 +633,7 @@ function Fills({
   const request = draft.start_request;
   return (
     <dl className="grid grid-cols-[6.5rem_minmax(0,1fr)] gap-x-4 gap-y-2.5 text-p-400">
-      <Fact term="Name">{draft.name ?? "Not in the flow"}</Fact>
+      <Fact term="Name">{draft.name ?? `Not in the ${source}`}</Fact>
       {request ? (
         <>
           <Fact term="Calls">The agent calls Yaksha</Fact>
@@ -446,8 +676,8 @@ function Fills({
           )}
         </Fact>
       )}
-      <Fact term="Config">The flow</Fact>
-      <Fact term="Brief">Drafted from the flow</Fact>
+      <Fact term="Config">The {source}</Fact>
+      <Fact term="Brief">Drafted from the {source}</Fact>
     </dl>
   );
 }

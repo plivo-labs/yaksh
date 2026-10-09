@@ -25,6 +25,7 @@ import {
   type ConversationSummary,
   LANGUAGE_NAMES,
   type OutboundSettings,
+  SOURCE_NAMES,
 } from "@/lib/types";
 import { EditAgentSheet } from "@/pages/agent-form";
 import { AgentKnowledgeBase } from "@/pages/agent-knowledge-base";
@@ -273,6 +274,7 @@ function Settings({ agent, edit }: { agent: Agent; edit: ReactNode }) {
             none
           )}
         </Fact>
+        <Fact label="Source">{SOURCE_NAMES[agent.source]}</Fact>
         <Fact label="External id" wrap>
           {agent.external_id ?? none}
         </Fact>

@@ -19,6 +19,33 @@ import (
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
+// Defines values for AgentSource.
+const (
+	AgentSourceElevenlabs AgentSource = "elevenlabs"
+	AgentSourceFile       AgentSource = "file"
+	AgentSourceManual     AgentSource = "manual"
+	AgentSourcePlivoCx    AgentSource = "plivo_cx"
+	AgentSourceVapi       AgentSource = "vapi"
+)
+
+// Valid indicates whether the value is a known member of the AgentSource enum.
+func (e AgentSource) Valid() bool {
+	switch e {
+	case AgentSourceElevenlabs:
+		return true
+	case AgentSourceFile:
+		return true
+	case AgentSourceManual:
+		return true
+	case AgentSourcePlivoCx:
+		return true
+	case AgentSourceVapi:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for Category.
 const (
 	EdgeCase   Category = "edge_case"
@@ -121,6 +148,30 @@ func (e Direction) Valid() bool {
 	case Inbound:
 		return true
 	case Outbound:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ElevenLabsRegion.
+const (
+	Eu     ElevenLabsRegion = "eu"
+	Global ElevenLabsRegion = "global"
+	In     ElevenLabsRegion = "in"
+	Sg     ElevenLabsRegion = "sg"
+)
+
+// Valid indicates whether the value is a known member of the ElevenLabsRegion enum.
+func (e ElevenLabsRegion) Valid() bool {
+	switch e {
+	case Eu:
+		return true
+	case Global:
+		return true
+	case In:
+		return true
+	case Sg:
 		return true
 	default:
 		return false
@@ -246,13 +297,13 @@ func (e GenerationStatus) Valid() bool {
 
 // Defines values for ImportProvider.
 const (
-	PlivoCx ImportProvider = "plivo_cx"
+	ImportProviderPlivoCx ImportProvider = "plivo_cx"
 )
 
 // Valid indicates whether the value is a known member of the ImportProvider enum.
 func (e ImportProvider) Valid() bool {
 	switch e {
-	case PlivoCx:
+	case ImportProviderPlivoCx:
 		return true
 	default:
 		return false
@@ -993,6 +1044,9 @@ type AgentCreate struct {
 	Outbound         *OutboundConfig           `json:"outbound,omitempty"`
 	Rules            *[]AgentCreate_Rules_Item `json:"rules,omitempty"`
 
+	// Source Where an agent came from: made in Yaksha, or imported from a file or a provider.
+	Source *AgentSource `json:"source,omitempty"`
+
 	// Transport How Yaksha reaches an agent; phone only today, kept as the seam for other ways.
 	Transport *Transport `json:"transport,omitempty"`
 }
@@ -1034,6 +1088,9 @@ type AgentRead struct {
 	Outbound         *OutboundConfig         `json:"outbound"`
 	Rules            []AgentRead_Rules_Item  `json:"rules"`
 
+	// Source Where an agent came from: made in Yaksha, or imported from a file or a provider.
+	Source AgentSource `json:"source"`
+
 	// Transport How Yaksha reaches an agent; phone only today, kept as the seam for other ways.
 	Transport Transport `json:"transport"`
 	UpdatedAt time.Time `json:"updated_at"`
@@ -1043,6 +1100,9 @@ type AgentRead struct {
 type AgentRead_Rules_Item struct {
 	union json.RawMessage
 }
+
+// AgentSource Where an agent came from: made in Yaksha, or imported from a file or a provider.
+type AgentSource string
 
 // AgentSummary An agent without its config and knowledge base, for lists.
 type AgentSummary struct {
@@ -1057,6 +1117,9 @@ type AgentSummary struct {
 	Language         Language           `json:"language"`
 	Name             string             `json:"name"`
 	Outbound         *OutboundConfig    `json:"outbound"`
+
+	// Source Where an agent came from: made in Yaksha, or imported from a file or a provider.
+	Source AgentSource `json:"source"`
 
 	// Transport How Yaksha reaches an agent; phone only today, kept as the seam for other ways.
 	Transport Transport `json:"transport"`
@@ -1348,6 +1411,44 @@ type Efforts struct {
 	Efforts []string `json:"efforts"`
 	Model   string   `json:"model"`
 }
+
+// ElevenLabsAgent defines model for ElevenLabsAgent.
+type ElevenLabsAgent struct {
+	Id         string     `json:"id"`
+	LastCallAt *time.Time `json:"last_call_at"`
+	Name       string     `json:"name"`
+}
+
+// ElevenLabsAgentChoice defines model for ElevenLabsAgentChoice.
+type ElevenLabsAgentChoice struct {
+	AgentId string `json:"agent_id"`
+	ApiKey  string `json:"api_key"`
+
+	// Region Where the ElevenLabs workspace is. EU, India and Singapore workspaces are separate, with
+	// their own API host and keys.
+	Region *ElevenLabsRegion `json:"region,omitempty"`
+}
+
+// ElevenLabsAgentPage defines model for ElevenLabsAgentPage.
+type ElevenLabsAgentPage struct {
+	Items      []ElevenLabsAgent `json:"items"`
+	NextCursor *string           `json:"next_cursor"`
+}
+
+// ElevenLabsAgentSearch defines model for ElevenLabsAgentSearch.
+type ElevenLabsAgentSearch struct {
+	ApiKey string  `json:"api_key"`
+	Cursor *string `json:"cursor,omitempty"`
+	Name   *string `json:"name,omitempty"`
+
+	// Region Where the ElevenLabs workspace is. EU, India and Singapore workspaces are separate, with
+	// their own API host and keys.
+	Region *ElevenLabsRegion `json:"region,omitempty"`
+}
+
+// ElevenLabsRegion Where the ElevenLabs workspace is. EU, India and Singapore workspaces are separate, with
+// their own API host and keys.
+type ElevenLabsRegion string
 
 // EndReason Who or what ended the conversation, as Yaksha observed it.
 type EndReason string
@@ -1890,18 +1991,6 @@ type PlivoAccount struct {
 	AuthToken string `json:"auth_token"`
 }
 
-// PlivoCxDraft The fields a Plivo CX agent flow fills. A flow that a call starts gives the numbers that
-// reach it; a flow that a request starts gives the start request instead.
-type PlivoCxDraft struct {
-	AgentNumbers []string           `json:"agent_numbers"`
-	Config       string             `json:"config"`
-	Direction    Direction          `json:"direction"`
-	ExternalId   string             `json:"external_id"`
-	Language     Language           `json:"language"`
-	Name         *string            `json:"name"`
-	StartRequest *StartRequestDraft `json:"start_request"`
-}
-
 // PlivoCxFlow defines model for PlivoCxFlow.
 type PlivoCxFlow struct {
 	Id        string     `json:"id"`
@@ -1937,6 +2026,18 @@ type Provenance string
 
 // Provider defines model for Provider.
 type Provider string
+
+// ProviderDraft The fields an agent read from a provider fills. An agent that answers calls gives the
+// numbers that reach it; an agent that calls out gives the start request instead.
+type ProviderDraft struct {
+	AgentNumbers []string           `json:"agent_numbers"`
+	Config       string             `json:"config"`
+	Direction    Direction          `json:"direction"`
+	ExternalId   string             `json:"external_id"`
+	Language     Language           `json:"language"`
+	Name         *string            `json:"name"`
+	StartRequest *StartRequestDraft `json:"start_request"`
+}
 
 // ProviderTest defines model for ProviderTest.
 type ProviderTest struct {
@@ -2521,12 +2622,13 @@ type WireEventKind string
 
 // ListAgentsApiV1AgentsGetParams defines parameters for ListAgentsApiV1AgentsGet.
 type ListAgentsApiV1AgentsGetParams struct {
-	ExternalId *string    `form:"external_id,omitempty" json:"external_id,omitempty"`
-	Direction  *Direction `form:"direction,omitempty" json:"direction,omitempty"`
-	Q          *string    `form:"q,omitempty" json:"q,omitempty"`
-	Sort       *string    `form:"sort,omitempty" json:"sort,omitempty"`
-	Page       *int       `form:"page,omitempty" json:"page,omitempty"`
-	PageSize   *int       `form:"page_size,omitempty" json:"page_size,omitempty"`
+	ExternalId *string      `form:"external_id,omitempty" json:"external_id,omitempty"`
+	Direction  *Direction   `form:"direction,omitempty" json:"direction,omitempty"`
+	Source     *AgentSource `form:"source,omitempty" json:"source,omitempty"`
+	Q          *string      `form:"q,omitempty" json:"q,omitempty"`
+	Sort       *string      `form:"sort,omitempty" json:"sort,omitempty"`
+	Page       *int         `form:"page,omitempty" json:"page,omitempty"`
+	PageSize   *int         `form:"page_size,omitempty" json:"page_size,omitempty"`
 }
 
 // ListGenerationsApiV1AgentsAgentIdScenarioGenerationsGetParams defines parameters for ListGenerationsApiV1AgentsAgentIdScenarioGenerationsGet.
@@ -2624,6 +2726,12 @@ type DraftAgentBriefApiV1AgentsDraftBriefPostJSONRequestBody = BriefSource
 
 // ImportAgentFileApiV1AgentsImportPostJSONRequestBody defines body for ImportAgentFileApiV1AgentsImportPost for application/json ContentType.
 type ImportAgentFileApiV1AgentsImportPostJSONRequestBody = AgentFile
+
+// ImportElevenlabsAgentApiV1AgentsImportElevenlabsAgentPostJSONRequestBody defines body for ImportElevenlabsAgentApiV1AgentsImportElevenlabsAgentPost for application/json ContentType.
+type ImportElevenlabsAgentApiV1AgentsImportElevenlabsAgentPostJSONRequestBody = ElevenLabsAgentChoice
+
+// ListElevenlabsAgentsApiV1AgentsImportElevenlabsAgentsPostJSONRequestBody defines body for ListElevenlabsAgentsApiV1AgentsImportElevenlabsAgentsPost for application/json ContentType.
+type ListElevenlabsAgentsApiV1AgentsImportElevenlabsAgentsPostJSONRequestBody = ElevenLabsAgentSearch
 
 // ImportPlivoCxFlowApiV1AgentsImportPlivoCxFlowPostJSONRequestBody defines body for ImportPlivoCxFlowApiV1AgentsImportPlivoCxFlowPost for application/json ContentType.
 type ImportPlivoCxFlowApiV1AgentsImportPlivoCxFlowPostJSONRequestBody = PlivoCxFlowChoice
@@ -3299,6 +3407,44 @@ type ClientInterface interface {
 	// Corresponds with POST /api/v1/agents/import (the `ImportAgentFileApiV1AgentsImportPost` operationId).
 	ImportAgentFileApiV1AgentsImportPost(ctx context.Context, body ImportAgentFileApiV1AgentsImportPostJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// ImportElevenlabsAgentApiV1AgentsImportElevenlabsAgentPostWithBody Import Elevenlabs Agent
+	//
+	// Read one ElevenLabs agent into a draft agent. Nothing is saved. An agent without a number
+	// gets a start request for ElevenLabs' outbound call, which carries the API key.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /api/v1/agents/import/elevenlabs/agent (the `ImportElevenlabsAgentApiV1AgentsImportElevenlabsAgentPost` operationId).
+	ImportElevenlabsAgentApiV1AgentsImportElevenlabsAgentPostWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ImportElevenlabsAgentApiV1AgentsImportElevenlabsAgentPost Import Elevenlabs Agent
+	//
+	// Read one ElevenLabs agent into a draft agent. Nothing is saved. An agent without a number
+	// gets a start request for ElevenLabs' outbound call, which carries the API key.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /api/v1/agents/import/elevenlabs/agent (the `ImportElevenlabsAgentApiV1AgentsImportElevenlabsAgentPost` operationId).
+	ImportElevenlabsAgentApiV1AgentsImportElevenlabsAgentPost(ctx context.Context, body ImportElevenlabsAgentApiV1AgentsImportElevenlabsAgentPostJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListElevenlabsAgentsApiV1AgentsImportElevenlabsAgentsPostWithBody List Elevenlabs Agents
+	//
+	// One page of an ElevenLabs workspace's agents. The API key is used for this call only.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /api/v1/agents/import/elevenlabs/agents (the `ListElevenlabsAgentsApiV1AgentsImportElevenlabsAgentsPost` operationId).
+	ListElevenlabsAgentsApiV1AgentsImportElevenlabsAgentsPostWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListElevenlabsAgentsApiV1AgentsImportElevenlabsAgentsPost List Elevenlabs Agents
+	//
+	// One page of an ElevenLabs workspace's agents. The API key is used for this call only.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /api/v1/agents/import/elevenlabs/agents (the `ListElevenlabsAgentsApiV1AgentsImportElevenlabsAgentsPost` operationId).
+	ListElevenlabsAgentsApiV1AgentsImportElevenlabsAgentsPost(ctx context.Context, body ListElevenlabsAgentsApiV1AgentsImportElevenlabsAgentsPostJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// ImportPlivoCxFlowApiV1AgentsImportPlivoCxFlowPostWithBody Import Plivo Cx Flow
 	//
 	// Read one Plivo CX agent flow into a draft agent. Nothing is saved. A flow that a request
@@ -3338,6 +3484,13 @@ type ClientInterface interface {
 	//
 	// Corresponds with POST /api/v1/agents/import/plivo-cx/flows (the `ListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPost` operationId).
 	ListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPost(ctx context.Context, body ListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPostJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListAgentSourcesApiV1AgentsSourcesGet List Agent Sources
+	//
+	// Where the live agents came from, each source once.
+	//
+	// Corresponds with GET /api/v1/agents/sources (the `ListAgentSourcesApiV1AgentsSourcesGet` operationId).
+	ListAgentSourcesApiV1AgentsSourcesGet(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ReadCurlCommandApiV1AgentsStartRequestFromCurlPostWithBody Read Curl Command
 	//
@@ -4158,6 +4311,84 @@ func (c *Client) ImportAgentFileApiV1AgentsImportPost(ctx context.Context, body 
 	return c.Client.Do(req)
 }
 
+// ImportElevenlabsAgentApiV1AgentsImportElevenlabsAgentPostWithBody Import Elevenlabs Agent
+//
+// Read one ElevenLabs agent into a draft agent. Nothing is saved. An agent without a number
+// gets a start request for ElevenLabs' outbound call, which carries the API key.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /api/v1/agents/import/elevenlabs/agent (the `ImportElevenlabsAgentApiV1AgentsImportElevenlabsAgentPost` operationId).
+func (c *Client) ImportElevenlabsAgentApiV1AgentsImportElevenlabsAgentPostWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewImportElevenlabsAgentApiV1AgentsImportElevenlabsAgentPostRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ImportElevenlabsAgentApiV1AgentsImportElevenlabsAgentPost Import Elevenlabs Agent
+//
+// Read one ElevenLabs agent into a draft agent. Nothing is saved. An agent without a number
+// gets a start request for ElevenLabs' outbound call, which carries the API key.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /api/v1/agents/import/elevenlabs/agent (the `ImportElevenlabsAgentApiV1AgentsImportElevenlabsAgentPost` operationId).
+func (c *Client) ImportElevenlabsAgentApiV1AgentsImportElevenlabsAgentPost(ctx context.Context, body ImportElevenlabsAgentApiV1AgentsImportElevenlabsAgentPostJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewImportElevenlabsAgentApiV1AgentsImportElevenlabsAgentPostRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListElevenlabsAgentsApiV1AgentsImportElevenlabsAgentsPostWithBody List Elevenlabs Agents
+//
+// One page of an ElevenLabs workspace's agents. The API key is used for this call only.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /api/v1/agents/import/elevenlabs/agents (the `ListElevenlabsAgentsApiV1AgentsImportElevenlabsAgentsPost` operationId).
+func (c *Client) ListElevenlabsAgentsApiV1AgentsImportElevenlabsAgentsPostWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListElevenlabsAgentsApiV1AgentsImportElevenlabsAgentsPostRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListElevenlabsAgentsApiV1AgentsImportElevenlabsAgentsPost List Elevenlabs Agents
+//
+// One page of an ElevenLabs workspace's agents. The API key is used for this call only.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /api/v1/agents/import/elevenlabs/agents (the `ListElevenlabsAgentsApiV1AgentsImportElevenlabsAgentsPost` operationId).
+func (c *Client) ListElevenlabsAgentsApiV1AgentsImportElevenlabsAgentsPost(ctx context.Context, body ListElevenlabsAgentsApiV1AgentsImportElevenlabsAgentsPostJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListElevenlabsAgentsApiV1AgentsImportElevenlabsAgentsPostRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // ImportPlivoCxFlowApiV1AgentsImportPlivoCxFlowPostWithBody Import Plivo Cx Flow
 //
 // Read one Plivo CX agent flow into a draft agent. Nothing is saved. A flow that a request
@@ -4228,6 +4459,23 @@ func (c *Client) ListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPostWithBody(ctx c
 // Corresponds with POST /api/v1/agents/import/plivo-cx/flows (the `ListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPost` operationId).
 func (c *Client) ListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPost(ctx context.Context, body ListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPostJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPostRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListAgentSourcesApiV1AgentsSourcesGet List Agent Sources
+//
+// Where the live agents came from, each source once.
+//
+// Corresponds with GET /api/v1/agents/sources (the `ListAgentSourcesApiV1AgentsSourcesGet` operationId).
+func (c *Client) ListAgentSourcesApiV1AgentsSourcesGet(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListAgentSourcesApiV1AgentsSourcesGetRequest(c.Server)
 	if err != nil {
 		return nil, err
 	}
@@ -5959,6 +6207,18 @@ func NewListAgentsApiV1AgentsGetRequest(server string, params *ListAgentsApiV1Ag
 
 		}
 
+		if params.Source != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "source", *params.Source, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
 		if params.Q != nil {
 
 			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "q", *params.Q, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "", Format: ""}); err != nil {
@@ -6141,6 +6401,86 @@ func NewImportAgentFileApiV1AgentsImportPostRequestWithBody(server string, conte
 	return req, nil
 }
 
+// NewImportElevenlabsAgentApiV1AgentsImportElevenlabsAgentPostRequest calls the generic ImportElevenlabsAgentApiV1AgentsImportElevenlabsAgentPost builder with application/json body
+func NewImportElevenlabsAgentApiV1AgentsImportElevenlabsAgentPostRequest(server string, body ImportElevenlabsAgentApiV1AgentsImportElevenlabsAgentPostJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewImportElevenlabsAgentApiV1AgentsImportElevenlabsAgentPostRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewImportElevenlabsAgentApiV1AgentsImportElevenlabsAgentPostRequestWithBody constructs an http.Request for the ImportElevenlabsAgentApiV1AgentsImportElevenlabsAgentPost method, with any body, and a specified content type
+func NewImportElevenlabsAgentApiV1AgentsImportElevenlabsAgentPostRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/agents/import/elevenlabs/agent")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewListElevenlabsAgentsApiV1AgentsImportElevenlabsAgentsPostRequest calls the generic ListElevenlabsAgentsApiV1AgentsImportElevenlabsAgentsPost builder with application/json body
+func NewListElevenlabsAgentsApiV1AgentsImportElevenlabsAgentsPostRequest(server string, body ListElevenlabsAgentsApiV1AgentsImportElevenlabsAgentsPostJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewListElevenlabsAgentsApiV1AgentsImportElevenlabsAgentsPostRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewListElevenlabsAgentsApiV1AgentsImportElevenlabsAgentsPostRequestWithBody constructs an http.Request for the ListElevenlabsAgentsApiV1AgentsImportElevenlabsAgentsPost method, with any body, and a specified content type
+func NewListElevenlabsAgentsApiV1AgentsImportElevenlabsAgentsPostRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/agents/import/elevenlabs/agents")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 // NewImportPlivoCxFlowApiV1AgentsImportPlivoCxFlowPostRequest calls the generic ImportPlivoCxFlowApiV1AgentsImportPlivoCxFlowPost builder with application/json body
 func NewImportPlivoCxFlowApiV1AgentsImportPlivoCxFlowPostRequest(server string, body ImportPlivoCxFlowApiV1AgentsImportPlivoCxFlowPostJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
@@ -6217,6 +6557,33 @@ func NewListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPostRequestWithBody(server 
 	}
 
 	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewListAgentSourcesApiV1AgentsSourcesGetRequest constructs an http.Request for the ListAgentSourcesApiV1AgentsSourcesGet method
+func NewListAgentSourcesApiV1AgentsSourcesGetRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/agents/sources")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
 
 	return req, nil
 }
@@ -9610,6 +9977,44 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with POST /api/v1/agents/import (the `ImportAgentFileApiV1AgentsImportPost` operationId).
 	ImportAgentFileApiV1AgentsImportPostWithResponse(ctx context.Context, body ImportAgentFileApiV1AgentsImportPostJSONRequestBody, reqEditors ...RequestEditorFn) (*ImportAgentFileApiV1AgentsImportPostResponse, error)
 
+	// ImportElevenlabsAgentApiV1AgentsImportElevenlabsAgentPostWithBodyWithResponse Import Elevenlabs Agent
+	//
+	// Read one ElevenLabs agent into a draft agent. Nothing is saved. An agent without a number
+	// gets a start request for ElevenLabs' outbound call, which carries the API key.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/agents/import/elevenlabs/agent (the `ImportElevenlabsAgentApiV1AgentsImportElevenlabsAgentPost` operationId).
+	ImportElevenlabsAgentApiV1AgentsImportElevenlabsAgentPostWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ImportElevenlabsAgentApiV1AgentsImportElevenlabsAgentPostResponse, error)
+
+	// ImportElevenlabsAgentApiV1AgentsImportElevenlabsAgentPostWithResponse Import Elevenlabs Agent
+	//
+	// Read one ElevenLabs agent into a draft agent. Nothing is saved. An agent without a number
+	// gets a start request for ElevenLabs' outbound call, which carries the API key.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/agents/import/elevenlabs/agent (the `ImportElevenlabsAgentApiV1AgentsImportElevenlabsAgentPost` operationId).
+	ImportElevenlabsAgentApiV1AgentsImportElevenlabsAgentPostWithResponse(ctx context.Context, body ImportElevenlabsAgentApiV1AgentsImportElevenlabsAgentPostJSONRequestBody, reqEditors ...RequestEditorFn) (*ImportElevenlabsAgentApiV1AgentsImportElevenlabsAgentPostResponse, error)
+
+	// ListElevenlabsAgentsApiV1AgentsImportElevenlabsAgentsPostWithBodyWithResponse List Elevenlabs Agents
+	//
+	// One page of an ElevenLabs workspace's agents. The API key is used for this call only.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/agents/import/elevenlabs/agents (the `ListElevenlabsAgentsApiV1AgentsImportElevenlabsAgentsPost` operationId).
+	ListElevenlabsAgentsApiV1AgentsImportElevenlabsAgentsPostWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ListElevenlabsAgentsApiV1AgentsImportElevenlabsAgentsPostResponse, error)
+
+	// ListElevenlabsAgentsApiV1AgentsImportElevenlabsAgentsPostWithResponse List Elevenlabs Agents
+	//
+	// One page of an ElevenLabs workspace's agents. The API key is used for this call only.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/agents/import/elevenlabs/agents (the `ListElevenlabsAgentsApiV1AgentsImportElevenlabsAgentsPost` operationId).
+	ListElevenlabsAgentsApiV1AgentsImportElevenlabsAgentsPostWithResponse(ctx context.Context, body ListElevenlabsAgentsApiV1AgentsImportElevenlabsAgentsPostJSONRequestBody, reqEditors ...RequestEditorFn) (*ListElevenlabsAgentsApiV1AgentsImportElevenlabsAgentsPostResponse, error)
+
 	// ImportPlivoCxFlowApiV1AgentsImportPlivoCxFlowPostWithBodyWithResponse Import Plivo Cx Flow
 	//
 	// Read one Plivo CX agent flow into a draft agent. Nothing is saved. A flow that a request
@@ -9649,6 +10054,15 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with POST /api/v1/agents/import/plivo-cx/flows (the `ListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPost` operationId).
 	ListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPostWithResponse(ctx context.Context, body ListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPostJSONRequestBody, reqEditors ...RequestEditorFn) (*ListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPostResponse, error)
+
+	// ListAgentSourcesApiV1AgentsSourcesGetWithResponse List Agent Sources
+	//
+	// Where the live agents came from, each source once.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/agents/sources (the `ListAgentSourcesApiV1AgentsSourcesGet` operationId).
+	ListAgentSourcesApiV1AgentsSourcesGetWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListAgentSourcesApiV1AgentsSourcesGetResponse, error)
 
 	// ReadCurlCommandApiV1AgentsStartRequestFromCurlPostWithBodyWithResponse Read Curl Command
 	//
@@ -10645,11 +11059,11 @@ func (r ImportAgentFileApiV1AgentsImportPostResponse) ContentType() string {
 	return ""
 }
 
-type ImportPlivoCxFlowApiV1AgentsImportPlivoCxFlowPostResponse struct {
+type ImportElevenlabsAgentApiV1AgentsImportElevenlabsAgentPostResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
-	JSON200 *PlivoCxDraft
+	JSON200 *ProviderDraft
 	// JSON4XX the response for an HTTP 4XX `application/json` response
 	JSON4XX *ErrorResponse
 	// JSON503 the response for an HTTP 503 `application/json` response
@@ -10657,7 +11071,117 @@ type ImportPlivoCxFlowApiV1AgentsImportPlivoCxFlowPostResponse struct {
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
-func (r ImportPlivoCxFlowApiV1AgentsImportPlivoCxFlowPostResponse) GetJSON200() *PlivoCxDraft {
+func (r ImportElevenlabsAgentApiV1AgentsImportElevenlabsAgentPostResponse) GetJSON200() *ProviderDraft {
+	return r.JSON200
+}
+
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r ImportElevenlabsAgentApiV1AgentsImportElevenlabsAgentPostResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r ImportElevenlabsAgentApiV1AgentsImportElevenlabsAgentPostResponse) GetJSON503() *ErrorResponse {
+	return r.JSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r ImportElevenlabsAgentApiV1AgentsImportElevenlabsAgentPostResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ImportElevenlabsAgentApiV1AgentsImportElevenlabsAgentPostResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ImportElevenlabsAgentApiV1AgentsImportElevenlabsAgentPostResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ImportElevenlabsAgentApiV1AgentsImportElevenlabsAgentPostResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type ListElevenlabsAgentsApiV1AgentsImportElevenlabsAgentsPostResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *ElevenLabsAgentPage
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *ErrorResponse
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListElevenlabsAgentsApiV1AgentsImportElevenlabsAgentsPostResponse) GetJSON200() *ElevenLabsAgentPage {
+	return r.JSON200
+}
+
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r ListElevenlabsAgentsApiV1AgentsImportElevenlabsAgentsPostResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r ListElevenlabsAgentsApiV1AgentsImportElevenlabsAgentsPostResponse) GetJSON503() *ErrorResponse {
+	return r.JSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r ListElevenlabsAgentsApiV1AgentsImportElevenlabsAgentsPostResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListElevenlabsAgentsApiV1AgentsImportElevenlabsAgentsPostResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListElevenlabsAgentsApiV1AgentsImportElevenlabsAgentsPostResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListElevenlabsAgentsApiV1AgentsImportElevenlabsAgentsPostResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type ImportPlivoCxFlowApiV1AgentsImportPlivoCxFlowPostResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *ProviderDraft
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *ErrorResponse
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ImportPlivoCxFlowApiV1AgentsImportPlivoCxFlowPostResponse) GetJSON200() *ProviderDraft {
 	return r.JSON200
 }
 
@@ -10749,6 +11273,54 @@ func (r ListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPostResponse) StatusCode() 
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r ListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPostResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type ListAgentSourcesApiV1AgentsSourcesGetResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *[]AgentSource
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListAgentSourcesApiV1AgentsSourcesGetResponse) GetJSON200() *[]AgentSource {
+	return r.JSON200
+}
+
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r ListAgentSourcesApiV1AgentsSourcesGetResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
+}
+
+// GetBody returns the raw response body bytes
+func (r ListAgentSourcesApiV1AgentsSourcesGetResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListAgentSourcesApiV1AgentsSourcesGetResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListAgentSourcesApiV1AgentsSourcesGetResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListAgentSourcesApiV1AgentsSourcesGetResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -14478,6 +15050,68 @@ func (c *ClientWithResponses) ImportAgentFileApiV1AgentsImportPostWithResponse(c
 	return ParseImportAgentFileApiV1AgentsImportPostResponse(rsp)
 }
 
+// ImportElevenlabsAgentApiV1AgentsImportElevenlabsAgentPostWithBodyWithResponse Import Elevenlabs Agent
+//
+// Read one ElevenLabs agent into a draft agent. Nothing is saved. An agent without a number
+// gets a start request for ElevenLabs' outbound call, which carries the API key.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/agents/import/elevenlabs/agent (the `ImportElevenlabsAgentApiV1AgentsImportElevenlabsAgentPost` operationId).
+func (c *ClientWithResponses) ImportElevenlabsAgentApiV1AgentsImportElevenlabsAgentPostWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ImportElevenlabsAgentApiV1AgentsImportElevenlabsAgentPostResponse, error) {
+	rsp, err := c.ImportElevenlabsAgentApiV1AgentsImportElevenlabsAgentPostWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseImportElevenlabsAgentApiV1AgentsImportElevenlabsAgentPostResponse(rsp)
+}
+
+// ImportElevenlabsAgentApiV1AgentsImportElevenlabsAgentPostWithResponse Import Elevenlabs Agent
+//
+// Read one ElevenLabs agent into a draft agent. Nothing is saved. An agent without a number
+// gets a start request for ElevenLabs' outbound call, which carries the API key.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/agents/import/elevenlabs/agent (the `ImportElevenlabsAgentApiV1AgentsImportElevenlabsAgentPost` operationId).
+func (c *ClientWithResponses) ImportElevenlabsAgentApiV1AgentsImportElevenlabsAgentPostWithResponse(ctx context.Context, body ImportElevenlabsAgentApiV1AgentsImportElevenlabsAgentPostJSONRequestBody, reqEditors ...RequestEditorFn) (*ImportElevenlabsAgentApiV1AgentsImportElevenlabsAgentPostResponse, error) {
+	rsp, err := c.ImportElevenlabsAgentApiV1AgentsImportElevenlabsAgentPost(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseImportElevenlabsAgentApiV1AgentsImportElevenlabsAgentPostResponse(rsp)
+}
+
+// ListElevenlabsAgentsApiV1AgentsImportElevenlabsAgentsPostWithBodyWithResponse List Elevenlabs Agents
+//
+// One page of an ElevenLabs workspace's agents. The API key is used for this call only.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/agents/import/elevenlabs/agents (the `ListElevenlabsAgentsApiV1AgentsImportElevenlabsAgentsPost` operationId).
+func (c *ClientWithResponses) ListElevenlabsAgentsApiV1AgentsImportElevenlabsAgentsPostWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ListElevenlabsAgentsApiV1AgentsImportElevenlabsAgentsPostResponse, error) {
+	rsp, err := c.ListElevenlabsAgentsApiV1AgentsImportElevenlabsAgentsPostWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListElevenlabsAgentsApiV1AgentsImportElevenlabsAgentsPostResponse(rsp)
+}
+
+// ListElevenlabsAgentsApiV1AgentsImportElevenlabsAgentsPostWithResponse List Elevenlabs Agents
+//
+// One page of an ElevenLabs workspace's agents. The API key is used for this call only.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/agents/import/elevenlabs/agents (the `ListElevenlabsAgentsApiV1AgentsImportElevenlabsAgentsPost` operationId).
+func (c *ClientWithResponses) ListElevenlabsAgentsApiV1AgentsImportElevenlabsAgentsPostWithResponse(ctx context.Context, body ListElevenlabsAgentsApiV1AgentsImportElevenlabsAgentsPostJSONRequestBody, reqEditors ...RequestEditorFn) (*ListElevenlabsAgentsApiV1AgentsImportElevenlabsAgentsPostResponse, error) {
+	rsp, err := c.ListElevenlabsAgentsApiV1AgentsImportElevenlabsAgentsPost(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListElevenlabsAgentsApiV1AgentsImportElevenlabsAgentsPostResponse(rsp)
+}
+
 // ImportPlivoCxFlowApiV1AgentsImportPlivoCxFlowPostWithBodyWithResponse Import Plivo Cx Flow
 //
 // Read one Plivo CX agent flow into a draft agent. Nothing is saved. A flow that a request
@@ -14540,6 +15174,21 @@ func (c *ClientWithResponses) ListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPostW
 		return nil, err
 	}
 	return ParseListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPostResponse(rsp)
+}
+
+// ListAgentSourcesApiV1AgentsSourcesGetWithResponse List Agent Sources
+//
+// Where the live agents came from, each source once.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/agents/sources (the `ListAgentSourcesApiV1AgentsSourcesGet` operationId).
+func (c *ClientWithResponses) ListAgentSourcesApiV1AgentsSourcesGetWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListAgentSourcesApiV1AgentsSourcesGetResponse, error) {
+	rsp, err := c.ListAgentSourcesApiV1AgentsSourcesGet(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListAgentSourcesApiV1AgentsSourcesGetResponse(rsp)
 }
 
 // ReadCurlCommandApiV1AgentsStartRequestFromCurlPostWithBodyWithResponse Read Curl Command
@@ -16064,6 +16713,86 @@ func ParseImportAgentFileApiV1AgentsImportPostResponse(rsp *http.Response) (*Imp
 	return response, nil
 }
 
+// ParseImportElevenlabsAgentApiV1AgentsImportElevenlabsAgentPostResponse parses an HTTP response from a ImportElevenlabsAgentApiV1AgentsImportElevenlabsAgentPostWithResponse call
+func ParseImportElevenlabsAgentApiV1AgentsImportElevenlabsAgentPostResponse(rsp *http.Response) (*ImportElevenlabsAgentApiV1AgentsImportElevenlabsAgentPostResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ImportElevenlabsAgentApiV1AgentsImportElevenlabsAgentPostResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ProviderDraft
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListElevenlabsAgentsApiV1AgentsImportElevenlabsAgentsPostResponse parses an HTTP response from a ListElevenlabsAgentsApiV1AgentsImportElevenlabsAgentsPostWithResponse call
+func ParseListElevenlabsAgentsApiV1AgentsImportElevenlabsAgentsPostResponse(rsp *http.Response) (*ListElevenlabsAgentsApiV1AgentsImportElevenlabsAgentsPostResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListElevenlabsAgentsApiV1AgentsImportElevenlabsAgentsPostResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ElevenLabsAgentPage
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseImportPlivoCxFlowApiV1AgentsImportPlivoCxFlowPostResponse parses an HTTP response from a ImportPlivoCxFlowApiV1AgentsImportPlivoCxFlowPostWithResponse call
 func ParseImportPlivoCxFlowApiV1AgentsImportPlivoCxFlowPostResponse(rsp *http.Response) (*ImportPlivoCxFlowApiV1AgentsImportPlivoCxFlowPostResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -16079,7 +16808,7 @@ func ParseImportPlivoCxFlowApiV1AgentsImportPlivoCxFlowPostResponse(rsp *http.Re
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest PlivoCxDraft
+		var dest ProviderDraft
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -16138,6 +16867,39 @@ func ParseListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPostResponse(rsp *http.Re
 			return nil, err
 		}
 		response.JSON503 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListAgentSourcesApiV1AgentsSourcesGetResponse parses an HTTP response from a ListAgentSourcesApiV1AgentsSourcesGetWithResponse call
+func ParseListAgentSourcesApiV1AgentsSourcesGetResponse(rsp *http.Response) (*ListAgentSourcesApiV1AgentsSourcesGetResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListAgentSourcesApiV1AgentsSourcesGetResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest []AgentSource
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
 
 	}
 

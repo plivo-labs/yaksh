@@ -5,7 +5,7 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict
 
 from yaksha.db.models import Agent, Document
-from yaksha.domain.agents import AgentConfig, Direction, Transport
+from yaksha.domain.agents import AgentConfig, AgentSource, Direction, Transport
 from yaksha.domain.languages import Language
 from yaksha.domain.rules import AgentRules
 from yaksha.domain.triggers import OutboundConfig
@@ -19,6 +19,7 @@ class AgentSummary(BaseModel):
     id: uuid.UUID
     name: str
     external_id: str | None
+    source: AgentSource
     direction: Direction
     transport: Transport
     agent_number: str | None

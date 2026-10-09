@@ -23,6 +23,7 @@ from yaksha.db.models import (
 from yaksha.domain.agents import (
     AgentConfig,
     AgentCreate,
+    AgentSource,
     AgentUpdate,
     Direction,
 )
@@ -114,9 +115,13 @@ async def get_agent(session: AsyncSession, agent_id: uuid.UUID, *, lock: bool = 
 
 
 async def add_agent(
-    session: AsyncSession, name: str, external_id: str | None, config: AgentConfig
+    session: AsyncSession,
+    name: str,
+    external_id: str | None,
+    source: AgentSource,
+    config: AgentConfig,
 ) -> Agent:
-    agent = Agent(name=name, external_id=external_id, current_version=1)
+    agent = Agent(name=name, external_id=external_id, source=source, current_version=1)
     apply_config(agent, config)
     session.add(agent)
     await flush(session)
@@ -127,7 +132,7 @@ async def add_agent(
 async def create_agent(session: AsyncSession, command: AgentCreate) -> Agent:
     config = command.to_config()
     await check_documents(session, config)
-    agent = await add_agent(session, command.name, command.external_id, config)
+    agent = await add_agent(session, command.name, command.external_id, command.source, config)
     await session.commit()
     return agent
 
@@ -136,7 +141,9 @@ async def duplicate_agent(session: AsyncSession, agent_id: uuid.UUID) -> Agent:
     """A new agent with the same configuration and a copy of every live scenario, all at
     version 1. The external id stays with the original, since it names that agent."""
     source = await get_agent(session, agent_id, lock=True)
-    agent = await add_agent(session, f"{source.name} (copy)", None, config_of(source))
+    agent = await add_agent(
+        session, f"{source.name} (copy)", None, source.source, config_of(source)
+    )
     # Locked, so no scenario changes its persona while it is copied: a live scenario keeps its
     # persona from being deleted, and the copy then points to a live persona too.
     scenarios = list(
@@ -173,6 +180,7 @@ async def list_agents(
     limit: int,
     external_id: str | None = None,
     direction: Direction | None = None,
+    source: AgentSource | None = None,
     search: str | None = None,
     sort: str = "-created_at",
 ) -> tuple[list[Agent], int]:
@@ -187,6 +195,8 @@ async def list_agents(
         query = query.where(Agent.external_id == external_id)
     if direction is not None:
         query = query.where(Agent.direction == direction)
+    if source is not None:
+        query = query.where(Agent.source == source)
     total = await session.scalar(select(func.count()).select_from(query.subquery()))
     key = SORT_KEYS[sort.removeprefix("-")]
     rows = await session.scalars(
@@ -195,6 +205,14 @@ async def list_agents(
         .limit(limit)
     )
     return list(rows), total or 0
+
+
+async def agent_sources(session: AsyncSession) -> list[AgentSource]:
+    """The sources of the live agents, each once."""
+    rows = await session.scalars(
+        select(Agent.source).where(Agent.deleted_at.is_(None)).distinct().order_by(Agent.source)
+    )
+    return list(rows)
 
 
 def matching(search: str) -> ColumnElement[bool]:

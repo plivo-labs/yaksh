@@ -1,10 +1,11 @@
 """The provider clients the API uses, built from the stored settings and built again when the
 settings they depend on change."""
 
+from yaksha.domain.agent_import import ElevenLabsRegion
 from yaksha.domain.language_models import JsonModel
 from yaksha.domain.settings import AppSettings, reveal
 from yaksha.domain.voices import VoiceProvider
-from yaksha.integrations.elevenlabs import ElevenLabsClient
+from yaksha.integrations.elevenlabs import REGION_APIS, ElevenLabsAgentsApi, ElevenLabsClient
 from yaksha.integrations.openai_models import OpenAIJsonModel
 from yaksha.integrations.plivo import PlivoApi
 from yaksha.simulation.voices import VoiceClients
@@ -49,6 +50,11 @@ class Providers:
         """A client for a Plivo account that someone imports an agent from; its credentials come
         with the request and are not stored."""
         return PlivoApi(auth_id, auth_token)
+
+    def elevenlabs_agents(self, api_key: str, region: ElevenLabsRegion) -> ElevenLabsAgentsApi:
+        """A client for an ElevenLabs workspace that someone imports an agent from; its key comes
+        with the request and is not stored."""
+        return ElevenLabsAgentsApi(api_key, base_url=REGION_APIS[region])
 
     def _model(
         self,

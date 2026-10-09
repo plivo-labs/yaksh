@@ -126,6 +126,22 @@
             }
           },
           {
+            "name": "source",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/AgentSource"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Source"
+            }
+          },
+          {
             "name": "q",
             "in": "query",
             "required": false,
@@ -329,7 +345,121 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PlivoCxDraft"
+                  "$ref": "#/components/schemas/ProviderDraft"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "The request failed. The error tells why.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "An outside service is not set up, or it did not answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/agents/import/elevenlabs/agents": {
+      "post": {
+        "tags": [
+          "agents"
+        ],
+        "summary": "List Elevenlabs Agents",
+        "description": "One page of an ElevenLabs workspace's agents. The API key is used for this call only.",
+        "operationId": "list_elevenlabs_agents_api_v1_agents_import_elevenlabs_agents_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ElevenLabsAgentSearch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ElevenLabsAgentPage"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "The request failed. The error tells why.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "An outside service is not set up, or it did not answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/agents/import/elevenlabs/agent": {
+      "post": {
+        "tags": [
+          "agents"
+        ],
+        "summary": "Import Elevenlabs Agent",
+        "description": "Read one ElevenLabs agent into a draft agent. Nothing is saved. An agent without a number\ngets a start request for ElevenLabs' outbound call, which carries the API key.",
+        "operationId": "import_elevenlabs_agent_api_v1_agents_import_elevenlabs_agent_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ElevenLabsAgentChoice"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProviderDraft"
                 }
               }
             }
@@ -450,6 +580,47 @@
           },
           "503": {
             "description": "An outside service is not set up, or it did not answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/agents/sources": {
+      "get": {
+        "tags": [
+          "agents"
+        ],
+        "summary": "List Agent Sources",
+        "description": "Where the live agents came from, each source once.",
+        "operationId": "list_agent_sources_api_v1_agents_sources_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AgentSource"
+                  },
+                  "type": "array",
+                  "title": "Response List Agent Sources Api V1 Agents Sources Get"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "The request failed. The error tells why.",
             "content": {
               "application/json": {
                 "schema": {
@@ -4717,6 +4888,10 @@
               }
             ],
             "title": "External Id"
+          },
+          "source": {
+            "$ref": "#/components/schemas/AgentSource",
+            "default": "manual"
           }
         },
         "additionalProperties": false,
@@ -4807,6 +4982,9 @@
               }
             ],
             "title": "External Id"
+          },
+          "source": {
+            "$ref": "#/components/schemas/AgentSource"
           },
           "direction": {
             "$ref": "#/components/schemas/Direction"
@@ -4906,6 +5084,7 @@
           "id",
           "name",
           "external_id",
+          "source",
           "direction",
           "transport",
           "agent_number",
@@ -4921,6 +5100,18 @@
           "rules"
         ],
         "title": "AgentRead"
+      },
+      "AgentSource": {
+        "type": "string",
+        "enum": [
+          "manual",
+          "file",
+          "plivo_cx",
+          "elevenlabs",
+          "vapi"
+        ],
+        "title": "AgentSource",
+        "description": "Where an agent came from: made in Yaksha, or imported from a file or a provider."
       },
       "AgentSummary": {
         "properties": {
@@ -4943,6 +5134,9 @@
               }
             ],
             "title": "External Id"
+          },
+          "source": {
+            "$ref": "#/components/schemas/AgentSource"
           },
           "direction": {
             "$ref": "#/components/schemas/Direction"
@@ -5002,6 +5196,7 @@
           "id",
           "name",
           "external_id",
+          "source",
           "direction",
           "transport",
           "agent_number",
@@ -6545,6 +6740,144 @@
           "efforts"
         ],
         "title": "Efforts"
+      },
+      "ElevenLabsAgent": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "last_call_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Call At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "last_call_at"
+        ],
+        "title": "ElevenLabsAgent"
+      },
+      "ElevenLabsAgentChoice": {
+        "properties": {
+          "api_key": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Api Key"
+          },
+          "region": {
+            "$ref": "#/components/schemas/ElevenLabsRegion",
+            "default": "global"
+          },
+          "agent_id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{1,100}$",
+            "title": "Agent Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "api_key",
+          "agent_id"
+        ],
+        "title": "ElevenLabsAgentChoice"
+      },
+      "ElevenLabsAgentPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ElevenLabsAgent"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "title": "ElevenLabsAgentPage"
+      },
+      "ElevenLabsAgentSearch": {
+        "properties": {
+          "api_key": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Api Key"
+          },
+          "region": {
+            "$ref": "#/components/schemas/ElevenLabsRegion",
+            "default": "global"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "cursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cursor"
+          }
+        },
+        "type": "object",
+        "required": [
+          "api_key"
+        ],
+        "title": "ElevenLabsAgentSearch"
+      },
+      "ElevenLabsRegion": {
+        "type": "string",
+        "enum": [
+          "global",
+          "eu",
+          "in",
+          "sg"
+        ],
+        "title": "ElevenLabsRegion",
+        "description": "Where the ElevenLabs workspace is. EU, India and Singapore workspaces are separate, with\ntheir own API host and keys."
       },
       "EndReason": {
         "type": "string",
@@ -8719,64 +9052,6 @@
         ],
         "title": "PlivoAccount"
       },
-      "PlivoCxDraft": {
-        "properties": {
-          "name": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Name"
-          },
-          "external_id": {
-            "type": "string",
-            "title": "External Id"
-          },
-          "language": {
-            "$ref": "#/components/schemas/Language"
-          },
-          "config": {
-            "type": "string",
-            "title": "Config"
-          },
-          "direction": {
-            "$ref": "#/components/schemas/Direction"
-          },
-          "agent_numbers": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Agent Numbers"
-          },
-          "start_request": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/StartRequestDraft"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          }
-        },
-        "type": "object",
-        "required": [
-          "name",
-          "external_id",
-          "language",
-          "config",
-          "direction",
-          "agent_numbers",
-          "start_request"
-        ],
-        "title": "PlivoCxDraft",
-        "description": "The fields a Plivo CX agent flow fills. A flow that a call starts gives the numbers that\nreach it; a flow that a request starts gives the start request instead."
-      },
       "PlivoCxFlow": {
         "properties": {
           "id": {
@@ -8946,6 +9221,64 @@
           "plivo"
         ],
         "title": "Provider"
+      },
+      "ProviderDraft": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "external_id": {
+            "type": "string",
+            "title": "External Id"
+          },
+          "language": {
+            "$ref": "#/components/schemas/Language"
+          },
+          "config": {
+            "type": "string",
+            "title": "Config"
+          },
+          "direction": {
+            "$ref": "#/components/schemas/Direction"
+          },
+          "agent_numbers": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Agent Numbers"
+          },
+          "start_request": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StartRequestDraft"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "external_id",
+          "language",
+          "config",
+          "direction",
+          "agent_numbers",
+          "start_request"
+        ],
+        "title": "ProviderDraft",
+        "description": "The fields an agent read from a provider fills. An agent that answers calls gives the\nnumbers that reach it; an agent that calls out gives the start request instead."
       },
       "ProviderTest": {
         "properties": {

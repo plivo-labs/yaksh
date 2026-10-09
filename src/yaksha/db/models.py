@@ -24,7 +24,7 @@ from sqlalchemy.dialects.postgresql import ARRAY, JSONB, UUID
 from sqlalchemy.orm import Mapped, MappedColumn, mapped_column
 
 from yaksha.db.base import Base
-from yaksha.domain.agents import Direction, Transport
+from yaksha.domain.agents import AgentSource, Direction, Transport
 from yaksha.domain.conversations import Channel, ConversationStatus, EndReason
 from yaksha.domain.evaluations import (
     DecidedBy,
@@ -57,6 +57,7 @@ class Agent(Base):
     id: Mapped[uuid.UUID] = uuid_primary_key()
     name: Mapped[str] = mapped_column(Text)
     external_id: Mapped[str | None] = mapped_column(Text)
+    source: Mapped[AgentSource] = mapped_column(pg_enum(AgentSource, "agent_source"))
     direction: Mapped[Direction] = mapped_column(pg_enum(Direction, "agent_direction"))
     transport: Mapped[Transport] = mapped_column(pg_enum(Transport, "agent_transport"))
     agent_number: Mapped[str | None] = mapped_column(Text)

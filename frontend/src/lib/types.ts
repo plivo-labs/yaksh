@@ -116,6 +116,16 @@ export const WAITING_REASON_TEXT: Record<WaitingReason, string> = {
   worker_or_number: "a free worker or number",
 };
 
+export type AgentSource = "manual" | "file" | "plivo_cx" | "elevenlabs" | "vapi";
+
+export const SOURCE_NAMES: Record<AgentSource, string> = {
+  manual: "Made in Yaksha",
+  file: "Agent file",
+  plivo_cx: "Plivo CX",
+  elevenlabs: "ElevenLabs",
+  vapi: "Vapi",
+};
+
 export const LANGUAGE_NAMES: Record<Language, string> = {
   en: "English",
   hi: "Hindi",
@@ -256,6 +266,7 @@ export interface AgentSummary {
   id: string;
   name: string;
   external_id: string | null;
+  source: AgentSource;
   direction: Direction;
   transport: Transport;
   agent_number: string | null;
@@ -382,8 +393,27 @@ export interface PlivoCxFlowPage {
   next_offset: number | null;
 }
 
-/** The fields a Plivo CX agent flow fills; nothing is saved. */
-export interface PlivoCxDraft {
+export type ElevenLabsRegion = "global" | "eu" | "in" | "sg";
+
+export interface ElevenLabsAccount {
+  api_key: string;
+  region: ElevenLabsRegion;
+}
+
+export interface ElevenLabsAgent {
+  id: string;
+  name: string;
+  last_call_at: string | null;
+}
+
+export interface ElevenLabsAgentPage {
+  items: ElevenLabsAgent[];
+  /** Where the next page starts, or null after the last. */
+  next_cursor: string | null;
+}
+
+/** The fields an agent read from a provider fills; nothing is saved. */
+export interface ProviderDraft {
   name: string | null;
   external_id: string;
   language: Language;
@@ -408,6 +438,8 @@ export interface AgentInput {
   knowledge_base?: KnowledgeBaseEntry[];
   /** Sent only when the agent is added; later changes go through the rules panel. */
   rules?: AgentRule[];
+  /** Sent only when the agent is added; it never changes. */
+  source?: AgentSource;
 }
 
 export interface PhoneNumber {

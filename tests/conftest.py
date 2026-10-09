@@ -22,6 +22,7 @@ from yaksha.config import Settings
 from yaksha.db.migrate import upgrade_to_head
 from yaksha.db.models import Conversation, Voice
 from yaksha.db.session import create_engine, create_sessionmaker
+from yaksha.domain.agent_import import ElevenLabsRegion
 from yaksha.domain.conversations import (
     Admission,
     CallObserver,
@@ -45,7 +46,7 @@ from yaksha.domain.settings import AppSettings, SecretName, Secrets
 from yaksha.domain.voices import ProviderVoice, VoiceGender, VoiceProvider, VoiceSettings
 from yaksha.evaluation import evaluations
 from yaksha.evaluation.evaluations import Evaluated
-from yaksha.integrations.elevenlabs import as_wav
+from yaksha.integrations.elevenlabs import ElevenLabsAgentsApi, as_wav
 from yaksha.integrations.plivo import PlivoApi
 from yaksha.integrations.plivo_signature import signature, signed_text
 from yaksha.settings import store
@@ -420,6 +421,13 @@ class FakeProviders:
 
     def plivo_cx(self, auth_id: str, auth_token: str) -> PlivoApi:
         return PlivoApi(auth_id, auth_token, base_url=self.plivo_api_url)
+
+    elevenlabs_api_url = "http://127.0.0.1:9"
+    """Where elevenlabs_agents clients go, whatever the region: nowhere, until a test points it at
+    its stand-in for ElevenLabs."""
+
+    def elevenlabs_agents(self, api_key: str, region: ElevenLabsRegion) -> ElevenLabsAgentsApi:
+        return ElevenLabsAgentsApi(api_key, base_url=self.elevenlabs_api_url)
 
     async def close(self) -> None:
         pass

@@ -26,6 +26,14 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useFilterParams } from "@/hooks/use-filter-params";
 import { usePageParam } from "@/hooks/use-page-param";
@@ -34,23 +42,30 @@ import { duration, reach, words } from "@/lib/format";
 import {
   AGENTS_PAGE,
   useAgentPage,
+  useAgentSources,
   useDeleteAgent,
   useDuplicateAgent,
   useLastCall,
   useScenarioCount,
 } from "@/lib/queries";
-import { type AgentSummary, LANGUAGE_NAMES } from "@/lib/types";
+import { type AgentSource, type AgentSummary, LANGUAGE_NAMES, SOURCE_NAMES } from "@/lib/types";
 
 const ROW =
   "grid grid-cols-[minmax(0,1fr)_2rem] items-center gap-x-4 gap-y-2 px-3 md:grid-cols-[minmax(12rem,1.4fr)_7rem_6rem_minmax(12rem,1fr)_8rem_2rem]";
+
+const ANY = "any";
 
 export function AgentsPage() {
   const [params, update] = useFilterParams();
   const search = params.get("q") ?? "";
   const sort = params.get("sort") ?? "";
+  const sources = useAgentSources().data ?? [];
+  const source = (Object.keys(SOURCE_NAMES) as AgentSource[]).find(
+    (value) => value === params.get("source"),
+  );
   const page = usePageParam();
-  const agents = useAgentPage(search, sort, page);
-  const empty = agents.data?.total === 0 && !search;
+  const agents = useAgentPage(search, source, sort, page);
+  const empty = agents.data?.total === 0 && !search && !source;
   const searchFor = (text: string) => update({ q: text });
   const sortBy = (next: string) => update({ sort: next });
 
@@ -65,6 +80,13 @@ export function AgentsPage() {
           placeholder="Search by name, number or id"
           className="order-last basis-full sm:order-none sm:basis-64"
         />
+        {(sources.length > 1 || source) && (
+          <SourceFilter
+            sources={sources}
+            value={source}
+            onChange={(next) => update({ source: next ?? null })}
+          />
+        )}
         {!empty && (
           <>
             <Button
@@ -144,7 +166,7 @@ export function AgentsPage() {
               ))
             ) : agents.data.items.length === 0 ? (
               <li className="px-3 py-8 text-p-400 text-muted-foreground">
-                No agents match “{search}”.
+                {search ? `No agents match “${search}”.` : "No agents from this source."}
               </li>
             ) : (
               agents.data.items.map((agent) => <AgentRow key={agent.id} agent={agent} />)
@@ -154,6 +176,42 @@ export function AgentsPage() {
         </div>
       )}
     </div>
+  );
+}
+
+/** Shown only when the agents came from more than one place, so one source adds no noise. */
+function SourceFilter({
+  sources,
+  value,
+  onChange,
+}: {
+  sources: AgentSource[];
+  value: AgentSource | undefined;
+  onChange: (source: AgentSource | undefined) => void;
+}) {
+  const items = [
+    { value: ANY, label: "All sources" },
+    ...sources.map((source) => ({ value: source, label: SOURCE_NAMES[source] })),
+  ];
+  return (
+    <Select
+      items={items}
+      value={value ?? ANY}
+      onValueChange={(next) => onChange(sources.find((source) => source === next))}
+    >
+      <SelectTrigger size="sm" className="w-40" aria-label="Filter by source">
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectGroup>
+          {items.map((item) => (
+            <SelectItem key={item.value} value={item.value}>
+              {item.label}
+            </SelectItem>
+          ))}
+        </SelectGroup>
+      </SelectContent>
+    </Select>
   );
 }
 

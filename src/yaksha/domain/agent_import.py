@@ -87,9 +87,9 @@ class PlivoCxFlowPage(BaseModel):
     """Where the next page starts, or None after the last."""
 
 
-class PlivoCxDraft(BaseModel):
-    """The fields a Plivo CX agent flow fills. A flow that a call starts gives the numbers that
-    reach it; a flow that a request starts gives the start request instead."""
+class ProviderDraft(BaseModel):
+    """The fields an agent read from a provider fills. An agent that answers calls gives the
+    numbers that reach it; an agent that calls out gives the start request instead."""
 
     name: str | None
     external_id: str
@@ -116,3 +116,61 @@ class PlivoCxAccountApi(Protocol):
     async def agent_flow_applications(self) -> dict[str, str]: ...
 
     async def list_numbers(self) -> list[AccountNumber]: ...
+
+
+class ElevenLabsRegion(StrEnum):
+    """Where the ElevenLabs workspace is. EU, India and Singapore workspaces are separate, with
+    their own API host and keys."""
+
+    GLOBAL = "global"
+    EU = "eu"
+    IN = "in"
+    SG = "sg"
+
+
+class ElevenLabsAccount(BaseModel):
+    """An ElevenLabs API key, used for one import and never stored."""
+
+    api_key: str = Field(min_length=1, max_length=200)
+    region: ElevenLabsRegion = ElevenLabsRegion.GLOBAL
+
+
+class ElevenLabsAgentSearch(ElevenLabsAccount):
+    name: str | None = Field(default=None, max_length=200)
+    cursor: str | None = Field(default=None, max_length=2000)
+
+
+class ElevenLabsAgentChoice(ElevenLabsAccount):
+    agent_id: str = Field(pattern=r"^[A-Za-z0-9_-]{1,100}$")
+
+
+class ElevenLabsAgent(BaseModel):
+    id: str
+    name: str
+    last_call_at: datetime | None
+
+
+class ElevenLabsAgentPage(BaseModel):
+    items: list[ElevenLabsAgent]
+    next_cursor: str | None
+    """Where the next page starts, or None after the last."""
+
+
+class ElevenLabsAccountApi(Protocol):
+    """The ElevenLabs calls an import makes, with the workspace's own key. A failed call raises
+    ProviderCallError with ElevenLabs' status."""
+
+    api_key: str
+    base_url: str
+
+    async def list_agents(self, *, name: str | None, cursor: str | None) -> dict[str, Any]:
+        """Agents that are not archived."""
+        ...
+
+    async def get_agent(self, agent_id: str) -> dict[str, Any]: ...
+
+    async def get_tool(self, tool_id: str) -> dict[str, Any]: ...
+
+    async def outbound_numbers(self) -> list[dict[str, Any]]:
+        """The workspace's numbers that can place calls."""
+        ...

@@ -22,6 +22,11 @@ def upgrade() -> None:
         sa.Column("name", sa.Text(), nullable=False),
         sa.Column("external_id", sa.Text(), nullable=True),
         sa.Column(
+            "source",
+            sa.Enum("manual", "file", "plivo_cx", "elevenlabs", "vapi", name="agent_source"),
+            nullable=False,
+        ),
+        sa.Column(
             "direction", sa.Enum("inbound", "outbound", name="agent_direction"), nullable=False
         ),
         sa.Column("transport", sa.Enum("phone", name="agent_transport"), nullable=False),
@@ -869,6 +874,7 @@ def downgrade() -> None:
         "language",
         "agent_transport",
         "agent_direction",
+        "agent_source",
         "scenario_category",
         "generation_mode",
         "generation_status",

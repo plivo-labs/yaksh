@@ -22,6 +22,7 @@ import { useBriefDraft } from "@/hooks/use-brief-draft";
 import { CONTEXT_NOTE, EMPTY_DRAFT, toInput } from "@/lib/agent-draft";
 import {
   clearStoredDraft,
+  IMPORT_SOURCES,
   type ImportedFrom,
   readStoredDraft,
   type StoredDraft,
@@ -160,7 +161,12 @@ export function AgentWizardPage() {
     const sent = ruleComplete ? withRule(rules, ruleEdit.index, ruleEdit.rule) : rules;
     const entries = knowledgeBase.documents.map(({ document_id, name }) => ({ document_id, name }));
     save.mutate(
-      { ...toInput(form.draft), knowledge_base: entries, rules: toRules(sent) },
+      {
+        ...toInput(form.draft),
+        source: importedFrom ? IMPORT_SOURCES[importedFrom.kind] : "manual",
+        knowledge_base: entries,
+        rules: toRules(sent),
+      },
       {
         onSuccess: (agent) => {
           done.current = true;
@@ -368,6 +374,7 @@ const IMPORTED_NOTES: Record<ImportedFrom["kind"], string> = {
   file: "Check the drafted brief, then add the phone number in the next step.",
   "config-only": "The file is the config. Check the drafted brief, then fill in the rest.",
   "plivo-cx": "Check the drafted brief and the language.",
+  elevenlabs: "Check the drafted brief.",
 };
 
 function ImportedNote({ from }: { from: ImportedFrom }) {

@@ -258,3 +258,22 @@ async def test_a_duplicate_waits_for_a_persona_change_and_copies_the_new_persona
     copied = (await client.get(f"/api/v1/agents/{copy['id']}/scenarios")).json()["items"]
     assert [item["persona_id"] for item in copied] == [new["id"]]
     assert deleted.status_code == 204
+
+
+async def test_an_agent_keeps_where_it_came_from_and_the_list_filters_by_it(
+    client: AsyncClient,
+) -> None:
+    made = await create_agent(client, name="Made here")
+    imported = await create_agent(client, name="From ElevenLabs", source="elevenlabs")
+    copy = (await client.post(f"/api/v1/agents/{imported['id']}/duplicate")).json()
+    changed = await client.patch(f"/api/v1/agents/{made['id']}", json={"source": "vapi"})
+
+    async def names(source: str) -> list[str]:
+        response = await client.get("/api/v1/agents", params={"source": source, "sort": "name"})
+        return [agent["name"] for agent in response.json()["items"]]
+
+    assert (made["source"], copy["source"]) == ("manual", "elevenlabs")
+    assert changed.status_code == 422
+    assert await names("elevenlabs") == ["From ElevenLabs", "From ElevenLabs (copy)"]
+    assert await names("manual") == ["Made here"]
+    assert (await client.get("/api/v1/agents/sources")).json() == ["manual", "elevenlabs"]

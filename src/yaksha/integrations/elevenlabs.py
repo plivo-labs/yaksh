@@ -1,4 +1,5 @@
-"""ElevenLabs voice lookup and speech, for adding voices and playing previews."""
+"""ElevenLabs voice lookup and speech, for adding voices and playing previews; and, to import
+agents, reads of a workspace's ElevenLabs agents with its own key."""
 
 import io
 import json
@@ -10,11 +11,18 @@ import aiohttp
 import pydantic
 
 from yaksha.diagnostics import describe_exception
-from yaksha.domain.errors import UnavailableError
+from yaksha.domain.agent_import import ElevenLabsRegion
+from yaksha.domain.errors import ProviderCallError, UnavailableError
 from yaksha.domain.languages import Language
 from yaksha.domain.voices import ProviderVoice, VoiceGender, VoiceSettings
 
 ELEVENLABS_API = "https://api.elevenlabs.io"
+REGION_APIS: dict[ElevenLabsRegion, str] = {
+    ElevenLabsRegion.GLOBAL: ELEVENLABS_API,
+    ElevenLabsRegion.EU: "https://api.eu.residency.elevenlabs.io",
+    ElevenLabsRegion.IN: "https://api.in.residency.elevenlabs.io",
+    ElevenLabsRegion.SG: "https://api.sg.residency.elevenlabs.io",
+}
 TIMEOUT = aiohttp.ClientTimeout(total=10)
 SPEECH_TIMEOUT = aiohttp.ClientTimeout(total=20)
 MODEL = "eleven_flash_v2_5"
@@ -81,6 +89,60 @@ class ElevenLabsClient:
         raise UnavailableError(
             f"ElevenLabs refused the speech request with {status}: {excerpt(text_body)}"
         )
+
+
+class ElevenLabsError(ProviderCallError):
+    pass
+
+
+class ElevenLabsAgentsApi:
+    def __init__(self, api_key: str, *, base_url: str = ELEVENLABS_API) -> None:
+        self.api_key = api_key
+        self.base_url = base_url.rstrip("/")
+        self._headers = {"xi-api-key": api_key}
+
+    async def list_agents(self, *, name: str | None, cursor: str | None) -> dict[str, Any]:
+        params = {"page_size": "50", "archived": "false"}
+        if name:
+            params["search"] = name
+        if cursor:
+            params["cursor"] = cursor
+        return await self._get("/v1/convai/agents", params, "listing agents")
+
+    async def get_agent(self, agent_id: str) -> dict[str, Any]:
+        return await self._get(
+            f"/v1/convai/agents/{quote(agent_id, safe='')}", {}, "reading the agent"
+        )
+
+    async def get_tool(self, tool_id: str) -> dict[str, Any]:
+        return await self._get(f"/v1/convai/tools/{quote(tool_id, safe='')}", {}, "reading a tool")
+
+    async def outbound_numbers(self) -> list[dict[str, Any]]:
+        """The first page, up to 100 numbers: an import needs one."""
+        page = await self._get(
+            "/v1/convai/v2/phone-numbers",
+            {"supports_outbound": "true", "page_size": "100"},
+            "listing numbers",
+        )
+        return list(page.get("phone_numbers") or [])
+
+    async def _get(self, path: str, params: dict[str, str], doing: str) -> dict[str, Any]:
+        try:
+            async with (
+                aiohttp.ClientSession(headers=self._headers, timeout=TIMEOUT) as session,
+                session.get(f"{self.base_url}{path}", params=params) as response,
+            ):
+                status, body = response.status, await response.text()
+        except (aiohttp.ClientError, TimeoutError, UnicodeDecodeError) as error:
+            raise ElevenLabsError(
+                f"{doing} did not reach ElevenLabs: {describe_exception(error)}"
+            ) from error
+        if status >= 400:
+            raise ElevenLabsError(f"{doing} failed with {status}: {excerpt(body)}", status=status)
+        found = json.loads(body)
+        if not isinstance(found, dict):
+            raise ValueError(f"{doing} answered with a body that is not an object")
+        return found
 
 
 def excerpt(text: str) -> str:

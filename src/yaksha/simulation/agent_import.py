@@ -51,11 +51,16 @@ def is_plivo_cx(data: Any) -> bool:
 
 
 def plivo_cx_language(settings: dict[str, Any]) -> Language:
-    """The first of the flow's languages, such as en-IN in "en-IN,hi". A language Yaksha does not
-    speak yet becomes English."""
+    """The first of the flow's languages, such as en-IN in "en-IN,hi"."""
     voice = settings.get("voice_ai_config")
     codes = voice.get("language") if isinstance(voice, dict) else None
-    first = codes.split(",")[0].strip().lower() if isinstance(codes, str) else ""
+    return language(codes.split(",")[0] if isinstance(codes, str) else None)
+
+
+def language(code: Any) -> Language:
+    """A provider's language code, such as hi or en-IN. A language Yaksha does not speak yet
+    becomes English."""
+    first = code.strip().lower() if isinstance(code, str) else ""
     return Language.HI if first.startswith("hi") else Language.EN
 
 
@@ -68,3 +73,34 @@ def text(value: Any) -> str | None:
         # A JSON escape such as \ud800 decodes to half a character, which no response can carry.
         raise ValidationError("the file has a name or ID that is not valid Unicode") from None
     return value.strip() or None
+
+
+NOT_BEHAVIOR = frozenset({"code_body"})
+"""The source code of a tool action; its description and parameters stay."""
+CONTRACTS = frozenset({"parameters", "properties", "payload_format"})
+"""Schemas and payload shapes, such as these and any field named like request_body_schema, kept
+exactly: an empty value or a field named code_body in one is part of what a tool takes."""
+REDACTED = "***REDACTED***"
+
+
+def pruned(value: Any) -> Any:
+    """`value` without empty values, redacted secrets or tool source, at any depth except inside a
+    schema; False and 0 stay, because they mean something."""
+    if isinstance(value, dict):
+        kept = {
+            key: item if contract(key) else pruned(item)
+            for key, item in value.items()
+            if key not in NOT_BEHAVIOR
+        }
+        return {key: item for key, item in kept.items() if contract(key) or not empty(item)}
+    if isinstance(value, list):
+        return [item for item in (pruned(item) for item in value) if not empty(item)]
+    return value
+
+
+def empty(value: Any) -> bool:
+    return value is None or value in ("", REDACTED) or value == [] or value == {}
+
+
+def contract(key: str) -> bool:
+    return key in CONTRACTS or key.endswith("schema")

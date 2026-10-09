@@ -17,9 +17,12 @@ import {
   type AgentDraft,
   type AppSettings,
   type AgentInput,
+  type AgentSource,
   type PlivoCxAccount,
-  type PlivoCxDraft,
   type PlivoCxFlowPage,
+  type ProviderDraft,
+  type ElevenLabsAccount,
+  type ElevenLabsAgentPage,
   type StartRequestDraft,
   type AgentRule,
   type AgentSummary,
@@ -126,14 +129,28 @@ export function useAgents() {
 
 export const AGENTS_PAGE = 25;
 
+/** Where the live agents came from, each source once. */
+export function useAgentSources() {
+  return useQuery({
+    queryKey: [...keys.agents, "sources"],
+    queryFn: ({ signal }) => api<AgentSource[]>("/agents/sources", { signal }),
+  });
+}
+
 /** One page of agents, filtered on the server by `search`. The previous page stays on screen
  * while the next one loads, so typing does not flash the table. */
-export function useAgentPage(search: string, sort: string, page: number) {
+export function useAgentPage(
+  search: string,
+  source: AgentSource | undefined,
+  sort: string,
+  page: number,
+) {
   const params = new URLSearchParams({ page: String(page), page_size: String(AGENTS_PAGE) });
   if (search) params.set("q", search);
+  if (source) params.set("source", source);
   if (sort) params.set("sort", sort);
   return useQuery({
-    queryKey: [...keys.agents, "page", { search, sort, page }],
+    queryKey: [...keys.agents, "page", { search, source, sort, page }],
     queryFn: ({ signal }) => api<Page<AgentSummary>>(`/agents?${params}`, { signal }),
     placeholderData: keepPreviousData,
   });
@@ -392,12 +409,45 @@ export function usePlivoCxFlows(account: PlivoCxAccount | null, connection: stri
 }
 
 /** Reads one Plivo CX agent flow into a draft. */
-export function useImportPlivoCxFlow() {
+export function useImportPlivoCxFlow(account: PlivoCxAccount) {
   return useMutation({
-    mutationFn: ({ account, flowId }: { account: PlivoCxAccount; flowId: string }) =>
-      api<PlivoCxDraft>("/agents/import/plivo-cx/flow", {
+    mutationFn: (flowId: string) =>
+      api<ProviderDraft>("/agents/import/plivo-cx/flow", {
         method: "POST",
         json: { ...account, flow_id: flowId },
+      }),
+  });
+}
+
+/** An ElevenLabs workspace's agents, 50 a page, searched by name. As with Plivo CX, the
+ * connection keys the query and the API key stays out of it. */
+export function useElevenLabsAgents(
+  account: ElevenLabsAccount | null,
+  connection: string,
+  name: string,
+) {
+  return useInfiniteQuery({
+    queryKey: ["elevenlabs-agents", connection, name] as const,
+    queryFn: ({ pageParam }) =>
+      api<ElevenLabsAgentPage>("/agents/import/elevenlabs/agents", {
+        method: "POST",
+        json: { ...account, name: name || null, cursor: pageParam },
+      }),
+    initialPageParam: null as string | null,
+    getNextPageParam: (last) => last.next_cursor ?? undefined,
+    enabled: account !== null,
+    retry: false,
+    staleTime: Infinity,
+  });
+}
+
+/** Reads one ElevenLabs agent into a draft. */
+export function useImportElevenLabsAgent(account: ElevenLabsAccount) {
+  return useMutation({
+    mutationFn: (agentId: string) =>
+      api<ProviderDraft>("/agents/import/elevenlabs/agent", {
+        method: "POST",
+        json: { ...account, agent_id: agentId },
       }),
   });
 }

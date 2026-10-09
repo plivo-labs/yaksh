@@ -13,16 +13,26 @@ from yaksha.domain.agent_import import (
     AgentDraft,
     AgentFile,
     CurlCommand,
-    PlivoCxDraft,
+    ElevenLabsAgentChoice,
+    ElevenLabsAgentPage,
+    ElevenLabsAgentSearch,
     PlivoCxFlowChoice,
     PlivoCxFlowPage,
     PlivoCxFlowSearch,
+    ProviderDraft,
     StartRequestDraft,
 )
-from yaksha.domain.agents import AgentCreate, AgentUpdate, BriefDraft, BriefSource, Direction
+from yaksha.domain.agents import (
+    AgentCreate,
+    AgentSource,
+    AgentUpdate,
+    BriefDraft,
+    BriefSource,
+    Direction,
+)
 from yaksha.domain.evaluations import RuleResults
 from yaksha.evaluation import rule_results
-from yaksha.simulation import agents, plivo_cx_import
+from yaksha.simulation import agents, elevenlabs_import, plivo_cx_import
 from yaksha.simulation.agent_import import import_agent
 from yaksha.simulation.briefs import draft_brief
 from yaksha.simulation.curl_import import start_request_from_curl
@@ -58,11 +68,28 @@ async def list_plivo_cx_flows(search: PlivoCxFlowSearch, request: Request) -> Pl
 
 
 @router.post("/import/plivo-cx/flow", responses=UNAVAILABLE)
-async def import_plivo_cx_flow(choice: PlivoCxFlowChoice, request: Request) -> PlivoCxDraft:
+async def import_plivo_cx_flow(choice: PlivoCxFlowChoice, request: Request) -> ProviderDraft:
     """Read one Plivo CX agent flow into a draft agent. Nothing is saved. A flow that a request
     starts gets a start request that carries the credentials, as Plivo CX's "Copy cURL" does."""
     api = request.app.state.providers.plivo_cx(choice.auth_id, choice.auth_token)
     return await plivo_cx_import.import_flow(api, choice.flow_id)
+
+
+@router.post("/import/elevenlabs/agents", responses=UNAVAILABLE)
+async def list_elevenlabs_agents(
+    search: ElevenLabsAgentSearch, request: Request
+) -> ElevenLabsAgentPage:
+    """One page of an ElevenLabs workspace's agents. The API key is used for this call only."""
+    api = request.app.state.providers.elevenlabs_agents(search.api_key, search.region)
+    return await elevenlabs_import.list_agents(api, search)
+
+
+@router.post("/import/elevenlabs/agent", responses=UNAVAILABLE)
+async def import_elevenlabs_agent(choice: ElevenLabsAgentChoice, request: Request) -> ProviderDraft:
+    """Read one ElevenLabs agent into a draft agent. Nothing is saved. An agent without a number
+    gets a start request for ElevenLabs' outbound call, which carries the API key."""
+    api = request.app.state.providers.elevenlabs_agents(choice.api_key, choice.region)
+    return await elevenlabs_import.import_agent(api, choice.agent_id)
 
 
 @router.post("/start-request-from-curl")
@@ -86,6 +113,7 @@ async def list_agents(
     page: PageDep,
     external_id: str | None = None,
     direction: Direction | None = None,
+    source: AgentSource | None = None,
     q: Annotated[str | None, Query(max_length=200)] = None,
     sort: Annotated[str, Query(pattern=SORT_PATTERN)] = "-created_at",
 ) -> Page[AgentSummary]:
@@ -95,10 +123,17 @@ async def list_agents(
         limit=page.page_size,
         external_id=external_id,
         direction=direction,
+        source=source,
         search=q,
         sort=sort,
     )
     return Page.of([AgentSummary.model_validate(row) for row in rows], total, page)
+
+
+@router.get("/sources")
+async def list_agent_sources(session: SessionDep) -> list[AgentSource]:
+    """Where the live agents came from, each source once."""
+    return await agents.agent_sources(session)
 
 
 @router.get("/{agent_id}")

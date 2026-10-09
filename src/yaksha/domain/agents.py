@@ -26,6 +26,16 @@ class Direction(StrEnum):
     OUTBOUND = "outbound"
 
 
+class AgentSource(StrEnum):
+    """Where an agent came from: made in Yaksha, or imported from a file or a provider."""
+
+    MANUAL = "manual"
+    FILE = "file"
+    PLIVO_CX = "plivo_cx"
+    ELEVENLABS = "elevenlabs"
+    VAPI = "vapi"
+
+
 class Transport(StrEnum):
     """How Yaksha reaches an agent; phone only today, kept as the seam for other ways."""
 
@@ -130,9 +140,12 @@ class BriefDraft(BaseModel):
 class AgentCreate(AgentConfig):
     name: str = Field(min_length=1)
     external_id: str | None = None
+    source: AgentSource = AgentSource.MANUAL
 
     def to_config(self) -> AgentConfig:
-        return AgentConfig.model_validate(self.model_dump(exclude={"name", "external_id"}))
+        return AgentConfig.model_validate(
+            self.model_dump(exclude={"name", "external_id", "source"})
+        )
 
 
 class AgentUpdate(BaseModel):
