@@ -375,6 +375,7 @@ const IMPORTED_NOTES: Record<ImportedFrom["kind"], string> = {
   "config-only": "The file is the config. Check the drafted brief, then fill in the rest.",
   "plivo-cx": "Check the drafted brief and the language.",
   elevenlabs: "Check the drafted brief.",
+  vapi: "Check the drafted brief and the language.",
 };
 
 function ImportedNote({ from }: { from: ImportedFrom }) {

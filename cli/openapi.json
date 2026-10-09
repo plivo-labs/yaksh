@@ -492,6 +492,120 @@
         ]
       }
     },
+    "/api/v1/agents/import/vapi/assistants": {
+      "post": {
+        "tags": [
+          "agents"
+        ],
+        "summary": "List Vapi Assistants",
+        "description": "One page of a Vapi organization's assistants, newest first. The API key is used for this\ncall only.",
+        "operationId": "list_vapi_assistants_api_v1_agents_import_vapi_assistants_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VapiAssistantSearch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VapiAssistantPage"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "The request failed. The error tells why.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "An outside service is not set up, or it did not answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/agents/import/vapi/assistant": {
+      "post": {
+        "tags": [
+          "agents"
+        ],
+        "summary": "Import Vapi Assistant",
+        "description": "Read one Vapi assistant into a draft agent. Nothing is saved. An assistant without a\nnumber gets a start request for Vapi's outbound call, which carries the API key.",
+        "operationId": "import_vapi_assistant_api_v1_agents_import_vapi_assistant_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VapiAssistantChoice"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProviderDraft"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "The request failed. The error tells why.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "An outside service is not set up, or it did not answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/agents/start-request-from-curl": {
       "post": {
         "tags": [
@@ -9265,6 +9379,11 @@
                 "type": "null"
               }
             ]
+          },
+          "agent_speaks_first": {
+            "type": "boolean",
+            "title": "Agent Speaks First",
+            "default": true
           }
         },
         "type": "object",
@@ -11744,6 +11863,151 @@
           "ok"
         ],
         "title": "Validity"
+      },
+      "VapiAssistant": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          },
+          "numbers": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Numbers"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "updated_at",
+          "numbers"
+        ],
+        "title": "VapiAssistant"
+      },
+      "VapiAssistantChoice": {
+        "properties": {
+          "api_key": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Api Key"
+          },
+          "region": {
+            "$ref": "#/components/schemas/VapiRegion",
+            "default": "us"
+          },
+          "assistant_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Assistant Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "api_key",
+          "assistant_id"
+        ],
+        "title": "VapiAssistantChoice"
+      },
+      "VapiAssistantPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/VapiAssistant"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "title": "VapiAssistantPage"
+      },
+      "VapiAssistantSearch": {
+        "properties": {
+          "api_key": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Api Key"
+          },
+          "region": {
+            "$ref": "#/components/schemas/VapiRegion",
+            "default": "us"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "cursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cursor"
+          }
+        },
+        "type": "object",
+        "required": [
+          "api_key"
+        ],
+        "title": "VapiAssistantSearch"
+      },
+      "VapiRegion": {
+        "type": "string",
+        "enum": [
+          "us",
+          "eu"
+        ],
+        "title": "VapiRegion",
+        "description": "Where the Vapi organization is. An EU organization has its own API host and keys."
       },
       "Verdict": {
         "type": "string",

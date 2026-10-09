@@ -412,6 +412,28 @@ export interface ElevenLabsAgentPage {
   next_cursor: string | null;
 }
 
+export type VapiRegion = "us" | "eu";
+
+export interface VapiAccount {
+  api_key: string;
+  region: VapiRegion;
+}
+
+export interface VapiAssistant {
+  id: string;
+  name: string;
+  updated_at: string | null;
+  /** The numbers that reach the assistant; without one, an import makes it call out. */
+  numbers: string[];
+}
+
+export interface VapiAssistantPage {
+  items: VapiAssistant[];
+  /** The creation time of the last assistant shown, where the next page starts; null after the
+   * last. */
+  next_cursor: string | null;
+}
+
 /** The fields an agent read from a provider fills; nothing is saved. */
 export interface ProviderDraft {
   name: string | null;
@@ -421,6 +443,7 @@ export interface ProviderDraft {
   direction: Direction;
   agent_numbers: string[];
   start_request: StartRequestDraft | null;
+  agent_speaks_first: boolean;
 }
 
 export interface AgentInput {

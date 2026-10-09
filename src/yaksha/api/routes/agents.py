@@ -21,6 +21,9 @@ from yaksha.domain.agent_import import (
     PlivoCxFlowSearch,
     ProviderDraft,
     StartRequestDraft,
+    VapiAssistantChoice,
+    VapiAssistantPage,
+    VapiAssistantSearch,
 )
 from yaksha.domain.agents import (
     AgentCreate,
@@ -32,7 +35,7 @@ from yaksha.domain.agents import (
 )
 from yaksha.domain.evaluations import RuleResults
 from yaksha.evaluation import rule_results
-from yaksha.simulation import agents, elevenlabs_import, plivo_cx_import
+from yaksha.simulation import agents, elevenlabs_import, plivo_cx_import, vapi_import
 from yaksha.simulation.agent_import import import_agent
 from yaksha.simulation.briefs import draft_brief
 from yaksha.simulation.curl_import import start_request_from_curl
@@ -90,6 +93,22 @@ async def import_elevenlabs_agent(choice: ElevenLabsAgentChoice, request: Reques
     gets a start request for ElevenLabs' outbound call, which carries the API key."""
     api = request.app.state.providers.elevenlabs_agents(choice.api_key, choice.region)
     return await elevenlabs_import.import_agent(api, choice.agent_id)
+
+
+@router.post("/import/vapi/assistants", responses=UNAVAILABLE)
+async def list_vapi_assistants(search: VapiAssistantSearch, request: Request) -> VapiAssistantPage:
+    """One page of a Vapi organization's assistants, newest first. The API key is used for this
+    call only."""
+    api = request.app.state.providers.vapi(search.api_key, search.region)
+    return await vapi_import.list_assistants(api, search)
+
+
+@router.post("/import/vapi/assistant", responses=UNAVAILABLE)
+async def import_vapi_assistant(choice: VapiAssistantChoice, request: Request) -> ProviderDraft:
+    """Read one Vapi assistant into a draft agent. Nothing is saved. An assistant without a
+    number gets a start request for Vapi's outbound call, which carries the API key."""
+    api = request.app.state.providers.vapi(choice.api_key, choice.region)
+    return await vapi_import.import_assistant(api, str(choice.assistant_id))
 
 
 @router.post("/start-request-from-curl")

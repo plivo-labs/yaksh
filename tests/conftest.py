@@ -22,7 +22,7 @@ from yaksha.config import Settings
 from yaksha.db.migrate import upgrade_to_head
 from yaksha.db.models import Conversation, Voice
 from yaksha.db.session import create_engine, create_sessionmaker
-from yaksha.domain.agent_import import ElevenLabsRegion
+from yaksha.domain.agent_import import ElevenLabsRegion, VapiRegion
 from yaksha.domain.conversations import (
     Admission,
     CallObserver,
@@ -49,6 +49,7 @@ from yaksha.evaluation.evaluations import Evaluated
 from yaksha.integrations.elevenlabs import ElevenLabsAgentsApi, as_wav
 from yaksha.integrations.plivo import PlivoApi
 from yaksha.integrations.plivo_signature import signature, signed_text
+from yaksha.integrations.vapi import VapiApi
 from yaksha.settings import store
 from yaksha.settings.cipher import Cipher
 from yaksha.settings.store import SettingsSource
@@ -428,6 +429,13 @@ class FakeProviders:
 
     def elevenlabs_agents(self, api_key: str, region: ElevenLabsRegion) -> ElevenLabsAgentsApi:
         return ElevenLabsAgentsApi(api_key, base_url=self.elevenlabs_api_url)
+
+    vapi_api_url = "http://127.0.0.1:9"
+    """Where vapi clients go, whatever the region: nowhere, until a test points it at its
+    stand-in for Vapi."""
+
+    def vapi(self, api_key: str, region: VapiRegion) -> VapiApi:
+        return VapiApi(api_key, base_url=self.vapi_api_url)
 
     async def close(self) -> None:
         pass
