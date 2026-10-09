@@ -20,6 +20,9 @@ from yaksha.domain.agent_import import (
     PlivoCxFlowPage,
     PlivoCxFlowSearch,
     ProviderDraft,
+    RetellAgentChoice,
+    RetellAgentPage,
+    RetellAgentSearch,
     StartRequestDraft,
     VapiAssistantChoice,
     VapiAssistantPage,
@@ -35,7 +38,13 @@ from yaksha.domain.agents import (
 )
 from yaksha.domain.evaluations import RuleResults
 from yaksha.evaluation import rule_results
-from yaksha.simulation import agents, elevenlabs_import, plivo_cx_import, vapi_import
+from yaksha.simulation import (
+    agents,
+    elevenlabs_import,
+    plivo_cx_import,
+    retell_import,
+    vapi_import,
+)
 from yaksha.simulation.agent_import import import_agent
 from yaksha.simulation.briefs import draft_brief
 from yaksha.simulation.curl_import import start_request_from_curl
@@ -109,6 +118,22 @@ async def import_vapi_assistant(choice: VapiAssistantChoice, request: Request) -
     number gets a start request for Vapi's outbound call, which carries the API key."""
     api = request.app.state.providers.vapi(choice.api_key, choice.region)
     return await vapi_import.import_assistant(api, str(choice.assistant_id))
+
+
+@router.post("/import/retell/agents", responses=UNAVAILABLE)
+async def list_retell_agents(search: RetellAgentSearch, request: Request) -> RetellAgentPage:
+    """One page of a Retell workspace's voice agents. The API key is used for this call only."""
+    api = request.app.state.providers.retell(search.api_key)
+    return await retell_import.list_agents(api, search)
+
+
+@router.post("/import/retell/agent", responses=UNAVAILABLE)
+async def import_retell_agent(choice: RetellAgentChoice, request: Request) -> ProviderDraft:
+    """Read the published version of one Retell agent into a draft agent. Nothing is saved. An
+    agent without a number gets a start request for Retell's outbound call, which carries the API
+    key."""
+    api = request.app.state.providers.retell(choice.api_key)
+    return await retell_import.import_agent(api, choice.agent_id)
 
 
 @router.post("/start-request-from-curl")

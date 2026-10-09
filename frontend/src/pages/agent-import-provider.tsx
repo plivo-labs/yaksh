@@ -41,8 +41,10 @@ import {
   useElevenLabsAgents,
   useImportElevenLabsAgent,
   useImportPlivoCxFlow,
+  useImportRetellAgent,
   useImportVapiAssistant,
   usePlivoCxFlows,
+  useRetellAgents,
   useVapiAssistants,
 } from "@/lib/queries";
 import { randomKey } from "@/lib/random-key";
@@ -51,19 +53,20 @@ import type {
   ElevenLabsRegion,
   PlivoCxAccount,
   ProviderDraft,
+  RetellAccount,
   VapiAccount,
   VapiRegion,
 } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-type ProviderId = "plivo-cx" | "elevenlabs" | "vapi";
+type ProviderId = "plivo-cx" | "elevenlabs" | "vapi" | "retell";
 
 /** Each provider's own icon, as its website serves it. */
 const PROVIDERS: { id: ProviderId | null; name: string; logo: string }[] = [
   { id: "plivo-cx", name: "Plivo CX", logo: plivoCxLogo },
   { id: "elevenlabs", name: "ElevenLabs", logo: elevenLabsLogo },
   { id: "vapi", name: "Vapi", logo: vapiLogo },
-  { id: null, name: "Retell", logo: retellLogo },
+  { id: "retell", name: "Retell", logo: retellLogo },
 ];
 
 const REGIONS: { value: ElevenLabsRegion; label: string }[] = [
@@ -78,6 +81,15 @@ const VAPI_REGIONS: { value: VapiRegion; label: string }[] = [
   { value: "eu", label: "EU" },
 ];
 
+/** Where each provider's API key comes from, and what Yaksha does with it. */
+const KEY_HELP: Record<Exclude<ProviderId, "plivo-cx">, string> = {
+  elevenlabs:
+    "An API key with ElevenAgents access, from the developers page of ElevenLabs. Yaksha uses it for this import and does not save it, except in the start request of an agent that calls out.",
+  vapi: "The private API key, from the API keys page of the Vapi dashboard. Yaksha uses it for this import and does not save it, except in the start request of an assistant that calls out.",
+  retell:
+    "An API key from the API keys page of Retell. Yaksha uses it for this import and does not save it, except in the start request of an agent that calls out.",
+};
+
 /** How each kind of flow that Yaksha lists takes calls; the server leaves out the others. */
 const CALL_TYPES: Record<string, string> = {
   incoming_call: "Answers calls",
@@ -88,7 +100,8 @@ const CALL_TYPES: Record<string, string> = {
 type Connection =
   | { provider: "plivo-cx"; account: PlivoCxAccount; id: string }
   | { provider: "elevenlabs"; account: ElevenLabsAccount; id: string }
-  | { provider: "vapi"; account: VapiAccount; id: string };
+  | { provider: "vapi"; account: VapiAccount; id: string }
+  | { provider: "retell"; account: RetellAccount; id: string };
 
 /** Reads an agent from a provider into a draft, then opens the new-agent wizard with it. The
  * credentials stay in this page's memory: they are sent with each call and never stored. */
@@ -120,6 +133,13 @@ export function AgentImportProviderPage() {
         />
       ) : connected?.provider === "vapi" ? (
         <VapiAssistants
+          key={connected.id}
+          account={connected.account}
+          connection={connected.id}
+          onChange={change}
+        />
+      ) : connected?.provider === "retell" ? (
+        <RetellAgents
           key={connected.id}
           account={connected.account}
           connection={connected.id}
@@ -169,6 +189,9 @@ function Credentials({
     }
     if (provider === "vapi" && !keyProblem) {
       onConnect({ provider, account: { api_key: apiKey.trim(), region: vapiRegion }, id });
+    }
+    if (provider === "retell" && !keyProblem) {
+      onConnect({ provider, account: { api_key: apiKey.trim() }, id });
     }
   };
 
@@ -244,7 +267,12 @@ function Credentials({
             </>
           ) : (
             <>
-              <div className="grid gap-5 sm:grid-cols-[minmax(0,1fr)_12rem]">
+              <div
+                className={cn(
+                  "grid gap-5",
+                  provider !== "retell" && "sm:grid-cols-[minmax(0,1fr)_12rem]",
+                )}
+              >
                 <Field>
                   <FieldLabel htmlFor="api_key">API key</FieldLabel>
                   <Input
@@ -257,14 +285,15 @@ function Credentials({
                   />
                   {submitted && keyProblem && <FieldError>{keyProblem}</FieldError>}
                 </Field>
-                {provider === "vapi" ? (
+                {provider === "vapi" && (
                   <RegionField
                     label="Organization"
                     items={VAPI_REGIONS}
                     value={vapiRegion}
                     onChange={setVapiRegion}
                   />
-                ) : (
+                )}
+                {provider === "elevenlabs" && (
                   <RegionField
                     label="Workspace"
                     items={REGIONS}
@@ -273,11 +302,7 @@ function Credentials({
                   />
                 )}
               </div>
-              <FieldDescription>
-                {provider === "vapi"
-                  ? "The private API key, from the API keys page of the Vapi dashboard. Yaksha uses it for this import and does not save it, except in the start request of an assistant that calls out."
-                  : "An API key with ElevenAgents access, from the developers page of ElevenLabs. Yaksha uses it for this import and does not save it, except in the start request of an agent that calls out."}
-              </FieldDescription>
+              <FieldDescription>{KEY_HELP[provider]}</FieldDescription>
             </>
           )}
         </FieldGroup>
@@ -458,6 +483,49 @@ function VapiAssistants({
               ? `Answers ${assistant.numbers.map(phone).join(", ")}`
               : "No number: calls out",
           when: assistant.updated_at ? `Updated ${when(assistant.updated_at)}` : null,
+        })),
+      )}
+      read={read}
+      onSearch={setName}
+      onChange={onChange}
+    />
+  );
+}
+
+function RetellAgents({
+  account,
+  connection,
+  onChange,
+}: {
+  account: RetellAccount;
+  connection: string;
+  onChange: () => void;
+}) {
+  const [name, setName] = useState("");
+  const agents = useRetellAgents(account, connection, name);
+  const read = useImportRetellAgent(account);
+  return (
+    <AgentChoice
+      account={<>Retell</>}
+      words={{
+        one: "agent",
+        reading: "Reading the agents",
+        shown: ["voice agent", "voice agents"],
+        none: "This workspace has no voice agents.",
+        noMatch: (search) => `No voice agent has "${search}" in its name.`,
+        source: (title) => `the Retell agent ${title}`,
+      }}
+      kind="retell"
+      list={agents}
+      rows={(agents.data?.pages ?? []).flatMap((page) =>
+        page.items.map((agent) => ({
+          id: agent.id,
+          name: agent.name,
+          detail:
+            agent.numbers.length > 0
+              ? `Answers ${agent.numbers.map(phone).join(", ")}`
+              : "No number: calls out",
+          when: agent.updated_at ? `Updated ${when(agent.updated_at)}` : null,
         })),
       )}
       read={read}

@@ -34,6 +34,7 @@ class AgentSource(StrEnum):
     PLIVO_CX = "plivo_cx"
     ELEVENLABS = "elevenlabs"
     VAPI = "vapi"
+    RETELL = "retell"
 
 
 class Transport(StrEnum):

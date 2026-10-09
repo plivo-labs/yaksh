@@ -13,7 +13,7 @@ const DRAFT_KEY = "yaksha.new-agent-draft";
  * an agent read from a provider. */
 export interface ImportedFrom {
   source: string;
-  kind: "file" | "config-only" | "plivo-cx" | "elevenlabs" | "vapi";
+  kind: "file" | "config-only" | "plivo-cx" | "elevenlabs" | "vapi" | "retell";
 }
 
 export const IMPORT_SOURCES: Record<ImportedFrom["kind"], AgentSource> = {
@@ -22,6 +22,7 @@ export const IMPORT_SOURCES: Record<ImportedFrom["kind"], AgentSource> = {
   "plivo-cx": "plivo_cx",
   elevenlabs: "elevenlabs",
   vapi: "vapi",
+  retell: "retell",
 };
 
 const IMPORT_KINDS: ReadonlySet<string> = new Set(Object.keys(IMPORT_SOURCES));

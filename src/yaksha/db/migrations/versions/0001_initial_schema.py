@@ -23,7 +23,9 @@ def upgrade() -> None:
         sa.Column("external_id", sa.Text(), nullable=True),
         sa.Column(
             "source",
-            sa.Enum("manual", "file", "plivo_cx", "elevenlabs", "vapi", name="agent_source"),
+            sa.Enum(
+                "manual", "file", "plivo_cx", "elevenlabs", "vapi", "retell", name="agent_source"
+            ),
             nullable=False,
         ),
         sa.Column(

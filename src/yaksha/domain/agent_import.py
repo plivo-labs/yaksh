@@ -235,3 +235,58 @@ class VapiAccountApi(Protocol):
     async def get_tool(self, tool_id: str) -> dict[str, Any]: ...
 
     async def phone_numbers(self) -> list[dict[str, Any]]: ...
+
+
+RETELL_PAGE_SIZE = 100
+"""The agents in one Retell list call."""
+
+
+class RetellAccount(BaseModel):
+    """A Retell API key, used for one import and never stored."""
+
+    api_key: str = Field(min_length=1, max_length=200)
+
+
+class RetellAgentSearch(RetellAccount):
+    name: str | None = Field(default=None, max_length=200)
+    cursor: str | None = Field(default=None, max_length=2000)
+
+
+class RetellAgentChoice(RetellAccount):
+    agent_id: str = Field(pattern=r"^[A-Za-z0-9_-]{1,100}$")
+
+
+class RetellAgent(BaseModel):
+    id: str
+    name: str
+    updated_at: datetime | None
+    numbers: list[str]
+    """The numbers that reach the agent; without one, an import makes it call out."""
+
+
+class RetellAgentPage(BaseModel):
+    items: list[RetellAgent]
+    next_cursor: str | None
+    """Where the next page starts, or None after the last."""
+
+
+class RetellAccountApi(Protocol):
+    """The Retell calls an import makes, with the workspace's own key. A failed call raises
+    ProviderCallError with Retell's status."""
+
+    api_key: str
+    base_url: str
+
+    async def list_agents(self, *, cursor: str | None) -> dict[str, Any]:
+        """One page of voice agents, each agent once."""
+        ...
+
+    async def agent_versions(self, agent_id: str) -> list[dict[str, Any]]: ...
+
+    async def get_agent(self, agent_id: str, version: int) -> dict[str, Any]: ...
+
+    async def get_retell_llm(self, llm_id: str, version: int | None) -> dict[str, Any]: ...
+
+    async def get_conversation_flow(self, flow_id: str, version: int | None) -> dict[str, Any]: ...
+
+    async def phone_numbers(self) -> list[dict[str, Any]]: ...

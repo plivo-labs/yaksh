@@ -23,6 +23,8 @@ import {
   type ProviderDraft,
   type ElevenLabsAccount,
   type ElevenLabsAgentPage,
+  type RetellAccount,
+  type RetellAgentPage,
   type VapiAccount,
   type VapiAssistantPage,
   type StartRequestDraft,
@@ -480,6 +482,35 @@ export function useImportVapiAssistant(account: VapiAccount) {
       api<ProviderDraft>("/agents/import/vapi/assistant", {
         method: "POST",
         json: { ...account, assistant_id: assistantId },
+      }),
+  });
+}
+
+/** A Retell workspace's voice agents, 100 a page. Retell cannot search, so the server reads on
+ * through the pages for a name. */
+export function useRetellAgents(account: RetellAccount | null, connection: string, name: string) {
+  return useInfiniteQuery({
+    queryKey: ["retell-agents", connection, name] as const,
+    queryFn: ({ pageParam }) =>
+      api<RetellAgentPage>("/agents/import/retell/agents", {
+        method: "POST",
+        json: { ...account, name: name || null, cursor: pageParam },
+      }),
+    initialPageParam: null as string | null,
+    getNextPageParam: (last) => last.next_cursor ?? undefined,
+    enabled: account !== null,
+    retry: false,
+    staleTime: Infinity,
+  });
+}
+
+/** Reads the published version of one Retell agent into a draft. */
+export function useImportRetellAgent(account: RetellAccount) {
+  return useMutation({
+    mutationFn: (agentId: string) =>
+      api<ProviderDraft>("/agents/import/retell/agent", {
+        method: "POST",
+        json: { ...account, agent_id: agentId },
       }),
   });
 }

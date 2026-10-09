@@ -25,6 +25,7 @@ const (
 	AgentSourceFile       AgentSource = "file"
 	AgentSourceManual     AgentSource = "manual"
 	AgentSourcePlivoCx    AgentSource = "plivo_cx"
+	AgentSourceRetell     AgentSource = "retell"
 	AgentSourceVapi       AgentSource = "vapi"
 )
 
@@ -38,6 +39,8 @@ func (e AgentSource) Valid() bool {
 	case AgentSourceManual:
 		return true
 	case AgentSourcePlivoCx:
+		return true
+	case AgentSourceRetell:
 		return true
 	case AgentSourceVapi:
 		return true
@@ -2115,6 +2118,33 @@ type Reply struct {
 	StartMs  int `json:"start_ms"`
 }
 
+// RetellAgent defines model for RetellAgent.
+type RetellAgent struct {
+	Id        string     `json:"id"`
+	Name      string     `json:"name"`
+	Numbers   []string   `json:"numbers"`
+	UpdatedAt *time.Time `json:"updated_at"`
+}
+
+// RetellAgentChoice defines model for RetellAgentChoice.
+type RetellAgentChoice struct {
+	AgentId string `json:"agent_id"`
+	ApiKey  string `json:"api_key"`
+}
+
+// RetellAgentPage defines model for RetellAgentPage.
+type RetellAgentPage struct {
+	Items      []RetellAgent `json:"items"`
+	NextCursor *string       `json:"next_cursor"`
+}
+
+// RetellAgentSearch defines model for RetellAgentSearch.
+type RetellAgentSearch struct {
+	ApiKey string  `json:"api_key"`
+	Cursor *string `json:"cursor,omitempty"`
+	Name   *string `json:"name,omitempty"`
+}
+
 // ReviewConversation defines model for ReviewConversation.
 type ReviewConversation struct {
 	Conversation ConversationRead `json:"conversation"`
@@ -2812,6 +2842,12 @@ type ImportPlivoCxFlowApiV1AgentsImportPlivoCxFlowPostJSONRequestBody = PlivoCxF
 
 // ListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPostJSONRequestBody defines body for ListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPost for application/json ContentType.
 type ListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPostJSONRequestBody = PlivoCxFlowSearch
+
+// ImportRetellAgentApiV1AgentsImportRetellAgentPostJSONRequestBody defines body for ImportRetellAgentApiV1AgentsImportRetellAgentPost for application/json ContentType.
+type ImportRetellAgentApiV1AgentsImportRetellAgentPostJSONRequestBody = RetellAgentChoice
+
+// ListRetellAgentsApiV1AgentsImportRetellAgentsPostJSONRequestBody defines body for ListRetellAgentsApiV1AgentsImportRetellAgentsPost for application/json ContentType.
+type ListRetellAgentsApiV1AgentsImportRetellAgentsPostJSONRequestBody = RetellAgentSearch
 
 // ImportVapiAssistantApiV1AgentsImportVapiAssistantPostJSONRequestBody defines body for ImportVapiAssistantApiV1AgentsImportVapiAssistantPost for application/json ContentType.
 type ImportVapiAssistantApiV1AgentsImportVapiAssistantPostJSONRequestBody = VapiAssistantChoice
@@ -3567,6 +3603,46 @@ type ClientInterface interface {
 	//
 	// Corresponds with POST /api/v1/agents/import/plivo-cx/flows (the `ListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPost` operationId).
 	ListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPost(ctx context.Context, body ListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPostJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ImportRetellAgentApiV1AgentsImportRetellAgentPostWithBody Import Retell Agent
+	//
+	// Read the published version of one Retell agent into a draft agent. Nothing is saved. An
+	// agent without a number gets a start request for Retell's outbound call, which carries the API
+	// key.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /api/v1/agents/import/retell/agent (the `ImportRetellAgentApiV1AgentsImportRetellAgentPost` operationId).
+	ImportRetellAgentApiV1AgentsImportRetellAgentPostWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ImportRetellAgentApiV1AgentsImportRetellAgentPost Import Retell Agent
+	//
+	// Read the published version of one Retell agent into a draft agent. Nothing is saved. An
+	// agent without a number gets a start request for Retell's outbound call, which carries the API
+	// key.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /api/v1/agents/import/retell/agent (the `ImportRetellAgentApiV1AgentsImportRetellAgentPost` operationId).
+	ImportRetellAgentApiV1AgentsImportRetellAgentPost(ctx context.Context, body ImportRetellAgentApiV1AgentsImportRetellAgentPostJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListRetellAgentsApiV1AgentsImportRetellAgentsPostWithBody List Retell Agents
+	//
+	// One page of a Retell workspace's voice agents. The API key is used for this call only.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /api/v1/agents/import/retell/agents (the `ListRetellAgentsApiV1AgentsImportRetellAgentsPost` operationId).
+	ListRetellAgentsApiV1AgentsImportRetellAgentsPostWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListRetellAgentsApiV1AgentsImportRetellAgentsPost List Retell Agents
+	//
+	// One page of a Retell workspace's voice agents. The API key is used for this call only.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /api/v1/agents/import/retell/agents (the `ListRetellAgentsApiV1AgentsImportRetellAgentsPost` operationId).
+	ListRetellAgentsApiV1AgentsImportRetellAgentsPost(ctx context.Context, body ListRetellAgentsApiV1AgentsImportRetellAgentsPostJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ImportVapiAssistantApiV1AgentsImportVapiAssistantPostWithBody Import Vapi Assistant
 	//
@@ -4600,6 +4676,86 @@ func (c *Client) ListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPostWithBody(ctx c
 // Corresponds with POST /api/v1/agents/import/plivo-cx/flows (the `ListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPost` operationId).
 func (c *Client) ListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPost(ctx context.Context, body ListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPostJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPostRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ImportRetellAgentApiV1AgentsImportRetellAgentPostWithBody Import Retell Agent
+//
+// Read the published version of one Retell agent into a draft agent. Nothing is saved. An
+// agent without a number gets a start request for Retell's outbound call, which carries the API
+// key.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /api/v1/agents/import/retell/agent (the `ImportRetellAgentApiV1AgentsImportRetellAgentPost` operationId).
+func (c *Client) ImportRetellAgentApiV1AgentsImportRetellAgentPostWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewImportRetellAgentApiV1AgentsImportRetellAgentPostRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ImportRetellAgentApiV1AgentsImportRetellAgentPost Import Retell Agent
+//
+// Read the published version of one Retell agent into a draft agent. Nothing is saved. An
+// agent without a number gets a start request for Retell's outbound call, which carries the API
+// key.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /api/v1/agents/import/retell/agent (the `ImportRetellAgentApiV1AgentsImportRetellAgentPost` operationId).
+func (c *Client) ImportRetellAgentApiV1AgentsImportRetellAgentPost(ctx context.Context, body ImportRetellAgentApiV1AgentsImportRetellAgentPostJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewImportRetellAgentApiV1AgentsImportRetellAgentPostRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListRetellAgentsApiV1AgentsImportRetellAgentsPostWithBody List Retell Agents
+//
+// One page of a Retell workspace's voice agents. The API key is used for this call only.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /api/v1/agents/import/retell/agents (the `ListRetellAgentsApiV1AgentsImportRetellAgentsPost` operationId).
+func (c *Client) ListRetellAgentsApiV1AgentsImportRetellAgentsPostWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListRetellAgentsApiV1AgentsImportRetellAgentsPostRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListRetellAgentsApiV1AgentsImportRetellAgentsPost List Retell Agents
+//
+// One page of a Retell workspace's voice agents. The API key is used for this call only.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /api/v1/agents/import/retell/agents (the `ListRetellAgentsApiV1AgentsImportRetellAgentsPost` operationId).
+func (c *Client) ListRetellAgentsApiV1AgentsImportRetellAgentsPost(ctx context.Context, body ListRetellAgentsApiV1AgentsImportRetellAgentsPostJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListRetellAgentsApiV1AgentsImportRetellAgentsPostRequest(c.Server, body)
 	if err != nil {
 		return nil, err
 	}
@@ -6801,6 +6957,86 @@ func NewListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPostRequestWithBody(server 
 	}
 
 	operationPath := fmt.Sprintf("/api/v1/agents/import/plivo-cx/flows")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewImportRetellAgentApiV1AgentsImportRetellAgentPostRequest calls the generic ImportRetellAgentApiV1AgentsImportRetellAgentPost builder with application/json body
+func NewImportRetellAgentApiV1AgentsImportRetellAgentPostRequest(server string, body ImportRetellAgentApiV1AgentsImportRetellAgentPostJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewImportRetellAgentApiV1AgentsImportRetellAgentPostRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewImportRetellAgentApiV1AgentsImportRetellAgentPostRequestWithBody constructs an http.Request for the ImportRetellAgentApiV1AgentsImportRetellAgentPost method, with any body, and a specified content type
+func NewImportRetellAgentApiV1AgentsImportRetellAgentPostRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/agents/import/retell/agent")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewListRetellAgentsApiV1AgentsImportRetellAgentsPostRequest calls the generic ListRetellAgentsApiV1AgentsImportRetellAgentsPost builder with application/json body
+func NewListRetellAgentsApiV1AgentsImportRetellAgentsPostRequest(server string, body ListRetellAgentsApiV1AgentsImportRetellAgentsPostJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewListRetellAgentsApiV1AgentsImportRetellAgentsPostRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewListRetellAgentsApiV1AgentsImportRetellAgentsPostRequestWithBody constructs an http.Request for the ListRetellAgentsApiV1AgentsImportRetellAgentsPost method, with any body, and a specified content type
+func NewListRetellAgentsApiV1AgentsImportRetellAgentsPostRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/agents/import/retell/agents")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -10434,6 +10670,46 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with POST /api/v1/agents/import/plivo-cx/flows (the `ListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPost` operationId).
 	ListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPostWithResponse(ctx context.Context, body ListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPostJSONRequestBody, reqEditors ...RequestEditorFn) (*ListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPostResponse, error)
 
+	// ImportRetellAgentApiV1AgentsImportRetellAgentPostWithBodyWithResponse Import Retell Agent
+	//
+	// Read the published version of one Retell agent into a draft agent. Nothing is saved. An
+	// agent without a number gets a start request for Retell's outbound call, which carries the API
+	// key.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/agents/import/retell/agent (the `ImportRetellAgentApiV1AgentsImportRetellAgentPost` operationId).
+	ImportRetellAgentApiV1AgentsImportRetellAgentPostWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ImportRetellAgentApiV1AgentsImportRetellAgentPostResponse, error)
+
+	// ImportRetellAgentApiV1AgentsImportRetellAgentPostWithResponse Import Retell Agent
+	//
+	// Read the published version of one Retell agent into a draft agent. Nothing is saved. An
+	// agent without a number gets a start request for Retell's outbound call, which carries the API
+	// key.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/agents/import/retell/agent (the `ImportRetellAgentApiV1AgentsImportRetellAgentPost` operationId).
+	ImportRetellAgentApiV1AgentsImportRetellAgentPostWithResponse(ctx context.Context, body ImportRetellAgentApiV1AgentsImportRetellAgentPostJSONRequestBody, reqEditors ...RequestEditorFn) (*ImportRetellAgentApiV1AgentsImportRetellAgentPostResponse, error)
+
+	// ListRetellAgentsApiV1AgentsImportRetellAgentsPostWithBodyWithResponse List Retell Agents
+	//
+	// One page of a Retell workspace's voice agents. The API key is used for this call only.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/agents/import/retell/agents (the `ListRetellAgentsApiV1AgentsImportRetellAgentsPost` operationId).
+	ListRetellAgentsApiV1AgentsImportRetellAgentsPostWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ListRetellAgentsApiV1AgentsImportRetellAgentsPostResponse, error)
+
+	// ListRetellAgentsApiV1AgentsImportRetellAgentsPostWithResponse List Retell Agents
+	//
+	// One page of a Retell workspace's voice agents. The API key is used for this call only.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/agents/import/retell/agents (the `ListRetellAgentsApiV1AgentsImportRetellAgentsPost` operationId).
+	ListRetellAgentsApiV1AgentsImportRetellAgentsPostWithResponse(ctx context.Context, body ListRetellAgentsApiV1AgentsImportRetellAgentsPostJSONRequestBody, reqEditors ...RequestEditorFn) (*ListRetellAgentsApiV1AgentsImportRetellAgentsPostResponse, error)
+
 	// ImportVapiAssistantApiV1AgentsImportVapiAssistantPostWithBodyWithResponse Import Vapi Assistant
 	//
 	// Read one Vapi assistant into a draft agent. Nothing is saved. An assistant without a
@@ -11710,6 +11986,116 @@ func (r ListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPostResponse) StatusCode() 
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r ListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPostResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type ImportRetellAgentApiV1AgentsImportRetellAgentPostResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *ProviderDraft
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *ErrorResponse
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ImportRetellAgentApiV1AgentsImportRetellAgentPostResponse) GetJSON200() *ProviderDraft {
+	return r.JSON200
+}
+
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r ImportRetellAgentApiV1AgentsImportRetellAgentPostResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r ImportRetellAgentApiV1AgentsImportRetellAgentPostResponse) GetJSON503() *ErrorResponse {
+	return r.JSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r ImportRetellAgentApiV1AgentsImportRetellAgentPostResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ImportRetellAgentApiV1AgentsImportRetellAgentPostResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ImportRetellAgentApiV1AgentsImportRetellAgentPostResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ImportRetellAgentApiV1AgentsImportRetellAgentPostResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type ListRetellAgentsApiV1AgentsImportRetellAgentsPostResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *RetellAgentPage
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *ErrorResponse
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListRetellAgentsApiV1AgentsImportRetellAgentsPostResponse) GetJSON200() *RetellAgentPage {
+	return r.JSON200
+}
+
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r ListRetellAgentsApiV1AgentsImportRetellAgentsPostResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r ListRetellAgentsApiV1AgentsImportRetellAgentsPostResponse) GetJSON503() *ErrorResponse {
+	return r.JSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r ListRetellAgentsApiV1AgentsImportRetellAgentsPostResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListRetellAgentsApiV1AgentsImportRetellAgentsPostResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListRetellAgentsApiV1AgentsImportRetellAgentsPostResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListRetellAgentsApiV1AgentsImportRetellAgentsPostResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -15778,6 +16164,70 @@ func (c *ClientWithResponses) ListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPostW
 	return ParseListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPostResponse(rsp)
 }
 
+// ImportRetellAgentApiV1AgentsImportRetellAgentPostWithBodyWithResponse Import Retell Agent
+//
+// Read the published version of one Retell agent into a draft agent. Nothing is saved. An
+// agent without a number gets a start request for Retell's outbound call, which carries the API
+// key.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/agents/import/retell/agent (the `ImportRetellAgentApiV1AgentsImportRetellAgentPost` operationId).
+func (c *ClientWithResponses) ImportRetellAgentApiV1AgentsImportRetellAgentPostWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ImportRetellAgentApiV1AgentsImportRetellAgentPostResponse, error) {
+	rsp, err := c.ImportRetellAgentApiV1AgentsImportRetellAgentPostWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseImportRetellAgentApiV1AgentsImportRetellAgentPostResponse(rsp)
+}
+
+// ImportRetellAgentApiV1AgentsImportRetellAgentPostWithResponse Import Retell Agent
+//
+// Read the published version of one Retell agent into a draft agent. Nothing is saved. An
+// agent without a number gets a start request for Retell's outbound call, which carries the API
+// key.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/agents/import/retell/agent (the `ImportRetellAgentApiV1AgentsImportRetellAgentPost` operationId).
+func (c *ClientWithResponses) ImportRetellAgentApiV1AgentsImportRetellAgentPostWithResponse(ctx context.Context, body ImportRetellAgentApiV1AgentsImportRetellAgentPostJSONRequestBody, reqEditors ...RequestEditorFn) (*ImportRetellAgentApiV1AgentsImportRetellAgentPostResponse, error) {
+	rsp, err := c.ImportRetellAgentApiV1AgentsImportRetellAgentPost(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseImportRetellAgentApiV1AgentsImportRetellAgentPostResponse(rsp)
+}
+
+// ListRetellAgentsApiV1AgentsImportRetellAgentsPostWithBodyWithResponse List Retell Agents
+//
+// One page of a Retell workspace's voice agents. The API key is used for this call only.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/agents/import/retell/agents (the `ListRetellAgentsApiV1AgentsImportRetellAgentsPost` operationId).
+func (c *ClientWithResponses) ListRetellAgentsApiV1AgentsImportRetellAgentsPostWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ListRetellAgentsApiV1AgentsImportRetellAgentsPostResponse, error) {
+	rsp, err := c.ListRetellAgentsApiV1AgentsImportRetellAgentsPostWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListRetellAgentsApiV1AgentsImportRetellAgentsPostResponse(rsp)
+}
+
+// ListRetellAgentsApiV1AgentsImportRetellAgentsPostWithResponse List Retell Agents
+//
+// One page of a Retell workspace's voice agents. The API key is used for this call only.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/agents/import/retell/agents (the `ListRetellAgentsApiV1AgentsImportRetellAgentsPost` operationId).
+func (c *ClientWithResponses) ListRetellAgentsApiV1AgentsImportRetellAgentsPostWithResponse(ctx context.Context, body ListRetellAgentsApiV1AgentsImportRetellAgentsPostJSONRequestBody, reqEditors ...RequestEditorFn) (*ListRetellAgentsApiV1AgentsImportRetellAgentsPostResponse, error) {
+	rsp, err := c.ListRetellAgentsApiV1AgentsImportRetellAgentsPost(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListRetellAgentsApiV1AgentsImportRetellAgentsPostResponse(rsp)
+}
+
 // ImportVapiAssistantApiV1AgentsImportVapiAssistantPostWithBodyWithResponse Import Vapi Assistant
 //
 // Read one Vapi assistant into a draft agent. Nothing is saved. An assistant without a
@@ -17545,6 +17995,86 @@ func ParseListPlivoCxFlowsApiV1AgentsImportPlivoCxFlowsPostResponse(rsp *http.Re
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest PlivoCxFlowPage
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseImportRetellAgentApiV1AgentsImportRetellAgentPostResponse parses an HTTP response from a ImportRetellAgentApiV1AgentsImportRetellAgentPostWithResponse call
+func ParseImportRetellAgentApiV1AgentsImportRetellAgentPostResponse(rsp *http.Response) (*ImportRetellAgentApiV1AgentsImportRetellAgentPostResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ImportRetellAgentApiV1AgentsImportRetellAgentPostResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ProviderDraft
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListRetellAgentsApiV1AgentsImportRetellAgentsPostResponse parses an HTTP response from a ListRetellAgentsApiV1AgentsImportRetellAgentsPostWithResponse call
+func ParseListRetellAgentsApiV1AgentsImportRetellAgentsPostResponse(rsp *http.Response) (*ListRetellAgentsApiV1AgentsImportRetellAgentsPostResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListRetellAgentsApiV1AgentsImportRetellAgentsPostResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest RetellAgentPage
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
