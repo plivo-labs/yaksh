@@ -1,6 +1,6 @@
 """Workers that cannot stop cleanly, for the process-exit tests.
 
-Run as `python -m tests.stuck_workers <kind> <database url> <data dir>`.
+Run as `python -m tests.stuck_workers <kind> <database url>`.
 """
 
 import asyncio
@@ -74,13 +74,15 @@ async def offline(self: PhoneAccount, app: AppSettings) -> None:
 KINDS = {"immortal": immortal, "stuck_write": stuck_write, "stuck_disposal": stuck_disposal}
 
 if __name__ == "__main__":
-    kind, database_url, data_dir = sys.argv[1:]
+    kind, database_url = sys.argv[1:]
     PhoneAccount.refresh = offline
     settings = Settings.model_validate(
         {
             "api_token": "t",
             "database_url": database_url,
-            "data_dir": data_dir,
+            "s3_endpoint": "http://storage.test",
+            "s3_access_key": "k",
+            "s3_secret_key": "s",
             "worker_poll_interval_s": 0.05,
             "worker_heartbeat_s": 0.05,
             "worker_lease_s": 2,

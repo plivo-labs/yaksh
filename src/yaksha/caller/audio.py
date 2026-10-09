@@ -1,6 +1,7 @@
 """The audio the phone leg works in: 8 kHz in 20 ms frames, one clock per call, the
 accounting of one reply's playout, and the call's recording."""
 
+import io
 import time
 import wave
 from collections.abc import Iterable, Sequence
@@ -114,10 +115,23 @@ class CallerReply:
     """The TTS finished the reply: its playout holds all of it."""
 
 
-def save_caller_voice(replies: Sequence[CallerReply], path: Path) -> list[CallerReplyWindow]:
-    """Write each reply's own audio, back to back, as a mono WAV, and say where each one is. A
-    reply cut off keeps only as much as went out before the cut; one that the end of the call
-    cut off keeps all it had."""
+def wav(pcm: bytes, channels: int) -> bytes:
+    """16-bit PCM at the call's sample rate as a WAV file."""
+    buffer = io.BytesIO()
+    with wave.open(buffer, "wb") as file:
+        file.setnchannels(channels)
+        file.setsampwidth(2)
+        file.setframerate(SAMPLE_RATE)
+        file.writeframes(pcm)
+    return buffer.getvalue()
+
+
+def caller_voice(
+    replies: Sequence[CallerReply],
+) -> tuple[bytes | None, list[CallerReplyWindow]]:
+    """Each reply's own audio, back to back, as a mono WAV, and where each one is in it; no WAV
+    when no reply had audio. A reply cut off keeps only as much as went out before the cut; one
+    that the end of the call cut off keeps all it had."""
     voice = bytearray()
     windows = []
     for reply in replies:
@@ -134,14 +148,7 @@ def save_caller_voice(replies: Sequence[CallerReply], path: Path) -> list[Caller
             )
         )
         voice += own
-    if voice:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        with wave.open(str(path), "wb") as file:
-            file.setnchannels(1)
-            file.setsampwidth(2)
-            file.setframerate(SAMPLE_RATE)
-            file.writeframes(voice)
-    return windows
+    return (wav(bytes(voice), 1) if voice else None), windows
 
 
 class CallRecording:
@@ -193,8 +200,8 @@ class CallRecording:
             ],
         )
 
-    def save(self, path: Path, start_ms: int) -> Path | None:
-        """Write the recording from start_ms on, if any audio came after it."""
+    def to_wav(self, start_ms: int) -> bytes | None:
+        """The recording from start_ms on, if any audio came after it."""
         agent = self.agent_track(start_ms)
         caller = track(self._caller, start_ms)
         size = max(len(agent), len(caller))
@@ -205,13 +212,7 @@ class CallRecording:
             audioop.tostereo(caller.ljust(size, b"\0"), 2, 0, 1),
             2,
         )
-        path.parent.mkdir(parents=True, exist_ok=True)
-        with wave.open(str(path), "wb") as recording:
-            recording.setnchannels(2)
-            recording.setsampwidth(2)
-            recording.setframerate(SAMPLE_RATE)
-            recording.writeframes(stereo)
-        return path
+        return wav(stereo, 2)
 
     def _agent_frames(self) -> list[tuple[int, bytes]]:
         offset = min((at - plivo for at, plivo, _ in self._agent if plivo is not None), default=0)

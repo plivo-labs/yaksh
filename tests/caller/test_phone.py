@@ -139,14 +139,13 @@ async def rig(monkeypatch: pytest.MonkeyPatch) -> AsyncIterator[Rig]:
     await plivo.stop(2.0)
 
 
-def request(tmp_path: Path) -> CallRequest:
+def request() -> CallRequest:
     return CallRequest(
         conversation_id=uuid.uuid4(),
         agent=AgentConfig.model_validate({"agent_number": AGENT_NUMBER, "brief": AGENT["brief"]}),
         **CALLER,
         caller_number=POOL_NUMBER,
         max_duration_s=120,
-        output_dir=tmp_path,
         app_settings=CALL_SETTINGS,
     )
 
@@ -161,10 +160,8 @@ def dial(rig: Rig, call: CallRequest, observer: Observer, stop: asyncio.Event) -
     return asyncio.create_task(rig.dialer.dial(call, entry, observer, lambda: 0, stop))
 
 
-async def test_the_stream_arrives_after_the_agent_rings_and_answers(
-    rig: Rig, tmp_path: Path
-) -> None:
-    call = request(tmp_path)
+async def test_the_stream_arrives_after_the_agent_rings_and_answers(rig: Rig) -> None:
+    call = request()
     observer = Observer()
     dialing = dial(rig, call, observer, asyncio.Event())
 
@@ -199,24 +196,22 @@ async def test_the_stream_arrives_after_the_agent_rings_and_answers(
     ]
 
 
-async def test_an_unanswered_call_and_a_stop_while_ringing_end_without_a_stream(
-    rig: Rig, tmp_path: Path
-) -> None:
-    unanswered = request(tmp_path)
+async def test_an_unanswered_call_and_a_stop_while_ringing_end_without_a_stream(rig: Rig) -> None:
+    unanswered = request()
     dialing = dial(rig, unanswered, Observer(), asyncio.Event())
     await rig.report(unanswered.conversation_id, CallStatus="ringing")
     await rig.report(unanswered.conversation_id, CallStatus="no-answer", HangupCause="NO_ANSWER")
     no_answer = await asyncio.wait_for(dialing, 2)
 
     stop = asyncio.Event()
-    cancelled = request(tmp_path)
+    cancelled = request()
     dialing = dial(rig, cancelled, Observer(), stop)
     await rig.report(cancelled.conversation_id, CallStatus="ringing")
     stop.set()
     stopped = await asyncio.wait_for(dialing, 2)
 
     stop = asyncio.Event()
-    answered = request(tmp_path)
+    answered = request()
     observer = Observer()
     dialing = dial(rig, answered, observer, stop)
     await rig.answer(answered.conversation_id, "call-3")
@@ -239,11 +234,11 @@ async def test_an_unanswered_call_and_a_stop_while_ringing_end_without_a_stream(
     ]
 
 
-async def test_silence_from_plivo_and_a_missing_stream_time_out(rig: Rig, tmp_path: Path) -> None:
-    silent = request(tmp_path)
+async def test_silence_from_plivo_and_a_missing_stream_time_out(rig: Rig) -> None:
+    silent = request()
     nothing = await asyncio.wait_for(dial(rig, silent, Observer(), asyncio.Event()), 5)
 
-    answered = request(tmp_path)
+    answered = request()
     dialing = dial(rig, answered, Observer(), asyncio.Event())
     await rig.answer(answered.conversation_id, "call-2")
     no_stream = await asyncio.wait_for(dialing, 5)
@@ -258,8 +253,8 @@ async def test_silence_from_plivo_and_a_missing_stream_time_out(rig: Rig, tmp_pa
     ]
 
 
-async def test_a_call_that_only_rang_is_not_reported_as_answered(rig: Rig, tmp_path: Path) -> None:
-    call = request(tmp_path)
+async def test_a_call_that_only_rang_is_not_reported_as_answered(rig: Rig) -> None:
+    call = request()
     dialing = dial(rig, call, Observer(), asyncio.Event())
     await rig.report(call.conversation_id, CallStatus="ringing", CallUUID="call-4")
 
@@ -269,11 +264,9 @@ async def test_a_call_that_only_rang_is_not_reported_as_answered(rig: Rig, tmp_p
     assert "rang" in outcome.caller_error and "answered" not in outcome.caller_error
 
 
-async def test_a_hangup_before_the_stream_names_the_side_plivo_reports(
-    rig: Rig, tmp_path: Path
-) -> None:
+async def test_a_hangup_before_the_stream_names_the_side_plivo_reports(rig: Rig) -> None:
     async def hung_up(**report: str) -> CallOutcome:
-        call = request(tmp_path)
+        call = request()
         dialing = dial(rig, call, Observer(), asyncio.Event())
         await rig.report(call.conversation_id, CallStatus="completed", Event="Hangup", **report)
         return await asyncio.wait_for(dialing, 2)
@@ -389,7 +382,7 @@ async def test_a_hang_up_survives_the_cancelled_call_that_started_it() -> None:
 async def test_the_phone_caller_reports_an_unanswered_call_and_frees_its_stream_entry(
     rig: Rig, tmp_path: Path
 ) -> None:
-    call = request(tmp_path)
+    call = request()
     observer = Observer()
     running = asyncio.create_task(rig.caller(tmp_path).run(call, observer, asyncio.Event()))
     await asyncio.wait_for(seen(observer, WireEventKind.CONNECT_STARTED), 2)
@@ -406,7 +399,7 @@ async def test_the_phone_caller_reports_an_unanswered_call_and_frees_its_stream_
 async def test_a_stream_that_is_not_plivo_ends_the_call_before_any_provider_is_touched(
     rig: Rig, tmp_path: Path
 ) -> None:
-    call = request(tmp_path)
+    call = request()
     observer = Observer()
     running = asyncio.create_task(rig.caller(tmp_path).run(call, observer, asyncio.Event()))
     await asyncio.wait_for(seen(observer, WireEventKind.CONNECT_STARTED), 2)
@@ -424,7 +417,7 @@ async def test_a_stream_that_is_not_plivo_ends_the_call_before_any_provider_is_t
     assert rig.seen[-1] == {"hang_up": "call-9"}
 
 
-def outbound_request(tmp_path: Path, window_s: float = 5) -> CallRequest:
+def outbound_request(window_s: float = 5) -> CallRequest:
     agent = AgentConfig.model_validate(
         {key: value for key, value in OUTBOUND_AGENT.items() if key != "name"}
     )
@@ -435,7 +428,6 @@ def outbound_request(tmp_path: Path, window_s: float = 5) -> CallRequest:
         caller_number=POOL_NUMBER,
         max_duration_s=120,
         accept_calls_until=datetime.now(UTC) + timedelta(seconds=window_s),
-        output_dir=tmp_path,
         app_settings=CALL_SETTINGS,
     )
 
@@ -456,10 +448,10 @@ def settled_trigger(result: TriggerResult, detail: str) -> asyncio.Future[Trigge
     return future
 
 
-async def test_a_refused_trigger_ends_the_wait_at_once(rig: Rig, tmp_path: Path) -> None:
+async def test_a_refused_trigger_ends_the_wait_at_once(rig: Rig) -> None:
     _, receiving = receive(
         rig,
-        outbound_request(tmp_path),
+        outbound_request(),
         Observer(),
         settled_trigger(TriggerResult.REJECTED, 'HTTP 422: {"error": "phone is required"}'),
     )
@@ -470,10 +462,8 @@ async def test_a_refused_trigger_ends_the_wait_at_once(rig: Rig, tmp_path: Path)
     assert outcome.caller_error == 'HTTP 422: {"error": "phone is required"}'
 
 
-async def test_a_call_that_arrives_before_the_trigger_answers_is_taken(
-    rig: Rig, tmp_path: Path
-) -> None:
-    call = outbound_request(tmp_path)
+async def test_a_call_that_arrives_before_the_trigger_answers_is_taken(rig: Rig) -> None:
+    call = outbound_request()
     observer = Observer()
     pending: asyncio.Future[TriggerOutcome] = asyncio.get_running_loop().create_future()
     entry, receiving = receive(rig, call, observer, pending)
@@ -489,10 +479,10 @@ async def test_a_call_that_arrives_before_the_trigger_answers_is_taken(
     assert not pending.done(), "the trigger keeps running after the call connected"
 
 
-async def test_no_call_within_the_window_names_the_trigger_result(rig: Rig, tmp_path: Path) -> None:
+async def test_no_call_within_the_window_names_the_trigger_result(rig: Rig) -> None:
     _, receiving = receive(
         rig,
-        outbound_request(tmp_path, window_s=0.2),
+        outbound_request(window_s=0.2),
         Observer(),
         settled_trigger(TriggerResult.UNKNOWN, "HTTP 503: upstream down"),
     )
@@ -506,8 +496,8 @@ async def test_no_call_within_the_window_names_the_trigger_result(rig: Rig, tmp_
     )
 
 
-async def test_a_stream_for_another_call_is_refused(rig: Rig, tmp_path: Path) -> None:
-    call = outbound_request(tmp_path)
+async def test_a_stream_for_another_call_is_refused(rig: Rig) -> None:
+    call = outbound_request()
     entry, receiving = receive(
         rig, call, Observer(), settled_trigger(TriggerResult.DELIVERED, "HTTP 200: {}")
     )
@@ -522,10 +512,8 @@ async def test_a_stream_for_another_call_is_refused(rig: Rig, tmp_path: Path) ->
     assert outcome.caller_error == "the stream belongs to call call-1, not the accepted call"
 
 
-async def test_an_agent_that_hangs_up_before_the_stream_opens_is_named(
-    rig: Rig, tmp_path: Path
-) -> None:
-    call = outbound_request(tmp_path)
+async def test_an_agent_that_hangs_up_before_the_stream_opens_is_named(rig: Rig) -> None:
+    call = outbound_request()
     entry, receiving = receive(
         rig, call, Observer(), settled_trigger(TriggerResult.DELIVERED, "HTTP 200: {}")
     )
@@ -542,7 +530,7 @@ async def test_a_trigger_that_cannot_be_rendered_is_recorded_as_not_sent(
     rig: Rig, tmp_path: Path
 ) -> None:
     observer = Observer()
-    call = outbound_request(tmp_path)
+    call = outbound_request()
 
     outcome = await rig.caller(tmp_path)._send_trigger(call, observer, Clock())
 
@@ -564,9 +552,9 @@ class StartedSocket:
     "trigger_result", [TriggerResult.REJECTED, TriggerResult.DELIVERED], ids=["refused", "sent"]
 )
 async def test_an_accepted_call_wins_over_events_that_arrive_with_it(
-    rig: Rig, tmp_path: Path, trigger_result: TriggerResult
+    rig: Rig, trigger_result: TriggerResult
 ) -> None:
-    call = outbound_request(tmp_path)
+    call = outbound_request()
     entry = rig.registry.expect(call.conversation_id)
     entry.callbacks.put_nowait({"CallUUID": "call-1"})
     entry.socket.set_result(cast(WebSocket, StartedSocket()))

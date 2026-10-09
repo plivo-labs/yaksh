@@ -11,7 +11,13 @@ from tests.conftest import FakeCaller, create_agent_id, start, wait_for, wait_un
 from yaksha.config import Settings
 from yaksha.db.models import Conversation, PhoneNumber
 from yaksha.db.session import create_engine, create_sessionmaker
-from yaksha.domain.conversations import CallOutcome, ConversationStatus, EndReason, Transcript
+from yaksha.domain.conversations import (
+    CallOutcome,
+    ConversationStatus,
+    EndReason,
+    StoredAudio,
+    Transcript,
+)
 from yaksha.domain.numbers import AccountNumber, PlivoApplication
 from yaksha.integrations.plivo import PlivoApi, PlivoError
 from yaksha.simulation import conversations, numbers
@@ -70,6 +76,7 @@ async def test_concurrent_leases_get_distinct_numbers_and_a_finished_call_frees_
             "w1",
             CallOutcome(connected=True, end_reason=EndReason.AGENT_HANGUP),
             Transcript(),
+            StoredAudio(),
             60,
         )
         assert recorded

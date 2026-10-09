@@ -22,7 +22,6 @@ class Settings(BaseSettings):
     api_port: int = 8000
     api_token: SecretStr = Field(min_length=1)
     database_url: PostgresDsn
-    data_dir: Path = REPO_ROOT / "data"
     frontend_dist: Path = REPO_ROOT / "frontend" / "dist"
     max_active_conversations: int = 4
     worker_poll_interval_s: float = 0.5
@@ -41,11 +40,11 @@ class Settings(BaseSettings):
     """Allow trigger URLs on private or local addresses, for development."""
     public_url: str | None = None
     stream_port: int = 8770
-    s3_endpoint: str | None = None
-    """Where uploaded files are kept: any S3-compatible service. Uploads are off without it."""
+    s3_endpoint: str
+    """Where files are kept, uploaded documents and call audio: any S3-compatible service."""
     s3_bucket: str = "yaksha"
-    s3_access_key: SecretStr | None = None
-    s3_secret_key: SecretStr | None = None
+    s3_access_key: SecretStr
+    s3_secret_key: SecretStr
     s3_region: str = "us-east-1"
     encryption_key: SecretStr = Field(min_length=32)
     """Encrypts the secrets stored with the settings. Without the key they are lost."""

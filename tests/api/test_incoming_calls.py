@@ -17,6 +17,7 @@ from yaksha.domain.conversations import (
     ConversationStatus,
     EndReason,
     IncomingCall,
+    StoredAudio,
     Transcript,
 )
 from yaksha.domain.languages import Language
@@ -245,6 +246,7 @@ async def test_a_call_the_worker_never_took_leaves_no_caller_on_the_conversation
             "w1",
             CallOutcome(connected=False, end_reason=EndReason.NO_CALL),
             Transcript(),
+            StoredAudio(),
             number_rest_s=0,
         )
         finished = await session.get_one(Conversation, conversation_id)

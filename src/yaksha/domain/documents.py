@@ -2,10 +2,9 @@
 A document never changes once created: agent versions and past conversations refer to it."""
 
 import unicodedata
-from collections.abc import AsyncGenerator
 from enum import StrEnum
 from pathlib import PurePath
-from typing import Annotated, Protocol
+from typing import Annotated
 
 from pydantic import AfterValidator, BaseModel, ConfigDict, StringConstraints
 
@@ -56,12 +55,3 @@ class TextDocumentCreate(BaseModel):
 
     name: DocumentName
     text: DocumentText
-
-
-class FileStore(Protocol):
-    """Keeps the original files. Keys are content hashes, so a put of the same bytes again
-    changes nothing."""
-
-    async def put(self, key: str, data: bytes, media_type: str) -> None: ...
-
-    def stream(self, key: str) -> AsyncGenerator[bytes]: ...

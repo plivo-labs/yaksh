@@ -5,7 +5,7 @@ from fastapi import Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from yaksha.config import Settings
-from yaksha.domain.documents import FileStore
+from yaksha.domain.files import FileStore
 from yaksha.domain.language_models import JsonModel
 from yaksha.domain.settings import AppSettings
 from yaksha.simulation.voices import VoiceClients
@@ -43,7 +43,7 @@ def get_brief_model(
     return request.app.state.providers.brief_model(settings)
 
 
-def get_file_store(request: Request) -> FileStore | None:
+def get_file_store(request: Request) -> FileStore:
     return request.app.state.file_store
 
 
@@ -53,4 +53,4 @@ SessionDep = Annotated[AsyncSession, Depends(get_session)]
 VoiceClientsDep = Annotated[VoiceClients, Depends(get_voice_clients)]
 GenerationModelDep = Annotated[JsonModel | None, Depends(get_generation_model)]
 BriefModelDep = Annotated[JsonModel | None, Depends(get_brief_model)]
-FileStoreDep = Annotated[FileStore | None, Depends(get_file_store)]
+FileStoreDep = Annotated[FileStore, Depends(get_file_store)]

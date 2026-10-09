@@ -22,8 +22,7 @@ Yaksha does tests of AI voice agents. A simulated caller speaks with your agent 
 | API | The console and the HTTP API, on port 8000. |
 | Worker | The process that makes and gets the test calls. Plivo sends the call audio to port 8770 of the worker. |
 | Database | Postgres keeps the agents, the scenarios, the personas and the conversations. |
-| Data folder | The worker writes the recording of each call to this folder. The API reads the recordings from the same folder. Docker Compose keeps the folder in the `yaksha_data` volume. |
-| File storage | S3-compatible storage keeps the documents that you upload. |
+| File storage | S3-compatible storage keeps the documents that you upload and the audio of each call. |
 
 ## How Yaksha does a test
 

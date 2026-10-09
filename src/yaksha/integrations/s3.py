@@ -43,6 +43,9 @@ class S3FileStore:
         except (BotoCoreError, ClientError) as error:
             raise UnavailableError(f"file storage refused the upload: {reason(error)}") from error
 
+    async def get(self, key: str) -> bytes:
+        return b"".join([chunk async for chunk in self.stream(key)])
+
     async def stream(self, key: str) -> AsyncGenerator[bytes]:
         try:
             async with get_session().create_client("s3", **self._client_args) as client:

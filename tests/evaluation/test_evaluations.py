@@ -1,13 +1,14 @@
 import asyncio
+import io
 import uuid
 import wave
-from pathlib import Path
 
 from httpx import AsyncClient
 from sqlalchemy import func, select, update
 
 from tests.conftest import (
     Db,
+    FakeFileStore,
     claim,
     eventually,
     expire_leases,
@@ -18,7 +19,14 @@ from tests.conftest import (
 )
 from yaksha.config import Settings
 from yaksha.db.models import Conversation, Evaluation, MetricValue
-from yaksha.domain.conversations import CallOutcome, EndReason, Transcript, WireEvent, WireEventKind
+from yaksha.domain.conversations import (
+    CallOutcome,
+    EndReason,
+    StoredAudio,
+    Transcript,
+    WireEvent,
+    WireEventKind,
+)
 from yaksha.domain.evaluations import EvaluationState, Metric, MetricKey
 from yaksha.domain.latency import CallerReplyWindow
 from yaksha.evaluation import evaluations
@@ -28,12 +36,15 @@ HUNG_UP = CallOutcome(connected=True, end_reason=EndReason.AGENT_HANGUP)
 RATE = 8000
 
 
-async def saved_call(client: AsyncClient, db: Db, outcome: CallOutcome = HUNG_UP) -> str:
+async def saved_call(
+    client: AsyncClient, db: Db, outcome: CallOutcome = HUNG_UP, audio: StoredAudio | None = None
+) -> str:
     await new_run(client)
     conversation_id = await claim(db)
     assert conversation_id is not None
     connected = [WireEvent(kind=WireEventKind.CONNECTED, at_ms=0)] if outcome.connected else []
-    assert await finish(db, conversation_id, outcome, transcript=Transcript(wire_events=connected))
+    transcript = Transcript(wire_events=connected)
+    assert await finish(db, conversation_id, outcome, transcript=transcript, audio=audio)
     return conversation_id
 
 
@@ -168,18 +179,20 @@ async def test_an_evaluation_that_stops_its_evaluator_every_time_ends_failed(
     )
 
 
-def write_wav(path: Path, channels: int, seconds: float) -> None:
-    with wave.open(str(path), "wb") as file:
+def silent_wav(channels: int, seconds: float) -> bytes:
+    buffer = io.BytesIO()
+    with wave.open(buffer, "wb") as file:
         file.setnchannels(channels)
         file.setsampwidth(2)
         file.setframerate(RATE)
         file.writeframes(bytes(2 * channels * round(RATE * seconds)))
+    return buffer.getvalue()
 
 
-async def run_evaluator(db: Db, settings: Settings) -> Evaluation:
+async def run_evaluator(db: Db, settings: Settings, store: FakeFileStore) -> Evaluation:
     """Run an evaluator until the one queued evaluation is done or has failed once."""
     stop = asyncio.Event()
-    evaluator = asyncio.create_task(make_evaluator(db, settings).run(stop))
+    evaluator = asyncio.create_task(make_evaluator(db, settings, store=store).run(stop))
     try:
         [evaluation] = await eventually(
             lambda: queued(db),
@@ -192,26 +205,24 @@ async def run_evaluator(db: Db, settings: Settings) -> Evaluation:
 
 
 async def test_the_evaluator_measures_a_saved_call_from_its_files(
-    client: AsyncClient, db: Db, settings: Settings, tmp_path: Path
+    client: AsyncClient, db: Db, settings: Settings, file_store: FakeFileStore
 ) -> None:
-    recording, voice = tmp_path / "recording.wav", tmp_path / "caller-voice.wav"
-    write_wav(recording, 2, 3)
-    write_wav(voice, 1, 0.5)
+    await file_store.put("recording.wav", silent_wav(2, 3), "audio/wav")
+    await file_store.put("caller-voice.wav", silent_wav(1, 0.5), "audio/wav")
     reply = CallerReplyWindow(
         start_ms=1000, end_ms=1500, finished=True, audio_start_ms=0, audio_ms=500
     )
     outcome = HUNG_UP.model_copy(
         update={
-            "recording_path": recording,
-            "caller_voice_path": voice,
             "recording_start_ms": 0,
             "stream_opened_ms": 0,
             "caller_replies": [reply],
         }
     )
-    await saved_call(client, db, outcome)
+    audio = StoredAudio(recording_key="recording.wav", caller_voice_key="caller-voice.wav")
+    await saved_call(client, db, outcome, audio)
 
-    evaluation = await run_evaluator(db, settings)
+    evaluation = await run_evaluator(db, settings, file_store)
 
     assert evaluation.state is EvaluationState.DONE
     found = await stored(db, evaluation.id)
@@ -229,24 +240,21 @@ async def test_the_evaluator_measures_a_saved_call_from_its_files(
 
 
 async def test_an_evaluation_that_cannot_read_its_files_is_tried_again_later(
-    client: AsyncClient, db: Db, settings: Settings, tmp_path: Path
+    client: AsyncClient, db: Db, settings: Settings, file_store: FakeFileStore
 ) -> None:
     outcome = HUNG_UP.model_copy(
-        update={
-            "recording_path": tmp_path / "missing.wav",
-            "recording_start_ms": 0,
-            "stream_opened_ms": 0,
-            "caller_replies": [],
-        }
+        update={"recording_start_ms": 0, "stream_opened_ms": 0, "caller_replies": []}
     )
-    await saved_call(client, db, outcome)
+    await saved_call(client, db, outcome, StoredAudio(recording_key="missing.wav"))
 
-    evaluation = await run_evaluator(db, settings)
+    evaluation = await run_evaluator(db, settings, file_store)
 
     assert (evaluation.state, evaluation.attempts, evaluation.claimed_by) == (
         EvaluationState.QUEUED,
         1,
         None,
     )
-    assert evaluation.not_before is not None and "missing.wav" in (evaluation.failure or "")
+    assert evaluation.not_before is not None and "could not return the file" in (
+        evaluation.failure or ""
+    )
     assert await stored(db, evaluation.id) == {}

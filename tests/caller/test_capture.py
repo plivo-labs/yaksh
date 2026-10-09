@@ -1,13 +1,13 @@
+import io
 import wave
-from pathlib import Path
 
 from yaksha.caller.audio import (
     SAMPLE_RATE,
     CallerReply,
     CallRecording,
     Playout,
+    caller_voice,
     placed,
-    save_caller_voice,
 )
 from yaksha.domain.latency import AgentMedia, CallerReplyWindow, Span
 
@@ -38,7 +38,7 @@ def test_the_agent_media_covers_the_line_and_names_its_gaps() -> None:
     assert CallRecording().agent_media(1000) is None
 
 
-def test_the_caller_voice_keeps_each_reply_as_it_went_out(tmp_path: Path) -> None:
+def test_the_caller_voice_keeps_each_reply_as_it_went_out() -> None:
     def said(seconds: float) -> Playout:
         playout = Playout()
         playout.received(silence(seconds), now_ns=0)
@@ -49,9 +49,8 @@ def test_the_caller_voice_keeps_each_reply_as_it_went_out(tmp_path: Path) -> Non
         CallerReply(start_ms=3000, end_ms=3200, playout=said(1.0)),
         CallerReply(start_ms=5000, playout=said(0.3)),
     ]
-    path = tmp_path / "caller-voice.wav"
 
-    windows = save_caller_voice(replies, path)
+    voice_wav, windows = caller_voice(replies)
 
     assert windows == [
         CallerReplyWindow(
@@ -64,5 +63,6 @@ def test_the_caller_voice_keeps_each_reply_as_it_went_out(tmp_path: Path) -> Non
             start_ms=5000, end_ms=None, finished=False, audio_start_ms=700, audio_ms=300
         ),
     ]
-    with wave.open(str(path)) as voice:
+    assert voice_wav is not None
+    with wave.open(io.BytesIO(voice_wav)) as voice:
         assert (voice.getnchannels(), voice.getnframes()) == (1, SAMPLE_RATE)

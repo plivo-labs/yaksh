@@ -1,7 +1,7 @@
 import base64
+import io
 import json
 import wave
-from pathlib import Path
 
 import audioop
 from pipecat.frames.frames import (
@@ -184,7 +184,7 @@ async def test_audio_that_plivo_cannot_play_after_the_stream_stopped_is_not_a_fa
     assert observer.kinds() == [WireEventKind.STOP]
 
 
-async def test_a_recording_puts_each_side_where_it_was_on_the_line(tmp_path: Path) -> None:
+async def test_a_recording_puts_each_side_where_it_was_on_the_line() -> None:
     clock = FixedClock()
     recording = CallRecording()
     serializer = StreamSerializer(
@@ -210,11 +210,11 @@ async def test_a_recording_puts_each_side_where_it_was_on_the_line(tmp_path: Pat
         await serializer.serialize(OutputAudioRawFrame(LOUD, SAMPLE_RATE, 1))
 
     start = recording.start_ms(connected)
-    saved = recording.save(tmp_path / "recording.wav", start)
+    saved = recording.to_wav(start)
 
     assert start == 960
     assert saved is not None
-    with wave.open(str(saved)) as file:
+    with wave.open(io.BytesIO(saved)) as file:
         assert (file.getnchannels(), file.getframerate()) == (2, SAMPLE_RATE)
         audio = file.readframes(file.getnframes())
     assert audioop.tomono(audio, 2, 1, 0) == (

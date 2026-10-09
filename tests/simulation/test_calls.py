@@ -1,6 +1,5 @@
 import asyncio
 import uuid
-from pathlib import Path
 
 from tests.conftest import AGENT, APP_SETTINGS, CALLER
 from yaksha.domain.agents import AgentConfig
@@ -20,7 +19,6 @@ REQUEST = CallRequest(
     **CALLER,
     caller_number="+15550100000",
     max_duration_s=10,
-    output_dir=Path("/tmp/unused"),
     app_settings=APP_SETTINGS,
 )
 
@@ -52,7 +50,7 @@ class ReturnsOnlyWhenCancelled:
             return CallOutcome(
                 connected=True,
                 end_reason=EndReason.AGENT_HANGUP,
-                recording_path=Path("/data/saved.wav"),
+                recording=b"RIFF",
             )
         raise AssertionError("unreachable")
 
@@ -65,7 +63,7 @@ async def test_a_caller_that_needed_cancelling_keeps_its_recording_but_is_marked
         ReturnsOnlyWhenCancelled(), REQUEST, live, end_timeout_s=0.1, dial_timeout_s=5
     )
 
-    assert outcome.recording_path == Path("/data/saved.wav")
+    assert outcome.recording == b"RIFF"
     assert outcome.end_reason is EndReason.USER_REQUEST
     assert outcome.caller_error == STOP_IGNORED
 

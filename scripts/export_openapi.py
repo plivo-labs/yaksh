@@ -14,6 +14,9 @@ def main() -> None:
         api_token="unused",
         database_url="postgresql+asyncpg://unused@localhost/unused",
         encryption_key="unused" * 6,
+        s3_endpoint="http://unused",
+        s3_access_key="unused",
+        s3_secret_key="unused",
     )
     spec = create_app(settings).openapi()
     SPEC_PATH.parent.mkdir(exist_ok=True)
