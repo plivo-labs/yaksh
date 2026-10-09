@@ -1562,6 +1562,7 @@ type ImportProvider string
 // ImportResult defines model for ImportResult.
 type ImportResult struct {
 	Changes  []string     `json:"changes"`
+	Failed   []string     `json:"failed"`
 	Settings SettingsRead `json:"settings"`
 	Skipped  []string     `json:"skipped"`
 }
@@ -4177,8 +4178,9 @@ type ClientInterface interface {
 
 	// ImportSettingsApiV1SettingsImportPostWithBody Import Settings
 	//
-	// Apply a YAML settings document: every key is checked with its provider first, and
-	// nothing is saved unless every check passes.
+	// Apply a YAML settings document. Every new key is checked with its provider; the
+	// settings and the keys that pass are saved, and each key that fails is left out and
+	// listed with its reason.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -4187,8 +4189,9 @@ type ClientInterface interface {
 
 	// ImportSettingsApiV1SettingsImportPost Import Settings
 	//
-	// Apply a YAML settings document: every key is checked with its provider first, and
-	// nothing is saved unless every check passes.
+	// Apply a YAML settings document. Every new key is checked with its provider; the
+	// settings and the keys that pass are saved, and each key that fails is left out and
+	// listed with its reason.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -6069,8 +6072,9 @@ func (c *Client) ExportSettingsApiV1SettingsExportGet(ctx context.Context, reqEd
 
 // ImportSettingsApiV1SettingsImportPostWithBody Import Settings
 //
-// Apply a YAML settings document: every key is checked with its provider first, and
-// nothing is saved unless every check passes.
+// Apply a YAML settings document. Every new key is checked with its provider; the
+// settings and the keys that pass are saved, and each key that fails is left out and
+// listed with its reason.
 //
 // Takes any type of body and a specified content type.
 //
@@ -6089,8 +6093,9 @@ func (c *Client) ImportSettingsApiV1SettingsImportPostWithBody(ctx context.Conte
 
 // ImportSettingsApiV1SettingsImportPost Import Settings
 //
-// Apply a YAML settings document: every key is checked with its provider first, and
-// nothing is saved unless every check passes.
+// Apply a YAML settings document. Every new key is checked with its provider; the
+// settings and the keys that pass are saved, and each key that fails is left out and
+// listed with its reason.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -11331,8 +11336,9 @@ type ClientWithResponsesInterface interface {
 
 	// ImportSettingsApiV1SettingsImportPostWithBodyWithResponse Import Settings
 	//
-	// Apply a YAML settings document: every key is checked with its provider first, and
-	// nothing is saved unless every check passes.
+	// Apply a YAML settings document. Every new key is checked with its provider; the
+	// settings and the keys that pass are saved, and each key that fails is left out and
+	// listed with its reason.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -11341,8 +11347,9 @@ type ClientWithResponsesInterface interface {
 
 	// ImportSettingsApiV1SettingsImportPostWithResponse Import Settings
 	//
-	// Apply a YAML settings document: every key is checked with its provider first, and
-	// nothing is saved unless every check passes.
+	// Apply a YAML settings document. Every new key is checked with its provider; the
+	// settings and the keys that pass are saved, and each key that fails is left out and
+	// listed with its reason.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -17311,8 +17318,9 @@ func (c *ClientWithResponses) ExportSettingsApiV1SettingsExportGetWithResponse(c
 
 // ImportSettingsApiV1SettingsImportPostWithBodyWithResponse Import Settings
 //
-// Apply a YAML settings document: every key is checked with its provider first, and
-// nothing is saved unless every check passes.
+// Apply a YAML settings document. Every new key is checked with its provider; the
+// settings and the keys that pass are saved, and each key that fails is left out and
+// listed with its reason.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -17327,8 +17335,9 @@ func (c *ClientWithResponses) ImportSettingsApiV1SettingsImportPostWithBodyWithR
 
 // ImportSettingsApiV1SettingsImportPostWithResponse Import Settings
 //
-// Apply a YAML settings document: every key is checked with its provider first, and
-// nothing is saved unless every check passes.
+// Apply a YAML settings document. Every new key is checked with its provider; the
+// settings and the keys that pass are saved, and each key that fails is left out and
+// listed with its reason.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //

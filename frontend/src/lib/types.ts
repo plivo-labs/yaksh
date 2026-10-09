@@ -1305,5 +1305,7 @@ export interface ProviderTest {
 export interface ImportResult {
   changes: string[];
   skipped: string[];
+  /** Keys that failed their check, with the reason: "name, name: reason". Not saved. */
+  failed: string[];
   settings: AppSettings;
 }

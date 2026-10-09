@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"regexp"
@@ -75,7 +76,8 @@ func (a *app) settingsApplyCmd() *cobra.Command {
 		Short: "Apply a YAML settings document",
 		Long: "Apply a YAML settings document, as settings export writes it. A secret given as " +
 			"${NAME} takes the value of the environment variable NAME. The server checks every key " +
-			"with its provider and saves nothing unless every check passes.",
+			"with its provider and saves the settings and the keys that pass. Each key that fails is " +
+			"left out and listed under failed, and the command then exits with status 1.",
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			document, err := os.ReadFile(file)
@@ -99,7 +101,21 @@ func (a *app) settingsApplyCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return printJSON(cmd.OutOrStdout(), body)
+			if err := printJSON(cmd.OutOrStdout(), body); err != nil {
+				return err
+			}
+			var result api.ImportResult
+			if err := json.Unmarshal(body, &result); err != nil {
+				return fmt.Errorf("read the import result: %w", err)
+			}
+			if len(result.Failed) > 0 {
+				return &nextStep{
+					what: "these keys failed their check and were not saved; the rest was saved:\n  " +
+						strings.Join(result.Failed, "\n  "),
+					next: "fix the keys in " + file + " and run this command again",
+				}
+			}
+			return nil
 		},
 	}
 	cmd.Flags().StringVarP(&file, "file", "f", "", "the YAML settings document")

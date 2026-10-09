@@ -197,15 +197,30 @@ async def export_settings(settings: AppSettingsDep) -> PlainTextResponse:
 async def import_settings(
     request: SettingsImport, settings: AppSettingsDep, session: SessionDep, cipher: CipherDep
 ) -> ImportResult:
-    """Apply a YAML settings document: every key is checked with its provider first, and
-    nothing is saved unless every check passes."""
+    """Apply a YAML settings document. Every new key is checked with its provider; the
+    settings and the keys that pass are saved, and each key that fails is left out and
+    listed with its reason."""
     plan = service.parse_document(request.document, request.env)
-    changes = service.describe_changes(settings, store.planned(settings, plan.values, plan.secrets))
+    candidate = store.planned(settings, plan.values, plan.secrets)
     if request.dry_run:
         return ImportResult(
-            changes=changes, skipped=plan.skipped, settings=SettingsRead.of(settings)
+            changes=service.describe_changes(settings, candidate),
+            skipped=plan.skipped,
+            failed=[],
+            settings=SettingsRead.of(settings),
         )
-    saved = await checked_change(
-        settings, session, cipher, values=plan.values, secrets=plan.secrets
+    failed = await service.failed_secrets(candidate, plan.secrets)
+    values, failed = service.hold_back_addresses(settings, plan.values, failed)
+    refused = {name for failure in failed for name in failure.names}
+    passed = {name: value for name, value in plan.secrets.items() if name not in refused}
+    saved = (
+        await store.change(session, cipher, values=values, secrets=passed)
+        if values or passed
+        else settings
     )
-    return ImportResult(changes=changes, skipped=plan.skipped, settings=SettingsRead.of(saved))
+    return ImportResult(
+        changes=service.describe_changes(settings, saved),
+        skipped=plan.skipped,
+        failed=[str(failure) for failure in failed],
+        settings=SettingsRead.of(saved),
+    )

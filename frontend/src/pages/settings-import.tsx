@@ -15,12 +15,14 @@ import { exportSettings, useImportSettings } from "@/lib/queries";
 import type { ImportResult } from "@/lib/types";
 
 /** Export downloads the settings as YAML, without secrets. Import reads a file, lists what it
- * changes, and saves only after the user confirms; every key in it is checked first. */
+ * changes, and saves only after the user confirms. Every key in it is checked first: the keys
+ * that pass are saved with the settings, and the dialog lists the ones that failed. */
 export function ImportExport() {
   const input = useRef<HTMLInputElement>(null);
   const [document, setDocument] = useState<string | null>(null);
   const preview = useImportSettings();
   const apply = useImportSettings();
+  const failed = apply.data?.failed.length ? apply.data : null;
 
   const download = async () => {
     try {
@@ -76,7 +78,9 @@ export function ImportExport() {
           <DialogHeader>
             <DialogTitle>Import settings</DialogTitle>
           </DialogHeader>
-          {preview.isPending ? (
+          {failed ? (
+            <Failed result={failed} />
+          ) : preview.isPending ? (
             <p className="flex items-center gap-2 text-s-400 text-muted-foreground">
               <Spinner /> Reading the file
             </p>
@@ -86,29 +90,36 @@ export function ImportExport() {
             preview.data && <Changes result={preview.data} />
           )}
           {apply.isError && <p className="text-s-400 text-destructive">{apply.error.message}</p>}
-          <DialogFooter>
-            <Button variant="ghost" onClick={close}>
-              Cancel
-            </Button>
-            <Button
-              disabled={!preview.data || preview.data.changes.length === 0 || apply.isPending}
-              onClick={() =>
-                document &&
-                apply.mutate(
-                  { document, dryRun: false },
-                  {
-                    onSuccess: () => {
-                      toast.success("Settings imported");
-                      close();
+          {failed ? (
+            <DialogFooter>
+              <Button onClick={close}>Done</Button>
+            </DialogFooter>
+          ) : (
+            <DialogFooter>
+              <Button variant="ghost" onClick={close}>
+                Cancel
+              </Button>
+              <Button
+                disabled={!preview.data || preview.data.changes.length === 0 || apply.isPending}
+                onClick={() =>
+                  document &&
+                  apply.mutate(
+                    { document, dryRun: false },
+                    {
+                      onSuccess: (result) => {
+                        if (result.failed.length > 0) return;
+                        toast.success("Settings imported");
+                        close();
+                      },
                     },
-                  },
-                )
-              }
-            >
-              {apply.isPending && <Spinner />}
-              Check and import
-            </Button>
-          </DialogFooter>
+                  )
+                }
+              >
+                {apply.isPending && <Spinner />}
+                Check and import
+              </Button>
+            </DialogFooter>
+          )}
         </DialogContent>
       </Dialog>
     </>
@@ -177,6 +188,40 @@ function Changes({ result }: { result: ImportResult }) {
           <SkippedList names={skipped} />
         </div>
       )}
+    </div>
+  );
+}
+
+/** After an import with keys that failed: what was saved, then each failed key and why. */
+function Failed({ result }: { result: ImportResult }) {
+  return (
+    <div className="grid gap-3 text-s-400">
+      {result.changes.length === 0 ? (
+        <p>Nothing was saved.</p>
+      ) : (
+        <div className="grid gap-1">
+          <p>Saved:</p>
+          <ul className="max-h-40 divide-y overflow-y-auto rounded-md border text-xs-400">
+            {result.changes.map((change) => (
+              <li key={change} className="px-3 py-1.5">
+                {changeLabel(change)}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      <p>These keys failed their check and were not saved:</p>
+      <ul className="max-h-64 divide-y overflow-y-auto rounded-md border text-xs-400">
+        {result.failed.map((failure) => {
+          const [names, reason] = failure.split(/: (.*)/s);
+          return (
+            <li key={failure} className="grid gap-0.5 px-3 py-1.5">
+              <span className="text-xs-500">{names.split(", ").map(secretLabel).join(", ")}</span>
+              <span className="text-destructive">{reason}</span>
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }

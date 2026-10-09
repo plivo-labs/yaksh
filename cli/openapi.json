@@ -4495,7 +4495,7 @@
           "settings"
         ],
         "summary": "Import Settings",
-        "description": "Apply a YAML settings document: every key is checked with its provider first, and\nnothing is saved unless every check passes.",
+        "description": "Apply a YAML settings document. Every new key is checked with its provider; the\nsettings and the keys that pass are saved, and each key that fails is left out and\nlisted with its reason.",
         "operationId": "import_settings_api_v1_settings_import_post",
         "requestBody": {
           "content": {
@@ -7507,6 +7507,13 @@
             "type": "array",
             "title": "Skipped"
           },
+          "failed": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Failed"
+          },
           "settings": {
             "$ref": "#/components/schemas/SettingsRead"
           }
@@ -7515,6 +7522,7 @@
         "required": [
           "changes",
           "skipped",
+          "failed",
           "settings"
         ],
         "title": "ImportResult"

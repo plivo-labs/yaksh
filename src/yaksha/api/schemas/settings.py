@@ -93,5 +93,7 @@ class ImportResult(BaseModel):
     """One line for each change, without secret values."""
     skipped: list[str]
     """Secrets whose ${NAME} had no value; they stay as they are."""
+    failed: list[str]
+    """Keys that failed their check, with the reason; they were not saved."""
     settings: SettingsRead
     """The settings after the import; as they are now on a dry run."""
