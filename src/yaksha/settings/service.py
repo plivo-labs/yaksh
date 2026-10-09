@@ -1,8 +1,9 @@
 """What the Settings page and the CLI do with the settings: check a key with its provider before
 it is saved, test the saved settings, and import or export them as a YAML document."""
 
+import asyncio
 import re
-from collections.abc import Mapping
+from collections.abc import Coroutine, Mapping
 from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Any
@@ -10,7 +11,13 @@ from typing import Any
 import yaml
 
 from yaksha.domain.errors import ValidationError
-from yaksha.domain.settings import TRIGGER_SECRET, AppSettings, SecretName, is_secret_name
+from yaksha.domain.settings import (
+    KEY_URLS,
+    TRIGGER_SECRET,
+    AppSettings,
+    SecretName,
+    is_secret_name,
+)
 from yaksha.evaluation.jev import JEV_MODEL
 from yaksha.integrations import provider_checks as checks
 from yaksha.integrations.provider_checks import ProviderCheckError
@@ -75,35 +82,97 @@ def required(secret: Any, what: str) -> str:
     return secret.get_secret_value()
 
 
-async def check_secrets(candidate: AppSettings, changed: Mapping[str, str | None]) -> None:
-    """Check each new key with its provider, with the candidate settings around it, before
-    anything is saved. The Plivo Auth ID and Auth token are checked together. Raises
-    ProviderCheckError, naming the key."""
-    plivo = False
+PLIVO_SECRETS = (SecretName.PLIVO_AUTH_ID, SecretName.PLIVO_AUTH_TOKEN)
+
+
+@dataclass(frozen=True)
+class Failure:
+    names: list[str]
+    """The keys one check covered: one key, or the Plivo Auth ID and Auth token together."""
+    reason: str
+
+    def __str__(self) -> str:
+        return f"{', '.join(self.names)}: {self.reason}"
+
+
+async def failed_secrets(
+    candidate: AppSettings, changed: Mapping[str, str | None]
+) -> list[Failure]:
+    """Check every new key with its provider at the same time, with the candidate settings
+    around it. Returns one Failure for each check that failed."""
+    checks_to_run: list[tuple[list[str], Coroutine[Any, Any, object]]] = []
     for name, value in changed.items():
-        if value is None:
+        if value is None or name in PLIVO_SECRETS:
             continue
-        try:
-            match name:
-                case SecretName.LLM_API_KEY:
-                    await checks.llm_models(candidate.llm.base_url, value)
-                case SecretName.DEEPGRAM_API_KEY:
-                    await checks.check_deepgram(
-                        candidate.deepgram.base_url, value, candidate.deepgram.model
-                    )
-                case SecretName.ELEVENLABS_API_KEY:
-                    await checks.check_elevenlabs(value, check_voice())
-                case SecretName.TYPESAFE_API_KEY:
-                    await checks.check_typesafe(value, JEV_MODEL)
-                case SecretName.PLIVO_AUTH_ID | SecretName.PLIVO_AUTH_TOKEN:
-                    plivo = True
-        except ProviderCheckError as error:
-            raise ProviderCheckError(f"{name}: {error}") from None
+        match name:
+            case SecretName.LLM_API_KEY:
+                check = checks.llm_models(candidate.llm.base_url, value)
+            case SecretName.DEEPGRAM_API_KEY:
+                check = checks.check_deepgram(
+                    candidate.deepgram.base_url, value, candidate.deepgram.model
+                )
+            case SecretName.ELEVENLABS_API_KEY:
+                check = checks.check_elevenlabs(value, check_voice())
+            case SecretName.TYPESAFE_API_KEY:
+                check = checks.check_typesafe(value, JEV_MODEL)
+            case _:
+                continue
+        checks_to_run.append(([name], check))
+    plivo: list[str] = [name for name in PLIVO_SECRETS if changed.get(name) is not None]
     if plivo:
-        credentials = candidate.plivo_credentials
-        if credentials is None:
-            raise ProviderCheckError("save the Plivo Auth ID and Auth token together")
-        await checks.check_plivo(*credentials)
+        checks_to_run.append((plivo, _check_plivo_pair(candidate)))
+    async with asyncio.TaskGroup() as group:
+        tasks = [
+            (names, group.create_task(_failure_reason(check))) for names, check in checks_to_run
+        ]
+    return [Failure(names, why) for names, task in tasks if (why := task.result()) is not None]
+
+
+def hold_back_addresses(
+    settings: AppSettings, values: Mapping[str, Any], failed: list[Failure]
+) -> tuple[dict[str, Any], list[Failure]]:
+    """Leave out the new address of each key that failed: a new address without its key would
+    remove the saved key and leave the provider with none. Each such failure says so."""
+    kept = {section: dict(fields) for section, fields in values.items()}
+    current = settings.model_dump(mode="json", include=set(DEFAULTS))
+    noted: list[Failure] = []
+    for failure in failed:
+        held = []
+        for name in failure.names:
+            if name not in KEY_URLS:
+                continue
+            section, field = KEY_URLS[SecretName(name)]
+            if field in kept.get(section, {}) and kept[section][field] != current[section][field]:
+                del kept[section][field]
+                held.append(f"{section}.{field}")
+        reason = failure.reason
+        if held:
+            reason += f"; {', '.join(held)} was not saved either"
+        noted.append(Failure(failure.names, reason))
+    return kept, noted
+
+
+async def _check_plivo_pair(candidate: AppSettings) -> None:
+    credentials = candidate.plivo_credentials
+    if credentials is None:
+        raise ProviderCheckError("save the Plivo Auth ID and Auth token together")
+    await checks.check_plivo(*credentials)
+
+
+async def _failure_reason(check: Coroutine[Any, Any, object]) -> str | None:
+    try:
+        await check
+    except ProviderCheckError as error:
+        return str(error)
+    return None
+
+
+async def check_secrets(candidate: AppSettings, changed: Mapping[str, str | None]) -> None:
+    """Check every new key, as failed_secrets does. Raises ProviderCheckError naming each key
+    that failed."""
+    failed = await failed_secrets(candidate, changed)
+    if failed:
+        raise ProviderCheckError("; ".join(str(failure) for failure in failed))
 
 
 def placeholder_name(name: str) -> str:

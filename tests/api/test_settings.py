@@ -310,17 +310,51 @@ async def test_a_dry_run_leaves_out_a_secret_that_is_already_saved(
     assert preview.json()["changes"] == ["typesafe_api_key: added"]
 
 
-async def test_an_import_with_a_refused_key_saves_nothing(
+async def test_an_import_saves_what_passes_and_lists_every_key_that_failed(
     client: AsyncClient, checks: list[Any]
 ) -> None:
     before = (await client.get("/api/v1/settings")).json()
-    document = "caller:\n  model: gpt-6-astra\nsecrets:\n  deepgram_api_key: bad-key\n"
+    document = (
+        "caller:\n  model: gpt-6-astra\n"
+        "secrets:\n"
+        "  deepgram_api_key: bad-key\n"
+        "  elevenlabs_api_key: test-test-test-6789\n"
+        "  plivo_auth_id: MANEW\n"
+        "  plivo_auth_token: bad-token\n"
+    )
 
-    refused = await client.post("/api/v1/settings/import", json={"document": document})
+    imported = await client.post("/api/v1/settings/import", json={"document": document})
 
-    assert refused.status_code == 422
-    assert "nothing was saved" in refused.json()["error"]["message"]
-    assert (await client.get("/api/v1/settings")).json() == before
+    result = imported.json()
+    assert imported.status_code == 200, imported.text
+    assert result["failed"] == [
+        "deepgram_api_key: 401 Unauthorized",
+        "plivo_auth_id, plivo_auth_token: 401 Unauthorized",
+    ]
+    assert result["changes"] == [
+        "caller.model: gpt-6-luna -> gpt-6-astra",
+        "elevenlabs_api_key: replaced",
+    ]
+    secrets = result["settings"]["secrets"]
+    assert secrets["deepgram_api_key"] == before["secrets"]["deepgram_api_key"]
+    assert secrets["plivo_auth_id"] == before["secrets"]["plivo_auth_id"]
+    assert secrets["elevenlabs_api_key"] == {"hint": "6789"}
+
+
+async def test_an_import_keeps_the_old_address_and_key_when_the_new_key_fails(
+    client: AsyncClient, checks: list[Any]
+) -> None:
+    await client.put("/api/v1/settings/secrets/llm_api_key", json={"value": LLM_KEY})
+    before = (await client.get("/api/v1/settings")).json()
+    document = "llm:\n  base_url: https://gateway.example/v1\nsecrets:\n  llm_api_key: bad-key\n"
+
+    imported = await client.post("/api/v1/settings/import", json={"document": document})
+
+    result = imported.json()
+    assert result["failed"] == ["llm_api_key: 401 Unauthorized; llm.base_url was not saved either"]
+    assert result["changes"] == []
+    assert result["settings"]["values"]["llm"] == before["values"]["llm"]
+    assert result["settings"]["secrets"]["llm_api_key"] == {"hint": "cdef"}
 
 
 @pytest.mark.parametrize(

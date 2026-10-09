@@ -74,7 +74,7 @@ yaksha settings export > yaksha-settings.yaml
 LLM_API_KEY=... DEEPGRAM_API_KEY=... yaksha settings apply -f yaksha-settings.yaml
 ```
 
-`yaksha settings apply` stops before it sends anything if a variable is not set. Yaksha checks each key in the file with its provider, and saves nothing if one check fails. Add `--dry-run` to see the changes without saving them. A dry run does not need the variables: it lists each placeholder without a value as skipped.
+`yaksha settings apply` stops before it sends anything if a variable is not set. Yaksha checks each key in the file with its provider. It saves the settings and the keys that pass. It does not save a key that fails: the command lists each one with the reason and exits with status 1. The Settings page shows the same list. Add `--dry-run` to see the changes without saving them. A dry run does not need the variables: it lists each placeholder without a value as skipped.
 
 The Import button of the console applies a file too. A browser cannot read environment variables, so the console skips each `${NAME}` placeholder and lists it.
 

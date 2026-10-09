@@ -613,6 +613,26 @@ func TestSettingsApplySendsTheValuesOfTheVariablesTheFileNames(t *testing.T) {
 	}
 }
 
+func TestSettingsApplyExitsWithStatus1AndNamesTheKeysThatFailed(t *testing.T) {
+	f := newFakeAPI(t, map[string]http.HandlerFunc{
+		"POST /api/v1/settings/import": reply(200, `{"changes":["caller.model: a -> b"],"skipped":[],`+
+			`"failed":["deepgram_api_key: Deepgram did not answer: TimeoutError"]}`),
+	})
+	file := filepath.Join(t.TempDir(), "settings.yaml")
+	if err := os.WriteFile(file, []byte("secrets:\n  deepgram_api_key: dg-key\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	code, stdout, stderr := run(t, context.Background(), against(f), "", "settings", "apply", "-f", file)
+
+	if code != 1 || !strings.Contains(stdout, `"caller.model: a -> b"`) {
+		t.Fatalf("code = %d, stdout = %q", code, stdout)
+	}
+	if !strings.Contains(stderr, "deepgram_api_key: Deepgram did not answer: TimeoutError") {
+		t.Fatalf("stderr = %q", stderr)
+	}
+}
+
 func TestSettingsApplyStopsBeforeTheServerWhenAVariableIsNotSet(t *testing.T) {
 	f := newFakeAPI(t, map[string]http.HandlerFunc{
 		"POST /api/v1/settings/import": reply(200, `{}`),
