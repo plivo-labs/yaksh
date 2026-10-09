@@ -5862,6 +5862,15 @@
             "type": "integer",
             "title": "Repeat"
           },
+          "persona_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Persona Id"
+          },
+          "persona": {
+            "type": "string",
+            "title": "Persona"
+          },
           "verdict": {
             "anyOf": [
               {
@@ -5877,6 +5886,8 @@
         "required": [
           "conversation_id",
           "repeat",
+          "persona_id",
+          "persona",
           "verdict"
         ],
         "title": "CallVerdict"
@@ -10182,14 +10193,13 @@
             "format": "uuid",
             "title": "Agent Id"
           },
-          "scenario_ids": {
+          "scenarios": {
             "items": {
-              "type": "string",
-              "format": "uuid"
+              "$ref": "#/components/schemas/RunScenario"
             },
             "type": "array",
             "minItems": 1,
-            "title": "Scenario Ids"
+            "title": "Scenarios"
           },
           "repeats": {
             "type": "integer",
@@ -10277,7 +10287,7 @@
         "type": "object",
         "required": [
           "agent_id",
-          "scenario_ids"
+          "scenarios"
         ],
         "title": "RunCreate",
         "description": "Limits that an operator sets, such as the most repeats, are checked where the settings\nare known."
@@ -10585,13 +10595,12 @@
             ],
             "title": "Response P90 Ms"
           },
-          "scenario_ids": {
+          "scenarios": {
             "items": {
-              "type": "string",
-              "format": "uuid"
+              "$ref": "#/components/schemas/RunScenario"
             },
             "type": "array",
-            "title": "Scenario Ids"
+            "title": "Scenarios"
           }
         },
         "type": "object",
@@ -10620,9 +10629,41 @@
           "created_at",
           "response_p50_ms",
           "response_p90_ms",
-          "scenario_ids"
+          "scenarios"
         ],
         "title": "RunRead"
+      },
+      "RunScenario": {
+        "properties": {
+          "scenario_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Scenario Id"
+          },
+          "persona_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "type": "array",
+                "minItems": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Persona Ids"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "scenario_id"
+        ],
+        "title": "RunScenario",
+        "description": "A scenario of a run and the personas that call it. None is the scenario's own persona."
       },
       "RunStatus": {
         "type": "string",

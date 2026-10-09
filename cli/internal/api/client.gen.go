@@ -1221,6 +1221,8 @@ type BriefSource struct {
 // CallVerdict defines model for CallVerdict.
 type CallVerdict struct {
 	ConversationId openapi_types.UUID `json:"conversation_id"`
+	Persona        string             `json:"persona"`
+	PersonaId      openapi_types.UUID `json:"persona_id"`
 	Repeat         int                `json:"repeat"`
 	Verdict        *Verdict           `json:"verdict"`
 }
@@ -2204,15 +2206,15 @@ type RuleResults struct {
 // RunCreate Limits that an operator sets, such as the most repeats, are checked where the settings
 // are known.
 type RunCreate struct {
-	AgentId        openapi_types.UUID   `json:"agent_id"`
-	MaxDurationS   *int                 `json:"max_duration_s,omitempty"`
-	MaxParallel    *int                 `json:"max_parallel,omitempty"`
-	MaxRetries     *int                 `json:"max_retries,omitempty"`
-	MaxTurns       *int                 `json:"max_turns,omitempty"`
-	Name           *string              `json:"name,omitempty"`
-	Repeats        *int                 `json:"repeats,omitempty"`
-	ScenarioIds    []openapi_types.UUID `json:"scenario_ids"`
-	StartIntervalS *int                 `json:"start_interval_s,omitempty"`
+	AgentId        openapi_types.UUID `json:"agent_id"`
+	MaxDurationS   *int               `json:"max_duration_s,omitempty"`
+	MaxParallel    *int               `json:"max_parallel,omitempty"`
+	MaxRetries     *int               `json:"max_retries,omitempty"`
+	MaxTurns       *int               `json:"max_turns,omitempty"`
+	Name           *string            `json:"name,omitempty"`
+	Repeats        *int               `json:"repeats,omitempty"`
+	Scenarios      []RunScenario      `json:"scenarios"`
+	StartIntervalS *int               `json:"start_interval_s,omitempty"`
 }
 
 // RunMetrics defines model for RunMetrics.
@@ -2261,31 +2263,37 @@ type RunNumbers struct {
 
 // RunRead defines model for RunRead.
 type RunRead struct {
-	AgentId        openapi_types.UUID   `json:"agent_id"`
-	AgentName      string               `json:"agent_name"`
-	AgentVersion   int                  `json:"agent_version"`
-	AgentVersionId openapi_types.UUID   `json:"agent_version_id"`
-	CancelledAt    *time.Time           `json:"cancelled_at"`
-	Counts         map[string]int       `json:"counts"`
-	CreatedAt      time.Time            `json:"created_at"`
-	EndReasons     map[string]int       `json:"end_reasons"`
-	EndedAt        *time.Time           `json:"ended_at"`
-	Id             openapi_types.UUID   `json:"id"`
-	MaxDurationS   int                  `json:"max_duration_s"`
-	MaxParallel    *int                 `json:"max_parallel"`
-	MaxRetries     int                  `json:"max_retries"`
-	MaxTurns       int                  `json:"max_turns"`
-	MedianTalkMs   *int                 `json:"median_talk_ms"`
-	Name           *string              `json:"name"`
-	Repeats        int                  `json:"repeats"`
-	ResponseP50Ms  *int                 `json:"response_p50_ms"`
-	ResponseP90Ms  *int                 `json:"response_p90_ms"`
-	Retries        int                  `json:"retries"`
-	ScenarioIds    []openapi_types.UUID `json:"scenario_ids"`
-	StartIntervalS *int                 `json:"start_interval_s"`
-	StartedAt      *time.Time           `json:"started_at"`
-	Status         RunStatus            `json:"status"`
-	WaitingReason  *WaitingReason       `json:"waiting_reason"`
+	AgentId        openapi_types.UUID `json:"agent_id"`
+	AgentName      string             `json:"agent_name"`
+	AgentVersion   int                `json:"agent_version"`
+	AgentVersionId openapi_types.UUID `json:"agent_version_id"`
+	CancelledAt    *time.Time         `json:"cancelled_at"`
+	Counts         map[string]int     `json:"counts"`
+	CreatedAt      time.Time          `json:"created_at"`
+	EndReasons     map[string]int     `json:"end_reasons"`
+	EndedAt        *time.Time         `json:"ended_at"`
+	Id             openapi_types.UUID `json:"id"`
+	MaxDurationS   int                `json:"max_duration_s"`
+	MaxParallel    *int               `json:"max_parallel"`
+	MaxRetries     int                `json:"max_retries"`
+	MaxTurns       int                `json:"max_turns"`
+	MedianTalkMs   *int               `json:"median_talk_ms"`
+	Name           *string            `json:"name"`
+	Repeats        int                `json:"repeats"`
+	ResponseP50Ms  *int               `json:"response_p50_ms"`
+	ResponseP90Ms  *int               `json:"response_p90_ms"`
+	Retries        int                `json:"retries"`
+	Scenarios      []RunScenario      `json:"scenarios"`
+	StartIntervalS *int               `json:"start_interval_s"`
+	StartedAt      *time.Time         `json:"started_at"`
+	Status         RunStatus          `json:"status"`
+	WaitingReason  *WaitingReason     `json:"waiting_reason"`
+}
+
+// RunScenario A scenario of a run and the personas that call it. None is the scenario's own persona.
+type RunScenario struct {
+	PersonaIds *[]openapi_types.UUID `json:"persona_ids,omitempty"`
+	ScenarioId openapi_types.UUID    `json:"scenario_id"`
 }
 
 // RunStatus defines model for RunStatus.

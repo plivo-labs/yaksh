@@ -209,7 +209,7 @@ class Conversation(Base):
             ["agent_version_id", "agent_id"], ["agent_versions.id", "agent_versions.agent_id"]
         ),
         ForeignKeyConstraint(["run_id", "agent_id"], ["runs.id", "runs.agent_id"]),
-        UniqueConstraint("run_id", "repeat", "scenario_id", "attempt"),
+        UniqueConstraint("run_id", "repeat", "scenario_id", "persona_id", "attempt"),
         CheckConstraint(
             "attempt >= 1 AND (retry_of IS NULL) = (attempt = 1)",
             name="retry_is_later_attempt",

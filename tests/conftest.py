@@ -230,14 +230,16 @@ async def start(
 async def start_run(
     client: AsyncClient,
     agent_id: str,
-    scenario_ids: list[str],
+    scenarios: list[str | dict[str, Any]],
     *,
     key: str | None = None,
     **fields: Any,
 ) -> Response:
+    """A scenario given by its id runs with its own persona."""
+    listed = [{"scenario_id": item} if isinstance(item, str) else item for item in scenarios]
     return await client.post(
         "/api/v1/runs",
-        json={"agent_id": agent_id, "scenario_ids": scenario_ids, **fields},
+        json={"agent_id": agent_id, "scenarios": listed, **fields},
         headers={} if key is None else {"Idempotency-Key": key},
     )
 

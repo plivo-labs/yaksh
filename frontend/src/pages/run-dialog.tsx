@@ -1,6 +1,9 @@
+import { Shuffle, XIcon } from "lucide-react";
 import { type SubmitEvent, useState } from "react";
 import { useNavigate } from "react-router";
 
+import { PersonaChips } from "@/components/persona-chips";
+import { ScenarioAdder } from "@/components/scenario-adder";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -10,15 +13,33 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
-import { randomKey } from "@/lib/random-key";
-import { counted } from "@/lib/format";
-import { usePersonaNames } from "@/hooks/use-persona-names";
+import { counted, when } from "@/lib/format";
 import { revealErrors } from "@/lib/forms";
-import { useDefaults, usePhoneNumbers, useRunScenarios, useStartRun } from "@/lib/queries";
-import type { AgentSummary, RunSummary } from "@/lib/types";
+import { mixPersonas } from "@/lib/mix";
+import { randomKey } from "@/lib/random-key";
+import {
+  useDefaults,
+  usePersonas,
+  usePhoneNumbers,
+  useRunScenarios,
+  useScenarios,
+  useStartRun,
+} from "@/lib/queries";
+import { type AgentSummary, LANGUAGE_NAMES, type RunSummary, type Scenario } from "@/lib/types";
+
+const MIX_SIZES = ["2", "3", "4", "5"].map((value) => ({ value, label: value }));
 
 /** A whole number from an input, null when it is empty, NaN when it is not a whole number. */
 function whole(value: string): number | null {
@@ -32,22 +53,25 @@ function text(value: number | null | undefined): string {
 }
 
 /** Starts a run of the scenarios, in the order given, or of every scenario of the agent when
- * `scenarioIds` is absent. For "Run again", `earlier` fills the fields, and scenarios deleted
- * since are left out. */
+ * `scenarioIds` is absent. Each scenario runs once for each persona on its card: its own persona
+ * at first, or the ones in `personasOf` for "Run again". `earlier` fills the other fields, and
+ * scenarios or personas deleted since are left out. */
 export function RunDialog({
   agent,
   scenarioIds,
+  personasOf,
   earlier,
   onClosed,
 }: {
   agent: AgentSummary;
   scenarioIds?: string[];
+  personasOf?: Record<string, string[]>;
   earlier?: RunSummary;
   onClosed: () => void;
 }) {
   const [open, setOpen] = useState(true);
   const [requestKey] = useState(randomKey);
-  const [name, setName] = useState(earlier?.name ?? "");
+  const [name, setName] = useState(() => `Run of ${when(new Date().toISOString())}`);
   const [repeats, setRepeats] = useState(() => text(earlier?.repeats ?? 1));
   /** Null until the user types: the field then shows the server's default. */
   const [maxDuration, setMaxDuration] = useState(earlier ? text(earlier.max_duration_s) : null);
@@ -55,18 +79,79 @@ export function RunDialog({
   const [maxParallel, setMaxParallel] = useState(() => text(earlier?.max_parallel));
   const [delay, setDelay] = useState(() => text(earlier?.start_interval_s));
   const [retries, setRetries] = useState(earlier ? text(earlier.max_retries) : null);
-  /** Null plays each persona's own setting. */
+  const [editLimits, setEditLimits] = useState(false);
   const [submitted, setSubmitted] = useState(false);
-  const { scenarios, leftOut, ready, error: loadError } = useRunScenarios(agent.id, scenarioIds);
-  const { personas, name: personaName } = usePersonaNames();
+  /** The run's scenarios and the personas on each card, copied once when they load, so a
+   * refresh in the background never changes what the user set up; null until then. */
+  const [rows, setRows] = useState<{ scenario: Scenario; personaIds: string[] }[] | null>(null);
+  const [mixSize, setMixSize] = useState("3");
+  const [mixOpen, setMixOpen] = useState(false);
+  const {
+    scenarios: loaded,
+    leftOut,
+    ready,
+    error: loadError,
+  } = useRunScenarios(agent.id, scenarioIds);
+  const everyScenario = useScenarios(agent.id);
+  const personas = usePersonas();
   const defaults = useDefaults();
-  const durationText = maxDuration ?? text(defaults.data?.max_duration_s);
-  const turnsText = maxTurns ?? text(defaults.data?.max_turns);
-  const retriesText = retries ?? text(defaults.data?.max_retries);
   const numbers = usePhoneNumbers();
   const start = useStartRun(requestKey);
   const navigate = useNavigate();
 
+  const known = personas.data ?? [];
+  const byId = new Map(known.map((persona) => [persona.id, persona]));
+  // Wait for the current persona list, not a cached one, so a persona deleted since the
+  // earlier run is left out before the cards are filled.
+  const personasSettled = personas.isSuccess && !personas.isFetching;
+  if (rows === null && ready && personasSettled) {
+    setRows(
+      loaded.map((scenario) => {
+        const kept = (personasOf?.[scenario.id] ?? []).filter((id) => byId.has(id));
+        return { scenario, personaIds: kept.length ? kept : [scenario.persona_id] };
+      }),
+    );
+  }
+  const scenarios = (rows ?? []).map((row) => row.scenario);
+  const cards = Object.fromEntries((rows ?? []).map((row) => [row.scenario.id, row.personaIds]));
+  const changed = (rows ?? []).some(
+    (row) => row.personaIds.length !== 1 || row.personaIds[0] !== row.scenario.persona_id,
+  );
+  const pool = known.filter((persona) => persona.language === agent.language);
+
+  const update = (change: (row: { scenario: Scenario; personaIds: string[] }) => string[]) =>
+    setRows((current) =>
+      (current ?? []).map((row) => ({ scenario: row.scenario, personaIds: change(row) })),
+    );
+  const setCard = (scenarioId: string, ids: string[]) =>
+    update((row) => (row.scenario.id === scenarioId ? ids : row.personaIds));
+  const removeScenario = (scenarioId: string) =>
+    setRows((current) => (current ?? []).filter((row) => row.scenario.id !== scenarioId));
+  const addScenario = (scenario: Scenario) =>
+    setRows((current) => [...(current ?? []), { scenario, personaIds: [scenario.persona_id] }]);
+  const mix = () => {
+    const mixed = mixPersonas(
+      scenarios,
+      pool.map((persona) => persona.id),
+      Number(mixSize),
+    );
+    update((row) => mixed[row.scenario.id]);
+    setMixOpen(false);
+  };
+  const addToAll = (personaId: string) => {
+    update((row) =>
+      row.personaIds.includes(personaId) ? row.personaIds : [...row.personaIds, personaId],
+    );
+    setMixOpen(false);
+  };
+  const resetToOwn = () => {
+    update((row) => [row.scenario.persona_id]);
+    setMixOpen(false);
+  };
+
+  const durationText = maxDuration ?? text(defaults.data?.max_duration_s);
+  const turnsText = maxTurns ?? text(defaults.data?.max_turns);
+  const retriesText = retries ?? text(defaults.data?.max_retries);
   const repeatCount = whole(repeats);
   const duration = whole(durationText);
   const turns = whole(turnsText);
@@ -79,25 +164,26 @@ export function RunDialog({
   const parallelOk = parallel === null || parallel >= 1;
   const intervalOk = interval === null || interval >= 1;
   const retriesOk = retryCount === null || retryCount >= 0;
+  const limitsOk = durationOk && turnsOk && parallelOk && intervalOk && retriesOk;
+  const empty = scenarios.filter((scenario) => (cards[scenario.id] ?? []).length === 0);
   const valid =
-    scenarios.length > 0 &&
-    repeatsOk &&
-    durationOk &&
-    turnsOk &&
-    parallelOk &&
-    intervalOk &&
-    retriesOk;
-  const total = scenarios.length * (repeatsOk ? repeatCount : 0);
+    rows !== null && scenarios.length > 0 && empty.length === 0 && repeatsOk && limitsOk;
+  const different = scenarios.reduce((sum, scenario) => sum + (cards[scenario.id]?.length ?? 0), 0);
+  const total = different * (repeatsOk ? repeatCount : 0);
+  const personaCount = new Set(scenarios.flatMap((scenario) => cards[scenario.id] ?? [])).size;
+  const times = !repeatsOk
+    ? ""
+    : repeatCount === 1
+      ? "once"
+      : repeatCount === 2
+        ? "twice"
+        : `${repeatCount} times`;
 
-  const perPersona = new Map<string, number>();
-  for (const scenario of scenarios) {
-    const persona = personaName(scenario.persona_id);
-    perPersona.set(persona, (perPersona.get(persona) ?? 0) + 1);
-  }
   const outbound = agent.direction === "outbound";
   const usable = (numbers.data?.items ?? []).filter(
     (number) => !outbound || number.on_outbound_application,
   );
+  const waits = outbound && usable.length > 0 && total > usable.length;
 
   const submit = (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -105,12 +191,16 @@ export function RunDialog({
       !revealErrors(event.currentTarget, () => setSubmitted(true), valid) ||
       repeatCount === null
     ) {
+      if (!limitsOk) setEditLimits(true);
       return;
     }
     start.mutate(
       {
         agent_id: agent.id,
-        scenario_ids: scenarios.map((scenario) => scenario.id),
+        scenarios: scenarios.map((scenario) => ({
+          scenario_id: scenario.id,
+          persona_ids: cards[scenario.id],
+        })),
         repeats: repeatCount,
         // Untouched fields go as null, for the defaults they show: a resent request then stays
         // the same whether or not the defaults had loaded when it was first sent.
@@ -125,17 +215,27 @@ export function RunDialog({
     );
   };
 
+  const limits: [string, string][] = [
+    ["Time limit", duration === null ? "Default" : `${duration} s`],
+    ["Turn limit", turns === null ? "Default" : `${turns} turns`],
+    ["At once", parallel === null ? "No run limit" : String(parallel)],
+    ["Delay", interval === null ? "None" : `${interval} s`],
+    ["Retries", retryCount === null ? "Default" : `Up to ${retryCount}`],
+  ];
+
   return (
     <Dialog
       open={open}
       onOpenChange={(next) => !next && !start.isPending && setOpen(false)}
       onOpenChangeComplete={(next) => !next && onClosed()}
     >
-      <DialogContent className="flex max-h-[90vh] flex-col gap-0 p-0 sm:max-w-lg">
-        <DialogHeader className="px-6 pt-6 pb-4">
-          <DialogTitle>{earlier ? "Run again" : "Run scenarios"}</DialogTitle>
+      <DialogContent className="flex h-[min(760px,90vh)] flex-col gap-0 p-0 sm:max-w-5xl">
+        <DialogHeader className="border-b px-6 py-5">
+          <DialogTitle>
+            {earlier ? "Run again" : scenarios.length === 1 ? "Run scenario" : "Run scenarios"}
+          </DialogTitle>
           <DialogDescription>
-            Each scenario runs with its own persona, once for each repeat.
+            {agent.name} · {counted(scenarios.length, "scenario", "scenarios")}
           </DialogDescription>
         </DialogHeader>
 
@@ -143,63 +243,202 @@ export function RunDialog({
           id="run-form"
           noValidate
           onSubmit={submit}
-          className="min-h-0 flex-1 overflow-y-auto px-6 py-1"
+          className="grid min-h-0 flex-1 grid-cols-1 sm:grid-cols-[minmax(0,1fr)_18rem]"
         >
-          <FieldGroup className="pb-6">
-            <div className="grid gap-1 rounded-md bg-muted/50 px-3 py-2.5 text-p-400">
+          <section className="flex min-h-0 flex-col gap-4 px-6 py-5">
+            <div className="flex items-end justify-between gap-4">
+              <div className="grid min-w-0 gap-1">
+                <span className="text-label text-secondary">Scenarios</span>
+                <span className="text-s-400 text-muted-foreground">
+                  Each scenario runs once for each persona in its list.
+                </span>
+              </div>
+              <Popover open={mixOpen} onOpenChange={setMixOpen}>
+                <PopoverTrigger
+                  render={
+                    <Button type="button" variant="outline" size="sm" disabled={rows === null} />
+                  }
+                >
+                  <Shuffle />
+                  Mix personas
+                </PopoverTrigger>
+                <PopoverContent align="end" className="w-80 gap-0 p-0">
+                  <div className="grid gap-3 p-4">
+                    <span className="text-s-500">Mix personas</span>
+                    <div className="flex items-center gap-2">
+                      <Select
+                        items={MIX_SIZES}
+                        value={mixSize}
+                        onValueChange={(value) => value && setMixSize(value)}
+                      >
+                        <SelectTrigger aria-label="Personas for each scenario" className="w-16">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectGroup>
+                            {MIX_SIZES.map((item) => (
+                              <SelectItem key={item.value} value={item.value}>
+                                {item.label}
+                              </SelectItem>
+                            ))}
+                          </SelectGroup>
+                        </SelectContent>
+                      </Select>
+                      <span className="text-s-400 text-muted-foreground">for each scenario</span>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="ml-auto"
+                        disabled={pool.length === 0}
+                        onClick={mix}
+                      >
+                        Mix
+                      </Button>
+                    </div>
+                    <p
+                      className="text-xs-400 text-muted-foreground"
+                      title={`Each scenario keeps its own persona. The others come from the ${pool.length} ${LANGUAGE_NAMES[agent.language]} personas, and each is used once before any is used twice.`}
+                    >
+                      Includes each scenario's own persona.
+                    </p>
+                  </div>
+                  <div className="grid gap-2 border-t p-4">
+                    <span className="text-s-500">Add a persona to every scenario</span>
+                    <Select
+                      items={known.map((persona) => ({ value: persona.id, label: persona.name }))}
+                      value={null}
+                      onValueChange={(value) => value && addToAll(value)}
+                    >
+                      <SelectTrigger aria-label="Persona to add" className="w-full">
+                        <SelectValue placeholder="Choose a persona" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectGroup>
+                          {known.map((persona) => (
+                            <SelectItem key={persona.id} value={persona.id}>
+                              {persona.name}
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {changed && (
+                    <button
+                      type="button"
+                      className="w-full border-t px-4 py-3 text-left text-s-400 hover:bg-hv1"
+                      onClick={resetToOwn}
+                    >
+                      Reset to scenario personas
+                    </button>
+                  )}
+                </PopoverContent>
+              </Popover>
+            </div>
+
+            {submitted && empty.length > 0 && (
+              <p role="alert" className="text-s-400 text-destructive">
+                Add a persona to {counted(empty.length, "scenario", "scenarios")} to start the run.
+              </p>
+            )}
+
+            <div className="grid min-h-0 flex-1 content-start gap-3 overflow-y-auto pr-1">
               {loadError ? (
                 <p role="alert" className="text-destructive">
                   Could not load the scenarios: {loadError.message}
                 </p>
-              ) : !ready ? (
-                <p className="text-muted-foreground">Loading the scenarios</p>
-              ) : (
-                <>
-                  <p className="font-medium tabular-nums">
-                    {counted(total, "conversation", "conversations")}:{" "}
-                    {counted(scenarios.length, "scenario", "scenarios")},{" "}
-                    {repeatsOk ? counted(repeatCount, "repeat", "repeats") : "no repeats"}
-                  </p>
-                  <p className="text-muted-foreground">
-                    Personas:{" "}
-                    {personas.isError
-                      ? `could not load them: ${personas.error.message}`
-                      : personas.isPending
-                        ? "loading"
-                        : [...perPersona]
-                            .map(([persona, count]) => `${persona} ${count}`)
-                            .join(", ")}
-                  </p>
-                </>
-              )}
-              {numbers.data && (
-                <p className="text-muted-foreground">
-                  {outbound
-                    ? `${counted(usable.length, "number receives", "numbers receive")} the agent's calls. Each rests ${numbers.data.rest_s} seconds after a call.`
-                    : `Yaksha calls from ${counted(usable.length, "number", "numbers")}, one call on each at a time.`}
+              ) : personas.error ? (
+                <p role="alert" className="text-destructive">
+                  Could not load the personas: {personas.error.message}{" "}
+                  <button type="button" className="underline" onClick={() => personas.refetch()}>
+                    Try again
+                  </button>
                 </p>
+              ) : rows === null ? (
+                <p className="text-s-400 text-muted-foreground">
+                  Loading the scenarios and personas
+                </p>
+              ) : (
+                scenarios.map((scenario) => {
+                  const ids = cards[scenario.id] ?? [];
+                  const foreign = ids
+                    .map((id) => byId.get(id))
+                    .filter((persona) => persona && persona.language !== agent.language);
+                  const calls = ids.length * (repeatsOk ? repeatCount : 0);
+                  return (
+                    <div
+                      key={scenario.id}
+                      className={`grid gap-3 border p-4 ${submitted && ids.length === 0 ? "border-destructive" : ""}`}
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <span className="text-s-500">{scenario.name}</span>
+                        <span className="flex shrink-0 items-center gap-2">
+                          <span className="text-xs-400 text-muted-foreground tabular-nums">
+                            {counted(calls, "call", "calls")}
+                          </span>
+                          <button
+                            type="button"
+                            aria-label={`Remove ${scenario.name} from this run`}
+                            title="Remove from this run"
+                            className="-mt-0.5 flex size-6 items-center justify-center rounded-sm text-muted-foreground hover:bg-hv1 hover:text-foreground"
+                            onClick={() => removeScenario(scenario.id)}
+                          >
+                            <XIcon className="size-3.5" />
+                          </button>
+                        </span>
+                      </div>
+                      <PersonaChips
+                        label={scenario.name}
+                        personas={known}
+                        value={ids}
+                        language={agent.language}
+                        invalid={submitted && ids.length === 0}
+                        onValueChange={(next) => setCard(scenario.id, next)}
+                      />
+                      {foreign.map(
+                        (persona) =>
+                          persona && (
+                            <p key={persona.id} className="text-xs-400 text-status-warning-text">
+                              {persona.name} speaks {LANGUAGE_NAMES[persona.language]}, and the
+                              agent speaks {LANGUAGE_NAMES[agent.language]}.
+                            </p>
+                          ),
+                      )}
+                    </div>
+                  );
+                })
+              )}
+              {rows !== null && (
+                <ScenarioAdder
+                  scenarios={(everyScenario.data ?? []).filter(
+                    (scenario) => !scenarios.some((shown) => shown.id === scenario.id),
+                  )}
+                  onAdd={addScenario}
+                />
               )}
               {leftOut > 0 && (
-                <p className="text-muted-foreground">
+                <p className="text-s-400 text-muted-foreground">
                   {counted(leftOut, "scenario", "scenarios")}
                   {earlier && " of the earlier run"} no longer {leftOut === 1 ? "exists" : "exist"}{" "}
                   and {leftOut === 1 ? "is" : "are"} left out.
                 </p>
               )}
             </div>
+          </section>
 
-            <Field>
-              <FieldLabel htmlFor="run-name">Name</FieldLabel>
-              <Input
-                id="run-name"
-                maxLength={80}
-                placeholder="The creation time when empty"
-                value={name}
-                onChange={(event) => setName(event.target.value)}
-              />
-            </Field>
-
-            <div className="grid grid-cols-2 gap-4">
+          <aside className="flex min-h-0 flex-col gap-6 overflow-y-auto border-t bg-muted/40 px-6 py-5 sm:border-t-0 sm:border-l">
+            <div className="grid gap-4">
+              <Field>
+                <FieldLabel htmlFor="run-name">Name</FieldLabel>
+                <Input
+                  id="run-name"
+                  maxLength={80}
+                  value={name}
+                  onFocus={(event) => event.currentTarget.select()}
+                  onChange={(event) => setName(event.target.value)}
+                />
+              </Field>
               <Field>
                 <FieldLabel htmlFor="run-repeats">Repeats</FieldLabel>
                 <Input
@@ -212,132 +451,160 @@ export function RunDialog({
                   value={repeats}
                   onChange={(event) => setRepeats(event.target.value)}
                 />
+                <FieldDescription>How many times each call runs.</FieldDescription>
                 {submitted && !repeatsOk && <FieldError>Enter a whole number from 1.</FieldError>}
               </Field>
-              <Field>
-                <FieldLabel htmlFor="run-duration">Time limit, seconds</FieldLabel>
-                <Input
-                  id="run-duration"
-                  type="number"
-                  inputMode="numeric"
-                  min={10}
-                  max={1800}
-                  placeholder="Default"
-                  aria-invalid={submitted && !durationOk}
-                  className="tabular-nums"
-                  value={durationText}
-                  onChange={(event) => setMaxDuration(event.target.value)}
-                />
-                {submitted && !durationOk && (
-                  <FieldError>Enter a whole number from 10 to 1800, or none.</FieldError>
-                )}
-              </Field>
-              <Field>
-                <FieldLabel htmlFor="run-parallel">Max parallel</FieldLabel>
-                <Input
-                  id="run-parallel"
-                  type="number"
-                  inputMode="numeric"
-                  min={1}
-                  placeholder="No run limit"
-                  aria-invalid={submitted && !parallelOk}
-                  className="tabular-nums"
-                  value={maxParallel}
-                  onChange={(event) => setMaxParallel(event.target.value)}
-                />
-                {submitted && !parallelOk && (
-                  <FieldError>Enter a whole number from 1, or none.</FieldError>
-                )}
-              </Field>
-              <Field>
-                <FieldLabel htmlFor="run-delay">Delay between calls, seconds</FieldLabel>
-                <Input
-                  id="run-delay"
-                  type="number"
-                  inputMode="numeric"
-                  min={1}
-                  placeholder="None"
-                  aria-invalid={submitted && !intervalOk}
-                  className="tabular-nums"
-                  value={delay}
-                  onChange={(event) => setDelay(event.target.value)}
-                />
-                {submitted && !intervalOk && (
-                  <FieldError>Enter a whole number from 1, or none.</FieldError>
-                )}
-              </Field>
             </div>
-            <FieldDescription>
-              Max parallel and the delay protect the agent under test. The workers' limits protect
-              Yaksha's phone account.
-            </FieldDescription>
 
-            <Field>
-              <FieldLabel htmlFor="run-turns">Turn limit</FieldLabel>
-              <Input
-                id="run-turns"
-                type="number"
-                inputMode="numeric"
-                min={1}
-                max={100}
-                placeholder="Default"
-                aria-invalid={submitted && !turnsOk}
-                className="w-24 tabular-nums"
-                value={turnsText}
-                onChange={(event) => setMaxTurns(event.target.value)}
-              />
-              <FieldDescription>
-                The caller answers the agent this many times, then says goodbye and hangs up. Empty
-                uses the server default.
-              </FieldDescription>
-              {submitted && !turnsOk && (
-                <FieldError>Enter a whole number from 1 to 100, or none.</FieldError>
+            <div className="grid gap-1">
+              <div className="flex items-baseline justify-between">
+                <span className="text-label text-secondary">Call limits</span>
+                <button
+                  type="button"
+                  className="text-s-400 text-brand-text"
+                  aria-expanded={editLimits}
+                  onClick={() => setEditLimits((current) => !current)}
+                >
+                  {editLimits ? "Done" : "Edit"}
+                </button>
+              </div>
+              {editLimits ? (
+                <div className="grid gap-3 pt-2">
+                  <LimitField
+                    id="run-duration"
+                    label="Time limit, seconds"
+                    value={durationText}
+                    placeholder="Default"
+                    invalid={submitted && !durationOk}
+                    error="Enter a whole number from 10 to 1800, or none."
+                    onChange={setMaxDuration}
+                  />
+                  <LimitField
+                    id="run-turns"
+                    label="Turn limit"
+                    value={turnsText}
+                    placeholder="Default"
+                    invalid={submitted && !turnsOk}
+                    error="Enter a whole number from 1 to 100, or none."
+                    onChange={setMaxTurns}
+                  />
+                  <LimitField
+                    id="run-parallel"
+                    label="Max parallel"
+                    value={maxParallel}
+                    placeholder="No run limit"
+                    invalid={submitted && !parallelOk}
+                    error="Enter a whole number from 1, or none."
+                    onChange={setMaxParallel}
+                  />
+                  <LimitField
+                    id="run-delay"
+                    label="Delay between calls, seconds"
+                    value={delay}
+                    placeholder="None"
+                    invalid={submitted && !intervalOk}
+                    error="Enter a whole number from 1, or none."
+                    onChange={setDelay}
+                  />
+                  <LimitField
+                    id="run-retries"
+                    label="Retries"
+                    value={retriesText}
+                    placeholder="Default"
+                    invalid={submitted && !retriesOk}
+                    error="Enter a whole number from 0, or none."
+                    onChange={setRetries}
+                  />
+                </div>
+              ) : (
+                <dl className="grid">
+                  {limits.map(([label, value]) => (
+                    <div key={label} className="flex justify-between border-t py-1.5 text-s-400">
+                      <dt className="text-muted-foreground">{label}</dt>
+                      <dd>{value}</dd>
+                    </div>
+                  ))}
+                </dl>
               )}
-            </Field>
-
-            <Field>
-              <FieldLabel htmlFor="run-retries">Retries</FieldLabel>
-              <Input
-                id="run-retries"
-                type="number"
-                inputMode="numeric"
-                min={0}
-                placeholder="Default"
-                aria-invalid={submitted && !retriesOk}
-                className="w-24 tabular-nums"
-                value={retriesText}
-                onChange={(event) => setRetries(event.target.value)}
-              />
-              <FieldDescription>
-                A conversation that ends with an error on Yaksha's side or on the line is tried
-                again, up to this many times. Empty uses the server default.
-              </FieldDescription>
-              {submitted && !retriesOk && (
-                <FieldError>Enter a whole number from 0, or none.</FieldError>
-              )}
-            </Field>
-          </FieldGroup>
+            </div>
+          </aside>
         </form>
-        {start.error && <FieldError className="px-6 pb-3">{start.error.message}</FieldError>}
-        <DialogFooter className="border-t px-6 py-4">
-          <Button
-            type="button"
-            variant="ghost"
-            disabled={start.isPending}
-            onClick={() => setOpen(false)}
-          >
-            Cancel
-          </Button>
-          <Button
-            type="submit"
-            form="run-form"
-            disabled={start.isPending || scenarios.length === 0}
-          >
-            {start.isPending && <Spinner />}
-            Start run
-          </Button>
+
+        <DialogFooter className="items-center border-t px-6 py-4 sm:justify-between">
+          <div className="grid gap-0.5">
+            {rows !== null && repeatsOk && (
+              <span className="text-s-400 text-muted-foreground tabular-nums">
+                {counted(different, "different call", "different calls")}, each run {times} ·{" "}
+                {counted(scenarios.length, "scenario", "scenarios")},{" "}
+                {counted(personaCount, "persona", "personas")}
+              </span>
+            )}
+            {waits && (
+              <span
+                className="text-xs-400 text-status-warning-text"
+                title={`The agent calls Yaksha, and each Yaksha number takes one call at a time, then rests ${numbers.data?.rest_s} s.`}
+              >
+                {counted(total, "call", "calls")} on {counted(usable.length, "number", "numbers")}:
+                they run {usable.length} at a time.
+              </span>
+            )}
+            {start.error && <FieldError>{start.error.message}</FieldError>}
+          </div>
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="ghost"
+              disabled={start.isPending}
+              onClick={() => setOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              form="run-form"
+              disabled={start.isPending || rows === null || scenarios.length === 0}
+            >
+              {start.isPending && <Spinner />}
+              Start {counted(total, "call", "calls")}
+            </Button>
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function LimitField({
+  id,
+  label,
+  value,
+  placeholder,
+  invalid,
+  error,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  placeholder: string;
+  invalid: boolean;
+  error: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <Field>
+      <FieldLabel htmlFor={id}>{label}</FieldLabel>
+      <Input
+        id={id}
+        type="number"
+        inputMode="numeric"
+        placeholder={placeholder}
+        aria-invalid={invalid}
+        className="tabular-nums"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+      />
+      {invalid && <FieldError>{error}</FieldError>}
+    </Field>
   );
 }

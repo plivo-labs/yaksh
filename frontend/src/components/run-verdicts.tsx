@@ -122,7 +122,7 @@ function Scorecard({ verdicts }: { verdicts: RunVerdicts }) {
       </Stat>
       <Stat
         label="Both repeats pass"
-        hint="The chance that two repeats of the same scenario both pass. A low value means the agent passes some tries of a scenario and fails others."
+        hint="The chance that two repeats of the same scenario with the same persona both pass. A low value means the agent passes some tries and fails others."
         value={verdicts.pass_hat_2 === null ? "None yet" : percent(verdicts.pass_hat_2)}
       >
         {verdicts.pass_hat_2 !== null && (
@@ -134,11 +134,11 @@ function Scorecard({ verdicts }: { verdicts: RunVerdicts }) {
         )}
         <p className="text-xs-400 text-muted-foreground">
           {verdicts.pass_hat_2 === null
-            ? "Needs two scored repeats of a scenario."
-            : `Over ${counted(verdicts.pass_hat_2_scenarios, "scenario", "scenarios")}. ${
+            ? "Needs two scored repeats of a scenario with one persona."
+            : `Over ${counted(verdicts.pass_hat_2_scenarios, "scenario and persona pair", "scenario and persona pairs")}. ${
                 verdicts.inconsistent.length === 0
-                  ? "No scenario both passed and failed."
-                  : `${counted(verdicts.inconsistent.length, "scenario", "scenarios")} passed and failed across repeats.`
+                  ? "No pair both passed and failed."
+                  : `${counted(verdicts.inconsistent.length, "scenario", "scenarios")} passed and failed across repeats of one persona.`
               }`}
         </p>
       </Stat>
@@ -272,7 +272,17 @@ function ScenarioRow({
   open: boolean;
   onToggle: () => void;
 }) {
-  const byRepeat = new Map(scenario.calls.map((call) => [call.repeat, call]));
+  const personas = [
+    ...new Map(scenario.calls.map((call) => [call.persona_id, call.persona])).entries(),
+  ];
+  const byRepeat = new Map(
+    scenario.calls.map((call) => [`${call.repeat}/${call.persona_id}`, call]),
+  );
+  const slots = Array.from({ length: repeats }, (_, index) => index + 1).flatMap((repeat) =>
+    personas.map(([id, persona]) => ({ repeat, persona, key: `${repeat}/${id}` })),
+  );
+  const named = (repeat: number, persona: string) =>
+    personas.length > 1 ? `Repeat ${repeat}, ${persona}` : `Repeat ${repeat}`;
   const failing = criteria.filter((c) => c.counts.fail);
   const blocked = criteria.filter((c) => c.counts.blocked && !c.counts.fail);
   const panel = `scenario-${scenario.scenario_id}`;
@@ -310,27 +320,27 @@ function ScenarioRow({
             </span>
           </span>
         </button>
-        <div className="flex gap-1">
-          {Array.from({ length: repeats }, (_, index) => index + 1).map((repeat) => {
-            const call = byRepeat.get(repeat);
+        <div className="flex max-w-56 flex-wrap justify-end gap-1">
+          {slots.map(({ repeat, persona, key }) => {
+            const call = byRepeat.get(key);
             if (!call) {
               return (
                 <span
-                  key={repeat}
+                  key={key}
                   role="img"
-                  aria-label={`Repeat ${repeat}: no judged call`}
+                  aria-label={`${named(repeat, persona)}: no judged call`}
                   className="size-6 rounded-md border border-dashed"
                 />
               );
             }
             const said = call.verdict === null ? "the evaluation failed" : CHIP_TEXT[call.verdict];
             return (
-              <Tooltip key={repeat}>
+              <Tooltip key={key}>
                 <TooltipTrigger
                   render={
                     <Link
                       to={`/conversations/${call.conversation_id}`}
-                      aria-label={`Repeat ${repeat} ${said}. Open the call.`}
+                      aria-label={`${named(repeat, persona)} ${said}. Open the call.`}
                     />
                   }
                   className={cn(
@@ -344,7 +354,7 @@ function ScenarioRow({
                   />
                 </TooltipTrigger>
                 <TooltipContent>
-                  Repeat {repeat} {said}. Open the call.
+                  {named(repeat, persona)} {said}. Open the call.
                 </TooltipContent>
               </Tooltip>
             );

@@ -738,7 +738,7 @@ export interface Conversation extends ConversationSummary {
 export interface RunInput {
   agent_id: string;
   /** In the order the conversations of each repeat start. */
-  scenario_ids: string[];
+  scenarios: RunScenario[];
   repeats: number;
   /** The server default when null. */
   max_duration_s: number | null;
@@ -783,8 +783,14 @@ export interface RunSummary {
   cancelled_at: string | null;
 }
 
+/** A scenario of a run and the personas that call it; none is the scenario's own persona. */
+export interface RunScenario {
+  scenario_id: string;
+  persona_ids?: string[] | null;
+}
+
 export interface Run extends RunSummary {
-  scenario_ids: string[];
+  scenarios: RunScenario[];
 }
 
 export type GenerationMode = "agent" | "knowledge_base";
@@ -1001,7 +1007,13 @@ export interface RunVerdicts {
     name: string;
     category: Category;
     /** In repeat order; a null verdict means the evaluation failed. */
-    calls: { conversation_id: string; repeat: number; verdict: Verdict | null }[];
+    calls: {
+      conversation_id: string;
+      repeat: number;
+      persona_id: string;
+      persona: string;
+      verdict: Verdict | null;
+    }[];
     passes: number;
     scored: number;
   }[];

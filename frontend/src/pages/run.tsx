@@ -241,7 +241,10 @@ function RunActions({ run }: { run: Run }) {
       {again && agent.data && (
         <RunDialog
           agent={agent.data}
-          scenarioIds={run.scenario_ids}
+          scenarioIds={run.scenarios.map((item) => item.scenario_id)}
+          personasOf={Object.fromEntries(
+            run.scenarios.map((item) => [item.scenario_id, item.persona_ids ?? []]),
+          )}
           earlier={run}
           onClosed={() => setAgain(false)}
         />

@@ -110,8 +110,53 @@ async def test_a_run_starts_each_repeat_of_every_scenario_in_order_with_its_pers
         (run["id"], 1, None, "queued")
     }
     detail = (await client.get(f"/api/v1/runs/{run['id']}")).json()
-    assert detail["scenario_ids"] == [second["id"], first["id"]]
+    assert detail["scenarios"] == [
+        {"scenario_id": second["id"], "persona_ids": [hurried]},
+        {"scenario_id": first["id"], "persona_ids": [calm]},
+    ]
     assert detail["median_talk_ms"] is None
+
+
+async def test_a_scenario_runs_once_for_each_persona_asked_for_and_the_run_lists_them(
+    client: AsyncClient,
+) -> None:
+    agent = await create_agent_id(client)
+    own = (await create_persona(client, name="Own caller"))["id"]
+    calm = (await create_persona(client, name="Calm caller"))["id"]
+    hindi = (await create_persona(client, name="Hindi caller", language="hi"))["id"]
+    first = await create_scenario(client, agent, persona_id=own)
+    second = await create_scenario(client, agent, name="Cancel a cleaning", persona_id=own)
+
+    response = await start_run(
+        client,
+        agent,
+        [{"scenario_id": first["id"], "persona_ids": [calm, hindi]}, second["id"]],
+        repeats=2,
+    )
+
+    assert response.status_code == 202, response.text
+    run = response.json()
+    assert run["counts"] == {**NO_OUTCOMES, "waiting": 6}
+    queued = await run_conversations(client, run["id"])
+    assert [(c["repeat"], c["scenario_id"], c["persona_id"], c["language"]) for c in queued] == [
+        (repeat, scenario["id"], persona, language)
+        for repeat in (1, 2)
+        for scenario, persona, language in (
+            (first, calm, "en"),
+            (first, hindi, "hi"),
+            (second, own, "en"),
+        )
+    ]
+    detail = (await client.get(f"/api/v1/runs/{run['id']}")).json()
+    assert detail["scenarios"] == [
+        {"scenario_id": first["id"], "persona_ids": [calm, hindi]},
+        {"scenario_id": second["id"], "persona_ids": [own]},
+    ]
+    again = await start_run(client, agent, detail["scenarios"], repeats=3)
+    assert again.status_code == 422, again.text
+    assert again.json()["error"]["message"] == (
+        "a run starts at most 6 conversations; 3 scenario and persona pairs and 3 repeats make 9"
+    )
 
 
 async def test_every_conversation_of_a_run_pins_what_was_current_when_it_started(
@@ -170,15 +215,20 @@ async def test_a_run_needs_distinct_scenarios_within_the_limits(client: AsyncCli
     agent = await create_agent_id(client)
     ids = [(await create_scenario(client, agent, name=f"Scenario {n}"))["id"] for n in range(4)]
 
-    async def refused(scenario_ids: list[str], **fields: Any) -> str:
-        response = await start_run(client, agent, scenario_ids, **fields)
+    async def refused(scenarios: list[str | dict[str, Any]], **fields: Any) -> str:
+        response = await start_run(client, agent, scenarios, **fields)
         assert response.status_code == 422, response.text
         return response.json()["error"]["message"]
 
-    assert (await refused([])).startswith("scenario_ids: ")
+    assert (await refused([])).startswith("scenarios: ")
     assert await refused([ids[0], ids[1], ids[0]]) == (
-        f"scenario_ids: scenario {ids[0]} is listed more than once"
+        f"scenarios: scenario {ids[0]} is listed more than once"
     )
+    persona = (await create_persona(client))["id"]
+    assert (await refused([{"scenario_id": ids[0], "persona_ids": [persona, persona]}])).endswith(
+        f"persona {persona} is listed more than once"
+    )
+    assert (await refused([{"scenario_id": ids[0], "persona_ids": []}])).startswith("scenarios")
     assert await refused(ids[:1], repeats=4) == "repeats: at most 3"
     assert await refused(ids[:1], max_retries=3) == "max_retries: at most 2"
     assert await refused(ids[:1], start_interval_s=61) == "start_interval_s: at most 60"
@@ -186,7 +236,7 @@ async def test_a_run_needs_distinct_scenarios_within_the_limits(client: AsyncCli
     assert await refused(ids[:1], max_parallel=7) == "max_parallel: at most 6"
     assert (await refused(ids[:1], priority="high")).startswith("priority: ")
     assert await refused(ids, repeats=2) == (
-        "a run starts at most 6 conversations; 4 scenarios and 2 repeats make 8"
+        "a run starts at most 6 conversations; 4 scenario and persona pairs and 2 repeats make 8"
     )
     assert (await client.get("/api/v1/runs")).json()["total"] == 0
 

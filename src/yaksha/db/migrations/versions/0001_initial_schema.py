@@ -475,8 +475,9 @@ def upgrade() -> None:
             "run_id",
             "repeat",
             "scenario_id",
+            "persona_id",
             "attempt",
-            name=op.f("uq_conversations_run_id_repeat_scenario_id_attempt"),
+            name=op.f("uq_conversations_run_id_repeat_scenario_id_persona_id_attempt"),
         ),
     )
     op.create_index(

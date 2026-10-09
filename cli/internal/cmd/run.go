@@ -106,7 +106,7 @@ func (a *app) startRun(cmd *cobra.Command, f runStartFlags) error {
 	}
 	body := api.RunCreate{
 		AgentId:        agentID,
-		ScenarioIds:    scenarioIDs,
+		Scenarios:      ownPersonas(scenarioIDs),
 		Repeats:        changed(cmd, "repeats", f.repeats),
 		MaxDurationS:   changed(cmd, "max-duration-s", f.maxDurationS),
 		MaxTurns:       changed(cmd, "max-turns", f.maxTurns),
@@ -409,4 +409,13 @@ func (a *app) runCancelCmd() *cobra.Command {
 			return nil
 		},
 	}
+}
+
+// ownPersonas runs each scenario with its own persona.
+func ownPersonas(ids []uuid.UUID) []api.RunScenario {
+	scenarios := make([]api.RunScenario, len(ids))
+	for i, id := range ids {
+		scenarios[i] = api.RunScenario{ScenarioId: id}
+	}
+	return scenarios
 }

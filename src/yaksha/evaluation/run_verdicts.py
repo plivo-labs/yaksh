@@ -49,6 +49,7 @@ async def run_verdicts(
             select(
                 Conversation.id.label("conversation_id"),
                 Conversation.scenario_id,
+                Conversation.persona_id,
                 Conversation.repeat,
                 Scenario.name,
                 Scenario.category,
@@ -105,6 +106,8 @@ async def run_verdicts(
                     CallVerdict(
                         conversation_id=call.conversation_id,
                         repeat=call.repeat,
+                        persona_id=call.persona_id,
+                        persona=call.persona,
                         verdict=call.verdict,
                     )
                     for call in calls
@@ -116,7 +119,16 @@ async def run_verdicts(
         results.append(result)
     worst_best = numbers.worst_and_best(results)
     interval = numbers.suite_interval(results, seed)
-    pass_hat, pass_hat_scenarios = numbers.pass_hat_k(results, 2)
+    # Repeats compare only when the same persona called: each scenario and persona pair is one
+    # group for pass^2 and for the scenarios that both passed and failed.
+    pairs: dict[tuple[uuid.UUID, uuid.UUID], list[Row[Any]]] = defaultdict(list)
+    for calls in grouped.values():
+        for call in calls:
+            pairs[(call.scenario_id, call.persona_id)].append(call)
+    pair_results = [
+        numbers.ScenarioResults([call.verdict for call in calls]) for calls in pairs.values()
+    ]
+    pass_hat, pass_hat_scenarios = numbers.pass_hat_k(pair_results, 2)
     decided = [item for item in items if item.item_key.startswith(DECIDED)]
     return RunVerdicts(
         pending=len(rows) - len(finished),
@@ -130,7 +142,9 @@ async def run_verdicts(
         pass_hat_2=pass_hat,
         pass_hat_2_scenarios=pass_hat_scenarios,
         scenarios=scenarios,
-        inconsistent=[scenarios[index].scenario_id for index in numbers.inconsistent(results)],
+        inconsistent=list(
+            dict.fromkeys(list(pairs)[index][0] for index in numbers.inconsistent(pair_results))
+        ),
         criteria=criterion_counts(list(grouped), judged, items),
         rules=rule_counts(items),
         decided_by=dict(

@@ -38,7 +38,7 @@ async def summaries(session: AsyncSession, rows: list[Run]) -> list[RunSummary]:
 
 async def detail(session: AsyncSession, run: Run) -> RunRead:
     base = (await summaries(session, [run]))[0]
-    return RunRead(**base.model_dump(), scenario_ids=await runs.scenario_ids(session, run))
+    return RunRead(**base.model_dump(), scenarios=await runs.run_scenarios(session, run))
 
 
 @router.post("", status_code=status.HTTP_202_ACCEPTED)
@@ -90,7 +90,7 @@ async def get_run_metrics(run_id: uuid.UUID, session: SessionDep) -> RunMetrics:
     return await results.run_metrics(
         session,
         counted.get(run.id, []),
-        await runs.scenario_ids(session, run),
+        [scenario.scenario_id for scenario in await runs.run_scenarios(session, run)],
         seed=run.id.int,
     )
 

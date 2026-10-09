@@ -3,7 +3,7 @@ from datetime import datetime
 
 from yaksha.db.models import Run
 from yaksha.domain.latency import Latency
-from yaksha.domain.runs import RunProgress
+from yaksha.domain.runs import RunProgress, RunScenario
 
 
 class RunSummary(RunProgress):
@@ -52,5 +52,6 @@ class RunSummary(RunProgress):
 
 
 class RunRead(RunSummary):
-    scenario_ids: list[uuid.UUID]
-    """In the order the conversations of each repeat start."""
+    scenarios: list[RunScenario]
+    """With the personas that call them, in the order the conversations of each repeat
+    start."""
