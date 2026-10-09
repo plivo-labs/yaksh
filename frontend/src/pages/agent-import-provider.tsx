@@ -831,7 +831,14 @@ function Fills({
       ) : (
         <Fact term="Number">
           {numbers.length === 0 ? (
-            "Enter it in the next step"
+            <span className="grid gap-0.5 whitespace-normal">
+              <span>Enter it in the next step</span>
+              {draft.number_note && (
+                <span className="text-s-400 break-words text-muted-foreground">
+                  {draft.number_note}
+                </span>
+              )}
+            </span>
           ) : numbers.length === 1 ? (
             <span className="font-mono tabular-nums">{phone(numbers[0])}</span>
           ) : (

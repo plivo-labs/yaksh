@@ -17,6 +17,13 @@ CHAT = "0b9e0c4a-0000-4000-8000-000000000003"
 OTHER = "0b9e0c4a-0000-4000-8000-000000000004"
 MISSING = "0b9e0c4a-0000-4000-8000-000000000005"
 DRAFT = "0b9e0c4a-0000-4000-8000-000000000006"
+LONELY = "0b9e0c4a-0000-4000-8000-000000000007"
+BLOCKED: dict[str, str] = {}
+"""Path parts the stand-in refuses with 403, and the reply it sends for each."""
+WHITELIST_REFUSAL = (
+    '{"api_id": "x", "error": "Access denied. The request originated from IP 203.0.113.9, which '
+    'is not in the IP whitelist for this account. Update your IP whitelist in the console."}'
+)
 
 FLOWS: dict[str, dict[str, Any]] = {
     INBOUND: {
@@ -56,6 +63,13 @@ FLOWS: dict[str, dict[str, Any]] = {
         "state": "DRAFT",
         "nodes": [{"id": "start-1", "type": "start", "config": {"model": {"triggers": ["call"]}}}],
     },
+    LONELY: {
+        "agent_uuid": LONELY,
+        "flow_type": "incoming_call",
+        "name": "Night line",
+        "state": "ACTIVE",
+        "nodes": [{"id": "start-1", "type": "start", "config": {"model": {"triggers": ["call"]}}}],
+    },
     CHAT: {
         "agent_uuid": CHAT,
         "flow_type": "incoming_chat",
@@ -83,6 +97,9 @@ async def plivo(providers: FakeProviders) -> AsyncIterator[list[dict[str, Any]]]
         seen.append({"path": request.url.path, "query": dict(request.query_params)})
         if request.headers.get("authorization") != expected:
             return Response('{"error": "authentication failed"}', status_code=401)
+        for part, reply in BLOCKED.items():
+            if part in request.url.path:
+                return Response(reply, status_code=403)
         return await call_next(request)
 
     @app.get("/v1/Account/{auth_id}/AgentFlow/")
@@ -161,6 +178,7 @@ async def plivo(providers: FakeProviders) -> AsyncIterator[list[dict[str, Any]]]
     await server.start()
     providers.plivo_api_url = f"http://127.0.0.1:{server.port}"
     yield seen
+    BLOCKED.clear()
     await server.stop(2.0)
 
 
@@ -176,7 +194,11 @@ async def test_the_flows_of_an_account_are_listed_and_searched(
         "/api/v1/agents/import/plivo-cx/flows", json=account(name="lead", offset=20)
     )
 
-    assert [flow["name"] for flow in listed.json()["items"]] == ["Front desk", "Lead callback"]
+    assert [flow["name"] for flow in listed.json()["items"]] == [
+        "Front desk",
+        "Lead callback",
+        "Night line",
+    ]
     assert listed.json()["next_offset"] is None
     assert [flow["name"] for flow in searched.json()["items"]] == ["Lead callback"]
     assert plivo[-1]["query"] == {"limit": "20", "offset": "20", "state": "ACTIVE", "name": "lead"}
@@ -199,6 +221,33 @@ async def test_a_flow_a_call_starts_gets_the_voice_numbers_that_still_reach_it(
     assert draft["language"] == "en" and '"Front desk"' in draft["config"]
 
 
+async def test_a_flow_no_number_reaches_is_imported_and_says_so(
+    client: AsyncClient, plivo: list[dict[str, Any]]
+) -> None:
+    imported = await client.post(
+        "/api/v1/agents/import/plivo-cx/flow", json=account(flow_id=LONELY)
+    )
+
+    draft = imported.json()
+    assert imported.status_code == 200 and draft["agent_numbers"] == []
+    assert draft["number_note"].startswith("No Plivo number sends calls to this agent")
+
+
+async def test_a_refused_number_lookup_still_imports_the_agent_with_plivos_reason(
+    client: AsyncClient, plivo: list[dict[str, Any]]
+) -> None:
+    BLOCKED["/Application/"] = WHITELIST_REFUSAL
+
+    imported = await client.post(
+        "/api/v1/agents/import/plivo-cx/flow", json=account(flow_id=INBOUND)
+    )
+
+    draft = imported.json()
+    assert imported.status_code == 200 and draft["name"] == "Front desk"
+    assert draft["agent_numbers"] == []
+    assert "IP 203.0.113.9 is not in this account's IP whitelist" in draft["number_note"]
+
+
 async def test_a_flow_a_request_starts_gets_the_start_request_plivo_cx_shows(
     client: AsyncClient, plivo: list[dict[str, Any]]
 ) -> None:
@@ -217,6 +266,34 @@ async def test_a_flow_a_request_starts_gets_the_start_request_plivo_cx_shows(
         "phone_number": "{{yaksha.number}}",
         "lead": {"source": "{{agent_data.lead_source}}"},
     }
+
+
+@pytest.mark.parametrize(
+    ("reply", "message"),
+    [
+        (
+            WHITELIST_REFUSAL,
+            "Plivo blocked the request: IP 203.0.113.9 is not in this account's IP whitelist. "
+            "Add it in the Plivo console, then try again",
+        ),
+        (
+            '{"error": "This feature is not on your plan."}',
+            "Plivo refused the request: This feature is not on your plan.",
+        ),
+        ("<html>Forbidden</html>", "Plivo refused the request"),
+    ],
+    ids=["ip whitelist", "other reason", "no reason"],
+)
+async def test_a_refused_flow_read_shows_plivos_reason(
+    client: AsyncClient, plivo: list[dict[str, Any]], reply: str, message: str
+) -> None:
+    BLOCKED["/AgentFlow/"] = reply
+
+    refused = await client.post(
+        "/api/v1/agents/import/plivo-cx/flow", json=account(flow_id=INBOUND)
+    )
+
+    assert refused.status_code == 422 and refused.json()["error"]["message"] == message
 
 
 @pytest.mark.parametrize(

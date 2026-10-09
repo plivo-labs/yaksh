@@ -463,6 +463,8 @@ export interface ProviderDraft {
   agent_numbers: string[];
   start_request: StartRequestDraft | null;
   agent_speaks_first: boolean;
+  /** Why an agent that answers calls has no number: none reaches it, or the lookup failed. */
+  number_note: string | null;
 }
 
 export interface AgentInput {

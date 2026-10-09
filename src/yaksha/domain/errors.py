@@ -20,8 +20,12 @@ class UnrecognizedFileError(ValidationError):
 
 class ProviderCallError(Exception):
     """A call to an outside provider that failed. `status` is the provider's HTTP status when it
-    answered; the message may hold the provider's reply, so it is for logs, not for clients."""
+    answered; the message may hold the provider's reply, so it is for logs, not for clients.
+    `reason` is the provider's own short explanation, which a client may see."""
 
-    def __init__(self, message: str, *, status: int | None = None) -> None:
+    def __init__(
+        self, message: str, *, status: int | None = None, reason: str | None = None
+    ) -> None:
         super().__init__(message)
         self.status = status
+        self.reason = reason

@@ -99,6 +99,9 @@ class ProviderDraft(BaseModel):
     agent_numbers: list[str]
     start_request: StartRequestDraft | None
     agent_speaks_first: bool = True
+    number_note: str | None = None
+    """Why an agent that answers calls has no number: none reaches it, or the lookup failed.
+    The person enters the number."""
 
 
 class PlivoCxAccountApi(Protocol):

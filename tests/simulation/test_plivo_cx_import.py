@@ -2,9 +2,7 @@ import json
 import uuid
 from typing import Any
 
-import pytest
-
-from yaksha.domain.errors import ProviderCallError, UnavailableError, ValidationError
+from yaksha.domain.errors import ProviderCallError
 from yaksha.domain.numbers import AccountNumber
 from yaksha.simulation.plivo_cx_import import behavior, import_flow
 
@@ -34,20 +32,18 @@ class FailingNumbers:
         raise self.failure
 
 
-async def test_every_plivo_call_maps_its_status() -> None:
-    with pytest.raises(ValidationError, match="subaccount"):
-        await import_flow(
-            FailingNumbers(ProviderCallError("listing numbers failed", status=403)), FLOW
-        )
+async def test_a_failed_number_lookup_keeps_the_agent_without_plivos_reply() -> None:
+    failure = ProviderCallError(
+        'failed with 500: {"error": "token=abc"}', status=500, reason="token=abc"
+    )
 
+    draft = await import_flow(FailingNumbers(failure), FLOW)
 
-async def test_plivo_s_reply_never_reaches_the_client() -> None:
-    failure = ProviderCallError('failed with 500: {"debug": "token=abc"}', status=500)
-
-    with pytest.raises(UnavailableError) as raised:
-        await import_flow(FailingNumbers(failure), FLOW)
-
-    assert str(raised.value) == "Plivo answered with status 500; try again later"
+    assert draft.name == "Front desk" and draft.agent_numbers == []
+    assert draft.number_note is not None and "token" not in draft.number_note
+    assert draft.number_note == (
+        "Yaksha could not look up its number. Plivo answered with status 500; try again later"
+    )
 
 
 def test_the_config_keeps_behavior_and_drops_the_noise() -> None:
