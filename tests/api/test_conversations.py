@@ -837,7 +837,9 @@ async def test_the_caller_knows_its_facts_and_today_but_never_the_criteria(
 ) -> None:
     agent_id = await create_agent_id(client)
     scenario = await create_scenario(client, agent_id)
-    command = RunCreate.model_validate({"agent_id": agent_id, "scenario_ids": [scenario["id"]]})
+    command = RunCreate.model_validate(
+        {"agent_id": agent_id, "scenarios": [{"scenario_id": scenario["id"]}]}
+    )
     zoned = APP_SETTINGS.model_copy(update={"phone": Phone(timezone=timezone)})
 
     engine = create_engine(settings.database_url.encoded_string())

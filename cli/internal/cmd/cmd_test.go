@@ -259,7 +259,7 @@ func TestRunStartSendsOnlyTheFieldsThatWereSet(t *testing.T) {
 	if err := json.Unmarshal(req.body, &body); err != nil {
 		t.Fatal(err)
 	}
-	want := fmt.Sprintf(`{"agent_id":"%s","repeats":2,"scenario_ids":["%s","%s"]}`, agentID, scenA, scenB)
+	want := fmt.Sprintf(`{"agent_id":"%s","repeats":2,"scenarios":[{"scenario_id":"%s"},{"scenario_id":"%s"}]}`, agentID, scenA, scenB)
 	if got, _ := json.Marshal(body); string(got) != want {
 		t.Fatalf("body = %s, want %s", got, want)
 	}
@@ -302,11 +302,13 @@ func TestRunStartAllTakesEveryPageOfScenarios(t *testing.T) {
 		t.Fatalf("code = %d, stderr = %q", code, stderr)
 	}
 	var body struct {
-		ScenarioIDs []string `json:"scenario_ids"`
+		Scenarios []struct {
+			ScenarioID string `json:"scenario_id"`
+		} `json:"scenarios"`
 	}
 	json.Unmarshal(f.requests("POST", "/api/v1/runs")[0].body, &body)
-	if len(body.ScenarioIDs) != 101 {
-		t.Fatalf("scenario_ids has %d IDs, want 101 from two pages", len(body.ScenarioIDs))
+	if len(body.Scenarios) != 101 {
+		t.Fatalf("scenarios has %d items, want 101 from two pages", len(body.Scenarios))
 	}
 }
 

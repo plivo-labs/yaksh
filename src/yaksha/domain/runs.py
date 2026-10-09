@@ -16,6 +16,28 @@ from yaksha.domain.conversations import EndReason, OutcomeGroup
 RunName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=80)]
 
 
+class RunScenario(BaseModel):
+    """A scenario of a run and the personas that call it. None is the scenario's own persona."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    scenario_id: uuid.UUID
+    persona_ids: list[uuid.UUID] | None = Field(default=None, min_length=1)
+    """In the order their conversations start."""
+
+    @field_validator("persona_ids")
+    @classmethod
+    def each_persona_once(cls, ids: list[uuid.UUID] | None) -> list[uuid.UUID] | None:
+        repeated = [persona_id for persona_id, n in Counter(ids or []).items() if n > 1]
+        if repeated:
+            raise ValueError(f"persona {repeated[0]} is listed more than once")
+        return ids
+
+    @property
+    def call_count(self) -> int:
+        return len(self.persona_ids) if self.persona_ids else 1
+
+
 class RunCreate(BaseModel):
     """Limits that an operator sets, such as the most repeats, are checked where the settings
     are known."""
@@ -23,7 +45,7 @@ class RunCreate(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     agent_id: uuid.UUID
-    scenario_ids: list[uuid.UUID] = Field(min_length=1)
+    scenarios: list[RunScenario] = Field(min_length=1)
     """In the order the conversations of each repeat start."""
     repeats: int = Field(default=1, ge=1)
     max_duration_s: int | None = Field(default=None, ge=10, le=1800)
@@ -38,13 +60,18 @@ class RunCreate(BaseModel):
     the operator's limit when that is lower."""
     name: RunName | None = None
 
-    @field_validator("scenario_ids")
+    @field_validator("scenarios")
     @classmethod
-    def each_scenario_once(cls, ids: list[uuid.UUID]) -> list[uuid.UUID]:
+    def each_scenario_once(cls, scenarios: list[RunScenario]) -> list[RunScenario]:
+        ids = [scenario.scenario_id for scenario in scenarios]
         repeated = [scenario_id for scenario_id, n in Counter(ids).items() if n > 1]
         if repeated:
             raise ValueError(f"scenario {repeated[0]} is listed more than once")
-        return ids
+        return scenarios
+
+    @property
+    def calls_per_repeat(self) -> int:
+        return sum(scenario.call_count for scenario in self.scenarios)
 
     def request_hash(self) -> str:
         """The same for the same request, so a repeated request can be told from another request

@@ -201,6 +201,9 @@ class SurroundingsNumbers(BaseModel):
 class CallVerdict(BaseModel):
     conversation_id: uuid.UUID
     repeat: int
+    persona_id: uuid.UUID
+    persona: str
+    """The name of the persona that called."""
     verdict: Verdict | None
     """The scenario verdict after labels; None when the evaluation failed."""
 
@@ -288,14 +291,15 @@ class RunVerdicts(BaseModel):
     interval_high: float | None
     """The "this suite" 95% interval; none below five scenarios."""
     pass_hat_2: float | None
-    """The chance that two repeats of a scenario both pass, over the scenarios with two scored
-    calls."""
+    """The chance that two repeats of a scenario with the same persona both pass, over the
+    scenario and persona pairs with two scored calls."""
     pass_hat_2_scenarios: int
+    """How many scenario and persona pairs pass_hat_2 covers."""
     scenarios: list[ScenarioVerdicts]
     """In the run's order."""
     inconsistent: list[uuid.UUID]
-    """Scenarios that both passed and failed across repeats. No cause is named: repeats mix the
-    agent, the caller and the line."""
+    """Scenarios that both passed and failed across repeats of one persona. No cause is named:
+    repeats mix the agent, the caller and the line."""
     criteria: list[CriterionCounts]
     rules: list[RuleCounts]
     """The agent rules the run's calls ran, by name."""

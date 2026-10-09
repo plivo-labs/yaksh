@@ -349,3 +349,48 @@ async def test_run_verdicts_leave_out_calls_with_no_verdict_yet(
         1.0,
     )
     assert found["callers"] == []
+
+
+async def test_repeats_compare_only_calls_with_the_same_persona(
+    client: AsyncClient, db: Db
+) -> None:
+    agent = await create_agent_id(client, name="Shop")
+    calm = (await create_persona(client, name="Calm caller"))["id"]
+    rushed = (await create_persona(client, name="Rushed caller"))["id"]
+    scenario = await create_scenario(client, agent, name="Usual", criteria=["Greets."])
+    run = (
+        await start_run(
+            client,
+            agent,
+            [{"scenario_id": scenario["id"], "persona_ids": [calm, rushed]}],
+            repeats=2,
+            max_retries=0,
+        )
+    ).json()
+    # Claims follow the run's order: calm, rushed, calm, rushed.
+    ids = [str(await claim(db)) for _ in range(4)]
+    for conversation in ids:
+        await finish(
+            db, conversation, CallOutcome(connected=True, end_reason=EndReason.AGENT_HANGUP)
+        )
+    async with db() as session:
+        while (evaluation := await evaluations.claim(session, "e1", 60)) is not None:
+            verdict = Verdict.PASS if str(evaluation.conversation_id) in ids[::2] else Verdict.FAIL
+            await evaluations.finish(
+                session,
+                evaluation.id,
+                evaluation.claim_seq,
+                Evaluated(metrics={}, scenario_verdict=verdict, conversation_verdict=verdict),
+                audit=False,
+            )
+
+    found = (await client.get(f"/api/v1/runs/{run['id']}/metrics")).json()["verdicts"]
+
+    assert (found["pass_hat_2"], found["pass_hat_2_scenarios"]) == (0.5, 2)
+    assert found["inconsistent"] == []
+    assert [(c["repeat"], c["persona"], c["verdict"]) for c in found["scenarios"][0]["calls"]] == [
+        (1, "Calm caller", "pass"),
+        (1, "Rushed caller", "fail"),
+        (2, "Calm caller", "pass"),
+        (2, "Rushed caller", "fail"),
+    ]

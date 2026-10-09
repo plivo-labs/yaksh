@@ -15,6 +15,7 @@ from yaksha.db.models import Agent, AgentVersion, Persona, PersonaVersion, Scena
 from yaksha.domain.agents import Direction
 from yaksha.domain.errors import NotFoundError, ValidationError
 from yaksha.domain.languages import Language
+from yaksha.domain.runs import RunScenario
 from yaksha.domain.settings import AppSettings
 from yaksha.domain.triggers import check_agent_data
 from yaksha.simulation.agents import config_of as agent_config_of
@@ -53,11 +54,12 @@ async def snapshot(
     settings: Settings,
     app: AppSettings,
     agent: Agent,
-    scenario_ids: Sequence[uuid.UUID],
+    wanted: Sequence[RunScenario],
 ) -> list[Inputs]:
     """Check that conversations of the agent's scenarios can start now, and read what they pin,
     once for all of them: the current agent, scenario and persona versions, and today. Each
-    scenario runs with its own persona. The caller holds the agent's lock.
+    scenario runs with the personas asked for, or its own persona. The inputs are in the order
+    asked: scenario, then persona. The caller holds the agent's lock.
     A refusal about a scenario names it."""
     problem = phone_problem(settings, app)
     if problem is not None:
@@ -66,8 +68,16 @@ async def snapshot(
         problem = await outbound_problem(session, settings, app)
         if problem is not None:
             raise ValidationError(f"outbound tests are off: {problem}")
+    scenario_ids = [item.scenario_id for item in wanted]
     scenarios = await scenarios_to_start(session, agent, scenario_ids)
-    personas = await live_personas(session, [s.persona_id for s in scenarios], share_lock=True)
+    pairs = [
+        (scenario, persona_id)
+        for scenario, item in zip(scenarios, wanted, strict=True)
+        for persona_id in item.persona_ids or [scenario.persona_id]
+    ]
+    personas = await live_personas(
+        session, sorted({persona_id for _, persona_id in pairs}), share_lock=True
+    )
     agent_version_id = (
         await session.execute(
             select(AgentVersion.id).where(
@@ -106,8 +116,8 @@ async def snapshot(
     today = datetime.now(ZoneInfo(app.phone.timezone)).date()
     outbound = agent_config_of(agent).outbound if agent.direction is Direction.OUTBOUND else None
     inputs = []
-    for scenario in scenarios:
-        persona = personas[scenario.persona_id]
+    for scenario, persona_id in pairs:
+        persona = personas[persona_id]
         config = persona_config_of(persona)
         wants = scenario_config_of(scenario)
         if outbound is not None:

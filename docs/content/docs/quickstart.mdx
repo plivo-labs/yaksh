@@ -100,7 +100,7 @@ You can do these steps in the console or with the API. The commands below use th
    curl -X POST localhost:8000/api/v1/runs \
      -H "Authorization: Bearer $YAKSHA_API_TOKEN" \
      -H 'Content-Type: application/json' \
-     -d '{"agent_id": "<agent id>", "scenario_ids": ["<scenario id>"]}'
+     -d '{"agent_id": "<agent id>", "scenarios": [{"scenario_id": "<scenario id>"}]}'
    ```
 
 6. In the console, click **Conversations**. Then click the conversation.

@@ -55,7 +55,7 @@ curl -X POST localhost:8000/api/v1/agents -H "Authorization: Bearer $YAKSHA_API_
 curl -X POST localhost:8000/api/v1/agents/<agent id>/scenarios -H "Authorization: Bearer $YAKSHA_API_TOKEN" -H 'Content-Type: application/json' \
   -d '{"name": "Book a table", "persona_id": "<persona id>", "instructions": "You want a table for two tonight. Once the agent confirms the booking, say goodbye.", "known_facts": [{"name": "Name", "value": "Priya Raman"}], "criteria": ["Reads the time and party size back before it books."]}'
 curl -X POST localhost:8000/api/v1/runs -H "Authorization: Bearer $YAKSHA_API_TOKEN" -H 'Content-Type: application/json' \
-  -d '{"agent_id": "<agent id>", "scenario_ids": ["<scenario id>"]}'
+  -d '{"agent_id": "<agent id>", "scenarios": [{"scenario_id": "<scenario id>"}]}'
 ```
 
 ## Surroundings
@@ -168,10 +168,10 @@ A run starts several scenarios of one agent together and repeats them. Each scen
 ```sh
 curl -X POST localhost:8000/api/v1/runs -H "Authorization: Bearer $YAKSHA_API_TOKEN" -H 'Content-Type: application/json' \
   -H 'Idempotency-Key: nightly-2026-10-01' \
-  -d '{"agent_id": "<agent id>", "scenario_ids": ["<scenario id>", "<scenario id>"], "repeats": 3, "max_parallel": 2, "start_interval_s": 10}'
+  -d '{"agent_id": "<agent id>", "scenarios": [{"scenario_id": "<scenario id>"}, {"scenario_id": "<scenario id>", "persona_ids": ["<persona id>", "<persona id>"]}], "repeats": 3, "max_parallel": 2, "start_interval_s": 10}'
 ```
 
-- The run starts one conversation for each repeat of each scenario, all of them or none. Every conversation pins the agent, scenario and persona versions that were current when the run was created.
+- The run starts one conversation for each repeat of each scenario and persona pair, all of them or none. A scenario with no `persona_ids` uses its own persona. Every conversation pins the agent, scenario and persona versions that were current when the run was created.
 - `max_parallel` sets how many conversations of the run can be in progress at once, from the moment a worker takes one until it ends, so ringing and the wait for an outbound agent's call count too. `start_interval_s` sets the least time between two conversation starts; a conversation starts when a worker takes it. When Yaksha calls the agent, the call follows a few seconds later; when the agent calls Yaksha, the start sends the trigger, and the call can come up to the agent's dial window later. Without them, the run has no limit and no delay of its own. Both protect the agent under test.
 - `max_duration_s` is the time limit of each call, 10 to 1800 seconds, default the call length in Settings (300).
 - `max_turns` is how many agent turns the caller answers, 1 to 100, default the turns per call in Settings (20). At the next turn the caller says goodbye and says nothing more, and the conversation ends with `turn_limit`. The caller ends the call on its own only when its instructions are done, so this limit ends the calls that go nowhere. When the caller ends the call, Yaksha waits until both sides are quiet for 8 seconds before it hangs up, so the agent can close the call. See `docs/decisions/0013-close-before-hang-up.md`. A reply that ends the call without a word does not end it: the caller gets one more reply to speak in, and after that Yaksha says the goodbye for it. See `docs/decisions/0020-the-caller-speaks-before-it-ends-the-call.md`.
