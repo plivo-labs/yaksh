@@ -3,11 +3,13 @@ import uuid
 from fastapi import APIRouter, Depends, status
 
 from yaksha.api.auth import require_token
-from yaksha.api.deps import SessionDep
+from yaksha.api.deps import BriefModelDep, SessionDep
+from yaksha.api.errors import UNAVAILABLE
 from yaksha.api.pagination import Page, PageDep
 from yaksha.api.schemas.personas import PersonaRead, PersonaScenario, PersonaVersionRead
-from yaksha.domain.personas import PersonaCreate, PersonaUpdate
+from yaksha.domain.personas import PersonaCreate, PersonaDraft, PersonaIdea, PersonaUpdate
 from yaksha.simulation import personas
+from yaksha.simulation.persona_drafts import draft_persona
 
 router = APIRouter(prefix="/personas", tags=["personas"], dependencies=[Depends(require_token)])
 
@@ -15,6 +17,14 @@ router = APIRouter(prefix="/personas", tags=["personas"], dependencies=[Depends(
 @router.post("", status_code=status.HTTP_201_CREATED)
 async def create_persona(command: PersonaCreate, session: SessionDep) -> PersonaRead:
     return PersonaRead.of(await personas.create_persona(session, command))
+
+
+@router.post("/draft", responses=UNAVAILABLE)
+async def draft_new_persona(
+    source: PersonaIdea, model: BriefModelDep, session: SessionDep
+) -> PersonaDraft:
+    """Write a new persona's fields from a short line. Nothing is saved."""
+    return await draft_persona(model, source, await personas.persona_names(session))
 
 
 @router.get("")

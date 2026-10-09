@@ -520,6 +520,17 @@ export interface PersonaScenario {
   agent_name: string;
 }
 
+/** A new persona written from a short line; the console picks a voice of `voice_gender`. */
+export interface PersonaDraft {
+  name: string;
+  prompt: string;
+  language: Language;
+  voice_gender: VoiceGender;
+  speed: number;
+  surroundings: Surroundings;
+  left_out: string[];
+}
+
 export interface Persona {
   id: string;
   name: string;

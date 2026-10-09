@@ -1878,6 +1878,25 @@ type PersonaCreate struct {
 	Voice VoiceSettings `json:"voice"`
 }
 
+// PersonaDraft A new persona's fields written from a short line, for the person to check before they
+// save it. The console picks a voice of `voice_gender` in the language.
+type PersonaDraft struct {
+	Language Language `json:"language"`
+	LeftOut  []string `json:"left_out"`
+	Name     string   `json:"name"`
+	Prompt   string   `json:"prompt"`
+	Speed    float32  `json:"speed"`
+
+	// Surroundings What the agent hears behind the caller. No sounds and no auto noise is a quiet room.
+	Surroundings Surroundings `json:"surroundings"`
+	VoiceGender  VoiceGender  `json:"voice_gender"`
+}
+
+// PersonaIdea A short line about the caller, such as "angry senior woman on a noisy street".
+type PersonaIdea struct {
+	Idea string `json:"idea"`
+}
+
 // PersonaRead defines model for PersonaRead.
 type PersonaRead struct {
 	BuiltinKey     *string            `json:"builtin_key"`
@@ -2768,6 +2787,9 @@ type CreateLabelerApiV1LabelersPostJSONRequestBody = LabelerCreate
 
 // CreatePersonaApiV1PersonasPostJSONRequestBody defines body for CreatePersonaApiV1PersonasPost for application/json ContentType.
 type CreatePersonaApiV1PersonasPostJSONRequestBody = PersonaCreate
+
+// DraftNewPersonaApiV1PersonasDraftPostJSONRequestBody defines body for DraftNewPersonaApiV1PersonasDraftPost for application/json ContentType.
+type DraftNewPersonaApiV1PersonasDraftPostJSONRequestBody = PersonaIdea
 
 // UpdatePersonaApiV1PersonasPersonaIdPatchJSONRequestBody defines body for UpdatePersonaApiV1PersonasPersonaIdPatch for application/json ContentType.
 type UpdatePersonaApiV1PersonasPersonaIdPatchJSONRequestBody = PersonaUpdate
@@ -3783,6 +3805,24 @@ type ClientInterface interface {
 	//
 	// Corresponds with POST /api/v1/personas (the `CreatePersonaApiV1PersonasPost` operationId).
 	CreatePersonaApiV1PersonasPost(ctx context.Context, body CreatePersonaApiV1PersonasPostJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DraftNewPersonaApiV1PersonasDraftPostWithBody Draft New Persona
+	//
+	// Write a new persona's fields from a short line. Nothing is saved.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /api/v1/personas/draft (the `DraftNewPersonaApiV1PersonasDraftPost` operationId).
+	DraftNewPersonaApiV1PersonasDraftPostWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DraftNewPersonaApiV1PersonasDraftPost Draft New Persona
+	//
+	// Write a new persona's fields from a short line. Nothing is saved.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /api/v1/personas/draft (the `DraftNewPersonaApiV1PersonasDraftPost` operationId).
+	DraftNewPersonaApiV1PersonasDraftPost(ctx context.Context, body DraftNewPersonaApiV1PersonasDraftPostJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// DeletePersonaApiV1PersonasPersonaIdDelete Delete Persona
 	//
@@ -5198,6 +5238,44 @@ func (c *Client) CreatePersonaApiV1PersonasPostWithBody(ctx context.Context, con
 // Corresponds with POST /api/v1/personas (the `CreatePersonaApiV1PersonasPost` operationId).
 func (c *Client) CreatePersonaApiV1PersonasPost(ctx context.Context, body CreatePersonaApiV1PersonasPostJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCreatePersonaApiV1PersonasPostRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DraftNewPersonaApiV1PersonasDraftPostWithBody Draft New Persona
+//
+// Write a new persona's fields from a short line. Nothing is saved.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /api/v1/personas/draft (the `DraftNewPersonaApiV1PersonasDraftPost` operationId).
+func (c *Client) DraftNewPersonaApiV1PersonasDraftPostWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDraftNewPersonaApiV1PersonasDraftPostRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DraftNewPersonaApiV1PersonasDraftPost Draft New Persona
+//
+// Write a new persona's fields from a short line. Nothing is saved.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /api/v1/personas/draft (the `DraftNewPersonaApiV1PersonasDraftPost` operationId).
+func (c *Client) DraftNewPersonaApiV1PersonasDraftPost(ctx context.Context, body DraftNewPersonaApiV1PersonasDraftPostJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDraftNewPersonaApiV1PersonasDraftPostRequest(c.Server, body)
 	if err != nil {
 		return nil, err
 	}
@@ -8084,6 +8162,46 @@ func NewCreatePersonaApiV1PersonasPostRequestWithBody(server string, contentType
 	return req, nil
 }
 
+// NewDraftNewPersonaApiV1PersonasDraftPostRequest calls the generic DraftNewPersonaApiV1PersonasDraftPost builder with application/json body
+func NewDraftNewPersonaApiV1PersonasDraftPostRequest(server string, body DraftNewPersonaApiV1PersonasDraftPostJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewDraftNewPersonaApiV1PersonasDraftPostRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewDraftNewPersonaApiV1PersonasDraftPostRequestWithBody constructs an http.Request for the DraftNewPersonaApiV1PersonasDraftPost method, with any body, and a specified content type
+func NewDraftNewPersonaApiV1PersonasDraftPostRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/personas/draft")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 // NewDeletePersonaApiV1PersonasPersonaIdDeleteRequest constructs an http.Request for the DeletePersonaApiV1PersonasPersonaIdDelete method
 func NewDeletePersonaApiV1PersonasPersonaIdDeleteRequest(server string, personaId openapi_types.UUID) (*http.Request, error) {
 	var err error
@@ -10403,6 +10521,24 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with POST /api/v1/personas (the `CreatePersonaApiV1PersonasPost` operationId).
 	CreatePersonaApiV1PersonasPostWithResponse(ctx context.Context, body CreatePersonaApiV1PersonasPostJSONRequestBody, reqEditors ...RequestEditorFn) (*CreatePersonaApiV1PersonasPostResponse, error)
+
+	// DraftNewPersonaApiV1PersonasDraftPostWithBodyWithResponse Draft New Persona
+	//
+	// Write a new persona's fields from a short line. Nothing is saved.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/personas/draft (the `DraftNewPersonaApiV1PersonasDraftPost` operationId).
+	DraftNewPersonaApiV1PersonasDraftPostWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*DraftNewPersonaApiV1PersonasDraftPostResponse, error)
+
+	// DraftNewPersonaApiV1PersonasDraftPostWithResponse Draft New Persona
+	//
+	// Write a new persona's fields from a short line. Nothing is saved.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/personas/draft (the `DraftNewPersonaApiV1PersonasDraftPost` operationId).
+	DraftNewPersonaApiV1PersonasDraftPostWithResponse(ctx context.Context, body DraftNewPersonaApiV1PersonasDraftPostJSONRequestBody, reqEditors ...RequestEditorFn) (*DraftNewPersonaApiV1PersonasDraftPostResponse, error)
 
 	// DeletePersonaApiV1PersonasPersonaIdDeleteWithResponse Delete Persona
 	//
@@ -12925,6 +13061,61 @@ func (r CreatePersonaApiV1PersonasPostResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r CreatePersonaApiV1PersonasPostResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type DraftNewPersonaApiV1PersonasDraftPostResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *PersonaDraft
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *ErrorResponse
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r DraftNewPersonaApiV1PersonasDraftPostResponse) GetJSON200() *PersonaDraft {
+	return r.JSON200
+}
+
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r DraftNewPersonaApiV1PersonasDraftPostResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r DraftNewPersonaApiV1PersonasDraftPostResponse) GetJSON503() *ErrorResponse {
+	return r.JSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r DraftNewPersonaApiV1PersonasDraftPostResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r DraftNewPersonaApiV1PersonasDraftPostResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DraftNewPersonaApiV1PersonasDraftPostResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r DraftNewPersonaApiV1PersonasDraftPostResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -15789,6 +15980,36 @@ func (c *ClientWithResponses) CreatePersonaApiV1PersonasPostWithResponse(ctx con
 	return ParseCreatePersonaApiV1PersonasPostResponse(rsp)
 }
 
+// DraftNewPersonaApiV1PersonasDraftPostWithBodyWithResponse Draft New Persona
+//
+// Write a new persona's fields from a short line. Nothing is saved.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/personas/draft (the `DraftNewPersonaApiV1PersonasDraftPost` operationId).
+func (c *ClientWithResponses) DraftNewPersonaApiV1PersonasDraftPostWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*DraftNewPersonaApiV1PersonasDraftPostResponse, error) {
+	rsp, err := c.DraftNewPersonaApiV1PersonasDraftPostWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDraftNewPersonaApiV1PersonasDraftPostResponse(rsp)
+}
+
+// DraftNewPersonaApiV1PersonasDraftPostWithResponse Draft New Persona
+//
+// Write a new persona's fields from a short line. Nothing is saved.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/personas/draft (the `DraftNewPersonaApiV1PersonasDraftPost` operationId).
+func (c *ClientWithResponses) DraftNewPersonaApiV1PersonasDraftPostWithResponse(ctx context.Context, body DraftNewPersonaApiV1PersonasDraftPostJSONRequestBody, reqEditors ...RequestEditorFn) (*DraftNewPersonaApiV1PersonasDraftPostResponse, error) {
+	rsp, err := c.DraftNewPersonaApiV1PersonasDraftPost(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDraftNewPersonaApiV1PersonasDraftPostResponse(rsp)
+}
+
 // DeletePersonaApiV1PersonasPersonaIdDeleteWithResponse Delete Persona
 //
 // Returns a wrapper object for the known response body format(s).
@@ -18009,6 +18230,46 @@ func ParseCreatePersonaApiV1PersonasPostResponse(rsp *http.Response) (*CreatePer
 			return nil, err
 		}
 		response.JSON4XX = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseDraftNewPersonaApiV1PersonasDraftPostResponse parses an HTTP response from a DraftNewPersonaApiV1PersonasDraftPostWithResponse call
+func ParseDraftNewPersonaApiV1PersonasDraftPostResponse(rsp *http.Response) (*DraftNewPersonaApiV1PersonasDraftPostResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DraftNewPersonaApiV1PersonasDraftPostResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest PersonaDraft
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
 
 	}
 

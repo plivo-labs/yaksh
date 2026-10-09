@@ -2045,6 +2045,63 @@
         }
       }
     },
+    "/api/v1/personas/draft": {
+      "post": {
+        "tags": [
+          "personas"
+        ],
+        "summary": "Draft New Persona",
+        "description": "Write a new persona's fields from a short line. Nothing is saved.",
+        "operationId": "draft_new_persona_api_v1_personas_draft_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PersonaIdea"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PersonaDraft"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "The request failed. The error tells why.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "An outside service is not set up, or it did not answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/personas/{persona_id}": {
       "get": {
         "tags": [
@@ -8571,6 +8628,67 @@
           "name"
         ],
         "title": "PersonaCreate"
+      },
+      "PersonaDraft": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "prompt": {
+            "type": "string",
+            "title": "Prompt"
+          },
+          "language": {
+            "$ref": "#/components/schemas/Language"
+          },
+          "voice_gender": {
+            "$ref": "#/components/schemas/VoiceGender"
+          },
+          "speed": {
+            "type": "number",
+            "title": "Speed"
+          },
+          "surroundings": {
+            "$ref": "#/components/schemas/Surroundings"
+          },
+          "left_out": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Left Out"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "prompt",
+          "language",
+          "voice_gender",
+          "speed",
+          "surroundings",
+          "left_out"
+        ],
+        "title": "PersonaDraft",
+        "description": "A new persona's fields written from a short line, for the person to check before they\nsave it. The console picks a voice of `voice_gender` in the language."
+      },
+      "PersonaIdea": {
+        "properties": {
+          "idea": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Idea"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "idea"
+        ],
+        "title": "PersonaIdea",
+        "description": "A short line about the caller, such as \"angry senior woman on a noisy street\"."
       },
       "PersonaRead": {
         "properties": {

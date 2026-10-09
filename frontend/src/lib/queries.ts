@@ -45,6 +45,7 @@ import {
   type Language,
   type Page,
   type Persona,
+  type PersonaDraft,
   type PhoneNumbers,
   type ProviderTest,
   type PersonaInput,
@@ -460,6 +461,14 @@ export function useStartRequestFromCurl() {
         method: "POST",
         json: { command },
       }),
+  });
+}
+
+/** A new persona's fields written by a model from a short line, for the person to check. */
+export function useDraftPersona() {
+  return useMutation({
+    mutationFn: (idea: string) =>
+      api<PersonaDraft>("/personas/draft", { method: "POST", json: { idea } }),
   });
 }
 
