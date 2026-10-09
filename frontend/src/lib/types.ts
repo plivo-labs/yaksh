@@ -116,7 +116,7 @@ export const WAITING_REASON_TEXT: Record<WaitingReason, string> = {
   worker_or_number: "a free worker or number",
 };
 
-export type AgentSource = "manual" | "file" | "plivo_cx" | "elevenlabs" | "vapi";
+export type AgentSource = "manual" | "file" | "plivo_cx" | "elevenlabs" | "vapi" | "retell";
 
 export const SOURCE_NAMES: Record<AgentSource, string> = {
   manual: "Made in Yaksha",
@@ -124,6 +124,7 @@ export const SOURCE_NAMES: Record<AgentSource, string> = {
   plivo_cx: "Plivo CX",
   elevenlabs: "ElevenLabs",
   vapi: "Vapi",
+  retell: "Retell",
 };
 
 export const LANGUAGE_NAMES: Record<Language, string> = {
@@ -431,6 +432,24 @@ export interface VapiAssistantPage {
   items: VapiAssistant[];
   /** The creation time of the last assistant shown, where the next page starts; null after the
    * last. */
+  next_cursor: string | null;
+}
+
+export interface RetellAccount {
+  api_key: string;
+}
+
+export interface RetellAgent {
+  id: string;
+  name: string;
+  updated_at: string | null;
+  /** The numbers that reach the agent; without one, an import makes it call out. */
+  numbers: string[];
+}
+
+export interface RetellAgentPage {
+  items: RetellAgent[];
+  /** Where the next page starts, or null after the last. */
   next_cursor: string | null;
 }
 

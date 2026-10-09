@@ -8,6 +8,7 @@ from yaksha.domain.voices import VoiceProvider
 from yaksha.integrations.elevenlabs import REGION_APIS, ElevenLabsAgentsApi, ElevenLabsClient
 from yaksha.integrations.openai_models import OpenAIJsonModel
 from yaksha.integrations.plivo import PlivoApi
+from yaksha.integrations.retell import RetellApi
 from yaksha.integrations.vapi import REGION_APIS as VAPI_APIS
 from yaksha.integrations.vapi import VapiApi
 from yaksha.simulation.voices import VoiceClients
@@ -57,6 +58,11 @@ class Providers:
         """A client for an ElevenLabs workspace that someone imports an agent from; its key comes
         with the request and is not stored."""
         return ElevenLabsAgentsApi(api_key, base_url=REGION_APIS[region])
+
+    def retell(self, api_key: str) -> RetellApi:
+        """A client for a Retell workspace that someone imports an agent from; its key comes
+        with the request and is not stored."""
+        return RetellApi(api_key)
 
     def vapi(self, api_key: str, region: VapiRegion) -> VapiApi:
         """A client for a Vapi organization that someone imports an assistant from; its key

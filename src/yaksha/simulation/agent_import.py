@@ -2,6 +2,7 @@
 fixed paths, and the whole file becomes the agent's config, which the judges read."""
 
 import json
+import logging
 from collections.abc import Awaitable, Generator, Iterable
 from contextlib import contextmanager
 from typing import Any, NoReturn
@@ -17,6 +18,8 @@ from yaksha.domain.errors import (
 )
 from yaksha.domain.languages import Language
 from yaksha.simulation.curl_import import FILL, ScenarioNames
+
+log = logging.getLogger(__name__)
 
 
 def import_agent(content: str) -> AgentDraft:
@@ -158,6 +161,7 @@ def provider_errors(provider: str, *, refused: str, forbidden: str) -> Generator
     try:
         yield
     except ProviderCallError as error:
+        log.warning("%s import call failed: %s", provider, error)
         match error.status:
             case 401:
                 raise ValidationError(refused) from None
@@ -177,5 +181,6 @@ def provider_errors(provider: str, *, refused: str, forbidden: str) -> Generator
                 raise UnavailableError(
                     f"{provider} answered with status {status}; try again later"
                 ) from None
-    except ValueError:
+    except ValueError as error:
+        log.warning("%s import call answered with an unexpected body: %s", provider, error)
         raise UnavailableError(f"{provider} answered with something that is not JSON") from None

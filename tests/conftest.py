@@ -51,6 +51,7 @@ from yaksha.evaluation.evaluations import Evaluated
 from yaksha.integrations.elevenlabs import ElevenLabsAgentsApi, as_wav
 from yaksha.integrations.plivo import PlivoApi
 from yaksha.integrations.plivo_signature import signature, signed_text
+from yaksha.integrations.retell import RetellApi
 from yaksha.integrations.vapi import VapiApi
 from yaksha.settings import store
 from yaksha.settings.cipher import Cipher
@@ -433,6 +434,12 @@ class FakeProviders:
 
     def elevenlabs_agents(self, api_key: str, region: ElevenLabsRegion) -> ElevenLabsAgentsApi:
         return ElevenLabsAgentsApi(api_key, base_url=self.elevenlabs_api_url)
+
+    retell_api_url = "http://127.0.0.1:9"
+    """Where retell clients go: nowhere, until a test points it at its stand-in for Retell."""
+
+    def retell(self, api_key: str) -> RetellApi:
+        return RetellApi(api_key, base_url=self.retell_api_url)
 
     vapi_api_url = "http://127.0.0.1:9"
     """Where vapi clients go, whatever the region: nowhere, until a test points it at its

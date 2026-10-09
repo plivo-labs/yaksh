@@ -376,6 +376,7 @@ const IMPORTED_NOTES: Record<ImportedFrom["kind"], string> = {
   "plivo-cx": "Check the drafted brief and the language.",
   elevenlabs: "Check the drafted brief.",
   vapi: "Check the drafted brief and the language.",
+  retell: "Check the drafted brief.",
 };
 
 function ImportedNote({ from }: { from: ImportedFrom }) {

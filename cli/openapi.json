@@ -606,6 +606,120 @@
         ]
       }
     },
+    "/api/v1/agents/import/retell/agents": {
+      "post": {
+        "tags": [
+          "agents"
+        ],
+        "summary": "List Retell Agents",
+        "description": "One page of a Retell workspace's voice agents. The API key is used for this call only.",
+        "operationId": "list_retell_agents_api_v1_agents_import_retell_agents_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RetellAgentSearch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RetellAgentPage"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "The request failed. The error tells why.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "An outside service is not set up, or it did not answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/agents/import/retell/agent": {
+      "post": {
+        "tags": [
+          "agents"
+        ],
+        "summary": "Import Retell Agent",
+        "description": "Read the published version of one Retell agent into a draft agent. Nothing is saved. An\nagent without a number gets a start request for Retell's outbound call, which carries the API\nkey.",
+        "operationId": "import_retell_agent_api_v1_agents_import_retell_agent_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RetellAgentChoice"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProviderDraft"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "The request failed. The error tells why.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "An outside service is not set up, or it did not answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/agents/start-request-from-curl": {
       "post": {
         "tags": [
@@ -5289,7 +5403,8 @@
           "file",
           "plivo_cx",
           "elevenlabs",
-          "vapi"
+          "vapi",
+          "retell"
         ],
         "title": "AgentSource",
         "description": "Where an agent came from: made in Yaksha, or imported from a file or a provider."
@@ -9672,6 +9787,133 @@
         ],
         "title": "Reply",
         "description": "The agent's answer to one caller reply, or to the start of the call."
+      },
+      "RetellAgent": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          },
+          "numbers": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Numbers"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "updated_at",
+          "numbers"
+        ],
+        "title": "RetellAgent"
+      },
+      "RetellAgentChoice": {
+        "properties": {
+          "api_key": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Api Key"
+          },
+          "agent_id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{1,100}$",
+            "title": "Agent Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "api_key",
+          "agent_id"
+        ],
+        "title": "RetellAgentChoice"
+      },
+      "RetellAgentPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/RetellAgent"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "title": "RetellAgentPage"
+      },
+      "RetellAgentSearch": {
+        "properties": {
+          "api_key": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Api Key"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "cursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cursor"
+          }
+        },
+        "type": "object",
+        "required": [
+          "api_key"
+        ],
+        "title": "RetellAgentSearch"
       },
       "ReviewConversation": {
         "properties": {
