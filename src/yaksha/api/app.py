@@ -61,6 +61,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
         log.info("seeded built-in personas: %s", ", ".join(personas))
     yield
     await app.state.providers.close()
+    await app.state.file_store.close()
     await app.state.engine.dispose()
 
 

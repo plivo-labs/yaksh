@@ -736,6 +736,9 @@ class FakeFileStore:
             raise UnavailableError("file storage refused the upload")
         self.files[key] = (data, media_type)
 
+    async def close(self) -> None:
+        pass
+
     async def get(self, key: str) -> bytes:
         if self.down or key not in self.files:
             raise UnavailableError("file storage could not return the file")
