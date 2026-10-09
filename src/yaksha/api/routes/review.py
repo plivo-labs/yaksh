@@ -1,11 +1,13 @@
 import uuid
 
-from fastapi import APIRouter, Response, status
+from fastapi import APIRouter, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from yaksha.api.auth import LabelerDep
 from yaksha.api.deps import AppSettingsDep, FileStoreDep, SessionDep
 from yaksha.api.errors import UNAVAILABLE
+from yaksha.api.files import StoredFileResponse
 from yaksha.api.routes.conversations import detail
 from yaksha.api.schemas.conversations import ItemRead
 from yaksha.api.schemas.review import (
@@ -96,7 +98,9 @@ async def get_review(
 
 
 @router.get(
-    "/conversations/{conversation_id}/recording", response_class=Response, responses=UNAVAILABLE
+    "/conversations/{conversation_id}/recording",
+    response_class=StreamingResponse,
+    responses=UNAVAILABLE,
 )
 async def get_recording(
     conversation_id: uuid.UUID,
@@ -104,13 +108,13 @@ async def get_recording(
     session: SessionDep,
     settings: AppSettingsDep,
     store: FileStoreDep,
-) -> Response:
+) -> StreamingResponse:
     # Only checks that the call is judged: what a labeler may see does not depend on the audio.
     await labels.review(
         session, conversation_id, labeler.id, settings.audit.weekly_budget, seen=True
     )
-    recording = await conversations.get_recording(session, store, conversation_id)
-    return Response(recording, media_type="audio/wav")
+    opened = await conversations.open_recording(session, store, conversation_id)
+    return StoredFileResponse(opened, "audio/wav")
 
 
 @router.post("/items/{item_id}/labels", status_code=status.HTTP_201_CREATED)

@@ -1,7 +1,5 @@
 import hashlib
 import uuid
-from collections.abc import AsyncGenerator
-from dataclasses import dataclass
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -15,6 +13,7 @@ from yaksha.domain.documents import (
 from yaksha.domain.errors import NotFoundError, ValidationError
 from yaksha.domain.files import FileStore
 from yaksha.simulation.extraction import extract_file
+from yaksha.simulation.files import OpenedFile, open_file
 
 
 async def create_file_document(
@@ -65,28 +64,10 @@ async def get_document(session: AsyncSession, document_id: uuid.UUID) -> Documen
     return document
 
 
-@dataclass(frozen=True)
-class OpenedFile:
-    """A document's original, with its first chunk already fetched so a storage failure is
-    reported before a download starts. close() releases the storage stream however the
-    download ends."""
-
-    document: Document
-    first: bytes
-    rest: AsyncGenerator[bytes]
-
-    async def chunks(self) -> AsyncGenerator[bytes]:
-        yield self.first
-        async for chunk in self.rest:
-            yield chunk
-
-    async def close(self) -> None:
-        await self.rest.aclose()
-
-
-async def open_file(session: AsyncSession, store: FileStore, document_id: uuid.UUID) -> OpenedFile:
+async def open_original(
+    session: AsyncSession, store: FileStore, document_id: uuid.UUID
+) -> tuple[Document, OpenedFile]:
     document = await get_document(session, document_id)
     if document.storage_key is None:
         raise NotFoundError("the document was pasted as text and has no file")
-    rest = store.stream(document.storage_key)
-    return OpenedFile(document, await anext(rest, b""), rest)
+    return document, await open_file(store, document.storage_key)

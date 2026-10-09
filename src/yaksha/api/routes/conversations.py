@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from yaksha.api.auth import require_token
 from yaksha.api.deps import FileStoreDep, SessionDep, SettingsDep
 from yaksha.api.errors import CLIENT_ERRORS, UNAVAILABLE, json_errors
+from yaksha.api.files import StoredFileResponse
 from yaksha.api.pagination import Page, PageDep
 from yaksha.api.schemas.conversations import (
     ConversationEvaluation,
@@ -183,12 +184,12 @@ async def get_evaluation(conversation_id: uuid.UUID, session: SessionDep) -> Con
     )
 
 
-@router.get("/{conversation_id}/recording", response_class=Response, responses=UNAVAILABLE)
+@router.get("/{conversation_id}/recording", response_class=StreamingResponse, responses=UNAVAILABLE)
 async def get_recording(
     conversation_id: uuid.UUID, session: SessionDep, store: FileStoreDep
-) -> Response:
-    recording = await conversations.get_recording(session, store, conversation_id)
-    return Response(recording, media_type="audio/wav")
+) -> StreamingResponse:
+    opened = await conversations.open_recording(session, store, conversation_id)
+    return StoredFileResponse(opened, "audio/wav")
 
 
 @router.post(

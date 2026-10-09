@@ -39,8 +39,8 @@ log = logging.getLogger(__name__)
 FINALIZE_ATTEMPTS = 5
 FINALIZE_RETRY_S = 1.0
 FINALIZE_TIMEOUT_S = 10.0
-STORE_TIMEOUT_S = 10.0
-"""For both audio files of a call; enough for storage in the same network."""
+STORE_TIMEOUT_S = 60.0
+"""For both audio files of a call: a 30-minute call, about 58 MB, at about 8 Mbit/s."""
 MAX_BACKOFF_S = 30.0
 DIAL_MARGIN_S = 60.0
 

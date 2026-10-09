@@ -46,6 +46,7 @@ from yaksha.domain.settings import AppSettings
 from yaksha.domain.surroundings import SoundPlan
 from yaksha.domain.triggers import SEND_TIMEOUT_S
 from yaksha.evaluation import evaluations, results
+from yaksha.simulation.files import OpenedFile, open_file
 from yaksha.simulation.languages import LANGUAGES
 from yaksha.simulation.numbers import free_numbers, lease_number, release_numbers
 from yaksha.simulation.runs import (
@@ -84,13 +85,13 @@ async def get_conversation(session: AsyncSession, conversation_id: uuid.UUID) ->
     return conversation
 
 
-async def get_recording(
+async def open_recording(
     session: AsyncSession, store: FileStore, conversation_id: uuid.UUID
-) -> bytes:
+) -> OpenedFile:
     conversation = await get_conversation(session, conversation_id)
     if conversation.recording_key is None:
         raise NotFoundError("no recording yet")
-    return await store.get(conversation.recording_key)
+    return await open_file(store, conversation.recording_key)
 
 
 def in_group(group: OutcomeGroup) -> ColumnElement[bool]:

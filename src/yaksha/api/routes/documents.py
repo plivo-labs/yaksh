@@ -3,39 +3,14 @@ from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, UploadFile, status
 from fastapi.responses import StreamingResponse
-from starlette.types import Receive, Scope, Send
 
 from yaksha.api.auth import require_token
 from yaksha.api.deps import FileStoreDep, SessionDep
 from yaksha.api.errors import UNAVAILABLE
+from yaksha.api.files import StoredFileResponse
 from yaksha.api.schemas.documents import DocumentRead, DocumentSummary
 from yaksha.domain.documents import MAX_FILE_BYTES, TextDocumentCreate
 from yaksha.simulation import documents
-from yaksha.simulation.documents import OpenedFile
-
-
-class DocumentFileResponse(StreamingResponse):
-    """Streams a document's original and always releases the storage stream: Starlette
-    leaves an unfinished iterator to the garbage collector."""
-
-    def __init__(self, opened: OpenedFile) -> None:
-        document = opened.document
-        super().__init__(
-            opened.chunks(),
-            media_type=document.media_type,
-            headers={
-                "Content-Disposition": f"attachment; filename*=UTF-8''{quote(document.name)}",
-                "Content-Length": str(document.size_bytes),
-            },
-        )
-        self._opened = opened
-
-    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        try:
-            await super().__call__(scope, receive, send)
-        finally:
-            await self._opened.close()
-
 
 router = APIRouter(prefix="/documents", tags=["documents"], dependencies=[Depends(require_token)])
 
@@ -65,4 +40,12 @@ async def get_document(document_id: uuid.UUID, session: SessionDep) -> DocumentR
 async def download_document(
     document_id: uuid.UUID, session: SessionDep, store: FileStoreDep
 ) -> StreamingResponse:
-    return DocumentFileResponse(await documents.open_file(session, store, document_id))
+    document, opened = await documents.open_original(session, store, document_id)
+    return StoredFileResponse(
+        opened,
+        document.media_type,
+        {
+            "Content-Disposition": f"attachment; filename*=UTF-8''{quote(document.name)}",
+            "Content-Length": str(document.size_bytes),
+        },
+    )

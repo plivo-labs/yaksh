@@ -37,8 +37,8 @@ services:
     ports:
       - "8770:8770"
     # Must exceed the worker's drain bound: Worker._execute_bound plus its
-    # cancel wait plus bounded_dispose, about 130 s at the default end timeout.
-    stop_grace_period: 150s
+    # cancel wait plus bounded_dispose, about 180 s at the default end timeout.
+    stop_grace_period: 210s
     healthcheck:
       disable: true
 
