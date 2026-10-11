@@ -8,6 +8,7 @@ from fastapi import APIRouter, FastAPI, HTTPException, status
 from yaksha import __version__
 from yaksha.api.body_limit import BodySizeLimit
 from yaksha.api.errors import CLIENT_ERRORS, register_error_handlers
+from yaksha.api.generations import Generations
 from yaksha.api.providers import Providers
 from yaksha.api.routes import (
     agents,
@@ -34,6 +35,7 @@ from yaksha.db.session import create_engine, create_sessionmaker
 from yaksha.domain.documents import MAX_FILE_BYTES
 from yaksha.settings.cipher import Cipher, SecretUnreadableError
 from yaksha.settings.store import SettingsSource
+from yaksha.simulation.generation import stop_running
 from yaksha.simulation.personas import seed_builtin_personas
 from yaksha.simulation.voices import seed_builtin_voices
 from yaksha.storage import file_store
@@ -55,11 +57,13 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     async with app.state.sessionmaker() as session:
         voices = await seed_builtin_voices(session)
         personas = await seed_builtin_personas(session)
+        await stop_running(session)
     if voices:
         log.info("seeded built-in voices: %s", ", ".join(voices))
     if personas:
         log.info("seeded built-in personas: %s", ", ".join(personas))
     yield
+    await app.state.generations.close()
     await app.state.providers.close()
     await app.state.file_store.close()
     await app.state.engine.dispose()
@@ -75,6 +79,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.sessionmaker, Cipher(settings.encryption_key.get_secret_value())
     )
     app.state.providers = Providers()
+    app.state.generations = Generations(app.state.sessionmaker)
     app.state.file_store = file_store(settings)
     register_error_handlers(app)
     app.add_middleware(BodySizeLimit, max_bytes=MAX_REQUEST_BYTES)

@@ -142,10 +142,12 @@ class AgentCreate(AgentConfig):
     name: str = Field(min_length=1)
     external_id: str | None = None
     source: AgentSource = AgentSource.MANUAL
+    write_scenarios: bool = True
+    """Start writing the first scenarios once the agent is saved."""
 
     def to_config(self) -> AgentConfig:
         return AgentConfig.model_validate(
-            self.model_dump(exclude={"name", "external_id", "source"})
+            self.model_dump(exclude={"name", "external_id", "source", "write_scenarios"})
         )
 
 

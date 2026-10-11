@@ -1069,7 +1069,8 @@ type AgentCreate struct {
 	Source *AgentSource `json:"source,omitempty"`
 
 	// Transport How Yaksha reaches an agent; phone only today, kept as the seam for other ways.
-	Transport *Transport `json:"transport,omitempty"`
+	Transport      *Transport `json:"transport,omitempty"`
+	WriteScenarios *bool      `json:"write_scenarios,omitempty"`
 }
 
 // AgentCreate_Rules_Item defines model for AgentCreate.rules.Item.
@@ -1536,7 +1537,9 @@ type GenerationModel struct {
 
 // GenerationRead defines model for GenerationRead.
 type GenerationRead struct {
+	Count     int                `json:"count"`
 	CreatedAt time.Time          `json:"created_at"`
+	Error     *string            `json:"error"`
 	Id        openapi_types.UUID `json:"id"`
 	Mode      GenerationMode     `json:"mode"`
 	Scenarios int                `json:"scenarios"`
@@ -3484,12 +3487,18 @@ type ClientInterface interface {
 
 	// CreateAgentApiV1AgentsPostWithBody Create Agent
 	//
+	// Saves the agent and, unless write_scenarios is false, starts writing its first scenarios.
+	// They arrive after the response: GET /agents/{id}/scenario-generations shows the progress.
+	//
 	// Takes any type of body and a specified content type.
 	//
 	// Corresponds with POST /api/v1/agents (the `CreateAgentApiV1AgentsPost` operationId).
 	CreateAgentApiV1AgentsPostWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// CreateAgentApiV1AgentsPost Create Agent
+	//
+	// Saves the agent and, unless write_scenarios is false, starts writing its first scenarios.
+	// They arrive after the response: GET /agents/{id}/scenario-generations shows the progress.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -4138,6 +4147,14 @@ type ClientInterface interface {
 	// Corresponds with GET /api/v1/runs/{run_id}/metrics (the `GetRunMetricsApiV1RunsRunIdMetricsGet` operationId).
 	GetRunMetricsApiV1RunsRunIdMetricsGet(ctx context.Context, runId openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// StopGenerationApiV1ScenarioGenerationsGenerationIdStopPost Stop Generation
+	//
+	// Stops a generation that runs without a console, such as a new agent's first scenarios.
+	// What is saved stays.
+	//
+	// Corresponds with POST /api/v1/scenario-generations/{generation_id}/stop (the `StopGenerationApiV1ScenarioGenerationsGenerationIdStopPost` operationId).
+	StopGenerationApiV1ScenarioGenerationsGenerationIdStopPost(ctx context.Context, generationId openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// DeleteScenarioApiV1ScenariosScenarioIdDelete Delete Scenario
 	//
 	// Corresponds with DELETE /api/v1/scenarios/{scenario_id} (the `DeleteScenarioApiV1ScenariosScenarioIdDelete` operationId).
@@ -4428,6 +4445,9 @@ func (c *Client) ListAgentsApiV1AgentsGet(ctx context.Context, params *ListAgent
 
 // CreateAgentApiV1AgentsPostWithBody Create Agent
 //
+// Saves the agent and, unless write_scenarios is false, starts writing its first scenarios.
+// They arrive after the response: GET /agents/{id}/scenario-generations shows the progress.
+//
 // Takes any type of body and a specified content type.
 //
 // Corresponds with POST /api/v1/agents (the `CreateAgentApiV1AgentsPost` operationId).
@@ -4444,6 +4464,9 @@ func (c *Client) CreateAgentApiV1AgentsPostWithBody(ctx context.Context, content
 }
 
 // CreateAgentApiV1AgentsPost Create Agent
+//
+// Saves the agent and, unless write_scenarios is false, starts writing its first scenarios.
+// They arrive after the response: GET /agents/{id}/scenario-generations shows the progress.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -5942,6 +5965,24 @@ func (c *Client) CancelRunApiV1RunsRunIdCancelPost(ctx context.Context, runId op
 // Corresponds with GET /api/v1/runs/{run_id}/metrics (the `GetRunMetricsApiV1RunsRunIdMetricsGet` operationId).
 func (c *Client) GetRunMetricsApiV1RunsRunIdMetricsGet(ctx context.Context, runId openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetRunMetricsApiV1RunsRunIdMetricsGetRequest(c.Server, runId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// StopGenerationApiV1ScenarioGenerationsGenerationIdStopPost Stop Generation
+//
+// Stops a generation that runs without a console, such as a new agent's first scenarios.
+// What is saved stays.
+//
+// Corresponds with POST /api/v1/scenario-generations/{generation_id}/stop (the `StopGenerationApiV1ScenarioGenerationsGenerationIdStopPost` operationId).
+func (c *Client) StopGenerationApiV1ScenarioGenerationsGenerationIdStopPost(ctx context.Context, generationId openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewStopGenerationApiV1ScenarioGenerationsGenerationIdStopPostRequest(c.Server, generationId)
 	if err != nil {
 		return nil, err
 	}
@@ -9443,6 +9484,40 @@ func NewGetRunMetricsApiV1RunsRunIdMetricsGetRequest(server string, runId openap
 	return req, nil
 }
 
+// NewStopGenerationApiV1ScenarioGenerationsGenerationIdStopPostRequest constructs an http.Request for the StopGenerationApiV1ScenarioGenerationsGenerationIdStopPost method
+func NewStopGenerationApiV1ScenarioGenerationsGenerationIdStopPostRequest(server string, generationId openapi_types.UUID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "generation_id", generationId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/scenario-generations/%s/stop", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewDeleteScenarioApiV1ScenariosScenarioIdDeleteRequest constructs an http.Request for the DeleteScenarioApiV1ScenariosScenarioIdDelete method
 func NewDeleteScenarioApiV1ScenariosScenarioIdDeleteRequest(server string, scenarioId openapi_types.UUID) (*http.Request, error) {
 	var err error
@@ -10554,12 +10629,18 @@ type ClientWithResponsesInterface interface {
 
 	// CreateAgentApiV1AgentsPostWithBodyWithResponse Create Agent
 	//
+	// Saves the agent and, unless write_scenarios is false, starts writing its first scenarios.
+	// They arrive after the response: GET /agents/{id}/scenario-generations shows the progress.
+	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with POST /api/v1/agents (the `CreateAgentApiV1AgentsPost` operationId).
 	CreateAgentApiV1AgentsPostWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateAgentApiV1AgentsPostResponse, error)
 
 	// CreateAgentApiV1AgentsPostWithResponse Create Agent
+	//
+	// Saves the agent and, unless write_scenarios is false, starts writing its first scenarios.
+	// They arrive after the response: GET /agents/{id}/scenario-generations shows the progress.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -11283,6 +11364,16 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with GET /api/v1/runs/{run_id}/metrics (the `GetRunMetricsApiV1RunsRunIdMetricsGet` operationId).
 	GetRunMetricsApiV1RunsRunIdMetricsGetWithResponse(ctx context.Context, runId openapi_types.UUID, reqEditors ...RequestEditorFn) (*GetRunMetricsApiV1RunsRunIdMetricsGetResponse, error)
+
+	// StopGenerationApiV1ScenarioGenerationsGenerationIdStopPostWithResponse Stop Generation
+	//
+	// Stops a generation that runs without a console, such as a new agent's first scenarios.
+	// What is saved stays.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/scenario-generations/{generation_id}/stop (the `StopGenerationApiV1ScenarioGenerationsGenerationIdStopPost` operationId).
+	StopGenerationApiV1ScenarioGenerationsGenerationIdStopPostWithResponse(ctx context.Context, generationId openapi_types.UUID, reqEditors ...RequestEditorFn) (*StopGenerationApiV1ScenarioGenerationsGenerationIdStopPostResponse, error)
 
 	// DeleteScenarioApiV1ScenariosScenarioIdDeleteWithResponse Delete Scenario
 	//
@@ -14703,6 +14794,47 @@ func (r GetRunMetricsApiV1RunsRunIdMetricsGetResponse) ContentType() string {
 	return ""
 }
 
+type StopGenerationApiV1ScenarioGenerationsGenerationIdStopPostResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
+}
+
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r StopGenerationApiV1ScenarioGenerationsGenerationIdStopPostResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
+}
+
+// GetBody returns the raw response body bytes
+func (r StopGenerationApiV1ScenarioGenerationsGenerationIdStopPostResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r StopGenerationApiV1ScenarioGenerationsGenerationIdStopPostResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r StopGenerationApiV1ScenarioGenerationsGenerationIdStopPostResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r StopGenerationApiV1ScenarioGenerationsGenerationIdStopPostResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type DeleteScenarioApiV1ScenariosScenarioIdDeleteResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -15966,6 +16098,9 @@ func (c *ClientWithResponses) ListAgentsApiV1AgentsGetWithResponse(ctx context.C
 
 // CreateAgentApiV1AgentsPostWithBodyWithResponse Create Agent
 //
+// Saves the agent and, unless write_scenarios is false, starts writing its first scenarios.
+// They arrive after the response: GET /agents/{id}/scenario-generations shows the progress.
+//
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
 // Corresponds with POST /api/v1/agents (the `CreateAgentApiV1AgentsPost` operationId).
@@ -15978,6 +16113,9 @@ func (c *ClientWithResponses) CreateAgentApiV1AgentsPostWithBodyWithResponse(ctx
 }
 
 // CreateAgentApiV1AgentsPostWithResponse Create Agent
+//
+// Saves the agent and, unless write_scenarios is false, starts writing its first scenarios.
+// They arrive after the response: GET /agents/{id}/scenario-generations shows the progress.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -17216,6 +17354,22 @@ func (c *ClientWithResponses) GetRunMetricsApiV1RunsRunIdMetricsGetWithResponse(
 		return nil, err
 	}
 	return ParseGetRunMetricsApiV1RunsRunIdMetricsGetResponse(rsp)
+}
+
+// StopGenerationApiV1ScenarioGenerationsGenerationIdStopPostWithResponse Stop Generation
+//
+// Stops a generation that runs without a console, such as a new agent's first scenarios.
+// What is saved stays.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/scenario-generations/{generation_id}/stop (the `StopGenerationApiV1ScenarioGenerationsGenerationIdStopPost` operationId).
+func (c *ClientWithResponses) StopGenerationApiV1ScenarioGenerationsGenerationIdStopPostWithResponse(ctx context.Context, generationId openapi_types.UUID, reqEditors ...RequestEditorFn) (*StopGenerationApiV1ScenarioGenerationsGenerationIdStopPostResponse, error) {
+	rsp, err := c.StopGenerationApiV1ScenarioGenerationsGenerationIdStopPost(ctx, generationId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseStopGenerationApiV1ScenarioGenerationsGenerationIdStopPostResponse(rsp)
 }
 
 // DeleteScenarioApiV1ScenariosScenarioIdDeleteWithResponse Delete Scenario
@@ -19903,6 +20057,35 @@ func ParseGetRunMetricsApiV1RunsRunIdMetricsGetResponse(rsp *http.Response) (*Ge
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseStopGenerationApiV1ScenarioGenerationsGenerationIdStopPostResponse parses an HTTP response from a StopGenerationApiV1ScenarioGenerationsGenerationIdStopPostWithResponse call
+func ParseStopGenerationApiV1ScenarioGenerationsGenerationIdStopPostResponse(rsp *http.Response) (*StopGenerationApiV1ScenarioGenerationsGenerationIdStopPostResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &StopGenerationApiV1ScenarioGenerationsGenerationIdStopPostResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case rsp.StatusCode == 204:
+		break // No content-type
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
 		var dest ErrorResponse

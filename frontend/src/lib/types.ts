@@ -828,8 +828,11 @@ export interface Generation {
   mode: GenerationMode;
   status: GenerationStatus;
   created_at: string;
+  /** How many scenarios it was asked to write. */
+  count: number;
   /** Its scenarios that are not deleted. */
   scenarios: number;
+  error: string | null;
 }
 
 export type EvaluationState = "queued" | "running" | "done" | "failed";

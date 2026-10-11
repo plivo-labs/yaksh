@@ -168,7 +168,8 @@ SCENARIO: dict[str, Any] = {
 
 
 async def create_agent(client: AsyncClient, **overrides: Any) -> dict[str, Any]:
-    response = await client.post("/api/v1/agents", json={**AGENT, **overrides})
+    body = {"write_scenarios": False, **AGENT, **overrides}
+    response = await client.post("/api/v1/agents", json=body)
     assert response.status_code == 201, response.text
     return response.json()
 
@@ -876,6 +877,7 @@ async def client(
     headers = {"Authorization": f"Bearer {TOKEN}"}
     async with AsyncClient(transport=transport, base_url="http://test", headers=headers) as client:
         yield client
+    await app.state.generations.close()
     await app.state.engine.dispose()
     engine = create_async_engine(settings.database_url.encoded_string())
     async with engine.begin() as connection:

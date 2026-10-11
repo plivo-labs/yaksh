@@ -1,7 +1,7 @@
 import { Toggle } from "@base-ui/react/toggle";
 import { ToggleGroup } from "@base-ui/react/toggle-group";
 import { ChevronDown, Pencil, Play, Plus, Sparkles, Trash2, X } from "lucide-react";
-import { Fragment, type ReactNode, useRef, useState } from "react";
+import { Fragment, type ReactNode, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
 import { toast } from "sonner";
 
@@ -151,6 +151,23 @@ export function AgentScenarios({ agent }: { agent: Agent }) {
   const [picked, setPicked] = useState<ReadonlySet<string>>(new Set());
   const selectAll = useRef<HTMLButtonElement>(null);
   const scenario = editing === "new" ? undefined : (editing ?? undefined);
+  const finished = useRef<string | null>(null);
+  const { id: generationId, progress, written, dismiss } = generation;
+  // A finished generation's scenarios are checked once, so the selection bar can run them, and
+  // its notice becomes a toast.
+  useEffect(() => {
+    if (
+      progress?.status !== "done" ||
+      !generationId ||
+      generationId === finished.current ||
+      written.length !== progress.saved
+    )
+      return;
+    finished.current = generationId;
+    setPicked(new Set(written));
+    toast.success(progressMessage(progress));
+    dismiss();
+  }, [generationId, progress, written, dismiss]);
 
   const items = scenarios.data ?? [];
   const listed = items.filter(
@@ -192,7 +209,7 @@ export function AgentScenarios({ agent }: { agent: Agent }) {
           toast.error("Could not change the persona", { description: error.message }),
       },
     );
-  const batches = generations.data ?? [];
+  const batches = (generations.data ?? []).filter((item) => item.scenarios > 0);
   const batchItems = [
     { value: ALL, label: "All batches" },
     ...batches.map((item) => ({ value: item.id, label: batchLabel(item) })),
@@ -227,6 +244,12 @@ export function AgentScenarios({ agent }: { agent: Agent }) {
           <p role="alert" className="px-5 py-4 text-p-400 text-destructive">
             {scenarios.error.message}
           </p>
+        ) : items.length === 0 && !shownBatch && generation.running ? (
+          <div aria-hidden className="grid gap-3 p-5">
+            <Skeleton className="h-11" />
+            <Skeleton className="h-11" />
+            <Skeleton className="h-11" />
+          </div>
         ) : items.length === 0 && !shownBatch ? (
           <div className="grid justify-items-center gap-4 px-5 py-10 text-center">
             <p className="text-p-400 text-muted-foreground">
