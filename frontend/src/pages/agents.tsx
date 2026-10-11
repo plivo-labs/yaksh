@@ -1,4 +1,4 @@
-import { Bot, Copy, CopyPlus, Ellipsis, Link2, Plus, Trash2 } from "lucide-react";
+import { Bot, Copy, GitFork, Ellipsis, Link2, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router";
 
@@ -44,7 +44,7 @@ import {
   useAgentPage,
   useAgentSources,
   useDeleteAgent,
-  useDuplicateAgent,
+  useForkAgent,
   useLastCall,
   useScenarioCount,
 } from "@/lib/queries";
@@ -281,7 +281,7 @@ function AgentRow({ agent }: { agent: AgentSummary }) {
 
 function AgentMenu({ agent }: { agent: AgentSummary }) {
   const navigate = useNavigate();
-  const duplicate = useDuplicateAgent();
+  const fork = useForkAgent();
   const remove = useDeleteAgent();
   const [deleting, setDeleting] = useState(false);
   return (
@@ -300,20 +300,27 @@ function AgentMenu({ agent }: { agent: AgentSummary }) {
             Copy agent id
           </DropdownMenuItem>
           <DropdownMenuItem
-            disabled={duplicate.isPending}
+            disabled={fork.isPending}
             onClick={() =>
-              duplicate.mutate(agent.id, {
+              fork.mutate(agent.id, {
                 onSuccess: (copy) => {
-                  toast.success(`Duplicated as ${copy.name}`);
+                  toast.success("Fork created", {
+                    description: `"${copy.name}" calls the same agent until you change its number or trigger.`,
+                    action: {
+                      label: "Undo",
+                      onClick: () =>
+                        void remove.mutateAsync(copy.id).then(() => navigate("/agents")),
+                    },
+                  });
                   navigate(`/agents/${copy.id}`);
                 },
                 onError: (error) =>
-                  toast.error(`Could not duplicate ${agent.name}`, { description: error.message }),
+                  toast.error(`Could not fork ${agent.name}`, { description: error.message }),
               })
             }
           >
-            <CopyPlus />
-            Duplicate
+            <GitFork />
+            Fork
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem variant="destructive" onClick={() => setDeleting(true)}>

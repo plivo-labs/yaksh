@@ -30,6 +30,7 @@ import {
 import { EditAgentSheet } from "@/pages/agent-form";
 import { AgentKnowledgeBase } from "@/pages/agent-knowledge-base";
 import { AgentRules } from "@/pages/agent-rules";
+import { ForkedFrom } from "@/components/forked-from";
 import { AgentScenarios } from "@/pages/agent-scenarios";
 
 export function AgentPage() {
@@ -116,6 +117,7 @@ function Designation({ agent }: { agent: Agent }) {
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-s-400">
           <span className="text-muted-foreground">{reach(agent)}</span>
           <LineState call={last.data} pending={last.isPending} />
+          <ForkedFrom kind="agent" id={agent.forked_from_id} />
         </div>
       </div>
     </Panel>

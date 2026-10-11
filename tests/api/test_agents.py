@@ -150,7 +150,7 @@ async def test_requests_without_a_valid_token_are_rejected(client: AsyncClient) 
     assert wrong.headers["www-authenticate"] == "Bearer"
 
 
-async def test_a_duplicate_copies_the_config_and_live_scenarios_but_not_the_external_id(
+async def test_a_fork_copies_the_config_and_live_scenarios_but_not_the_external_id(
     client: AsyncClient,
 ) -> None:
     original = await create_agent(
@@ -163,11 +163,12 @@ async def test_a_duplicate_copies_the_config_and_live_scenarios_but_not_the_exte
     await client.delete(f"/api/v1/scenarios/{gone['id']}")
     await client.patch(f"/api/v1/scenarios/{kept['id']}", json={"criteria": ["Books it."]})
 
-    response = await client.post(f"/api/v1/agents/{original['id']}/duplicate")
+    response = await client.post(f"/api/v1/agents/{original['id']}/fork")
 
     assert response.status_code == 201
     copy = response.json()
-    assert copy["id"] != original["id"] and copy["name"] == f"{AGENT['name']} (copy)"
+    assert copy["id"] != original["id"] and copy["name"] == f"{AGENT['name']} (fork)"
+    assert copy["forked_from_id"] == original["id"]
     assert (copy["external_id"], copy["brief"], copy["current_version"]) == (
         None,
         "Books rooms for guests",
@@ -183,6 +184,7 @@ async def test_a_duplicate_copies_the_config_and_live_scenarios_but_not_the_exte
             s["category"],
             s["description"],
             s["persona_id"],
+            s["forked_from_id"],
         )
         for s in copied
     ] == [
@@ -193,10 +195,11 @@ async def test_a_duplicate_copies_the_config_and_live_scenarios_but_not_the_exte
             "messy_input",
             "Checks a corrected date.",
             kept["persona_id"],
+            kept["id"],
         )
     ]
     assert (await client.get(f"/api/v1/agents/{original['id']}/scenarios")).json()["total"] == 1
-    missing = await client.post(f"/api/v1/agents/{uuid.uuid4()}/duplicate")
+    missing = await client.post(f"/api/v1/agents/{uuid.uuid4()}/fork")
     assert missing.status_code == 404
 
 
@@ -237,7 +240,7 @@ async def test_the_list_sorts_by_name_and_by_last_update(client: AsyncClient) ->
     assert invalid.status_code == 422
 
 
-async def test_a_duplicate_waits_for_a_persona_change_and_copies_the_new_persona(
+async def test_a_fork_waits_for_a_persona_change_and_copies_the_new_persona(
     client: AsyncClient, db: Db
 ) -> None:
     original = await create_agent(client)
@@ -249,10 +252,10 @@ async def test_a_duplicate_waits_for_a_persona_change_and_copies_the_new_persona
         row = await other.get_one(Scenario, uuid.UUID(scenario["id"]), with_for_update=True)
         row.persona_id = uuid.UUID(new["id"])
         await other.flush()
-        duplicating = asyncio.create_task(client.post(f"/api/v1/agents/{original['id']}/duplicate"))
+        forking = asyncio.create_task(client.post(f"/api/v1/agents/{original['id']}/fork"))
         await wait_for_lock_waiters(db, 1)
         await other.commit()
-    copy = (await duplicating).json()
+    copy = (await forking).json()
     deleted = await client.delete(f"/api/v1/personas/{old['id']}")
 
     copied = (await client.get(f"/api/v1/agents/{copy['id']}/scenarios")).json()["items"]
@@ -265,7 +268,7 @@ async def test_an_agent_keeps_where_it_came_from_and_the_list_filters_by_it(
 ) -> None:
     made = await create_agent(client, name="Made here")
     imported = await create_agent(client, name="From ElevenLabs", source="elevenlabs")
-    copy = (await client.post(f"/api/v1/agents/{imported['id']}/duplicate")).json()
+    copy = (await client.post(f"/api/v1/agents/{imported['id']}/fork")).json()
     changed = await client.patch(f"/api/v1/agents/{made['id']}", json={"source": "vapi"})
 
     async def names(source: str) -> list[str]:
@@ -274,6 +277,6 @@ async def test_an_agent_keeps_where_it_came_from_and_the_list_filters_by_it(
 
     assert (made["source"], copy["source"]) == ("manual", "elevenlabs")
     assert changed.status_code == 422
-    assert await names("elevenlabs") == ["From ElevenLabs", "From ElevenLabs (copy)"]
+    assert await names("elevenlabs") == ["From ElevenLabs", "From ElevenLabs (fork)"]
     assert await names("manual") == ["Made here"]
     assert (await client.get("/api/v1/agents/sources")).json() == ["manual", "elevenlabs"]

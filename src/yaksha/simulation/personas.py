@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from yaksha.db.models import Agent, Persona, PersonaVersion, Scenario, Voice
 from yaksha.domain.errors import ConflictError, NotFoundError, ValidationError
+from yaksha.domain.names import fork_name
 from yaksha.domain.personas import PersonaConfig, PersonaCreate, PersonaSettings, PersonaUpdate
 from yaksha.domain.surroundings import Surroundings
 from yaksha.domain.voices import VoiceSettings
@@ -112,7 +113,9 @@ async def create_persona(session: AsyncSession, command: PersonaCreate) -> Perso
     settings = command.settings()
     voice = await live_voice(session, settings.voice)
     config = PersonaConfig.model_validate({**settings.model_dump(), "voice_gender": voice.gender})
-    persona = Persona(name=command.name, current_version=1)
+    if command.forked_from_id is not None:
+        await existing_persona(session, command.forked_from_id)
+    persona = Persona(name=command.name, current_version=1, forked_from_id=command.forked_from_id)
     apply_config(persona, config)
     session.add(persona)
     await flush(session)
@@ -121,6 +124,30 @@ async def create_persona(session: AsyncSession, command: PersonaCreate) -> Perso
     )
     await session.commit()
     return persona
+
+
+FORK_NAME_TRIES = 3
+"""Personas have no row to lock, so a fork whose free name was taken meanwhile tries again."""
+
+
+async def fork_persona(session: AsyncSession, persona_id: uuid.UUID) -> Persona:
+    """A copy of the persona under a free "… (fork)" name, at version 1. A built-in persona's
+    copy is not built in."""
+    source = await get_persona(session, persona_id)
+    # Read now: a conflict rolls the session back, which expires the row.
+    source_id, source_name = source.id, source.name
+    settings = config_of(source).model_dump(exclude={"voice_gender"})
+    for attempt in range(FORK_NAME_TRIES):
+        taken = {name.lower() for name in await persona_names(session)}
+        command = PersonaCreate(
+            **settings, name=fork_name(source_name, taken), forked_from_id=source_id
+        )
+        try:
+            return await create_persona(session, command)
+        except ConflictError:
+            if attempt == FORK_NAME_TRIES - 1:
+                raise
+    raise AssertionError("unreachable")
 
 
 async def persona_names(session: AsyncSession) -> list[str]:

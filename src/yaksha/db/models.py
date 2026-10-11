@@ -78,6 +78,8 @@ class Agent(Base):
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    forked_from_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("agents.id"))
+    """The agent this one was copied from."""
 
     __table_args__ = (
         Index(
@@ -436,6 +438,8 @@ class Persona(Base):
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    forked_from_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("personas.id"))
+    """The persona this one was copied from."""
 
     __table_args__ = (
         Index(
@@ -541,6 +545,8 @@ class Scenario(Base):
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    forked_from_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("scenarios.id"))
+    """The scenario this one was copied from."""
 
     __table_args__ = (
         Index(

@@ -142,6 +142,12 @@ async def update_scenario(
     return ScenarioRead.of(await scenarios.update_scenario(session, scenario_id, update))
 
 
+@router.post("/scenarios/{scenario_id}/fork", status_code=status.HTTP_201_CREATED)
+async def fork_scenario(scenario_id: uuid.UUID, session: SessionDep) -> ScenarioRead:
+    """A copy of the scenario named "… (fork)", for the person to change."""
+    return ScenarioRead.of(await scenarios.fork_scenario(session, scenario_id))
+
+
 @router.delete("/scenarios/{scenario_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_scenario(scenario_id: uuid.UUID, session: SessionDep) -> None:
     await scenarios.delete_scenario(session, scenario_id)

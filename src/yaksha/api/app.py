@@ -15,6 +15,7 @@ from yaksha.api.routes import (
     conversations,
     defaults,
     documents,
+    forks,
     health,
     judges,
     labelers,
@@ -90,6 +91,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     api.include_router(conversations.router)
     api.include_router(defaults.router)
     api.include_router(documents.router)
+    api.include_router(forks.router)
     api.include_router(judges.router)
     api.include_router(labelers.router)
     api.include_router(personas.router)

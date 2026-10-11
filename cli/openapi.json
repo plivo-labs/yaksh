@@ -1009,13 +1009,14 @@
         }
       }
     },
-    "/api/v1/agents/{agent_id}/duplicate": {
+    "/api/v1/agents/{agent_id}/fork": {
       "post": {
         "tags": [
           "agents"
         ],
-        "summary": "Duplicate Agent",
-        "operationId": "duplicate_agent_api_v1_agents__agent_id__duplicate_post",
+        "summary": "Fork Agent",
+        "description": "A copy of the agent and its live scenarios. It calls the same agent until its number or\ntrigger changes.",
+        "operationId": "fork_agent_api_v1_agents__agent_id__fork_post",
         "security": [
           {
             "HTTPBearer": []
@@ -1961,6 +1962,174 @@
         }
       }
     },
+    "/api/v1/scenarios/{scenario_id}/forks/draft": {
+      "post": {
+        "tags": [
+          "forks"
+        ],
+        "summary": "Draft Scenario Forks",
+        "description": "Writes forks of the scenario, each a scenario the console can create with its\nforked_from_id. Nothing is saved.",
+        "operationId": "draft_scenario_forks_api_v1_scenarios__scenario_id__forks_draft_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "scenario_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Scenario Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ForkRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/event-stream": {
+                "itemSchema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "string"
+                    },
+                    "event": {
+                      "type": "string"
+                    },
+                    "id": {
+                      "type": "string"
+                    },
+                    "retry": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "The request failed. The error tells why.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "An outside service is not set up, or it did not answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/personas/{persona_id}/forks/draft": {
+      "post": {
+        "tags": [
+          "forks"
+        ],
+        "summary": "Draft Persona Forks",
+        "description": "Writes forks of the persona, each a persona the console can create with its\nforked_from_id. Nothing is saved.",
+        "operationId": "draft_persona_forks_api_v1_personas__persona_id__forks_draft_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "persona_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Persona Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ForkRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/event-stream": {
+                "itemSchema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "string"
+                    },
+                    "event": {
+                      "type": "string"
+                    },
+                    "id": {
+                      "type": "string"
+                    },
+                    "retry": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "The request failed. The error tells why.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "An outside service is not set up, or it did not answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/judges/agreement": {
       "get": {
         "tags": [
@@ -2262,6 +2431,55 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Page_PersonaRead_"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "The request failed. The error tells why.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/personas/{persona_id}/fork": {
+      "post": {
+        "tags": [
+          "personas"
+        ],
+        "summary": "Fork Persona",
+        "description": "A copy of the persona named \"\u2026 (fork)\", for the person to change.",
+        "operationId": "fork_persona_api_v1_personas__persona_id__fork_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "persona_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Persona Id"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PersonaRead"
                 }
               }
             }
@@ -3841,6 +4059,55 @@
         }
       }
     },
+    "/api/v1/scenarios/{scenario_id}/fork": {
+      "post": {
+        "tags": [
+          "scenarios"
+        ],
+        "summary": "Fork Scenario",
+        "description": "A copy of the scenario named \"\u2026 (fork)\", for the person to change.",
+        "operationId": "fork_scenario_api_v1_scenarios__scenario_id__fork_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "scenario_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Scenario Id"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScenarioRead"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "The request failed. The error tells why.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/scenarios/{scenario_id}/versions": {
       "get": {
         "tags": [
@@ -5371,6 +5638,18 @@
             "type": "integer",
             "title": "Current Version"
           },
+          "forked_from_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Forked From Id"
+          },
           "created_at": {
             "type": "string",
             "format": "date-time",
@@ -5436,6 +5715,7 @@
           "language",
           "brief",
           "current_version",
+          "forked_from_id",
           "created_at",
           "updated_at",
           "config",
@@ -5524,6 +5804,18 @@
             "type": "integer",
             "title": "Current Version"
           },
+          "forked_from_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Forked From Id"
+          },
           "created_at": {
             "type": "string",
             "format": "date-time",
@@ -5549,6 +5841,7 @@
           "language",
           "brief",
           "current_version",
+          "forked_from_id",
           "created_at",
           "updated_at"
         ],
@@ -7366,6 +7659,30 @@
         ],
         "title": "FieldError"
       },
+      "ForkRequest": {
+        "properties": {
+          "instruction": {
+            "type": "string",
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Instruction"
+          },
+          "count": {
+            "type": "integer",
+            "maximum": 5.0,
+            "minimum": 1.0,
+            "title": "Count"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "instruction",
+          "count"
+        ],
+        "title": "ForkRequest",
+        "description": "What the forks of a scenario or a persona change, and how many to write."
+      },
       "GenerateScenarios": {
         "properties": {
           "mode": {
@@ -8941,6 +9258,18 @@
             "maxLength": 80,
             "minLength": 1,
             "title": "Name"
+          },
+          "forked_from_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Forked From Id"
           }
         },
         "additionalProperties": false,
@@ -9073,6 +9402,18 @@
             "type": "integer",
             "title": "Current Version"
           },
+          "forked_from_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Forked From Id"
+          },
           "created_at": {
             "type": "string",
             "format": "date-time",
@@ -9096,6 +9437,7 @@
           "surroundings",
           "sample_line",
           "current_version",
+          "forked_from_id",
           "created_at",
           "updated_at"
         ],
@@ -11312,6 +11654,18 @@
             "type": "string",
             "format": "uuid",
             "title": "Persona Id"
+          },
+          "forked_from_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Forked From Id"
           }
         },
         "additionalProperties": false,
@@ -11449,6 +11803,18 @@
             "type": "integer",
             "title": "Current Version"
           },
+          "forked_from_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Forked From Id"
+          },
           "created_at": {
             "type": "string",
             "format": "date-time",
@@ -11477,6 +11843,7 @@
           "first_words",
           "caller",
           "current_version",
+          "forked_from_id",
           "created_at",
           "updated_at"
         ],

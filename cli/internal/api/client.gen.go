@@ -1103,6 +1103,7 @@ type AgentRead struct {
 	CurrentVersion   int                     `json:"current_version"`
 	Direction        Direction               `json:"direction"`
 	ExternalId       *string                 `json:"external_id"`
+	ForkedFromId     *openapi_types.UUID     `json:"forked_from_id"`
 	Id               openapi_types.UUID      `json:"id"`
 	KnowledgeBase    []KnowledgeBaseDocument `json:"knowledge_base"`
 	Language         Language                `json:"language"`
@@ -1128,17 +1129,18 @@ type AgentSource string
 
 // AgentSummary An agent without its config and knowledge base, for lists.
 type AgentSummary struct {
-	AgentNumber      *string            `json:"agent_number"`
-	AgentSpeaksFirst bool               `json:"agent_speaks_first"`
-	Brief            string             `json:"brief"`
-	CreatedAt        time.Time          `json:"created_at"`
-	CurrentVersion   int                `json:"current_version"`
-	Direction        Direction          `json:"direction"`
-	ExternalId       *string            `json:"external_id"`
-	Id               openapi_types.UUID `json:"id"`
-	Language         Language           `json:"language"`
-	Name             string             `json:"name"`
-	Outbound         *OutboundConfig    `json:"outbound"`
+	AgentNumber      *string             `json:"agent_number"`
+	AgentSpeaksFirst bool                `json:"agent_speaks_first"`
+	Brief            string              `json:"brief"`
+	CreatedAt        time.Time           `json:"created_at"`
+	CurrentVersion   int                 `json:"current_version"`
+	Direction        Direction           `json:"direction"`
+	ExternalId       *string             `json:"external_id"`
+	ForkedFromId     *openapi_types.UUID `json:"forked_from_id"`
+	Id               openapi_types.UUID  `json:"id"`
+	Language         Language            `json:"language"`
+	Name             string              `json:"name"`
+	Outbound         *OutboundConfig     `json:"outbound"`
 
 	// Source Where an agent came from: made in Yaksha, or imported from a file or a provider.
 	Source AgentSource `json:"source"`
@@ -1514,6 +1516,12 @@ type FieldErrorLoc1 = int
 // FieldError_Loc_Item defines model for FieldError.loc.Item.
 type FieldError_Loc_Item struct {
 	union json.RawMessage
+}
+
+// ForkRequest What the forks of a scenario or a persona change, and how many to write.
+type ForkRequest struct {
+	Count       int    `json:"count"`
+	Instruction string `json:"instruction"`
 }
 
 // GenerateScenarios defines model for GenerateScenarios.
@@ -1892,10 +1900,11 @@ type PersonaConfig struct {
 
 // PersonaCreate defines model for PersonaCreate.
 type PersonaCreate struct {
-	Language   *Language `json:"language,omitempty"`
-	Name       string    `json:"name"`
-	Prompt     string    `json:"prompt"`
-	SampleLine *string   `json:"sample_line,omitempty"`
+	ForkedFromId *openapi_types.UUID `json:"forked_from_id,omitempty"`
+	Language     *Language           `json:"language,omitempty"`
+	Name         string              `json:"name"`
+	Prompt       string              `json:"prompt"`
+	SampleLine   *string             `json:"sample_line,omitempty"`
 
 	// Surroundings What the agent hears behind the caller. No sounds and no auto noise is a quiet room.
 	Surroundings *Surroundings `json:"surroundings,omitempty"`
@@ -1926,14 +1935,15 @@ type PersonaIdea struct {
 
 // PersonaRead defines model for PersonaRead.
 type PersonaRead struct {
-	BuiltinKey     *string            `json:"builtin_key"`
-	CreatedAt      time.Time          `json:"created_at"`
-	CurrentVersion int                `json:"current_version"`
-	Id             openapi_types.UUID `json:"id"`
-	Language       Language           `json:"language"`
-	Name           string             `json:"name"`
-	Prompt         string             `json:"prompt"`
-	SampleLine     *string            `json:"sample_line"`
+	BuiltinKey     *string             `json:"builtin_key"`
+	CreatedAt      time.Time           `json:"created_at"`
+	CurrentVersion int                 `json:"current_version"`
+	ForkedFromId   *openapi_types.UUID `json:"forked_from_id"`
+	Id             openapi_types.UUID  `json:"id"`
+	Language       Language            `json:"language"`
+	Name           string              `json:"name"`
+	Prompt         string              `json:"prompt"`
+	SampleLine     *string             `json:"sample_line"`
 
 	// Surroundings What the agent hears behind the caller. No sounds and no auto noise is a quiet room.
 	Surroundings Surroundings `json:"surroundings"`
@@ -2373,15 +2383,16 @@ type ScenarioCreate struct {
 	Caller    *CallerModel `json:"caller,omitempty"`
 
 	// Category What kind of situation a scenario tests. How the caller talks comes from the persona.
-	Category     *Category          `json:"category,omitempty"`
-	Criteria     []string           `json:"criteria"`
-	Description  *string            `json:"description,omitempty"`
-	FirstWords   *string            `json:"first_words,omitempty"`
-	Instructions string             `json:"instructions"`
-	KnownFacts   *[]Fact            `json:"known_facts,omitempty"`
-	Name         string             `json:"name"`
-	PersonaId    openapi_types.UUID `json:"persona_id"`
-	UnknownFacts *[]string          `json:"unknown_facts,omitempty"`
+	Category     *Category           `json:"category,omitempty"`
+	Criteria     []string            `json:"criteria"`
+	Description  *string             `json:"description,omitempty"`
+	FirstWords   *string             `json:"first_words,omitempty"`
+	ForkedFromId *openapi_types.UUID `json:"forked_from_id,omitempty"`
+	Instructions string              `json:"instructions"`
+	KnownFacts   *[]Fact             `json:"known_facts,omitempty"`
+	Name         string              `json:"name"`
+	PersonaId    openapi_types.UUID  `json:"persona_id"`
+	UnknownFacts *[]string           `json:"unknown_facts,omitempty"`
 }
 
 // ScenarioDelete Scenarios of one agent to delete together: all of them, or none if one is missing.
@@ -2402,6 +2413,7 @@ type ScenarioRead struct {
 	CurrentVersion int                 `json:"current_version"`
 	Description    *string             `json:"description"`
 	FirstWords     *string             `json:"first_words"`
+	ForkedFromId   *openapi_types.UUID `json:"forked_from_id"`
 	GenerationId   *openapi_types.UUID `json:"generation_id"`
 	Id             openapi_types.UUID  `json:"id"`
 	Instructions   string              `json:"instructions"`
@@ -2908,6 +2920,9 @@ type DraftNewPersonaApiV1PersonasDraftPostJSONRequestBody = PersonaIdea
 // UpdatePersonaApiV1PersonasPersonaIdPatchJSONRequestBody defines body for UpdatePersonaApiV1PersonasPersonaIdPatch for application/json ContentType.
 type UpdatePersonaApiV1PersonasPersonaIdPatchJSONRequestBody = PersonaUpdate
 
+// DraftPersonaForksApiV1PersonasPersonaIdForksDraftPostJSONRequestBody defines body for DraftPersonaForksApiV1PersonasPersonaIdForksDraftPost for application/json ContentType.
+type DraftPersonaForksApiV1PersonasPersonaIdForksDraftPostJSONRequestBody = ForkRequest
+
 // LabelItemApiV1ReviewItemsItemIdLabelsPostJSONRequestBody defines body for LabelItemApiV1ReviewItemsItemIdLabelsPost for application/json ContentType.
 type LabelItemApiV1ReviewItemsItemIdLabelsPostJSONRequestBody = LabelCreate
 
@@ -2916,6 +2931,9 @@ type CreateRunApiV1RunsPostJSONRequestBody = RunCreate
 
 // UpdateScenarioApiV1ScenariosScenarioIdPatchJSONRequestBody defines body for UpdateScenarioApiV1ScenariosScenarioIdPatch for application/json ContentType.
 type UpdateScenarioApiV1ScenariosScenarioIdPatchJSONRequestBody = ScenarioUpdate
+
+// DraftScenarioForksApiV1ScenariosScenarioIdForksDraftPostJSONRequestBody defines body for DraftScenarioForksApiV1ScenariosScenarioIdForksDraftPost for application/json ContentType.
+type DraftScenarioForksApiV1ScenariosScenarioIdForksDraftPostJSONRequestBody = ForkRequest
 
 // ImportSettingsApiV1SettingsImportPostJSONRequestBody defines body for ImportSettingsApiV1SettingsImportPost for application/json ContentType.
 type ImportSettingsApiV1SettingsImportPostJSONRequestBody = SettingsImport
@@ -3760,10 +3778,13 @@ type ClientInterface interface {
 	// Corresponds with PATCH /api/v1/agents/{agent_id} (the `UpdateAgentApiV1AgentsAgentIdPatch` operationId).
 	UpdateAgentApiV1AgentsAgentIdPatch(ctx context.Context, agentId openapi_types.UUID, body UpdateAgentApiV1AgentsAgentIdPatchJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// DuplicateAgentApiV1AgentsAgentIdDuplicatePost Duplicate Agent
+	// ForkAgentApiV1AgentsAgentIdForkPost Fork Agent
 	//
-	// Corresponds with POST /api/v1/agents/{agent_id}/duplicate (the `DuplicateAgentApiV1AgentsAgentIdDuplicatePost` operationId).
-	DuplicateAgentApiV1AgentsAgentIdDuplicatePost(ctx context.Context, agentId openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error)
+	// A copy of the agent and its live scenarios. It calls the same agent until its number or
+	// trigger changes.
+	//
+	// Corresponds with POST /api/v1/agents/{agent_id}/fork (the `ForkAgentApiV1AgentsAgentIdForkPost` operationId).
+	ForkAgentApiV1AgentsAgentIdForkPost(ctx context.Context, agentId openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetRuleResultsApiV1AgentsAgentIdRuleResultsGet Get Rule Results
 	//
@@ -4048,6 +4069,33 @@ type ClientInterface interface {
 	// Corresponds with PATCH /api/v1/personas/{persona_id} (the `UpdatePersonaApiV1PersonasPersonaIdPatch` operationId).
 	UpdatePersonaApiV1PersonasPersonaIdPatch(ctx context.Context, personaId openapi_types.UUID, body UpdatePersonaApiV1PersonasPersonaIdPatchJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// ForkPersonaApiV1PersonasPersonaIdForkPost Fork Persona
+	//
+	// A copy of the persona named "… (fork)", for the person to change.
+	//
+	// Corresponds with POST /api/v1/personas/{persona_id}/fork (the `ForkPersonaApiV1PersonasPersonaIdForkPost` operationId).
+	ForkPersonaApiV1PersonasPersonaIdForkPost(ctx context.Context, personaId openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DraftPersonaForksApiV1PersonasPersonaIdForksDraftPostWithBody Draft Persona Forks
+	//
+	// Writes forks of the persona, each a persona the console can create with its
+	// forked_from_id. Nothing is saved.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /api/v1/personas/{persona_id}/forks/draft (the `DraftPersonaForksApiV1PersonasPersonaIdForksDraftPost` operationId).
+	DraftPersonaForksApiV1PersonasPersonaIdForksDraftPostWithBody(ctx context.Context, personaId openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DraftPersonaForksApiV1PersonasPersonaIdForksDraftPost Draft Persona Forks
+	//
+	// Writes forks of the persona, each a persona the console can create with its
+	// forked_from_id. Nothing is saved.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /api/v1/personas/{persona_id}/forks/draft (the `DraftPersonaForksApiV1PersonasPersonaIdForksDraftPost` operationId).
+	DraftPersonaForksApiV1PersonasPersonaIdForksDraftPost(ctx context.Context, personaId openapi_types.UUID, body DraftPersonaForksApiV1PersonasPersonaIdForksDraftPostJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// ListPersonaScenariosApiV1PersonasPersonaIdScenariosGet List Persona Scenarios
 	//
 	// The live scenarios that use the persona; a persona is deleted only when none does.
@@ -4182,6 +4230,33 @@ type ClientInterface interface {
 	//
 	// Corresponds with PATCH /api/v1/scenarios/{scenario_id} (the `UpdateScenarioApiV1ScenariosScenarioIdPatch` operationId).
 	UpdateScenarioApiV1ScenariosScenarioIdPatch(ctx context.Context, scenarioId openapi_types.UUID, body UpdateScenarioApiV1ScenariosScenarioIdPatchJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ForkScenarioApiV1ScenariosScenarioIdForkPost Fork Scenario
+	//
+	// A copy of the scenario named "… (fork)", for the person to change.
+	//
+	// Corresponds with POST /api/v1/scenarios/{scenario_id}/fork (the `ForkScenarioApiV1ScenariosScenarioIdForkPost` operationId).
+	ForkScenarioApiV1ScenariosScenarioIdForkPost(ctx context.Context, scenarioId openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DraftScenarioForksApiV1ScenariosScenarioIdForksDraftPostWithBody Draft Scenario Forks
+	//
+	// Writes forks of the scenario, each a scenario the console can create with its
+	// forked_from_id. Nothing is saved.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /api/v1/scenarios/{scenario_id}/forks/draft (the `DraftScenarioForksApiV1ScenariosScenarioIdForksDraftPost` operationId).
+	DraftScenarioForksApiV1ScenariosScenarioIdForksDraftPostWithBody(ctx context.Context, scenarioId openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DraftScenarioForksApiV1ScenariosScenarioIdForksDraftPost Draft Scenario Forks
+	//
+	// Writes forks of the scenario, each a scenario the console can create with its
+	// forked_from_id. Nothing is saved.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /api/v1/scenarios/{scenario_id}/forks/draft (the `DraftScenarioForksApiV1ScenariosScenarioIdForksDraftPost` operationId).
+	DraftScenarioForksApiV1ScenariosScenarioIdForksDraftPost(ctx context.Context, scenarioId openapi_types.UUID, body DraftScenarioForksApiV1ScenariosScenarioIdForksDraftPostJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListVersionsApiV1ScenariosScenarioIdVersionsGet List Versions
 	//
@@ -5008,11 +5083,14 @@ func (c *Client) UpdateAgentApiV1AgentsAgentIdPatch(ctx context.Context, agentId
 	return c.Client.Do(req)
 }
 
-// DuplicateAgentApiV1AgentsAgentIdDuplicatePost Duplicate Agent
+// ForkAgentApiV1AgentsAgentIdForkPost Fork Agent
 //
-// Corresponds with POST /api/v1/agents/{agent_id}/duplicate (the `DuplicateAgentApiV1AgentsAgentIdDuplicatePost` operationId).
-func (c *Client) DuplicateAgentApiV1AgentsAgentIdDuplicatePost(ctx context.Context, agentId openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewDuplicateAgentApiV1AgentsAgentIdDuplicatePostRequest(c.Server, agentId)
+// A copy of the agent and its live scenarios. It calls the same agent until its number or
+// trigger changes.
+//
+// Corresponds with POST /api/v1/agents/{agent_id}/fork (the `ForkAgentApiV1AgentsAgentIdForkPost` operationId).
+func (c *Client) ForkAgentApiV1AgentsAgentIdForkPost(ctx context.Context, agentId openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewForkAgentApiV1AgentsAgentIdForkPostRequest(c.Server, agentId)
 	if err != nil {
 		return nil, err
 	}
@@ -5726,6 +5804,63 @@ func (c *Client) UpdatePersonaApiV1PersonasPersonaIdPatch(ctx context.Context, p
 	return c.Client.Do(req)
 }
 
+// ForkPersonaApiV1PersonasPersonaIdForkPost Fork Persona
+//
+// A copy of the persona named "… (fork)", for the person to change.
+//
+// Corresponds with POST /api/v1/personas/{persona_id}/fork (the `ForkPersonaApiV1PersonasPersonaIdForkPost` operationId).
+func (c *Client) ForkPersonaApiV1PersonasPersonaIdForkPost(ctx context.Context, personaId openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewForkPersonaApiV1PersonasPersonaIdForkPostRequest(c.Server, personaId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DraftPersonaForksApiV1PersonasPersonaIdForksDraftPostWithBody Draft Persona Forks
+//
+// Writes forks of the persona, each a persona the console can create with its
+// forked_from_id. Nothing is saved.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /api/v1/personas/{persona_id}/forks/draft (the `DraftPersonaForksApiV1PersonasPersonaIdForksDraftPost` operationId).
+func (c *Client) DraftPersonaForksApiV1PersonasPersonaIdForksDraftPostWithBody(ctx context.Context, personaId openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDraftPersonaForksApiV1PersonasPersonaIdForksDraftPostRequestWithBody(c.Server, personaId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DraftPersonaForksApiV1PersonasPersonaIdForksDraftPost Draft Persona Forks
+//
+// Writes forks of the persona, each a persona the console can create with its
+// forked_from_id. Nothing is saved.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /api/v1/personas/{persona_id}/forks/draft (the `DraftPersonaForksApiV1PersonasPersonaIdForksDraftPost` operationId).
+func (c *Client) DraftPersonaForksApiV1PersonasPersonaIdForksDraftPost(ctx context.Context, personaId openapi_types.UUID, body DraftPersonaForksApiV1PersonasPersonaIdForksDraftPostJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDraftPersonaForksApiV1PersonasPersonaIdForksDraftPostRequest(c.Server, personaId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // ListPersonaScenariosApiV1PersonasPersonaIdScenariosGet List Persona Scenarios
 //
 // The live scenarios that use the persona; a persona is deleted only when none does.
@@ -6051,6 +6186,63 @@ func (c *Client) UpdateScenarioApiV1ScenariosScenarioIdPatchWithBody(ctx context
 // Corresponds with PATCH /api/v1/scenarios/{scenario_id} (the `UpdateScenarioApiV1ScenariosScenarioIdPatch` operationId).
 func (c *Client) UpdateScenarioApiV1ScenariosScenarioIdPatch(ctx context.Context, scenarioId openapi_types.UUID, body UpdateScenarioApiV1ScenariosScenarioIdPatchJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewUpdateScenarioApiV1ScenariosScenarioIdPatchRequest(c.Server, scenarioId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ForkScenarioApiV1ScenariosScenarioIdForkPost Fork Scenario
+//
+// A copy of the scenario named "… (fork)", for the person to change.
+//
+// Corresponds with POST /api/v1/scenarios/{scenario_id}/fork (the `ForkScenarioApiV1ScenariosScenarioIdForkPost` operationId).
+func (c *Client) ForkScenarioApiV1ScenariosScenarioIdForkPost(ctx context.Context, scenarioId openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewForkScenarioApiV1ScenariosScenarioIdForkPostRequest(c.Server, scenarioId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DraftScenarioForksApiV1ScenariosScenarioIdForksDraftPostWithBody Draft Scenario Forks
+//
+// Writes forks of the scenario, each a scenario the console can create with its
+// forked_from_id. Nothing is saved.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /api/v1/scenarios/{scenario_id}/forks/draft (the `DraftScenarioForksApiV1ScenariosScenarioIdForksDraftPost` operationId).
+func (c *Client) DraftScenarioForksApiV1ScenariosScenarioIdForksDraftPostWithBody(ctx context.Context, scenarioId openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDraftScenarioForksApiV1ScenariosScenarioIdForksDraftPostRequestWithBody(c.Server, scenarioId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DraftScenarioForksApiV1ScenariosScenarioIdForksDraftPost Draft Scenario Forks
+//
+// Writes forks of the scenario, each a scenario the console can create with its
+// forked_from_id. Nothing is saved.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /api/v1/scenarios/{scenario_id}/forks/draft (the `DraftScenarioForksApiV1ScenariosScenarioIdForksDraftPost` operationId).
+func (c *Client) DraftScenarioForksApiV1ScenariosScenarioIdForksDraftPost(ctx context.Context, scenarioId openapi_types.UUID, body DraftScenarioForksApiV1ScenariosScenarioIdForksDraftPostJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDraftScenarioForksApiV1ScenariosScenarioIdForksDraftPostRequest(c.Server, scenarioId, body)
 	if err != nil {
 		return nil, err
 	}
@@ -7377,8 +7569,8 @@ func NewUpdateAgentApiV1AgentsAgentIdPatchRequestWithBody(server string, agentId
 	return req, nil
 }
 
-// NewDuplicateAgentApiV1AgentsAgentIdDuplicatePostRequest constructs an http.Request for the DuplicateAgentApiV1AgentsAgentIdDuplicatePost method
-func NewDuplicateAgentApiV1AgentsAgentIdDuplicatePostRequest(server string, agentId openapi_types.UUID) (*http.Request, error) {
+// NewForkAgentApiV1AgentsAgentIdForkPostRequest constructs an http.Request for the ForkAgentApiV1AgentsAgentIdForkPost method
+func NewForkAgentApiV1AgentsAgentIdForkPostRequest(server string, agentId openapi_types.UUID) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -7393,7 +7585,7 @@ func NewDuplicateAgentApiV1AgentsAgentIdDuplicatePostRequest(server string, agen
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/v1/agents/%s/duplicate", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/agents/%s/fork", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -8873,6 +9065,87 @@ func NewUpdatePersonaApiV1PersonasPersonaIdPatchRequestWithBody(server string, p
 	return req, nil
 }
 
+// NewForkPersonaApiV1PersonasPersonaIdForkPostRequest constructs an http.Request for the ForkPersonaApiV1PersonasPersonaIdForkPost method
+func NewForkPersonaApiV1PersonasPersonaIdForkPostRequest(server string, personaId openapi_types.UUID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "persona_id", personaId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/personas/%s/fork", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewDraftPersonaForksApiV1PersonasPersonaIdForksDraftPostRequest calls the generic DraftPersonaForksApiV1PersonasPersonaIdForksDraftPost builder with application/json body
+func NewDraftPersonaForksApiV1PersonasPersonaIdForksDraftPostRequest(server string, personaId openapi_types.UUID, body DraftPersonaForksApiV1PersonasPersonaIdForksDraftPostJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewDraftPersonaForksApiV1PersonasPersonaIdForksDraftPostRequestWithBody(server, personaId, "application/json", bodyReader)
+}
+
+// NewDraftPersonaForksApiV1PersonasPersonaIdForksDraftPostRequestWithBody constructs an http.Request for the DraftPersonaForksApiV1PersonasPersonaIdForksDraftPost method, with any body, and a specified content type
+func NewDraftPersonaForksApiV1PersonasPersonaIdForksDraftPostRequestWithBody(server string, personaId openapi_types.UUID, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "persona_id", personaId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/personas/%s/forks/draft", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 // NewListPersonaScenariosApiV1PersonasPersonaIdScenariosGetRequest constructs an http.Request for the ListPersonaScenariosApiV1PersonasPersonaIdScenariosGet method
 func NewListPersonaScenariosApiV1PersonasPersonaIdScenariosGetRequest(server string, personaId openapi_types.UUID) (*http.Request, error) {
 	var err error
@@ -9628,6 +9901,87 @@ func NewUpdateScenarioApiV1ScenariosScenarioIdPatchRequestWithBody(server string
 	}
 
 	req, err := http.NewRequest(http.MethodPatch, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewForkScenarioApiV1ScenariosScenarioIdForkPostRequest constructs an http.Request for the ForkScenarioApiV1ScenariosScenarioIdForkPost method
+func NewForkScenarioApiV1ScenariosScenarioIdForkPostRequest(server string, scenarioId openapi_types.UUID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "scenario_id", scenarioId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/scenarios/%s/fork", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewDraftScenarioForksApiV1ScenariosScenarioIdForksDraftPostRequest calls the generic DraftScenarioForksApiV1ScenariosScenarioIdForksDraftPost builder with application/json body
+func NewDraftScenarioForksApiV1ScenariosScenarioIdForksDraftPostRequest(server string, scenarioId openapi_types.UUID, body DraftScenarioForksApiV1ScenariosScenarioIdForksDraftPostJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewDraftScenarioForksApiV1ScenariosScenarioIdForksDraftPostRequestWithBody(server, scenarioId, "application/json", bodyReader)
+}
+
+// NewDraftScenarioForksApiV1ScenariosScenarioIdForksDraftPostRequestWithBody constructs an http.Request for the DraftScenarioForksApiV1ScenariosScenarioIdForksDraftPost method, with any body, and a specified content type
+func NewDraftScenarioForksApiV1ScenariosScenarioIdForksDraftPostRequestWithBody(server string, scenarioId openapi_types.UUID, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "scenario_id", scenarioId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/scenarios/%s/forks/draft", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
 	if err != nil {
 		return nil, err
 	}
@@ -10908,12 +11262,15 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with PATCH /api/v1/agents/{agent_id} (the `UpdateAgentApiV1AgentsAgentIdPatch` operationId).
 	UpdateAgentApiV1AgentsAgentIdPatchWithResponse(ctx context.Context, agentId openapi_types.UUID, body UpdateAgentApiV1AgentsAgentIdPatchJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateAgentApiV1AgentsAgentIdPatchResponse, error)
 
-	// DuplicateAgentApiV1AgentsAgentIdDuplicatePostWithResponse Duplicate Agent
+	// ForkAgentApiV1AgentsAgentIdForkPostWithResponse Fork Agent
+	//
+	// A copy of the agent and its live scenarios. It calls the same agent until its number or
+	// trigger changes.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
-	// Corresponds with POST /api/v1/agents/{agent_id}/duplicate (the `DuplicateAgentApiV1AgentsAgentIdDuplicatePost` operationId).
-	DuplicateAgentApiV1AgentsAgentIdDuplicatePostWithResponse(ctx context.Context, agentId openapi_types.UUID, reqEditors ...RequestEditorFn) (*DuplicateAgentApiV1AgentsAgentIdDuplicatePostResponse, error)
+	// Corresponds with POST /api/v1/agents/{agent_id}/fork (the `ForkAgentApiV1AgentsAgentIdForkPost` operationId).
+	ForkAgentApiV1AgentsAgentIdForkPostWithResponse(ctx context.Context, agentId openapi_types.UUID, reqEditors ...RequestEditorFn) (*ForkAgentApiV1AgentsAgentIdForkPostResponse, error)
 
 	// GetRuleResultsApiV1AgentsAgentIdRuleResultsGetWithResponse Get Rule Results
 	//
@@ -11244,6 +11601,35 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with PATCH /api/v1/personas/{persona_id} (the `UpdatePersonaApiV1PersonasPersonaIdPatch` operationId).
 	UpdatePersonaApiV1PersonasPersonaIdPatchWithResponse(ctx context.Context, personaId openapi_types.UUID, body UpdatePersonaApiV1PersonasPersonaIdPatchJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdatePersonaApiV1PersonasPersonaIdPatchResponse, error)
 
+	// ForkPersonaApiV1PersonasPersonaIdForkPostWithResponse Fork Persona
+	//
+	// A copy of the persona named "… (fork)", for the person to change.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/personas/{persona_id}/fork (the `ForkPersonaApiV1PersonasPersonaIdForkPost` operationId).
+	ForkPersonaApiV1PersonasPersonaIdForkPostWithResponse(ctx context.Context, personaId openapi_types.UUID, reqEditors ...RequestEditorFn) (*ForkPersonaApiV1PersonasPersonaIdForkPostResponse, error)
+
+	// DraftPersonaForksApiV1PersonasPersonaIdForksDraftPostWithBodyWithResponse Draft Persona Forks
+	//
+	// Writes forks of the persona, each a persona the console can create with its
+	// forked_from_id. Nothing is saved.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/personas/{persona_id}/forks/draft (the `DraftPersonaForksApiV1PersonasPersonaIdForksDraftPost` operationId).
+	DraftPersonaForksApiV1PersonasPersonaIdForksDraftPostWithBodyWithResponse(ctx context.Context, personaId openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*DraftPersonaForksApiV1PersonasPersonaIdForksDraftPostResponse, error)
+
+	// DraftPersonaForksApiV1PersonasPersonaIdForksDraftPostWithResponse Draft Persona Forks
+	//
+	// Writes forks of the persona, each a persona the console can create with its
+	// forked_from_id. Nothing is saved.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/personas/{persona_id}/forks/draft (the `DraftPersonaForksApiV1PersonasPersonaIdForksDraftPost` operationId).
+	DraftPersonaForksApiV1PersonasPersonaIdForksDraftPostWithResponse(ctx context.Context, personaId openapi_types.UUID, body DraftPersonaForksApiV1PersonasPersonaIdForksDraftPostJSONRequestBody, reqEditors ...RequestEditorFn) (*DraftPersonaForksApiV1PersonasPersonaIdForksDraftPostResponse, error)
+
 	// ListPersonaScenariosApiV1PersonasPersonaIdScenariosGetWithResponse List Persona Scenarios
 	//
 	// The live scenarios that use the persona; a persona is deleted only when none does.
@@ -11406,6 +11792,35 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with PATCH /api/v1/scenarios/{scenario_id} (the `UpdateScenarioApiV1ScenariosScenarioIdPatch` operationId).
 	UpdateScenarioApiV1ScenariosScenarioIdPatchWithResponse(ctx context.Context, scenarioId openapi_types.UUID, body UpdateScenarioApiV1ScenariosScenarioIdPatchJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateScenarioApiV1ScenariosScenarioIdPatchResponse, error)
+
+	// ForkScenarioApiV1ScenariosScenarioIdForkPostWithResponse Fork Scenario
+	//
+	// A copy of the scenario named "… (fork)", for the person to change.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/scenarios/{scenario_id}/fork (the `ForkScenarioApiV1ScenariosScenarioIdForkPost` operationId).
+	ForkScenarioApiV1ScenariosScenarioIdForkPostWithResponse(ctx context.Context, scenarioId openapi_types.UUID, reqEditors ...RequestEditorFn) (*ForkScenarioApiV1ScenariosScenarioIdForkPostResponse, error)
+
+	// DraftScenarioForksApiV1ScenariosScenarioIdForksDraftPostWithBodyWithResponse Draft Scenario Forks
+	//
+	// Writes forks of the scenario, each a scenario the console can create with its
+	// forked_from_id. Nothing is saved.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/scenarios/{scenario_id}/forks/draft (the `DraftScenarioForksApiV1ScenariosScenarioIdForksDraftPost` operationId).
+	DraftScenarioForksApiV1ScenariosScenarioIdForksDraftPostWithBodyWithResponse(ctx context.Context, scenarioId openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*DraftScenarioForksApiV1ScenariosScenarioIdForksDraftPostResponse, error)
+
+	// DraftScenarioForksApiV1ScenariosScenarioIdForksDraftPostWithResponse Draft Scenario Forks
+	//
+	// Writes forks of the scenario, each a scenario the console can create with its
+	// forked_from_id. Nothing is saved.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/scenarios/{scenario_id}/forks/draft (the `DraftScenarioForksApiV1ScenariosScenarioIdForksDraftPost` operationId).
+	DraftScenarioForksApiV1ScenariosScenarioIdForksDraftPostWithResponse(ctx context.Context, scenarioId openapi_types.UUID, body DraftScenarioForksApiV1ScenariosScenarioIdForksDraftPostJSONRequestBody, reqEditors ...RequestEditorFn) (*DraftScenarioForksApiV1ScenariosScenarioIdForksDraftPostResponse, error)
 
 	// ListVersionsApiV1ScenariosScenarioIdVersionsGetWithResponse List Versions
 	//
@@ -12556,7 +12971,7 @@ func (r UpdateAgentApiV1AgentsAgentIdPatchResponse) ContentType() string {
 	return ""
 }
 
-type DuplicateAgentApiV1AgentsAgentIdDuplicatePostResponse struct {
+type ForkAgentApiV1AgentsAgentIdForkPostResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	// JSON201 the response for an HTTP 201 `application/json` response
@@ -12566,22 +12981,22 @@ type DuplicateAgentApiV1AgentsAgentIdDuplicatePostResponse struct {
 }
 
 // GetJSON201 returns the response for an HTTP 201 `application/json` response
-func (r DuplicateAgentApiV1AgentsAgentIdDuplicatePostResponse) GetJSON201() *AgentRead {
+func (r ForkAgentApiV1AgentsAgentIdForkPostResponse) GetJSON201() *AgentRead {
 	return r.JSON201
 }
 
 // GetJSON4XX returns the response for an HTTP 4XX `application/json` response
-func (r DuplicateAgentApiV1AgentsAgentIdDuplicatePostResponse) GetJSON4XX() *ErrorResponse {
+func (r ForkAgentApiV1AgentsAgentIdForkPostResponse) GetJSON4XX() *ErrorResponse {
 	return r.JSON4XX
 }
 
 // GetBody returns the raw response body bytes
-func (r DuplicateAgentApiV1AgentsAgentIdDuplicatePostResponse) GetBody() []byte {
+func (r ForkAgentApiV1AgentsAgentIdForkPostResponse) GetBody() []byte {
 	return r.Body
 }
 
 // Status returns HTTPResponse.Status
-func (r DuplicateAgentApiV1AgentsAgentIdDuplicatePostResponse) Status() string {
+func (r ForkAgentApiV1AgentsAgentIdForkPostResponse) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -12589,7 +13004,7 @@ func (r DuplicateAgentApiV1AgentsAgentIdDuplicatePostResponse) Status() string {
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r DuplicateAgentApiV1AgentsAgentIdDuplicatePostResponse) StatusCode() int {
+func (r ForkAgentApiV1AgentsAgentIdForkPostResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -12597,7 +13012,7 @@ func (r DuplicateAgentApiV1AgentsAgentIdDuplicatePostResponse) StatusCode() int 
 }
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r DuplicateAgentApiV1AgentsAgentIdDuplicatePostResponse) ContentType() string {
+func (r ForkAgentApiV1AgentsAgentIdForkPostResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -14167,6 +14582,102 @@ func (r UpdatePersonaApiV1PersonasPersonaIdPatchResponse) ContentType() string {
 	return ""
 }
 
+type ForkPersonaApiV1PersonasPersonaIdForkPostResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON201 the response for an HTTP 201 `application/json` response
+	JSON201 *PersonaRead
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
+}
+
+// GetJSON201 returns the response for an HTTP 201 `application/json` response
+func (r ForkPersonaApiV1PersonasPersonaIdForkPostResponse) GetJSON201() *PersonaRead {
+	return r.JSON201
+}
+
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r ForkPersonaApiV1PersonasPersonaIdForkPostResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
+}
+
+// GetBody returns the raw response body bytes
+func (r ForkPersonaApiV1PersonasPersonaIdForkPostResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ForkPersonaApiV1PersonasPersonaIdForkPostResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ForkPersonaApiV1PersonasPersonaIdForkPostResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ForkPersonaApiV1PersonasPersonaIdForkPostResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type DraftPersonaForksApiV1PersonasPersonaIdForksDraftPostResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *ErrorResponse
+}
+
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r DraftPersonaForksApiV1PersonasPersonaIdForksDraftPostResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r DraftPersonaForksApiV1PersonasPersonaIdForksDraftPostResponse) GetJSON503() *ErrorResponse {
+	return r.JSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r DraftPersonaForksApiV1PersonasPersonaIdForksDraftPostResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r DraftPersonaForksApiV1PersonasPersonaIdForksDraftPostResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DraftPersonaForksApiV1PersonasPersonaIdForksDraftPostResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r DraftPersonaForksApiV1PersonasPersonaIdForksDraftPostResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type ListPersonaScenariosApiV1PersonasPersonaIdScenariosGetResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -14970,6 +15481,102 @@ func (r UpdateScenarioApiV1ScenariosScenarioIdPatchResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r UpdateScenarioApiV1ScenariosScenarioIdPatchResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type ForkScenarioApiV1ScenariosScenarioIdForkPostResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON201 the response for an HTTP 201 `application/json` response
+	JSON201 *ScenarioRead
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
+}
+
+// GetJSON201 returns the response for an HTTP 201 `application/json` response
+func (r ForkScenarioApiV1ScenariosScenarioIdForkPostResponse) GetJSON201() *ScenarioRead {
+	return r.JSON201
+}
+
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r ForkScenarioApiV1ScenariosScenarioIdForkPostResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
+}
+
+// GetBody returns the raw response body bytes
+func (r ForkScenarioApiV1ScenariosScenarioIdForkPostResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ForkScenarioApiV1ScenariosScenarioIdForkPostResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ForkScenarioApiV1ScenariosScenarioIdForkPostResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ForkScenarioApiV1ScenariosScenarioIdForkPostResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type DraftScenarioForksApiV1ScenariosScenarioIdForksDraftPostResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *ErrorResponse
+}
+
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r DraftScenarioForksApiV1ScenariosScenarioIdForksDraftPostResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r DraftScenarioForksApiV1ScenariosScenarioIdForksDraftPostResponse) GetJSON503() *ErrorResponse {
+	return r.JSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r DraftScenarioForksApiV1ScenariosScenarioIdForksDraftPostResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r DraftScenarioForksApiV1ScenariosScenarioIdForksDraftPostResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DraftScenarioForksApiV1ScenariosScenarioIdForksDraftPostResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r DraftScenarioForksApiV1ScenariosScenarioIdForksDraftPostResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -16551,17 +17158,20 @@ func (c *ClientWithResponses) UpdateAgentApiV1AgentsAgentIdPatchWithResponse(ctx
 	return ParseUpdateAgentApiV1AgentsAgentIdPatchResponse(rsp)
 }
 
-// DuplicateAgentApiV1AgentsAgentIdDuplicatePostWithResponse Duplicate Agent
+// ForkAgentApiV1AgentsAgentIdForkPostWithResponse Fork Agent
+//
+// A copy of the agent and its live scenarios. It calls the same agent until its number or
+// trigger changes.
 //
 // Returns a wrapper object for the known response body format(s).
 //
-// Corresponds with POST /api/v1/agents/{agent_id}/duplicate (the `DuplicateAgentApiV1AgentsAgentIdDuplicatePost` operationId).
-func (c *ClientWithResponses) DuplicateAgentApiV1AgentsAgentIdDuplicatePostWithResponse(ctx context.Context, agentId openapi_types.UUID, reqEditors ...RequestEditorFn) (*DuplicateAgentApiV1AgentsAgentIdDuplicatePostResponse, error) {
-	rsp, err := c.DuplicateAgentApiV1AgentsAgentIdDuplicatePost(ctx, agentId, reqEditors...)
+// Corresponds with POST /api/v1/agents/{agent_id}/fork (the `ForkAgentApiV1AgentsAgentIdForkPost` operationId).
+func (c *ClientWithResponses) ForkAgentApiV1AgentsAgentIdForkPostWithResponse(ctx context.Context, agentId openapi_types.UUID, reqEditors ...RequestEditorFn) (*ForkAgentApiV1AgentsAgentIdForkPostResponse, error) {
+	rsp, err := c.ForkAgentApiV1AgentsAgentIdForkPost(ctx, agentId, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParseDuplicateAgentApiV1AgentsAgentIdDuplicatePostResponse(rsp)
+	return ParseForkAgentApiV1AgentsAgentIdForkPostResponse(rsp)
 }
 
 // GetRuleResultsApiV1AgentsAgentIdRuleResultsGetWithResponse Get Rule Results
@@ -17145,6 +17755,53 @@ func (c *ClientWithResponses) UpdatePersonaApiV1PersonasPersonaIdPatchWithRespon
 	return ParseUpdatePersonaApiV1PersonasPersonaIdPatchResponse(rsp)
 }
 
+// ForkPersonaApiV1PersonasPersonaIdForkPostWithResponse Fork Persona
+//
+// A copy of the persona named "… (fork)", for the person to change.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/personas/{persona_id}/fork (the `ForkPersonaApiV1PersonasPersonaIdForkPost` operationId).
+func (c *ClientWithResponses) ForkPersonaApiV1PersonasPersonaIdForkPostWithResponse(ctx context.Context, personaId openapi_types.UUID, reqEditors ...RequestEditorFn) (*ForkPersonaApiV1PersonasPersonaIdForkPostResponse, error) {
+	rsp, err := c.ForkPersonaApiV1PersonasPersonaIdForkPost(ctx, personaId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseForkPersonaApiV1PersonasPersonaIdForkPostResponse(rsp)
+}
+
+// DraftPersonaForksApiV1PersonasPersonaIdForksDraftPostWithBodyWithResponse Draft Persona Forks
+//
+// Writes forks of the persona, each a persona the console can create with its
+// forked_from_id. Nothing is saved.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/personas/{persona_id}/forks/draft (the `DraftPersonaForksApiV1PersonasPersonaIdForksDraftPost` operationId).
+func (c *ClientWithResponses) DraftPersonaForksApiV1PersonasPersonaIdForksDraftPostWithBodyWithResponse(ctx context.Context, personaId openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*DraftPersonaForksApiV1PersonasPersonaIdForksDraftPostResponse, error) {
+	rsp, err := c.DraftPersonaForksApiV1PersonasPersonaIdForksDraftPostWithBody(ctx, personaId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDraftPersonaForksApiV1PersonasPersonaIdForksDraftPostResponse(rsp)
+}
+
+// DraftPersonaForksApiV1PersonasPersonaIdForksDraftPostWithResponse Draft Persona Forks
+//
+// Writes forks of the persona, each a persona the console can create with its
+// forked_from_id. Nothing is saved.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/personas/{persona_id}/forks/draft (the `DraftPersonaForksApiV1PersonasPersonaIdForksDraftPost` operationId).
+func (c *ClientWithResponses) DraftPersonaForksApiV1PersonasPersonaIdForksDraftPostWithResponse(ctx context.Context, personaId openapi_types.UUID, body DraftPersonaForksApiV1PersonasPersonaIdForksDraftPostJSONRequestBody, reqEditors ...RequestEditorFn) (*DraftPersonaForksApiV1PersonasPersonaIdForksDraftPostResponse, error) {
+	rsp, err := c.DraftPersonaForksApiV1PersonasPersonaIdForksDraftPost(ctx, personaId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDraftPersonaForksApiV1PersonasPersonaIdForksDraftPostResponse(rsp)
+}
+
 // ListPersonaScenariosApiV1PersonasPersonaIdScenariosGetWithResponse List Persona Scenarios
 //
 // The live scenarios that use the persona; a persona is deleted only when none does.
@@ -17426,6 +18083,53 @@ func (c *ClientWithResponses) UpdateScenarioApiV1ScenariosScenarioIdPatchWithRes
 		return nil, err
 	}
 	return ParseUpdateScenarioApiV1ScenariosScenarioIdPatchResponse(rsp)
+}
+
+// ForkScenarioApiV1ScenariosScenarioIdForkPostWithResponse Fork Scenario
+//
+// A copy of the scenario named "… (fork)", for the person to change.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/scenarios/{scenario_id}/fork (the `ForkScenarioApiV1ScenariosScenarioIdForkPost` operationId).
+func (c *ClientWithResponses) ForkScenarioApiV1ScenariosScenarioIdForkPostWithResponse(ctx context.Context, scenarioId openapi_types.UUID, reqEditors ...RequestEditorFn) (*ForkScenarioApiV1ScenariosScenarioIdForkPostResponse, error) {
+	rsp, err := c.ForkScenarioApiV1ScenariosScenarioIdForkPost(ctx, scenarioId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseForkScenarioApiV1ScenariosScenarioIdForkPostResponse(rsp)
+}
+
+// DraftScenarioForksApiV1ScenariosScenarioIdForksDraftPostWithBodyWithResponse Draft Scenario Forks
+//
+// Writes forks of the scenario, each a scenario the console can create with its
+// forked_from_id. Nothing is saved.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/scenarios/{scenario_id}/forks/draft (the `DraftScenarioForksApiV1ScenariosScenarioIdForksDraftPost` operationId).
+func (c *ClientWithResponses) DraftScenarioForksApiV1ScenariosScenarioIdForksDraftPostWithBodyWithResponse(ctx context.Context, scenarioId openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*DraftScenarioForksApiV1ScenariosScenarioIdForksDraftPostResponse, error) {
+	rsp, err := c.DraftScenarioForksApiV1ScenariosScenarioIdForksDraftPostWithBody(ctx, scenarioId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDraftScenarioForksApiV1ScenariosScenarioIdForksDraftPostResponse(rsp)
+}
+
+// DraftScenarioForksApiV1ScenariosScenarioIdForksDraftPostWithResponse Draft Scenario Forks
+//
+// Writes forks of the scenario, each a scenario the console can create with its
+// forked_from_id. Nothing is saved.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/scenarios/{scenario_id}/forks/draft (the `DraftScenarioForksApiV1ScenariosScenarioIdForksDraftPost` operationId).
+func (c *ClientWithResponses) DraftScenarioForksApiV1ScenariosScenarioIdForksDraftPostWithResponse(ctx context.Context, scenarioId openapi_types.UUID, body DraftScenarioForksApiV1ScenariosScenarioIdForksDraftPostJSONRequestBody, reqEditors ...RequestEditorFn) (*DraftScenarioForksApiV1ScenariosScenarioIdForksDraftPostResponse, error) {
+	rsp, err := c.DraftScenarioForksApiV1ScenariosScenarioIdForksDraftPost(ctx, scenarioId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDraftScenarioForksApiV1ScenariosScenarioIdForksDraftPostResponse(rsp)
 }
 
 // ListVersionsApiV1ScenariosScenarioIdVersionsGetWithResponse List Versions
@@ -18516,15 +19220,15 @@ func ParseUpdateAgentApiV1AgentsAgentIdPatchResponse(rsp *http.Response) (*Updat
 	return response, nil
 }
 
-// ParseDuplicateAgentApiV1AgentsAgentIdDuplicatePostResponse parses an HTTP response from a DuplicateAgentApiV1AgentsAgentIdDuplicatePostWithResponse call
-func ParseDuplicateAgentApiV1AgentsAgentIdDuplicatePostResponse(rsp *http.Response) (*DuplicateAgentApiV1AgentsAgentIdDuplicatePostResponse, error) {
+// ParseForkAgentApiV1AgentsAgentIdForkPostResponse parses an HTTP response from a ForkAgentApiV1AgentsAgentIdForkPostWithResponse call
+func ParseForkAgentApiV1AgentsAgentIdForkPostResponse(rsp *http.Response) (*ForkAgentApiV1AgentsAgentIdForkPostResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &DuplicateAgentApiV1AgentsAgentIdDuplicatePostResponse{
+	response := &ForkAgentApiV1AgentsAgentIdForkPostResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
@@ -19635,6 +20339,72 @@ func ParseUpdatePersonaApiV1PersonasPersonaIdPatchResponse(rsp *http.Response) (
 	return response, nil
 }
 
+// ParseForkPersonaApiV1PersonasPersonaIdForkPostResponse parses an HTTP response from a ForkPersonaApiV1PersonasPersonaIdForkPostWithResponse call
+func ParseForkPersonaApiV1PersonasPersonaIdForkPostResponse(rsp *http.Response) (*ForkPersonaApiV1PersonasPersonaIdForkPostResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ForkPersonaApiV1PersonasPersonaIdForkPostResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest PersonaRead
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseDraftPersonaForksApiV1PersonasPersonaIdForksDraftPostResponse parses an HTTP response from a DraftPersonaForksApiV1PersonasPersonaIdForksDraftPostWithResponse call
+func ParseDraftPersonaForksApiV1PersonasPersonaIdForksDraftPostResponse(rsp *http.Response) (*DraftPersonaForksApiV1PersonasPersonaIdForksDraftPostResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DraftPersonaForksApiV1PersonasPersonaIdForksDraftPostResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseListPersonaScenariosApiV1PersonasPersonaIdScenariosGetResponse parses an HTTP response from a ListPersonaScenariosApiV1PersonasPersonaIdScenariosGetWithResponse call
 func ParseListPersonaScenariosApiV1PersonasPersonaIdScenariosGetResponse(rsp *http.Response) (*ListPersonaScenariosApiV1PersonasPersonaIdScenariosGetResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -20192,6 +20962,72 @@ func ParseUpdateScenarioApiV1ScenariosScenarioIdPatchResponse(rsp *http.Response
 			return nil, err
 		}
 		response.JSON4XX = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseForkScenarioApiV1ScenariosScenarioIdForkPostResponse parses an HTTP response from a ForkScenarioApiV1ScenariosScenarioIdForkPostWithResponse call
+func ParseForkScenarioApiV1ScenariosScenarioIdForkPostResponse(rsp *http.Response) (*ForkScenarioApiV1ScenariosScenarioIdForkPostResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ForkScenarioApiV1ScenariosScenarioIdForkPostResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest ScenarioRead
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseDraftScenarioForksApiV1ScenariosScenarioIdForksDraftPostResponse parses an HTTP response from a DraftScenarioForksApiV1ScenariosScenarioIdForksDraftPostWithResponse call
+func ParseDraftScenarioForksApiV1ScenariosScenarioIdForksDraftPostResponse(rsp *http.Response) (*DraftScenarioForksApiV1ScenariosScenarioIdForksDraftPostResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DraftScenarioForksApiV1ScenariosScenarioIdForksDraftPostResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
 
 	}
 

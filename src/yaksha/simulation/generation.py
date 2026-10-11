@@ -36,6 +36,7 @@ from yaksha.domain.generation import (
     spread_personas,
 )
 from yaksha.domain.language_models import JsonModel
+from yaksha.domain.names import free_name
 from yaksha.domain.scenarios import ScenarioCreate
 from yaksha.domain.triggers import agent_data_names, check_agent_data
 from yaksha.simulation import scenarios
@@ -58,7 +59,6 @@ log = logging.getLogger(__name__)
 WRITERS = 4
 """Writer calls at once."""
 MAX_CRITERIA = 10
-MAX_NAME_CHARS = 80
 MODEL_OFF = "scenario generation is off: add the LLM provider key in Settings"
 FIRST_SCENARIOS = 5
 """Scenarios written for a new agent, so its page has something to run."""
@@ -339,16 +339,6 @@ def grounded_questions(
         Question(item["question"], None, None, None) for item in answer.get("unanswered", [])
     ]
     return answered, unanswered
-
-
-def free_name(name: str, taken: set[str]) -> str:
-    """The name, or the name with " (2)", " (3)"… when it is taken, within the name limit."""
-    candidate, n = name, 2
-    while candidate.lower() in taken:
-        suffix = f" ({n})"
-        candidate = f"{name[: MAX_NAME_CHARS - len(suffix)]}{suffix}"
-        n += 1
-    return candidate
 
 
 class Writer:

@@ -201,6 +201,15 @@ export function useSavePersona(id?: string) {
   });
 }
 
+/** A copy of the persona, named "… (fork)". */
+export function useForkPersona() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api<Persona>(`/personas/${id}/fork`, { method: "POST" }),
+    onSuccess: () => client.invalidateQueries({ queryKey: keys.personas }),
+  });
+}
+
 export function useDeletePersona() {
   const client = useQueryClient();
   return useMutation({
@@ -274,7 +283,18 @@ export function refreshScenarios(client: QueryClient, agentId: string) {
   return Promise.all([
     client.invalidateQueries({ queryKey: keys.scenarios(agentId) }),
     client.invalidateQueries({ queryKey: keys.generations(agentId) }),
+    client.invalidateQueries({ queryKey: ["scenarios"] }),
   ]);
+}
+
+/** The names of an agent's live scenarios, read now. */
+export async function scenarioNames(agentId: string): Promise<string[]> {
+  return (await all<Scenario>(`/agents/${agentId}/scenarios`)).map((item) => item.name);
+}
+
+/** The names of the live personas, read now. */
+export async function personaNames(): Promise<string[]> {
+  return (await all<Persona>("/personas")).map((item) => item.name);
 }
 
 export function useDeleteScenarios(agentId: string) {
@@ -306,6 +326,25 @@ export function useSaveScenario(agentId: string, id?: string) {
         ? api<Scenario>(`/scenarios/${id}`, { method: "PATCH", json: input })
         : api<Scenario>(`/agents/${agentId}/scenarios`, { method: "POST", json: input }),
     onSuccess: () => refreshScenarios(client, agentId),
+  });
+}
+
+/** A copy of the scenario, named "… (fork)". */
+export function useForkScenario(agentId: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api<Scenario>(`/scenarios/${id}/fork`, { method: "POST" }),
+    onSuccess: () => refreshScenarios(client, agentId),
+  });
+}
+
+/** One scenario, such as the one a fork was made from. */
+export function useScenario(id: string | null | undefined) {
+  return useQuery({
+    queryKey: ["scenarios", id ?? ""] as const,
+    queryFn: () => api<Scenario>(`/scenarios/${id}`),
+    enabled: Boolean(id),
+    retry: false,
   });
 }
 
@@ -586,10 +625,11 @@ export function useSaveRules(agentId: string) {
   });
 }
 
-export function useDuplicateAgent() {
+/** A copy of the agent and its live scenarios, named "… (fork)". */
+export function useForkAgent() {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => api<Agent>(`/agents/${id}/duplicate`, { method: "POST" }),
+    mutationFn: (id: string) => api<Agent>(`/agents/${id}/fork`, { method: "POST" }),
     onSuccess: () => client.invalidateQueries({ queryKey: keys.agents }),
   });
 }

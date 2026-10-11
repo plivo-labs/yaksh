@@ -64,6 +64,10 @@ def upgrade() -> None:
             nullable=False,
         ),
         sa.Column("deleted_at", sa.DateTime(timezone=True), nullable=True),
+        sa.Column("forked_from_id", sa.UUID(), nullable=True),
+        sa.ForeignKeyConstraint(
+            ["forked_from_id"], ["agents.id"], name=op.f("fk_agents_forked_from_id_agents")
+        ),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_agents")),
     )
     op.create_index(
@@ -103,6 +107,10 @@ def upgrade() -> None:
             nullable=False,
         ),
         sa.Column("deleted_at", sa.DateTime(timezone=True), nullable=True),
+        sa.Column("forked_from_id", sa.UUID(), nullable=True),
+        sa.ForeignKeyConstraint(
+            ["forked_from_id"], ["personas.id"], name=op.f("fk_personas_forked_from_id_personas")
+        ),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_personas")),
         sa.UniqueConstraint("builtin_key", name=op.f("uq_personas_builtin_key")),
     )
@@ -274,6 +282,12 @@ def upgrade() -> None:
         ),
         sa.ForeignKeyConstraint(
             ["persona_id"], ["personas.id"], name=op.f("fk_scenarios_persona_id_personas")
+        ),
+        sa.Column("forked_from_id", sa.UUID(), nullable=True),
+        sa.ForeignKeyConstraint(
+            ["forked_from_id"],
+            ["scenarios.id"],
+            name=op.f("fk_scenarios_forked_from_id_scenarios"),
         ),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_scenarios")),
         sa.UniqueConstraint("id", "agent_id", name=op.f("uq_scenarios_id_agent_id")),
