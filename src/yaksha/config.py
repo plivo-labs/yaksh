@@ -3,10 +3,12 @@ from typing import Annotated, Any
 
 from pydantic import Field, PostgresDsn, SecretStr, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
+from sqlalchemy.engine import make_url
 
 from yaksha.domain.numbers import E164
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+ASYNCPG_SCHEMES = ("postgres", "postgresql", "postgresql+asyncpg")
 
 
 class Settings(BaseSettings):
@@ -55,6 +57,23 @@ class Settings(BaseSettings):
         if isinstance(value, str):
             return [number.strip() for number in value.split(",") if number.strip()]
         return value
+
+    @field_validator("database_url")
+    @classmethod
+    def use_asyncpg(cls, url: PostgresDsn) -> PostgresDsn:
+        """Hosts give postgres:// or postgresql:// URLs with libpq's sslmode, which asyncpg
+        takes as ssl."""
+        if url.scheme not in ASYNCPG_SCHEMES:
+            raise ValueError(
+                "use a postgres://, postgresql:// or postgresql+asyncpg:// URL;"
+                " Yaksha connects with asyncpg"
+            )
+        parsed = make_url(str(url))
+        query = dict(parsed.query)
+        if "sslmode" in query:
+            query["ssl"] = query.pop("sslmode")
+        asyncpg_url = parsed.set(drivername="postgresql+asyncpg", query=query)
+        return PostgresDsn(asyncpg_url.render_as_string(hide_password=False))
 
     # Required fields come from the environment; without this pyright demands them as arguments.
     def __init__(self, **values: Any) -> None:
