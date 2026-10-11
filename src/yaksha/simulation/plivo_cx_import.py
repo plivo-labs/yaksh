@@ -191,7 +191,9 @@ MAX_REASON_CHARS = 200
 
 
 def refusal(
-    error: ProviderCallError | ValueError, *, missing: str = "Plivo has no agent flow with this ID in the account"
+    error: ProviderCallError | ValueError,
+    *,
+    missing: str = "Plivo has no agent flow with this ID in the account",
 ) -> ValidationError | NotFoundError | UnavailableError:
     """What a failed Plivo call means for the person: a ValueError is a reply that is not JSON.
     A 403 shows Plivo's own reason, cut short; any other status shows only the status, never
