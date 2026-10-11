@@ -288,3 +288,14 @@ async def test_health_answers_without_a_signature_or_a_saved_auth_token() -> Non
 
     assert response.status_code == 200
     assert response.json() == {"status": "ok", "version": __version__}
+
+
+async def test_without_a_public_url_the_worker_serves_only_its_health_route() -> None:
+    async with AsyncClient(
+        transport=ASGITransport(app=create_app(StreamRegistry(), None, lambda: None, refuse_calls)),
+        base_url="http://worker",
+    ) as client:
+        health = await client.get("/health")
+        incoming = await client.post("/incoming")
+
+    assert (health.status_code, incoming.status_code) == (200, 404)

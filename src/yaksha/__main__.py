@@ -133,18 +133,13 @@ async def run_worker(settings: Settings, caller: Caller, registry: StreamRegistr
         PhoneAccount(sessionmaker, settings),
         store,
     )
-    server = None
-    if settings.public_url is not None:
-        server = PlivoServer(
-            create_app(
-                registry,
-                settings.public_url,
-                partial(plivo_auth_token, source),
-                worker.accept_incoming,
-            ),
-            settings.port or 8770,
-        )
-        await server.start()
+    server = PlivoServer(
+        create_app(
+            registry, settings.public_url, partial(plivo_auth_token, source), worker.accept_incoming
+        ),
+        settings.port or 8770,
+    )
+    await server.start()
     stop = asyncio.Event()
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGINT, signal.SIGTERM):
@@ -152,8 +147,7 @@ async def run_worker(settings: Settings, caller: Caller, registry: StreamRegistr
     try:
         await worker.run(stop)
     finally:
-        if server is not None:
-            await server.stop(settings.end_timeout_s)
+        await server.stop(settings.end_timeout_s)
         await store.close()
         if worker.fatal.is_set() or not await bounded_dispose(engine, settings.end_timeout_s):
             # A leaked task would keep asyncio.run's teardown waiting forever.

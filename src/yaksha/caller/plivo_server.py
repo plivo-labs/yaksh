@@ -145,12 +145,13 @@ def plus_e164(number: str) -> str:
 
 def create_app(
     registry: StreamRegistry,
-    public_url: str,
+    public_url: str | None,
     auth_token: Callable[[], str | None],
     accept: Accept,
 ) -> FastAPI:
     """accept admits calls to Yaksha's numbers, or says why it refuses them. auth_token gives
-    the Plivo auth token of the current settings, so a changed token applies at once."""
+    the Plivo auth token of the current settings, so a changed token applies at once. Without a
+    public URL, Plivo cannot reach the worker, so the app has only its health route."""
     app = FastAPI(title="Yaksha worker", docs_url=None, redoc_url=None, openapi_url=None)
 
     def expected(conversation_id: str) -> PendingStream | None:
@@ -163,6 +164,9 @@ def create_app(
     @app.get("/health")
     async def health() -> dict[str, str]:
         return {"status": "ok", "version": __version__}
+
+    if public_url is None:
+        return app
 
     @app.post("/answer/{conversation_id}")
     async def answer(conversation_id: str, request: Request) -> Response:
