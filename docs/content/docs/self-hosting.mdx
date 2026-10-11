@@ -29,7 +29,7 @@ Each process reads `PORT` for its one listener. With Docker Compose, do not set 
 
 The worker keeps the stream of each call in its memory. Thus, the webhooks and the stream of a call must go to the worker that made the call. Operate one worker.
 
-- A deploy must stop the old worker before it starts the new worker. If a platform operates the old and the new worker together, calls that start during the deploy can fail.
+- A deploy must stop the old worker before it starts the new worker, or very soon after. If a platform operates the old and the new worker together for a long time, calls that start during the deploy can fail.
 - When the worker stops, it ends its live calls with the end reason `worker_stopped`. It saves their results, and the run tries them again.
 - Give the worker a stop grace period of 210 seconds or more. Docker Compose sets `stop_grace_period: 210s`.
 
@@ -49,7 +49,64 @@ If the Plivo account has an IP whitelist, add the outbound IP of the server. If 
 
 ### Docker Compose on one server
 
-We recommend this option. Use `docker/compose.yaml`. It operates Postgres and SeaweedFS for you. To give the worker a public HTTPS address, use a named Cloudflare tunnel or a reverse proxy such as Caddy.
+We recommend this option. `docker/compose.yaml` operates the three processes, Postgres and SeaweedFS for you. Use a server with 2 vCPU or more and 4 GB of memory. On 1 shared vCPU, the worker can stall during calls.
+
+Do these steps in this sequence. The worker must have its public address before it starts.
+
+1. Install Docker Engine with the Compose plugin. Refer to [Install Docker Engine](https://docs.docker.com/engine/install/).
+2. Get the code: `git clone https://github.com/plivo-labs/yaksha && cd yaksha`.
+3. Give the worker a fixed public HTTPS address. Use a named Cloudflare tunnel or Caddy (see below). Do not use a Cloudflare quick tunnel on a server: its address changes each time it starts, and then Plivo cannot get to the worker.
+4. Copy `docker/.env.example` to `docker/.env`. Set `YAKSHA_API_TOKEN`, `YAKSHA_ENCRYPTION_KEY` and `YAKSHA_PUBLIC_URL`. Keep a copy of the encryption key.
+5. Start Yaksha in the background: `docker compose -f docker/compose.yaml up --build -d`.
+6. Open the console on port 8000 and enter the API token. On the Settings page, save the provider keys and the Plivo Auth ID and Auth token.
+7. Make the Plivo Application of this install (see [Plivo](#plivo)). Set `YAKSHA_PLIVO_APP_ID` and `YAKSHA_PLIVO_NUMBERS` in `docker/.env`. Then recreate the API and the worker, so that they read the new values: `docker compose -f docker/compose.yaml up -d yaksha worker`.
+8. Add an agent and do one test call.
+
+The console is on port 8000 of the server. Do not make it public without access control. To use it from your computer, connect over SSH: `ssh -L 8000:localhost:8000 <server>`, then open `http://localhost:8000`.
+
+#### Public address with a named Cloudflare tunnel
+
+You do not open ports on the server.
+
+1. In the Cloudflare dashboard, make a tunnel. Copy its token.
+2. Add a public hostname to the tunnel, for example `calls.example.com`. Set the service to `http://worker:8770`.
+3. Start the tunnel on the Compose network of Yaksha:
+
+   ```sh
+   docker run -d --name yaksha-tunnel --restart unless-stopped --network yaksha_default \
+     cloudflare/cloudflared:2026.9.1 tunnel --no-autoupdate run --token <token>
+   ```
+
+4. Set `YAKSHA_PUBLIC_URL=https://calls.example.com`.
+
+The network `yaksha_default` exists after the first `docker compose up`. If you start the tunnel before, make the network first: `docker network create yaksha_default`.
+
+#### Public address with Caddy
+
+Caddy gets a TLS certificate for you. The server must accept ports 80 and 443, and a DNS record must send the hostname to the server.
+
+1. Install Caddy on the server. Refer to [Install Caddy](https://caddyserver.com/docs/install).
+2. In `/etc/caddy/Caddyfile`, send the hostname to the worker:
+
+   ```
+   calls.example.com {
+       reverse_proxy localhost:8770
+   }
+   ```
+
+3. Reload Caddy: `sudo systemctl reload caddy`.
+4. Set `YAKSHA_PUBLIC_URL=https://calls.example.com`.
+
+Caddy also sends the WebSocket of each call to the worker.
+
+#### Update Yaksha
+
+```sh
+git pull
+docker compose -f docker/compose.yaml up --build -d
+```
+
+Compose stops the old worker before it starts the new one. The calls that are live at that time end with `worker_stopped`, and the run tries them again.
 
 ### Railway
 
@@ -59,5 +116,5 @@ We did tests of Yaksha on Railway.
 - Set `PORT` on the api and the worker to the port of their public domain: 8000 and 8770.
 - Set `YAKSHA_DATABASE_URL` to `${{Postgres.DATABASE_URL}}`.
 - On the worker, set `RAILWAY_DEPLOYMENT_DRAINING_SECONDS=210`. With the default of 0, Railway stops the worker before it saves the results.
-- Railway starts the new worker before it stops the old worker. Calls that start during a deploy can fail.
+- Railway starts the new worker, then stops the old worker about 1 second later. The calls that are live at that time end with `worker_stopped`, and the run tries them again.
 - The outbound IP can change on a deploy, unless the service has a Static Outbound IP. A Static Outbound IP costs money. This is important for an IP whitelist.

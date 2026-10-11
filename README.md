@@ -13,7 +13,7 @@ Open http://localhost:8000 and enter the API token. The API is under `/api/v1` a
 
 The API listens on port 8000 and the worker listens on port 8770. To use a different port, set `PORT` for that process. Hosting platforms such as Railway, Render, Fly and Cloud Run set `PORT` for each service.
 
-To deploy on a server or a platform, see `docs/content/docs/self-hosting.mdx`.
+This starts Yaksha on your computer. To install it on a server, follow the steps in `docs/content/docs/self-hosting.mdx`: a server needs a fixed public address for the worker and `up -d`.
 
 ## Settings
 
