@@ -137,7 +137,7 @@ async def run_worker(settings: Settings, caller: Caller, registry: StreamRegistr
         create_app(
             registry, settings.public_url, partial(plivo_auth_token, source), worker.accept_incoming
         ),
-        settings.port or 8770,
+        8770 if settings.port is None else settings.port,
     )
     await server.start()
     stop = asyncio.Event()
