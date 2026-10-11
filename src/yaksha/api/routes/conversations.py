@@ -74,7 +74,11 @@ async def summaries(
         }
         data["agent_version"], data["agent_name"] = agents[row.agent_version_id]
         data["persona_version"], data["persona_name"] = personas[row.persona_version_id]
-        data["scenario_version"], data["scenario_name"] = scenarios[row.scenario_version_id]
+        (
+            data["scenario_version"],
+            data["scenario_name"],
+            data["scenario_data_sets"],
+        ) = scenarios[row.scenario_version_id]
         data["recording_url"] = recording_url(row)
         evaluation = found.get(row.id)
         latency = evaluation.latency if evaluation else None
@@ -120,7 +124,7 @@ async def detail(session: AsyncSession, conversation: Conversation) -> Conversat
         **base.model_dump(),
         instructions=conversation.instructions,
         sounds=SoundRead.all_of(conversation.sound_plan),
-        scenario=await conversations.pinned_scenario_config(session, conversation),
+        scenario=await conversations.played_scenario(session, conversation),
         transcript=turns_with_replies(transcript, latency),
         replies=latency.replies if latency else [],
         wire_events=transcript.wire_events,

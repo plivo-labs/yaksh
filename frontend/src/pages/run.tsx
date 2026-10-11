@@ -245,6 +245,9 @@ function RunActions({ run }: { run: Run }) {
           personasOf={Object.fromEntries(
             run.scenarios.map((item) => [item.scenario_id, item.persona_ids ?? []]),
           )}
+          dataSetsOf={Object.fromEntries(
+            run.scenarios.map((item) => [item.scenario_id, item.data_set_ids ?? []]),
+          )}
           earlier={run}
           onClosed={() => setAgain(false)}
         />

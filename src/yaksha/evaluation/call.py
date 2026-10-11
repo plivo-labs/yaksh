@@ -23,7 +23,7 @@ from yaksha.domain.files import FileStore
 from yaksha.domain.language_models import JsonModel
 from yaksha.domain.latency import Latency, Span, waits
 from yaksha.domain.rules import LlmRule, PhraseRule
-from yaksha.domain.scenarios import ScenarioConfig
+from yaksha.domain.scenarios import PlayedScenario
 from yaksha.evaluation import metrics, speech
 from yaksha.evaluation.caller_check import CALLER_CHECK, applied, check_caller
 from yaksha.evaluation.criteria import AGENT_RULE, CRITERION, judge_criterion, judge_rule, rule_text
@@ -69,7 +69,7 @@ async def evaluate(
     conversation: Conversation,
     store: FileStore,
     agent: AgentConfig,
-    scenario: ScenarioConfig,
+    scenario: PlayedScenario,
     persona: str | None,
     documents: Sequence[Document],
     judging: Judging | None,
@@ -259,7 +259,7 @@ def outcomes(
 
 
 def call_view(
-    conversation: Conversation, agent: AgentConfig, scenario: ScenarioConfig, transcript: Transcript
+    conversation: Conversation, agent: AgentConfig, scenario: PlayedScenario, transcript: Transcript
 ) -> CallView:
     line = parsed(LineFacts, conversation.line_facts)
     return CallView(

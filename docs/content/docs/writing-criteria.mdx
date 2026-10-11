@@ -21,7 +21,7 @@ Yaksha tests the agent from the outside, through a phone line. The judge reads o
 
 1. Write what the agent says or does on the call. A condition inside the agent ("after the PIN matches") cannot be seen. Write it as speech: "if the agent says the PIN matched".
 2. Write one check per criterion. Two checks in one criterion give one verdict for both.
-3. Give exact values when they matter: "$95", not "the right price".
+3. Give exact values when they matter: "$95", not "the right price". When the value is a fact the caller knows, write the fact's name in double braces, as in "The agent reads back the move to `{{Moving to}}`". Each call fills it in from its data set, so the criterion stays right in every data set.
 4. Write a condition when the check does not apply to every call: "If the caller asks about the price, the agent says...". A call where the condition does not come up is not applicable, not a fail.
 5. Do not check a saved record. A criterion that needs a tool call or a backend state ends "unsure" with the kind "hidden action". It counts as not applicable and never passes on a guess.
 6. Do not name a cause that the call cannot show, such as "the agent misheard".

@@ -17,6 +17,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
+import { playedDataSet } from "@/lib/data-sets";
 import { copyText } from "@/lib/clipboard";
 import { duration, surroundingsLabel, when } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -190,6 +191,7 @@ function ConversationRow({
           )}
         </span>
         <span className="truncate text-s-400 text-muted-foreground">
+          {playedDataSet(conversation) && `${playedDataSet(conversation)} · `}
           {conversation.persona_name}, repeat {conversation.repeat}
         </span>
         <span className="truncate text-s-400 text-muted-foreground @3xl/conversations:hidden">
@@ -237,9 +239,10 @@ function ConversationRow({
 function label(conversation: ConversationSummary): string {
   const parts = [
     conversation.scenario_name,
+    playedDataSet(conversation),
     conversation.persona_name,
     `repeat ${conversation.repeat}`,
-  ];
+  ].filter((part) => part !== null);
   if (conversation.attempt > 1) parts.push(`attempt ${conversation.attempt}`);
   const surroundings = surroundingsLabel(conversation.surroundings);
   if (surroundings) parts.push(`surroundings: ${surroundings}`);

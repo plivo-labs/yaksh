@@ -95,6 +95,10 @@ class Phone(Section):
         return value
 
 
+MAX_DATA_SETS = 50
+"""The ceiling of the operator's limit on data sets per scenario."""
+
+
 class Limits(Section):
     default_max_turns: int = Field(default=20, ge=1, le=100)
     """How many agent turns the caller answers before it says goodbye, when a run does not
@@ -106,6 +110,7 @@ class Limits(Section):
     max_run_repeats: int = Field(default=10, ge=1, le=1000)
     max_run_retries: int = Field(default=3, ge=0, le=100)
     max_run_start_interval_s: int = Field(default=600, ge=1, le=86_400)
+    max_scenario_data_sets: int = Field(default=10, ge=1, le=MAX_DATA_SETS)
 
     @property
     def default_max_retries(self) -> int:

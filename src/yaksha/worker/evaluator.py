@@ -253,7 +253,10 @@ class Evaluator:
             async with self._sessionmaker() as session:
                 conversation = await session.get_one(Conversation, evaluation.conversation_id)
                 agent = await session.get_one(AgentVersion, conversation.agent_version_id)
-                scenario = await session.get_one(ScenarioVersion, conversation.scenario_version_id)
+                version = await session.get_one(ScenarioVersion, conversation.scenario_version_id)
+                scenario = ScenarioConfig.model_validate(version.config).played(
+                    conversation.data_set_id
+                )
                 agent_config = AgentConfig.model_validate(agent.config)
                 judged = judging is not None and call.judged(conversation)
                 persona = await persona_prompt(session, conversation) if judged else None
@@ -262,7 +265,7 @@ class Evaluator:
                 conversation,
                 self._store,
                 agent_config,
-                ScenarioConfig.model_validate(scenario.config),
+                scenario,
                 persona,
                 documents,
                 judging,

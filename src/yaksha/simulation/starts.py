@@ -16,6 +16,7 @@ from yaksha.domain.agents import Direction
 from yaksha.domain.errors import NotFoundError, ValidationError
 from yaksha.domain.languages import Language
 from yaksha.domain.runs import RunScenario
+from yaksha.domain.scenarios import DataSet
 from yaksha.domain.settings import AppSettings
 from yaksha.domain.triggers import check_agent_data
 from yaksha.simulation.agents import config_of as agent_config_of
@@ -39,6 +40,8 @@ class Inputs:
     persona_version_id: uuid.UUID
     scenario_id: uuid.UUID
     scenario_version_id: uuid.UUID
+    data_set_id: uuid.UUID
+    data_set_name: str
     language: Language
     instructions: str
     nudge: str
@@ -58,8 +61,9 @@ async def snapshot(
 ) -> list[Inputs]:
     """Check that conversations of the agent's scenarios can start now, and read what they pin,
     once for all of them: the current agent, scenario and persona versions, and today. Each
-    scenario runs with the personas asked for, or its own persona. The inputs are in the order
-    asked: scenario, then persona. The caller holds the agent's lock.
+    scenario runs with the personas asked for, or its own persona, and each persona plays the
+    data sets asked for, or every data set. The inputs are in the order asked: scenario, then
+    persona, then data set. The caller holds the agent's lock.
     A refusal about a scenario names it."""
     problem = phone_problem(settings, app)
     if problem is not None:
@@ -70,13 +74,14 @@ async def snapshot(
             raise ValidationError(f"outbound tests are off: {problem}")
     scenario_ids = [item.scenario_id for item in wanted]
     scenarios = await scenarios_to_start(session, agent, scenario_ids)
-    pairs = [
-        (scenario, persona_id)
+    plays = [
+        (scenario, persona_id, data_set)
         for scenario, item in zip(scenarios, wanted, strict=True)
         for persona_id in item.persona_ids or [scenario.persona_id]
+        for data_set in data_sets_to_play(scenario, item.data_set_ids)
     ]
     personas = await live_personas(
-        session, sorted({persona_id for _, persona_id in pairs}), share_lock=True
+        session, sorted({persona_id for _, persona_id, _ in plays}), share_lock=True
     )
     agent_version_id = (
         await session.execute(
@@ -116,12 +121,13 @@ async def snapshot(
     today = datetime.now(ZoneInfo(app.phone.timezone)).date()
     outbound = agent_config_of(agent).outbound if agent.direction is Direction.OUTBOUND else None
     inputs = []
-    for scenario, persona_id in pairs:
+    for scenario, persona_id, data_set in plays:
         persona = personas[persona_id]
         config = persona_config_of(persona)
         wants = scenario_config_of(scenario)
         if outbound is not None:
             check_agent_data(outbound.trigger, wants, scenario.name)
+        played = wants.played(data_set.id)
         inputs.append(
             Inputs(
                 agent_id=agent.id,
@@ -131,12 +137,14 @@ async def snapshot(
                 persona_version_id=persona_versions[persona.id],
                 scenario_id=scenario.id,
                 scenario_version_id=scenario_versions[scenario.id],
+                data_set_id=data_set.id,
+                data_set_name=data_set.name,
                 language=config.language,
                 instructions=caller_instructions(
                     config,
-                    instructions=wants.instructions,
-                    known_facts=wants.known_facts,
-                    unknown_facts=wants.unknown_facts,
+                    instructions=played.instructions,
+                    known_facts=played.known_facts,
+                    unknown_facts=played.unknown_facts,
                     today=today,
                     direction=agent.direction,
                 ),
@@ -147,6 +155,14 @@ async def snapshot(
             )
         )
     return inputs
+
+
+def data_sets_to_play(scenario: Scenario, ids: Sequence[uuid.UUID] | None) -> list[DataSet]:
+    """The scenario's data sets with these ids, in the order asked, or all of them."""
+    try:
+        return scenario_config_of(scenario).chosen(ids)
+    except ValidationError as error:
+        raise ValidationError(f'the scenario "{scenario.name}": {error}') from error
 
 
 async def scenarios_to_start(

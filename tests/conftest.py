@@ -153,17 +153,29 @@ PERSONA = {
     "prompt": "You are in a hurry.",
     "voice": {"provider": "elevenlabs", "id": ENGLISH_VOICE.id},
 }
+
+
+def data_sets(**fields: Any) -> list[dict[str, Any]]:
+    """The test scenario's one data set, with these fields changed."""
+    return [{**SCENARIO["data_sets"][0], **fields}]
+
+
 SCENARIO: dict[str, Any] = {
     "name": "Reschedule a cleaning",
     "instructions": (
         "Move your cleaning to an evening next week; if none is free, keep the current one."
     ),
-    "known_facts": [
-        {"name": "Name", "value": "Priya Raman"},
-        {"name": "Current appointment", "value": "next Thursday, 10:30 am"},
-    ],
     "unknown_facts": ["Patient ID"],
     "criteria": ["Reads the new date and time back before it moves the appointment."],
+    "data_sets": [
+        {
+            "name": "Data set 1",
+            "known_facts": [
+                {"name": "Name", "value": "Priya Raman"},
+                {"name": "Current appointment", "value": "next Thursday, 10:30 am"},
+            ],
+        }
+    ],
 }
 
 

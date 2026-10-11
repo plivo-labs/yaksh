@@ -16,6 +16,7 @@ from yaksha.db.models import (
     JudgeVersion,
     Persona,
     Scenario,
+    ScenarioVersion,
 )
 from yaksha.domain.conversations import ConversationStatus, EndReason
 from yaksha.domain.evaluations import (
@@ -50,7 +51,9 @@ async def run_verdicts(
                 Conversation.id.label("conversation_id"),
                 Conversation.scenario_id,
                 Conversation.persona_id,
+                Conversation.data_set_id,
                 Conversation.repeat,
+                ScenarioVersion.config["criteria"].label("criteria"),
                 Scenario.name,
                 Scenario.category,
                 Persona.name.label("persona"),
@@ -59,6 +62,7 @@ async def run_verdicts(
                 Evaluation.effective_scenario_verdict.label("verdict"),
             )
             .join(Scenario, Scenario.id == Conversation.scenario_id)
+            .join(ScenarioVersion, ScenarioVersion.id == Conversation.scenario_version_id)
             .join(Persona, Persona.id == Conversation.persona_id)
             .outerjoin(Evaluation, Evaluation.conversation_id == Conversation.id)
             .where(
@@ -119,12 +123,13 @@ async def run_verdicts(
         results.append(result)
     worst_best = numbers.worst_and_best(results)
     interval = numbers.suite_interval(results, seed)
-    # Repeats compare only when the same persona called: each scenario and persona pair is one
-    # group for pass^2 and for the scenarios that both passed and failed.
-    pairs: dict[tuple[uuid.UUID, uuid.UUID], list[Row[Any]]] = defaultdict(list)
+    # Repeats compare only when the same persona called with the same data set: each scenario,
+    # persona and data set is one group for pass^2 and for the scenarios that both passed and
+    # failed.
+    pairs: dict[tuple[uuid.UUID, uuid.UUID, uuid.UUID], list[Row[Any]]] = defaultdict(list)
     for calls in grouped.values():
         for call in calls:
-            pairs[(call.scenario_id, call.persona_id)].append(call)
+            pairs[(call.scenario_id, call.persona_id, call.data_set_id)].append(call)
     pair_results = [
         numbers.ScenarioResults([call.verdict for call in calls]) for calls in pairs.values()
     ]
@@ -171,17 +176,20 @@ def criterion_counts(
     order: Sequence[uuid.UUID], rows: Sequence[Row[Any]], items: Sequence[Row[Any]]
 ) -> list[CriterionCounts]:
     """Each criterion of each scenario, by its number in the pinned scenario version, in the
-    scenarios' order."""
+    scenarios' order. Its text is the version's, with its placeholders: the judges saw it
+    filled in with the values of each call's data set."""
     scenario_of = {row.evaluation_id: row.scenario_id for row in rows}
+    criteria_of = {row.evaluation_id: row.criteria for row in rows}
     position = {scenario: index for index, scenario in enumerate(order)}
     counts: dict[tuple[uuid.UUID, int], Counter[str]] = defaultdict(Counter)
     texts: dict[tuple[uuid.UUID, int], str] = {}
     for item in items:
         if not item.item_key.startswith(CRITERION):
             continue
-        key = (scenario_of[item.evaluation_id], int(item.item_key.removeprefix(CRITERION)))
+        number = int(item.item_key.removeprefix(CRITERION))
+        key = (scenario_of[item.evaluation_id], number)
         counts[key][outcome_name(item)] += 1
-        texts[key] = item.subject
+        texts[key] = criteria_of[item.evaluation_id][number - 1]
     found = []
     for (scenario_id, number), counted in sorted(
         counts.items(), key=lambda entry: (position[entry[0][0]], entry[0][1])

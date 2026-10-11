@@ -5,7 +5,7 @@ from pydantic import BaseModel, ConfigDict
 
 from yaksha.db.models import Scenario, ScenarioGeneration
 from yaksha.domain.generation import GenerationMode, GenerationStatus
-from yaksha.domain.scenarios import Category, Fact, ScenarioConfig
+from yaksha.domain.scenarios import Category, DataSet, ScenarioConfig
 from yaksha.domain.settings import CallerModel
 from yaksha.simulation.scenarios import config_of
 
@@ -19,10 +19,9 @@ class ScenarioRead(BaseModel):
     description: str | None
     generation_id: uuid.UUID | None
     instructions: str
-    known_facts: list[Fact]
     unknown_facts: list[str]
     criteria: list[str]
-    agent_data: list[Fact]
+    data_sets: list[DataSet]
     first_words: str | None
     caller: CallerModel | None
     current_version: int

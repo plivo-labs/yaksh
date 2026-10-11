@@ -1358,6 +1358,8 @@ type ConversationRead struct {
 	CallerReason   *string            `json:"caller_reason"`
 	Channel        Channel            `json:"channel"`
 	CreatedAt      time.Time          `json:"created_at"`
+	DataSetId      openapi_types.UUID `json:"data_set_id"`
+	DataSetName    string             `json:"data_set_name"`
 	Direction      Direction          `json:"direction"`
 	EndReason      *EndReason         `json:"end_reason"`
 	EndedAt        *time.Time         `json:"ended_at"`
@@ -1382,10 +1384,9 @@ type ConversationRead struct {
 	RetryOf          *openapi_types.UUID `json:"retry_of"`
 	RunId            openapi_types.UUID  `json:"run_id"`
 
-	// Scenario What a scenario version pins. The instructions and the facts go to the caller. The
-	// criteria never do: they are what the agent must say or do on the call. Agent data goes only
-	// to the agent, in an outbound agent's trigger.
-	Scenario          ScenarioConfig     `json:"scenario"`
+	// Scenario A scenario version as one data set plays it: placeholders filled with the set's values.
+	Scenario          PlayedScenario     `json:"scenario"`
+	ScenarioDataSets  int                `json:"scenario_data_sets"`
 	ScenarioId        openapi_types.UUID `json:"scenario_id"`
 	ScenarioName      string             `json:"scenario_name"`
 	ScenarioVersion   int                `json:"scenario_version"`
@@ -1418,6 +1419,8 @@ type ConversationSummary struct {
 	CallerReason   *string            `json:"caller_reason"`
 	Channel        Channel            `json:"channel"`
 	CreatedAt      time.Time          `json:"created_at"`
+	DataSetId      openapi_types.UUID `json:"data_set_id"`
+	DataSetName    string             `json:"data_set_name"`
 	Direction      Direction          `json:"direction"`
 	EndReason      *EndReason         `json:"end_reason"`
 	EndedAt        *time.Time         `json:"ended_at"`
@@ -1438,6 +1441,7 @@ type ConversationSummary struct {
 	Repeat            int                 `json:"repeat"`
 	RetryOf           *openapi_types.UUID `json:"retry_of"`
 	RunId             openapi_types.UUID  `json:"run_id"`
+	ScenarioDataSets  int                 `json:"scenario_data_sets"`
 	ScenarioId        openapi_types.UUID  `json:"scenario_id"`
 	ScenarioName      string              `json:"scenario_name"`
 	ScenarioVersion   int                 `json:"scenario_version"`
@@ -1462,6 +1466,15 @@ type CriterionCounts struct {
 // CurlCommand defines model for CurlCommand.
 type CurlCommand struct {
 	Command string `json:"command"`
+}
+
+// DataSet One set of values a scenario plays: every data set of a scenario has the same fact
+// names and agent data names, in the same order, with values of its own.
+type DataSet struct {
+	AgentData  *[]Fact             `json:"agent_data,omitempty"`
+	Id         *openapi_types.UUID `json:"id,omitempty"`
+	KnownFacts *[]Fact             `json:"known_facts,omitempty"`
+	Name       string              `json:"name"`
 }
 
 // DecidedBy defines model for DecidedBy.
@@ -1815,6 +1828,7 @@ type Limits struct {
 	MaxRunRepeats        *int `json:"max_run_repeats,omitempty"`
 	MaxRunRetries        *int `json:"max_run_retries,omitempty"`
 	MaxRunStartIntervalS *int `json:"max_run_start_interval_s,omitempty"`
+	MaxScenarioDataSets  *int `json:"max_scenario_data_sets,omitempty"`
 }
 
 // Llm Any API with OpenAI's Responses endpoint. The caller, scenario writing and the judges
@@ -2127,6 +2141,19 @@ type PlanPreview struct {
 	Surroundings Surroundings `json:"surroundings"`
 }
 
+// PlayedScenario A scenario version as one data set plays it: placeholders filled with the set's values.
+type PlayedScenario struct {
+	AgentData    []Fact             `json:"agent_data"`
+	Caller       *CallerModel       `json:"caller"`
+	Criteria     []string           `json:"criteria"`
+	DataSetId    openapi_types.UUID `json:"data_set_id"`
+	DataSetName  string             `json:"data_set_name"`
+	FirstWords   *string            `json:"first_words"`
+	Instructions string             `json:"instructions"`
+	KnownFacts   []Fact             `json:"known_facts"`
+	UnknownFacts []string           `json:"unknown_facts"`
+}
+
 // PlivoAccount defines model for PlivoAccount.
 type PlivoAccount struct {
 	AuthId    string `json:"auth_id"`
@@ -2392,8 +2419,10 @@ type RunRead struct {
 	WaitingReason  *WaitingReason     `json:"waiting_reason"`
 }
 
-// RunScenario A scenario of a run and the personas that call it. None is the scenario's own persona.
+// RunScenario A scenario of a run, the personas that call it and the data sets they play. No personas
+// is the scenario's own persona; no data sets is every data set of its current version.
 type RunScenario struct {
+	DataSetIds *[]openapi_types.UUID `json:"data_set_ids,omitempty"`
 	PersonaIds *[]openapi_types.UUID `json:"persona_ids,omitempty"`
 	ScenarioId openapi_types.UUID    `json:"scenario_id"`
 }
@@ -2455,30 +2484,28 @@ type RunVerdicts struct {
 
 // ScenarioConfig What a scenario version pins. The instructions and the facts go to the caller. The
 // criteria never do: they are what the agent must say or do on the call. Agent data goes only
-// to the agent, in an outbound agent's trigger.
+// to the agent, in an outbound agent's trigger. Each data set is played as its own call.
 type ScenarioConfig struct {
-	AgentData    *[]Fact      `json:"agent_data,omitempty"`
 	Caller       *CallerModel `json:"caller,omitempty"`
 	Criteria     []string     `json:"criteria"`
+	DataSets     []DataSet    `json:"data_sets"`
 	FirstWords   *string      `json:"first_words,omitempty"`
 	Instructions string       `json:"instructions"`
-	KnownFacts   *[]Fact      `json:"known_facts,omitempty"`
 	UnknownFacts *[]string    `json:"unknown_facts,omitempty"`
 }
 
 // ScenarioCreate defines model for ScenarioCreate.
 type ScenarioCreate struct {
-	AgentData *[]Fact      `json:"agent_data,omitempty"`
-	Caller    *CallerModel `json:"caller,omitempty"`
+	Caller *CallerModel `json:"caller,omitempty"`
 
 	// Category What kind of situation a scenario tests. How the caller talks comes from the persona.
 	Category     *Category           `json:"category,omitempty"`
 	Criteria     []string            `json:"criteria"`
+	DataSets     []DataSet           `json:"data_sets"`
 	Description  *string             `json:"description,omitempty"`
 	FirstWords   *string             `json:"first_words,omitempty"`
 	ForkedFromId *openapi_types.UUID `json:"forked_from_id,omitempty"`
 	Instructions string              `json:"instructions"`
-	KnownFacts   *[]Fact             `json:"known_facts,omitempty"`
 	Name         string              `json:"name"`
 	PersonaId    openapi_types.UUID  `json:"persona_id"`
 	UnknownFacts *[]string           `json:"unknown_facts,omitempty"`
@@ -2489,24 +2516,35 @@ type ScenarioDelete struct {
 	ScenarioIds []openapi_types.UUID `json:"scenario_ids"`
 }
 
+// ScenarioFork The data sets a fork of a scenario keeps; None keeps them all.
+type ScenarioFork struct {
+	DataSetIds *[]openapi_types.UUID `json:"data_set_ids,omitempty"`
+}
+
+// ScenarioForkRequest Forks written from a scenario, each with the data sets it keeps.
+type ScenarioForkRequest struct {
+	Count       int                   `json:"count"`
+	DataSetIds  *[]openapi_types.UUID `json:"data_set_ids,omitempty"`
+	Instruction string                `json:"instruction"`
+}
+
 // ScenarioRead defines model for ScenarioRead.
 type ScenarioRead struct {
-	AgentData []Fact             `json:"agent_data"`
-	AgentId   openapi_types.UUID `json:"agent_id"`
-	Caller    *CallerModel       `json:"caller"`
+	AgentId openapi_types.UUID `json:"agent_id"`
+	Caller  *CallerModel       `json:"caller"`
 
 	// Category What kind of situation a scenario tests. How the caller talks comes from the persona.
 	Category       Category            `json:"category"`
 	CreatedAt      time.Time           `json:"created_at"`
 	Criteria       []string            `json:"criteria"`
 	CurrentVersion int                 `json:"current_version"`
+	DataSets       []DataSet           `json:"data_sets"`
 	Description    *string             `json:"description"`
 	FirstWords     *string             `json:"first_words"`
 	ForkedFromId   *openapi_types.UUID `json:"forked_from_id"`
 	GenerationId   *openapi_types.UUID `json:"generation_id"`
 	Id             openapi_types.UUID  `json:"id"`
 	Instructions   string              `json:"instructions"`
-	KnownFacts     []Fact              `json:"known_facts"`
 	Name           string              `json:"name"`
 	PersonaId      openapi_types.UUID  `json:"persona_id"`
 	UnknownFacts   []string            `json:"unknown_facts"`
@@ -2515,14 +2553,13 @@ type ScenarioRead struct {
 
 // ScenarioUpdate A partial change; lists replace the stored list as a whole.
 type ScenarioUpdate struct {
-	AgentData    *[]Fact             `json:"agent_data,omitempty"`
 	Caller       *CallerModel        `json:"caller,omitempty"`
 	Category     *Category           `json:"category,omitempty"`
 	Criteria     *[]string           `json:"criteria,omitempty"`
+	DataSets     *[]DataSet          `json:"data_sets,omitempty"`
 	Description  *string             `json:"description,omitempty"`
 	FirstWords   *string             `json:"first_words,omitempty"`
 	Instructions *string             `json:"instructions,omitempty"`
-	KnownFacts   *[]Fact             `json:"known_facts,omitempty"`
 	Name         *string             `json:"name,omitempty"`
 	PersonaId    *openapi_types.UUID `json:"persona_id,omitempty"`
 	UnknownFacts *[]string           `json:"unknown_facts,omitempty"`
@@ -2544,7 +2581,7 @@ type ScenarioVerdicts struct {
 type ScenarioVersionRead struct {
 	// Config What a scenario version pins. The instructions and the facts go to the caller. The
 	// criteria never do: they are what the agent must say or do on the call. Agent data goes only
-	// to the agent, in an outbound agent's trigger.
+	// to the agent, in an outbound agent's trigger. Each data set is played as its own call.
 	Config     ScenarioConfig     `json:"config"`
 	CreatedAt  time.Time          `json:"created_at"`
 	Id         openapi_types.UUID `json:"id"`
@@ -2924,6 +2961,9 @@ type CreateRunApiV1RunsPostParams struct {
 	IdempotencyKey *string `json:"idempotency-key,omitempty"`
 }
 
+// ForkScenarioApiV1ScenariosScenarioIdForkPostJSONBody defines parameters for ForkScenarioApiV1ScenariosScenarioIdForkPost.
+type ForkScenarioApiV1ScenariosScenarioIdForkPostJSONBody = ScenarioFork
+
 // ListVersionsApiV1ScenariosScenarioIdVersionsGetParams defines parameters for ListVersionsApiV1ScenariosScenarioIdVersionsGet.
 type ListVersionsApiV1ScenariosScenarioIdVersionsGetParams struct {
 	Page     *int `form:"page,omitempty" json:"page,omitempty"`
@@ -3024,8 +3064,14 @@ type CreateRunApiV1RunsPostJSONRequestBody = RunCreate
 // UpdateScenarioApiV1ScenariosScenarioIdPatchJSONRequestBody defines body for UpdateScenarioApiV1ScenariosScenarioIdPatch for application/json ContentType.
 type UpdateScenarioApiV1ScenariosScenarioIdPatchJSONRequestBody = ScenarioUpdate
 
+// DraftDataSetsApiV1ScenariosScenarioIdDataSetsDraftPostJSONRequestBody defines body for DraftDataSetsApiV1ScenariosScenarioIdDataSetsDraftPost for application/json ContentType.
+type DraftDataSetsApiV1ScenariosScenarioIdDataSetsDraftPostJSONRequestBody = ForkRequest
+
+// ForkScenarioApiV1ScenariosScenarioIdForkPostJSONRequestBody defines body for ForkScenarioApiV1ScenariosScenarioIdForkPost for application/json ContentType.
+type ForkScenarioApiV1ScenariosScenarioIdForkPostJSONRequestBody = ForkScenarioApiV1ScenariosScenarioIdForkPostJSONBody
+
 // DraftScenarioForksApiV1ScenariosScenarioIdForksDraftPostJSONRequestBody defines body for DraftScenarioForksApiV1ScenariosScenarioIdForksDraftPost for application/json ContentType.
-type DraftScenarioForksApiV1ScenariosScenarioIdForksDraftPostJSONRequestBody = ForkRequest
+type DraftScenarioForksApiV1ScenariosScenarioIdForksDraftPostJSONRequestBody = ScenarioForkRequest
 
 // ImportSettingsApiV1SettingsImportPostJSONRequestBody defines body for ImportSettingsApiV1SettingsImportPost for application/json ContentType.
 type ImportSettingsApiV1SettingsImportPostJSONRequestBody = SettingsImport
@@ -4323,12 +4369,43 @@ type ClientInterface interface {
 	// Corresponds with PATCH /api/v1/scenarios/{scenario_id} (the `UpdateScenarioApiV1ScenariosScenarioIdPatch` operationId).
 	UpdateScenarioApiV1ScenariosScenarioIdPatch(ctx context.Context, scenarioId openapi_types.UUID, body UpdateScenarioApiV1ScenariosScenarioIdPatchJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// DraftDataSetsApiV1ScenariosScenarioIdDataSetsDraftPostWithBody Draft Data Sets
+	//
+	// Writes new data sets for the scenario: `planned`, then `data_set` for each one, which
+	// the console adds to the scenario with an update. Nothing is saved.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /api/v1/scenarios/{scenario_id}/data-sets/draft (the `DraftDataSetsApiV1ScenariosScenarioIdDataSetsDraftPost` operationId).
+	DraftDataSetsApiV1ScenariosScenarioIdDataSetsDraftPostWithBody(ctx context.Context, scenarioId openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DraftDataSetsApiV1ScenariosScenarioIdDataSetsDraftPost Draft Data Sets
+	//
+	// Writes new data sets for the scenario: `planned`, then `data_set` for each one, which
+	// the console adds to the scenario with an update. Nothing is saved.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /api/v1/scenarios/{scenario_id}/data-sets/draft (the `DraftDataSetsApiV1ScenariosScenarioIdDataSetsDraftPost` operationId).
+	DraftDataSetsApiV1ScenariosScenarioIdDataSetsDraftPost(ctx context.Context, scenarioId openapi_types.UUID, body DraftDataSetsApiV1ScenariosScenarioIdDataSetsDraftPostJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ForkScenarioApiV1ScenariosScenarioIdForkPostWithBody Fork Scenario
+	//
+	// A copy of the scenario named "… (fork)", for the person to change.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /api/v1/scenarios/{scenario_id}/fork (the `ForkScenarioApiV1ScenariosScenarioIdForkPost` operationId).
+	ForkScenarioApiV1ScenariosScenarioIdForkPostWithBody(ctx context.Context, scenarioId openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// ForkScenarioApiV1ScenariosScenarioIdForkPost Fork Scenario
 	//
 	// A copy of the scenario named "… (fork)", for the person to change.
 	//
+	// Takes a body of the `application/json` content type.
+	//
 	// Corresponds with POST /api/v1/scenarios/{scenario_id}/fork (the `ForkScenarioApiV1ScenariosScenarioIdForkPost` operationId).
-	ForkScenarioApiV1ScenariosScenarioIdForkPost(ctx context.Context, scenarioId openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error)
+	ForkScenarioApiV1ScenariosScenarioIdForkPost(ctx context.Context, scenarioId openapi_types.UUID, body ForkScenarioApiV1ScenariosScenarioIdForkPostJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// DraftScenarioForksApiV1ScenariosScenarioIdForksDraftPostWithBody Draft Scenario Forks
 	//
@@ -6288,13 +6365,74 @@ func (c *Client) UpdateScenarioApiV1ScenariosScenarioIdPatch(ctx context.Context
 	return c.Client.Do(req)
 }
 
+// DraftDataSetsApiV1ScenariosScenarioIdDataSetsDraftPostWithBody Draft Data Sets
+//
+// Writes new data sets for the scenario: `planned`, then `data_set` for each one, which
+// the console adds to the scenario with an update. Nothing is saved.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /api/v1/scenarios/{scenario_id}/data-sets/draft (the `DraftDataSetsApiV1ScenariosScenarioIdDataSetsDraftPost` operationId).
+func (c *Client) DraftDataSetsApiV1ScenariosScenarioIdDataSetsDraftPostWithBody(ctx context.Context, scenarioId openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDraftDataSetsApiV1ScenariosScenarioIdDataSetsDraftPostRequestWithBody(c.Server, scenarioId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DraftDataSetsApiV1ScenariosScenarioIdDataSetsDraftPost Draft Data Sets
+//
+// Writes new data sets for the scenario: `planned`, then `data_set` for each one, which
+// the console adds to the scenario with an update. Nothing is saved.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /api/v1/scenarios/{scenario_id}/data-sets/draft (the `DraftDataSetsApiV1ScenariosScenarioIdDataSetsDraftPost` operationId).
+func (c *Client) DraftDataSetsApiV1ScenariosScenarioIdDataSetsDraftPost(ctx context.Context, scenarioId openapi_types.UUID, body DraftDataSetsApiV1ScenariosScenarioIdDataSetsDraftPostJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDraftDataSetsApiV1ScenariosScenarioIdDataSetsDraftPostRequest(c.Server, scenarioId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ForkScenarioApiV1ScenariosScenarioIdForkPostWithBody Fork Scenario
+//
+// A copy of the scenario named "… (fork)", for the person to change.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /api/v1/scenarios/{scenario_id}/fork (the `ForkScenarioApiV1ScenariosScenarioIdForkPost` operationId).
+func (c *Client) ForkScenarioApiV1ScenariosScenarioIdForkPostWithBody(ctx context.Context, scenarioId openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewForkScenarioApiV1ScenariosScenarioIdForkPostRequestWithBody(c.Server, scenarioId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // ForkScenarioApiV1ScenariosScenarioIdForkPost Fork Scenario
 //
 // A copy of the scenario named "… (fork)", for the person to change.
 //
+// Takes a body of the `application/json` content type.
+//
 // Corresponds with POST /api/v1/scenarios/{scenario_id}/fork (the `ForkScenarioApiV1ScenariosScenarioIdForkPost` operationId).
-func (c *Client) ForkScenarioApiV1ScenariosScenarioIdForkPost(ctx context.Context, scenarioId openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewForkScenarioApiV1ScenariosScenarioIdForkPostRequest(c.Server, scenarioId)
+func (c *Client) ForkScenarioApiV1ScenariosScenarioIdForkPost(ctx context.Context, scenarioId openapi_types.UUID, body ForkScenarioApiV1ScenariosScenarioIdForkPostJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewForkScenarioApiV1ScenariosScenarioIdForkPostRequest(c.Server, scenarioId, body)
 	if err != nil {
 		return nil, err
 	}
@@ -10002,8 +10140,66 @@ func NewUpdateScenarioApiV1ScenariosScenarioIdPatchRequestWithBody(server string
 	return req, nil
 }
 
-// NewForkScenarioApiV1ScenariosScenarioIdForkPostRequest constructs an http.Request for the ForkScenarioApiV1ScenariosScenarioIdForkPost method
-func NewForkScenarioApiV1ScenariosScenarioIdForkPostRequest(server string, scenarioId openapi_types.UUID) (*http.Request, error) {
+// NewDraftDataSetsApiV1ScenariosScenarioIdDataSetsDraftPostRequest calls the generic DraftDataSetsApiV1ScenariosScenarioIdDataSetsDraftPost builder with application/json body
+func NewDraftDataSetsApiV1ScenariosScenarioIdDataSetsDraftPostRequest(server string, scenarioId openapi_types.UUID, body DraftDataSetsApiV1ScenariosScenarioIdDataSetsDraftPostJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewDraftDataSetsApiV1ScenariosScenarioIdDataSetsDraftPostRequestWithBody(server, scenarioId, "application/json", bodyReader)
+}
+
+// NewDraftDataSetsApiV1ScenariosScenarioIdDataSetsDraftPostRequestWithBody constructs an http.Request for the DraftDataSetsApiV1ScenariosScenarioIdDataSetsDraftPost method, with any body, and a specified content type
+func NewDraftDataSetsApiV1ScenariosScenarioIdDataSetsDraftPostRequestWithBody(server string, scenarioId openapi_types.UUID, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "scenario_id", scenarioId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/scenarios/%s/data-sets/draft", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewForkScenarioApiV1ScenariosScenarioIdForkPostRequest calls the generic ForkScenarioApiV1ScenariosScenarioIdForkPost builder with application/json body
+func NewForkScenarioApiV1ScenariosScenarioIdForkPostRequest(server string, scenarioId openapi_types.UUID, body ForkScenarioApiV1ScenariosScenarioIdForkPostJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewForkScenarioApiV1ScenariosScenarioIdForkPostRequestWithBody(server, scenarioId, "application/json", bodyReader)
+}
+
+// NewForkScenarioApiV1ScenariosScenarioIdForkPostRequestWithBody constructs an http.Request for the ForkScenarioApiV1ScenariosScenarioIdForkPost method, with any body, and a specified content type
+func NewForkScenarioApiV1ScenariosScenarioIdForkPostRequestWithBody(server string, scenarioId openapi_types.UUID, contentType string, body io.Reader) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -10028,10 +10224,12 @@ func NewForkScenarioApiV1ScenariosScenarioIdForkPostRequest(server string, scena
 		return nil, err
 	}
 
-	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
 	if err != nil {
 		return nil, err
 	}
+
+	req.Header.Add("Content-Type", contentType)
 
 	return req, nil
 }
@@ -11885,14 +12083,43 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with PATCH /api/v1/scenarios/{scenario_id} (the `UpdateScenarioApiV1ScenariosScenarioIdPatch` operationId).
 	UpdateScenarioApiV1ScenariosScenarioIdPatchWithResponse(ctx context.Context, scenarioId openapi_types.UUID, body UpdateScenarioApiV1ScenariosScenarioIdPatchJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateScenarioApiV1ScenariosScenarioIdPatchResponse, error)
 
+	// DraftDataSetsApiV1ScenariosScenarioIdDataSetsDraftPostWithBodyWithResponse Draft Data Sets
+	//
+	// Writes new data sets for the scenario: `planned`, then `data_set` for each one, which
+	// the console adds to the scenario with an update. Nothing is saved.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/scenarios/{scenario_id}/data-sets/draft (the `DraftDataSetsApiV1ScenariosScenarioIdDataSetsDraftPost` operationId).
+	DraftDataSetsApiV1ScenariosScenarioIdDataSetsDraftPostWithBodyWithResponse(ctx context.Context, scenarioId openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*DraftDataSetsApiV1ScenariosScenarioIdDataSetsDraftPostResponse, error)
+
+	// DraftDataSetsApiV1ScenariosScenarioIdDataSetsDraftPostWithResponse Draft Data Sets
+	//
+	// Writes new data sets for the scenario: `planned`, then `data_set` for each one, which
+	// the console adds to the scenario with an update. Nothing is saved.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/scenarios/{scenario_id}/data-sets/draft (the `DraftDataSetsApiV1ScenariosScenarioIdDataSetsDraftPost` operationId).
+	DraftDataSetsApiV1ScenariosScenarioIdDataSetsDraftPostWithResponse(ctx context.Context, scenarioId openapi_types.UUID, body DraftDataSetsApiV1ScenariosScenarioIdDataSetsDraftPostJSONRequestBody, reqEditors ...RequestEditorFn) (*DraftDataSetsApiV1ScenariosScenarioIdDataSetsDraftPostResponse, error)
+
+	// ForkScenarioApiV1ScenariosScenarioIdForkPostWithBodyWithResponse Fork Scenario
+	//
+	// A copy of the scenario named "… (fork)", for the person to change.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/scenarios/{scenario_id}/fork (the `ForkScenarioApiV1ScenariosScenarioIdForkPost` operationId).
+	ForkScenarioApiV1ScenariosScenarioIdForkPostWithBodyWithResponse(ctx context.Context, scenarioId openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ForkScenarioApiV1ScenariosScenarioIdForkPostResponse, error)
+
 	// ForkScenarioApiV1ScenariosScenarioIdForkPostWithResponse Fork Scenario
 	//
 	// A copy of the scenario named "… (fork)", for the person to change.
 	//
-	// Returns a wrapper object for the known response body format(s).
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with POST /api/v1/scenarios/{scenario_id}/fork (the `ForkScenarioApiV1ScenariosScenarioIdForkPost` operationId).
-	ForkScenarioApiV1ScenariosScenarioIdForkPostWithResponse(ctx context.Context, scenarioId openapi_types.UUID, reqEditors ...RequestEditorFn) (*ForkScenarioApiV1ScenariosScenarioIdForkPostResponse, error)
+	ForkScenarioApiV1ScenariosScenarioIdForkPostWithResponse(ctx context.Context, scenarioId openapi_types.UUID, body ForkScenarioApiV1ScenariosScenarioIdForkPostJSONRequestBody, reqEditors ...RequestEditorFn) (*ForkScenarioApiV1ScenariosScenarioIdForkPostResponse, error)
 
 	// DraftScenarioForksApiV1ScenariosScenarioIdForksDraftPostWithBodyWithResponse Draft Scenario Forks
 	//
@@ -15579,6 +15806,54 @@ func (r UpdateScenarioApiV1ScenariosScenarioIdPatchResponse) ContentType() strin
 	return ""
 }
 
+type DraftDataSetsApiV1ScenariosScenarioIdDataSetsDraftPostResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *ErrorResponse
+}
+
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r DraftDataSetsApiV1ScenariosScenarioIdDataSetsDraftPostResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r DraftDataSetsApiV1ScenariosScenarioIdDataSetsDraftPostResponse) GetJSON503() *ErrorResponse {
+	return r.JSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r DraftDataSetsApiV1ScenariosScenarioIdDataSetsDraftPostResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r DraftDataSetsApiV1ScenariosScenarioIdDataSetsDraftPostResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DraftDataSetsApiV1ScenariosScenarioIdDataSetsDraftPostResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r DraftDataSetsApiV1ScenariosScenarioIdDataSetsDraftPostResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type ForkScenarioApiV1ScenariosScenarioIdForkPostResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -18177,15 +18452,62 @@ func (c *ClientWithResponses) UpdateScenarioApiV1ScenariosScenarioIdPatchWithRes
 	return ParseUpdateScenarioApiV1ScenariosScenarioIdPatchResponse(rsp)
 }
 
+// DraftDataSetsApiV1ScenariosScenarioIdDataSetsDraftPostWithBodyWithResponse Draft Data Sets
+//
+// Writes new data sets for the scenario: `planned`, then `data_set` for each one, which
+// the console adds to the scenario with an update. Nothing is saved.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/scenarios/{scenario_id}/data-sets/draft (the `DraftDataSetsApiV1ScenariosScenarioIdDataSetsDraftPost` operationId).
+func (c *ClientWithResponses) DraftDataSetsApiV1ScenariosScenarioIdDataSetsDraftPostWithBodyWithResponse(ctx context.Context, scenarioId openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*DraftDataSetsApiV1ScenariosScenarioIdDataSetsDraftPostResponse, error) {
+	rsp, err := c.DraftDataSetsApiV1ScenariosScenarioIdDataSetsDraftPostWithBody(ctx, scenarioId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDraftDataSetsApiV1ScenariosScenarioIdDataSetsDraftPostResponse(rsp)
+}
+
+// DraftDataSetsApiV1ScenariosScenarioIdDataSetsDraftPostWithResponse Draft Data Sets
+//
+// Writes new data sets for the scenario: `planned`, then `data_set` for each one, which
+// the console adds to the scenario with an update. Nothing is saved.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/scenarios/{scenario_id}/data-sets/draft (the `DraftDataSetsApiV1ScenariosScenarioIdDataSetsDraftPost` operationId).
+func (c *ClientWithResponses) DraftDataSetsApiV1ScenariosScenarioIdDataSetsDraftPostWithResponse(ctx context.Context, scenarioId openapi_types.UUID, body DraftDataSetsApiV1ScenariosScenarioIdDataSetsDraftPostJSONRequestBody, reqEditors ...RequestEditorFn) (*DraftDataSetsApiV1ScenariosScenarioIdDataSetsDraftPostResponse, error) {
+	rsp, err := c.DraftDataSetsApiV1ScenariosScenarioIdDataSetsDraftPost(ctx, scenarioId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDraftDataSetsApiV1ScenariosScenarioIdDataSetsDraftPostResponse(rsp)
+}
+
+// ForkScenarioApiV1ScenariosScenarioIdForkPostWithBodyWithResponse Fork Scenario
+//
+// A copy of the scenario named "… (fork)", for the person to change.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/scenarios/{scenario_id}/fork (the `ForkScenarioApiV1ScenariosScenarioIdForkPost` operationId).
+func (c *ClientWithResponses) ForkScenarioApiV1ScenariosScenarioIdForkPostWithBodyWithResponse(ctx context.Context, scenarioId openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ForkScenarioApiV1ScenariosScenarioIdForkPostResponse, error) {
+	rsp, err := c.ForkScenarioApiV1ScenariosScenarioIdForkPostWithBody(ctx, scenarioId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseForkScenarioApiV1ScenariosScenarioIdForkPostResponse(rsp)
+}
+
 // ForkScenarioApiV1ScenariosScenarioIdForkPostWithResponse Fork Scenario
 //
 // A copy of the scenario named "… (fork)", for the person to change.
 //
-// Returns a wrapper object for the known response body format(s).
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
 // Corresponds with POST /api/v1/scenarios/{scenario_id}/fork (the `ForkScenarioApiV1ScenariosScenarioIdForkPost` operationId).
-func (c *ClientWithResponses) ForkScenarioApiV1ScenariosScenarioIdForkPostWithResponse(ctx context.Context, scenarioId openapi_types.UUID, reqEditors ...RequestEditorFn) (*ForkScenarioApiV1ScenariosScenarioIdForkPostResponse, error) {
-	rsp, err := c.ForkScenarioApiV1ScenariosScenarioIdForkPost(ctx, scenarioId, reqEditors...)
+func (c *ClientWithResponses) ForkScenarioApiV1ScenariosScenarioIdForkPostWithResponse(ctx context.Context, scenarioId openapi_types.UUID, body ForkScenarioApiV1ScenariosScenarioIdForkPostJSONRequestBody, reqEditors ...RequestEditorFn) (*ForkScenarioApiV1ScenariosScenarioIdForkPostResponse, error) {
+	rsp, err := c.ForkScenarioApiV1ScenariosScenarioIdForkPost(ctx, scenarioId, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
@@ -21054,6 +21376,39 @@ func ParseUpdateScenarioApiV1ScenariosScenarioIdPatchResponse(rsp *http.Response
 			return nil, err
 		}
 		response.JSON4XX = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseDraftDataSetsApiV1ScenariosScenarioIdDataSetsDraftPostResponse parses an HTTP response from a DraftDataSetsApiV1ScenariosScenarioIdDataSetsDraftPostWithResponse call
+func ParseDraftDataSetsApiV1ScenariosScenarioIdDataSetsDraftPostResponse(rsp *http.Response) (*DraftDataSetsApiV1ScenariosScenarioIdDataSetsDraftPostResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DraftDataSetsApiV1ScenariosScenarioIdDataSetsDraftPostResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
 
 	}
 

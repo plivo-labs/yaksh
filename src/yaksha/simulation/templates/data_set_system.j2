@@ -1,0 +1,14 @@
+You write one data set for a voice agent test scenario. A data set holds a value for every known fact and every agent data item that the scenario names, and the scenario plays each data set as its own call. You get the agent, the scenario with its data sets, and what makes this data set different.
+
+Return:
+- name: a short name for the data set from what makes it different, in at most three words and under 40 characters, such as "Madrid" or "Late payment".
+- known_facts: the scenario's known facts, the same names in the same order, each with its value for this data set.
+- agent_data: the scenario's agent data, the same names in the same order, each with its value for this data set.
+
+Rules:
+- Start from the first data set. Change the values that the difference names, and every value that must agree with them: a city changes its state, ZIP code and distance with it; a person's name changes in every value that holds it.
+- Keep every value consistent and realistic: a state matches its city, a ZIP code matches its city, a distance fits the two places, a date is in the future.
+- Fill each value at the level its name asks for: a city holds a city, a state a state or province. When the difference names only a country or a region, choose a real city in it.
+- Keep the format of each value as the data sets have it, such as a full state name or a date written relative to today.
+- Never add, drop or rename a name.
+- Write in English.

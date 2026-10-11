@@ -57,7 +57,7 @@ curl localhost:8000/api/v1/personas -H "Authorization: Bearer $YAKSHA_API_TOKEN"
 curl -X POST localhost:8000/api/v1/agents -H "Authorization: Bearer $YAKSHA_API_TOKEN" -H 'Content-Type: application/json' \
   -d '{"name": "Support line", "agent_number": "+14155550100", "brief": "Answers billing questions and resets passwords."}'
 curl -X POST localhost:8000/api/v1/agents/<agent id>/scenarios -H "Authorization: Bearer $YAKSHA_API_TOKEN" -H 'Content-Type: application/json' \
-  -d '{"name": "Book a table", "persona_id": "<persona id>", "instructions": "You want a table for two tonight. Once the agent confirms the booking, say goodbye.", "known_facts": [{"name": "Name", "value": "Priya Raman"}], "criteria": ["Reads the time and party size back before it books."]}'
+  -d '{"name": "Book a table", "persona_id": "<persona id>", "instructions": "You want a table for two tonight. Once the agent confirms the booking, say goodbye.", "criteria": ["Reads the time and party size back before it books."], "data_sets": [{"name": "Priya", "known_facts": [{"name": "Name", "value": "Priya Raman"}]}]}'
 curl -X POST localhost:8000/api/v1/runs -H "Authorization: Bearer $YAKSHA_API_TOKEN" -H 'Content-Type: application/json' \
   -d '{"agent_id": "<agent id>", "scenarios": [{"scenario_id": "<scenario id>"}]}'
 ```
@@ -156,7 +156,7 @@ An outbound agent calls Yaksha. Yaksha sends the agent's trigger, a POST or GET 
 
 1. In the Plivo console, create an Application with answer URL `<YAKSHA_PUBLIC_URL>/incoming` and hangup URL `<YAKSHA_PUBLIC_URL>/incoming/hangup`, both `POST`, and link the numbers that receive test calls to it.
 2. Set the variables below, then recreate the API and the worker as in Phone: the API reads `YAKSHA_PLIVO_APP_ID` and the worker reads all of them at startup, and a restart keeps the old values. The worker reads the Application and its numbers at startup and when the Plivo keys in Settings change, so restart it after a change in the Plivo console. The Numbers page says why outbound tests are off, if they are.
-3. Create an agent with direction outbound, its trigger URL, headers and JSON body. In the trigger, `{{yaksha.number}}` is the number to call, `{{yaksha.conversation_id}}` the conversation, `{{agent_data.<name>}}` a value from the scenario and `{{secrets.<NAME>}}` a trigger secret from the Phone tab of Settings.
+3. Create an agent with direction outbound, its trigger URL, headers and JSON body. In the trigger, `{{yaksha.number}}` is the number to call, `{{yaksha.conversation_id}}` the conversation, `{{agent_data.<name>}}` a value from the data set the call plays and `{{secrets.<NAME>}}` a trigger secret from the Phone tab of Settings.
 
 | Variable | Purpose |
 | --- | --- |

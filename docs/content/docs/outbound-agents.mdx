@@ -34,7 +34,7 @@ You can put placeholders in header values, in the string values of the JSON body
 | --- | --- |
 | `{{yaksha.number}}` | The number that the agent must call. |
 | `{{yaksha.conversation_id}}` | The ID of the conversation. |
-| `{{agent_data.<name>}}` | A value from the agent data of the scenario. |
+| `{{agent_data.<name>}}` | A value from the agent data of the data set the call plays. |
 | `{{secrets.<NAME>}}` | A trigger secret from the **Phone** tab of Settings. `<NAME>` has only uppercase letters, digits and underscores, and starts with a letter. |
 
 Agent data is a list of names and values in a scenario. Yaksha sends it only in the trigger. The caller does not get it. Each scenario must have each agent data name that the trigger uses. If not, Yaksha rejects the request. For a run, Yaksha starts no conversation.

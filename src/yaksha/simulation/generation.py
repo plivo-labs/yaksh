@@ -45,7 +45,7 @@ from yaksha.domain.generation import (
 )
 from yaksha.domain.language_models import JsonModel
 from yaksha.domain.names import free_name
-from yaksha.domain.scenarios import ScenarioCreate
+from yaksha.domain.scenarios import ScenarioCreate, default_data_set_name
 from yaksha.domain.triggers import agent_data_names, check_agent_data
 from yaksha.simulation import scenarios
 from yaksha.simulation.agents import get_agent
@@ -67,6 +67,8 @@ log = logging.getLogger(__name__)
 WRITERS = 4
 """Writer calls at once."""
 MAX_CRITERIA = 10
+FACT_FIELDS = ("known_facts", "agent_data")
+"""What the writer returns flat and a scenario holds in its data sets."""
 MODEL_OFF = "scenario generation is off: add the LLM provider key in Settings"
 FIRST_SCENARIOS = 5
 """Scenarios written for a new agent, so its page has something to run."""
@@ -417,15 +419,23 @@ class Writer:
         ).data
 
     def checked(self, answer: dict[str, Any], slot: Slot, persona_id: uuid.UUID) -> ScenarioCreate:
-        """The written scenario as the API would take it, or why it cannot be saved."""
+        """The written scenario as the API would take it, its facts as its one data set, or why
+        it cannot be saved."""
+        texts = {key: value for key, value in answer.items() if key not in FACT_FIELDS}
         try:
             command = ScenarioCreate.model_validate(
                 {
-                    **answer,
+                    **texts,
                     "category": slot.category,
                     "persona_id": persona_id,
                     "criteria": answer["criteria"][:MAX_CRITERIA],
-                    "agent_data": answer["agent_data"] if self._agent_data else [],
+                    "data_sets": [
+                        {
+                            "name": default_data_set_name(1),
+                            "known_facts": answer["known_facts"],
+                            "agent_data": answer["agent_data"] if self._agent_data else [],
+                        }
+                    ],
                 }
             )
         except pydantic.ValidationError as error:

@@ -1,7 +1,9 @@
 You write a fork of a voice agent test scenario: a copy of the scenario with one change. A simulated caller phones the agent and follows the scenario; a judge later checks the criteria against the call transcript.
 
 You get the agent, the scenario as it is, and the change. Return every field of the scenario, changed only as the change needs:
-- Change a value everywhere it appears: in the instructions, the known facts, the agent data, the criteria, the name and the description. A city changes its state, ZIP code and distance with it; a name changes everywhere it is used.
+- The scenario has one or more data sets. Each holds a value for every known fact and every agent data item. Return one data set for each, in the same order, with the same names in the same order: change values only, never add, drop or rename a name.
+- A text written as {% raw %}{{fact name}}{% endraw %} takes that fact's value from each data set. Keep these placeholders. In text you add or change, never write a value of a known fact: write its placeholder, such as "Ask whether the {% raw %}{{Drink}}{% endraw %} comes in a large size.", so the text stays right in every data set.
+- Change a value everywhere it appears: in the instructions, the data sets, the criteria, the name and the description. When the change is about a value, change it in every data set in a way that fits that data set. A city changes its state, ZIP code and distance with it; a name changes everywhere it is used.
 - Keep every value consistent and realistic: a state matches its city, a ZIP code matches its city, a distance fits the two places, a date is in the future.
 - Fill each value at the level its field asks for: a city field holds a city, a state field a state or province. When the change names only a country or a region, choose a real city in it.
 - Keep the format of each value as the scenario has it, such as a full state name or a date written relative to today.

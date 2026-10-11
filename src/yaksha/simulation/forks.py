@@ -17,12 +17,19 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from yaksha.db.models import Scenario, Voice
 from yaksha.domain.agents import AgentConfig, Direction
 from yaksha.domain.errors import UnavailableError, ValidationError
-from yaksha.domain.forks import ForkRequest
+from yaksha.domain.forks import ForkRequest, ScenarioForkRequest
 from yaksha.domain.language_models import JsonModel, ModelCallError
 from yaksha.domain.languages import Language
 from yaksha.domain.names import MAX_NAME_CHARS, fork_name, free_name
 from yaksha.domain.personas import PersonaConfig, PersonaCreate
-from yaksha.domain.scenarios import Category, ScenarioConfig, ScenarioCreate
+from yaksha.domain.scenarios import (
+    Category,
+    DataSet,
+    Fact,
+    ScenarioConfig,
+    ScenarioCreate,
+    normalized,
+)
 from yaksha.domain.surroundings import (
     AutoNoise,
     NoiseSound,
@@ -31,10 +38,10 @@ from yaksha.domain.surroundings import (
     SpeakerKind,
     Surroundings,
 )
-from yaksha.domain.triggers import Trigger, agent_data_names, check_agent_data
+from yaksha.domain.triggers import Trigger, check_agent_data
 from yaksha.domain.voices import VoiceGender, VoiceSettings
 from yaksha.simulation import agents, personas, scenarios
-from yaksha.simulation.generation_prompts import SCENARIO_SCHEMA, TEXT, TEXTS, strict_object
+from yaksha.simulation.generation_prompts import FACTS, TEXT, TEXTS, strict_object
 from yaksha.simulation.persona_drafts import (
     AUTO,
     NOISE_DB,
@@ -49,6 +56,19 @@ WRITERS = 4
 NONE = "none"
 """A persona fork's word for removing the noise or the speaker; null keeps them."""
 CHANGES_SCHEMA = strict_object({"changes": TEXTS})
+FORK_SCENARIO_SCHEMA = strict_object(
+    {
+        "instructions": TEXT,
+        "unknown_facts": TEXTS,
+        "criteria": TEXTS,
+        "data_sets": {
+            "type": "array",
+            "items": strict_object({"known_facts": FACTS, "agent_data": FACTS}),
+        },
+        "description": TEXT,
+        "name": TEXT,
+    }
+)
 FORK_SCENARIO_SYSTEM = render("fork_scenario_system.j2")
 FORK_PERSONA_SYSTEM = render("fork_persona_system.j2")
 MODEL_OFF = "forking with Generate is off: add the LLM provider key in Settings"
@@ -167,9 +187,12 @@ class ScenarioSource:
         outbound = self.agent.outbound
         return outbound.trigger if outbound and self.agent.direction is Direction.OUTBOUND else None
 
-    def text(self) -> str:
+    def text(self, data_sets: list[DataSet]) -> str:
+        """The scenario as the writers read it, with the data sets the forks keep."""
         fields = {"name": self.name, "description": self.description or ""}
-        return json.dumps({**fields, **self.config.model_dump(mode="json")}, indent=1)
+        config = self.config.model_dump(mode="json", exclude={"data_sets"})
+        kept = [data_set.model_dump(mode="json", exclude={"id"}) for data_set in data_sets]
+        return json.dumps({**fields, **config, "data_sets": kept}, indent=1)
 
 
 async def scenario_source(
@@ -198,41 +221,72 @@ async def scenario_source(
 
 
 def scenario_forks(
-    model: JsonModel, source: ScenarioSource, request: ForkRequest
+    model: JsonModel, source: ScenarioSource, request: ScenarioForkRequest
 ) -> AsyncGenerator[Event[ScenarioCreate]]:
-    """Forks of the scenario as the API would create them, each with a free name."""
-    trigger = source.trigger
-    names = sorted(agent_data_names(trigger)) if trigger else []
-    agent_text = render("agent.j2", name=source.agent_name, agent=source.agent, agent_data=names)
+    """Forks of the scenario as the API would create them, each with a free name and the data
+    sets asked for. A fork keeps the fact names and the agent data names and changes only text
+    and values, so its data sets stay comparable with the scenario's."""
+    kept = source.config.chosen(request.data_set_ids)
+    original = source.text(kept)
+    agent_text = render(
+        "agent.j2",
+        name=source.agent_name,
+        agent=source.agent,
+        agent_data=source.config.agent_data_names,
+    )
     named = set(source.taken)
 
     async def write(change: str) -> ScenarioCreate:
-        user = f"{agent_text}\n\n## Scenario\n{source.text()}\n\n## Change\n{change}"
+        user = f"{agent_text}\n\n## Scenario\n{original}\n\n## Change\n{change}"
         answer = await model.complete_json(
-            system=FORK_SCENARIO_SYSTEM, user=user, name="scenario", schema=SCENARIO_SCHEMA
+            system=FORK_SCENARIO_SYSTEM, user=user, name="scenario", schema=FORK_SCENARIO_SCHEMA
         )
+        written = answer.data.get("data_sets") or []
+        if len(written) != len(kept):
+            raise ValidationError(f"the written fork has {len(written)} data sets, not {len(kept)}")
+        data_sets = [
+            {
+                "name": data_set.name,
+                "known_facts": renamed(values["known_facts"], data_set.known_facts),
+                "agent_data": renamed(values["agent_data"], data_set.agent_data),
+            }
+            for data_set, values in zip(kept, written, strict=True)
+        ]
+        texts = {key: value for key, value in answer.data.items() if key != "data_sets"}
         try:
             draft = ScenarioCreate.model_validate(
                 {
-                    **answer.data,
+                    **texts,
+                    "data_sets": data_sets,
                     "category": source.category,
                     "persona_id": source.persona_id,
                     "first_words": source.config.first_words,
                     "caller": source.config.caller,
-                    "agent_data": answer.data.get("agent_data") if names else [],
                     "forked_from_id": source.id,
                 }
             )
         except pydantic.ValidationError as error:
             message = error.errors()[0]["msg"]
             raise ValidationError(f"the written fork is not valid: {message}") from error
-        if trigger is not None:
-            check_agent_data(trigger, draft.to_config())
+        if source.trigger is not None:
+            check_agent_data(source.trigger, draft.to_config())
         name = free_name(draft.name, named)
         named.add(name.lower())
         return draft.model_copy(update={"name": name})
 
-    return fork_drafts(model, "scenario", source.text(), request, write)
+    return fork_drafts(model, "scenario", original, request, write)
+
+
+def renamed(written: list[dict[str, Any]], facts: list[Fact]) -> list[dict[str, Any]]:
+    """The written values under the source's own names, in its order. Written values that add,
+    drop or rename a name are refused."""
+    names = [normalized(str(item.get("name", ""))) for item in written]
+    if names != [normalized(fact.name) for fact in facts]:
+        raise ValidationError("the model changed the names of the facts or agent data")
+    return [
+        {"name": fact.name, "value": item.get("value")}
+        for fact, item in zip(facts, written, strict=True)
+    ]
 
 
 def _level(surroundings: Surroundings) -> int:

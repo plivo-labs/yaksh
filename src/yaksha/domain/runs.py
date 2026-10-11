@@ -9,7 +9,14 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    StringConstraints,
+    ValidationInfo,
+    field_validator,
+)
 
 from yaksha.domain.conversations import EndReason, OutcomeGroup
 
@@ -17,25 +24,25 @@ RunName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, 
 
 
 class RunScenario(BaseModel):
-    """A scenario of a run and the personas that call it. None is the scenario's own persona."""
+    """A scenario of a run, the personas that call it and the data sets they play. No personas
+    is the scenario's own persona; no data sets is every data set of its current version."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     scenario_id: uuid.UUID
     persona_ids: list[uuid.UUID] | None = Field(default=None, min_length=1)
     """In the order their conversations start."""
+    data_set_ids: list[uuid.UUID] | None = Field(default=None, min_length=1)
+    """In the order each persona plays them."""
 
-    @field_validator("persona_ids")
+    @field_validator("persona_ids", "data_set_ids")
     @classmethod
-    def each_persona_once(cls, ids: list[uuid.UUID] | None) -> list[uuid.UUID] | None:
-        repeated = [persona_id for persona_id, n in Counter(ids or []).items() if n > 1]
+    def each_once(cls, ids: list[uuid.UUID] | None, info: ValidationInfo) -> list[uuid.UUID] | None:
+        repeated = [item for item, n in Counter(ids or []).items() if n > 1]
         if repeated:
-            raise ValueError(f"persona {repeated[0]} is listed more than once")
+            kind = "persona" if info.field_name == "persona_ids" else "data set"
+            raise ValueError(f"{kind} {repeated[0]} is listed more than once")
         return ids
-
-    @property
-    def call_count(self) -> int:
-        return len(self.persona_ids) if self.persona_ids else 1
 
 
 class RunCreate(BaseModel):
@@ -68,10 +75,6 @@ class RunCreate(BaseModel):
         if repeated:
             raise ValueError(f"scenario {repeated[0]} is listed more than once")
         return scenarios
-
-    @property
-    def calls_per_repeat(self) -> int:
-        return sum(scenario.call_count for scenario in self.scenarios)
 
     def request_hash(self) -> str:
         """The same for the same request, so a repeated request can be told from another request

@@ -8,11 +8,14 @@ from httpx import AsyncClient
 
 from tests.conftest import (
     HINDI_VOICE,
+    Db,
     FakeJsonModel,
     FakeProviders,
     create_agent_id,
     create_persona,
     create_scenario,
+    data_sets,
+    save_settings,
 )
 from yaksha.domain.forks import ForkRequest
 from yaksha.domain.surroundings import NoiseSound, Sound, Speaker, SpeakerKind, Surroundings
@@ -23,10 +26,9 @@ FORKED_FIELDS = (
     "description",
     "persona_id",
     "instructions",
-    "known_facts",
     "unknown_facts",
     "criteria",
-    "agent_data",
+    "data_sets",
     "first_words",
     "caller",
 )
@@ -40,7 +42,7 @@ async def test_a_scenario_fork_copies_every_field_under_a_free_name(client: Asyn
         name="Moves the cleaning",
         category="messy_input",
         description="Checks a corrected date.",
-        known_facts=[{"name": "Date of birth", "value": "4 May 1990"}],
+        data_sets=data_sets(known_facts=[{"name": "Date of birth", "value": "4 May 1990"}]),
         unknown_facts=["Patient ID"],
         first_words="Hi, it's about my cleaning.",
         caller={"model": "gpt-6-astra", "reasoning_effort": "low"},
@@ -88,6 +90,7 @@ async def test_a_scenario_is_created_as_a_fork_only_of_its_own_agent(client: Asy
             "persona_id": original["persona_id"],
             "instructions": original["instructions"],
             "criteria": original["criteria"],
+            "data_sets": original["data_sets"],
             "forked_from_id": original["id"],
         },
     )
@@ -124,16 +127,18 @@ def events_of(body: str) -> list[tuple[str, dict[str, Any]]]:
 
 
 def moved_to(prompt: str) -> dict[str, Any]:
-    """A fork that moves the destination named in the change."""
-    city = prompt.rsplit("## Change\n", 1)[1].strip()
+    """A fork that moves the destination named in the change, in each data set it was given."""
+    scenario, city = prompt.split("## Scenario\n", 1)[1].split("\n\n## Change\n", 1)
+    given = json.loads(scenario)["data_sets"]
     return {
-        "name": f"Moves to {city}",
-        "description": f"Tests a move to {city}.",
+        "name": f"Moves to {city.strip()}",
+        "description": f"Tests a move to {city.strip()}.",
         "instructions": "Confirm the move when the agent reads it back.",
-        "known_facts": [{"name": "Moving to", "value": city}],
         "unknown_facts": [],
-        "criteria": [f"Reads back the move to {city}."],
-        "agent_data": [],
+        "criteria": [f"Reads back the move to {city.strip()}."],
+        "data_sets": [
+            {"known_facts": item["known_facts"], "agent_data": item["agent_data"]} for item in given
+        ],
     }
 
 
@@ -410,3 +415,97 @@ def test_surroundings_a_fork_does_not_touch_stay_as_they_are() -> None:
     )
 
     assert forks.changed_surroundings(own, None, None, None) == own
+
+
+TWO_SETS = [
+    {"name": "Austin", "known_facts": [{"name": "Moving to", "value": "Austin, Texas"}]},
+    {"name": "Denver", "known_facts": [{"name": "Moving to", "value": "Denver, Colorado"}]},
+]
+
+
+async def test_a_fork_keeps_only_the_data_sets_asked_for(
+    client: AsyncClient, generation_model: FakeJsonModel
+) -> None:
+    original = await create_scenario(client, await create_agent_id(client), data_sets=TWO_SETS)
+    denver = original["data_sets"][1]
+    url = f"/api/v1/scenarios/{original['id']}"
+    generation_model.changes = ["Madrid"]
+    generation_model.write = moved_to
+
+    manual = await client.post(f"{url}/fork", json={"data_set_ids": [denver["id"]]})
+    drafted = await client.post(
+        f"{url}/forks/draft",
+        json={"instruction": "Moves to Madrid", "count": 1, "data_set_ids": [denver["id"]]},
+    )
+    unknown = await client.post(f"{url}/fork", json={"data_set_ids": [str(uuid.uuid4())]})
+    twice = await client.post(f"{url}/fork", json={"data_set_ids": [denver["id"]] * 2})
+
+    assert manual.status_code == 201, manual.text
+    assert manual.json()["data_sets"] == [denver]
+    draft = next(data for kind, data in events_of(drafted.text) if kind == "fork")
+    assert [(item["name"], item["known_facts"]) for item in draft["data_sets"]] == [
+        ("Denver", denver["known_facts"])
+    ]
+    assert unknown.status_code == 422 and "no data set" in unknown.text
+    assert twice.status_code == 422 and "listed more than once" in twice.text
+
+
+async def test_a_written_fork_that_renames_a_fact_is_dropped(
+    client: AsyncClient, generation_model: FakeJsonModel
+) -> None:
+    original = await create_scenario(client, await create_agent_id(client))
+
+    def renames(prompt: str) -> dict[str, Any]:
+        fork = moved_to(prompt)
+        fork["data_sets"][0]["known_facts"][0]["name"] = "Full name"
+        return fork
+
+    generation_model.changes = ["Madrid"]
+    generation_model.write = renames
+
+    response = await client.post(
+        f"/api/v1/scenarios/{original['id']}/forks/draft",
+        json={"instruction": "Moves to Madrid", "count": 1},
+    )
+
+    assert [kind for kind, _ in events_of(response.text)] == ["planned", "dropped"]
+    assert "changed the names" in events_of(response.text)[1][1]["reason"]
+
+
+def data_set_for(prompt: str) -> dict[str, Any]:
+    """A data set that moves the destination to the city its line names, named as written."""
+    line = prompt.rsplit("## This data set\n", 1)[1]
+    city = " ".join(line.split())
+    return {"name": line, "known_facts": [{"name": "moving TO", "value": city}], "agent_data": []}
+
+
+async def test_written_data_sets_keep_the_names_and_get_free_set_names(
+    client: AsyncClient, generation_model: FakeJsonModel, db: Db
+) -> None:
+    original = await create_scenario(client, await create_agent_id(client), data_sets=TWO_SETS)
+    url = f"/api/v1/scenarios/{original['id']}"
+    generation_model.changes = ["Austin", "  New   York "]
+    generation_model.write = data_set_for
+
+    await client.patch(
+        url, json={"data_sets": [*original["data_sets"], {**TWO_SETS[0], "name": "new york"}]}
+    )
+    response = await client.post(
+        f"{url}/data-sets/draft", json={"instruction": "Austin and New York", "count": 2}
+    )
+    drafts = [data for kind, data in events_of(response.text) if kind == "data_set"]
+    current = (await client.get(url)).json()["data_sets"]
+    saved = await client.patch(url, json={"data_sets": [*current, *drafts]})
+    await save_settings(db, {"limits": {"max_scenario_data_sets": 5}})
+    no_room = await client.post(
+        f"{url}/data-sets/draft", json={"instruction": "Austin and Madrid", "count": 2}
+    )
+
+    assert sorted((d["name"], d["known_facts"][0]["value"]) for d in drafts) == [
+        ("Austin (2)", "Austin"),
+        ("New York (2)", "New York"),
+    ]
+    assert all(d["known_facts"][0]["name"] == "Moving to" for d in drafts)
+    assert len(current) == 3, "writing data sets saves nothing"
+    assert saved.status_code == 200, saved.text
+    assert no_room.status_code == 422 and "room for 0 more data sets" in no_room.text

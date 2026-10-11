@@ -33,13 +33,13 @@ curl -X POST localhost:8000/api/v1/runs \
   }'
 ```
 
-The run makes one conversation for each repeat of each scenario and persona pair. It makes all of them or none. A scenario with no `persona_ids` uses its own persona. In the example, scenario 2 calls once as persona A and once as persona B, so each repeat makes 3 conversations. Each conversation uses the versions of the agent, the scenario and the persona at the time when Yaksha made the run. Put each scenario only one time in `scenarios`, and each persona only one time in its `persona_ids`. To start the same pair more than one time, use `repeats`.
+The run makes one conversation for each repeat of each scenario, persona and data set. It makes all of them or none. A scenario with no `data_set_ids` plays all of its data sets; give `data_set_ids` to play only some of them, in that order. A scenario with no `persona_ids` uses its own persona. In the example, scenario 2 calls once as persona A and once as persona B, so each repeat makes 3 conversations. Each conversation uses the versions of the agent, the scenario and the persona at the time when Yaksha made the run. Put each scenario only one time in `scenarios`, and each persona only one time in its `persona_ids`. To start the same pair more than one time, use `repeats`.
 
 ## Fields
 
 | Field | Description |
 | --- | --- |
-| `repeats` | How many conversations the run makes for each scenario and persona pair. The default is 1. |
+| `repeats` | How many conversations the run makes for each scenario, persona and data set. The default is 1. |
 | `max_parallel` | The maximum number of conversations of the run that can be in progress at the same time. A conversation is in progress from the time when a worker gets it until it stops. This includes the time while the phone rings, and the time while Yaksha waits for the call of an outbound agent. |
 | `start_interval_s` | The minimum time between the starts of two conversations. |
 | `max_duration_s` | The time limit of each call, 10 to 1800 seconds. The default is the call length on the **Limits** tab of Settings (300). |

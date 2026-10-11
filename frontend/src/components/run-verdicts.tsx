@@ -122,7 +122,7 @@ function Scorecard({ verdicts }: { verdicts: RunVerdicts }) {
       </Stat>
       <Stat
         label="Both repeats pass"
-        hint="The chance that two repeats of the same scenario with the same persona both pass. A low value means the agent passes some tries and fails others."
+        hint="The chance that two repeats of the same scenario, persona and data set both pass. A low value means the agent passes some tries and fails others."
         value={verdicts.pass_hat_2 === null ? "None yet" : percent(verdicts.pass_hat_2)}
       >
         {verdicts.pass_hat_2 !== null && (
@@ -134,11 +134,11 @@ function Scorecard({ verdicts }: { verdicts: RunVerdicts }) {
         )}
         <p className="text-xs-400 text-muted-foreground">
           {verdicts.pass_hat_2 === null
-            ? "Needs two scored repeats of a scenario with one persona."
-            : `Over ${counted(verdicts.pass_hat_2_scenarios, "scenario and persona pair", "scenario and persona pairs")}. ${
+            ? "Needs two scored repeats of a scenario with one persona and one data set."
+            : `Over ${counted(verdicts.pass_hat_2_scenarios, "scenario, persona and data set", "scenarios, personas and data sets")}. ${
                 verdicts.inconsistent.length === 0
-                  ? "No pair both passed and failed."
-                  : `${counted(verdicts.inconsistent.length, "scenario", "scenarios")} passed and failed across repeats of one persona.`
+                  ? "None both passed and failed."
+                  : `${counted(verdicts.inconsistent.length, "scenario", "scenarios")} passed and failed across repeats of one persona and data set.`
               }`}
         </p>
       </Stat>

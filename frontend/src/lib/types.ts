@@ -652,15 +652,41 @@ export interface Fact {
   value: string;
 }
 
+/** One set of values a scenario plays as its own call. Every data set of a scenario has the
+ * same fact names and agent data names, in the same order. */
+export interface DataSet {
+  /** Kept across edits, so a run can play the same data set again; new data sets have none. */
+  id?: string;
+  name: string;
+  known_facts: Fact[];
+  agent_data: Fact[];
+}
+
+/** The ceiling of the operator's limit on data sets per scenario. */
+export const MAX_DATA_SETS = 50;
+
 export interface ScenarioConfig {
+  /** `{{fact name}}` takes the value of the known fact from the data set the call plays. */
+  instructions: string;
+  unknown_facts: string[];
+  criteria: string[];
+  data_sets: DataSet[];
+  /** What the caller says first when it speaks first; null says its language's opening. */
+  first_words: string | null;
+  /** The caller's model for this scenario; null uses the settings' model. */
+  caller: CallerModel | null;
+}
+
+/** A scenario version as one data set played it, its placeholders filled in. */
+export interface PlayedScenario {
+  data_set_id: string;
+  data_set_name: string;
   instructions: string;
   known_facts: Fact[];
   unknown_facts: string[];
   criteria: string[];
   agent_data: Fact[];
-  /** What the caller says first when it speaks first; null says its language's opening. */
   first_words: string | null;
-  /** The caller's model for this scenario; null uses the settings' model. */
   caller: CallerModel | null;
 }
 
@@ -761,6 +787,11 @@ export interface ConversationSummary {
   scenario_version_id: string;
   scenario_version: number;
   scenario_name: string;
+  data_set_id: string;
+  /** The data set's name in the scenario version the conversation played. */
+  data_set_name: string;
+  /** How many data sets that scenario version holds; the name matters only with more than one. */
+  scenario_data_sets: number;
   language: Language;
   channel: "voice";
   caller_number: string | null;
@@ -795,7 +826,7 @@ export interface Conversation extends ConversationSummary {
   instructions: string;
   /** What the call played behind the caller, as planned before it started. */
   sounds: PlayedSound[];
-  scenario: ScenarioConfig;
+  scenario: PlayedScenario;
   transcript: Turn[];
   replies: Reply[];
   wire_events: WireEvent[];
@@ -854,10 +885,12 @@ export interface RunSummary {
   cancelled_at: string | null;
 }
 
-/** A scenario of a run and the personas that call it; none is the scenario's own persona. */
+/** A scenario of a run, the personas that call it and the data sets they play. No personas is
+ * the scenario's own persona; no data sets is every data set. */
 export interface RunScenario {
   scenario_id: string;
   persona_ids?: string[] | null;
+  data_set_ids?: string[] | null;
 }
 
 export interface Run extends RunSummary {
@@ -1362,6 +1395,7 @@ export interface SettingsValues {
     max_run_repeats: number;
     max_run_retries: number;
     max_run_start_interval_s: number;
+    max_scenario_data_sets: number;
   };
 }
 
@@ -1405,10 +1439,15 @@ export interface ImportResult {
   settings: AppSettings;
 }
 
-/** What forks change, and how many to write. */
+/** What forks or new data sets change, and how many to write. */
 export interface ForkRequest {
   instruction: string;
   count: number;
+}
+
+/** The data sets a fork of a scenario keeps; none keeps them all. */
+export interface ScenarioFork {
+  data_set_ids?: string[] | null;
 }
 
 export const MAX_FORKS = 5;
