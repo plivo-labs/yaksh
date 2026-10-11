@@ -300,7 +300,7 @@ def agent_data_names(trigger: Trigger) -> set[str]:
 def check_agent_data(trigger: Trigger, scenario: ScenarioConfig, name: str | None = None) -> None:
     """Refuse a scenario that lacks agent data the trigger needs; the refusal names the
     scenario when its name is given."""
-    have = {normalized(fact.name) for fact in scenario.agent_data}
+    have = {normalized(name) for name in scenario.agent_data_names}
     missing = sorted(agent_data_names(trigger) - have)
     if missing:
         subject = "the scenario" if name is None else f'the scenario "{name}"'

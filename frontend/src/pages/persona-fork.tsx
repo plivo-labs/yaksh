@@ -3,9 +3,11 @@ import { useState } from "react";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";
 
-import { ForkDialog } from "@/components/fork-dialog";
+import { DraftDialog } from "@/components/draft-dialog";
 import { Button } from "@/components/ui/button";
+import { forkWords } from "@/lib/drafts";
 import { surroundingsLabel } from "@/lib/format";
+import { forkSaver } from "@/lib/names";
 import {
   personaNames,
   useDeletePersona,
@@ -88,14 +90,13 @@ export function PersonaFork({ persona }: { persona: Persona }) {
         Fork
       </Button>
       {open && (
-        <ForkDialog<PersonaInput>
-          kind="persona"
+        <DraftDialog<PersonaInput>
+          words={forkWords("persona")}
           originalName={persona.name}
           path={`/personas/${persona.id}/forks/draft`}
           changes={changes}
-          onManual={forkManually}
-          takenNames={personaNames}
-          saveOne={(draft) => create.mutateAsync(draft)}
+          manual={{ label: "Skip, fork manually", onClick: forkManually }}
+          save={forkSaver(personaNames, (draft) => create.mutateAsync(draft))}
           onSaved={(ids) =>
             toast.success(`Saved ${ids.length === 1 ? "1 fork" : `${ids.length} forks`}`)
           }

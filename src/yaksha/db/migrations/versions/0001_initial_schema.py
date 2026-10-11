@@ -407,6 +407,8 @@ def upgrade() -> None:
         sa.Column("persona_version_id", sa.UUID(), nullable=False),
         sa.Column("scenario_id", sa.UUID(), nullable=False),
         sa.Column("scenario_version_id", sa.UUID(), nullable=False),
+        sa.Column("data_set_id", sa.UUID(), nullable=False),
+        sa.Column("data_set_name", sa.Text(), nullable=False),
         sa.Column(
             "language",
             sa.Enum("en", "hi", "bn", "gu", "kn", "mr", "ta", "te", "es", name="language"),
@@ -525,8 +527,9 @@ def upgrade() -> None:
             "repeat",
             "scenario_id",
             "persona_id",
+            "data_set_id",
             "attempt",
-            name=op.f("uq_conversations_run_id_repeat_scenario_id_persona_id_attempt"),
+            name=op.f("uq_conversations_run_id_repeat_scenario_id_persona_id_data_set_id_attempt"),
         ),
     )
     op.create_index(

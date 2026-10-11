@@ -15,6 +15,7 @@ from tests.conftest import (
     claim,
     create_agent,
     create_scenario,
+    data_sets,
     expire_leases,
     make_settings,
     make_worker,
@@ -32,6 +33,7 @@ from yaksha.simulation.workers import report_worker
 APP_ID = "31216907353261579"
 RECEIVING = "+15716535187"
 AGENT_DATA = [{"name": "Customer name", "value": "Priya Raman"}]
+WITH_DATA = data_sets(agent_data=AGENT_DATA)
 
 
 @pytest.fixture
@@ -77,7 +79,7 @@ async def test_an_outbound_run_needs_a_linked_number_and_names_a_scenario_withou
     client: AsyncClient, settings: Settings
 ) -> None:
     agent = await create_agent(client, **OUTBOUND_AGENT)
-    with_data = await create_scenario(client, agent["id"], agent_data=AGENT_DATA)
+    with_data = await create_scenario(client, agent["id"], data_sets=WITH_DATA)
     without = await create_scenario(client, agent["id"], name="No data")
 
     await report(settings)
@@ -105,7 +107,8 @@ async def test_an_outbound_conversation_runs_only_where_its_call_can_be_received
     await report(settings)
     await link_number(settings, available_after=datetime.now(UTC) + timedelta(minutes=5))
     (started,) = await run_conversations(
-        client, (await start_outbound(client, agent_data=AGENT_DATA)).json()["id"]
+        client,
+        (await start_outbound(client, data_sets=WITH_DATA)).json()["id"],
     )
 
     no_application = await claim(db)
@@ -125,10 +128,11 @@ async def test_preparing_the_call_opens_the_dial_window_and_keeps_the_pinned_dat
     await link_number(settings)
     outbound = {**OUTBOUND_AGENT["outbound"], "dial_window_s": 30}
     agent = await create_agent(client, **{**OUTBOUND_AGENT, "outbound": outbound})
-    scenario = await create_scenario(client, agent["id"], agent_data=AGENT_DATA)
+    scenario = await create_scenario(client, agent["id"], data_sets=WITH_DATA)
     await start_run(client, agent["id"], [scenario["id"]])
     edited = [{"name": "Customer name", "value": "Someone else"}]
-    await client.patch(f"/api/v1/scenarios/{scenario['id']}", json={"agent_data": edited})
+    changed = [{**scenario["data_sets"][0], "agent_data": edited}]
+    await client.patch(f"/api/v1/scenarios/{scenario['id']}", json={"data_sets": changed})
     claimed = await claim(db, receiving_app_id=APP_ID)
     assert claimed is not None
 
@@ -151,7 +155,7 @@ async def test_a_waiting_outbound_conversation_does_not_hold_up_inbound_ones(
 ) -> None:
     await report(settings)
     await link_number(settings)
-    waiting = await start_outbound(client, agent_data=AGENT_DATA)
+    waiting = await start_outbound(client, data_sets=WITH_DATA)
     assert waiting.status_code == 202
     queued = await start(client, (await create_agent(client))["id"])
 
@@ -181,10 +185,10 @@ async def test_an_outbound_start_needs_a_running_worker_that_receives_its_calls(
     client: AsyncClient, settings: Settings
 ) -> None:
     await link_number(settings)
-    nobody = await start_outbound(client, agent_data=AGENT_DATA)
+    nobody = await start_outbound(client, data_sets=WITH_DATA)
     await report(settings, "w1", receiving_app_id=None, outbound_problem="answer URL is wrong")
     await report(settings, "w2", receiving_app_id=None, outbound_problem="Plivo returned 401")
-    misconfigured = await start_outbound(client, agent_data=AGENT_DATA)
+    misconfigured = await start_outbound(client, data_sets=WITH_DATA)
     engine = create_engine(settings.database_url.encoded_string())
     async with engine.begin() as connection:
         await connection.execute(
@@ -195,14 +199,14 @@ async def test_an_outbound_start_needs_a_running_worker_that_receives_its_calls(
             )
         )
     await engine.dispose()
-    stopped = await start_outbound(client, agent_data=AGENT_DATA)
+    stopped = await start_outbound(client, data_sets=WITH_DATA)
     engine = create_engine(settings.database_url.encoded_string())
     worker = make_worker(
         create_sessionmaker(engine), FakeCaller(), settings, receiving_app_id=APP_ID
     )
     await worker.poll()
     await engine.dispose()
-    running = await start_outbound(client, agent_data=AGENT_DATA)
+    running = await start_outbound(client, data_sets=WITH_DATA)
 
     assert nobody.json()["error"]["message"] == (
         f"outbound tests are off: no running worker receives calls for application {APP_ID}"
@@ -220,7 +224,7 @@ async def test_an_outbound_retry_runs_as_outbound(
     await report(settings)
     await link_number(settings)
     agent = await create_agent(client, **OUTBOUND_AGENT)
-    scenario = await create_scenario(client, agent["id"], agent_data=AGENT_DATA)
+    scenario = await create_scenario(client, agent["id"], data_sets=WITH_DATA)
     run = await start_run(client, agent["id"], [scenario["id"]])
     lost = await claim(db, receiving_app_id=APP_ID)
     assert run.status_code == 202 and lost is not None

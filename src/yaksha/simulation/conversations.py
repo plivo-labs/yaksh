@@ -41,7 +41,7 @@ from yaksha.domain.conversations import (
 from yaksha.domain.errors import NotFoundError
 from yaksha.domain.files import FileStore
 from yaksha.domain.personas import PersonaConfig
-from yaksha.domain.scenarios import ScenarioConfig
+from yaksha.domain.scenarios import PlayedScenario, ScenarioConfig
 from yaksha.domain.settings import AppSettings
 from yaksha.domain.surroundings import SoundPlan
 from yaksha.domain.triggers import SEND_TIMEOUT_S
@@ -178,22 +178,26 @@ async def pinned_agents(
 
 async def pinned_scenarios(
     session: AsyncSession, version_ids: Iterable[uuid.UUID]
-) -> dict[uuid.UUID, tuple[int, str]]:
-    """The version number of each scenario version and the scenario's current name, by
-    version id."""
+) -> dict[uuid.UUID, tuple[int, str, int]]:
+    """The version number of each scenario version, the scenario's current name and how many
+    data sets the version holds, by version id."""
     rows = await session.execute(
-        select(ScenarioVersion.id, ScenarioVersion.version, Scenario.name)
+        select(
+            ScenarioVersion.id,
+            ScenarioVersion.version,
+            Scenario.name,
+            func.jsonb_array_length(ScenarioVersion.config["data_sets"]).label("data_sets"),
+        )
         .join(Scenario, Scenario.id == ScenarioVersion.scenario_id)
         .where(ScenarioVersion.id.in_(set(version_ids)))
     )
-    return {row.id: (row.version, row.name) for row in rows}
+    return {row.id: (row.version, row.name, row.data_sets) for row in rows}
 
 
-async def pinned_scenario_config(
-    session: AsyncSession, conversation: Conversation
-) -> ScenarioConfig:
+async def played_scenario(session: AsyncSession, conversation: Conversation) -> PlayedScenario:
+    """The pinned scenario version as the conversation's data set plays it."""
     version = await session.get_one(ScenarioVersion, conversation.scenario_version_id)
-    return ScenarioConfig.model_validate(version.config)
+    return ScenarioConfig.model_validate(version.config).played(conversation.data_set_id)
 
 
 async def pinned_personas(
@@ -343,8 +347,7 @@ async def call_request(
     agent: AgentConfig,
 ) -> CallRequest:
     persona_version = await session.get_one(PersonaVersion, conversation.persona_version_id)
-    scenario_version = await session.get_one(ScenarioVersion, conversation.scenario_version_id)
-    scenario = ScenarioConfig.model_validate(scenario_version.config)
+    scenario = await played_scenario(session, conversation)
     return CallRequest(
         conversation_id=conversation.id,
         agent=agent,

@@ -24,7 +24,7 @@ from yaksha.domain.evaluations import (
 )
 from yaksha.domain.languages import Language
 from yaksha.domain.latency import Latency, Reply
-from yaksha.domain.scenarios import ScenarioConfig
+from yaksha.domain.scenarios import PlayedScenario
 from yaksha.domain.surroundings import Layer, NoiseSound, SoundPlan, SpeakerKind, Surroundings
 from yaksha.simulation.surroundings import clip_by_file
 
@@ -71,6 +71,11 @@ class ConversationSummary(BaseModel):
     scenario_version_id: uuid.UUID
     scenario_version: int
     scenario_name: str
+    data_set_id: uuid.UUID
+    data_set_name: str
+    scenario_data_sets: int
+    """How many data sets the pinned scenario version holds; the data set's name tells a call
+    apart only when it holds more than one."""
     direction: Direction
     language: Language
     channel: Channel
@@ -145,7 +150,7 @@ class ConversationRead(ConversationSummary):
     sounds: list[SoundRead]
     """What the call played behind the caller, as planned before it started; sounds planned
     after the call ended were not heard."""
-    scenario: ScenarioConfig
+    scenario: PlayedScenario
     transcript: list[TurnRead]
     replies: list[Reply]
     """Each reply's start point and the agent's first speech, on the call's clock."""

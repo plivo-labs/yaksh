@@ -394,3 +394,64 @@ async def test_repeats_compare_only_calls_with_the_same_persona(
         (2, "Calm caller", "pass"),
         (2, "Rushed caller", "fail"),
     ]
+
+
+async def test_run_verdicts_compare_repeats_within_each_data_set(
+    client: AsyncClient, db: Db
+) -> None:
+    agent = await create_agent_id(client, name="Movers")
+    scenario = await create_scenario(
+        client,
+        agent,
+        name="Moves",
+        criteria=["Confirms {{Moving to}}."],
+        data_sets=[
+            {"name": "Austin", "known_facts": [{"name": "Moving to", "value": "Austin"}]},
+            {"name": "Denver", "known_facts": [{"name": "Moving to", "value": "Denver"}]},
+        ],
+    )
+    run = (await start_run(client, agent, [scenario["id"]], repeats=2, max_retries=0)).json()
+    ids = [str(await claim(db)) for _ in range(4)]
+    for conversation in ids:
+        await finish(
+            db, conversation, CallOutcome(connected=True, end_reason=EndReason.AGENT_HANGUP)
+        )
+    async with db() as session:
+        versions = await evaluations.stored_judge_versions(
+            session, [CRITERION.version("openai_compatible", "judge-1", {})]
+        )
+    # Claims follow the run's order: Austin, Denver, Austin, Denver. Austin always passes.
+    austin = set(ids[::2])
+    async with db() as session:
+        while (evaluation := await evaluations.claim(session, "e1", 60)) is not None:
+            passed = str(evaluation.conversation_id) in austin
+            outcome = Outcome.PASS if passed else Outcome.FAIL
+            verdict = Verdict.PASS if passed else Verdict.FAIL
+            item = ItemResult(
+                key="criterion-1",
+                subject=f"Confirms {'Austin' if passed else 'Denver'}.",
+                judge="criterion",
+                decided_by=DecidedBy.LLM,
+                role=ItemRole.DECIDING,
+                outcome=outcome,
+            )
+            await evaluations.finish(
+                session,
+                evaluation.id,
+                evaluation.claim_seq,
+                Evaluated(
+                    metrics={},
+                    items=[item],
+                    scenario_verdict=verdict,
+                    conversation_verdict=verdict,
+                    judge_versions=versions,
+                ),
+                audit=False,
+            )
+
+    found = (await client.get(f"/api/v1/runs/{run['id']}/metrics")).json()["verdicts"]
+
+    assert (found["pass_rate"], found["pass_hat_2"], found["inconsistent"]) == (0.5, 0.5, [])
+    assert [(c["text"], c["counts"]) for c in found["criteria"]] == [
+        ("Confirms {{Moving to}}.", {"pass": 2, "fail": 2})
+    ]

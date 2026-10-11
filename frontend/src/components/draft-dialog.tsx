@@ -17,7 +17,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { counted } from "@/lib/format";
 import { openStream, readEvents } from "@/lib/sse";
-import { freeName } from "@/lib/names";
+import type { DraftWords } from "@/lib/drafts";
 import { type ForkRequest, MAX_FORKS } from "@/lib/types";
 
 type Phase = "input" | "writing" | "review";
@@ -30,57 +30,73 @@ interface Ending {
   stopped: boolean;
 }
 
-const PLACEHOLDER =
-  "Describe enough different changes for each fork, and what the agent should do if that changes. For example: moves to China, Spain and Toronto; the agent should refuse.";
-
-function reviewLine(ending: Ending, written: number, asked: number): string | null {
-  if (ending.failed) return `Could not write the forks: ${ending.failed}`;
+function reviewLine(
+  words: DraftWords,
+  ending: Ending,
+  written: number,
+  asked: number,
+): string | null {
+  if (ending.failed) return `Could not write the ${words.many}: ${ending.failed}`;
   if (ending.planned === 0)
-    return "The instruction was not enough for any fork. Go back and say what should change.";
-  if (ending.stopped) return `Stopped. ${written} of the ${asked} forks were written.`;
+    return `The instruction was not enough for any ${words.one}. Go back and say what should change.`;
+  if (ending.stopped) return `Stopped. ${written} of the ${asked} ${words.many} were written.`;
   if (ending.dropped.length > 0)
-    return `Could not write ${counted(ending.dropped.length, "fork", "forks")}: ${ending.dropped[0]}`;
+    return `Could not write ${counted(ending.dropped.length, words.one, words.many)}: ${ending.dropped[0]}`;
   if (written < asked)
-    return `The instruction was enough for ${written} of the ${asked} forks. Save these, or go back and add more changes.`;
+    return `The instruction was enough for ${written} of the ${asked} ${words.many}. ${words.verb} these, or go back and add more changes.`;
   return null;
 }
 
-/** Fork with Generate: what should change and how many forks, then the forks as they are
- * written, then a review where each is checked to be saved, all of them at first. */
-export function ForkDialog<T extends { name: string }>({
-  kind,
+/** Drafts that a model writes from an instruction: what should change and how many, then the
+ * drafts as they are written, then a review where each is checked to be saved, all of them at
+ * first. `save` saves the chosen drafts and calls `done` with each one's id as it is saved, so a
+ * save that fails part way retries only the rest; `onSaved` then gets every id, in order. */
+export function DraftDialog<T extends { name: string }>({
+  words,
   originalName,
   path,
+  body,
+  most = MAX_FORKS,
+  inputExtra,
+  ready = true,
   changes,
-  onManual,
-  takenNames,
-  saveOne,
+  manual,
+  save: saveDrafts,
   onSaved,
   onClosed,
 }: {
-  kind: "scenario" | "persona";
+  words: DraftWords;
   originalName: string;
   /** The draft endpoint, such as `/scenarios/<id>/forks/draft`. */
   path: string;
+  /** More fields of the draft request. */
+  body?: Record<string, unknown>;
+  /** The most drafts one request may ask for. */
+  most?: number;
+  /** More fields under the instruction. */
+  inputExtra?: ReactNode;
+  /** False while inputExtra holds a choice that cannot be written. */
+  ready?: boolean;
   /** What a draft changes from the original, one line each. */
   changes: (draft: T) => ReactNode[];
-  onManual: () => void;
-  /** The names in use now, read right before saving so each fork gets a free name. */
-  takenNames: () => Promise<string[]>;
-  saveOne: (draft: T) => Promise<{ id: string }>;
-  /** After every chosen fork is saved, with their ids in order. */
-  onSaved: (ids: string[]) => void;
+  manual?: { label: string; onClick: () => void };
+  save: (
+    chosen: { draft: T; index: number }[],
+    done: (index: number, id: string) => void,
+  ) => Promise<void>;
+  onSaved?: (ids: string[]) => void;
   onClosed: () => void;
 }) {
   const [open, setOpen] = useState(true);
   const [phase, setPhase] = useState<Phase>("input");
   const [instruction, setInstruction] = useState("");
-  const [count, setCount] = useState(3);
-  const [asked, setAsked] = useState(3);
+  const [count, setCount] = useState(Math.min(3, most));
+  const [asked, setAsked] = useState(Math.min(3, most));
   const [drafts, setDrafts] = useState<T[]>([]);
   /** The forks left out of the save; every other one is saved. */
   const [unchecked, setUnchecked] = useState<ReadonlySet<number>>(new Set());
-  /** The forks already saved, so a save that failed part way retries only the rest. */
+  /** The drafts already saved, with their ids, so a save that failed part way retries only
+   * the rest. */
   const [saved, setSaved] = useState<ReadonlyMap<number, string>>(new Map());
   const [ending, setEnding] = useState<Ending>({
     planned: null,
@@ -111,6 +127,7 @@ export function ForkDialog<T extends { name: string }>({
     let response: Response;
     try {
       response = await openStream(path, abort.signal, {
+        ...body,
         instruction: text,
         count,
       } satisfies ForkRequest);
@@ -127,7 +144,7 @@ export function ForkDialog<T extends { name: string }>({
     await readEvents(response, ({ event, data }) => {
       const payload = JSON.parse(data);
       if (event === "planned") setEnding((current) => ({ ...current, planned: payload.count }));
-      else if (event === "fork") setDrafts((current) => [...current, payload as T]);
+      else if (event === words.event) setDrafts((current) => [...current, payload as T]);
       else if (event === "dropped")
         setEnding((current) => ({ ...current, dropped: [...current.dropped, payload.reason] }));
       else if (event === "failed") setEnding((current) => ({ ...current, failed: payload.error }));
@@ -153,15 +170,11 @@ export function ForkDialog<T extends { name: string }>({
     setSaveError(null);
     const ids = new Map(saved);
     try {
-      const taken = new Set((await takenNames()).map((name) => name.toLowerCase()));
-      for (const { draft, index } of chosen) {
-        const name = freeName(draft.name, taken);
-        taken.add(name.toLowerCase());
-        const { id } = await saveOne({ ...draft, name });
+      await saveDrafts(chosen, (index, id) => {
         ids.set(index, id);
         setSaved(new Map(ids));
-      }
-      onSaved([...ids.values()]);
+      });
+      onSaved?.([...ids.entries()].sort(([a], [b]) => a - b).map(([, id]) => id));
       setOpen(false);
     } catch (failure) {
       setSaveError(failure instanceof Error ? failure.message : String(failure));
@@ -170,7 +183,6 @@ export function ForkDialog<T extends { name: string }>({
     }
   };
 
-  const title = kind === "scenario" ? "Fork scenario" : "Fork persona";
   const chosen = drafts
     .map((draft, index) => ({ draft, index }))
     .filter(({ index }) => !unchecked.has(index) && !saved.has(index));
@@ -186,7 +198,7 @@ export function ForkDialog<T extends { name: string }>({
     (ending.planned ?? asked) - drafts.length - ending.dropped.length,
     0,
   );
-  const line = phase === "review" ? reviewLine(ending, drafts.length, asked) : null;
+  const line = phase === "review" ? reviewLine(words, ending, drafts.length, asked) : null;
 
   return (
     <Dialog
@@ -197,7 +209,7 @@ export function ForkDialog<T extends { name: string }>({
       <DialogContent className="flex max-h-[90vh] flex-col gap-0 p-0 sm:max-w-2xl">
         <DialogHeader className="border-b px-6 pt-6 pb-4">
           <DialogTitle>
-            {phase === "review" ? counted(drafts.length, "fork", "forks") : title}
+            {phase === "review" ? counted(drafts.length, words.one, words.many) : words.title}
           </DialogTitle>
           <DialogDescription>
             {phase === "input" ? originalName : `Of "${originalName}".`}
@@ -205,7 +217,12 @@ export function ForkDialog<T extends { name: string }>({
         </DialogHeader>
 
         {phase === "input" ? (
-          <form id="fork-form" noValidate onSubmit={generate} className="grid gap-5 px-6 py-5">
+          <form
+            id="fork-form"
+            noValidate
+            onSubmit={generate}
+            className="grid min-h-0 flex-1 gap-5 overflow-y-auto px-6 py-5"
+          >
             <Field>
               <FieldLabel htmlFor="fork-instruction">What should change?</FieldLabel>
               <Textarea
@@ -213,15 +230,15 @@ export function ForkDialog<T extends { name: string }>({
                 rows={4}
                 autoFocus
                 maxLength={1000}
-                placeholder={PLACEHOLDER}
+                placeholder={words.placeholder}
                 value={instruction}
                 onChange={(e) => setInstruction(e.target.value)}
               />
               {refused && <FieldError>{refused}</FieldError>}
             </Field>
             <div className="flex items-center gap-3">
-              <span id="fork-count-label" className="text-s-500">
-                Forks
+              <span id="fork-count-label" className="text-s-500 first-letter:uppercase">
+                {words.many}
               </span>
               <div
                 role="group"
@@ -232,7 +249,7 @@ export function ForkDialog<T extends { name: string }>({
                   type="button"
                   variant="ghost"
                   size="icon-sm"
-                  aria-label="Fewer forks"
+                  aria-label={`Fewer ${words.many}`}
                   disabled={count <= 1}
                   onClick={() => setCount(count - 1)}
                 >
@@ -245,15 +262,16 @@ export function ForkDialog<T extends { name: string }>({
                   type="button"
                   variant="ghost"
                   size="icon-sm"
-                  aria-label="More forks"
-                  disabled={count >= MAX_FORKS}
+                  aria-label={`More ${words.many}`}
+                  disabled={count >= most}
                   onClick={() => setCount(count + 1)}
                 >
                   <Plus />
                 </Button>
               </div>
-              <span className="text-s-400 text-muted-foreground">Up to {MAX_FORKS}</span>
+              <span className="text-s-400 text-muted-foreground">Up to {most}</span>
             </div>
+            {inputExtra}
           </form>
         ) : (
           <div className="min-h-0 flex-1 overflow-y-auto">
@@ -265,7 +283,7 @@ export function ForkDialog<T extends { name: string }>({
                 <Spinner />
                 {ending.planned === null
                   ? "Reading the instruction."
-                  : `Writing forks: ${drafts.length} of ${ending.planned} done.`}
+                  : `Writing ${words.many}: ${drafts.length} of ${ending.planned} done.`}
               </div>
             )}
             {line && (
@@ -333,10 +351,14 @@ export function ForkDialog<T extends { name: string }>({
         <DialogFooter className="border-t px-6 py-4 sm:justify-between">
           {phase === "input" ? (
             <>
-              <Button type="button" variant="link" className="px-0" onClick={onManual}>
-                Skip, fork manually
-              </Button>
-              <Button type="submit" form="fork-form" disabled={!instruction.trim()}>
+              {manual ? (
+                <Button type="button" variant="link" className="px-0" onClick={manual.onClick}>
+                  {manual.label}
+                </Button>
+              ) : (
+                <span />
+              )}
+              <Button type="submit" form="fork-form" disabled={!instruction.trim() || !ready}>
                 <Sparkles />
                 Generate
               </Button>
@@ -364,7 +386,7 @@ export function ForkDialog<T extends { name: string }>({
                     onClick={() => void save()}
                   >
                     {saving && <Spinner />}
-                    Save {counted(chosen.length, "fork", "forks")}
+                    {words.verb} {counted(chosen.length, words.one, words.many)}
                   </Button>
                 )}
               </div>

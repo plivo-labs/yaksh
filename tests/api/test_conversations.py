@@ -26,6 +26,7 @@ from tests.conftest import (
     create_agent_id,
     create_persona,
     create_scenario,
+    data_sets,
     eventually,
     make_worker,
     start,
@@ -242,6 +243,8 @@ async def test_an_expired_lease_is_marked_failed_while_a_live_one_is_not(
                 persona_version_id=uuid.UUID(live["persona_version_id"]),
                 scenario_id=uuid.UUID(live["scenario_id"]),
                 scenario_version_id=uuid.UUID(live["scenario_version_id"]),
+                data_set_id=uuid.UUID(live["data_set_id"]),
+                data_set_name=live["data_set_name"],
                 language=Language.EN,
                 instructions="orphaned by a dead worker",
                 nudge="Hello?",
@@ -784,7 +787,7 @@ async def test_a_conversation_freezes_its_persona_scenario_and_prompt(
         json={
             "name": "Renamed",
             "instructions": "Cancel the cleaning.",
-            "known_facts": [],
+            "data_sets": data_sets(known_facts=[]),
             "first_words": None,
         },
     )

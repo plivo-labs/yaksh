@@ -1992,6 +1992,90 @@
           "content": {
             "application/json": {
               "schema": {
+                "$ref": "#/components/schemas/ScenarioForkRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/event-stream": {
+                "itemSchema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "string"
+                    },
+                    "event": {
+                      "type": "string"
+                    },
+                    "id": {
+                      "type": "string"
+                    },
+                    "retry": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "The request failed. The error tells why.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "An outside service is not set up, or it did not answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/scenarios/{scenario_id}/data-sets/draft": {
+      "post": {
+        "tags": [
+          "forks"
+        ],
+        "summary": "Draft Data Sets",
+        "description": "Writes new data sets for the scenario: `planned`, then `data_set` for each one, which\nthe console adds to the scenario with an update. Nothing is saved.",
+        "operationId": "draft_data_sets_api_v1_scenarios__scenario_id__data_sets_draft_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "scenario_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Scenario Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
                 "$ref": "#/components/schemas/ForkRequest"
               }
             }
@@ -4084,6 +4168,23 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/ScenarioFork"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Fork"
+              }
+            }
+          }
+        },
         "responses": {
           "201": {
             "description": "Successful Response",
@@ -6533,6 +6634,19 @@
             "type": "string",
             "title": "Scenario Name"
           },
+          "data_set_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Data Set Id"
+          },
+          "data_set_name": {
+            "type": "string",
+            "title": "Data Set Name"
+          },
+          "scenario_data_sets": {
+            "type": "integer",
+            "title": "Scenario Data Sets"
+          },
           "direction": {
             "$ref": "#/components/schemas/Direction"
           },
@@ -6729,7 +6843,7 @@
             "title": "Sounds"
           },
           "scenario": {
-            "$ref": "#/components/schemas/ScenarioConfig"
+            "$ref": "#/components/schemas/PlayedScenario"
           },
           "transcript": {
             "items": {
@@ -6790,6 +6904,9 @@
           "scenario_version_id",
           "scenario_version",
           "scenario_name",
+          "data_set_id",
+          "data_set_name",
+          "scenario_data_sets",
           "direction",
           "language",
           "channel",
@@ -6898,6 +7015,19 @@
           "scenario_name": {
             "type": "string",
             "title": "Scenario Name"
+          },
+          "data_set_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Data Set Id"
+          },
+          "data_set_name": {
+            "type": "string",
+            "title": "Data Set Name"
+          },
+          "scenario_data_sets": {
+            "type": "integer",
+            "title": "Scenario Data Sets"
           },
           "direction": {
             "$ref": "#/components/schemas/Direction"
@@ -7099,6 +7229,9 @@
           "scenario_version_id",
           "scenario_version",
           "scenario_name",
+          "data_set_id",
+          "data_set_name",
+          "scenario_data_sets",
           "direction",
           "language",
           "channel",
@@ -7183,6 +7316,44 @@
           "command"
         ],
         "title": "CurlCommand"
+      },
+      "DataSet": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 40,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "known_facts": {
+            "items": {
+              "$ref": "#/components/schemas/Fact"
+            },
+            "type": "array",
+            "maxItems": 30,
+            "title": "Known Facts"
+          },
+          "agent_data": {
+            "items": {
+              "$ref": "#/components/schemas/Fact"
+            },
+            "type": "array",
+            "maxItems": 30,
+            "title": "Agent Data"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "DataSet",
+        "description": "One set of values a scenario plays: every data set of a scenario has the same fact\nnames and agent data names, in the same order, with values of its own."
       },
       "DecidedBy": {
         "type": "string",
@@ -8697,6 +8868,13 @@
             "minimum": 1.0,
             "title": "Max Run Start Interval S",
             "default": 600
+          },
+          "max_scenario_data_sets": {
+            "type": "integer",
+            "maximum": 50.0,
+            "minimum": 1.0,
+            "title": "Max Scenario Data Sets",
+            "default": 10
           }
         },
         "additionalProperties": false,
@@ -9881,6 +10059,87 @@
           "language"
         ],
         "title": "PlanPreview"
+      },
+      "PlayedScenario": {
+        "properties": {
+          "data_set_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Data Set Id"
+          },
+          "data_set_name": {
+            "type": "string",
+            "title": "Data Set Name"
+          },
+          "instructions": {
+            "type": "string",
+            "title": "Instructions"
+          },
+          "known_facts": {
+            "items": {
+              "$ref": "#/components/schemas/Fact"
+            },
+            "type": "array",
+            "title": "Known Facts"
+          },
+          "unknown_facts": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Unknown Facts"
+          },
+          "criteria": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Criteria"
+          },
+          "agent_data": {
+            "items": {
+              "$ref": "#/components/schemas/Fact"
+            },
+            "type": "array",
+            "title": "Agent Data"
+          },
+          "first_words": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Words"
+          },
+          "caller": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CallerModel"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "data_set_id",
+          "data_set_name",
+          "instructions",
+          "known_facts",
+          "unknown_facts",
+          "criteria",
+          "agent_data",
+          "first_words",
+          "caller"
+        ],
+        "title": "PlayedScenario",
+        "description": "A scenario version as one data set plays it: placeholders filled with the set's values."
       },
       "PlivoAccount": {
         "properties": {
@@ -11165,6 +11424,22 @@
               }
             ],
             "title": "Persona Ids"
+          },
+          "data_set_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "type": "array",
+                "minItems": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data Set Ids"
           }
         },
         "additionalProperties": false,
@@ -11173,7 +11448,7 @@
           "scenario_id"
         ],
         "title": "RunScenario",
-        "description": "A scenario of a run and the personas that call it. None is the scenario's own persona."
+        "description": "A scenario of a run, the personas that call it and the data sets they play. No personas\nis the scenario's own persona; no data sets is every data set of its current version."
       },
       "RunStatus": {
         "type": "string",
@@ -11590,14 +11865,6 @@
             "minLength": 1,
             "title": "Instructions"
           },
-          "known_facts": {
-            "items": {
-              "$ref": "#/components/schemas/Fact"
-            },
-            "type": "array",
-            "maxItems": 30,
-            "title": "Known Facts"
-          },
           "unknown_facts": {
             "items": {
               "type": "string",
@@ -11619,13 +11886,14 @@
             "minItems": 1,
             "title": "Criteria"
           },
-          "agent_data": {
+          "data_sets": {
             "items": {
-              "$ref": "#/components/schemas/Fact"
+              "$ref": "#/components/schemas/DataSet"
             },
             "type": "array",
-            "maxItems": 30,
-            "title": "Agent Data"
+            "maxItems": 50,
+            "minItems": 1,
+            "title": "Data Sets"
           },
           "first_words": {
             "anyOf": [
@@ -11655,10 +11923,11 @@
         "type": "object",
         "required": [
           "instructions",
-          "criteria"
+          "criteria",
+          "data_sets"
         ],
         "title": "ScenarioConfig",
-        "description": "What a scenario version pins. The instructions and the facts go to the caller. The\ncriteria never do: they are what the agent must say or do on the call. Agent data goes only\nto the agent, in an outbound agent's trigger."
+        "description": "What a scenario version pins. The instructions and the facts go to the caller. The\ncriteria never do: they are what the agent must say or do on the call. Agent data goes only\nto the agent, in an outbound agent's trigger. Each data set is played as its own call."
       },
       "ScenarioCreate": {
         "properties": {
@@ -11667,14 +11936,6 @@
             "maxLength": 4000,
             "minLength": 1,
             "title": "Instructions"
-          },
-          "known_facts": {
-            "items": {
-              "$ref": "#/components/schemas/Fact"
-            },
-            "type": "array",
-            "maxItems": 30,
-            "title": "Known Facts"
           },
           "unknown_facts": {
             "items": {
@@ -11697,13 +11958,14 @@
             "minItems": 1,
             "title": "Criteria"
           },
-          "agent_data": {
+          "data_sets": {
             "items": {
-              "$ref": "#/components/schemas/Fact"
+              "$ref": "#/components/schemas/DataSet"
             },
             "type": "array",
-            "maxItems": 30,
-            "title": "Agent Data"
+            "maxItems": 50,
+            "minItems": 1,
+            "title": "Data Sets"
           },
           "first_words": {
             "anyOf": [
@@ -11773,6 +12035,7 @@
         "required": [
           "instructions",
           "criteria",
+          "data_sets",
           "name",
           "persona_id"
         ],
@@ -11798,6 +12061,70 @@
         ],
         "title": "ScenarioDelete",
         "description": "Scenarios of one agent to delete together: all of them, or none if one is missing."
+      },
+      "ScenarioFork": {
+        "properties": {
+          "data_set_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "type": "array",
+                "minItems": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data Set Ids"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "ScenarioFork",
+        "description": "The data sets a fork of a scenario keeps; None keeps them all."
+      },
+      "ScenarioForkRequest": {
+        "properties": {
+          "data_set_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "type": "array",
+                "minItems": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data Set Ids"
+          },
+          "instruction": {
+            "type": "string",
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Instruction"
+          },
+          "count": {
+            "type": "integer",
+            "maximum": 5.0,
+            "minimum": 1.0,
+            "title": "Count"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "instruction",
+          "count"
+        ],
+        "title": "ScenarioForkRequest",
+        "description": "Forks written from a scenario, each with the data sets it keeps."
       },
       "ScenarioRead": {
         "properties": {
@@ -11850,13 +12177,6 @@
             "type": "string",
             "title": "Instructions"
           },
-          "known_facts": {
-            "items": {
-              "$ref": "#/components/schemas/Fact"
-            },
-            "type": "array",
-            "title": "Known Facts"
-          },
           "unknown_facts": {
             "items": {
               "type": "string"
@@ -11871,12 +12191,12 @@
             "type": "array",
             "title": "Criteria"
           },
-          "agent_data": {
+          "data_sets": {
             "items": {
-              "$ref": "#/components/schemas/Fact"
+              "$ref": "#/components/schemas/DataSet"
             },
             "type": "array",
-            "title": "Agent Data"
+            "title": "Data Sets"
           },
           "first_words": {
             "anyOf": [
@@ -11936,10 +12256,9 @@
           "description",
           "generation_id",
           "instructions",
-          "known_facts",
           "unknown_facts",
           "criteria",
-          "agent_data",
+          "data_sets",
           "first_words",
           "caller",
           "current_version",
@@ -12011,21 +12330,6 @@
             ],
             "title": "Instructions"
           },
-          "known_facts": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/Fact"
-                },
-                "type": "array",
-                "maxItems": 30
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Known Facts"
-          },
           "unknown_facts": {
             "anyOf": [
               {
@@ -12061,20 +12365,21 @@
             ],
             "title": "Criteria"
           },
-          "agent_data": {
+          "data_sets": {
             "anyOf": [
               {
                 "items": {
-                  "$ref": "#/components/schemas/Fact"
+                  "$ref": "#/components/schemas/DataSet"
                 },
                 "type": "array",
-                "maxItems": 30
+                "maxItems": 50,
+                "minItems": 1
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Agent Data"
+            "title": "Data Sets"
           },
           "first_words": {
             "anyOf": [
@@ -12376,7 +12681,8 @@
               "max_run_conversations": 200,
               "max_run_repeats": 10,
               "max_run_retries": 3,
-              "max_run_start_interval_s": 600
+              "max_run_start_interval_s": 600,
+              "max_scenario_data_sets": 10
             }
           }
         },

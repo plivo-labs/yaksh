@@ -11,6 +11,8 @@ from tests.conftest import (
     create_agent_id,
     create_persona,
     create_scenario,
+    data_sets,
+    save_settings,
     wait_for_lock_waiters,
 )
 from yaksha.db.models import Agent
@@ -22,7 +24,7 @@ async def test_a_config_change_writes_a_version_but_a_rename_does_not(
     scenario = await create_scenario(client, await create_agent_id(client))
     url = f"/api/v1/scenarios/{scenario['id']}"
     assert scenario["current_version"] == 1
-    assert scenario["known_facts"] == SCENARIO["known_facts"]
+    assert scenario["data_sets"][0]["known_facts"] == SCENARIO["data_sets"][0]["known_facts"]
 
     renamed = await client.patch(url, json={"name": "Move a cleaning"})
     same = await client.patch(url, json={"instructions": SCENARIO["instructions"]})
@@ -67,14 +69,18 @@ async def test_facts_and_criteria_must_be_distinct_after_normalization(
         return response.json()["error"]["message"]
 
     both = await rejected(unknown_facts=["  name "])
-    await rejected(known_facts=[{"name": "Name", "value": "A"}, {"name": "NAME", "value": "B"}])
+    await rejected(
+        data_sets=data_sets(
+            known_facts=[{"name": "Name", "value": "A"}, {"name": "NAME", "value": "B"}]
+        )
+    )
     await rejected(criteria=["Greets the caller.", "greets  the caller."])
     await rejected(instructions="   ")
 
     assert both == "a fact cannot be both known and unknown: name"
     assert (await rejected(criteria=[])).startswith("criteria: ")
     missing = await client.post(f"/api/v1/agents/{agent}/scenarios", json={"name": "Only a name"})
-    assert missing.json()["error"]["message"] == "instructions: Field required (and 2 more errors)"
+    assert missing.json()["error"]["message"] == "instructions: Field required (and 3 more errors)"
     assert (await client.get(f"/api/v1/agents/{agent}/scenarios")).json()["total"] == 0
 
 
@@ -227,3 +233,68 @@ async def test_a_bulk_change_waits_while_the_agent_is_locked(
     response = await changing
 
     assert response.status_code == 204
+
+
+async def test_data_sets_share_their_names_and_placeholders_name_known_facts(
+    client: AsyncClient,
+) -> None:
+    agent = await create_agent_id(client)
+    persona = (await create_persona(client))["id"]
+    url = f"/api/v1/agents/{agent}/scenarios"
+    moving = {"name": "Austin", "known_facts": [{"name": "Moving to", "value": "Austin, Texas"}]}
+
+    async def refused(**overrides: Any) -> str:
+        response = await client.post(
+            url, json={**SCENARIO, "persona_id": persona, "data_sets": [moving], **overrides}
+        )
+        assert response.status_code == 422, response.text
+        return response.json()["error"]["message"]
+
+    other_names = await refused(
+        data_sets=[moving, {"name": "Denver", "known_facts": [{"name": "City", "value": "Denver"}]}]
+    )
+    same_name = await refused(data_sets=[moving, {**moving, "name": " austin "}])
+    unknown = await refused(criteria=["Reads back {{Destination}}."])
+    agent_data = await refused(
+        instructions="Ask about {{To_city}}.",
+        data_sets=[{**moving, "agent_data": [{"name": "To_city", "value": "Austin"}]}],
+    )
+    braces = await refused(instructions="Say {{Moving to} twice.")
+
+    assert "must have the same known facts" in other_names
+    assert "data set names must be unique" in same_name
+    assert "{{Destination}} names no known fact; use one of: Moving to" in unknown
+    assert "{{To_city}} names no known fact" in agent_data
+    assert "unmatched braces" in braces
+
+
+async def test_a_scenario_holds_at_most_the_operator_limit_of_data_sets(
+    client: AsyncClient, db: Db
+) -> None:
+    await save_settings(db, {"limits": {"max_scenario_data_sets": 2}})
+    agent = await create_agent_id(client)
+    sets = [
+        {"name": f"Set {n}", "known_facts": [{"name": "Name", "value": f"Caller {n}"}]}
+        for n in range(1, 4)
+    ]
+    persona = (await create_persona(client))["id"]
+
+    three = await client.post(
+        f"/api/v1/agents/{agent}/scenarios",
+        json={**SCENARIO, "persona_id": persona, "data_sets": sets},
+    )
+    two = await create_scenario(client, agent, data_sets=sets[:2])
+    url = f"/api/v1/scenarios/{two['id']}"
+    grown = await client.patch(url, json={"data_sets": [*two["data_sets"], sets[2]]})
+    await save_settings(db, {"limits": {"max_scenario_data_sets": 1}})
+    kept = await client.patch(url, json={"criteria": ["Greets the caller."]})
+    over = await client.post(f"{url}/fork")
+    one = await client.post(f"{url}/fork", json={"data_set_ids": [two["data_sets"][0]["id"]]})
+    shrunk = await client.patch(url, json={"data_sets": two["data_sets"][:1]})
+
+    assert three.status_code == 422 and "at most 2 data sets" in three.text
+    assert over.status_code == 422 and "at most 1 data set" in over.text
+    assert one.status_code == 201, one.text
+    assert grown.status_code == 422 and "at most 2 data sets" in grown.text
+    assert shrunk.status_code == 200, shrunk.text
+    assert kept.status_code == 200, kept.text

@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { MAX_DATA_SETS } from "@/lib/types";
 import { RISE } from "@/lib/motion";
 import { useSaveSettingsValues, useSettings } from "@/lib/queries";
 import type { AppSettings, SettingsValues } from "@/lib/types";
@@ -485,6 +486,15 @@ function Form({
               min={1}
               value={draft.limits.max_run_start_interval_s}
               onValueChange={(value) => change("limits", "max_run_start_interval_s", value)}
+            />
+            <NumberRow
+              id="max-data-sets"
+              help="Each data set of a scenario is its own call in a run."
+              label="Data sets per scenario"
+              min={1}
+              max={MAX_DATA_SETS}
+              value={draft.limits.max_scenario_data_sets}
+              onValueChange={(value) => change("limits", "max_scenario_data_sets", value)}
             />
           </Panel>
         </TabsContent>

@@ -36,7 +36,10 @@ import { cn } from "@/lib/utils";
 
 const PLACEHOLDERS: { name: string; meaning: string }[] = [
   { name: "{{yaksha.conversation_id}}", meaning: "the test call's ID" },
-  { name: "{{agent_data.<name>}}", meaning: "a value from the scenario's data sent to the agent" },
+  {
+    name: "{{agent_data.<name>}}",
+    meaning: "a value from the data sent to the agent, in the data set the call plays",
+  },
   { name: "{{secrets.<NAME>}}", meaning: "a trigger secret from Settings" },
 ];
 

@@ -1,4 +1,5 @@
 import uuid
+from collections.abc import Sequence
 from datetime import UTC, datetime
 from typing import Any
 
@@ -9,19 +10,32 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from yaksha.db.models import Scenario, ScenarioVersion
 from yaksha.domain.errors import ConflictError, NotFoundError, ValidationError
+from yaksha.domain.forks import ScenarioFork
 from yaksha.domain.names import fork_name
 from yaksha.domain.scenarios import (
     SCENARIO_LABELS,
     AssignPersona,
+    DataSet,
     ScenarioConfig,
     ScenarioCreate,
     ScenarioDelete,
     ScenarioUpdate,
 )
+from yaksha.domain.settings import Limits
 from yaksha.simulation.agents import get_agent
 from yaksha.simulation.personas import get_persona
 
 NAME_INDEX = "ix_scenarios_agent_name_live"
+
+
+def check_data_set_limit(limits: Limits, data_sets: Sequence[DataSet], *, held: int = 0) -> None:
+    """Refuse more data sets than the operator allows. A scenario that already holds more,
+    because the limit was lowered, can keep them and drop some, but not add one."""
+    if len(data_sets) > max(limits.max_scenario_data_sets, held):
+        most = limits.max_scenario_data_sets
+        raise ValidationError(
+            f"a scenario holds at most {most} {'data set' if most == 1 else 'data sets'}"
+        )
 
 
 def config_of(scenario: Scenario) -> ScenarioConfig:
@@ -101,10 +115,16 @@ async def create_scenario(
     return scenario
 
 
-async def fork_scenario(session: AsyncSession, scenario_id: uuid.UUID) -> Scenario:
-    """A copy of the scenario under a free "… (fork)" name, at version 1. The agent row is
-    locked before the names are read, so two forks at once cannot pick the same name."""
+async def fork_scenario(
+    session: AsyncSession, scenario_id: uuid.UUID, fork: ScenarioFork, *, limits: Limits
+) -> Scenario:
+    """A copy of the scenario with the data sets asked for, under a free "… (fork)" name, at
+    version 1. The agent row is locked before the names are read, so two forks at once cannot
+    pick the same name."""
     source = await get_scenario(session, scenario_id)
+    config = config_of(source)
+    data_sets = config.chosen(fork.data_set_ids)
+    check_data_set_limit(limits, data_sets)
     await get_agent(session, source.agent_id, lock=True)
     taken = await session.scalars(
         select(func.lower(Scenario.name)).where(
@@ -112,7 +132,8 @@ async def fork_scenario(session: AsyncSession, scenario_id: uuid.UUID) -> Scenar
         )
     )
     command = ScenarioCreate(
-        **config_of(source).model_dump(),
+        **config.model_dump(exclude={"data_sets"}),
+        data_sets=data_sets,
         name=fork_name(source.name, set(taken)),
         category=source.category,
         description=source.description,
@@ -142,7 +163,7 @@ async def list_scenarios(
 
 
 async def update_scenario(
-    session: AsyncSession, scenario_id: uuid.UUID, update: ScenarioUpdate
+    session: AsyncSession, scenario_id: uuid.UUID, update: ScenarioUpdate, *, limits: Limits
 ) -> Scenario:
     """Labels and the persona change in place; a changed config writes the next version. The
     merge reads the config under the row lock, so two concurrent changes cannot drop each
@@ -158,6 +179,7 @@ async def update_scenario(
     if changes:
         current = config_of(scenario)
         new = validate_config({**current.model_dump(), **changes})
+        check_data_set_limit(limits, new.data_sets, held=len(current.data_sets))
         if new != current:
             scenario.config = new.model_dump(mode="json")
             scenario.current_version += 1

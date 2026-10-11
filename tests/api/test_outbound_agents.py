@@ -3,7 +3,14 @@ from typing import Any
 import pytest
 from httpx import AsyncClient
 
-from tests.conftest import AGENT, OUTBOUND_AGENT, SCENARIO, create_agent, create_scenario
+from tests.conftest import (
+    AGENT,
+    OUTBOUND_AGENT,
+    SCENARIO,
+    create_agent,
+    create_scenario,
+    data_sets,
+)
 
 TRIGGER = OUTBOUND_AGENT["outbound"]["trigger"]
 
@@ -96,16 +103,18 @@ async def test_a_scenario_keeps_agent_data_with_distinct_names(client: AsyncClie
     agent = await create_agent(client, **OUTBOUND_AGENT)
     agent_data = [{"name": "Customer name", "value": "Priya Raman"}]
 
-    scenario = await create_scenario(client, agent["id"], agent_data=agent_data)
+    scenario = await create_scenario(
+        client, agent["id"], data_sets=data_sets(agent_data=agent_data)
+    )
     duplicated = await client.post(
         f"/api/v1/agents/{agent['id']}/scenarios",
         json={
             **SCENARIO,
             "name": "Twice",
-            "agent_data": agent_data * 2,
+            "data_sets": data_sets(agent_data=agent_data * 2),
             "persona_id": scenario["persona_id"],
         },
     )
 
-    assert scenario["agent_data"] == agent_data
+    assert scenario["data_sets"][0]["agent_data"] == agent_data
     assert duplicated.status_code == 422 and "agent data names" in duplicated.text

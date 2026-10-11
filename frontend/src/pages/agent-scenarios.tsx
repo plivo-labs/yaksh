@@ -49,6 +49,7 @@ import { cn } from "@/lib/utils";
 import { GenerateDialog } from "@/pages/generate-dialog";
 import { RunDialog } from "@/pages/run-dialog";
 import { ScenarioDialog } from "@/pages/scenario-dialog";
+import { DataSetBar, DataSetPanel, DataSetTabs, Filled } from "@/pages/scenario-data-sets";
 import { ScenarioFork } from "@/pages/scenario-fork";
 
 const ALL = "all";
@@ -636,6 +637,9 @@ function ScenarioDetail({
   onRun: () => void;
 }) {
   const outbound = agent.direction === "outbound";
+  const [chosen, setChosen] = useState<string | null>(null);
+  const selected =
+    scenario.data_sets.find((dataSet) => dataSet.id === chosen) ?? scenario.data_sets[0];
   return (
     <section
       aria-label={scenario.name}
@@ -669,59 +673,68 @@ function ScenarioDetail({
           </Button>
         </div>
       </header>
-      <dl className="grid grid-cols-2 gap-x-8 gap-y-6 px-6 py-5">
-        <Section label="Persona">{persona}</Section>
-        {scenario.caller && (
-          <Section label="Caller model">
-            {scenario.caller.model}
-            {scenario.caller.reasoning_effort && `, ${scenario.caller.reasoning_effort} effort`}
-          </Section>
-        )}
-        <Section label="First words">
-          {scenario.first_words ?? (
-            <span className="text-muted-foreground">The default for the persona's language</span>
-          )}
-        </Section>
-        <Section label="Instructions" wide>
-          {scenario.instructions}
-        </Section>
-        <Section label="What the caller knows">
-          <FactList facts={scenario.known_facts} />
-        </Section>
-        <Section label="What the caller does not have">
-          {scenario.unknown_facts.length > 0 ? (
-            <ul className="grid gap-1.5 text-s-400">
-              {scenario.unknown_facts.map((fact, index) => (
-                <li key={index}>{fact}</li>
-              ))}
-            </ul>
-          ) : (
-            <span className="text-muted-foreground">None</span>
-          )}
-        </Section>
-        {outbound && (
-          <Section label="Data sent to the agent" wide>
-            <FactList facts={scenario.agent_data} />
-          </Section>
-        )}
-        <Section label="Criteria" wide>
-          {scenario.criteria.length > 0 ? (
-            <ol className="divide-y rounded-md border">
-              {scenario.criteria.map((criterion, index) => (
-                <li
-                  key={index}
-                  className="grid grid-cols-[1.5rem_minmax(0,1fr)] gap-2 px-3 py-2.5 text-s-400"
-                >
-                  <span className="text-muted-foreground tabular-nums">{index + 1}</span>
-                  {criterion}
-                </li>
-              ))}
-            </ol>
-          ) : (
-            <span className="text-muted-foreground">None</span>
-          )}
-        </Section>
-      </dl>
+      <DataSetTabs scenario={scenario} selected={selected} onSelect={setChosen}>
+        <DataSetBar agent={agent} scenario={scenario} selected={selected} onSelect={setChosen} />
+        <DataSetPanel scenario={scenario} selected={selected}>
+          <dl className="grid grid-cols-2 gap-x-8 gap-y-6 px-6 py-5">
+            <Section label="Persona">{persona}</Section>
+            {scenario.caller && (
+              <Section label="Caller model">
+                {scenario.caller.model}
+                {scenario.caller.reasoning_effort && `, ${scenario.caller.reasoning_effort} effort`}
+              </Section>
+            )}
+            <Section label="First words">
+              {scenario.first_words ?? (
+                <span className="text-muted-foreground">
+                  The default for the persona's language
+                </span>
+              )}
+            </Section>
+            <Section label="Instructions" wide>
+              <Filled text={scenario.instructions} facts={selected.known_facts} />
+            </Section>
+            <Section label="What the caller knows">
+              <FactList facts={selected.known_facts} />
+            </Section>
+            <Section label="What the caller does not have">
+              {scenario.unknown_facts.length > 0 ? (
+                <ul className="grid gap-1.5 text-s-400">
+                  {scenario.unknown_facts.map((fact, index) => (
+                    <li key={index}>{fact}</li>
+                  ))}
+                </ul>
+              ) : (
+                <span className="text-muted-foreground">None</span>
+              )}
+            </Section>
+            {outbound && (
+              <Section label="Data sent to the agent" wide>
+                <FactList facts={selected.agent_data} />
+              </Section>
+            )}
+            <Section label="Criteria" wide>
+              {scenario.criteria.length > 0 ? (
+                <ol className="divide-y rounded-md border">
+                  {scenario.criteria.map((criterion, index) => (
+                    <li
+                      key={index}
+                      className="grid grid-cols-[1.5rem_minmax(0,1fr)] gap-2 px-3 py-2.5 text-s-400"
+                    >
+                      <span className="text-muted-foreground tabular-nums">{index + 1}</span>
+                      <span>
+                        <Filled text={criterion} facts={selected.known_facts} />
+                      </span>
+                    </li>
+                  ))}
+                </ol>
+              ) : (
+                <span className="text-muted-foreground">None</span>
+              )}
+            </Section>
+          </dl>
+        </DataSetPanel>
+      </DataSetTabs>
       <footer className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t px-6 py-3 text-xs-400 text-muted-foreground">
         <span>Version {scenario.current_version}</span>
         <span>Updated on {when(scenario.updated_at)}</span>

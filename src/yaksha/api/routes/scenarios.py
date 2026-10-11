@@ -7,11 +7,12 @@ from fastapi import APIRouter, Depends, Request, status
 from fastapi.sse import EventSourceResponse, ServerSentEvent
 
 from yaksha.api.auth import require_token
-from yaksha.api.deps import GenerationModelDep, SessionDep
+from yaksha.api.deps import AppSettingsDep, GenerationModelDep, SessionDep
 from yaksha.api.errors import CLIENT_ERRORS, UNAVAILABLE, json_errors
 from yaksha.api.pagination import Page, PageDep
 from yaksha.api.schemas.scenarios import GenerationRead, ScenarioRead, ScenarioVersionRead
 from yaksha.domain.errors import NotFoundError
+from yaksha.domain.forks import ScenarioFork
 from yaksha.domain.generation import GenerateScenarios
 from yaksha.domain.scenarios import AssignPersona, ScenarioCreate, ScenarioDelete, ScenarioUpdate
 from yaksha.simulation import generation, scenarios
@@ -21,8 +22,9 @@ router = APIRouter(tags=["scenarios"], dependencies=[Depends(require_token)])
 
 @router.post("/agents/{agent_id}/scenarios", status_code=status.HTTP_201_CREATED)
 async def create_scenario(
-    agent_id: uuid.UUID, command: ScenarioCreate, session: SessionDep
+    agent_id: uuid.UUID, command: ScenarioCreate, session: SessionDep, app: AppSettingsDep
 ) -> ScenarioRead:
+    scenarios.check_data_set_limit(app.limits, command.data_sets)
     return ScenarioRead.of(await scenarios.create_scenario(session, agent_id, command))
 
 
@@ -137,15 +139,26 @@ async def get_scenario(scenario_id: uuid.UUID, session: SessionDep) -> ScenarioR
 
 @router.patch("/scenarios/{scenario_id}")
 async def update_scenario(
-    scenario_id: uuid.UUID, update: ScenarioUpdate, session: SessionDep
+    scenario_id: uuid.UUID, update: ScenarioUpdate, session: SessionDep, app: AppSettingsDep
 ) -> ScenarioRead:
-    return ScenarioRead.of(await scenarios.update_scenario(session, scenario_id, update))
+    return ScenarioRead.of(
+        await scenarios.update_scenario(session, scenario_id, update, limits=app.limits)
+    )
 
 
 @router.post("/scenarios/{scenario_id}/fork", status_code=status.HTTP_201_CREATED)
-async def fork_scenario(scenario_id: uuid.UUID, session: SessionDep) -> ScenarioRead:
+async def fork_scenario(
+    scenario_id: uuid.UUID,
+    session: SessionDep,
+    app: AppSettingsDep,
+    fork: ScenarioFork | None = None,
+) -> ScenarioRead:
     """A copy of the scenario named "… (fork)", for the person to change."""
-    return ScenarioRead.of(await scenarios.fork_scenario(session, scenario_id))
+    return ScenarioRead.of(
+        await scenarios.fork_scenario(
+            session, scenario_id, fork or ScenarioFork(), limits=app.limits
+        )
+    )
 
 
 @router.delete("/scenarios/{scenario_id}", status_code=status.HTTP_204_NO_CONTENT)

@@ -1,4 +1,4 @@
-import { Shuffle, XIcon } from "lucide-react";
+import { Check, Shuffle, XIcon } from "lucide-react";
 import { type SubmitEvent, useState } from "react";
 import { useNavigate } from "react-router";
 
@@ -47,6 +47,14 @@ import {
   servedLanguages,
 } from "@/lib/types";
 
+/** The ids of the scenario's data sets that are still there, of `wanted` when given and any
+ * of them is left, else all of them. */
+function dataSetsToPlay(scenario: Scenario, wanted?: string[]): string[] {
+  const ids = scenario.data_sets.map((dataSet) => dataSet.id ?? "");
+  const kept = (wanted ?? []).filter((id) => ids.includes(id));
+  return kept.length > 0 ? kept : ids;
+}
+
 const MIX_SIZES = ["2", "3", "4", "5"].map((value) => ({ value, label: value }));
 
 /** A whole number from an input, null when it is empty, NaN when it is not a whole number. */
@@ -60,20 +68,30 @@ function text(value: number | null | undefined): string {
   return value === null || value === undefined ? "" : String(value);
 }
 
+interface Row {
+  scenario: Scenario;
+  personaIds: string[];
+  /** The data sets each persona plays: all of them at first. */
+  dataSetIds: string[];
+}
+
 /** Starts a run of the scenarios, in the order given, or of every scenario of the agent when
- * `scenarioIds` is absent. Each scenario runs once for each persona on its card: its own persona
- * at first, or the ones in `personasOf` for "Run again". `earlier` fills the other fields, and
- * scenarios or personas deleted since are left out. */
+ * `scenarioIds` is absent. Each scenario runs once for each persona on its card and each data
+ * set checked on it: its own persona and every data set at first, or the ones in `personasOf`
+ * and `dataSetsOf` for "Run again". `earlier` fills the other fields, and scenarios, personas
+ * or data sets deleted since are left out. */
 export function RunDialog({
   agent,
   scenarioIds,
   personasOf,
+  dataSetsOf,
   earlier,
   onClosed,
 }: {
   agent: AgentSummary;
   scenarioIds?: string[];
   personasOf?: Record<string, string[]>;
+  dataSetsOf?: Record<string, string[]>;
   earlier?: RunSummary;
   onClosed: () => void;
 }) {
@@ -91,7 +109,7 @@ export function RunDialog({
   const [submitted, setSubmitted] = useState(false);
   /** The run's scenarios and the personas on each card, copied once when they load, so a
    * refresh in the background never changes what the user set up; null until then. */
-  const [rows, setRows] = useState<{ scenario: Scenario; personaIds: string[] }[] | null>(null);
+  const [rows, setRows] = useState<Row[] | null>(null);
   const [mixSize, setMixSize] = useState("3");
   const served = servedLanguages(agent.languages);
   const [mixLanguage, setMixLanguage] = useState<Language>(
@@ -120,7 +138,11 @@ export function RunDialog({
     setRows(
       loaded.map((scenario) => {
         const kept = (personasOf?.[scenario.id] ?? []).filter((id) => byId.has(id));
-        return { scenario, personaIds: kept.length ? kept : [scenario.persona_id] };
+        return {
+          scenario,
+          personaIds: kept.length ? kept : [scenario.persona_id],
+          dataSetIds: dataSetsToPlay(scenario, dataSetsOf?.[scenario.id]),
+        };
       }),
     );
   }
@@ -131,16 +153,24 @@ export function RunDialog({
   );
   const pool = known.filter((persona) => persona.language === mixLanguage);
 
-  const update = (change: (row: { scenario: Scenario; personaIds: string[] }) => string[]) =>
+  const update = (change: (row: Row) => string[]) =>
+    setRows((current) => (current ?? []).map((row) => ({ ...row, personaIds: change(row) })));
+  const setDataSets = (scenarioId: string, ids: string[]) =>
     setRows((current) =>
-      (current ?? []).map((row) => ({ scenario: row.scenario, personaIds: change(row) })),
+      (current ?? []).map((row) =>
+        row.scenario.id === scenarioId ? { ...row, dataSetIds: ids } : row,
+      ),
     );
+  const played = Object.fromEntries((rows ?? []).map((row) => [row.scenario.id, row.dataSetIds]));
   const setCard = (scenarioId: string, ids: string[]) =>
     update((row) => (row.scenario.id === scenarioId ? ids : row.personaIds));
   const removeScenario = (scenarioId: string) =>
     setRows((current) => (current ?? []).filter((row) => row.scenario.id !== scenarioId));
   const addScenario = (scenario: Scenario) =>
-    setRows((current) => [...(current ?? []), { scenario, personaIds: [scenario.persona_id] }]);
+    setRows((current) => [
+      ...(current ?? []),
+      { scenario, personaIds: [scenario.persona_id], dataSetIds: dataSetsToPlay(scenario) },
+    ]);
   const mix = () => {
     const mixed = mixPersonas(
       scenarios,
@@ -178,11 +208,24 @@ export function RunDialog({
   const retriesOk = retryCount === null || retryCount >= 0;
   const limitsOk = durationOk && turnsOk && parallelOk && intervalOk && retriesOk;
   const empty = scenarios.filter((scenario) => (cards[scenario.id] ?? []).length === 0);
+  const unplayed = scenarios.filter((scenario) => (played[scenario.id] ?? []).length === 0);
   const valid =
-    rows !== null && scenarios.length > 0 && empty.length === 0 && repeatsOk && limitsOk;
-  const different = scenarios.reduce((sum, scenario) => sum + (cards[scenario.id]?.length ?? 0), 0);
+    rows !== null &&
+    scenarios.length > 0 &&
+    empty.length === 0 &&
+    unplayed.length === 0 &&
+    repeatsOk &&
+    limitsOk;
+  const different = scenarios.reduce(
+    (sum, scenario) => sum + (cards[scenario.id]?.length ?? 0) * (played[scenario.id]?.length ?? 0),
+    0,
+  );
   const total = different * (repeatsOk ? repeatCount : 0);
   const personaCount = new Set(scenarios.flatMap((scenario) => cards[scenario.id] ?? [])).size;
+  const dataSetCount = scenarios.reduce(
+    (sum, scenario) => sum + (played[scenario.id]?.length ?? 0),
+    0,
+  );
   const times = !repeatsOk
     ? ""
     : repeatCount === 1
@@ -212,6 +255,7 @@ export function RunDialog({
         scenarios: scenarios.map((scenario) => ({
           scenario_id: scenario.id,
           persona_ids: cards[scenario.id],
+          data_set_ids: scenario.data_sets.length > 1 ? played[scenario.id] : null,
         })),
         repeats: repeatCount,
         // Untouched fields go as null, for the defaults they show: a resent request then stays
@@ -403,11 +447,12 @@ export function RunDialog({
                   const foreign = ids
                     .map((id) => byId.get(id))
                     .filter((persona) => persona && !served.has(persona.language));
-                  const calls = ids.length * (repeatsOk ? repeatCount : 0);
+                  const sets = played[scenario.id] ?? [];
+                  const calls = ids.length * sets.length * (repeatsOk ? repeatCount : 0);
                   return (
                     <div
                       key={scenario.id}
-                      className={`grid gap-3 border p-4 ${submitted && ids.length === 0 ? "border-destructive" : ""}`}
+                      className={`grid gap-3 border p-4 ${submitted && (ids.length === 0 || sets.length === 0) ? "border-destructive" : ""}`}
                     >
                       <div className="flex items-start justify-between gap-4">
                         <span className="text-s-500">{scenario.name}</span>
@@ -434,6 +479,14 @@ export function RunDialog({
                         invalid={submitted && ids.length === 0}
                         onValueChange={(next) => setCard(scenario.id, next)}
                       />
+                      {scenario.data_sets.length > 1 && (
+                        <DataSetChips
+                          scenario={scenario}
+                          value={sets}
+                          invalid={submitted && sets.length === 0}
+                          onValueChange={(next) => setDataSets(scenario.id, next)}
+                        />
+                      )}
                       {foreign.map(
                         (persona) =>
                           persona && (
@@ -575,6 +628,8 @@ export function RunDialog({
                 {counted(different, "different call", "different calls")}, each run {times} ·{" "}
                 {counted(scenarios.length, "scenario", "scenarios")},{" "}
                 {counted(personaCount, "persona", "personas")}
+                {dataSetCount > scenarios.length &&
+                  `, ${counted(dataSetCount, "data set", "data sets")}`}
               </span>
             )}
             {waits && (
@@ -609,6 +664,57 @@ export function RunDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+/** The scenario's data sets as toggles: each checked one is played by every persona. */
+function DataSetChips({
+  scenario,
+  value,
+  invalid,
+  onValueChange,
+}: {
+  scenario: Scenario;
+  value: string[];
+  invalid: boolean;
+  onValueChange: (ids: string[]) => void;
+}) {
+  const toggle = (id: string) =>
+    onValueChange(
+      value.includes(id)
+        ? value.filter((item) => item !== id)
+        : scenario.data_sets
+            .map((dataSet) => dataSet.id ?? "")
+            .filter((item) => item === id || value.includes(item)),
+    );
+  return (
+    <div className="grid gap-1.5">
+      <div
+        role="group"
+        aria-label={`Data sets of ${scenario.name}`}
+        className="flex flex-wrap items-center gap-1.5"
+      >
+        <span className="mr-1 text-xs-400 text-muted-foreground">Data sets</span>
+        {scenario.data_sets.map((dataSet) => {
+          const on = value.includes(dataSet.id ?? "");
+          return (
+            <Button
+              key={dataSet.id}
+              type="button"
+              size="sm"
+              variant={on ? "tertiary" : "ghost"}
+              aria-pressed={on}
+              className={on ? undefined : "text-muted-foreground"}
+              onClick={() => toggle(dataSet.id ?? "")}
+            >
+              {on && <Check />}
+              {dataSet.name}
+            </Button>
+          );
+        })}
+      </div>
+      {invalid && <FieldError>Check at least one data set.</FieldError>}
+    </div>
   );
 }
 

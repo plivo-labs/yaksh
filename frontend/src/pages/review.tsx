@@ -27,6 +27,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { VerdictPill } from "@/components/verdict-ui";
+import { playedDataSet } from "@/lib/data-sets";
 import { LABELER_TOKEN } from "@/lib/api";
 import { useReview, useReviewQueue, useSaveLabel } from "@/lib/queries";
 import { turnStart } from "@/lib/turns";
@@ -192,7 +193,11 @@ export function ReviewPage() {
                 </ul>
               </CardContent>
             </Card>
-            <ScenarioCard name={conversation.scenario_name} scenario={conversation.scenario} />
+            <ScenarioCard
+              name={conversation.scenario_name}
+              scenario={conversation.scenario}
+              dataSet={playedDataSet(conversation)}
+            />
           </div>
         </ScrollArea>
       </div>

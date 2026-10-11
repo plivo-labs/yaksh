@@ -46,6 +46,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
+import { playedDataSet } from "@/lib/data-sets";
 import { copyText } from "@/lib/clipboard";
 import {
   BAND_TEXT,
@@ -77,7 +78,7 @@ import {
   type Fact as ScenarioFact,
   LANGUAGE_NAMES,
   type Reply,
-  type ScenarioConfig,
+  type PlayedScenario,
   type Turn,
   WIRE_EVENT_HELP,
   type WireEvent,
@@ -149,6 +150,7 @@ function ConversationView({ id }: { id: string }) {
                 {agent.data?.name ?? data.agent_name}
               </Link>
               , {data.persona_name}
+              {playedDataSet(data) && ` · ${playedDataSet(data)}`}
             </p>
           </div>
           <div className="flex items-center gap-4">
@@ -213,7 +215,11 @@ function ConversationView({ id }: { id: string }) {
                   <CallMetricsCard conversationId={data.id} evaluation={data.evaluation} />
                 </TabsContent>
                 <TabsContent value="scenario">
-                  <ScenarioCard name={data.scenario_name} scenario={data.scenario} />
+                  <ScenarioCard
+                    name={data.scenario_name}
+                    scenario={data.scenario}
+                    dataSet={playedDataSet(data)}
+                  />
                 </TabsContent>
                 <TabsContent value="caller">
                   <Card>
@@ -516,7 +522,18 @@ function RailTitle({ role, name }: { role: string; name: string }) {
   );
 }
 
-export function ScenarioCard({ name, scenario }: { name: string; scenario: ScenarioConfig }) {
+/** The scenario as the call played it: the instructions and criteria with the values of the
+ * data set filled in, and that data set's facts. */
+export function ScenarioCard({
+  name,
+  scenario,
+  dataSet,
+}: {
+  name: string;
+  scenario: PlayedScenario;
+  /** The data set's name, when the scenario version held more than one. */
+  dataSet: string | null;
+}) {
   return (
     <Card>
       <CardHeader>
@@ -525,6 +542,12 @@ export function ScenarioCard({ name, scenario }: { name: string; scenario: Scena
       </CardHeader>
       <CardContent>
         <dl className="grid gap-3 text-p-400">
+          {dataSet && (
+            <div className="grid gap-1">
+              <dt className="text-xs-400 text-muted-foreground">Data set</dt>
+              <dd>{dataSet}</dd>
+            </div>
+          )}
           {scenario.first_words && (
             <div className="grid gap-1">
               <dt className="text-xs-400 text-muted-foreground">First words</dt>

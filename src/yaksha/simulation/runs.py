@@ -85,13 +85,6 @@ def check_limits(limits: Limits, command: RunCreate) -> None:
     interval = command.start_interval_s or 0
     if interval > limits.max_run_start_interval_s:
         raise ValidationError(f"start_interval_s: at most {limits.max_run_start_interval_s}")
-    count = command.calls_per_repeat * command.repeats
-    if count > limits.max_run_conversations:
-        raise ValidationError(
-            f"a run starts at most {limits.max_run_conversations} conversations;"
-            f" {command.calls_per_repeat} scenario and persona pairs and {command.repeats} repeats"
-            f" make {count}"
-        )
 
 
 CallerCheck = Callable[[CallerModel], Awaitable[str | None]]
@@ -140,12 +133,12 @@ async def create_run(
     request_key: str | None,
     check_caller: CallerCheck | None = None,
 ) -> Run:
-    """Start a conversation for each repeat of each scenario and persona pair, all of them or
-    none, in the order repeat, then scenario, then persona. A repeated request with the same
-    idempotency key returns the run it started, whatever changed since. The key is looked up
-    first, and again once the agent's lock is held, so a request that waited for another one
-    with its key returns that run; a request for another agent collides with it on the unique
-    key instead."""
+    """Start a conversation for each repeat of each scenario, persona and data set, all of them
+    or none, in the order repeat, then scenario, then persona, then data set. A repeated
+    request with the same idempotency key returns the run it started, whatever changed since.
+    The key is looked up first, and again once the agent's lock is held, so a request that
+    waited for another one with its key returns that run; a request for another agent collides
+    with it on the unique key instead."""
     request_hash = command.request_hash() if request_key is not None else None
     earlier = await earlier_run(session, request_key, request_hash)
     if earlier is not None:
@@ -158,6 +151,12 @@ async def create_run(
         await session.commit()
         return earlier
     inputs = await snapshot(session, settings, app, agent, command.scenarios)
+    count = len(inputs) * command.repeats
+    if count > app.limits.max_run_conversations:
+        raise ValidationError(
+            f"a run starts at most {app.limits.max_run_conversations} conversations;"
+            f" {len(inputs)} different calls and {command.repeats} repeats make {count}"
+        )
     if check_caller is not None:
         await refuse_unserved_callers(session, check_caller, inputs)
     run = Run(
@@ -355,7 +354,14 @@ async def retry(session: AsyncSession, run: Run, ended: Sequence[Row[Any]]) -> N
         insert(Conversation)
         .from_select([*(column.key for column in INPUTS), "attempt", "retry_of"], copies)
         .on_conflict_do_nothing(
-            index_elements=["run_id", "repeat", "scenario_id", "persona_id", "attempt"]
+            index_elements=[
+                "run_id",
+                "repeat",
+                "scenario_id",
+                "persona_id",
+                "data_set_id",
+                "attempt",
+            ]
         )
     )
 
@@ -499,14 +505,19 @@ async def counted_conversations(
 
 
 async def run_scenarios(session: AsyncSession, run: Run) -> list[RunScenario]:
-    """The run's scenarios with the personas that call them, in the order the conversations of
-    each repeat start."""
+    """The run's scenarios with the personas that call them and the data sets they play, in
+    the order the conversations of each repeat start."""
     rows = await session.execute(
-        select(Conversation.scenario_id, Conversation.persona_id)
+        select(Conversation.scenario_id, Conversation.persona_id, Conversation.data_set_id)
         .where(Conversation.run_id == run.id, Conversation.repeat == 1, Conversation.attempt == 1)
         .order_by(Conversation.created_at, Conversation.id)
     )
-    personas: dict[uuid.UUID, list[uuid.UUID]] = {}
-    for scenario_id, persona_id in rows.tuples():
-        personas.setdefault(scenario_id, []).append(persona_id)
-    return [RunScenario(scenario_id=s, persona_ids=p) for s, p in personas.items()]
+    personas: dict[uuid.UUID, dict[uuid.UUID, None]] = {}
+    data_sets: dict[uuid.UUID, dict[uuid.UUID, None]] = {}
+    for scenario_id, persona_id, data_set_id in rows.tuples():
+        personas.setdefault(scenario_id, {})[persona_id] = None
+        data_sets.setdefault(scenario_id, {})[data_set_id] = None
+    return [
+        RunScenario(scenario_id=s, persona_ids=list(p), data_set_ids=list(data_sets[s]))
+        for s, p in personas.items()
+    ]

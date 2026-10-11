@@ -70,6 +70,12 @@ async def limits(client: AsyncClient, db: Db) -> None:
     await save_settings(db, {"limits": LIMITS})
 
 
+def only(scenario: dict[str, Any]) -> str:
+    """The id of the scenario's one data set."""
+    [data_set] = scenario["data_sets"]
+    return data_set["id"]
+
+
 async def test_a_run_starts_each_repeat_of_every_scenario_in_order_with_its_persona(
     client: AsyncClient,
 ) -> None:
@@ -112,8 +118,8 @@ async def test_a_run_starts_each_repeat_of_every_scenario_in_order_with_its_pers
     }
     detail = (await client.get(f"/api/v1/runs/{run['id']}")).json()
     assert detail["scenarios"] == [
-        {"scenario_id": second["id"], "persona_ids": [hurried]},
-        {"scenario_id": first["id"], "persona_ids": [calm]},
+        {"scenario_id": second["id"], "persona_ids": [hurried], "data_set_ids": [only(second)]},
+        {"scenario_id": first["id"], "persona_ids": [calm], "data_set_ids": [only(first)]},
     ]
     assert detail["median_talk_ms"] is None
 
@@ -150,14 +156,14 @@ async def test_a_scenario_runs_once_for_each_persona_asked_for_and_the_run_lists
     ]
     detail = (await client.get(f"/api/v1/runs/{run['id']}")).json()
     assert detail["scenarios"] == [
-        {"scenario_id": first["id"], "persona_ids": [calm, hindi]},
-        {"scenario_id": second["id"], "persona_ids": [own]},
+        {"scenario_id": first["id"], "persona_ids": [calm, hindi], "data_set_ids": [only(first)]},
+        {"scenario_id": second["id"], "persona_ids": [own], "data_set_ids": [only(second)]},
     ]
     assert run["languages"] == detail["languages"] == ["en", "hi"]
     again = await start_run(client, agent, detail["scenarios"], repeats=3)
     assert again.status_code == 422, again.text
     assert again.json()["error"]["message"] == (
-        "a run starts at most 6 conversations; 3 scenario and persona pairs and 3 repeats make 9"
+        "a run starts at most 6 conversations; 3 different calls and 3 repeats make 9"
     )
 
 
@@ -238,7 +244,7 @@ async def test_a_run_needs_distinct_scenarios_within_the_limits(client: AsyncCli
     assert await refused(ids[:1], max_parallel=7) == "max_parallel: at most 6"
     assert (await refused(ids[:1], priority="high")).startswith("priority: ")
     assert await refused(ids, repeats=2) == (
-        "a run starts at most 6 conversations; 4 scenario and persona pairs and 2 repeats make 8"
+        "a run starts at most 6 conversations; 4 different calls and 2 repeats make 8"
     )
     assert (await client.get("/api/v1/runs")).json()["total"] == 0
 
@@ -760,3 +766,43 @@ async def test_response_times_reach_the_turns_the_list_and_the_run(
     ]
     pooled = (await client.get(f"/api/v1/runs/{run['id']}")).json()
     assert (pooled["response_p50_ms"], pooled["response_p90_ms"]) == (200, 1_800)
+
+
+async def test_each_persona_plays_each_data_set_with_its_values_filled_in(
+    client: AsyncClient,
+) -> None:
+    agent = await create_agent_id(client)
+    scenario = await create_scenario(
+        client,
+        agent,
+        instructions="You are moving to {{Moving to}}. Confirm it when the agent reads it back.",
+        criteria=["Reads back the move to {{ moving TO }}."],
+        data_sets=[
+            {"name": "Austin", "known_facts": [{"name": "Moving to", "value": "Austin, Texas"}]},
+            {"name": "Denver", "known_facts": [{"name": "Moving to", "value": "Denver, Colorado"}]},
+        ],
+    )
+    austin, denver = scenario["data_sets"]
+
+    every = (await start_run(client, agent, [scenario["id"]])).json()
+    chosen = await start_run(
+        client, agent, [{"scenario_id": scenario["id"], "data_set_ids": [denver["id"]]}]
+    )
+    removed = await start_run(
+        client, agent, [{"scenario_id": scenario["id"], "data_set_ids": [str(uuid.uuid4())]}]
+    )
+
+    played = await run_conversations(client, every["id"])
+    assert [c["data_set_name"] for c in played] == ["Austin", "Denver"]
+    detail = (await client.get(f"/api/v1/conversations/{played[1]['id']}")).json()
+    assert detail["scenario"]["instructions"].startswith("You are moving to Denver, Colorado.")
+    assert detail["scenario"]["criteria"] == ["Reads back the move to Denver, Colorado."]
+    assert detail["scenario"]["known_facts"] == denver["known_facts"]
+    assert "You are moving to Denver, Colorado." in detail["instructions"]
+    assert "- Moving to: Denver, Colorado" in detail["instructions"]
+    assert "Austin" not in detail["instructions"]
+    assert chosen.status_code == 202, chosen.text
+    run = (await client.get(f"/api/v1/runs/{chosen.json()['id']}")).json()
+    assert run["scenarios"][0]["data_set_ids"] == [denver["id"]]
+    assert removed.status_code == 422 and "no data set" in removed.text
+    assert austin["id"] != denver["id"]

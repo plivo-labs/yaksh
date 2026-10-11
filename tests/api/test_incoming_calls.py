@@ -73,6 +73,8 @@ async def waiting_conversation(
                 scenario_version_id=await first_version_id(
                     client, f"/api/v1/scenarios/{scenario['id']}"
                 ),
+                data_set_id=uuid.UUID(scenario["data_sets"][0]["id"]),
+                data_set_name=scenario["data_sets"][0]["name"],
                 language=Language.EN,
                 instructions="You answer the phone.",
                 nudge="Hello?",

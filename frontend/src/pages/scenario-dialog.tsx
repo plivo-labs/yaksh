@@ -48,14 +48,24 @@ import {
   useSettings,
 } from "@/lib/queries";
 import {
+  dataSetsProblem,
+  defaultDataSetName,
+  fixedValues,
+  trimmedDataSets,
+  unknownPlaceholders,
+  withPlaceholder,
+} from "@/lib/data-sets";
+import { cn } from "@/lib/utils";
+import {
   type AgentSummary,
   CATEGORY_ITEMS,
   type CallerModel,
   type Category,
-  type Fact as ScenarioFact,
+  MAX_DATA_SETS,
   type Scenario,
   type ScenarioInput,
 } from "@/lib/types";
+import { DataSetsGrid } from "@/pages/data-sets-grid";
 
 const EMPTY: ScenarioInput = {
   name: "",
@@ -63,10 +73,9 @@ const EMPTY: ScenarioInput = {
   description: null,
   persona_id: "",
   instructions: "",
-  known_facts: [],
   unknown_facts: [],
   criteria: [""],
-  agent_data: [],
+  data_sets: [{ name: defaultDataSetName(1), known_facts: [], agent_data: [] }],
   first_words: null,
   caller: null,
 };
@@ -78,19 +87,12 @@ function toDraft(scenario: Scenario): ScenarioInput {
     description: scenario.description,
     persona_id: scenario.persona_id,
     instructions: scenario.instructions,
-    known_facts: scenario.known_facts,
     unknown_facts: scenario.unknown_facts,
     criteria: scenario.criteria,
-    agent_data: scenario.agent_data,
+    data_sets: scenario.data_sets,
     first_words: scenario.first_words,
     caller: scenario.caller,
   };
-}
-
-function trimFacts(facts: ScenarioFact[]): ScenarioFact[] {
-  return facts
-    .map((fact) => ({ name: fact.name.trim(), value: fact.value.trim() }))
-    .filter((fact) => fact.name || fact.value);
 }
 
 /** The draft as the API takes it: text trimmed, rows left fully empty dropped. */
@@ -101,10 +103,9 @@ function toInput(draft: ScenarioInput): ScenarioInput {
     description: draft.description?.trim() || null,
     persona_id: draft.persona_id,
     instructions: draft.instructions.trim(),
-    known_facts: trimFacts(draft.known_facts),
     unknown_facts: draft.unknown_facts.map((name) => name.trim()).filter(Boolean),
     criteria: draft.criteria.map((text) => text.trim()).filter(Boolean),
-    agent_data: trimFacts(draft.agent_data),
+    data_sets: trimmedDataSets(draft.data_sets),
     first_words: draft.first_words?.trim() || null,
     caller: draft.caller,
   };
@@ -134,70 +135,6 @@ function AddRow({
   );
 }
 
-type FactKey = "known_facts" | "agent_data";
-
-function FactRows({
-  label,
-  facts,
-  submitted,
-  onChange,
-}: {
-  label: string;
-  facts: ScenarioFact[];
-  submitted: boolean;
-  onChange: (facts: ScenarioFact[]) => void;
-}) {
-  const set = (index: number, next: Partial<ScenarioFact>) =>
-    onChange(facts.map((fact, at) => (at === index ? { ...fact, ...next } : fact)));
-
-  return (
-    <>
-      <div className="grid gap-2">
-        {facts.map((fact, index) => (
-          <div key={index} className="flex items-start gap-2">
-            <div className="flex flex-1 flex-col gap-2 sm:flex-row">
-              <Input
-                aria-label={`${label} ${index + 1} name`}
-                aria-invalid={submitted && !fact.name.trim() && Boolean(fact.value.trim())}
-                placeholder="Name"
-                maxLength={80}
-                className="sm:w-2/5"
-                value={fact.name}
-                onChange={(e) => set(index, { name: e.target.value })}
-              />
-              <Input
-                aria-label={`${label} ${index + 1} value`}
-                aria-invalid={submitted && !fact.value.trim() && Boolean(fact.name.trim())}
-                placeholder="Value"
-                maxLength={500}
-                className="sm:flex-1"
-                value={fact.value}
-                onChange={(e) => set(index, { value: e.target.value })}
-              />
-            </div>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              aria-label={`Remove ${label.toLowerCase()} ${index + 1}`}
-              onClick={() => onChange(facts.filter((_, at) => at !== index))}
-            >
-              <X />
-            </Button>
-          </div>
-        ))}
-      </div>
-      <AddRow
-        count={facts.length}
-        limit={30}
-        onAdd={() => onChange([...facts, { name: "", value: "" }])}
-      >
-        {`Add ${label.toLowerCase()}`}
-      </AddRow>
-    </>
-  );
-}
-
 export function ScenarioDialog({
   agent,
   scenario,
@@ -216,6 +153,7 @@ export function ScenarioDialog({
   const [draft, setDraft] = useState<ScenarioInput>(initial);
   const [submitted, setSubmitted] = useState(false);
   const personas = usePersonas();
+  const settings = useSettings();
   /** A new scenario shows the first persona; both sides of the change check see the same one. */
   const withPersona = (value: ScenarioInput): ScenarioInput => ({
     ...value,
@@ -230,7 +168,6 @@ export function ScenarioDialog({
     save.reset();
     setDraft((current) => ({ ...current, ...next(current) }));
   };
-  const setFacts = (key: FactKey, facts: ScenarioFact[]) => change(() => ({ [key]: facts }));
   const addListItem = (key: "unknown_facts" | "criteria") =>
     change((current) => ({ [key]: [...current[key], ""] }));
   const setListItem = (key: "unknown_facts" | "criteria", index: number, value: string) =>
@@ -242,9 +179,13 @@ export function ScenarioDialog({
   const persona = personas.data?.find((item) => item.id === input.persona_id);
   const opening = persona ? defaults.data?.first_words[persona.language] : undefined;
   const outbound = agent.direction === "outbound";
-  const halfFact = (facts: ScenarioFact[]) => facts.some((fact) => !fact.name || !fact.value);
-  const halfKnown = halfFact(input.known_facts);
-  const halfAgentData = outbound && halfFact(input.agent_data);
+  const limit = settings.data?.values.limits.max_scenario_data_sets ?? MAX_DATA_SETS;
+  const problem = dataSetsProblem(input.data_sets);
+  const factNames = input.data_sets[0].known_facts.map((fact) => fact.name);
+  const unknownIn = (text: string) => unknownPlaceholders(text, factNames);
+  const badPlaceholders = [input.instructions, ...input.criteria].some(
+    (text) => unknownIn(text).length > 0,
+  );
 
   const submit = (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -253,8 +194,8 @@ export function ScenarioDialog({
       Boolean(input.persona_id) &&
       Boolean(input.instructions) &&
       input.criteria.length > 0 &&
-      !halfKnown &&
-      !halfAgentData;
+      problem === null &&
+      !badPlaceholders;
     if (!revealErrors(event.currentTarget, () => setSubmitted(true), valid)) return;
     save.mutate(input, {
       onSuccess: (saved) => {
@@ -271,7 +212,12 @@ export function ScenarioDialog({
       onOpenChange={(next) => !next && guard.requestClose()}
       onOpenChangeComplete={(next) => !next && onClosed()}
     >
-      <DialogContent className="flex max-h-[90vh] flex-col gap-0 p-0 sm:max-w-2xl">
+      <DialogContent
+        className={cn(
+          "flex max-h-[90vh] flex-col gap-0 p-0",
+          draft.data_sets.length > 1 ? "sm:max-w-4xl" : "sm:max-w-2xl",
+        )}
+      >
         <DialogHeader className="px-6 pt-6 pb-4">
           <DialogTitle>{id ? "Edit scenario" : "New scenario"}</DialogTitle>
           {scenario?.forked_from_id && (
@@ -375,10 +321,22 @@ export function ScenarioDialog({
               <FieldDescription>
                 What the caller wants and how it reacts to the agent, written to the caller as
                 “you”. Put names, numbers and dates in the facts below, and mood in the persona.
+                Write a fact's name in double braces, such as <code>{"{{Moving to}}"}</code>, and
+                each call uses the value of its data set.
               </FieldDescription>
               {submitted && !input.instructions && (
                 <FieldError>Tell the caller what to do on this call.</FieldError>
               )}
+              <TextChecks
+                unknown={unknownIn(input.instructions)}
+                factNames={factNames}
+                fixed={fixedValues(input.instructions, input.data_sets)}
+                onReplace={(value, fact) =>
+                  change((current) => ({
+                    instructions: withPlaceholder(current.instructions, value, fact),
+                  }))
+                }
+              />
             </Field>
 
             <Field>
@@ -396,40 +354,14 @@ export function ScenarioDialog({
               </FieldDescription>
             </Field>
 
-            <FieldSet>
-              <FieldLegend variant="label">What the caller knows</FieldLegend>
-              <FieldDescription>
-                Write dates relative to today, for example next Thursday.
-              </FieldDescription>
-              <FactRows
-                label="Fact"
-                facts={draft.known_facts}
-                submitted={submitted}
-                onChange={(facts) => setFacts("known_facts", facts)}
-              />
-              {submitted && halfKnown && (
-                <FieldError>Give each fact a name and a value.</FieldError>
-              )}
-            </FieldSet>
-
-            {outbound && (
-              <FieldSet>
-                <FieldLegend variant="label">Data sent to the agent</FieldLegend>
-                <FieldDescription>
-                  Yaksha puts these in the request that starts the call, as{" "}
-                  <code>{"{{agent_data.<name>}}"}</code>. The caller does not see them.
-                </FieldDescription>
-                <FactRows
-                  label="Agent data"
-                  facts={draft.agent_data}
-                  submitted={submitted}
-                  onChange={(facts) => setFacts("agent_data", facts)}
-                />
-                {submitted && halfAgentData && (
-                  <FieldError>Give each item a name and a value.</FieldError>
-                )}
-              </FieldSet>
-            )}
+            <DataSetsGrid
+              dataSets={draft.data_sets}
+              outbound={outbound}
+              limit={limit}
+              submitted={submitted}
+              problem={problem}
+              onChange={(dataSets) => change(() => ({ data_sets: dataSets }))}
+            />
 
             <FieldSet>
               <FieldLegend variant="label">What the caller does not have</FieldLegend>
@@ -468,29 +400,44 @@ export function ScenarioDialog({
             <FieldSet>
               <FieldLegend variant="label">Criteria</FieldLegend>
               <FieldDescription>
-                The caller never sees these. Write what the agent must say or do on the call.
+                The caller never sees these. Write what the agent must say or do on the call. Write
+                a fact's name in double braces for a value that changes between data sets.
               </FieldDescription>
               <div className="grid gap-2">
                 {draft.criteria.map((text, index) => (
-                  <div key={index} className="flex gap-2">
-                    <Textarea
-                      aria-label={`Criterion ${index + 1}`}
-                      rows={2}
-                      maxLength={500}
-                      placeholder="Reads the new date and time back before it moves the appointment."
-                      className="flex-1"
-                      value={text}
-                      onChange={(e) => setListItem("criteria", index, e.target.value)}
+                  <div key={index} className="grid gap-1.5">
+                    <div className="flex gap-2">
+                      <Textarea
+                        aria-label={`Criterion ${index + 1}`}
+                        rows={2}
+                        maxLength={500}
+                        placeholder="Reads the new date and time back before it moves the appointment."
+                        className="flex-1"
+                        value={text}
+                        onChange={(e) => setListItem("criteria", index, e.target.value)}
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        aria-label={`Remove criterion ${index + 1}`}
+                        onClick={() => removeListItem("criteria", index)}
+                      >
+                        <X />
+                      </Button>
+                    </div>
+                    <TextChecks
+                      unknown={unknownIn(text)}
+                      factNames={factNames}
+                      fixed={fixedValues(text, input.data_sets)}
+                      onReplace={(value, fact) =>
+                        change((current) => ({
+                          criteria: current.criteria.map((item, at) =>
+                            at === index ? withPlaceholder(item, value, fact) : item,
+                          ),
+                        }))
+                      }
                     />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      aria-label={`Remove criterion ${index + 1}`}
-                      onClick={() => removeListItem("criteria", index)}
-                    >
-                      <X />
-                    </Button>
                   </div>
                 ))}
               </div>
@@ -546,6 +493,48 @@ export function ScenarioDialog({
         <DiscardConfirm subject="scenario" {...guard.discard} />
       </DialogContent>
     </Dialog>
+  );
+}
+
+/** Under a text that takes placeholders: a placeholder that names no known fact keeps the
+ * scenario from saving; a value written for one data set only is a warning, with a fix. */
+function TextChecks({
+  unknown,
+  factNames,
+  fixed,
+  onReplace,
+}: {
+  unknown: string[];
+  factNames: string[];
+  fixed: { value: string; dataSet: string; fact: string }[];
+  onReplace: (value: string, fact: string) => void;
+}) {
+  return (
+    <>
+      {unknown.map((name) => (
+        <FieldError key={name}>
+          There is no fact named “{name}”.{" "}
+          {factNames.length > 0
+            ? `Use one of: ${factNames.join(", ")}.`
+            : "Add a known fact first."}
+        </FieldError>
+      ))}
+      {fixed.map(({ value, dataSet, fact }) => (
+        <p key={`${value}-${fact}`} className="text-s-400 text-status-warning-text">
+          “{value}” is a value of the data set {dataSet}; the other data sets have other values
+          here. Use <code>{`{{${fact}}}`}</code>.{" "}
+          <Button
+            type="button"
+            variant="link"
+            size="sm"
+            className="h-auto px-0"
+            onClick={() => onReplace(value, fact)}
+          >
+            Replace it
+          </Button>
+        </p>
+      ))}
+    </>
   );
 }
 
