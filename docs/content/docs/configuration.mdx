@@ -86,6 +86,7 @@ The Import button of the console applies a file too. A browser cannot read envir
 - `GET /api/v1/health` and `GET /api/v1/defaults` do not use the token. All other API requests must have it.
 - The console keeps the token in the storage of the browser. The CLI keeps it in `$XDG_CONFIG_HOME/yaksha/config.json`, or in `~/.config/yaksha/config.json` if `XDG_CONFIG_HOME` is not set. Only your user can read that file.
 - Port 8770 of the worker must be public for Plivo. The worker examines the Plivo signature of each request with the saved Plivo Auth token. It rejects a request without a correct signature.
+- `GET /health` on port 8770 of the worker does not use a Plivo signature. It gives the status and the version, as `GET /api/v1/health` does. The worker opens port 8770 only when `YAKSHA_PUBLIC_URL` is set.
 
 ## File storage
 

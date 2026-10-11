@@ -18,6 +18,7 @@ import uvicorn
 from fastapi import FastAPI, Request, WebSocket
 from fastapi.responses import Response
 
+from yaksha import __version__
 from yaksha.domain.conversations import Admission, IncomingCall
 from yaksha.integrations.plivo_signature import is_signed
 
@@ -158,6 +159,10 @@ def create_app(
             return registry.get(uuid.UUID(conversation_id))
         except ValueError:
             return None
+
+    @app.get("/health")
+    async def health() -> dict[str, str]:
+        return {"status": "ok", "version": __version__}
 
     @app.post("/answer/{conversation_id}")
     async def answer(conversation_id: str, request: Request) -> Response:
