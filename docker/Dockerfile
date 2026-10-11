@@ -27,10 +27,9 @@ COPY --from=backend --chown=yaksha:yaksha /app/.venv ./.venv
 COPY --from=frontend --chown=yaksha:yaksha /build/dist ./frontend/dist
 ENV PATH="/app/.venv/bin:$PATH" \
     YAKSHA_API_HOST=0.0.0.0 \
-    YAKSHA_API_PORT=8000 \
     YAKSHA_FRONTEND_DIST=/app/frontend/dist
 USER yaksha
 EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health')"
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:${PORT:-8000}/api/v1/health')"
 CMD ["yaksha-server", "api"]

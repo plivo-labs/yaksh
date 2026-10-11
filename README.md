@@ -11,6 +11,8 @@ docker compose -f docker/compose.yaml up --build
 
 Open http://localhost:8000 and enter the API token. The API is under `/api/v1` and takes the token as a bearer header.
 
+The API listens on port 8000 and the worker listens on port 8770. To use a different port, set `PORT` for that process. Hosting platforms such as Railway, Render, Fly and Cloud Run set `PORT` for each service.
+
 ## Settings
 
 Yaksha keeps its configuration in two places:

@@ -19,7 +19,8 @@ class Settings(BaseSettings):
     )
 
     api_host: str = "127.0.0.1"
-    api_port: int = 8000
+    port: int | None = Field(default=None, validation_alias="PORT")
+    """The port of the one listener of each process. Hosting platforms set PORT."""
     api_token: SecretStr = Field(min_length=1)
     database_url: PostgresDsn
     frontend_dist: Path = REPO_ROOT / "frontend" / "dist"
@@ -39,7 +40,6 @@ class Settings(BaseSettings):
     allow_private_triggers: bool = False
     """Allow trigger URLs on private or local addresses, for development."""
     public_url: str | None = None
-    stream_port: int = 8770
     s3_endpoint: str
     """Where files are kept, uploaded documents and call audio: any S3-compatible service."""
     s3_bucket: str = "yaksha"
