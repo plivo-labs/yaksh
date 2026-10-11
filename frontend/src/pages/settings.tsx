@@ -96,6 +96,8 @@ function Form({
   const change: Change = (section, key, value) =>
     setDraft((current) => ({ ...current, [section]: { ...current[section], [key]: value } }));
   const secrets = settings.secrets;
+  const llmMoved = draft.llm.base_url !== settings.values.llm.base_url;
+  const deepgramMoved = draft.deepgram.base_url !== settings.values.deepgram.base_url;
 
   useEffect(() => {
     if (!dirty) return;
@@ -124,42 +126,43 @@ function Form({
           <ProviderPanel
             title="LLM provider"
             provider="llm"
-            canTest={Boolean(secrets.llm_api_key)}
+            canTest={Boolean(secrets.llm_api_key) && !llmMoved}
             description="Any API with OpenAI's Responses endpoint, such as OpenAI or Azure OpenAI. Used by the caller, scenario writing and the judges."
           >
             <SettingRow
               label="Base URL"
               htmlFor="llm-url"
-              help={keyRemovedBy(
-                draft.llm.base_url !== settings.values.llm.base_url && secrets.llm_api_key,
-              )}
+              help={keyRemovedBy(llmMoved && secrets.llm_api_key)}
             >
               <Input
                 id="llm-url"
                 value={draft.llm.base_url}
-                onChange={(event) => change("llm", "base_url", event.target.value)}
+                onChange={(event) => change("llm", "base_url", event.target.value.trim())}
               />
             </SettingRow>
-            <KeyRow name="llm_api_key" label="API key" state={secrets.llm_api_key} checked />
+            <KeyRow
+              name="llm_api_key"
+              label="API key"
+              state={secrets.llm_api_key}
+              url={draft.llm.base_url}
+              checked
+            />
           </ProviderPanel>
           <ProviderPanel
             title="Deepgram"
             description="Speech to text."
             provider="deepgram"
-            canTest={Boolean(secrets.deepgram_api_key)}
+            canTest={Boolean(secrets.deepgram_api_key) && !deepgramMoved}
           >
             <SettingRow
               label="Base URL"
               htmlFor="deepgram-url"
-              help={keyRemovedBy(
-                draft.deepgram.base_url !== settings.values.deepgram.base_url &&
-                  secrets.deepgram_api_key,
-              )}
+              help={keyRemovedBy(deepgramMoved && secrets.deepgram_api_key)}
             >
               <Input
                 id="deepgram-url"
                 value={draft.deepgram.base_url}
-                onChange={(event) => change("deepgram", "base_url", event.target.value)}
+                onChange={(event) => change("deepgram", "base_url", event.target.value.trim())}
               />
             </SettingRow>
             <SettingRow label="Model" htmlFor="deepgram-model">
@@ -174,6 +177,7 @@ function Form({
               name="deepgram_api_key"
               label="API key"
               state={secrets.deepgram_api_key}
+              url={draft.deepgram.base_url}
               checked
             />
           </ProviderPanel>
@@ -571,6 +575,8 @@ function NumberRow({
 /** The warning a changed base URL shows while its provider has a saved key. */
 function keyRemovedBy(changed: unknown) {
   return changed ? (
-    <span className="text-warning-foreground">Saving removes the saved key.</span>
+    <span className="text-warning-foreground">
+      Saving removes the saved key. A new key saves with this address.
+    </span>
   ) : undefined;
 }

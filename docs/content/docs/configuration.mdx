@@ -56,7 +56,7 @@ The Settings page has four tabs.
 | Limits | The default turns and length of a call, and the maximum conversations, repeats, retries and start interval of a run. |
 
 - **Keys.** The page shows only the last 4 characters of a saved key. When you save a key, Yaksha first sends one small request to its provider. It saves the key only when the provider accepts it.
-- **Base URLs.** A new base URL of the LLM provider or of Deepgram removes the key of that provider. Add the key again after you save. Thus, a key goes only to the address that it was checked with.
+- **Base URLs.** A new base URL of the LLM provider or of Deepgram removes the key of that provider when you save it. To keep a key, type the new base URL, then replace the key and click **Check and save**: Yaksha checks the new key at the new address and saves both. **Test** is off while a base URL has a change that is not saved. Thus, a key goes only to the address that it was checked with.
 - **Plivo.** You save the Auth ID and the Auth token together. Yaksha checks them together with Plivo.
 - **Missing keys.** A run cannot start until the LLM provider, Deepgram, ElevenLabs and Plivo keys are saved.
 - **Test.** The Test button of a provider uses the saved settings for a small piece of real work, for example one short answer from the caller model. The provider can charge for this request.

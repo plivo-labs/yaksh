@@ -110,6 +110,37 @@ async def test_a_new_base_url_removes_the_key_unless_the_same_change_saves_one(
     assert ("llm_models", ("https://gateway.example/v1", "sk-gateway-0123456789")) in checks
 
 
+async def test_a_key_sent_with_a_new_address_is_checked_there_and_saved_with_it(
+    client: AsyncClient, checks: list[tuple[str, tuple[Any, ...]]]
+) -> None:
+    values = (await client.get("/api/v1/settings")).json()["values"]
+    values["deepgram"]["base_url"] = "https://deepgram-proxy.example"
+    await client.put("/api/v1/settings/values", json=values)
+
+    moved = await client.put(
+        "/api/v1/settings/secrets/deepgram_api_key",
+        json={"value": "dg-new-key", "url": "https://api.deepgram.com"},
+    )
+    refused = await client.put(
+        "/api/v1/settings/secrets/deepgram_api_key",
+        json={"value": "bad-key", "url": "https://elsewhere.example"},
+    )
+    no_address = await client.put(
+        "/api/v1/settings/secrets/elevenlabs_api_key",
+        json={"value": "el-key", "url": "https://api.elevenlabs.io"},
+    )
+
+    assert moved.status_code == 200, moved.text
+    assert checks[0] == ("check_deepgram", ("https://api.deepgram.com", "dg-new-key", "nova-3"))
+    assert moved.json()["values"]["deepgram"]["base_url"] == "https://api.deepgram.com"
+    assert "deepgram_api_key" in moved.json()["secrets"]
+    assert refused.status_code == 422 and "nothing was saved" in refused.text
+    saved = (await client.get("/api/v1/settings")).json()
+    assert saved["values"]["deepgram"]["base_url"] == "https://api.deepgram.com"
+    assert no_address.status_code == 422
+    assert no_address.json()["error"]["message"] == "elevenlabs_api_key has no address"
+
+
 async def test_a_run_cannot_start_while_a_caller_key_is_missing(client: AsyncClient) -> None:
     agent_id = await create_agent_id(client)
     scenario = await create_scenario(client, agent_id, persona_id=await new_persona_id(client))

@@ -46,7 +46,8 @@ export function SettingRow({
 }
 
 /** A provider's settings, with a Test button that uses the saved ones for a small piece of
- * real work. */
+ * real work. `canTest` is off while no key is saved, or while the form changes the address, since
+ * the saved key goes only to its saved address. */
 export function ProviderPanel({
   title,
   description,
@@ -113,6 +114,7 @@ export function KeyRow({
   label,
   help,
   state,
+  url,
   removable = false,
   checked = false,
 }: {
@@ -120,6 +122,9 @@ export function KeyRow({
   label: string;
   help?: ReactNode;
   state: SecretState | undefined;
+  /** The address the form shows for a key that has one: the key is checked there and saved
+   * with it, so it never goes to an address the person does not see. */
+  url?: string;
   removable?: boolean;
   /** Whether the key's provider checks it before it is saved. */
   checked?: boolean;
@@ -143,7 +148,7 @@ export function KeyRow({
           onSubmit={(event) => {
             event.preventDefault();
             save.mutate(
-              { name, value: value.trim() },
+              { name, value: value.trim(), url },
               {
                 onSuccess: () => {
                   close();
