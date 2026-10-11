@@ -4,7 +4,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query, Request, status
 
 from yaksha.api.auth import require_token
-from yaksha.api.deps import BriefModelDep, SessionDep
+from yaksha.api.deps import BriefModelDep, GenerationModelDep, SessionDep
 from yaksha.api.errors import UNAVAILABLE
 from yaksha.api.pagination import Page, PageDep
 from yaksha.api.schemas.agents import AgentRead, AgentSummary, AgentVersionRead
@@ -41,6 +41,7 @@ from yaksha.evaluation import rule_results
 from yaksha.simulation import (
     agents,
     elevenlabs_import,
+    generation,
     plivo_cx_import,
     retell_import,
     vapi_import,
@@ -60,8 +61,19 @@ router = APIRouter(prefix="/agents", tags=["agents"], dependencies=[Depends(requ
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)
-async def create_agent(command: AgentCreate, session: SessionDep) -> AgentRead:
-    return await agent_read(session, await agents.create_agent(session, command))
+async def create_agent(
+    command: AgentCreate, session: SessionDep, request: Request, model: GenerationModelDep
+) -> AgentRead:
+    """Saves the agent and, unless write_scenarios is false, starts writing its first scenarios.
+    They arrive after the response: GET /agents/{id}/scenario-generations shows the progress."""
+    agent = await agents.create_agent(session, command)
+    if command.write_scenarios:
+        prepared = await generation.first_generation(session, model, agent.id)
+        if prepared is not None:
+            sessionmaker = request.app.state.sessionmaker
+            generation_id = await generation.open_generation(sessionmaker, prepared)
+            request.app.state.generations.start(prepared, generation_id)
+    return await agent_read(session, agent)
 
 
 @router.post("/import")

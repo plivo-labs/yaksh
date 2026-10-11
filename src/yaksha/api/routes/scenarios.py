@@ -11,6 +11,7 @@ from yaksha.api.deps import GenerationModelDep, SessionDep
 from yaksha.api.errors import CLIENT_ERRORS, UNAVAILABLE, json_errors
 from yaksha.api.pagination import Page, PageDep
 from yaksha.api.schemas.scenarios import GenerationRead, ScenarioRead, ScenarioVersionRead
+from yaksha.domain.errors import NotFoundError
 from yaksha.domain.generation import GenerateScenarios
 from yaksha.domain.scenarios import AssignPersona, ScenarioCreate, ScenarioDelete, ScenarioUpdate
 from yaksha.simulation import generation, scenarios
@@ -115,6 +116,18 @@ async def list_generations(
         session, agent_id, offset=page.offset, limit=page.page_size
     )
     return Page.of([GenerationRead.of(row, count) for row, count in rows], total, page)
+
+
+@router.post(
+    "/scenario-generations/{generation_id}/stop",
+    status_code=status.HTTP_204_NO_CONTENT,
+    responses=json_errors(CLIENT_ERRORS),
+)
+async def stop_generation(generation_id: uuid.UUID, request: Request) -> None:
+    """Stops a generation that runs without a console, such as a new agent's first scenarios.
+    What is saved stays."""
+    if not request.app.state.generations.stop(generation_id):
+        raise NotFoundError(f"generation {generation_id} is not running")
 
 
 @router.get("/scenarios/{scenario_id}")

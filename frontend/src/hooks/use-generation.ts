@@ -1,7 +1,9 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 
-import { refreshScenarios } from "@/lib/queries";
+import { api } from "@/lib/api";
+import { refreshScenarios, useGenerations, useScenarios } from "@/lib/queries";
 import { openStream, readEvents } from "@/lib/sse";
 import type { GenerateInput, GenerationStatus, Scenario } from "@/lib/types";
 
@@ -15,11 +17,27 @@ export interface GenerationProgress {
 }
 
 /** Runs one generation at a time for an agent. The stream is the generation: stopping it, or
- * leaving the page, stops the writing, and what is saved stays. */
+ * leaving the page, stops the writing, and what is saved stays. It also follows a generation
+ * that runs without a stream, such as a new agent's first scenarios, from the time this page
+ * sees it running. */
 export function useGeneration(agentId: string) {
   const client = useQueryClient();
   const [progress, setProgress] = useState<GenerationProgress | null>(null);
   const [newIds, setNewIds] = useState<ReadonlySet<string>>(new Set());
+  const [streamedId, setStreamedId] = useState<string | null>(null);
+  const generations = useGenerations(agentId);
+  const [followed, setFollowed] = useState<string | null>(null);
+  const running = generations.data?.find((item) => item.status === "running");
+  if (running && !progress && followed !== running.id) setFollowed(running.id);
+  const background = progress ? undefined : generations.data?.find((item) => item.id === followed);
+  /** The generation the notice is about, and its scenarios whatever the list's filters. */
+  const shownId = progress ? streamedId : (background?.id ?? null);
+  const batch = useScenarios(agentId, Boolean(shownId), shownId);
+  const backgroundState = background && `${background.status}:${background.scenarios}`;
+
+  useEffect(() => {
+    if (backgroundState) void refreshScenarios(client, agentId);
+  }, [client, agentId, backgroundState]);
   const controller = useRef<AbortController | null>(null);
 
   useEffect(() => () => controller.current?.abort(), []);
@@ -49,7 +67,9 @@ export function useGeneration(agentId: string) {
     let finished = false;
     void readEvents(response, ({ event, data }) => {
       const payload = JSON.parse(data);
-      if (event === "planned") {
+      if (event === "started") {
+        setStreamedId(payload.generation_id);
+      } else if (event === "planned") {
         patch({ planned: payload.count });
       } else if (event === "scenario") {
         const scenario = payload as Scenario;
@@ -78,12 +98,39 @@ export function useGeneration(agentId: string) {
       });
   };
 
+  const shown: GenerationProgress | null =
+    progress ??
+    (background
+      ? {
+          status: background.status,
+          planned: background.count,
+          saved: background.scenarios,
+          dropped: [],
+          error: background.error,
+        }
+      : null);
+  const written = shownId ? (batch.data ?? []).map((item) => item.id) : [];
+
   return {
-    progress,
-    newIds,
-    running: progress?.status === "running",
+    progress: shown,
+    newIds: new Set([...newIds, ...written]),
+    /** The generation in the notice, and its scenarios that still exist. */
+    id: shownId,
+    written,
+    running: shown?.status === "running",
     start,
-    stop: () => controller.current?.abort(),
-    dismiss: () => setProgress(null),
+    stop: () => {
+      if (controller.current) controller.current.abort();
+      else if (background)
+        void api<void>(`/scenario-generations/${background.id}/stop`, { method: "POST" })
+          .catch((error: Error) =>
+            toast.error("Could not stop the generation", { description: error.message }),
+          )
+          .finally(() => refreshScenarios(client, agentId));
+    },
+    dismiss: () => {
+      setProgress(null);
+      setFollowed(null);
+    },
   };
 }

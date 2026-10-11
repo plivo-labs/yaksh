@@ -59,8 +59,11 @@ class GenerationRead(BaseModel):
     mode: GenerationMode
     status: GenerationStatus
     created_at: datetime
+    count: int
+    """How many scenarios it was asked to write."""
     scenarios: int
     """How many of its scenarios are not deleted."""
+    error: str | None
 
     @classmethod
     def of(cls, generation: ScenarioGeneration, scenarios: int) -> GenerationRead:
@@ -69,5 +72,7 @@ class GenerationRead(BaseModel):
             mode=generation.mode,
             status=generation.status,
             created_at=generation.created_at,
+            count=generation.count,
             scenarios=scenarios,
+            error=generation.error,
         )
