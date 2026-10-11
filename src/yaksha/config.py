@@ -20,7 +20,6 @@ class Settings(BaseSettings):
 
     api_host: str = "127.0.0.1"
     port: int | None = Field(default=None, validation_alias="PORT")
-    """The port of the one listener of each process. Hosting platforms set PORT."""
     api_token: SecretStr = Field(min_length=1)
     database_url: PostgresDsn
     frontend_dist: Path = REPO_ROOT / "frontend" / "dist"

@@ -27,7 +27,7 @@ Yaksha keeps its configuration in two places:
 | `YAKSHA_PLIVO_APP_ID` | The Plivo Application for outbound tests. The API and the worker read it. Outbound tests are off without it. Refer to [Outbound agents](/docs/outbound-agents). |
 | `YAKSHA_ALLOW_PRIVATE_TRIGGERS` | This variable is optional. It lets trigger URLs use `http` and private addresses, for agents on your own network. The default is off. |
 | `YAKSHA_MAX_ACTIVE_CONVERSATIONS` | The maximum number of conversations on one worker at the same time. The default is 4. |
-| `PORT` | This variable is optional. It sets the port that the process listens on. The default is 8000 for the API and 8770 for the worker. Hosting platforms such as Railway, Render, Fly and Cloud Run set it for each service. `yaksha-server api --port` overrides it. |
+| `PORT` | This variable is optional. It sets the port that the process listens on. The default is 8000 for the API and 8770 for the worker. Hosting platforms such as Railway, Render, Fly and Cloud Run set it for each service. `yaksha-server api --port` overrides it. Do not set it in `docker/.env`: the API and the worker read the same file, and the Compose port mappings stay at 8000 and 8770. |
 
 After you change `docker/.env`, make the containers again. Use these commands from the root of the repository:
 
