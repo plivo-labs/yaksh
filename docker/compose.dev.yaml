@@ -12,7 +12,6 @@ x-yaksha: &yaksha
       required: false
   environment:
     YAKSHA_API_HOST: 0.0.0.0
-    YAKSHA_API_PORT: 8000
     YAKSHA_DATABASE_URL: postgresql+asyncpg://yaksha:yaksha@postgres:5432/yaksha
     YAKSHA_S3_ENDPOINT: ${YAKSHA_S3_ENDPOINT:-http://storage:8333}
     YAKSHA_S3_BUCKET: ${YAKSHA_S3_BUCKET:-yaksha}

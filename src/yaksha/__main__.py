@@ -39,7 +39,7 @@ def api(host: str | None = None, port: int | None = None, reload: bool = False) 
         "yaksha.api:create_app",
         factory=True,
         host=host or settings.api_host,
-        port=port or settings.api_port,
+        port=port or settings.port or 8000,
         reload=reload,
         log_config=API_LOGGING,
     )
@@ -142,7 +142,7 @@ async def run_worker(settings: Settings, caller: Caller, registry: StreamRegistr
                 partial(plivo_auth_token, source),
                 worker.accept_incoming,
             ),
-            settings.stream_port,
+            settings.port or 8770,
         )
         await server.start()
     stop = asyncio.Event()
