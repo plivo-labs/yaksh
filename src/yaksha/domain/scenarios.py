@@ -105,10 +105,12 @@ class ScenarioCreate(ScenarioConfig):
     persona_id: uuid.UUID
     """The persona the scenario runs with. Not versioned: each conversation pins the persona
     and its version."""
+    forked_from_id: uuid.UUID | None = None
+    """The scenario of the same agent this one was copied from."""
 
     def to_config(self) -> ScenarioConfig:
         return ScenarioConfig.model_validate(
-            self.model_dump(exclude={*SCENARIO_LABELS, "persona_id"})
+            self.model_dump(exclude={*SCENARIO_LABELS, "persona_id", "forked_from_id"})
         )
 
 

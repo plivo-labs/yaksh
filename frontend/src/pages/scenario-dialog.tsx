@@ -4,6 +4,7 @@ import { toast } from "sonner";
 
 import { DeleteConfirm, DiscardConfirm } from "@/components/confirm-dialogs";
 import { CopyId } from "@/components/copy-id";
+import { ForkedFrom } from "@/components/forked-from";
 import { EffortSelect } from "@/components/effort-select";
 import { ModelCombobox } from "@/components/model-combobox";
 import { Fact } from "@/components/panel";
@@ -12,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -272,6 +274,11 @@ export function ScenarioDialog({
       <DialogContent className="flex max-h-[90vh] flex-col gap-0 p-0 sm:max-w-2xl">
         <DialogHeader className="px-6 pt-6 pb-4">
           <DialogTitle>{id ? "Edit scenario" : "New scenario"}</DialogTitle>
+          {scenario?.forked_from_id && (
+            <DialogDescription>
+              <ForkedFrom kind="scenario" id={scenario.forked_from_id} />
+            </DialogDescription>
+          )}
         </DialogHeader>
 
         <form

@@ -28,6 +28,7 @@ class AgentSummary(BaseModel):
     languages: list[AgentLanguage]
     brief: str
     current_version: int
+    forked_from_id: uuid.UUID | None
     created_at: datetime
     updated_at: datetime
 

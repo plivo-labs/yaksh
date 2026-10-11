@@ -22,6 +22,7 @@ class PersonaRead(BaseModel):
     surroundings: Surroundings
     sample_line: str | None
     current_version: int
+    forked_from_id: uuid.UUID | None
     created_at: datetime
     updated_at: datetime
 
@@ -33,6 +34,7 @@ class PersonaRead(BaseModel):
             builtin_key=persona.builtin_key,
             **config_of(persona).model_dump(),
             current_version=persona.current_version,
+            forked_from_id=persona.forked_from_id,
             created_at=persona.created_at,
             updated_at=persona.updated_at,
         )

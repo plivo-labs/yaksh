@@ -202,9 +202,11 @@ async def update_agent(agent_id: uuid.UUID, update: AgentUpdate, session: Sessio
     return await agent_read(session, await agents.update_agent(session, agent_id, update))
 
 
-@router.post("/{agent_id}/duplicate", status_code=status.HTTP_201_CREATED)
-async def duplicate_agent(agent_id: uuid.UUID, session: SessionDep) -> AgentRead:
-    return await agent_read(session, await agents.duplicate_agent(session, agent_id))
+@router.post("/{agent_id}/fork", status_code=status.HTTP_201_CREATED)
+async def fork_agent(agent_id: uuid.UUID, session: SessionDep) -> AgentRead:
+    """A copy of the agent and its live scenarios. It calls the same agent until its number or
+    trigger changes."""
+    return await agent_read(session, await agents.fork_agent(session, agent_id))
 
 
 @router.delete("/{agent_id}", status_code=status.HTTP_204_NO_CONTENT)

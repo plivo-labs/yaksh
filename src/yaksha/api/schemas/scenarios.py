@@ -26,6 +26,7 @@ class ScenarioRead(BaseModel):
     first_words: str | None
     caller: CallerModel | None
     current_version: int
+    forked_from_id: uuid.UUID | None
     created_at: datetime
     updated_at: datetime
 
@@ -41,6 +42,7 @@ class ScenarioRead(BaseModel):
             generation_id=scenario.generation_id,
             **config_of(scenario).model_dump(),
             current_version=scenario.current_version,
+            forked_from_id=scenario.forked_from_id,
             created_at=scenario.created_at,
             updated_at=scenario.updated_at,
         )

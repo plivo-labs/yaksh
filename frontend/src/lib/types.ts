@@ -323,6 +323,8 @@ export interface AgentSummary {
   languages: AgentLanguage[];
   brief: string;
   current_version: number;
+  /** The agent this one was forked from. */
+  forked_from_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -599,6 +601,8 @@ export interface VoiceEdit {
 
 export interface PersonaInput {
   name: string;
+  /** The persona a new one is forked from. */
+  forked_from_id?: string | null;
   prompt: string;
   language: Language;
   voice: VoiceSettings;
@@ -637,6 +641,8 @@ export interface Persona {
   surroundings: Surroundings;
   sample_line: string | null;
   current_version: number;
+  /** The persona this one was forked from. */
+  forked_from_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -686,6 +692,8 @@ export interface ScenarioInput extends ScenarioConfig {
   description: string | null;
   /** The persona the scenario runs with. */
   persona_id: string;
+  /** The scenario of the same agent a new one is forked from. */
+  forked_from_id?: string | null;
 }
 
 export interface Scenario extends ScenarioInput {
@@ -694,6 +702,7 @@ export interface Scenario extends ScenarioInput {
   /** The generation that wrote it; null when written by hand. */
   generation_id: string | null;
   current_version: number;
+  forked_from_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -1395,3 +1404,11 @@ export interface ImportResult {
   failed: string[];
   settings: AppSettings;
 }
+
+/** What forks change, and how many to write. */
+export interface ForkRequest {
+  instruction: string;
+  count: number;
+}
+
+export const MAX_FORKS = 5;

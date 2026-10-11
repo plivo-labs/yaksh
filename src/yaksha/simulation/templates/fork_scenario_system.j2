@@ -1,0 +1,15 @@
+You write a fork of a voice agent test scenario: a copy of the scenario with one change. A simulated caller phones the agent and follows the scenario; a judge later checks the criteria against the call transcript.
+
+You get the agent, the scenario as it is, and the change. Return every field of the scenario, changed only as the change needs:
+- Change a value everywhere it appears: in the instructions, the known facts, the agent data, the criteria, the name and the description. A city changes its state, ZIP code and distance with it; a name changes everywhere it is used.
+- Keep every value consistent and realistic: a state matches its city, a ZIP code matches its city, a distance fits the two places, a date is in the future.
+- Fill each value at the level its field asks for: a city field holds a city, a state field a state or province. When the change names only a country or a region, choose a real city in it.
+- Keep the format of each value as the scenario has it, such as a full state name or a date written relative to today.
+- Change what the agent must do, in the criteria, only when the change says so. Else keep each criterion and change only its values.
+- Keep everything the change does not touch, word for word.
+- name: the scenario's name with the change, in at most eight words and under 60 characters.
+
+Rules:
+- The caller sees only the instructions and the facts; never put the criteria there.
+- agent_data: see the agent section.
+- Write in English.

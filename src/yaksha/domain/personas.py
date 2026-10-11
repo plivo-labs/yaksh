@@ -1,3 +1,4 @@
+import uuid
 from typing import Annotated, Any
 
 from pydantic import (
@@ -37,9 +38,11 @@ class PersonaConfig(PersonaSettings):
 
 class PersonaCreate(PersonaSettings):
     name: str = Field(min_length=1, max_length=80)
+    forked_from_id: uuid.UUID | None = None
+    """The persona this one was copied from."""
 
     def settings(self) -> PersonaSettings:
-        return PersonaSettings.model_validate(self.model_dump(exclude={"name"}))
+        return PersonaSettings.model_validate(self.model_dump(exclude={"name", "forked_from_id"}))
 
 
 class PersonaIdea(BaseModel):

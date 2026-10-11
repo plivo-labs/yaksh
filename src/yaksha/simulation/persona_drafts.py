@@ -5,6 +5,7 @@ from typing import Any
 from yaksha.domain.errors import UnavailableError
 from yaksha.domain.language_models import JsonModel, ModelCallError
 from yaksha.domain.languages import Language
+from yaksha.domain.names import MAX_NAME_CHARS
 from yaksha.domain.personas import PersonaDraft, PersonaIdea
 from yaksha.domain.surroundings import (
     AutoNoise,
@@ -22,7 +23,6 @@ MODEL_OFF = "writing a persona is off: add the LLM provider key in Settings"
 PERSONA_SYSTEM = render("persona_system.j2")
 MIN_BEHAVIOR_CHARS = 40
 MAX_BEHAVIOR_CHARS = 4000
-MAX_NAME_CHARS = 80
 SPEEDS = {"slow": 0.85, "normal": 1.0, "fast": 1.15}
 AUTO = "mixed"
 NOISE_DB = {"soft": -18, "normal": -10, "loud": -4}

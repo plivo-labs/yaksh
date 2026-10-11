@@ -659,6 +659,8 @@ class FakeJsonModel:
         self.capabilities: list[dict[str, Any]] = []
         self.questions: dict[str, Any] = {"answered": [], "unanswered": []}
         self.write: Callable[[str], dict[str, Any]] = written_scenario
+        self.changes: list[str] = []
+        """The fork planner's answer."""
         self.brief = "Books, moves and cancels dental appointments for callers."
         self.persona: dict[str, Any] = {
             "name": "Asha Rao",
@@ -687,6 +689,8 @@ class FakeJsonModel:
             data = {"brief": self.brief}
         elif name == "persona":
             data = self.persona
+        elif name == "changes":
+            data = {"changes": self.changes}
         else:
             data = self.write(user)
         return ModelAnswer(data=data, model="fake", input_tokens=None, output_tokens=None)

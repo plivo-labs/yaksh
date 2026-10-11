@@ -1,12 +1,13 @@
 import { Toggle } from "@base-ui/react/toggle";
 import { ToggleGroup } from "@base-ui/react/toggle-group";
-import { ChevronDown, Pencil, Play, Plus, Sparkles, Trash2, X } from "lucide-react";
+import { ChevronDown, GitFork, Pencil, Play, Plus, Sparkles, Trash2, X } from "lucide-react";
 import { Fragment, type ReactNode, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
 import { toast } from "sonner";
 
 import { DeleteConfirm, DeleteDialog } from "@/components/confirm-dialogs";
 import { CopyId } from "@/components/copy-id";
+import { ForkedFrom } from "@/components/forked-from";
 import { Panel } from "@/components/panel";
 import { SearchInput } from "@/components/search-input";
 import { Badge } from "@/components/ui/badge";
@@ -48,6 +49,7 @@ import { cn } from "@/lib/utils";
 import { GenerateDialog } from "@/pages/generate-dialog";
 import { RunDialog } from "@/pages/run-dialog";
 import { ScenarioDialog } from "@/pages/scenario-dialog";
+import { ScenarioFork } from "@/pages/scenario-fork";
 
 const ALL = "all";
 
@@ -146,6 +148,7 @@ export function AgentScenarios({ agent }: { agent: Agent }) {
   const { personas, name: personaName } = usePersonaNames();
   const generation = useGeneration(agent.id);
   const [editing, setEditing] = useState<Scenario | "new" | null>(null);
+  const [forking, setForking] = useState<Scenario | null>(null);
   const [generating, setGenerating] = useState(false);
   const [running, setRunning] = useState<string[] | null>(null);
   const [picked, setPicked] = useState<ReadonlySet<string>>(new Set());
@@ -417,6 +420,7 @@ export function AgentScenarios({ agent }: { agent: Agent }) {
                 scenario={open}
                 persona={personaName(open.persona_id)}
                 onEdit={() => setEditing(open)}
+                onFork={() => setForking(open)}
                 onRun={() => setRunning([open.id])}
               />
             )}
@@ -424,6 +428,17 @@ export function AgentScenarios({ agent }: { agent: Agent }) {
         )}
       </Panel>
 
+      {forking && (
+        <ScenarioFork
+          agent={agent}
+          scenario={forking}
+          onOpen={(id, fork) => {
+            setOpenId(id);
+            setEditing(fork ?? null);
+          }}
+          onClosed={() => setForking(null)}
+        />
+      )}
       {editing !== null && (
         <ScenarioDialog
           key={scenario?.id ?? "new"}
@@ -610,12 +625,14 @@ function ScenarioDetail({
   scenario,
   persona,
   onEdit,
+  onFork,
   onRun,
 }: {
   agent: Agent;
   scenario: Scenario;
   persona: string;
   onEdit: () => void;
+  onFork: () => void;
   onRun: () => void;
 }) {
   const outbound = agent.direction === "outbound";
@@ -635,8 +652,13 @@ function ScenarioDetail({
           {scenario.description && (
             <p className="text-s-400 text-muted-foreground">{scenario.description}</p>
           )}
+          <ForkedFrom kind="scenario" id={scenario.forked_from_id} />
         </div>
         <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={onFork}>
+            <GitFork />
+            Fork
+          </Button>
           <Button variant="outline" size="sm" onClick={onEdit}>
             <Pencil />
             Edit

@@ -4,6 +4,7 @@ import { Link, useBlocker, useLocation, useNavigate, useParams } from "react-rou
 
 import { DeleteConfirm, DiscardConfirm } from "@/components/confirm-dialogs";
 import { CopyId } from "@/components/copy-id";
+import { ForkedFrom } from "@/components/forked-from";
 import { GenderBadge } from "@/components/gender-badge";
 import { SurroundingsField } from "@/components/surroundings-field";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -54,6 +55,7 @@ import {
   type Voice,
 } from "@/lib/types";
 import type { GeneratedPersona } from "@/pages/new-persona-dialog";
+import { PersonaFork } from "@/pages/persona-fork";
 
 interface Draft {
   name: string;
@@ -291,9 +293,11 @@ function PersonaEditor({
               <span className="font-mono text-xs-400">Version {persona.current_version}</span>
               {persona.builtin_key && <Badge>Built-in</Badge>}
               <CopyId id={persona.id} label="persona id" />
+              <ForkedFrom kind="persona" id={persona.forked_from_id} />
             </CardDescription>
           )}
           <CardAction className="flex items-center gap-2">
+            {persona && !changed && <PersonaFork persona={persona} />}
             {id && changed && (
               <Button
                 type="button"

@@ -19,6 +19,12 @@ async def create_persona(command: PersonaCreate, session: SessionDep) -> Persona
     return PersonaRead.of(await personas.create_persona(session, command))
 
 
+@router.post("/{persona_id}/fork", status_code=status.HTTP_201_CREATED)
+async def fork_persona(persona_id: uuid.UUID, session: SessionDep) -> PersonaRead:
+    """A copy of the persona named "… (fork)", for the person to change."""
+    return PersonaRead.of(await personas.fork_persona(session, persona_id))
+
+
 @router.post("/draft", responses=UNAVAILABLE)
 async def draft_new_persona(
     source: PersonaIdea, model: BriefModelDep, session: SessionDep

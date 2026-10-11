@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from yaksha.db.models import Scenario, ScenarioVersion
 from yaksha.domain.errors import ConflictError, NotFoundError, ValidationError
+from yaksha.domain.names import fork_name
 from yaksha.domain.scenarios import (
     SCENARIO_LABELS,
     AssignPersona,
@@ -75,6 +76,10 @@ async def create_scenario(
     then the persona row, so the persona cannot be deleted before the scenario uses it."""
     agent = await get_agent(session, agent_id, lock=True)
     persona = await get_persona(session, command.persona_id, lock=True)
+    if command.forked_from_id is not None:
+        source = await existing_scenario(session, command.forked_from_id)
+        if source.agent_id != agent.id:
+            raise ValidationError("a scenario can be forked only from a scenario of its agent")
     config = command.to_config()
     scenario = Scenario(
         agent_id=agent.id,
@@ -83,6 +88,7 @@ async def create_scenario(
         category=command.category,
         description=command.description or None,
         generation_id=generation_id,
+        forked_from_id=command.forked_from_id,
         config=config.model_dump(mode="json"),
         current_version=1,
     )
@@ -93,6 +99,27 @@ async def create_scenario(
     )
     await session.commit()
     return scenario
+
+
+async def fork_scenario(session: AsyncSession, scenario_id: uuid.UUID) -> Scenario:
+    """A copy of the scenario under a free "… (fork)" name, at version 1. The agent row is
+    locked before the names are read, so two forks at once cannot pick the same name."""
+    source = await get_scenario(session, scenario_id)
+    await get_agent(session, source.agent_id, lock=True)
+    taken = await session.scalars(
+        select(func.lower(Scenario.name)).where(
+            Scenario.agent_id == source.agent_id, Scenario.deleted_at.is_(None)
+        )
+    )
+    command = ScenarioCreate(
+        **config_of(source).model_dump(),
+        name=fork_name(source.name, set(taken)),
+        category=source.category,
+        description=source.description,
+        persona_id=source.persona_id,
+        forked_from_id=source.id,
+    )
+    return await create_scenario(session, source.agent_id, command)
 
 
 async def list_scenarios(
