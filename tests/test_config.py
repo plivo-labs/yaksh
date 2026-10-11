@@ -41,6 +41,7 @@ def test_yaksha_refuses_to_start_without_a_long_enough_encryption_key(key: str |
 
 def test_port_comes_from_the_platform_port_variable(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("PORT", raising=False)
+    monkeypatch.setenv("YAKSHA_PORT", "9200")
     assert Settings(_env_file=None, **REQUIRED).port is None
 
     monkeypatch.setenv("PORT", "9100")

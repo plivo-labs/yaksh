@@ -87,7 +87,7 @@ if __name__ == "__main__":
             "worker_heartbeat_s": 0.05,
             "worker_lease_s": 2,
             "end_timeout_s": 0.3,
-            "port": 0,
+            "PORT": 0,
             "encryption_key": ENCRYPTION_KEY,
         }
     )
