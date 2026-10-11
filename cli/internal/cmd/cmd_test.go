@@ -134,7 +134,7 @@ func TestAgentListPrintsTheServersJSON(t *testing.T) {
 }
 
 func TestAgentImportPrintsTheDraftOrAddsTheAgent(t *testing.T) {
-	const draft = `{"provider":"plivo_cx","name":"Dental front desk","external_id":"flow-1","language":"hi","config":"{}"}`
+	const draft = `{"provider":"plivo_cx","name":"Dental front desk","external_id":"flow-1","languages":["en-IN","hi"],"language_note":null,"config":"{}"}`
 	file := filepath.Join(t.TempDir(), "front-desk-config.json")
 	if err := os.WriteFile(file, []byte(`{"flowId":"flow-1"}`), 0o600); err != nil {
 		t.Fatal(err)
@@ -161,7 +161,7 @@ func TestAgentImportPrintsTheDraftOrAddsTheAgent(t *testing.T) {
 	if err := json.Unmarshal(f.requests("POST", "/api/v1/agents")[0].body, &body); err != nil {
 		t.Fatal(err)
 	}
-	want := `{"agent_number":"+14155550100","brief":"Books dental appointments for callers.","config":"{}","external_id":"flow-1","language":"hi","name":"Dental front desk"}`
+	want := `{"agent_number":"+14155550100","brief":"Books dental appointments for callers.","config":"{}","external_id":"flow-1","languages":["en-IN","hi"],"name":"Dental front desk"}`
 	if got, _ := json.Marshal(body); string(got) != want {
 		t.Fatalf("create body = %s, want %s", got, want)
 	}
@@ -173,6 +173,22 @@ func TestAgentImportNeedsBothTheBriefAndTheNumber(t *testing.T) {
 
 	if code == 0 || !strings.Contains(stderr, "number") || len(f.seen) != 0 {
 		t.Fatalf("code = %d, stderr = %q, requests = %d", code, stderr, len(f.seen))
+	}
+}
+
+func TestAgentImportAddsNoAgentWithoutALanguageYakshaKnows(t *testing.T) {
+	const draft = `{"provider":"plivo_cx","name":"Front desk","external_id":"flow-1","languages":[],"language_note":"Yaksha does not know the language multi. Choose the agent's languages","config":"{}"}`
+	file := filepath.Join(t.TempDir(), "front-desk-config.json")
+	if err := os.WriteFile(file, []byte(`{"flowId":"flow-1"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	f := newFakeAPI(t, map[string]http.HandlerFunc{"POST /api/v1/agents/import": reply(200, draft)})
+
+	code, _, stderr := run(t, context.Background(), against(f), "",
+		"agent", "import", file, "--brief", "Books dental appointments for callers.", "--number", "+14155550100")
+
+	if code == 0 || !strings.Contains(stderr, "no language that Yaksha knows") || len(f.requests("POST", "/api/v1/agents")) != 0 {
+		t.Fatalf("code = %d, stderr = %q", code, stderr)
 	}
 }
 

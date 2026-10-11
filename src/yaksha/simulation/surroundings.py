@@ -79,7 +79,12 @@ def speaker_clips() -> tuple[SpeakerClip, ...]:
 
 
 def clips_of(kind: SpeakerKind, language: Language) -> list[SpeakerClip]:
-    return [clip for clip in speaker_clips() if clip.kind is kind and clip.language == language]
+    """The clips in the caller's language; a language with no clips of its own uses the English
+    ones."""
+    of_kind = [clip for clip in speaker_clips() if clip.kind is kind]
+    return [clip for clip in of_kind if clip.language == language] or [
+        clip for clip in of_kind if clip.language == Language.EN
+    ]
 
 
 def clip_by_file(file: str) -> SpeakerClip | None:

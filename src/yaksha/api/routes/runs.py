@@ -24,6 +24,7 @@ router = APIRouter(prefix="/runs", tags=["runs"], dependencies=[Depends(require_
 async def summaries(session: AsyncSession, rows: list[Run]) -> list[RunSummary]:
     agents = await conversations.pinned_agents(session, (row.agent_version_id for row in rows))
     progress = await runs.progress(session, rows)
+    languages = await runs.caller_languages(session, [row.id for row in rows])
     counted = await runs.counted_conversations(session, [row.id for row in rows])
     found = await results.evaluated(session, (c for ids in counted.values() for c in ids))
     measured = {key: done.latency for key, done in found.items() if done.latency}
@@ -33,6 +34,7 @@ async def summaries(session: AsyncSession, rows: list[Run]) -> list[RunSummary]:
             agents[row.agent_version_id],
             progress[row.id],
             pooled([measured[c] for c in counted.get(row.id, []) if c in measured]),
+            languages.get(row.id, []),
         )
         for row in rows
     ]

@@ -21,7 +21,7 @@ from yaksha.domain.agents import Direction
 from yaksha.domain.errors import ValidationError
 from yaksha.domain.triggers import TriggerMethod
 from yaksha.simulation.agent_import import (
-    language,
+    agent_languages,
     provider_errors,
     pruned,
     scenario_variables,
@@ -67,10 +67,14 @@ async def import_agent(api: ElevenLabsAccountApi, agent_id: str) -> ProviderDraf
         for number in agent.get("phone_numbers") or []
         if number.get("supports_inbound", True) and number.get("phone_number")
     ]
+    languages, language_note = agent_languages(
+        [settings(agent).get("language"), *language_presets(agent)]
+    )
     draft = ProviderDraft(
         name=text(agent.get("name")),
         external_id=agent_id,
-        language=language(settings(agent).get("language")),
+        languages=languages,
+        language_note=language_note,
         config=json.dumps(behavior(agent, tools), indent=2, ensure_ascii=False),
         direction=Direction.INBOUND,
         agent_numbers=numbers,
@@ -98,6 +102,12 @@ def settings(agent: dict[str, Any]) -> dict[str, Any]:
     return (agent.get("conversation_config") or {}).get("agent") or {}
 
 
+def language_presets(agent: dict[str, Any]) -> dict[str, Any]:
+    """The agent's other languages, by code, each with what it changes for that language."""
+    presets = (agent.get("conversation_config") or {}).get("language_presets")
+    return presets if isinstance(presets, dict) else {}
+
+
 def tool_ids(agent: dict[str, Any]) -> list[str]:
     """The agent's own tools, then the tools its workflow nodes add or override, each once."""
     nodes = list(((agent.get("workflow") or {}).get("nodes") or {}).values())
@@ -115,8 +125,9 @@ def prompt_of(owner: dict[str, Any]) -> dict[str, Any]:
 
 
 def behavior(agent: dict[str, Any], tools: list[dict[str, Any]]) -> dict[str, Any]:
-    """The agent as the judges read it: its prompt, first message, workflow and tools, and how
-    ElevenLabs grades its calls, without voice, widget and account settings."""
+    """The agent as the judges read it: its prompt, first message, what each other language
+    changes in them, workflow and tools, and how ElevenLabs grades its calls, without voice,
+    widget and account settings."""
     platform = agent.get("platform_settings") or {}
     workflow = agent.get("workflow") or {}
     nodes = {
@@ -128,6 +139,11 @@ def behavior(agent: dict[str, Any], tools: list[dict[str, Any]]) -> dict[str, An
             {
                 "name": agent.get("name"),
                 "agent": settings(agent),
+                "language_presets": {
+                    code: (preset.get("overrides") or {}).get("agent")
+                    for code, preset in language_presets(agent).items()
+                    if isinstance(preset, dict)
+                },
                 "workflow": {**workflow, "nodes": nodes},
                 "tools": [tool.get("tool_config") or tool for tool in tools],
                 "evaluation": platform.get("evaluation"),

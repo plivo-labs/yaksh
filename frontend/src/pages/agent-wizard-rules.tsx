@@ -35,6 +35,7 @@ export function DraftRules({
   onEdit,
   onRuleChange,
   locked,
+  multilingual,
 }: {
   rules: AgentRule[];
   onChange: (rules: AgentRule[]) => void;
@@ -43,6 +44,8 @@ export function DraftRules({
   onRuleChange: (rule: AgentRule) => void;
   /** While the agent is being added, nothing here changes. */
   locked: boolean;
+  /** The agent serves more than one language. */
+  multilingual: boolean;
 }) {
   const full = locked || edit !== null || rules.length >= MAX_RULES;
   const finish = (next: AgentRule[]) => {
@@ -81,6 +84,7 @@ export function DraftRules({
           key={edit.index ?? `new-${edit.rule.kind}`}
           rule={edit.rule}
           locked={locked}
+          multilingual={multilingual}
           title={
             edit.index === null
               ? `New ${KIND[edit.rule.kind].label}`
@@ -132,6 +136,7 @@ export function DraftRules({
 function RuleForm({
   rule,
   locked,
+  multilingual,
   title,
   onChange,
   onSave,
@@ -140,6 +145,7 @@ function RuleForm({
 }: {
   rule: AgentRule;
   locked: boolean;
+  multilingual: boolean;
   title: string;
   onChange: (rule: AgentRule) => void;
   onSave: (rule: AgentRule) => void;
@@ -168,7 +174,12 @@ function RuleForm({
         <p className="text-s-400 text-muted-foreground">{KIND[rule.kind].note}</p>
       </div>
       <fieldset disabled={locked} className="contents">
-        <RuleFields rule={rule} submitted={submitted} onChange={onChange} />
+        <RuleFields
+          rule={rule}
+          submitted={submitted}
+          multilingual={multilingual}
+          onChange={onChange}
+        />
         <div className="flex flex-wrap items-center justify-end gap-2">
           {onRemove && (
             <Button type="button" variant="ghost" size="sm" className="mr-auto" onClick={onRemove}>

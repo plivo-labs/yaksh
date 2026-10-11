@@ -207,6 +207,9 @@ class CallerSettings(BaseModel):
     scenario_model: bool = False
     """The scenario chose the model and effort, not the settings."""
     stt_model: str
+    stt_language: str | None = None
+    """The language setting the speech-to-text heard the agent with; None on calls from before
+    Yaksha recorded it."""
     tts_model: str
     voice: VoiceSettings
 

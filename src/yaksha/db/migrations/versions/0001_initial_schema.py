@@ -35,7 +35,27 @@ def upgrade() -> None:
         sa.Column("agent_number", sa.Text(), nullable=True),
         sa.Column("outbound", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
         sa.Column("agent_speaks_first", sa.Boolean(), nullable=False),
-        sa.Column("language", sa.Enum("en", "hi", name="language"), nullable=False),
+        sa.Column(
+            "languages",
+            postgresql.ARRAY(
+                sa.Enum(
+                    "en-US",
+                    "en-IN",
+                    "en-GB",
+                    "en-AU",
+                    "hi",
+                    "bn",
+                    "gu",
+                    "kn",
+                    "mr",
+                    "ta",
+                    "te",
+                    "es",
+                    name="agent_language",
+                )
+            ),
+            nullable=False,
+        ),
         sa.Column("brief", sa.Text(), nullable=False),
         sa.Column("config", sa.Text(), nullable=True),
         sa.Column(
@@ -64,6 +84,9 @@ def upgrade() -> None:
             nullable=False,
         ),
         sa.Column("deleted_at", sa.DateTime(timezone=True), nullable=True),
+        sa.CheckConstraint(
+            "cardinality(languages) > 0", name=op.f("ck_agents_languages_not_empty")
+        ),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_agents")),
     )
     op.create_index(
@@ -79,7 +102,11 @@ def upgrade() -> None:
         sa.Column("name", sa.Text(), nullable=False),
         sa.Column("builtin_key", sa.Text(), nullable=True),
         sa.Column("prompt", sa.Text(), nullable=False),
-        sa.Column("language", sa.Enum("en", "hi", name="language"), nullable=False),
+        sa.Column(
+            "language",
+            sa.Enum("en", "hi", "bn", "gu", "kn", "mr", "ta", "te", "es", name="language"),
+            nullable=False,
+        ),
         sa.Column("voice_provider", sa.Enum("elevenlabs", name="voice_provider"), nullable=False),
         sa.Column("voice_id", sa.Text(), nullable=False),
         sa.Column("voice_speed", sa.Float(), nullable=False),
@@ -125,12 +152,16 @@ def upgrade() -> None:
         sa.Column("accent", sa.Text(), nullable=True),
         sa.Column(
             "languages",
-            postgresql.ARRAY(sa.Enum("en", "hi", name="language")),
+            postgresql.ARRAY(
+                sa.Enum("en", "hi", "bn", "gu", "kn", "mr", "ta", "te", "es", name="language")
+            ),
             nullable=False,
         ),
         sa.Column(
             "listed_languages",
-            postgresql.ARRAY(sa.Enum("en", "hi", name="language")),
+            postgresql.ARRAY(
+                sa.Enum("en", "hi", "bn", "gu", "kn", "mr", "ta", "te", "es", name="language")
+            ),
             nullable=False,
         ),
         sa.Column("builtin", sa.Boolean(), nullable=False),
@@ -362,7 +393,11 @@ def upgrade() -> None:
         sa.Column("persona_version_id", sa.UUID(), nullable=False),
         sa.Column("scenario_id", sa.UUID(), nullable=False),
         sa.Column("scenario_version_id", sa.UUID(), nullable=False),
-        sa.Column("language", sa.Enum("en", "hi", name="language"), nullable=False),
+        sa.Column(
+            "language",
+            sa.Enum("en", "hi", "bn", "gu", "kn", "mr", "ta", "te", "es", name="language"),
+            nullable=False,
+        ),
         sa.Column("instructions", sa.Text(), nullable=False),
         sa.Column("nudge", sa.Text(), nullable=False),
         sa.Column("today", sa.Date(), nullable=False),
@@ -875,6 +910,7 @@ def downgrade() -> None:
         "voice_gender",
         "voice_provider",
         "language",
+        "agent_language",
         "agent_transport",
         "agent_direction",
         "agent_source",

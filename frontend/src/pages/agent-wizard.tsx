@@ -15,7 +15,7 @@ import { useDraftKnowledgeBase } from "@/hooks/use-knowledge-base";
 import { APPEAR, STEP_BACK, STEP_FORWARD } from "@/lib/motion";
 import { useSaveAgent } from "@/lib/queries";
 import { NEW_LLM, NEW_PHRASE, ruleProblems, toRules, withRule } from "@/lib/rules";
-import type { AgentRule } from "@/lib/types";
+import { type AgentRule, servedLanguages } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { useAgentDraft } from "@/hooks/use-agent-draft";
 import { useBriefDraft } from "@/hooks/use-brief-draft";
@@ -77,7 +77,7 @@ export function AgentWizardPage() {
   const { needs } = form;
   const stepProblems = [
     needs.name || needs.brief || needs.config,
-    needs.direction || needs.reach,
+    needs.direction || needs.reach || needs.languages,
     false,
     false,
   ];
@@ -296,6 +296,7 @@ export function AgentWizardPage() {
               onChange={setRules}
               edit={ruleEdit}
               locked={saving}
+              multilingual={servedLanguages(form.draft.languages).size > 1}
               onEdit={(edit) => {
                 setRuleDraft(null);
                 setParam("rule", edit === null ? null : String(edit.index ?? edit.rule.kind));
@@ -373,9 +374,9 @@ function openRule(
 const IMPORTED_NOTES: Record<ImportedFrom["kind"], string> = {
   file: "Check the drafted brief, then add the phone number in the next step.",
   "config-only": "The file is the config. Check the drafted brief, then fill in the rest.",
-  "plivo-cx": "Check the drafted brief and the language.",
+  "plivo-cx": "Check the drafted brief and the languages.",
   elevenlabs: "Check the drafted brief.",
-  vapi: "Check the drafted brief and the language.",
+  vapi: "Check the drafted brief and the languages.",
   retell: "Check the drafted brief.",
 };
 

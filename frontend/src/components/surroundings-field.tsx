@@ -443,7 +443,7 @@ export function SurroundingsField({
             </div>
           </div>
           <FieldDescription>
-            Speaks in the persona's language, with short pauses, until the call ends.
+            Speaks English, or Hindi for a Hindi persona, with short pauses, until the call ends.
             {value.speaker.start_s >= LOOP_S &&
               ` The preview loops ${LOOP_S} s, so it does not reach this start; calls do.`}
           </FieldDescription>

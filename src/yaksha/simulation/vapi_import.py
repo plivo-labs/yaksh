@@ -23,7 +23,7 @@ from yaksha.domain.agents import Direction
 from yaksha.domain.errors import ValidationError
 from yaksha.domain.triggers import TriggerMethod
 from yaksha.simulation.agent_import import (
-    language,
+    agent_languages,
     provider_errors,
     pruned,
     scenario_variables,
@@ -89,10 +89,14 @@ async def import_assistant(api: VapiAccountApi, assistant_id: str) -> ProviderDr
         found = await asyncio.gather(*(unless_missing(api.get_tool(str(id))) for id in ids))
     tools = [tool for tool in found if tool is not None]
     own = numbers_of(numbers, assistant_id)
+    languages, language_note = agent_languages(
+        [(assistant.get("transcriber") or {}).get("language")]
+    )
     draft = ProviderDraft(
         name=text(assistant.get("name")),
         external_id=assistant_id,
-        language=language((assistant.get("transcriber") or {}).get("language")),
+        languages=languages,
+        language_note=language_note,
         config=json.dumps(behavior(assistant, tools), indent=2, ensure_ascii=False),
         direction=Direction.INBOUND,
         agent_numbers=own,

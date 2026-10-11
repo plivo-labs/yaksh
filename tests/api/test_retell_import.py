@@ -201,10 +201,10 @@ async def test_an_agent_with_its_own_number_is_inbound_at_the_version_the_number
     )
 
     draft = imported.json()
-    assert (draft["name"], draft["direction"], draft["language"], draft["agent_speaks_first"]) == (
+    assert (draft["name"], draft["direction"], draft["languages"], draft["agent_speaks_first"]) == (
         "Front desk",
         "inbound",
-        "hi",
+        ["hi"],
         False,
     )
     assert draft["agent_numbers"] == ["+14155550101"] and draft["start_request"] is None

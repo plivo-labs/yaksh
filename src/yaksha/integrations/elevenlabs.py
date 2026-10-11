@@ -28,10 +28,25 @@ SPEECH_TIMEOUT = aiohttp.ClientTimeout(total=20)
 MODEL = "eleven_flash_v2_5"
 CALL_AUDIO = "pcm_8000"
 
-LANGUAGE_PINS: dict[Language, str] = {
+LANGUAGE_CODES: dict[Language, str] = {
     Language.EN: "en",
     Language.HI: "hi",
+    Language.BN: "bn",
+    Language.GU: "gu",
+    Language.KN: "kn",
+    Language.MR: "mr",
+    Language.TA: "ta",
+    Language.TE: "te",
+    Language.ES: "es",
 }
+"""ElevenLabs' code for each language, as a voice lists the languages it is verified in."""
+PINNED_LANGUAGES = frozenset({Language.EN, Language.HI, Language.TA, Language.ES})
+"""The languages that the model takes as a language_code; it refuses a code it does not take, and
+reads any other language from the text."""
+
+
+def language_pin(language: Language) -> str | None:
+    return LANGUAGE_CODES[language] if language in PINNED_LANGUAGES else None
 
 
 class ElevenLabsClient:
@@ -69,8 +84,10 @@ class ElevenLabsClient:
             "text": text,
             "model_id": MODEL,
             "voice_settings": {"speed": voice.speed, "stability": voice.stability},
-            "language_code": LANGUAGE_PINS[language],
         }
+        pin = language_pin(language)
+        if pin is not None:
+            body["language_code"] = pin
         url = f"{self.base_url}/v1/text-to-speech/{quote(voice.id, safe='')}"
         try:
             async with (
@@ -191,7 +208,7 @@ def provider_voice(entry: Any) -> ProviderVoice:
             gender=VoiceGender(gender) if gender in VoiceGender else None,
             accent=labels.get("accent"),
             listed_languages=tuple(
-                language for language, code in LANGUAGE_PINS.items() if code in codes
+                language for language, code in LANGUAGE_CODES.items() if code in codes
             ),
         )
     except (AttributeError, KeyError, TypeError, pydantic.ValidationError) as error:

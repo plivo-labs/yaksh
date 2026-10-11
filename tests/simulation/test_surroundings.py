@@ -87,12 +87,20 @@ def test_every_speaker_clip_talks_at_the_callers_level_in_the_call_format(clip) 
     assert all("[" not in line.text for line in clip.lines)
 
 
-@pytest.mark.parametrize("language", list(Language))
+@pytest.mark.parametrize("language", [Language.EN, Language.HI])
 @pytest.mark.parametrize("kind", list(SpeakerKind))
-def test_every_language_has_clips_of_every_speaker_kind(
+def test_english_and_hindi_have_their_own_clips_of_every_speaker_kind(
     language: Language, kind: SpeakerKind
 ) -> None:
-    assert clips_of(kind, language)
+    clips = clips_of(kind, language)
+    assert clips and all(clip.language == language for clip in clips)
+
+
+def test_a_language_with_no_clips_of_its_own_plays_the_english_ones() -> None:
+    speaker = Speaker(kind=SpeakerKind.TV, db=-6, start_s=0)
+    plan = sound_plan(Surroundings(speaker=speaker), Language.TA, key="a", duration_s=60)
+
+    assert plan.layers and all(layer.file.startswith("speakers/en_tv_") for layer in plan.layers)
 
 
 def test_sounds_play_through_the_whole_call_at_their_level() -> None:

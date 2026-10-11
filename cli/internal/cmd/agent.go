@@ -59,7 +59,7 @@ func (a *app) agentImportCmd() *cobra.Command {
 		Use:   "import <file> [--brief <text> --number <E.164>]",
 		Short: "Read a Plivo CX agent download into a draft; with --brief and --number, add the agent",
 		Long: `Read a Plivo CX agent download (the console's {name}-config.json) into a draft: the name,
-the agent ID, the language and the whole file as the config. Without flags, print the draft.
+the agent ID, the languages and the whole file as the config. Without flags, print the draft.
 With --brief and --number, add the agent, which Yaksha then calls on that number.`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -92,10 +92,13 @@ With --brief and --number, add the agent, which Yaksha then calls on that number
 			if draft.Name == nil {
 				return errors.New("the file has no agent name; set one with --name")
 			}
+			if len(draft.Languages) == 0 {
+				return errors.New("the file has no language that Yaksha knows; see language_note in the draft")
+			}
 			created, err := api.Body(c.CreateAgentApiV1AgentsPost(cmd.Context(), api.AgentCreate{
 				Name:        *draft.Name,
 				ExternalId:  draft.ExternalId,
-				Language:    &draft.Language,
+				Languages:   &draft.Languages,
 				Config:      &draft.Config,
 				Brief:       brief,
 				AgentNumber: &number,
@@ -147,7 +150,7 @@ func (a *app) agentListCmd() *cobra.Command {
 	f.StringVar(&externalID, "external-id", "", "only the agent with this external ID")
 	f.StringVar(&direction, "direction", "", "only inbound or outbound agents")
 	f.StringVar(&q, "q", "", "search the name, external ID, ID or number")
-	f.StringVar(&sort, "sort", "", "name, language, created_at or updated_at; a leading - sorts descending")
+	f.StringVar(&sort, "sort", "", "name, languages, created_at or updated_at; a leading - sorts descending")
 	addPageFlags(cmd, &page, &pageSize)
 	return cmd
 }

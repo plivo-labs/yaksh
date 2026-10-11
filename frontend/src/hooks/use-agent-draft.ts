@@ -25,6 +25,7 @@ export function useAgentDraft(baseline: Draft, start: Draft = baseline) {
       (outbound
         ? Object.keys(outboundProblems(draft.outbound)).length > 0
         : !isPhoneNumber(draft.agent_number)),
+    languages: draft.languages.length === 0,
     brief: briefLength(draft.brief) < MIN_BRIEF_CHARS,
     config: draft.config.length > MAX_CONFIG_CHARS,
   };

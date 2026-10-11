@@ -4,7 +4,7 @@ import {
   type AgentRule,
   type AgentSource,
   type KnowledgeBaseDocument,
-  LANGUAGE_NAMES,
+  AGENT_LANGUAGES,
 } from "@/lib/types";
 
 const DRAFT_KEY = "yaksha.new-agent-draft";
@@ -51,8 +51,9 @@ export function readStoredDraft(): StoredDraft | null {
       ...stored.draft,
       outbound: { ...EMPTY_DRAFT.outbound, ...stored.draft?.outbound },
     };
-    // A language Yaksha no longer has would leave the field empty and fail on save.
-    if (!(draft.language in LANGUAGE_NAMES)) draft.language = EMPTY_DRAFT.language;
+    // A language Yaksha no longer has would fail on save. An empty list stays empty: the import
+    // found no language that Yaksha knows, and the person chooses.
+    draft.languages = draft.languages.filter((code) => code in AGENT_LANGUAGES);
     return {
       draft,
       rules: stored.rules ?? [],

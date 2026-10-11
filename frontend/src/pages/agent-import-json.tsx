@@ -14,7 +14,7 @@ import { textSize } from "@/lib/format";
 import { startImportedDraft } from "@/lib/new-agent-draft";
 import { randomKey } from "@/lib/random-key";
 import { draftBrief, keys, useImportAgentFile } from "@/lib/queries";
-import { LANGUAGE_NAMES } from "@/lib/types";
+import { languageNames } from "@/lib/types";
 
 /** The API takes up to a million characters; a character is at most four bytes of UTF-8, so a
  * larger file cannot fit and is not read. */
@@ -80,7 +80,7 @@ export function AgentImportJsonPage() {
         ? {
             name: draft.name ?? "",
             external_id: draft.external_id ?? "",
-            language: draft.language,
+            languages: draft.languages,
             config: draft.config,
           }
         : { config: file.content },
@@ -164,8 +164,19 @@ export function AgentImportJsonPage() {
               <dd>{read.data.name ?? "Not in the file"}</dd>
               <dt className="text-muted-foreground">Agent ID</dt>
               <dd className="truncate">{read.data.external_id ?? "Not in the file"}</dd>
-              <dt className="text-muted-foreground">Language</dt>
-              <dd>{LANGUAGE_NAMES[read.data.language]}</dd>
+              <dt className="text-muted-foreground">Languages</dt>
+              <dd className="grid gap-0.5">
+                <span>
+                  {read.data.languages.length > 0
+                    ? languageNames(read.data.languages)
+                    : "Choose them in the next step"}
+                </span>
+                {read.data.language_note && (
+                  <span className="text-s-400 break-words text-muted-foreground">
+                    {read.data.language_note}
+                  </span>
+                )}
+              </dd>
               <dt className="text-muted-foreground">Config</dt>
               <dd>The whole file</dd>
             </dl>

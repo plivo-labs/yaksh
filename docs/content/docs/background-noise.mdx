@@ -11,7 +11,7 @@ All levels are in dB relative to the voice of the caller: 0 dB is as loud as the
 | --- | --- |
 | `sounds` | Noise loops that play during the full call, each at its own level, for example `[{"sound": "cafe", "db": -10}]`. The sounds are `street`, `cafe`, `office`, `car`, `tv`, `crowd`, `kitchen` and `wind`. |
 | `auto` | Auto noise, for example `{"db": -10, "seed": 1}`. One sound plays during the full call, and other sounds start and stop at random times. Use `sounds` or `auto`, not both. A different `seed` gives a different mix. |
-| `speaker` | A person who talks behind the caller, for example `{"kind": "talks_to_caller", "db": -6, "start_s": 5}`. `kind` is `talks_to_caller`, `own_phone_call` or `tv`. The person starts at `start_s` seconds and talks with short pauses until the call ends. The person speaks the language of the persona: English for `en`, Hindi for `hi`. |
+| `speaker` | A person who talks behind the caller, for example `{"kind": "talks_to_caller", "db": -6, "start_s": 5}`. `kind` is `talks_to_caller`, `own_phone_call` or `tv`. The person starts at `start_s` seconds and talks with short pauses until the call ends. The person speaks Hindi behind a Hindi persona, and English behind every other persona. |
 
 No `sounds`, no `auto` and no `speaker` is a quiet room.
 

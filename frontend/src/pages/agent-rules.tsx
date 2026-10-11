@@ -31,7 +31,7 @@ import {
   ruleProblems,
   summary,
 } from "@/lib/rules";
-import type { Agent, AgentRule, RuleResults } from "@/lib/types";
+import { type Agent, type AgentRule, type RuleResults, servedLanguages } from "@/lib/types";
 import { RuleFields } from "@/pages/agent-rules-field";
 
 const RESULTS_NOTE =
@@ -113,6 +113,7 @@ export function AgentRules({ agent }: { agent: Agent }) {
         <RuleDialog
           key={editing.key || editing.kind}
           agentId={agent.id}
+          multilingual={servedLanguages(agent.languages).size > 1}
           rule={editing}
           onClosed={() => setEditing(null)}
         />
@@ -194,10 +195,12 @@ function Results({
 /** Adds or edits one rule. A save applies to the rules as they are when it starts. */
 function RuleDialog({
   agentId,
+  multilingual,
   rule,
   onClosed,
 }: {
   agentId: string;
+  multilingual: boolean;
   rule: AgentRule;
   onClosed: () => void;
 }) {
@@ -252,6 +255,7 @@ function RuleDialog({
           <RuleFields
             rule={draft}
             submitted={submitted}
+            multilingual={multilingual}
             onChange={(next) => {
               save.reset();
               setDraft(next);

@@ -5,7 +5,7 @@ import {
   toOutbound,
   toOutboundDraft,
 } from "@/lib/outbound";
-import type { Agent, AgentInput, Direction, Language } from "@/lib/types";
+import type { Agent, AgentInput, AgentLanguage, Direction } from "@/lib/types";
 
 /** The API's limits for the brief, which every agent has. */
 export const MIN_BRIEF_CHARS = 20;
@@ -22,7 +22,7 @@ export interface Draft {
   agent_number: string;
   outbound: OutboundDraft;
   agent_speaks_first: boolean;
-  language: Language;
+  languages: AgentLanguage[];
   brief: string;
   config: string;
 }
@@ -34,7 +34,7 @@ export const EMPTY_DRAFT: Draft = {
   agent_number: "",
   outbound: EMPTY_OUTBOUND,
   agent_speaks_first: true,
-  language: "en",
+  languages: ["en-US"],
   brief: "",
   config: "",
 };
@@ -47,7 +47,7 @@ export function toDraft(agent: Agent): Draft {
     agent_number: agent.agent_number ?? "",
     outbound: agent.outbound ? toOutboundDraft(agent.outbound) : EMPTY_OUTBOUND,
     agent_speaks_first: agent.agent_speaks_first,
-    language: agent.language,
+    languages: agent.languages,
     brief: agent.brief,
     config: agent.config ?? "",
   };
@@ -69,7 +69,7 @@ export function toInput(draft: Draft): AgentInput {
     agent_number: outbound ? null : normalizeNumber(draft.agent_number),
     outbound: outbound ? toOutbound(draft.outbound) : null,
     agent_speaks_first: draft.agent_speaks_first,
-    language: draft.language,
+    languages: draft.languages,
     brief: draft.brief.trim(),
     config: draft.config.trim() ? draft.config : null,
   };

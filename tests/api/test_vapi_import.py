@@ -183,9 +183,9 @@ async def test_an_assistant_with_a_number_is_inbound_without_its_credentials(
     )
 
     draft = imported.json()
-    assert (draft["direction"], draft["language"], draft["agent_speaks_first"]) == (
+    assert (draft["direction"], draft["languages"], draft["agent_speaks_first"]) == (
         "inbound",
-        "hi",
+        ["hi"],
         False,
     )
     assert draft["agent_numbers"] == ["+14155550101"] and draft["start_request"] is None

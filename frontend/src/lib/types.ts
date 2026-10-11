@@ -40,7 +40,20 @@ export const END_REASON_LABELS: Record<EndReason, string> = {
 };
 
 type Role = "agent" | "caller";
-export type Language = "en" | "hi";
+export type Language = "en" | "hi" | "bn" | "gu" | "kn" | "mr" | "ta" | "te" | "es";
+export type AgentLanguage =
+  | "en-US"
+  | "en-IN"
+  | "en-GB"
+  | "en-AU"
+  | "hi"
+  | "bn"
+  | "gu"
+  | "kn"
+  | "mr"
+  | "ta"
+  | "te"
+  | "es";
 export type VoiceGender = "male" | "female" | "neutral";
 type Provenance = "transmitted" | "cut" | "unconfirmed";
 type WireEventKind =
@@ -130,12 +143,45 @@ export const SOURCE_NAMES: Record<AgentSource, string> = {
 export const LANGUAGE_NAMES: Record<Language, string> = {
   en: "English",
   hi: "Hindi",
+  bn: "Bengali",
+  gu: "Gujarati",
+  kn: "Kannada",
+  mr: "Marathi",
+  ta: "Tamil",
+  te: "Telugu",
+  es: "Spanish",
 };
 
 export const LANGUAGE_ITEMS = (Object.keys(LANGUAGE_NAMES) as Language[]).map((language) => ({
   value: language,
   label: LANGUAGE_NAMES[language],
 }));
+
+/** Each language an agent can serve, with the language a caller speaks it in. */
+export const AGENT_LANGUAGES: Record<AgentLanguage, { name: string; language: Language }> = {
+  "en-US": { name: "English (US)", language: "en" },
+  "en-IN": { name: "English (India)", language: "en" },
+  "en-GB": { name: "English (UK)", language: "en" },
+  "en-AU": { name: "English (Australia)", language: "en" },
+  hi: { name: "Hindi", language: "hi" },
+  bn: { name: "Bengali", language: "bn" },
+  gu: { name: "Gujarati", language: "gu" },
+  kn: { name: "Kannada", language: "kn" },
+  mr: { name: "Marathi", language: "mr" },
+  ta: { name: "Tamil", language: "ta" },
+  te: { name: "Telugu", language: "te" },
+  es: { name: "Spanish", language: "es" },
+};
+
+export const AGENT_LANGUAGE_CODES = Object.keys(AGENT_LANGUAGES) as AgentLanguage[];
+
+/** The agent's languages by name, in its order. */
+export const languageNames = (languages: AgentLanguage[]) =>
+  languages.map((code) => AGENT_LANGUAGES[code].name).join(", ");
+
+/** The languages a caller can speak to the agent in. */
+export const servedLanguages = (languages: AgentLanguage[]) =>
+  new Set(languages.map((code) => AGENT_LANGUAGES[code].language));
 
 export type NoiseSound = "street" | "cafe" | "office" | "car" | "tv" | "crowd" | "kitchen" | "wind";
 export type SpeakerKind = "talks_to_caller" | "own_phone_call" | "tv";
@@ -273,7 +319,8 @@ export interface AgentSummary {
   agent_number: string | null;
   outbound: OutboundSettings | null;
   agent_speaks_first: boolean;
-  language: Language;
+  /** The first is the agent's main language. */
+  languages: AgentLanguage[];
   brief: string;
   current_version: number;
   created_at: string;
@@ -358,7 +405,9 @@ export interface AgentDraft {
   provider: "plivo_cx";
   name: string | null;
   external_id: string | null;
-  language: Language;
+  languages: AgentLanguage[];
+  /** The file's language codes that Yaksha does not know. */
+  language_note: string | null;
   config: string;
 }
 
@@ -457,7 +506,9 @@ export interface RetellAgentPage {
 export interface ProviderDraft {
   name: string | null;
   external_id: string;
-  language: Language;
+  languages: AgentLanguage[];
+  /** The agent's language codes that Yaksha does not know. */
+  language_note: string | null;
   config: string;
   direction: Direction;
   agent_numbers: string[];
@@ -475,7 +526,7 @@ export interface AgentInput {
   agent_number: string | null;
   outbound: OutboundSettings | null;
   agent_speaks_first: boolean;
-  language: Language;
+  languages: AgentLanguage[];
   brief: string;
   config: string | null;
   /** Sent only when the agent is added; later changes go through the knowledge base panel. */
@@ -770,6 +821,8 @@ export interface RunSummary {
   agent_version: number;
   agent_name: string;
   name: string | null;
+  /** The languages the run's callers speak. */
+  languages: Language[];
   repeats: number;
   max_duration_s: number;
   max_turns: number;
@@ -893,6 +946,8 @@ export interface Usage {
     /** The scenario chose the model, not the settings. */
     scenario_model: boolean;
     stt_model: string;
+    /** The language setting the speech-to-text heard the agent with; null on older calls. */
+    stt_language: string | null;
     tts_model: string;
   } | null;
   usage: {

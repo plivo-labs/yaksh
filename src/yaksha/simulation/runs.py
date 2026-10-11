@@ -24,6 +24,7 @@ from yaksha.domain.conversations import (
     outcome_group,
 )
 from yaksha.domain.errors import ConflictError, NotFoundError, ValidationError
+from yaksha.domain.languages import Language
 from yaksha.domain.runs import (
     RunCreate,
     RunProgress,
@@ -428,6 +429,24 @@ async def progress(session: AsyncSession, runs: Sequence[Run]) -> dict[uuid.UUID
     for row in rows:
         by_run[row.run_id].append(row)
     return {run_id: counted(run_rows) for run_id, run_rows in by_run.items()}
+
+
+async def caller_languages(
+    session: AsyncSession, run_ids: Sequence[uuid.UUID]
+) -> dict[uuid.UUID, list[Language]]:
+    """The languages each run's callers speak, in the languages' order."""
+    rows = await session.execute(
+        select(Conversation.run_id, Conversation.language)
+        .where(Conversation.run_id.in_(run_ids))
+        .distinct()
+    )
+    found: dict[uuid.UUID, set[Language]] = defaultdict(set)
+    for run_id, language in rows.tuples():
+        found[run_id].add(language)
+    return {
+        run_id: [language for language in Language if language in spoken]
+        for run_id, spoken in found.items()
+    }
 
 
 def counted(rows: list[Row[Any]]) -> RunProgress:
