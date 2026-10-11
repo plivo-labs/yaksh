@@ -36,7 +36,7 @@ The two Docker Compose files use the same project name. Thus, use only one stack
    docker compose -f docker/compose.dev.yaml up -d postgres storage
    ```
 
-3. Use `export` to set `YAKSHA_API_TOKEN` to a secret value. Also use `export` to set `YAKSHA_DATABASE_URL` to `postgresql+asyncpg://yaksha:yaksha@localhost:5433/yaksha`, `YAKSHA_S3_ENDPOINT` to `http://localhost:8333`, `YAKSHA_S3_ACCESS_KEY` to `yaksha` and `YAKSHA_S3_SECRET_KEY` to `yaksha-storage`. To make test calls, also set the credentials of the services. Refer to [Configuration](/docs/configuration).
+3. Use `export` to set `YAKSHA_API_TOKEN` to a secret value. Also use `export` to set `YAKSHA_DATABASE_URL` to `postgresql://yaksha:yaksha@localhost:5433/yaksha`, `YAKSHA_S3_ENDPOINT` to `http://localhost:8333`, `YAKSHA_S3_ACCESS_KEY` to `yaksha` and `YAKSHA_S3_SECRET_KEY` to `yaksha-storage`. To make test calls, also set the credentials of the services. Refer to [Configuration](/docs/configuration).
 4. From the root of the repository, start the API with `uv run yaksha-server api --reload`.
 5. In a second terminal, set the same variables. Then, from the root of the repository, start the worker with `uv run yaksha-server worker`. The worker does not load changes. After you change the code, stop the worker. Then start it again.
 6. In a third terminal, go to `frontend/`. Start the console with `bun install && bun run dev`.
