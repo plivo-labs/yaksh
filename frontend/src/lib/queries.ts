@@ -258,10 +258,14 @@ export function useRunScenarios(agentId: string, scenarioIds?: string[]) {
   };
 }
 
+/** The agent's generations. It refreshes while one runs, such as a new agent's first
+ * scenarios, which no stream reports. */
 export function useGenerations(agentId: string) {
   return useQuery({
     queryKey: keys.generations(agentId),
     queryFn: () => all<Generation>(`/agents/${agentId}/scenario-generations`),
+    refetchInterval: (query) =>
+      query.state.data?.some((item) => item.status === "running") ? 2_000 : false,
   });
 }
 

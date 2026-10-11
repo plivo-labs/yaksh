@@ -3,6 +3,8 @@ what to test, code spreads the requested count over it, and one writer call per 
 scenario, which is checked and saved as soon as it arrives."""
 
 import asyncio
+import logging
+import math
 import uuid
 from collections.abc import AsyncGenerator, Sequence
 from contextlib import aclosing
@@ -15,7 +17,7 @@ import pydantic
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from yaksha.db.models import AgentVersion, Document, Scenario, ScenarioGeneration
+from yaksha.db.models import AgentVersion, Document, Persona, Scenario, ScenarioGeneration
 from yaksha.domain.agents import AgentConfig, Direction
 from yaksha.domain.errors import NotFoundError, UnavailableError, ValidationError
 from yaksha.domain.generation import (
@@ -51,11 +53,18 @@ from yaksha.simulation.generation_prompts import (
 )
 from yaksha.simulation.personas import live_personas
 
+log = logging.getLogger(__name__)
+
 WRITERS = 4
 """Writer calls at once."""
 MAX_CRITERIA = 10
 MAX_NAME_CHARS = 80
 MODEL_OFF = "scenario generation is off: add the LLM provider key in Settings"
+FIRST_SCENARIOS = 5
+"""Scenarios written for a new agent, so its page has something to run."""
+TIME_LIMIT_S = 600.0
+"""How long a generation that runs without a console may take."""
+TOO_LONG = "the generation took more than 10 minutes"
 
 
 @dataclass(frozen=True)
@@ -175,40 +184,56 @@ async def prepare(
     return prepared
 
 
-async def generate(
+async def open_generation(
     sessionmaker: async_sessionmaker[AsyncSession], prepared: Prepared
-) -> AsyncGenerator[Event]:
-    """The events of one generation. Closing the iterator, or cancelling it when the console
-    disconnects, stops it: what is saved stays, and the generation is recorded as stopped."""
+) -> uuid.UUID:
+    """Records a generation as running, before any model call."""
     command = prepared.command
+    async with sessionmaker() as session:
+        row = ScenarioGeneration(
+            agent_id=prepared.agent_id,
+            agent_version_id=prepared.agent_version_id,
+            mode=command.mode,
+            count=command.count,
+            instructions=command.instructions,
+            document_ids=[str(document_id) for document_id in command.document_ids],
+        )
+        session.add(row)
+        await session.commit()
+        return row.id
+
+
+async def generate(
+    sessionmaker: async_sessionmaker[AsyncSession],
+    prepared: Prepared,
+    generation_id: uuid.UUID | None = None,
+    limit_s: float = math.inf,
+) -> AsyncGenerator[Event]:
+    """The events of one generation, opened here unless generation_id is given. Closing the
+    iterator, or cancelling it when the console disconnects, stops it: what is saved stays, and
+    the generation is recorded as stopped. One that runs past limit_s is recorded as failed."""
     model = prepared.model
-    # Shielded, so a committed row always reaches the finally below.
-    with anyio.CancelScope(shield=True):
-        async with sessionmaker() as session:
-            row = ScenarioGeneration(
-                agent_id=prepared.agent_id,
-                agent_version_id=prepared.agent_version_id,
-                mode=command.mode,
-                count=command.count,
-                instructions=command.instructions,
-                document_ids=[str(document_id) for document_id in command.document_ids],
-            )
-            session.add(row)
-            await session.commit()
-            generation_id = row.id
+    if generation_id is None:
+        # Shielded, so a committed row always reaches the finally below.
+        with anyio.CancelScope(shield=True):
+            generation_id = await open_generation(sessionmaker, prepared)
     writer = Writer(sessionmaker, model, prepared, generation_id)
     status, error, saved = GenerationStatus.STOPPED, None, 0
     try:
-        yield Started(generation_id)
-        planned = await plan(model, prepared)
-        if planned.slots:
-            yield Planned(len(planned.slots))
-            async with aclosing(writer.write_all(planned)) as written:
-                async for event in written:
-                    yield event
-            status = GenerationStatus.DONE
-        else:
-            status, error = GenerationStatus.FAILED, "the agent's context shows nothing to test"
+        with anyio.CancelScope(deadline=anyio.current_time() + limit_s) as limit:
+            yield Started(generation_id)
+            planned = await plan(model, prepared)
+            if planned.slots:
+                yield Planned(len(planned.slots))
+                async with aclosing(writer.write_all(planned)) as written:
+                    async for event in written:
+                        yield event
+                status = GenerationStatus.DONE
+            else:
+                status = GenerationStatus.FAILED
+                error = "the agent's context shows nothing to test"
+        if limit.cancelled_caught:
+            status, error = GenerationStatus.FAILED, TOO_LONG
     except (UnavailableError, NotFoundError) as failure:
         status, error = GenerationStatus.FAILED, str(failure)
     except Exception:
@@ -430,17 +455,74 @@ class Writer:
             )
 
 
+async def first_generation(
+    session: AsyncSession, model: JsonModel | None, agent_id: uuid.UUID
+) -> Prepared | None:
+    """The first scenarios of a new agent, spread over up to five random personas. None when
+    they cannot be written: no LLM key, no persona, or a context too large to plan from."""
+    persona_ids = list(
+        await session.scalars(
+            select(Persona.id)
+            .where(Persona.deleted_at.is_(None))
+            .order_by(func.random())
+            .limit(FIRST_SCENARIOS)
+        )
+    )
+    if not persona_ids:
+        return None
+    command = GenerateScenarios(count=FIRST_SCENARIOS, persona_ids=persona_ids)
+    try:
+        return await prepare(session, model, agent_id, command)
+    except (UnavailableError, ValidationError, NotFoundError) as reason:
+        log.info("no first scenarios for agent %s: %s", agent_id, reason)
+        return None
+
+
+async def run_to_end(
+    sessionmaker: async_sessionmaker[AsyncSession],
+    prepared: Prepared,
+    generation_id: uuid.UUID,
+) -> None:
+    """Runs an opened generation that no console reads, within TIME_LIMIT_S."""
+    try:
+        events = generate(sessionmaker, prepared, generation_id, TIME_LIMIT_S)
+        async with aclosing(events):
+            async for _ in events:
+                pass
+    except Exception:
+        log.exception("the generation %s failed", generation_id)
+
+
+async def stop_running(session: AsyncSession) -> None:
+    """Marks generations left running by a process that ended as stopped. Run at start, when
+    this process runs none.
+
+    ponytail: assumes one API process; with replicas, give generations a lease instead."""
+    await session.execute(
+        update(ScenarioGeneration)
+        .where(ScenarioGeneration.status == GenerationStatus.RUNNING)
+        .values(status=GenerationStatus.STOPPED, ended_at=datetime.now(UTC))
+    )
+    await session.commit()
+
+
 async def list_generations(
     session: AsyncSession, agent_id: uuid.UUID, *, offset: int, limit: int
 ) -> tuple[list[tuple[ScenarioGeneration, int]], int]:
-    """The agent's generations that still have scenarios, newest first, each with how many."""
+    """The agent's generations, newest first, each with how many of its scenarios are not
+    deleted. One whose scenarios were all deleted is left out; one that has saved none yet, or
+    ended without any, is listed, so its state shows."""
     agent = await get_agent(session, agent_id)
     live = func.count(Scenario.id).label("live")
     query = (
         select(ScenarioGeneration, live)
-        .join(Scenario, Scenario.generation_id == ScenarioGeneration.id)
-        .where(ScenarioGeneration.agent_id == agent.id, Scenario.deleted_at.is_(None))
+        .outerjoin(
+            Scenario,
+            (Scenario.generation_id == ScenarioGeneration.id) & Scenario.deleted_at.is_(None),
+        )
+        .where(ScenarioGeneration.agent_id == agent.id)
         .group_by(ScenarioGeneration.id)
+        .having((live > 0) | (ScenarioGeneration.saved == 0))
     )
     total = await session.scalar(select(func.count()).select_from(query.subquery()))
     rows = await session.execute(

@@ -42,6 +42,7 @@
           "agents"
         ],
         "summary": "Create Agent",
+        "description": "Saves the agent and, unless write_scenarios is false, starts writing its first scenarios.\nThey arrive after the response: GET /agents/{id}/scenario-generations shows the progress.",
         "operationId": "create_agent_api_v1_agents_post",
         "security": [
           {
@@ -3655,6 +3656,48 @@
         }
       }
     },
+    "/api/v1/scenario-generations/{generation_id}/stop": {
+      "post": {
+        "tags": [
+          "scenarios"
+        ],
+        "summary": "Stop Generation",
+        "description": "Stops a generation that runs without a console, such as a new agent's first scenarios.\nWhat is saved stays.",
+        "operationId": "stop_generation_api_v1_scenario_generations__generation_id__stop_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "generation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Generation Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "4XX": {
+            "description": "The request failed. The error tells why.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/scenarios/{scenario_id}": {
       "get": {
         "tags": [
@@ -5187,6 +5230,11 @@
           "source": {
             "$ref": "#/components/schemas/AgentSource",
             "default": "manual"
+          },
+          "write_scenarios": {
+            "type": "boolean",
+            "title": "Write Scenarios",
+            "default": true
           }
         },
         "additionalProperties": false,
@@ -7430,9 +7478,24 @@
             "format": "date-time",
             "title": "Created At"
           },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          },
           "scenarios": {
             "type": "integer",
             "title": "Scenarios"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
           }
         },
         "type": "object",
@@ -7441,7 +7504,9 @@
           "mode",
           "status",
           "created_at",
-          "scenarios"
+          "count",
+          "scenarios",
+          "error"
         ],
         "title": "GenerationRead"
       },
