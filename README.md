@@ -11,6 +11,8 @@ docker compose -f docker/compose.yaml up --build
 
 Open http://localhost:8000 and enter the API token. The API is under `/api/v1` and takes the token as a bearer header.
 
+To deploy on a server or a platform, see `docs/content/docs/self-hosting.mdx`.
+
 ## Settings
 
 Yaksha keeps its configuration in two places:

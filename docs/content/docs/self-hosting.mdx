@@ -1,0 +1,60 @@
+---
+title: Self-hosting
+description: Deploy Yaksha on a server or on a platform.
+---
+
+## What a deploy needs
+
+| Part | Description |
+| --- | --- |
+| `yaksha-server api` | The console and the API. |
+| `yaksha-server worker` | Makes and gets the test calls. Plivo must get to it at a public HTTPS address. Plivo sends webhooks and one WebSocket audio stream for each call. A stream stays open for up to 30 minutes. |
+| `yaksha-server evaluator` | Measures and judges the saved conversations. It has no port. |
+| PostgreSQL | Version 18 or later. |
+| S3-compatible bucket | Required. It keeps the documents that you upload and the audio of each call. |
+
+The three processes use the same image. For the environment variables, refer to [Configuration](/docs/configuration).
+
+## Ports
+
+| Process | Port |
+| --- | --- |
+| API | `PORT`. The default is 8000. |
+| Worker | `PORT`. The default is 8770. The worker answers `GET /health` on this port. |
+| Evaluator | No port. |
+
+Each process reads `PORT` for its one listener. `YAKSHA_DATABASE_URL` accepts the `postgres://` or `postgresql://` URL that a host gives. Yaksha uses the asyncpg driver.
+
+## One worker for each public address
+
+The worker keeps the stream of each call in its memory. Thus, the webhooks and the stream of a call must go to the worker that made the call. Operate one worker.
+
+- A deploy must stop the old worker before it starts the new worker. If a platform operates the old and the new worker together, calls that start during the deploy can fail.
+- When the worker stops, it ends its live calls with the end reason `worker_stopped`. It saves their results, and the run tries them again.
+- Give the worker a stop grace period of 210 seconds or more. Docker Compose sets `stop_grace_period: 210s`.
+
+## Plivo
+
+Each install must have its own Plivo Application and its own numbers.
+
+1. Make a Plivo Application. Set the answer URL to `<YAKSHA_PUBLIC_URL>/incoming` and the hangup URL to `<YAKSHA_PUBLIC_URL>/incoming/hangup`. Set both methods to `POST`.
+2. Set `YAKSHA_PLIVO_APP_ID` to the ID of the Application.
+3. Set `YAKSHA_PLIVO_NUMBERS` to the numbers of this install.
+
+A Plivo number has only one Application at a time. Thus, two installs must not use the same numbers.
+
+If the Plivo account has an IP whitelist, add the outbound IP of the server. If not, Plivo refuses the calls. The import then shows "Plivo blocked the request: IP … is not in this account's IP whitelist".
+
+## Platforms
+
+### Docker Compose on one server
+
+We recommend this option. Use `docker/compose.yaml`. It operates Postgres and SeaweedFS for you. To give the worker a public HTTPS address, use a named Cloudflare tunnel or a reverse proxy such as Caddy.
+
+### Railway
+
+We did tests of Yaksha on Railway.
+
+- On the worker, set `RAILWAY_DEPLOYMENT_DRAINING_SECONDS=210`. With the default of 0, Railway stops the worker before it saves the results.
+- Railway starts the new worker before it stops the old worker. Calls that start during a deploy can fail.
+- The outbound IP changes on each deploy, unless the service has a Static Outbound IP. A Static Outbound IP costs money. This is important for an IP whitelist.
