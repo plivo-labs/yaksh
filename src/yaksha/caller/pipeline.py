@@ -41,6 +41,7 @@ from pipecat.turns.user_turn_strategies import UserTurnStrategies
 from pipecat.workers.runner import WorkerRunner
 
 from yaksha.caller.audio import SAMPLE_RATE, Clock
+from yaksha.caller.speech_to_text import deepgram_language
 from yaksha.caller.transcript import (
     AgentTurnTap,
     GeneratedTap,
@@ -56,7 +57,6 @@ from yaksha.domain.conversations import (
     WireEvent,
     WireEventKind,
 )
-from yaksha.domain.languages import Language
 from yaksha.domain.latency import VAD_CONFIDENCE, VAD_START_S, VAD_STOP_S
 from yaksha.domain.settings import AppSettings, CallerModel
 from yaksha.integrations import elevenlabs
@@ -74,12 +74,6 @@ QUIET_POLL_S = 0.25
 VAD = VADParams(confidence=VAD_CONFIDENCE, start_secs=VAD_START_S, stop_secs=VAD_STOP_S)
 IDLE_S = 15.0
 IDLE_NUDGES = 2
-# Deepgram language per agent language: Yaksha hears the agent in the language the agent
-# speaks. The Hindi model also transcribes the English words that Hindi speakers mix in.
-DEEPGRAM_LANGUAGES: dict[Language, str] = {
-    Language.EN: "en",
-    Language.HI: "hi",
-}
 
 END_CALL = FunctionSchema(
     name="end_call",
@@ -317,11 +311,13 @@ class Persona:
     ) -> None:
         settings = request.app_settings
         self.llm = llm_service(settings, request.caller, keys, request.instructions)
+        hearing = deepgram_language(request.agent.languages, request.caller_language)
         self.settings = CallerSettings(
             llm_model=request.caller.model,
             reasoning_effort=request.caller.reasoning_effort,
             scenario_model=request.scenario_model,
             stt_model=settings.deepgram.model,
+            stt_language=hearing,
             tts_model=elevenlabs.MODEL,
             voice=request.voice,
         )
@@ -331,9 +327,7 @@ class Persona:
             api_key=keys.deepgram,
             base_url=settings.deepgram.base_url,
             sample_rate=SAMPLE_RATE,
-            settings=DeepgramSTTService.Settings(
-                model=settings.deepgram.model, language=DEEPGRAM_LANGUAGES[request.agent.language]
-            ),
+            settings=DeepgramSTTService.Settings(model=settings.deepgram.model, language=hearing),
         )
         self.tts = ElevenLabsTTSService(
             api_key=keys.elevenlabs,

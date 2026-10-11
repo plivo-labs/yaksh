@@ -95,7 +95,9 @@ function Metrics({ found }: { found: ConversationEvaluation }) {
             Language model {settings.llm_model}
             {settings.reasoning_effort && `, ${settings.reasoning_effort} effort`}
             {settings.scenario_model && " (set by the scenario)"}, speech to text{" "}
-            {settings.stt_model}, text to speech {settings.tts_model}
+            {settings.stt_model}
+            {settings.stt_language && ` (${settings.stt_language})`}, text to speech{" "}
+            {settings.tts_model}
           </Line>
         )}
         {consumed && (

@@ -34,7 +34,7 @@ async def test_a_plivo_cx_download_becomes_a_draft_that_creates_an_agent(
     created = await client.post(
         "/api/v1/agents",
         json={
-            **{key: draft[key] for key in ("name", "external_id", "language", "config")},
+            **{key: draft[key] for key in ("name", "external_id", "languages", "config")},
             "brief": AGENT["brief"],
             "agent_number": AGENT["agent_number"],
         },
@@ -45,31 +45,52 @@ async def test_a_plivo_cx_download_becomes_a_draft_that_creates_an_agent(
         "provider": "plivo_cx",
         "name": "Dental front desk",
         "external_id": "3f9c1a72-6b4e-4d8a-9e21-5c7b0d3f8a16",
-        "language": "hi",
+        "languages": ["hi", "en-US"],
+        "language_note": None,
         "config": content,
     }
     assert created.status_code == 201, created.text
-    assert created.json()["config"] == content and created.json()["language"] == "hi"
+    assert created.json()["config"] == content
+    assert created.json()["languages"] == ["hi", "en-US"]
 
 
 @pytest.mark.parametrize(
-    ("language", "expected"),
+    ("language", "expected", "unknown"),
     [
-        ("hi", "hi"),
-        ("hi_IN", "hi"),
-        ("en-IN,hi", "en"),
-        ("ta", "en"),
-        ("", "en"),
-        (None, "en"),
+        ("hi", ["hi"], None),
+        ("hi_IN", ["hi"], None),
+        ("en-IN,hi", ["en-IN", "hi"], None),
+        ("en", ["en-US"], None),
+        ("hi, hi-IN", ["hi"], None),
+        ("en-IN,multi,en-NZ", ["en-IN"], "multi, en-NZ"),
+        ("multi", [], "multi"),
+        ("", ["en-US"], None),
+        (None, ["en-US"], None),
     ],
-    ids=["hindi", "hindi with a region", "first of several", "not spoken yet", "empty", "missing"],
+    ids=[
+        "hindi",
+        "hindi with a region",
+        "every language in order",
+        "english without a region",
+        "the same language twice",
+        "codes yaksha does not know",
+        "no code yaksha knows",
+        "empty",
+        "missing",
+    ],
 )
-async def test_the_first_language_is_taken_and_one_yaksha_does_not_speak_becomes_english(
-    client: AsyncClient, language: str | None, expected: str
+async def test_every_language_the_flow_serves_is_taken_and_unknown_codes_are_named(
+    client: AsyncClient, language: str | None, expected: list[str], unknown: str | None
 ) -> None:
     imported = await client.post("/api/v1/agents/import", json={"content": plivo_cx_file(language)})
 
-    assert imported.json()["language"] == expected
+    assert imported.json()["languages"] == expected
+    note = imported.json()["language_note"]
+    assert note == (
+        None
+        if unknown is None
+        else f"Yaksha does not know the language {unknown}. Choose the agent's languages"
+    )
 
 
 @pytest.mark.parametrize(

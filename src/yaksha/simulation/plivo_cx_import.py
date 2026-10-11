@@ -26,7 +26,7 @@ from yaksha.domain.errors import (
     UnavailableError,
     ValidationError,
 )
-from yaksha.domain.languages import Language
+from yaksha.domain.languages import AgentLanguage
 from yaksha.domain.triggers import TriggerMethod
 from yaksha.simulation.agent_import import pruned, text
 from yaksha.simulation.curl_import import FILL, NUMBER, NUMBER_NAME, check, scenario_body
@@ -79,7 +79,7 @@ async def import_flow(api: PlivoCxAccountApi, flow_id: uuid.UUID) -> ProviderDra
         name=text(flow.get("name")),
         external_id=str(flow_id),
         # The public API has no language yet; the person sets it.
-        language=Language.EN,
+        languages=[AgentLanguage.EN_US],
         config=json.dumps(behavior(flow), indent=2, ensure_ascii=False),
         direction=Direction.INBOUND,
         agent_numbers=[],

@@ -19,6 +19,33 @@ import (
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
+// Defines values for AgentLanguage.
+const (
+	AgentLanguageEnAU AgentLanguage = "en-AU"
+	AgentLanguageEnGB AgentLanguage = "en-GB"
+	AgentLanguageEnIN AgentLanguage = "en-IN"
+	AgentLanguageEnUS AgentLanguage = "en-US"
+	AgentLanguageHi   AgentLanguage = "hi"
+)
+
+// Valid indicates whether the value is a known member of the AgentLanguage enum.
+func (e AgentLanguage) Valid() bool {
+	switch e {
+	case AgentLanguageEnAU:
+		return true
+	case AgentLanguageEnGB:
+		return true
+	case AgentLanguageEnIN:
+		return true
+	case AgentLanguageEnUS:
+		return true
+	case AgentLanguageHi:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for AgentSource.
 const (
 	AgentSourceElevenlabs AgentSource = "elevenlabs"
@@ -438,16 +465,16 @@ func (e Lane) Valid() bool {
 
 // Defines values for Language.
 const (
-	En Language = "en"
-	Hi Language = "hi"
+	LanguageEn Language = "en"
+	LanguageHi Language = "hi"
 )
 
 // Valid indicates whether the value is a known member of the Language enum.
 func (e Language) Valid() bool {
 	switch e {
-	case En:
+	case LanguageEn:
 		return true
-	case Hi:
+	case LanguageHi:
 		return true
 	default:
 		return false
@@ -1038,7 +1065,7 @@ type AgentConfig struct {
 	Config           *string                   `json:"config,omitempty"`
 	Direction        *Direction                `json:"direction,omitempty"`
 	KnowledgeBase    *[]KnowledgeBaseEntry     `json:"knowledge_base,omitempty"`
-	Language         *Language                 `json:"language,omitempty"`
+	Languages        *[]AgentLanguage          `json:"languages,omitempty"`
 	Outbound         *OutboundConfig           `json:"outbound,omitempty"`
 	Rules            *[]AgentConfig_Rules_Item `json:"rules,omitempty"`
 
@@ -1060,7 +1087,7 @@ type AgentCreate struct {
 	Direction        *Direction                `json:"direction,omitempty"`
 	ExternalId       *string                   `json:"external_id,omitempty"`
 	KnowledgeBase    *[]KnowledgeBaseEntry     `json:"knowledge_base,omitempty"`
-	Language         *Language                 `json:"language,omitempty"`
+	Languages        *[]AgentLanguage          `json:"languages,omitempty"`
 	Name             string                    `json:"name"`
 	Outbound         *OutboundConfig           `json:"outbound,omitempty"`
 	Rules            *[]AgentCreate_Rules_Item `json:"rules,omitempty"`
@@ -1081,17 +1108,22 @@ type AgentCreate_Rules_Item struct {
 // AgentDraft The fields an agent file fills. Nothing is saved: the person adds the rest, such as the
 // brief and how Yaksha reaches the agent, then creates the agent.
 type AgentDraft struct {
-	Config     string         `json:"config"`
-	ExternalId *string        `json:"external_id"`
-	Language   Language       `json:"language"`
-	Name       *string        `json:"name"`
-	Provider   ImportProvider `json:"provider"`
+	Config       string          `json:"config"`
+	ExternalId   *string         `json:"external_id"`
+	LanguageNote *string         `json:"language_note,omitempty"`
+	Languages    []AgentLanguage `json:"languages"`
+	Name         *string         `json:"name"`
+	Provider     ImportProvider  `json:"provider"`
 }
 
 // AgentFile defines model for AgentFile.
 type AgentFile struct {
 	Content string `json:"content"`
 }
+
+// AgentLanguage A language an agent serves. English carries its region, as the agent's own settings
+// give it.
+type AgentLanguage string
 
 // AgentRead defines model for AgentRead.
 type AgentRead struct {
@@ -1105,7 +1137,7 @@ type AgentRead struct {
 	ExternalId       *string                 `json:"external_id"`
 	Id               openapi_types.UUID      `json:"id"`
 	KnowledgeBase    []KnowledgeBaseDocument `json:"knowledge_base"`
-	Language         Language                `json:"language"`
+	Languages        []AgentLanguage         `json:"languages"`
 	Name             string                  `json:"name"`
 	Outbound         *OutboundConfig         `json:"outbound"`
 	Rules            []AgentRead_Rules_Item  `json:"rules"`
@@ -1136,7 +1168,7 @@ type AgentSummary struct {
 	Direction        Direction          `json:"direction"`
 	ExternalId       *string            `json:"external_id"`
 	Id               openapi_types.UUID `json:"id"`
-	Language         Language           `json:"language"`
+	Languages        []AgentLanguage    `json:"languages"`
 	Name             string             `json:"name"`
 	Outbound         *OutboundConfig    `json:"outbound"`
 
@@ -1157,7 +1189,7 @@ type AgentUpdate struct {
 	Direction        *Direction                `json:"direction,omitempty"`
 	ExternalId       *string                   `json:"external_id,omitempty"`
 	KnowledgeBase    *[]KnowledgeBaseEntry     `json:"knowledge_base,omitempty"`
-	Language         *Language                 `json:"language,omitempty"`
+	Languages        *[]AgentLanguage          `json:"languages,omitempty"`
 	Name             *string                   `json:"name,omitempty"`
 	Outbound         *OutboundConfig           `json:"outbound,omitempty"`
 	Rules            *[]AgentUpdate_Rules_Item `json:"rules,omitempty"`
@@ -1271,24 +1303,26 @@ type ConversationEvaluation struct {
 
 // ConversationRead defines model for ConversationRead.
 type ConversationRead struct {
-	AgentCallerId    *string             `json:"agent_caller_id"`
-	AgentId          openapi_types.UUID  `json:"agent_id"`
-	AgentName        string              `json:"agent_name"`
-	AgentVersion     int                 `json:"agent_version"`
-	AgentVersionId   openapi_types.UUID  `json:"agent_version_id"`
-	Attempt          int                 `json:"attempt"`
-	CallUuid         *string             `json:"call_uuid"`
-	CallerNumber     *string             `json:"caller_number"`
-	CallerReason     *string             `json:"caller_reason"`
-	Channel          Channel             `json:"channel"`
-	CreatedAt        time.Time           `json:"created_at"`
-	Direction        Direction           `json:"direction"`
-	EndReason        *EndReason          `json:"end_reason"`
-	EndedAt          *time.Time          `json:"ended_at"`
-	Evaluation       *EvaluationState    `json:"evaluation"`
-	FailureReason    *string             `json:"failure_reason"`
-	Id               openapi_types.UUID  `json:"id"`
-	Instructions     string              `json:"instructions"`
+	AgentCallerId  *string            `json:"agent_caller_id"`
+	AgentId        openapi_types.UUID `json:"agent_id"`
+	AgentName      string             `json:"agent_name"`
+	AgentVersion   int                `json:"agent_version"`
+	AgentVersionId openapi_types.UUID `json:"agent_version_id"`
+	Attempt        int                `json:"attempt"`
+	CallUuid       *string            `json:"call_uuid"`
+	CallerNumber   *string            `json:"caller_number"`
+	CallerReason   *string            `json:"caller_reason"`
+	Channel        Channel            `json:"channel"`
+	CreatedAt      time.Time          `json:"created_at"`
+	Direction      Direction          `json:"direction"`
+	EndReason      *EndReason         `json:"end_reason"`
+	EndedAt        *time.Time         `json:"ended_at"`
+	Evaluation     *EvaluationState   `json:"evaluation"`
+	FailureReason  *string            `json:"failure_reason"`
+	Id             openapi_types.UUID `json:"id"`
+	Instructions   string             `json:"instructions"`
+
+	// Language A language a caller speaks.
 	Language         Language            `json:"language"`
 	Latency          *LatencySummary     `json:"latency"`
 	MaxDurationS     int                 `json:"max_duration_s"`
@@ -1329,23 +1363,25 @@ type ConversationStatus string
 
 // ConversationSummary defines model for ConversationSummary.
 type ConversationSummary struct {
-	AgentCallerId     *string             `json:"agent_caller_id"`
-	AgentId           openapi_types.UUID  `json:"agent_id"`
-	AgentName         string              `json:"agent_name"`
-	AgentVersion      int                 `json:"agent_version"`
-	AgentVersionId    openapi_types.UUID  `json:"agent_version_id"`
-	Attempt           int                 `json:"attempt"`
-	CallUuid          *string             `json:"call_uuid"`
-	CallerNumber      *string             `json:"caller_number"`
-	CallerReason      *string             `json:"caller_reason"`
-	Channel           Channel             `json:"channel"`
-	CreatedAt         time.Time           `json:"created_at"`
-	Direction         Direction           `json:"direction"`
-	EndReason         *EndReason          `json:"end_reason"`
-	EndedAt           *time.Time          `json:"ended_at"`
-	Evaluation        *EvaluationState    `json:"evaluation"`
-	FailureReason     *string             `json:"failure_reason"`
-	Id                openapi_types.UUID  `json:"id"`
+	AgentCallerId  *string            `json:"agent_caller_id"`
+	AgentId        openapi_types.UUID `json:"agent_id"`
+	AgentName      string             `json:"agent_name"`
+	AgentVersion   int                `json:"agent_version"`
+	AgentVersionId openapi_types.UUID `json:"agent_version_id"`
+	Attempt        int                `json:"attempt"`
+	CallUuid       *string            `json:"call_uuid"`
+	CallerNumber   *string            `json:"caller_number"`
+	CallerReason   *string            `json:"caller_reason"`
+	Channel        Channel            `json:"channel"`
+	CreatedAt      time.Time          `json:"created_at"`
+	Direction      Direction          `json:"direction"`
+	EndReason      *EndReason         `json:"end_reason"`
+	EndedAt        *time.Time         `json:"ended_at"`
+	Evaluation     *EvaluationState   `json:"evaluation"`
+	FailureReason  *string            `json:"failure_reason"`
+	Id             openapi_types.UUID `json:"id"`
+
+	// Language A language a caller speaks.
 	Language          Language            `json:"language"`
 	Latency           *LatencySummary     `json:"latency"`
 	MaxDurationS      int                 `json:"max_duration_s"`
@@ -1697,7 +1733,7 @@ type LabelerRead struct {
 // Lane defines model for Lane.
 type Lane string
 
-// Language defines model for Language.
+// Language A language a caller speaks.
 type Language string
 
 // LatencySummary The agent's response times in one call: nearest-rank percentiles over the measured
@@ -1877,6 +1913,7 @@ type Pair struct {
 
 // PersonaConfig What a persona version pins: the settings plus the voice gender from the voices list.
 type PersonaConfig struct {
+	// Language A language a caller speaks.
 	Language   *Language `json:"language,omitempty"`
 	Prompt     string    `json:"prompt"`
 	SampleLine *string   `json:"sample_line,omitempty"`
@@ -1892,6 +1929,7 @@ type PersonaConfig struct {
 
 // PersonaCreate defines model for PersonaCreate.
 type PersonaCreate struct {
+	// Language A language a caller speaks.
 	Language   *Language `json:"language,omitempty"`
 	Name       string    `json:"name"`
 	Prompt     string    `json:"prompt"`
@@ -1908,6 +1946,7 @@ type PersonaCreate struct {
 // PersonaDraft A new persona's fields written from a short line, for the person to check before they
 // save it. The console picks a voice of `voice_gender` in the language.
 type PersonaDraft struct {
+	// Language A language a caller speaks.
 	Language Language `json:"language"`
 	LeftOut  []string `json:"left_out"`
 	Name     string   `json:"name"`
@@ -1930,10 +1969,12 @@ type PersonaRead struct {
 	CreatedAt      time.Time          `json:"created_at"`
 	CurrentVersion int                `json:"current_version"`
 	Id             openapi_types.UUID `json:"id"`
-	Language       Language           `json:"language"`
-	Name           string             `json:"name"`
-	Prompt         string             `json:"prompt"`
-	SampleLine     *string            `json:"sample_line"`
+
+	// Language A language a caller speaks.
+	Language   Language `json:"language"`
+	Name       string   `json:"name"`
+	Prompt     string   `json:"prompt"`
+	SampleLine *string  `json:"sample_line"`
 
 	// Surroundings What the agent hears behind the caller. No sounds and no auto noise is a quiet room.
 	Surroundings Surroundings `json:"surroundings"`
@@ -2024,8 +2065,10 @@ type PhraseWhere string
 
 // PlanPreview defines model for PlanPreview.
 type PlanPreview struct {
-	DurationS *int     `json:"duration_s,omitempty"`
-	Language  Language `json:"language"`
+	DurationS *int `json:"duration_s,omitempty"`
+
+	// Language A language a caller speaks.
+	Language Language `json:"language"`
 
 	// Surroundings What the agent hears behind the caller. No sounds and no auto noise is a quiet room.
 	Surroundings Surroundings `json:"surroundings"`
@@ -2081,7 +2124,8 @@ type ProviderDraft struct {
 	Config           string             `json:"config"`
 	Direction        Direction          `json:"direction"`
 	ExternalId       string             `json:"external_id"`
-	Language         Language           `json:"language"`
+	LanguageNote     *string            `json:"language_note,omitempty"`
+	Languages        []AgentLanguage    `json:"languages"`
 	Name             *string            `json:"name"`
 	NumberNote       *string            `json:"number_note,omitempty"`
 	StartRequest     *StartRequestDraft `json:"start_request"`
@@ -2686,6 +2730,7 @@ type VoiceGender string
 
 // VoicePreview defines model for VoicePreview.
 type VoicePreview struct {
+	// Language A language a caller speaks.
 	Language   Language `json:"language"`
 	SampleLine *string  `json:"sample_line,omitempty"`
 

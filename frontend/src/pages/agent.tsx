@@ -23,7 +23,7 @@ import {
   ACTIVE_STATUSES,
   type Agent,
   type ConversationSummary,
-  LANGUAGE_NAMES,
+  languageNames,
   type OutboundSettings,
   SOURCE_NAMES,
 } from "@/lib/types";
@@ -290,7 +290,7 @@ function Settings({ agent, edit }: { agent: Agent; edit: ReactNode }) {
           <ChevronDown className="size-3.5 transition-transform duration-150 group-open:rotate-180" />
         </summary>
         <dl className="mt-4 grid grid-cols-2 gap-x-6 gap-y-4">
-          <Fact label="Language">{LANGUAGE_NAMES[agent.language]}</Fact>
+          <Fact label="Languages">{languageNames(agent.languages)}</Fact>
           <Fact label="Opens with">
             {agent.agent_speaks_first ? "Agent speaks first" : "Caller speaks first"}
           </Fact>

@@ -4,6 +4,7 @@ import { useNavigate } from "react-router";
 import { toast } from "sonner";
 
 import { DeleteConfirm, DiscardConfirm } from "@/components/confirm-dialogs";
+import { LanguageChips } from "@/components/language-chips";
 import { PhoneInput } from "@/components/phone-input";
 import { Button } from "@/components/ui/button";
 import {
@@ -17,14 +18,6 @@ import {
   FieldSet,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Spinner } from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
@@ -40,7 +33,7 @@ import {
   toInput,
 } from "@/lib/agent-draft";
 import { useDeleteAgent, useSaveAgent } from "@/lib/queries";
-import { type Agent, type Direction, LANGUAGE_ITEMS, type Language } from "@/lib/types";
+import type { Agent, Direction } from "@/lib/types";
 import { ConfigField } from "@/pages/agent-config-field";
 import { OutboundFields } from "@/pages/agent-outbound-fields";
 
@@ -179,31 +172,21 @@ export function AgentIdField({ form }: { form: AgentDraft }) {
   );
 }
 
-/** The call's language and who speaks first. */
+/** The agent's languages and who speaks first. */
 export function CallOptionsFields({ form }: { form: AgentDraft }) {
-  const { draft, set } = form;
+  const { draft, set, submitted, needs } = form;
   return (
     <>
       <Field>
-        <FieldLabel htmlFor="language">Language</FieldLabel>
-        <Select
-          items={LANGUAGE_ITEMS}
-          value={draft.language}
-          onValueChange={(value) => value && set("language", value as Language)}
-        >
-          <SelectTrigger id="language" className="w-full sm:w-64">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectGroup>
-              {LANGUAGE_ITEMS.map((item) => (
-                <SelectItem key={item.value} value={item.value}>
-                  {item.label}
-                </SelectItem>
-              ))}
-            </SelectGroup>
-          </SelectContent>
-        </Select>
+        <FieldLabel htmlFor="languages">Languages</FieldLabel>
+        <LanguageChips
+          id="languages"
+          value={draft.languages}
+          invalid={submitted && needs.languages}
+          onValueChange={(languages) => set("languages", languages)}
+        />
+        <FieldDescription>The first is the main language.</FieldDescription>
+        {submitted && needs.languages && <FieldError>Choose a language.</FieldError>}
       </Field>
       <Field orientation="horizontal" className="rounded-md border bg-muted/40 px-3.5 py-3">
         <FieldContent>

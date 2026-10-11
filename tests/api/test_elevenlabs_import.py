@@ -35,6 +35,12 @@ AGENTS: dict[str, dict[str, Any]] = {
                 },
             },
             "tts": {"voice_id": "voice-1"},
+            "language_presets": {
+                "en": {
+                    "overrides": {"agent": {"first_message": "Hello"}, "tts": {"voice_id": "v2"}}
+                },
+                "fr": {"overrides": {"agent": {"first_message": "Bonjour"}}},
+            },
         },
         "platform_settings": {"widget": {"variant": "full"}, "evaluation": {"criteria": []}},
         "workflow": {
@@ -161,11 +167,14 @@ async def test_an_agent_with_a_number_is_inbound_with_its_behavior_as_the_config
     draft = imported.json()
     config = json.loads(draft["config"])
     assert "Namaste — welcome" in draft["config"] and "secret" not in draft["config"]
-    assert (draft["name"], draft["external_id"], draft["direction"], draft["language"]) == (
+    assert (draft["name"], draft["external_id"], draft["direction"], draft["languages"]) == (
         "Front desk",
         INBOUND,
         "inbound",
-        "hi",
+        ["hi", "en-US"],
+    )
+    assert draft["language_note"] == (
+        "Yaksha does not know the language fr. Choose the agent's languages"
     )
     assert draft["agent_numbers"] == ["+14155550101"] and draft["start_request"] is None
     assert config == {
@@ -179,6 +188,7 @@ async def test_an_agent_with_a_number_is_inbound_with_its_behavior_as_the_config
                 "tools": [{"name": "notify", "api_schema": {"url": "https://example.com"}}],
             },
         },
+        "language_presets": {"en": {"first_message": "Hello"}, "fr": {"first_message": "Bonjour"}},
         "workflow": {
             "nodes": {
                 "start_node": {"type": "start"},

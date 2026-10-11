@@ -6,7 +6,7 @@ from pydantic import BaseModel, ConfigDict
 
 from yaksha.db.models import Agent, Document
 from yaksha.domain.agents import AgentConfig, AgentSource, Direction, Transport
-from yaksha.domain.languages import Language
+from yaksha.domain.languages import AgentLanguage
 from yaksha.domain.rules import AgentRules
 from yaksha.domain.triggers import OutboundConfig
 
@@ -25,7 +25,7 @@ class AgentSummary(BaseModel):
     agent_number: str | None
     outbound: OutboundConfig | None
     agent_speaks_first: bool
-    language: Language
+    languages: list[AgentLanguage]
     brief: str
     current_version: int
     created_at: datetime

@@ -1,0 +1,35 @@
+---
+title: Languages
+description: The languages of agents and callers, and how Yaksha hears a call.
+---
+
+An agent serves one or more languages. A persona, which is the caller, speaks one language.
+
+## Agent languages
+
+Set the languages of an agent on its page, in order. The first language is the main language of the agent. English has a region: English (US), English (India), English (UK) or English (Australia). A new agent gets English (US).
+
+An import takes all the languages of the agent from its provider. If the provider gives a code that Yaksha does not know, for example `multi`, the draft leaves it out and names it in `language_note`. Then you choose the languages.
+
+## Caller languages
+
+A persona speaks English or Hindi. The Hindi caller speaks the everyday mix of Hindi with English words.
+
+To test an agent in more than one language, make one run for each language, with personas that speak it.
+
+## How Yaksha hears the agent
+
+Yaksha writes what the agent says with Deepgram. Each call uses one language setting. Yaksha chooses it from the languages of the agent and the language of the persona:
+
+1. The agent should answer in the language of the persona. If the agent does not serve that language, it should answer in its main language.
+2. From the settings that hear that language, Yaksha uses the one that hears the most of the other languages of the call. On a tie, a model for one language comes first.
+
+| Setting | Hears |
+| --- | --- |
+| One language, for example `en-IN` or `hi` | That language |
+| `hi` | Hindi, and the English words in Hindi speech |
+| `multi` | English and Hindi, and 8 languages that Yaksha does not have |
+
+For English, Yaksha uses the English variant of the agent. The call page shows the setting after the speech-to-text model, for example `nova-3 (hi)`.
+
+When a reply is in a language that the setting does not hear, the transcript of that reply is wrong, and the judges read the wrong transcript.

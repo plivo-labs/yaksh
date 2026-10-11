@@ -15,7 +15,7 @@ from pydantic import (
 )
 
 from yaksha.domain.documents import DocumentName
-from yaksha.domain.languages import Language
+from yaksha.domain.languages import AgentLanguage
 from yaksha.domain.numbers import E164
 from yaksha.domain.rules import AgentRules
 from yaksha.domain.triggers import OutboundConfig
@@ -94,6 +94,18 @@ def distinct_entries(entries: list[KnowledgeBaseEntry]) -> list[KnowledgeBaseEnt
     return entries
 
 
+def distinct_languages(languages: list[AgentLanguage]) -> list[AgentLanguage]:
+    if len(set(languages)) < len(languages):
+        raise ValueError("a language is listed twice")
+    return languages
+
+
+AgentLanguages = Annotated[
+    list[AgentLanguage], Field(min_length=1), AfterValidator(distinct_languages)
+]
+"""The first is the agent's main language."""
+
+
 class AgentConfig(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -103,7 +115,7 @@ class AgentConfig(BaseModel):
     """The number Yaksha dials; inbound agents only."""
     outbound: OutboundConfig | None = None
     agent_speaks_first: bool = True
-    language: Language = Language.EN
+    languages: AgentLanguages = [AgentLanguage.EN_US]
     brief: Brief
     """A short description of the agent, in the user's words."""
     config: ConfigText | None = None
@@ -161,13 +173,13 @@ class AgentUpdate(BaseModel):
     agent_number: E164 | None = None
     outbound: OutboundConfig | None = None
     agent_speaks_first: bool | None = None
-    language: Language | None = None
+    languages: AgentLanguages | None = None
     brief: Brief | None = None
     config: ConfigText | None = None
     knowledge_base: Annotated[KnowledgeBase, AfterValidator(distinct_entries)] | None = None
     rules: AgentRules | None = None
 
-    @field_validator("name", "language", "brief", "knowledge_base", "rules")
+    @field_validator("name", "languages", "brief", "knowledge_base", "rules")
     @classmethod
     def cannot_be_cleared(cls, value: Any, info: ValidationInfo) -> Any:
         if value is None:

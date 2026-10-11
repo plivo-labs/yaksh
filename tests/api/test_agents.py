@@ -21,7 +21,7 @@ async def test_changing_config_creates_a_version_but_renaming_does_not(
 ) -> None:
     agent = await create_agent(client)
     url = f"/api/v1/agents/{agent['id']}"
-    assert agent["current_version"] == 1 and agent["language"] == "en"
+    assert agent["current_version"] == 1 and agent["languages"] == ["en-US"]
 
     renamed = await client.patch(url, json={"name": "Reception"})
     assert renamed.json()["current_version"] == 1
@@ -34,12 +34,12 @@ async def test_changing_config_creates_a_version_but_renaming_does_not(
     unchanged = await client.patch(url, json={"agent_speaks_first": False})
     assert unchanged.json()["current_version"] == 2
 
-    relanguaged = await client.patch(url, json={"language": "hi"})
+    relanguaged = await client.patch(url, json={"languages": ["en-IN", "hi"]})
     assert relanguaged.json()["current_version"] == 3
 
     versions = (await client.get(f"{url}/versions")).json()
     assert [v["version"] for v in versions["items"]] == [3, 2, 1]
-    assert versions["items"][0]["config"]["language"] == "hi"
+    assert versions["items"][0]["config"]["languages"] == ["en-IN", "hi"]
     assert versions["items"][1]["config"]["brief"] == "Books rooms for guests"
 
 
@@ -100,8 +100,10 @@ async def test_invalid_updates_are_rejected_before_the_database(client: AsyncCli
     assert (await client.patch(url, json={"agent_number": None})).status_code == 422
     assert (await client.patch(url, json={"agent_number": "4155550100"})).status_code == 422
     assert (await client.patch(url, json={"name": None})).status_code == 422
-    assert (await client.patch(url, json={"language": None})).status_code == 422
-    assert (await client.patch(url, json={"language": "klingon"})).status_code == 422
+    assert (await client.patch(url, json={"languages": None})).status_code == 422
+    assert (await client.patch(url, json={"languages": []})).status_code == 422
+    assert (await client.patch(url, json={"languages": ["hi", "hi"]})).status_code == 422
+    assert (await client.patch(url, json={"languages": ["klingon"]})).status_code == 422
 
     moved = await client.patch(url, json={"agent_number": "+14155550199"})
     assert moved.status_code == 200 and moved.json()["agent_number"] == "+14155550199"

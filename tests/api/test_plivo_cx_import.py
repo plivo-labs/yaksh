@@ -218,7 +218,7 @@ async def test_a_flow_a_call_starts_gets_the_voice_numbers_that_still_reach_it(
         "inbound",
     )
     assert draft["agent_numbers"] == ["+14155550101"] and draft["start_request"] is None
-    assert draft["language"] == "en" and '"Front desk"' in draft["config"]
+    assert draft["languages"] == ["en-US"] and '"Front desk"' in draft["config"]
 
 
 async def test_a_flow_no_number_reaches_is_imported_and_says_so(

@@ -34,7 +34,7 @@ IDENTITY_FIELDS = frozenset({"name", "external_id"})
 EXTERNAL_ID_INDEX = "ix_agents_external_id_live"
 SORT_KEYS = {
     "name": func.lower(Agent.name),
-    "language": Agent.language,
+    "languages": Agent.languages,
     "created_at": Agent.created_at,
     "updated_at": Agent.updated_at,
 }

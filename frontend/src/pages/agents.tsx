@@ -48,7 +48,7 @@ import {
   useLastCall,
   useScenarioCount,
 } from "@/lib/queries";
-import { type AgentSource, type AgentSummary, LANGUAGE_NAMES, SOURCE_NAMES } from "@/lib/types";
+import { type AgentSource, type AgentSummary, languageNames, SOURCE_NAMES } from "@/lib/types";
 
 const ROW =
   "grid grid-cols-[minmax(0,1fr)_2rem] items-center gap-x-4 gap-y-2 px-3 md:grid-cols-[minmax(12rem,1.4fr)_7rem_6rem_minmax(12rem,1fr)_8rem_2rem]";
@@ -145,7 +145,7 @@ export function AgentsPage() {
         >
           <div className={`${ROW} hidden border-b pb-3 text-label text-secondary md:grid`}>
             <SortHeader label="Agent" field="name" sort={sort} onSort={sortBy} />
-            <SortHeader label="Language" field="language" sort={sort} onSort={sortBy} />
+            <SortHeader label="Languages" field="languages" sort={sort} onSort={sortBy} />
             <span>Scenarios</span>
             <span>Last call</span>
             <SortHeader
@@ -235,7 +235,7 @@ function AgentRow({ agent }: { agent: AgentSummary }) {
           <span className="text-s-400 text-muted-foreground">{reach(agent)}</span>
         </div>
       </div>
-      <div className="col-span-2 text-s-400 md:col-span-1">{LANGUAGE_NAMES[agent.language]}</div>
+      <div className="col-span-2 text-s-400 md:col-span-1">{languageNames(agent.languages)}</div>
       <div className="col-span-2 text-s-400 md:col-span-1">
         {scenarios.data === undefined ? (
           <Skeleton className="h-4 w-12" />

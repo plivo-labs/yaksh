@@ -37,7 +37,15 @@ import {
   useScenarios,
   useStartRun,
 } from "@/lib/queries";
-import { type AgentSummary, LANGUAGE_NAMES, type RunSummary, type Scenario } from "@/lib/types";
+import {
+  AGENT_LANGUAGES,
+  type AgentSummary,
+  type Language,
+  LANGUAGE_NAMES,
+  type RunSummary,
+  type Scenario,
+  servedLanguages,
+} from "@/lib/types";
 
 const MIX_SIZES = ["2", "3", "4", "5"].map((value) => ({ value, label: value }));
 
@@ -85,6 +93,10 @@ export function RunDialog({
    * refresh in the background never changes what the user set up; null until then. */
   const [rows, setRows] = useState<{ scenario: Scenario; personaIds: string[] }[] | null>(null);
   const [mixSize, setMixSize] = useState("3");
+  const served = servedLanguages(agent.languages);
+  const [mixLanguage, setMixLanguage] = useState<Language>(
+    AGENT_LANGUAGES[agent.languages[0]].language,
+  );
   const [mixOpen, setMixOpen] = useState(false);
   const {
     scenarios: loaded,
@@ -117,7 +129,7 @@ export function RunDialog({
   const changed = (rows ?? []).some(
     (row) => row.personaIds.length !== 1 || row.personaIds[0] !== row.scenario.persona_id,
   );
-  const pool = known.filter((persona) => persona.language === agent.language);
+  const pool = known.filter((persona) => persona.language === mixLanguage);
 
   const update = (change: (row: { scenario: Scenario; personaIds: string[] }) => string[]) =>
     setRows((current) =>
@@ -296,9 +308,35 @@ export function RunDialog({
                         Mix
                       </Button>
                     </div>
+                    {served.size > 1 && (
+                      <div className="flex items-center gap-2">
+                        <Select
+                          items={[...served].map((language) => ({
+                            value: language,
+                            label: LANGUAGE_NAMES[language],
+                          }))}
+                          value={mixLanguage}
+                          onValueChange={(value) => value && setMixLanguage(value as Language)}
+                        >
+                          <SelectTrigger aria-label="Language of the personas" className="w-28">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectGroup>
+                              {[...served].map((language) => (
+                                <SelectItem key={language} value={language}>
+                                  {LANGUAGE_NAMES[language]}
+                                </SelectItem>
+                              ))}
+                            </SelectGroup>
+                          </SelectContent>
+                        </Select>
+                        <span className="text-s-400 text-muted-foreground">personas</span>
+                      </div>
+                    )}
                     <p
                       className="text-xs-400 text-muted-foreground"
-                      title={`Each scenario keeps its own persona. The others come from the ${pool.length} ${LANGUAGE_NAMES[agent.language]} personas, and each is used once before any is used twice.`}
+                      title={`Each scenario keeps its own persona. The others come from the ${pool.length} ${LANGUAGE_NAMES[mixLanguage]} personas, and each is used once before any is used twice.`}
                     >
                       Includes each scenario's own persona.
                     </p>
@@ -364,7 +402,7 @@ export function RunDialog({
                   const ids = cards[scenario.id] ?? [];
                   const foreign = ids
                     .map((id) => byId.get(id))
-                    .filter((persona) => persona && persona.language !== agent.language);
+                    .filter((persona) => persona && !served.has(persona.language));
                   const calls = ids.length * (repeatsOk ? repeatCount : 0);
                   return (
                     <div
@@ -392,7 +430,7 @@ export function RunDialog({
                         label={scenario.name}
                         personas={known}
                         value={ids}
-                        language={agent.language}
+                        served={served}
                         invalid={submitted && ids.length === 0}
                         onValueChange={(next) => setCard(scenario.id, next)}
                       />
@@ -400,8 +438,8 @@ export function RunDialog({
                         (persona) =>
                           persona && (
                             <p key={persona.id} className="text-xs-400 text-status-warning-text">
-                              {persona.name} speaks {LANGUAGE_NAMES[persona.language]}, and the
-                              agent speaks {LANGUAGE_NAMES[agent.language]}.
+                              {persona.name} speaks {LANGUAGE_NAMES[persona.language]}, which the
+                              agent does not serve.
                             </p>
                           ),
                       )}

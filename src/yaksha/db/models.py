@@ -38,7 +38,7 @@ from yaksha.domain.evaluations import (
     Verdict,
 )
 from yaksha.domain.generation import GenerationMode, GenerationStatus
-from yaksha.domain.languages import Language
+from yaksha.domain.languages import AgentLanguage, Language
 from yaksha.domain.scenarios import Category
 from yaksha.domain.voices import VoiceGender, VoiceProvider
 
@@ -63,7 +63,9 @@ class Agent(Base):
     agent_number: Mapped[str | None] = mapped_column(Text)
     outbound: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     agent_speaks_first: Mapped[bool] = mapped_column(Boolean, default=True)
-    language: Mapped[Language] = mapped_column(pg_enum(Language, "language"))
+    languages: Mapped[list[AgentLanguage]] = mapped_column(
+        ARRAY(pg_enum(AgentLanguage, "agent_language"))
+    )
     brief: Mapped[str] = mapped_column(Text)
     config: Mapped[str | None] = mapped_column(Text)
     knowledge_base: Mapped[list[dict[str, Any]]] = mapped_column(
@@ -86,6 +88,7 @@ class Agent(Base):
             unique=True,
             postgresql_where=text("deleted_at IS NULL"),
         ),
+        CheckConstraint("cardinality(languages) > 0", name="languages_not_empty"),
     )
 
 

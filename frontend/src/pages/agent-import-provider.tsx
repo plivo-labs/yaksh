@@ -48,14 +48,15 @@ import {
   useVapiAssistants,
 } from "@/lib/queries";
 import { randomKey } from "@/lib/random-key";
-import type {
-  ElevenLabsAccount,
-  ElevenLabsRegion,
-  PlivoCxAccount,
-  ProviderDraft,
-  RetellAccount,
-  VapiAccount,
-  VapiRegion,
+import {
+  type ElevenLabsAccount,
+  type ElevenLabsRegion,
+  languageNames,
+  type PlivoCxAccount,
+  type ProviderDraft,
+  type RetellAccount,
+  type VapiAccount,
+  type VapiRegion,
 } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -630,7 +631,7 @@ function AgentChoice({
       {
         name: draft.name ?? "",
         external_id: draft.external_id,
-        language: draft.language,
+        languages: draft.languages,
         config: draft.config,
         direction: draft.direction,
         agent_number: number ?? "",
@@ -810,6 +811,20 @@ function Fills({
   return (
     <dl className="grid grid-cols-[6.5rem_minmax(0,1fr)] gap-x-4 gap-y-2.5 text-p-400">
       <Fact term="Name">{draft.name ?? `Not in the ${source}`}</Fact>
+      <Fact term="Languages">
+        <span className="grid gap-0.5 whitespace-normal">
+          <span>
+            {draft.languages.length > 0
+              ? languageNames(draft.languages)
+              : "Choose them in the next step"}
+          </span>
+          {draft.language_note && (
+            <span className="text-s-400 break-words text-muted-foreground">
+              {draft.language_note}
+            </span>
+          )}
+        </span>
+      </Fact>
       {request ? (
         <>
           <Fact term="Calls">The agent calls Yaksha</Fact>

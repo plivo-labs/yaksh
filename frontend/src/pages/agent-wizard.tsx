@@ -77,7 +77,7 @@ export function AgentWizardPage() {
   const { needs } = form;
   const stepProblems = [
     needs.name || needs.brief || needs.config,
-    needs.direction || needs.reach,
+    needs.direction || needs.reach || needs.languages,
     false,
     false,
   ];
@@ -373,9 +373,9 @@ function openRule(
 const IMPORTED_NOTES: Record<ImportedFrom["kind"], string> = {
   file: "Check the drafted brief, then add the phone number in the next step.",
   "config-only": "The file is the config. Check the drafted brief, then fill in the rest.",
-  "plivo-cx": "Check the drafted brief and the language.",
+  "plivo-cx": "Check the drafted brief and the languages.",
   elevenlabs: "Check the drafted brief.",
-  vapi: "Check the drafted brief and the language.",
+  vapi: "Check the drafted brief and the languages.",
   retell: "Check the drafted brief.",
 };
 

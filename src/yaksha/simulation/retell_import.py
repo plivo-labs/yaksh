@@ -22,7 +22,7 @@ from yaksha.domain.agents import Direction
 from yaksha.domain.errors import ValidationError
 from yaksha.domain.triggers import TriggerMethod
 from yaksha.simulation.agent_import import (
-    language,
+    agent_languages,
     provider_errors,
     pruned,
     scenario_variables,
@@ -119,10 +119,12 @@ async def import_agent(api: RetellAccountApi, agent_id: str) -> ProviderDraft:
         agent = await api.get_agent(agent_id, version)
         engine = await response_engine(api, agent.get("response_engine") or {})
     own = [number for number, pinned in routed if resolve(pinned, versions) == version]
+    languages, language_note = agent_languages([agent.get("language")])
     draft = ProviderDraft(
         name=text(agent.get("agent_name")),
         external_id=agent_id,
-        language=language(agent.get("language")),
+        languages=languages,
+        language_note=language_note,
         config=json.dumps(behavior(agent, engine), indent=2, ensure_ascii=False),
         direction=Direction.INBOUND,
         agent_numbers=own,

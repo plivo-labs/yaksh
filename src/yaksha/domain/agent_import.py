@@ -6,7 +6,7 @@ from typing import Any, Protocol
 from pydantic import BaseModel, Field
 
 from yaksha.domain.agents import Direction
-from yaksha.domain.languages import Language
+from yaksha.domain.languages import AgentLanguage
 from yaksha.domain.numbers import AccountNumber
 from yaksha.domain.triggers import TriggerMethod
 
@@ -29,7 +29,9 @@ class AgentDraft(BaseModel):
     provider: ImportProvider
     name: str | None
     external_id: str | None
-    language: Language
+    languages: list[AgentLanguage]
+    language_note: str | None = None
+    """The agent's language codes that Yaksha does not know; the person chooses."""
     config: str
 
 
@@ -93,7 +95,9 @@ class ProviderDraft(BaseModel):
 
     name: str | None
     external_id: str
-    language: Language
+    languages: list[AgentLanguage]
+    language_note: str | None = None
+    """The agent's language codes that Yaksha does not know; the person chooses."""
     config: str
     direction: Direction
     agent_numbers: list[str]

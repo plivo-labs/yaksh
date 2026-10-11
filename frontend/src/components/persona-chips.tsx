@@ -6,20 +6,20 @@ import { cn } from "@/lib/utils";
 import { LANGUAGE_NAMES, type Language, type Persona } from "@/lib/types";
 
 /** The personas of one list as chips, in the list's order, each with a button that removes it,
- * and an "Add" button that searches the other personas. Personas in another language than
- * `language` are marked in the search list. */
+ * and an "Add" button that searches the other personas. Personas in a language outside `served`
+ * are marked in the search list. */
 export function PersonaChips({
   label,
   personas,
   value,
-  language,
+  served,
   invalid,
   onValueChange,
 }: {
   label: string;
   personas: Persona[];
   value: string[];
-  language: Language;
+  served: ReadonlySet<Language>;
   invalid?: boolean;
   onValueChange: (ids: string[]) => void;
 }) {
@@ -95,7 +95,7 @@ export function PersonaChips({
                   <span
                     className={cn(
                       "shrink-0 text-xs-400",
-                      persona.language === language
+                      served.has(persona.language)
                         ? "text-muted-foreground"
                         : "text-status-warning-text",
                     )}

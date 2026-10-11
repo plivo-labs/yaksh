@@ -16,7 +16,7 @@ from yaksha.domain.errors import (
     UnrecognizedFileError,
     ValidationError,
 )
-from yaksha.domain.languages import Language
+from yaksha.domain.languages import AgentLanguage
 from yaksha.simulation.curl_import import FILL, ScenarioNames
 
 log = logging.getLogger(__name__)
@@ -28,11 +28,13 @@ def import_agent(content: str) -> AgentDraft:
     data = parse(content)
     if not is_plivo_cx(data):
         raise UnrecognizedFileError("Yaksha does not know this file's format")
+    languages, note = plivo_cx_languages(data["agentSettings"])
     return AgentDraft(
         provider=ImportProvider.PLIVO_CX,
         name=text(data.get("name")),
         external_id=text(data.get("flowId")),
-        language=plivo_cx_language(data["agentSettings"]),
+        languages=languages,
+        language_note=note,
         config=content,
     )
 
@@ -62,18 +64,46 @@ def is_plivo_cx(data: Any) -> bool:
     )
 
 
-def plivo_cx_language(settings: dict[str, Any]) -> Language:
-    """The first of the flow's languages, such as en-IN in "en-IN,hi"."""
+def plivo_cx_languages(settings: dict[str, Any]) -> tuple[list[AgentLanguage], str | None]:
+    """The flow's languages, such as en-IN and hi in "en-IN,hi"."""
     voice = settings.get("voice_ai_config")
     codes = voice.get("language") if isinstance(voice, dict) else None
-    return language(codes.split(",")[0] if isinstance(codes, str) else None)
+    return agent_languages(codes.split(",") if isinstance(codes, str) else [])
 
 
-def language(code: Any) -> Language:
-    """A provider's language code, such as hi or en-IN. A language Yaksha does not speak yet
-    becomes English."""
-    first = code.strip().lower() if isinstance(code, str) else ""
-    return Language.HI if first.startswith("hi") else Language.EN
+def agent_languages(codes: Iterable[Any]) -> tuple[list[AgentLanguage], str | None]:
+    """A provider's language codes as the languages Yaksha knows, in their order, and a note
+    that names the codes it does not know. No code at all is the providers' default, English."""
+    given = [code.strip() for code in codes if isinstance(code, str) and code.strip()]
+    if not given:
+        return [AgentLanguage.EN_US], None
+    known: list[AgentLanguage] = []
+    unknown: list[str] = []
+    for code in given:
+        language = agent_language(code)
+        if language is None:
+            unknown.append(code)
+        elif language not in known:
+            known.append(language)
+    if not unknown:
+        return known, None
+    return (
+        known,
+        f"Yaksha does not know the language {', '.join(unknown)}. Choose the agent's languages",
+    )
+
+
+def agent_language(code: str) -> AgentLanguage | None:
+    """A code such as hi-IN, en_in or en; en alone is en-US. None for a code Yaksha does not
+    know, such as multi or en-NZ."""
+    tag = code.replace("_", "-").lower()
+    if tag == "en":
+        return AgentLanguage.EN_US
+    for language in AgentLanguage:
+        if language.value.lower() == tag:
+            return language
+    base = tag.split("-")[0]
+    return AgentLanguage(base) if base in AgentLanguage else None
 
 
 def text(value: Any) -> str | None:

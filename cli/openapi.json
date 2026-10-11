@@ -165,7 +165,7 @@
             "required": false,
             "schema": {
               "type": "string",
-              "pattern": "^-?(name|language|created_at|updated_at)$",
+              "pattern": "^-?(name|languages|created_at|updated_at)$",
               "default": "-created_at",
               "title": "Sort"
             }
@@ -5058,9 +5058,16 @@
             "title": "Agent Speaks First",
             "default": true
           },
-          "language": {
-            "$ref": "#/components/schemas/Language",
-            "default": "en"
+          "languages": {
+            "items": {
+              "$ref": "#/components/schemas/AgentLanguage"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Languages",
+            "default": [
+              "en-US"
+            ]
           },
           "brief": {
             "type": "string",
@@ -5157,9 +5164,16 @@
             "title": "Agent Speaks First",
             "default": true
           },
-          "language": {
-            "$ref": "#/components/schemas/Language",
-            "default": "en"
+          "languages": {
+            "items": {
+              "$ref": "#/components/schemas/AgentLanguage"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Languages",
+            "default": [
+              "en-US"
+            ]
           },
           "brief": {
             "type": "string",
@@ -5272,8 +5286,23 @@
             ],
             "title": "External Id"
           },
-          "language": {
-            "$ref": "#/components/schemas/Language"
+          "languages": {
+            "items": {
+              "$ref": "#/components/schemas/AgentLanguage"
+            },
+            "type": "array",
+            "title": "Languages"
+          },
+          "language_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Language Note"
           },
           "config": {
             "type": "string",
@@ -5285,7 +5314,7 @@
           "provider",
           "name",
           "external_id",
-          "language",
+          "languages",
           "config"
         ],
         "title": "AgentDraft",
@@ -5303,6 +5332,18 @@
           "content"
         ],
         "title": "AgentFile"
+      },
+      "AgentLanguage": {
+        "type": "string",
+        "enum": [
+          "en-US",
+          "en-IN",
+          "en-GB",
+          "en-AU",
+          "hi"
+        ],
+        "title": "AgentLanguage",
+        "description": "A language an agent serves. English carries its region, as the agent's own settings\ngive it."
       },
       "AgentRead": {
         "properties": {
@@ -5360,8 +5401,12 @@
             "type": "boolean",
             "title": "Agent Speaks First"
           },
-          "language": {
-            "$ref": "#/components/schemas/Language"
+          "languages": {
+            "items": {
+              "$ref": "#/components/schemas/AgentLanguage"
+            },
+            "type": "array",
+            "title": "Languages"
           },
           "brief": {
             "type": "string",
@@ -5433,7 +5478,7 @@
           "agent_number",
           "outbound",
           "agent_speaks_first",
-          "language",
+          "languages",
           "brief",
           "current_version",
           "created_at",
@@ -5513,8 +5558,12 @@
             "type": "boolean",
             "title": "Agent Speaks First"
           },
-          "language": {
-            "$ref": "#/components/schemas/Language"
+          "languages": {
+            "items": {
+              "$ref": "#/components/schemas/AgentLanguage"
+            },
+            "type": "array",
+            "title": "Languages"
           },
           "brief": {
             "type": "string",
@@ -5546,7 +5595,7 @@
           "agent_number",
           "outbound",
           "agent_speaks_first",
-          "language",
+          "languages",
           "brief",
           "current_version",
           "created_at",
@@ -5633,15 +5682,20 @@
             ],
             "title": "Agent Speaks First"
           },
-          "language": {
+          "languages": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/Language"
+                "items": {
+                  "$ref": "#/components/schemas/AgentLanguage"
+                },
+                "type": "array",
+                "minItems": 1
               },
               {
                 "type": "null"
               }
-            ]
+            ],
+            "title": "Languages"
           },
           "brief": {
             "anyOf": [
@@ -8160,7 +8214,8 @@
           "en",
           "hi"
         ],
-        "title": "Language"
+        "title": "Language",
+        "description": "A language a caller speaks."
       },
       "LatencySummary": {
         "properties": {
@@ -9680,8 +9735,23 @@
             "type": "string",
             "title": "External Id"
           },
-          "language": {
-            "$ref": "#/components/schemas/Language"
+          "languages": {
+            "items": {
+              "$ref": "#/components/schemas/AgentLanguage"
+            },
+            "type": "array",
+            "title": "Languages"
+          },
+          "language_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Language Note"
           },
           "config": {
             "type": "string",
@@ -9728,7 +9798,7 @@
         "required": [
           "name",
           "external_id",
-          "language",
+          "languages",
           "config",
           "direction",
           "agent_numbers",
