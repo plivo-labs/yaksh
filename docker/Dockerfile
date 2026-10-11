@@ -1,9 +1,7 @@
-# syntax=docker/dockerfile:1
-
 FROM oven/bun:1.3.9-slim AS frontend
 WORKDIR /build
 COPY frontend/package.json frontend/bun.lock ./
-RUN --mount=type=cache,target=/root/.bun/install/cache bun install --frozen-lockfile
+RUN bun install --frozen-lockfile
 COPY frontend/ ./
 RUN bun run build
 
@@ -11,16 +9,14 @@ FROM python:3.14-slim-trixie AS backend
 COPY --from=ghcr.io/astral-sh/uv:0.12.15 /uv /uvx /bin/
 ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy UV_PYTHON_DOWNLOADS=0
 WORKDIR /app
-RUN --mount=type=cache,target=/root/.cache/uv \
-    --mount=type=bind,source=uv.lock,target=uv.lock \
-    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
-    uv sync --locked --no-dev --no-install-project
-COPY pyproject.toml uv.lock README.md LICENSE ./
+COPY pyproject.toml uv.lock ./
+RUN uv sync --locked --no-dev --no-install-project
+COPY README.md LICENSE ./
 COPY src ./src
-RUN --mount=type=cache,target=/root/.cache/uv uv sync --locked --no-dev --no-editable
+RUN uv sync --locked --no-dev --no-editable
 
 FROM backend AS dev
-RUN --mount=type=cache,target=/root/.cache/uv uv sync --locked
+RUN uv sync --locked
 ENV PATH="/app/.venv/bin:$PATH" YAKSHA_API_HOST=0.0.0.0
 CMD ["yaksha-server", "api", "--reload"]
 
