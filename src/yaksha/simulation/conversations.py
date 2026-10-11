@@ -361,6 +361,8 @@ async def call_request(
         agent_data=scenario.agent_data,
         accept_calls_until=conversation.dial_deadline_at,
         app_settings=app,
+        caller=scenario.caller or app.caller,
+        scenario_model=scenario.caller is not None,
     )
 
 

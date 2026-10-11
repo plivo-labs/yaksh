@@ -20,6 +20,7 @@ REQUEST = CallRequest(
     caller_number="+15550100000",
     max_duration_s=10,
     app_settings=APP_SETTINGS,
+    caller=APP_SETTINGS.caller,
 )
 
 

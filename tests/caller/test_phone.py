@@ -147,6 +147,7 @@ def request() -> CallRequest:
         caller_number=POOL_NUMBER,
         max_duration_s=120,
         app_settings=CALL_SETTINGS,
+        caller=CALL_SETTINGS.caller,
     )
 
 
@@ -429,6 +430,7 @@ def outbound_request(window_s: float = 5) -> CallRequest:
         max_duration_s=120,
         accept_calls_until=datetime.now(UTC) + timedelta(seconds=window_s),
         app_settings=CALL_SETTINGS,
+        caller=CALL_SETTINGS.caller,
     )
 
 

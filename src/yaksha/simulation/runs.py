@@ -1,7 +1,8 @@
+import asyncio
 import statistics
 import uuid
 from collections import defaultdict
-from collections.abc import Sequence
+from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import asdict, fields
 from datetime import datetime
 from typing import Any
@@ -13,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
 from yaksha.config import Settings
-from yaksha.db.models import Agent, Conversation, Persona, Run, Scenario
+from yaksha.db.models import Agent, Conversation, Persona, Run, Scenario, ScenarioVersion
 from yaksha.domain.conversations import (
     ACTIVE_STATUSES,
     LIVE_STATUSES,
@@ -31,7 +32,8 @@ from yaksha.domain.runs import (
     run_status,
     waiting_reason,
 )
-from yaksha.domain.settings import AppSettings, Limits
+from yaksha.domain.scenarios import ScenarioConfig
+from yaksha.domain.settings import AppSettings, CallerModel, Limits
 from yaksha.domain.surroundings import Surroundings
 from yaksha.simulation.agents import get_agent
 from yaksha.simulation.starts import Inputs, snapshot
@@ -91,12 +93,51 @@ def check_limits(limits: Limits, command: RunCreate) -> None:
         )
 
 
+CallerCheck = Callable[[CallerModel], Awaitable[str | None]]
+"""Asks the LLM provider to serve a caller model; returns why it refused, or None."""
+CALLER_CHECKS_AT_ONCE = 4
+
+
+async def refuse_unserved_callers(
+    session: AsyncSession, check: CallerCheck, inputs: Sequence[Inputs]
+) -> None:
+    """Refuses the run when the provider refuses a caller model that a pinned scenario version
+    chooses, naming those scenarios."""
+    chosen: dict[CallerModel, list[str]] = defaultdict(list)
+    rows = await session.execute(
+        select(Scenario.name, ScenarioVersion.config)
+        .join(Scenario, Scenario.id == ScenarioVersion.scenario_id)
+        .where(ScenarioVersion.id.in_({item.scenario_version_id for item in inputs}))
+        .order_by(Scenario.name)
+    )
+    for name, config in rows.tuples():
+        caller = ScenarioConfig.model_validate(config).caller
+        if caller is not None:
+            chosen[caller].append(name)
+    slots = asyncio.Semaphore(CALLER_CHECKS_AT_ONCE)
+
+    async def bounded(caller: CallerModel) -> str | None:
+        async with slots:
+            return await check(caller)
+
+    reasons = await asyncio.gather(*(bounded(caller) for caller in chosen))
+    refused = [
+        f"{', '.join(f'"{name}"' for name in names)}: the LLM provider refused its caller "
+        f"model: {reason}"
+        for names, reason in zip(chosen.values(), reasons, strict=True)
+        if reason is not None
+    ]
+    if refused:
+        raise ValidationError("; ".join(refused))
+
+
 async def create_run(
     session: AsyncSession,
     settings: Settings,
     app: AppSettings,
     command: RunCreate,
     request_key: str | None,
+    check_caller: CallerCheck | None = None,
 ) -> Run:
     """Start a conversation for each repeat of each scenario and persona pair, all of them or
     none, in the order repeat, then scenario, then persona. A repeated request with the same
@@ -116,6 +157,8 @@ async def create_run(
         await session.commit()
         return earlier
     inputs = await snapshot(session, settings, app, agent, command.scenarios)
+    if check_caller is not None:
+        await refuse_unserved_callers(session, check_caller, inputs)
     run = Run(
         agent_id=agent.id,
         agent_version_id=inputs[0].agent_version_id,

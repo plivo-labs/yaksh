@@ -13,7 +13,9 @@ from yaksha.db.models import Run
 from yaksha.domain.evaluations import RunMetrics
 from yaksha.domain.latency import pooled
 from yaksha.domain.runs import RunCreate, RunStatus
+from yaksha.domain.settings import AppSettings, CallerModel
 from yaksha.evaluation import results
+from yaksha.integrations import provider_checks
 from yaksha.simulation import conversations, runs
 
 router = APIRouter(prefix="/runs", tags=["runs"], dependencies=[Depends(require_token)])
@@ -41,6 +43,25 @@ async def detail(session: AsyncSession, run: Run) -> RunRead:
     return RunRead(**base.model_dump(), scenarios=await runs.run_scenarios(session, run))
 
 
+def caller_check(app: AppSettings) -> runs.CallerCheck | None:
+    """One short answer from a caller model with its effort; None without an LLM key, when the
+    run's own checks refuse the run."""
+    key = app.secrets.llm_api_key
+    if key is None:
+        return None
+
+    async def check(caller: CallerModel) -> str | None:
+        try:
+            await provider_checks.check_llm(
+                app.llm.base_url, key.get_secret_value(), caller.model, caller.reasoning_effort
+            )
+        except provider_checks.ProviderCheckError as error:
+            return str(error)
+        return None
+
+    return check
+
+
 @router.post("", status_code=status.HTTP_202_ACCEPTED)
 async def create_run(
     command: RunCreate,
@@ -49,7 +70,7 @@ async def create_run(
     app: AppSettingsDep,
     idempotency_key: Annotated[str | None, Header(min_length=1, max_length=200)] = None,
 ) -> RunSummary:
-    run = await runs.create_run(session, settings, app, command, idempotency_key)
+    run = await runs.create_run(session, settings, app, command, idempotency_key, caller_check(app))
     return (await summaries(session, [run]))[0]
 
 

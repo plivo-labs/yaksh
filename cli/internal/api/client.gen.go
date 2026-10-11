@@ -2358,17 +2358,19 @@ type RunVerdicts struct {
 // criteria never do: they are what the agent must say or do on the call. Agent data goes only
 // to the agent, in an outbound agent's trigger.
 type ScenarioConfig struct {
-	AgentData    *[]Fact   `json:"agent_data,omitempty"`
-	Criteria     []string  `json:"criteria"`
-	FirstWords   *string   `json:"first_words,omitempty"`
-	Instructions string    `json:"instructions"`
-	KnownFacts   *[]Fact   `json:"known_facts,omitempty"`
-	UnknownFacts *[]string `json:"unknown_facts,omitempty"`
+	AgentData    *[]Fact      `json:"agent_data,omitempty"`
+	Caller       *CallerModel `json:"caller,omitempty"`
+	Criteria     []string     `json:"criteria"`
+	FirstWords   *string      `json:"first_words,omitempty"`
+	Instructions string       `json:"instructions"`
+	KnownFacts   *[]Fact      `json:"known_facts,omitempty"`
+	UnknownFacts *[]string    `json:"unknown_facts,omitempty"`
 }
 
 // ScenarioCreate defines model for ScenarioCreate.
 type ScenarioCreate struct {
-	AgentData *[]Fact `json:"agent_data,omitempty"`
+	AgentData *[]Fact      `json:"agent_data,omitempty"`
+	Caller    *CallerModel `json:"caller,omitempty"`
 
 	// Category What kind of situation a scenario tests. How the caller talks comes from the persona.
 	Category     *Category          `json:"category,omitempty"`
@@ -2391,6 +2393,7 @@ type ScenarioDelete struct {
 type ScenarioRead struct {
 	AgentData []Fact             `json:"agent_data"`
 	AgentId   openapi_types.UUID `json:"agent_id"`
+	Caller    *CallerModel       `json:"caller"`
 
 	// Category What kind of situation a scenario tests. How the caller talks comes from the persona.
 	Category       Category            `json:"category"`
@@ -2412,6 +2415,7 @@ type ScenarioRead struct {
 // ScenarioUpdate A partial change; lists replace the stored list as a whole.
 type ScenarioUpdate struct {
 	AgentData    *[]Fact             `json:"agent_data,omitempty"`
+	Caller       *CallerModel        `json:"caller,omitempty"`
 	Category     *Category           `json:"category,omitempty"`
 	Criteria     *[]string           `json:"criteria,omitempty"`
 	Description  *string             `json:"description,omitempty"`
