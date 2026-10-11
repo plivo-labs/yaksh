@@ -39,7 +39,7 @@ Each install must have its own Plivo Application and its own numbers.
 
 1. Make a Plivo Application. Set the answer URL to `<YAKSHA_PUBLIC_URL>/incoming` and the hangup URL to `<YAKSHA_PUBLIC_URL>/incoming/hangup`. Set both methods to `POST`.
 2. Set `YAKSHA_PLIVO_APP_ID` to the ID of the Application.
-3. Set `YAKSHA_PLIVO_NUMBERS` to the numbers of this install.
+3. Set `YAKSHA_PLIVO_NUMBERS` to the numbers of this install. Without it, the worker uses all voice numbers of the account.
 
 A Plivo number has only one Application at a time. Thus, two installs must not use the same numbers.
 
@@ -55,6 +55,9 @@ We recommend this option. Use `docker/compose.yaml`. It operates Postgres and Se
 
 We did tests of Yaksha on Railway.
 
+- Make the api, the worker and the evaluator from the repository with `docker/Dockerfile`. Use the start commands `yaksha-server api`, `yaksha-server worker` and `yaksha-server evaluator`.
+- Set `PORT` on the api and the worker to the port of their public domain: 8000 and 8770.
+- Set `YAKSHA_DATABASE_URL` to `${{Postgres.DATABASE_URL}}`.
 - On the worker, set `RAILWAY_DEPLOYMENT_DRAINING_SECONDS=210`. With the default of 0, Railway stops the worker before it saves the results.
 - Railway starts the new worker before it stops the old worker. Calls that start during a deploy can fail.
-- The outbound IP changes on each deploy, unless the service has a Static Outbound IP. A Static Outbound IP costs money. This is important for an IP whitelist.
+- The outbound IP can change on a deploy, unless the service has a Static Outbound IP. A Static Outbound IP costs money. This is important for an IP whitelist.
