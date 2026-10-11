@@ -22,6 +22,7 @@ from yaksha.api.schemas.settings import (
 )
 from yaksha.domain.errors import UnavailableError, ValidationError
 from yaksha.domain.settings import (
+    KEY_URLS,
     TRIGGER_SECRET,
     TRIGGER_SECRET_NAME,
     AppSettings,
@@ -69,9 +70,15 @@ async def put_secret(
     cipher: CipherDep,
 ) -> SettingsRead:
     """Check the key with its provider, then save it. A key the provider refuses is not
-    saved."""
+    saved. A key sent with a new address is checked at that address and saved with it."""
+    values = None
+    if secret.url is not None:
+        if name not in KEY_URLS:
+            raise ValidationError(f"{name} has no address")
+        section, field = KEY_URLS[name]
+        values = {section: {field: secret.url}}
     return SettingsRead.of(
-        await checked_change(settings, session, cipher, secrets={name: secret.value})
+        await checked_change(settings, session, cipher, values=values, secrets={name: secret.value})
     )
 
 

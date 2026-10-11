@@ -2461,7 +2461,8 @@ type SecretState struct {
 
 // SecretWrite defines model for SecretWrite.
 type SecretWrite struct {
-	Value string `json:"value"`
+	Url   *string `json:"url,omitempty"`
+	Value string  `json:"value"`
 }
 
 // SettingsImport defines model for SettingsImport.
@@ -4279,7 +4280,7 @@ type ClientInterface interface {
 	// PutSecretApiV1SettingsSecretsNamePutWithBody Put Secret
 	//
 	// Check the key with its provider, then save it. A key the provider refuses is not
-	// saved.
+	// saved. A key sent with a new address is checked at that address and saved with it.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -4289,7 +4290,7 @@ type ClientInterface interface {
 	// PutSecretApiV1SettingsSecretsNamePut Put Secret
 	//
 	// Check the key with its provider, then save it. A key the provider refuses is not
-	// saved.
+	// saved. A key sent with a new address is checked at that address and saved with it.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -6277,7 +6278,7 @@ func (c *Client) DeleteSecretApiV1SettingsSecretsNameDelete(ctx context.Context,
 // PutSecretApiV1SettingsSecretsNamePutWithBody Put Secret
 //
 // Check the key with its provider, then save it. A key the provider refuses is not
-// saved.
+// saved. A key sent with a new address is checked at that address and saved with it.
 //
 // Takes any type of body and a specified content type.
 //
@@ -6297,7 +6298,7 @@ func (c *Client) PutSecretApiV1SettingsSecretsNamePutWithBody(ctx context.Contex
 // PutSecretApiV1SettingsSecretsNamePut Put Secret
 //
 // Check the key with its provider, then save it. A key the provider refuses is not
-// saved.
+// saved. A key sent with a new address is checked at that address and saved with it.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -11519,7 +11520,7 @@ type ClientWithResponsesInterface interface {
 	// PutSecretApiV1SettingsSecretsNamePutWithBodyWithResponse Put Secret
 	//
 	// Check the key with its provider, then save it. A key the provider refuses is not
-	// saved.
+	// saved. A key sent with a new address is checked at that address and saved with it.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -11529,7 +11530,7 @@ type ClientWithResponsesInterface interface {
 	// PutSecretApiV1SettingsSecretsNamePutWithResponse Put Secret
 	//
 	// Check the key with its provider, then save it. A key the provider refuses is not
-	// saved.
+	// saved. A key sent with a new address is checked at that address and saved with it.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -17612,7 +17613,7 @@ func (c *ClientWithResponses) DeleteSecretApiV1SettingsSecretsNameDeleteWithResp
 // PutSecretApiV1SettingsSecretsNamePutWithBodyWithResponse Put Secret
 //
 // Check the key with its provider, then save it. A key the provider refuses is not
-// saved.
+// saved. A key sent with a new address is checked at that address and saved with it.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -17628,7 +17629,7 @@ func (c *ClientWithResponses) PutSecretApiV1SettingsSecretsNamePutWithBodyWithRe
 // PutSecretApiV1SettingsSecretsNamePutWithResponse Put Secret
 //
 // Check the key with its provider, then save it. A key the provider refuses is not
-// saved.
+// saved. A key sent with a new address is checked at that address and saved with it.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //

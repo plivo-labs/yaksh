@@ -4058,7 +4058,7 @@
           "settings"
         ],
         "summary": "Put Secret",
-        "description": "Check the key with its provider, then save it. A key the provider refuses is not\nsaved.",
+        "description": "Check the key with its provider, then save it. A key the provider refuses is not\nsaved. A key sent with a new address is checked at that address and saved with it.",
         "operationId": "put_secret_api_v1_settings_secrets__name__put",
         "security": [
           {
@@ -11755,6 +11755,18 @@
             "maxLength": 4000,
             "minLength": 1,
             "title": "Value"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^https?://\\S+$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
           }
         },
         "type": "object",

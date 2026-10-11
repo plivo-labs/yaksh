@@ -955,8 +955,8 @@ export function useSaveSettingsValues() {
 export function useSaveSecret() {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: ({ name, value }: { name: SecretName; value: string }) =>
-      api<AppSettings>(`/settings/secrets/${name}`, { method: "PUT", json: { value } }),
+    mutationFn: ({ name, value, url }: { name: SecretName; value: string; url?: string }) =>
+      api<AppSettings>(`/settings/secrets/${name}`, { method: "PUT", json: { value, url } }),
     onSuccess: (settings) => settingsChanged(client, settings),
   });
 }
