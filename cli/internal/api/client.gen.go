@@ -2080,6 +2080,7 @@ type ProviderDraft struct {
 	ExternalId       string             `json:"external_id"`
 	Language         Language           `json:"language"`
 	Name             *string            `json:"name"`
+	NumberNote       *string            `json:"number_note,omitempty"`
 	StartRequest     *StartRequestDraft `json:"start_request"`
 }
 

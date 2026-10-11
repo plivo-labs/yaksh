@@ -86,8 +86,15 @@ async def import_flow(api: PlivoCxAccountApi, flow_id: uuid.UUID) -> ProviderDra
         start_request=None,
     )
     if "call" in triggers:
-        with plivo_errors():
+        try:
             numbers = await flow_numbers(api, flow_id)
+        except (ProviderCallError, ValueError) as error:
+            why = refusal(error, missing="Plivo answered with status 404")
+            note = f"Yaksha could not look up its number. {why}"
+            return draft.model_copy(update={"number_note": note})
+        if not numbers:
+            note = "No Plivo number sends calls to this agent. Link one to it in Plivo CX"
+            return draft.model_copy(update={"number_note": note})
         return draft.model_copy(update={"agent_numbers": numbers})
     if "http" in triggers:
         request = start_request(api, flow_id, start_model(flow))
@@ -179,31 +186,47 @@ def filled(payload_format: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+IP_NOT_WHITELISTED = re.compile(r"\bIP (\S+?),? which is not in the IP whitelist")
+MAX_REASON_CHARS = 200
+
+
+def refusal(
+    error: ProviderCallError | ValueError, *, missing: str = "Plivo has no agent flow with this ID in the account"
+) -> ValidationError | NotFoundError | UnavailableError:
+    """What a failed Plivo call means for the person: a ValueError is a reply that is not JSON.
+    A 403 shows Plivo's own reason, cut short; any other status shows only the status, never
+    Plivo's reply. `missing` is what a 404 means for the call."""
+    if isinstance(error, ValueError):
+        return UnavailableError("Plivo answered with something that is not JSON")
+    match error.status:
+        case 401:
+            return ValidationError("Plivo refused the Auth ID and Auth token")
+        case 403:
+            reason = (error.reason or "")[:MAX_REASON_CHARS]
+            found = IP_NOT_WHITELISTED.search(reason)
+            if found:
+                return ValidationError(
+                    f"Plivo blocked the request: IP {found.group(1)} is not in this account's IP "
+                    "whitelist. Add it in the Plivo console, then try again"
+                )
+            if reason:
+                return ValidationError(f"Plivo refused the request: {reason}")
+            return ValidationError("Plivo refused the request")
+        case 404:
+            return NotFoundError(missing)
+        case 429:
+            return UnavailableError(
+                "Plivo allows 60 requests a minute; wait a minute, then try again"
+            )
+        case None:
+            return UnavailableError("Yaksha could not reach Plivo; try again later")
+        case status:
+            return UnavailableError(f"Plivo answered with status {status}; try again later")
+
+
 @contextmanager
 def plivo_errors() -> Generator[None]:
     try:
         yield
-    except ProviderCallError as error:
-        match error.status:
-            case 401:
-                raise ValidationError("Plivo refused the Auth ID and Auth token") from None
-            case 403:
-                raise ValidationError(
-                    "Plivo refused this account: use the main account's Auth ID and Auth token, "
-                    "not a subaccount's"
-                ) from None
-            case 404:
-                raise NotFoundError("Plivo has no agent flow with this ID in the account") from None
-            case 429:
-                raise UnavailableError(
-                    "Plivo allows 60 requests a minute; wait a minute, then try again"
-                ) from None
-            case None:
-                raise UnavailableError("Yaksha could not reach Plivo; try again later") from None
-            case status:
-                # Plivo's reply stays out of the message: the client sees only its status.
-                raise UnavailableError(
-                    f"Plivo answered with status {status}; try again later"
-                ) from None
-    except ValueError:
-        raise UnavailableError("Plivo answered with something that is not JSON") from None
+    except (ProviderCallError, ValueError) as error:
+        raise refusal(error) from None

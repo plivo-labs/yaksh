@@ -9646,6 +9646,17 @@
             "type": "boolean",
             "title": "Agent Speaks First",
             "default": true
+          },
+          "number_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Number Note"
           }
         },
         "type": "object",

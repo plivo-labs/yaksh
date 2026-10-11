@@ -24,6 +24,18 @@ class PlivoError(ProviderCallError):
     pass
 
 
+def plivo_reason(body: str) -> str | None:
+    """The text of the error field of Plivo's reply, when it is text."""
+    try:
+        reply = json.loads(body)
+    except ValueError:
+        return None
+    reason = reply.get("error") if isinstance(reply, dict) else None
+    if not isinstance(reason, str):
+        return None
+    return reason.strip() or None
+
+
 @dataclass(frozen=True)
 class OutboundCall:
     from_number: str
@@ -92,6 +104,7 @@ class PlivoApi:
                             raise PlivoError(
                                 f"listing numbers failed with {response.status}: {body}",
                                 status=response.status,
+                                reason=plivo_reason(body),
                             )
                     page = json.loads(body)
                     numbers.extend(account_numbers(page.get("objects") or []))
@@ -148,7 +161,9 @@ class PlivoApi:
             raise PlivoError(f"{doing} did not reach Plivo: {describe_exception(error)}") from error
         if response.status >= 400:
             raise PlivoError(
-                f"{doing} failed with {response.status}: {body}", status=response.status
+                f"{doing} failed with {response.status}: {body}",
+                status=response.status,
+                reason=plivo_reason(body),
             )
         return body
 
