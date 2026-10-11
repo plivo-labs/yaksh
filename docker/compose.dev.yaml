@@ -40,6 +40,12 @@ services:
     # Must exceed the worker's drain bound: Worker._execute_bound plus its
     # cancel wait plus bounded_dispose, about 180 s at the default end timeout.
     stop_grace_period: 210s
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import os, urllib.request; urllib.request.urlopen(f"http://127.0.0.1:{os.environ.get('PORT', '8770')}/health")
 
   evaluator:
     <<: *yaksha

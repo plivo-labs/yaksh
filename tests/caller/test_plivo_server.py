@@ -8,6 +8,7 @@ import websockets
 from httpx import ASGITransport, AsyncClient, Response
 
 from tests.conftest import PLIVO_TOKEN, plivo_signed, refuse_calls
+from yaksha import __version__
 from yaksha.caller.plivo_server import (
     HANGUP_XML,
     NO_CALL,
@@ -274,3 +275,16 @@ async def test_without_a_saved_auth_token_even_a_signed_request_is_refused() -> 
 
     assert (before.status_code, after.status_code) == (403, 200)
     assert entry.callbacks.qsize() == 1
+
+
+async def test_health_answers_without_a_signature_or_a_saved_auth_token() -> None:
+    async with AsyncClient(
+        transport=ASGITransport(
+            app=create_app(StreamRegistry(), PUBLIC_URL, lambda: None, refuse_calls)
+        ),
+        base_url="http://worker",
+    ) as client:
+        response = await client.get("/health")
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "ok", "version": __version__}
