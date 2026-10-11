@@ -58,7 +58,7 @@ from yaksha.domain.conversations import (
 )
 from yaksha.domain.languages import Language
 from yaksha.domain.latency import VAD_CONFIDENCE, VAD_START_S, VAD_STOP_S
-from yaksha.domain.settings import AppSettings
+from yaksha.domain.settings import AppSettings, CallerModel
 from yaksha.integrations import elevenlabs
 
 log = logging.getLogger(__name__)
@@ -125,17 +125,17 @@ def caller_keys(settings: AppSettings) -> CallerKeys:
 
 
 def llm_service(
-    settings: AppSettings, keys: CallerKeys, instructions: str
+    settings: AppSettings, caller: CallerModel, keys: CallerKeys, instructions: str
 ) -> OpenAIResponsesHttpLLMService:
     """The persona's model over the Responses API. With no effort configured, Pipecat asks a
     reasoning model that accepts it for effort none, for the fastest first word; other models
     get no effort. A reply calls at most one tool, so it can end the call only once."""
-    effort = settings.caller.reasoning_effort
+    effort = caller.reasoning_effort
     return OpenAIResponsesHttpLLMService(
         api_key=keys.llm,
         base_url=settings.llm.base_url,
         settings=OpenAIResponsesHttpLLMService.Settings(
-            model=settings.caller.model,
+            model=caller.model,
             system_instruction=instructions,
             reasoning=OpenAIResponsesHttpLLMService.ReasoningConfig(effort=effort)
             if effort
@@ -316,10 +316,11 @@ class Persona:
         observers: Sequence[BaseObserver] = (),
     ) -> None:
         settings = request.app_settings
-        self.llm = llm_service(settings, keys, request.instructions)
+        self.llm = llm_service(settings, request.caller, keys, request.instructions)
         self.settings = CallerSettings(
-            llm_model=settings.caller.model,
-            reasoning_effort=settings.caller.reasoning_effort,
+            llm_model=request.caller.model,
+            reasoning_effort=request.caller.reasoning_effort,
+            scenario_model=request.scenario_model,
             stt_model=settings.deepgram.model,
             tts_model=elevenlabs.MODEL,
             voice=request.voice,

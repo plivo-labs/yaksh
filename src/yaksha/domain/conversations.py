@@ -10,7 +10,7 @@ from yaksha.domain.agents import AgentConfig
 from yaksha.domain.languages import Language
 from yaksha.domain.latency import AgentMedia, CallerReplyWindow, LoopLag
 from yaksha.domain.scenarios import Fact
-from yaksha.domain.settings import AppSettings
+from yaksha.domain.settings import AppSettings, CallerModel
 from yaksha.domain.surroundings import SoundPlan
 from yaksha.domain.voices import VoiceSettings
 
@@ -204,6 +204,8 @@ class CallerSettings(BaseModel):
     reasoning_effort: str | None
     """The effort configured for the caller's model; None leaves it to Pipecat, which asks a
     reasoning model that accepts it for none."""
+    scenario_model: bool = False
+    """The scenario chose the model and effort, not the settings."""
     stt_model: str
     tts_model: str
     voice: VoiceSettings
@@ -267,6 +269,9 @@ class CallRequest(BaseModel):
     """Outbound: when the window for the agent's call closes."""
     app_settings: AppSettings
     """The settings when the call started; a change during the call does not reach it."""
+    caller: CallerModel
+    """The caller's model: the scenario's, else the settings'."""
+    scenario_model: bool = False
 
 
 class CallOutcome(BaseModel):

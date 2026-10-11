@@ -592,7 +592,10 @@ function ScenarioRow({
           <Badge variant={CATEGORY_BADGE[scenario.category]} className="shrink-0">
             {CATEGORY_LABELS[scenario.category]}
           </Badge>
-          <span className="truncate">{persona}</span>
+          <span className="truncate">
+            {persona}
+            {scenario.caller && ` · ${scenario.caller.model}`}
+          </span>
         </span>
       </button>
     </li>
@@ -646,6 +649,12 @@ function ScenarioDetail({
       </header>
       <dl className="grid grid-cols-2 gap-x-8 gap-y-6 px-6 py-5">
         <Section label="Persona">{persona}</Section>
+        {scenario.caller && (
+          <Section label="Caller model">
+            {scenario.caller.model}
+            {scenario.caller.reasoning_effort && `, ${scenario.caller.reasoning_effort} effort`}
+          </Section>
+        )}
         <Section label="First words">
           {scenario.first_words ?? (
             <span className="text-muted-foreground">The default for the persona's language</span>

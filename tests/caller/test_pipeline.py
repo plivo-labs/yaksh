@@ -114,7 +114,8 @@ async def test_the_persona_asks_the_responses_api_with_reasoning_off_unless_conf
 ) -> None:
     base, fake = provider
     settings = model_settings(base, model, effort)
-    llm = llm_service(settings, CallerKeys(llm="test", deepgram="", elevenlabs=""), "Be a caller.")
+    keys = CallerKeys(llm="test", deepgram="", elevenlabs="")
+    llm = llm_service(settings, settings.caller, keys, "Be a caller.")
 
     await llm.run_inference(LLMContext(messages=[{"role": "user", "content": "Hello."}]))
 

@@ -4,6 +4,8 @@ import { toast } from "sonner";
 
 import { DeleteConfirm, DiscardConfirm } from "@/components/confirm-dialogs";
 import { CopyId } from "@/components/copy-id";
+import { EffortSelect } from "@/components/effort-select";
+import { ModelCombobox } from "@/components/model-combobox";
 import { Fact } from "@/components/panel";
 import { PersonaSelect } from "@/components/persona-select";
 import { Button } from "@/components/ui/button";
@@ -36,10 +38,17 @@ import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { useCloseGuard } from "@/hooks/use-close-guard";
 import { revealErrors } from "@/lib/forms";
-import { useDefaults, useDeleteScenario, usePersonas, useSaveScenario } from "@/lib/queries";
+import {
+  useDefaults,
+  useDeleteScenario,
+  usePersonas,
+  useSaveScenario,
+  useSettings,
+} from "@/lib/queries";
 import {
   type AgentSummary,
   CATEGORY_ITEMS,
+  type CallerModel,
   type Category,
   type Fact as ScenarioFact,
   type Scenario,
@@ -57,6 +66,7 @@ const EMPTY: ScenarioInput = {
   criteria: [""],
   agent_data: [],
   first_words: null,
+  caller: null,
 };
 
 function toDraft(scenario: Scenario): ScenarioInput {
@@ -71,6 +81,7 @@ function toDraft(scenario: Scenario): ScenarioInput {
     criteria: scenario.criteria,
     agent_data: scenario.agent_data,
     first_words: scenario.first_words,
+    caller: scenario.caller,
   };
 }
 
@@ -93,6 +104,7 @@ function toInput(draft: ScenarioInput): ScenarioInput {
     criteria: draft.criteria.map((text) => text.trim()).filter(Boolean),
     agent_data: trimFacts(draft.agent_data),
     first_words: draft.first_words?.trim() || null,
+    caller: draft.caller,
   };
 }
 
@@ -486,6 +498,11 @@ export function ScenarioDialog({
                 Add criterion
               </AddRow>
             </FieldSet>
+
+            <CallerModelField
+              value={draft.caller}
+              onChange={(caller) => change(() => ({ caller }))}
+            />
           </FieldGroup>
         </form>
 
@@ -522,5 +539,94 @@ export function ScenarioDialog({
         <DiscardConfirm subject="scenario" {...guard.discard} />
       </DialogContent>
     </Dialog>
+  );
+}
+
+/** The caller's model for this scenario. Most scenarios keep the default, so it stays one line
+ * until changed. */
+function CallerModelField({
+  value,
+  onChange,
+}: {
+  value: CallerModel | null;
+  onChange: (caller: CallerModel | null) => void;
+}) {
+  const settings = useSettings();
+  const fallback = settings.data?.values.caller;
+  const [open, setOpen] = useState(value !== null);
+  const model = value?.model ?? fallback?.model;
+  if (!open || model === undefined) {
+    const shown = value ?? fallback;
+    return (
+      <div className="flex items-center gap-3 border-t pt-4">
+        <div className="grid min-w-0 flex-1 gap-0.5">
+          <span className="text-s-500">Caller model</span>
+          <span className="text-s-400 text-muted-foreground">
+            {!value && "Default"}
+            {shown &&
+              `${value ? "" : ": "}${shown.model}, ${shown.reasoning_effort ?? "no"} reasoning effort`}
+            {!shown && settings.isError && " (the settings did not load)"}
+          </span>
+        </div>
+        <Button
+          type="button"
+          variant="link"
+          size="sm"
+          disabled={model === undefined}
+          onClick={() => setOpen(true)}
+        >
+          Change
+        </Button>
+      </div>
+    );
+  }
+  return (
+    <FieldSet className="border-t pt-4">
+      <div className="flex items-baseline justify-between">
+        <FieldLegend variant="label">Caller model</FieldLegend>
+        <Button
+          type="button"
+          variant="link"
+          size="sm"
+          onClick={() => {
+            onChange(null);
+            setOpen(false);
+          }}
+        >
+          Use the default
+        </Button>
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field>
+          <FieldLabel htmlFor="scenario-caller-model">Model</FieldLabel>
+          <ModelCombobox
+            id="scenario-caller-model"
+            value={value?.model ?? null}
+            inherit={fallback?.model}
+            inheritName="Default"
+            onValueChange={(next) => {
+              if (next !== (value?.model ?? null)) {
+                onChange(next === null ? null : { model: next, reasoning_effort: null });
+              }
+            }}
+          />
+        </Field>
+        <Field>
+          <FieldLabel htmlFor="scenario-caller-effort">Reasoning effort</FieldLabel>
+          <EffortSelect
+            id="scenario-caller-effort"
+            model={model}
+            value={value ? value.reasoning_effort : (fallback?.reasoning_effort ?? null)}
+            onValueChange={(effort) => onChange({ model, reasoning_effort: effort })}
+            unset="none"
+            hidden={["none"]}
+          />
+        </Field>
+      </div>
+      <FieldDescription>
+        A stronger model follows long instructions better, but answers slower. A long pause can make
+        the agent ask if the caller is still there.
+      </FieldDescription>
+    </FieldSet>
   );
 }

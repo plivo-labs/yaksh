@@ -12,6 +12,8 @@ from pydantic import (
     model_validator,
 )
 
+from yaksha.domain.settings import CallerModel
+
 Instructions = Annotated[
     str, StringConstraints(strip_whitespace=True, min_length=1, max_length=4000)
 ]
@@ -68,6 +70,8 @@ class ScenarioConfig(BaseModel):
     first_words: FirstWords | None = None
     """What the caller says first when it speaks first, without its model; None says its
     language's opening."""
+    caller: CallerModel | None = None
+    """The caller's model and reasoning effort for this scenario; None uses the settings'."""
 
     @model_validator(mode="after")
     def names_and_criteria_are_distinct(self) -> ScenarioConfig:
@@ -124,6 +128,8 @@ class ScenarioUpdate(BaseModel):
     agent_data: list[Fact] | None = Field(default=None, max_length=MAX_FACTS)
     first_words: FirstWords | None = None
     """None clears it."""
+    caller: CallerModel | None = None
+    """None clears it: the scenario uses the settings' caller model."""
 
     @field_validator(
         "name",

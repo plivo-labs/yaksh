@@ -11197,6 +11197,16 @@
               }
             ],
             "title": "First Words"
+          },
+          "caller": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CallerModel"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "additionalProperties": false,
@@ -11265,6 +11275,16 @@
               }
             ],
             "title": "First Words"
+          },
+          "caller": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CallerModel"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "name": {
             "type": "string",
@@ -11415,6 +11435,16 @@
             ],
             "title": "First Words"
           },
+          "caller": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CallerModel"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "current_version": {
             "type": "integer",
             "title": "Current Version"
@@ -11445,6 +11475,7 @@
           "criteria",
           "agent_data",
           "first_words",
+          "caller",
           "current_version",
           "created_at",
           "updated_at"
@@ -11590,6 +11621,16 @@
               }
             ],
             "title": "First Words"
+          },
+          "caller": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CallerModel"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "additionalProperties": false,

@@ -3,24 +3,17 @@ import { type ReactNode, useEffect, useState } from "react";
 import { useSearchParams } from "react-router";
 import { toast } from "sonner";
 
+import { EffortSelect } from "@/components/effort-select";
 import { ModelCombobox } from "@/components/model-combobox";
 import { Panel, PanelHeader } from "@/components/panel";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RISE } from "@/lib/motion";
-import { useModelEfforts, useSaveSettingsValues, useSettings } from "@/lib/queries";
+import { useSaveSettingsValues, useSettings } from "@/lib/queries";
 import type { AppSettings, SettingsValues } from "@/lib/types";
 import { KeyRow, PlivoAccountRow, ProviderPanel, SettingRow } from "@/pages/settings-keys";
 import { ImportExport } from "@/pages/settings-import";
@@ -580,88 +573,4 @@ function keyRemovedBy(changed: unknown) {
   return changed ? (
     <span className="text-warning-foreground">Saving removes the saved key.</span>
   ) : undefined;
-}
-
-const UNSET = "unset";
-
-/** The reasoning efforts the model takes, as Yaksha checked them with the provider. `unset`
- * names what no effort means for this field. */
-function EffortSelect({
-  id,
-  model,
-  value,
-  onValueChange,
-  unset,
-  hidden = [],
-}: {
-  id: string;
-  model: string;
-  value: string | null;
-  onValueChange: (effort: string | null) => void;
-  unset: string;
-  hidden?: string[];
-}) {
-  const efforts = useModelEfforts(model);
-  if (efforts.isPending) {
-    return (
-      <span className="flex items-center gap-2 text-s-400 text-muted-foreground">
-        <Spinner /> Checking which efforts {model} takes
-      </span>
-    );
-  }
-  if (efforts.isError) {
-    return (
-      <span className="text-s-400">
-        {value ?? unset}
-        <span className="block text-xs-400 text-muted-foreground">
-          Can't check this model: {efforts.error.message}
-        </span>
-      </span>
-    );
-  }
-  const taken = efforts.data.efforts;
-  if (taken.length === 0) {
-    return (
-      <div className="flex flex-wrap items-center gap-2">
-        <Badge>This model has no reasoning</Badge>
-        {value !== null && (
-          <Button size="sm" variant="outline" onClick={() => onValueChange(null)}>
-            Send no effort
-          </Button>
-        )}
-      </div>
-    );
-  }
-  const items = [
-    { value: UNSET, label: unset },
-    ...taken
-      .filter((effort) => !hidden.includes(effort))
-      .map((effort) => ({ value: effort, label: effort })),
-  ];
-  const refused = value !== null && !taken.includes(value);
-  return (
-    <>
-      <Select
-        items={items}
-        value={value ?? UNSET}
-        onValueChange={(next) => next && onValueChange(next === UNSET ? null : next)}
-      >
-        <SelectTrigger id={id} className="w-56" aria-invalid={refused}>
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {items.map((item) => (
-            <SelectItem key={item.value} value={item.value}>
-              {item.label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-      {refused && (
-        <span className="text-xs-400 text-destructive">
-          {model} does not take {value}; choose another effort.
-        </span>
-      )}
-    </>
-  );
 }

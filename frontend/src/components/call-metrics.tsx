@@ -92,8 +92,10 @@ function Metrics({ found }: { found: ConversationEvaluation }) {
         )}
         {settings && (
           <Line label="Caller models">
-            Language model {settings.llm_model}, speech to text {settings.stt_model}, text to speech{" "}
-            {settings.tts_model}
+            Language model {settings.llm_model}
+            {settings.reasoning_effort && `, ${settings.reasoning_effort} effort`}
+            {settings.scenario_model && " (set by the scenario)"}, speech to text{" "}
+            {settings.stt_model}, text to speech {settings.tts_model}
           </Line>
         )}
         {consumed && (

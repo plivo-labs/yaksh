@@ -16,11 +16,14 @@ export function ModelCombobox({
   value,
   onValueChange,
   inherit,
+  inheritName = "Same as the caller",
 }: {
   id: string;
   value: string | null;
   onValueChange: (model: string | null) => void;
   inherit?: string;
+  /** What the inherited option is called, before the model it stands for. */
+  inheritName?: string;
 }) {
   const [opened, setOpened] = useState(false);
   const [query, setQuery] = useState("");
@@ -33,7 +36,7 @@ export function ModelCombobox({
     ...(value && !listed.includes(value) ? [value] : []),
     ...(typed && !listed.includes(typed) && typed !== value ? [typed] : []),
   ];
-  const label = (item: string) => (item === SAME ? `Same as the caller (${inherit})` : item);
+  const label = (item: string) => (item === SAME ? `${inheritName} (${inherit})` : item);
   return (
     <Combobox.Root
       items={items}

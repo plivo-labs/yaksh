@@ -6,6 +6,7 @@ from pydantic import BaseModel, ConfigDict
 from yaksha.db.models import Scenario, ScenarioGeneration
 from yaksha.domain.generation import GenerationMode, GenerationStatus
 from yaksha.domain.scenarios import Category, Fact, ScenarioConfig
+from yaksha.domain.settings import CallerModel
 from yaksha.simulation.scenarios import config_of
 
 
@@ -23,6 +24,7 @@ class ScenarioRead(BaseModel):
     criteria: list[str]
     agent_data: list[Fact]
     first_words: str | None
+    caller: CallerModel | None
     current_version: int
     created_at: datetime
     updated_at: datetime

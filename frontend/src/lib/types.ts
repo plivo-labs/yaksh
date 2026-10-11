@@ -603,6 +603,13 @@ export interface ScenarioConfig {
   agent_data: Fact[];
   /** What the caller says first when it speaks first; null says its language's opening. */
   first_words: string | null;
+  /** The caller's model for this scenario; null uses the settings' model. */
+  caller: CallerModel | null;
+}
+
+export interface CallerModel {
+  model: string;
+  reasoning_effort: string | null;
 }
 
 export type Category = "happy_path" | "messy_input" | "edge_case";
@@ -880,7 +887,14 @@ export type CaptureFaults =
   | { incomplete_record: true };
 
 export interface Usage {
-  settings: { llm_model: string; stt_model: string; tts_model: string } | null;
+  settings: {
+    llm_model: string;
+    reasoning_effort: string | null;
+    /** The scenario chose the model, not the settings. */
+    scenario_model: boolean;
+    stt_model: string;
+    tts_model: string;
+  } | null;
   usage: {
     llm_prompt_tokens: number | null;
     llm_completion_tokens: number | null;
@@ -1263,7 +1277,7 @@ export const LABEL_REASONS: { value: LabelReason; label: string; example: string
 export interface SettingsValues {
   llm: { base_url: string };
   deepgram: { base_url: string; model: string };
-  caller: { model: string; reasoning_effort: string | null };
+  caller: CallerModel;
   generation: { model: string | null; reasoning_effort: string | null; timeout_s: number };
   brief: { model: string; reasoning_effort: string | null; timeout_s: number };
   judges: {
