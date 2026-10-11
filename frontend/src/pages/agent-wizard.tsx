@@ -15,7 +15,7 @@ import { useDraftKnowledgeBase } from "@/hooks/use-knowledge-base";
 import { APPEAR, STEP_BACK, STEP_FORWARD } from "@/lib/motion";
 import { useSaveAgent } from "@/lib/queries";
 import { NEW_LLM, NEW_PHRASE, ruleProblems, toRules, withRule } from "@/lib/rules";
-import type { AgentRule } from "@/lib/types";
+import { type AgentRule, servedLanguages } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { useAgentDraft } from "@/hooks/use-agent-draft";
 import { useBriefDraft } from "@/hooks/use-brief-draft";
@@ -296,6 +296,7 @@ export function AgentWizardPage() {
               onChange={setRules}
               edit={ruleEdit}
               locked={saving}
+              multilingual={servedLanguages(form.draft.languages).size > 1}
               onEdit={(edit) => {
                 setRuleDraft(null);
                 setParam("rule", edit === null ? null : String(edit.index ?? edit.rule.kind));

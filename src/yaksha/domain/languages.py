@@ -6,6 +6,13 @@ class Language(StrEnum):
 
     EN = "en"
     HI = "hi"
+    BN = "bn"
+    GU = "gu"
+    KN = "kn"
+    MR = "mr"
+    TA = "ta"
+    TE = "te"
+    ES = "es"
 
 
 class AgentLanguage(StrEnum):
@@ -17,6 +24,13 @@ class AgentLanguage(StrEnum):
     EN_GB = "en-GB"
     EN_AU = "en-AU"
     HI = "hi"
+    BN = "bn"
+    GU = "gu"
+    KN = "kn"
+    MR = "mr"
+    TA = "ta"
+    TE = "te"
+    ES = "es"
 
     @property
     def language(self) -> Language:

@@ -46,7 +46,8 @@ class AutoNoise(BaseModel):
 
 
 class Speaker(BaseModel):
-    """A person who talks behind the caller, in the caller's language, from start_s on."""
+    """A person who talks behind the caller from start_s on, in the caller's language when it has
+    clips, else in English."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 

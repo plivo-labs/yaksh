@@ -23,6 +23,7 @@ VOICE = {
         {"language": "en", "model_id": "eleven_turbo_v2_5"},
         {"language": "hi", "model_id": "eleven_multilingual_v2"},
         {"language": "fr", "model_id": "eleven_multilingual_v2"},
+        {"language": "ta", "model_id": "eleven_multilingual_v2"},
     ],
 }
 
@@ -77,7 +78,7 @@ async def test_a_lookup_tells_a_missing_voice_from_a_refused_request(
     plain = await client.get_voice("unlabeled")
     assert found is not None and found.name == "Chris"
     assert (found.gender, found.accent) == (VoiceGender.MALE, "american")
-    assert found.listed_languages == (Language.EN, Language.HI)
+    assert found.listed_languages == (Language.EN, Language.HI, Language.TA)
     assert plain is not None and (plain.gender, plain.listed_languages) == (None, ())
 
     assert await client.get_voice("gone") is None
@@ -112,7 +113,7 @@ async def test_a_broken_answer_is_unavailable_with_its_status_and_never_the_key(
     assert API_KEY not in str(looped.value)
 
 
-async def test_speech_uses_the_call_model_voice_settings_and_language_pin(
+async def test_speech_uses_the_call_model_voice_settings_and_a_pin_the_model_takes(
     elevenlabs: tuple[str, list[dict[str, Any]]],
 ) -> None:
     base_url, seen = elevenlabs
@@ -121,6 +122,7 @@ async def test_speech_uses_the_call_model_voice_settings_and_language_pin(
 
     hindi = await client.speak(voice, Language.HI, "नमस्ते")
     await client.speak(voice, Language.EN, "Hello")
+    await client.speak(voice, Language.MR, "नमस्कार")
     gone = await client.speak(voice.model_copy(update={"id": "gone"}), Language.EN, "Hi")
 
     assert gone is None and hindi is not None
@@ -137,3 +139,4 @@ async def test_speech_uses_the_call_model_voice_settings_and_language_pin(
         "language_code": "hi",
     }
     assert seen[1]["language_code"] == "en"
+    assert "language_code" not in seen[2]

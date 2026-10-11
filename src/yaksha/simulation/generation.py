@@ -14,10 +14,18 @@ from typing import Any
 
 import anyio
 import pydantic
-from sqlalchemy import func, select, update
+from sqlalchemy import func, select, true, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+from sqlalchemy.sql.elements import ColumnElement
 
-from yaksha.db.models import AgentVersion, Document, Persona, Scenario, ScenarioGeneration
+from yaksha.db.models import (
+    Agent,
+    AgentVersion,
+    Document,
+    Persona,
+    Scenario,
+    ScenarioGeneration,
+)
 from yaksha.domain.agents import AgentConfig, Direction
 from yaksha.domain.errors import NotFoundError, UnavailableError, ValidationError
 from yaksha.domain.generation import (
@@ -458,16 +466,12 @@ class Writer:
 async def first_generation(
     session: AsyncSession, model: JsonModel | None, agent_id: uuid.UUID
 ) -> Prepared | None:
-    """The first scenarios of a new agent, spread over up to five random personas. None when
-    they cannot be written: no LLM key, no persona, or a context too large to plan from."""
-    persona_ids = list(
-        await session.scalars(
-            select(Persona.id)
-            .where(Persona.deleted_at.is_(None))
-            .order_by(func.random())
-            .limit(FIRST_SCENARIOS)
-        )
-    )
+    """The first scenarios of a new agent, spread over up to five random personas: personas in
+    the agent's languages, or any personas when none speaks one. None when they cannot be
+    written: no LLM key, no persona, or a context too large to plan from."""
+    languages = await session.scalar(select(Agent.languages).where(Agent.id == agent_id)) or []
+    served = Persona.language.in_([language.language for language in languages])
+    persona_ids = await random_personas(session, served) or await random_personas(session, true())
     if not persona_ids:
         return None
     command = GenerateScenarios(count=FIRST_SCENARIOS, persona_ids=persona_ids)
@@ -476,6 +480,17 @@ async def first_generation(
     except (UnavailableError, ValidationError, NotFoundError) as reason:
         log.info("no first scenarios for agent %s: %s", agent_id, reason)
         return None
+
+
+async def random_personas(session: AsyncSession, where: ColumnElement[bool]) -> list[uuid.UUID]:
+    return list(
+        await session.scalars(
+            select(Persona.id)
+            .where(Persona.deleted_at.is_(None), where)
+            .order_by(func.random())
+            .limit(FIRST_SCENARIOS)
+        )
+    )
 
 
 async def run_to_end(

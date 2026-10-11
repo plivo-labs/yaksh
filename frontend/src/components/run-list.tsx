@@ -5,7 +5,13 @@ import { ResponseTime } from "@/components/response-time";
 import { RunStatusLabel } from "@/components/status-label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { counted, runFinished, runTitle, runTotal } from "@/lib/format";
-import { ACTIVE_RUN_STATUSES, OUTCOME_GROUPS, type Page, type RunSummary } from "@/lib/types";
+import {
+  ACTIVE_RUN_STATUSES,
+  LANGUAGE_NAMES,
+  OUTCOME_GROUPS,
+  type Page,
+  type RunSummary,
+} from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 /** Columns follow the list's own width, not the window's: the same list sits in a full page
@@ -22,7 +28,9 @@ function outcomes(run: RunSummary): string {
   const parts = OUTCOME_GROUPS.filter((group) => run.counts[group.value] > 0).map(
     (group) => `${group.label.toLowerCase()} ${run.counts[group.value]}`,
   );
-  return `${counted(runTotal(run), "conversation", "conversations")}: ${parts.join(", ")}`;
+  const total = `${counted(runTotal(run), "conversation", "conversations")}: ${parts.join(", ")}`;
+  const languages = run.languages.map((language) => LANGUAGE_NAMES[language]).join(", ");
+  return languages ? `${languages} · ${total}` : total;
 }
 
 /** Runs, newest first, one row each. `place` sets the edges: a list on a page closes with a

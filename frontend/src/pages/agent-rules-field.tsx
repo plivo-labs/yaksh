@@ -13,14 +13,18 @@ import { Textarea } from "@/components/ui/textarea";
 import { ruleProblems } from "@/lib/rules";
 import type { AgentRule, LlmRule, PhraseRule } from "@/lib/types";
 
-/** One rule's fields. The kind is chosen when the rule is added and does not change. */
+/** One rule's fields. The kind is chosen when the rule is added and does not change.
+ * `multilingual` is an agent that serves more than one language, where a phrase must match in
+ * each of them. */
 export function RuleFields({
   rule,
   submitted,
+  multilingual,
   onChange,
 }: {
   rule: AgentRule;
   submitted: boolean;
+  multilingual: boolean;
   onChange: (rule: AgentRule) => void;
 }) {
   const problems = submitted ? ruleProblems(rule) : {};
@@ -38,7 +42,12 @@ export function RuleFields({
       {rule.kind === "llm" ? (
         <LlmFields rule={rule} problems={problems} onChange={onChange} />
       ) : (
-        <PhraseFields rule={rule} problems={problems} onChange={onChange} />
+        <PhraseFields
+          rule={rule}
+          problems={problems}
+          multilingual={multilingual}
+          onChange={onChange}
+        />
       )}
       <Field orientation="horizontal" className="rounded-md border bg-muted/40 px-3.5 py-3">
         <FieldContent>
@@ -119,10 +128,12 @@ function LlmFields({
 function PhraseFields({
   rule,
   problems,
+  multilingual,
   onChange,
 }: {
   rule: PhraseRule;
   problems: Partial<Record<string, string>>;
+  multilingual: boolean;
   onChange: (rule: PhraseRule) => void;
 }) {
   return (
@@ -173,6 +184,11 @@ function PhraseFields({
         }
         onChange={(value) => onChange({ ...rule, value })}
       />
+      {multilingual && (
+        <p className="text-xs-400 text-status-warning-text">
+          This agent speaks more than one language. Write it to match in each one.
+        </p>
+      )}
     </>
   );
 }

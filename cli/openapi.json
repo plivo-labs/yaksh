@@ -5340,7 +5340,14 @@
           "en-IN",
           "en-GB",
           "en-AU",
-          "hi"
+          "hi",
+          "bn",
+          "gu",
+          "kn",
+          "mr",
+          "ta",
+          "te",
+          "es"
         ],
         "title": "AgentLanguage",
         "description": "A language an agent serves. English carries its region, as the agent's own settings\ngive it."
@@ -8212,7 +8219,14 @@
         "type": "string",
         "enum": [
           "en",
-          "hi"
+          "hi",
+          "bn",
+          "gu",
+          "kn",
+          "mr",
+          "ta",
+          "te",
+          "es"
         ],
         "title": "Language",
         "description": "A language a caller speaks."
@@ -10741,6 +10755,13 @@
             ],
             "title": "Response P90 Ms"
           },
+          "languages": {
+            "items": {
+              "$ref": "#/components/schemas/Language"
+            },
+            "type": "array",
+            "title": "Languages"
+          },
           "scenarios": {
             "items": {
               "$ref": "#/components/schemas/RunScenario"
@@ -10775,6 +10796,7 @@
           "created_at",
           "response_p50_ms",
           "response_p90_ms",
+          "languages",
           "scenarios"
         ],
         "title": "RunRead"
@@ -11006,6 +11028,13 @@
               }
             ],
             "title": "Response P90 Ms"
+          },
+          "languages": {
+            "items": {
+              "$ref": "#/components/schemas/Language"
+            },
+            "type": "array",
+            "title": "Languages"
           }
         },
         "type": "object",
@@ -11033,7 +11062,8 @@
           "max_retries",
           "created_at",
           "response_p50_ms",
-          "response_p90_ms"
+          "response_p90_ms",
+          "languages"
         ],
         "title": "RunSummary"
       },
@@ -12155,7 +12185,7 @@
           "db"
         ],
         "title": "Speaker",
-        "description": "A person who talks behind the caller, in the caller's language, from start_s on."
+        "description": "A person who talks behind the caller from start_s on, in the caller's language when it has\nclips, else in English."
       },
       "SpeakerKind": {
         "type": "string",

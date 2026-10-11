@@ -337,7 +337,7 @@ class Persona:
                 voice=request.voice.id,
                 speed=request.voice.speed,
                 stability=request.voice.stability,
-                language=elevenlabs.LANGUAGE_PINS[request.caller_language],
+                language=elevenlabs.language_pin(request.caller_language),
             ),
         )
 

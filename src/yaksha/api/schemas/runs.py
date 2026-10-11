@@ -2,6 +2,7 @@ import uuid
 from datetime import datetime
 
 from yaksha.db.models import Run
+from yaksha.domain.languages import Language
 from yaksha.domain.latency import Latency
 from yaksha.domain.runs import RunProgress, RunScenario
 
@@ -23,10 +24,17 @@ class RunSummary(RunProgress):
     response_p50_ms: int | None
     response_p90_ms: int | None
     """Nearest rank over every measured reply of the latest attempts, pooled."""
+    languages: list[Language]
+    """The languages the run's callers speak."""
 
     @classmethod
     def of(
-        cls, run: Run, agent: tuple[int, str], progress: RunProgress, response: Latency
+        cls,
+        run: Run,
+        agent: tuple[int, str],
+        progress: RunProgress,
+        response: Latency,
+        languages: list[Language],
     ) -> RunSummary:
         """The run's own columns and its pinned agent; status and cancelled_at come only from
         the progress, read in one statement."""
@@ -47,6 +55,7 @@ class RunSummary(RunProgress):
             created_at=run.created_at,
             response_p50_ms=response.p50_ms,
             response_p90_ms=response.p90_ms,
+            languages=languages,
             **progress.model_dump(),
         )
 

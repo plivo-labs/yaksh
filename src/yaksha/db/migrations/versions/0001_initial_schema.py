@@ -38,7 +38,21 @@ def upgrade() -> None:
         sa.Column(
             "languages",
             postgresql.ARRAY(
-                sa.Enum("en-US", "en-IN", "en-GB", "en-AU", "hi", name="agent_language")
+                sa.Enum(
+                    "en-US",
+                    "en-IN",
+                    "en-GB",
+                    "en-AU",
+                    "hi",
+                    "bn",
+                    "gu",
+                    "kn",
+                    "mr",
+                    "ta",
+                    "te",
+                    "es",
+                    name="agent_language",
+                )
             ),
             nullable=False,
         ),
@@ -88,7 +102,11 @@ def upgrade() -> None:
         sa.Column("name", sa.Text(), nullable=False),
         sa.Column("builtin_key", sa.Text(), nullable=True),
         sa.Column("prompt", sa.Text(), nullable=False),
-        sa.Column("language", sa.Enum("en", "hi", name="language"), nullable=False),
+        sa.Column(
+            "language",
+            sa.Enum("en", "hi", "bn", "gu", "kn", "mr", "ta", "te", "es", name="language"),
+            nullable=False,
+        ),
         sa.Column("voice_provider", sa.Enum("elevenlabs", name="voice_provider"), nullable=False),
         sa.Column("voice_id", sa.Text(), nullable=False),
         sa.Column("voice_speed", sa.Float(), nullable=False),
@@ -134,12 +152,16 @@ def upgrade() -> None:
         sa.Column("accent", sa.Text(), nullable=True),
         sa.Column(
             "languages",
-            postgresql.ARRAY(sa.Enum("en", "hi", name="language")),
+            postgresql.ARRAY(
+                sa.Enum("en", "hi", "bn", "gu", "kn", "mr", "ta", "te", "es", name="language")
+            ),
             nullable=False,
         ),
         sa.Column(
             "listed_languages",
-            postgresql.ARRAY(sa.Enum("en", "hi", name="language")),
+            postgresql.ARRAY(
+                sa.Enum("en", "hi", "bn", "gu", "kn", "mr", "ta", "te", "es", name="language")
+            ),
             nullable=False,
         ),
         sa.Column("builtin", sa.Boolean(), nullable=False),
@@ -371,7 +393,11 @@ def upgrade() -> None:
         sa.Column("persona_version_id", sa.UUID(), nullable=False),
         sa.Column("scenario_id", sa.UUID(), nullable=False),
         sa.Column("scenario_version_id", sa.UUID(), nullable=False),
-        sa.Column("language", sa.Enum("en", "hi", name="language"), nullable=False),
+        sa.Column(
+            "language",
+            sa.Enum("en", "hi", "bn", "gu", "kn", "mr", "ta", "te", "es", name="language"),
+            nullable=False,
+        ),
         sa.Column("instructions", sa.Text(), nullable=False),
         sa.Column("nudge", sa.Text(), nullable=False),
         sa.Column("today", sa.Date(), nullable=False),

@@ -9,7 +9,11 @@ from yaksha.domain.languages import AgentLanguage, Language
 WIDE_SETTINGS: tuple[tuple[str, frozenset[Language]], ...] = (
     # The Hindi model also writes the English words that Hindi speakers mix in.
     ("hi", frozenset({Language.HI, Language.EN})),
-    ("multi", frozenset({Language.EN, Language.HI})),
+    # The Hindi model writes Marathi as Hindi. The Marathi model hears both, which share a
+    # script. It counts English as voice agents use it for Marathi with English; nobody measured
+    # that.
+    ("mr", frozenset({Language.MR, Language.HI, Language.EN})),
+    ("multi", frozenset({Language.EN, Language.HI, Language.ES})),
 )
 """Settings that hear more than one language, with the languages of Yaksha's that each hears, in
 the order a tie takes them. `multi` switches between ten languages; only these are Yaksha's."""

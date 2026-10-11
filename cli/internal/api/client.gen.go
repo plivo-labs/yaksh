@@ -21,16 +21,25 @@ import (
 
 // Defines values for AgentLanguage.
 const (
+	AgentLanguageBn   AgentLanguage = "bn"
 	AgentLanguageEnAU AgentLanguage = "en-AU"
 	AgentLanguageEnGB AgentLanguage = "en-GB"
 	AgentLanguageEnIN AgentLanguage = "en-IN"
 	AgentLanguageEnUS AgentLanguage = "en-US"
+	AgentLanguageEs   AgentLanguage = "es"
+	AgentLanguageGu   AgentLanguage = "gu"
 	AgentLanguageHi   AgentLanguage = "hi"
+	AgentLanguageKn   AgentLanguage = "kn"
+	AgentLanguageMr   AgentLanguage = "mr"
+	AgentLanguageTa   AgentLanguage = "ta"
+	AgentLanguageTe   AgentLanguage = "te"
 )
 
 // Valid indicates whether the value is a known member of the AgentLanguage enum.
 func (e AgentLanguage) Valid() bool {
 	switch e {
+	case AgentLanguageBn:
+		return true
 	case AgentLanguageEnAU:
 		return true
 	case AgentLanguageEnGB:
@@ -39,7 +48,19 @@ func (e AgentLanguage) Valid() bool {
 		return true
 	case AgentLanguageEnUS:
 		return true
+	case AgentLanguageEs:
+		return true
+	case AgentLanguageGu:
+		return true
 	case AgentLanguageHi:
+		return true
+	case AgentLanguageKn:
+		return true
+	case AgentLanguageMr:
+		return true
+	case AgentLanguageTa:
+		return true
+	case AgentLanguageTe:
 		return true
 	default:
 		return false
@@ -465,16 +486,37 @@ func (e Lane) Valid() bool {
 
 // Defines values for Language.
 const (
+	LanguageBn Language = "bn"
 	LanguageEn Language = "en"
+	LanguageEs Language = "es"
+	LanguageGu Language = "gu"
 	LanguageHi Language = "hi"
+	LanguageKn Language = "kn"
+	LanguageMr Language = "mr"
+	LanguageTa Language = "ta"
+	LanguageTe Language = "te"
 )
 
 // Valid indicates whether the value is a known member of the Language enum.
 func (e Language) Valid() bool {
 	switch e {
+	case LanguageBn:
+		return true
 	case LanguageEn:
 		return true
+	case LanguageEs:
+		return true
+	case LanguageGu:
+		return true
 	case LanguageHi:
+		return true
+	case LanguageKn:
+		return true
+	case LanguageMr:
+		return true
+	case LanguageTa:
+		return true
+	case LanguageTe:
 		return true
 	default:
 		return false
@@ -2321,6 +2363,7 @@ type RunRead struct {
 	EndReasons     map[string]int     `json:"end_reasons"`
 	EndedAt        *time.Time         `json:"ended_at"`
 	Id             openapi_types.UUID `json:"id"`
+	Languages      []Language         `json:"languages"`
 	MaxDurationS   int                `json:"max_duration_s"`
 	MaxParallel    *int               `json:"max_parallel"`
 	MaxRetries     int                `json:"max_retries"`
@@ -2359,6 +2402,7 @@ type RunSummary struct {
 	EndReasons     map[string]int     `json:"end_reasons"`
 	EndedAt        *time.Time         `json:"ended_at"`
 	Id             openapi_types.UUID `json:"id"`
+	Languages      []Language         `json:"languages"`
 	MaxDurationS   int                `json:"max_duration_s"`
 	MaxParallel    *int               `json:"max_parallel"`
 	MaxRetries     int                `json:"max_retries"`
@@ -2579,7 +2623,8 @@ type SoundRead struct {
 	StartS       float32      `json:"start_s"`
 }
 
-// Speaker A person who talks behind the caller, in the caller's language, from start_s on.
+// Speaker A person who talks behind the caller from start_s on, in the caller's language when it has
+// clips, else in English.
 type Speaker struct {
 	Db int `json:"db"`
 

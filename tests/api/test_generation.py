@@ -13,9 +13,11 @@ from sqlalchemy import select
 from tests.conftest import (
     OUTBOUND_AGENT,
     TOKEN,
+    Db,
     FakeJsonModel,
     FakeProviders,
     create_agent,
+    create_persona,
     create_scenario,
     new_persona_id,
 )
@@ -520,6 +522,26 @@ async def test_new_scenarios_spread_the_chosen_personas(
 
     saved = {data["category"]: data["persona_id"] for kind, data in events if kind == "scenario"}
     assert saved == {"happy_path": first, "messy_input": second, "edge_case": first}
+
+
+async def test_the_first_scenarios_take_personas_in_the_agents_languages_when_there_are_any(
+    client: AsyncClient, db: Db, generation_model: FakeJsonModel
+) -> None:
+    hindi_agent = await create_agent(client, brief=BRIEF, languages=["hi"])
+    tamil_agent = await create_agent(client, brief=BRIEF, languages=["ta"])
+    hindi = await create_persona(client, name="Hindi caller", language="hi")
+    await create_persona(client, name="English caller")
+
+    async with db() as session:
+        served = await generation.first_generation(
+            session, generation_model, uuid.UUID(hindi_agent["id"])
+        )
+        unserved = await generation.first_generation(
+            session, generation_model, uuid.UUID(tamil_agent["id"])
+        )
+
+    assert served is not None and served.command.persona_ids == [uuid.UUID(hindi["id"])]
+    assert unserved is not None and unserved.command.persona_ids
 
 
 async def test_a_generation_needs_live_personas_each_picked_once(client: AsyncClient) -> None:

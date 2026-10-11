@@ -40,8 +40,20 @@ export const END_REASON_LABELS: Record<EndReason, string> = {
 };
 
 type Role = "agent" | "caller";
-export type Language = "en" | "hi";
-export type AgentLanguage = "en-US" | "en-IN" | "en-GB" | "en-AU" | "hi";
+export type Language = "en" | "hi" | "bn" | "gu" | "kn" | "mr" | "ta" | "te" | "es";
+export type AgentLanguage =
+  | "en-US"
+  | "en-IN"
+  | "en-GB"
+  | "en-AU"
+  | "hi"
+  | "bn"
+  | "gu"
+  | "kn"
+  | "mr"
+  | "ta"
+  | "te"
+  | "es";
 export type VoiceGender = "male" | "female" | "neutral";
 type Provenance = "transmitted" | "cut" | "unconfirmed";
 type WireEventKind =
@@ -131,6 +143,13 @@ export const SOURCE_NAMES: Record<AgentSource, string> = {
 export const LANGUAGE_NAMES: Record<Language, string> = {
   en: "English",
   hi: "Hindi",
+  bn: "Bengali",
+  gu: "Gujarati",
+  kn: "Kannada",
+  mr: "Marathi",
+  ta: "Tamil",
+  te: "Telugu",
+  es: "Spanish",
 };
 
 export const LANGUAGE_ITEMS = (Object.keys(LANGUAGE_NAMES) as Language[]).map((language) => ({
@@ -145,6 +164,13 @@ export const AGENT_LANGUAGES: Record<AgentLanguage, { name: string; language: La
   "en-GB": { name: "English (UK)", language: "en" },
   "en-AU": { name: "English (Australia)", language: "en" },
   hi: { name: "Hindi", language: "hi" },
+  bn: { name: "Bengali", language: "bn" },
+  gu: { name: "Gujarati", language: "gu" },
+  kn: { name: "Kannada", language: "kn" },
+  mr: { name: "Marathi", language: "mr" },
+  ta: { name: "Tamil", language: "ta" },
+  te: { name: "Telugu", language: "te" },
+  es: { name: "Spanish", language: "es" },
 };
 
 export const AGENT_LANGUAGE_CODES = Object.keys(AGENT_LANGUAGES) as AgentLanguage[];
@@ -795,6 +821,8 @@ export interface RunSummary {
   agent_version: number;
   agent_name: string;
   name: string | null;
+  /** The languages the run's callers speak. */
+  languages: Language[];
   repeats: number;
   max_duration_s: number;
   max_turns: number;

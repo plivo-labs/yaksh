@@ -38,6 +38,7 @@ from yaksha.domain.conversations import (
     Turn,
 )
 from yaksha.domain.evaluations import Metric, MetricKey
+from yaksha.domain.languages import Language
 from yaksha.domain.latency import (
     AgentMedia,
     CallerReplyWindow,
@@ -152,6 +153,7 @@ async def test_a_scenario_runs_once_for_each_persona_asked_for_and_the_run_lists
         {"scenario_id": first["id"], "persona_ids": [calm, hindi]},
         {"scenario_id": second["id"], "persona_ids": [own]},
     ]
+    assert run["languages"] == detail["languages"] == ["en", "hi"]
     again = await start_run(client, agent, detail["scenarios"], repeats=3)
     assert again.status_code == 422, again.text
     assert again.json()["error"]["message"] == (
@@ -659,7 +661,7 @@ async def test_omitted_fields_take_the_operators_defaults_as_the_api_reports_the
     refused = await start_run(client, agent, [scenario], max_retries=1)
     calls = [await run_conversations(client, r.json()["id"]) for r in (started, chosen)]
 
-    openings = {"en": "Hello", "hi": "Hello"}
+    openings = dict.fromkeys((language.value for language in Language), "Hello")
     samples = {language.value: policy.sample for language, policy in LANGUAGES.items()}
     assert standard == {
         "max_duration_s": 300,
