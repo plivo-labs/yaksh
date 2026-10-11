@@ -10,9 +10,8 @@ WIDE_SETTINGS: tuple[tuple[str, frozenset[Language]], ...] = (
     # The Hindi model also writes the English words that Hindi speakers mix in.
     ("hi", frozenset({Language.HI, Language.EN})),
     # The Hindi model writes Marathi as Hindi. The Marathi model hears both, which share a
-    # script. It counts English as voice agents use it for Marathi with English; nobody measured
-    # that.
-    ("mr", frozenset({Language.MR, Language.HI, Language.EN})),
+    # script, but not English: on a real call it wrote an English agent as "Bubeet Herastaurant".
+    ("mr", frozenset({Language.MR, Language.HI})),
     ("multi", frozenset({Language.EN, Language.HI, Language.ES})),
 )
 """Settings that hear more than one language, with the languages of Yaksha's that each hears, in
