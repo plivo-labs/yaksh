@@ -1,7 +1,7 @@
 import { useLayoutEffect, useState } from "react";
 import { flushSync } from "react-dom";
 
-const THEME_KEY = "yaksha.theme";
+const THEME_KEY = "yaksh.theme";
 
 export function useDarkMode(): [boolean, () => void] {
   const [dark, setDark] = useState(() => {

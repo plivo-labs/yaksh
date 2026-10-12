@@ -1,64 +1,64 @@
 ---
 title: CLI
-description: The yaksha CLI is a command-line client for coding agents, CI and persons.
+description: The yaksh CLI is a command-line client for coding agents, CI and persons.
 ---
 
-`yaksha` is a command-line client for the Yaksha API. Coding agents, CI and persons use the same commands. The `agent`, `scenario`, `persona`, `run` and `conversation` commands write the JSON of the server to stdout. With `--wait`, `yaksha run start` waits for the calls and then for the judges. Then it writes the run.
+`yaksh` is a command-line client for the Yaksh API. Coding agents, CI and persons use the same commands. The `agent`, `scenario`, `persona`, `run` and `conversation` commands write the JSON of the server to stdout. With `--wait`, `yaksh run start` waits for the calls and then for the judges. Then it writes the run.
 
-`yaksha auth status` and `yaksha version` write JSON that the CLI makes. `yaksha guide` writes Markdown. `yaksha auth login` and `yaksha auth logout` do not write to stdout. Each command writes progress, hints and errors to stderr. Each command exits with 0 if it has no error, and with 1 if it has an error. If a test ran and did not pass, the last lines start with `failed:` and `next:`. If the command itself went wrong, the line starts with `error:`.
+`yaksh auth status` and `yaksh version` write JSON that the CLI makes. `yaksh guide` writes Markdown. `yaksh auth login` and `yaksh auth logout` do not write to stdout. Each command writes progress, hints and errors to stderr. Each command exits with 0 if it has no error, and with 1 if it has an error. If a test ran and did not pass, the last lines start with `failed:` and `next:`. If the command itself went wrong, the line starts with `error:`.
 
 ## Install
 
 Until the first release, build the CLI from the source code. Clone the repository (refer to [Quickstart](/docs/quickstart)). Then, at the root of the clone, build the CLI with Go 1.27 or later:
 
 ```sh
-cd cli && go build -o ~/.yaksha/bin/yaksha .
-export PATH="$HOME/.yaksha/bin:$PATH"   # also add this line to your shell profile
+cd cli && go build -o ~/.yaksh/bin/yaksh .
+export PATH="$HOME/.yaksh/bin:$PATH"   # also add this line to your shell profile
 ```
 
 After the first release, you can give this text to your coding agent. It installs the CLI and its skill:
 
 ```text
-Install the Yaksha CLI with
-curl -fsSL https://raw.githubusercontent.com/plivo-labs/yaksha/main/install.sh | bash,
-then run npx skills add plivo-labs/yaksha -g
-and follow the yaksha skill to test my voice agent.
+Install the Yaksh CLI with
+curl -fsSL https://raw.githubusercontent.com/plivo-labs/yaksh/main/install.sh | bash,
+then run npx skills add plivo-labs/yaksh -g
+and follow the yaksh skill to test my voice agent.
 ```
 
 ## Log in
 
 ```sh
-yaksha auth login --server http://localhost:8000
+yaksh auth login --server http://localhost:8000
 ```
 
-The command asks for the API token: the value of `YAKSHA_API_TOKEN` on the server. It does a check of the server and the token. Then it saves them. Without a terminal, send the token on stdin with `--with-token`. `yaksha auth status` shows the server. It also shows if the server accepts the token.
+The command asks for the API token: the value of `YAKSH_API_TOKEN` on the server. It does a check of the server and the token. Then it saves them. Without a terminal, send the token on stdin with `--with-token`. `yaksh auth status` shows the server. It also shows if the server accepts the token.
 
-You can also set two variables and not use `yaksha auth login`, for example in CI. Set `YAKSHA_URL` to the URL of the server without `/api/v1`, for example `http://localhost:8000`. Set `YAKSHA_API_TOKEN` to the token. If you set `YAKSHA_URL` or `YAKSHA_API_TOKEN`, the CLI uses that variable and not the saved value.
+You can also set two variables and not use `yaksh auth login`, for example in CI. Set `YAKSH_URL` to the URL of the server without `/api/v1`, for example `http://localhost:8000`. Set `YAKSH_API_TOKEN` to the token. If you set `YAKSH_URL` or `YAKSH_API_TOKEN`, the CLI uses that variable and not the saved value.
 
 ## Do a test of an agent
 
 ```sh
-yaksha run start --agent <agent id> --all --wait
+yaksh run start --agent <agent id> --all --wait
 ```
 
-This command starts a run of all scenarios of the agent, waits until the run stops, and then waits for the verdicts of the judges. With `--wait`, the command exits with 0 only if all conversations of the run completed and the judges passed all calls. For a conversation that has retries, only the last retry counts. The judges decide each call by its scenario verdict after the labels of persons, as for the pass rate of the run. A call that did not connect, a call that the judges failed or did not score, and a failed evaluation give exit 1. If no `--timeout` is set, the wait for the judges stops after 10 minutes. If the judges are off, exit 0 does not tell you that the agent did its tasks correctly. If you stop the command with Ctrl-C while the run continues, the CLI cancels the run. `yaksha agent list` shows the IDs of the agents.
+This command starts a run of all scenarios of the agent, waits until the run stops, and then waits for the verdicts of the judges. With `--wait`, the command exits with 0 only if all conversations of the run completed and the judges passed all calls. For a conversation that has retries, only the last retry counts. The judges decide each call by its scenario verdict after the labels of persons, as for the pass rate of the run. A call that did not connect, a call that the judges failed or did not score, and a failed evaluation give exit 1. If no `--timeout` is set, the wait for the judges stops after 10 minutes. If the judges are off, exit 0 does not tell you that the agent did its tasks correctly. If you stop the command with Ctrl-C while the run continues, the CLI cancels the run. `yaksh agent list` shows the IDs of the agents.
 
 If the judges failed a call, these commands show why:
 
-- `yaksha run metrics <run id>` shows the pass rate, the coverage, the calls of each scenario with their verdicts, and the counts of each criterion. A call with a null verdict is a call whose evaluation failed.
-- `yaksha conversation evaluation <conversation id>` shows the verdicts of one call, and each criterion and rule with the quotes and the reasoning of its judge.
-- `yaksha conversation view <conversation id>` shows the transcript of the call.
+- `yaksh run metrics <run id>` shows the pass rate, the coverage, the calls of each scenario with their verdicts, and the counts of each criterion. A call with a null verdict is a call whose evaluation failed.
+- `yaksh conversation evaluation <conversation id>` shows the verdicts of one call, and each criterion and rule with the quotes and the reasoning of its judge.
+- `yaksh conversation view <conversation id>` shows the transcript of the call.
 
-The instruction adherence judge reads the `config` of the agent in Yaksha. After you change the prompt or the flow of the agent, update this copy with `yaksha agent update <agent id> --config-file prompt.md`.
+The instruction adherence judge reads the `config` of the agent in Yaksh. After you change the prompt or the flow of the agent, update this copy with `yaksh agent update <agent id> --config-file prompt.md`.
 
 To add an agent from a Plivo CX agent download (the `{name}-config.json` file from the Plivo CX console), use this command:
 
 ```sh
-yaksha agent import front-desk-config.json --brief "Books dental appointments for callers." --number +14155550100
+yaksh agent import front-desk-config.json --brief "Books dental appointments for callers." --number +14155550100
 ```
 
-Yaksha takes the name, the agent ID and the languages from the file, and keeps the whole file as the config. The draft leaves out a language code that Yaksha does not know and names it in `language_note`. If the file has no language that Yaksha knows, the command adds no agent. Without `--brief` and `--number`, the command shows what Yaksha reads from the file and adds no agent. In the console, choose **Import from a JSON file** on the **New agent** page.
+Yaksh takes the name, the agent ID and the languages from the file, and keeps the whole file as the config. The draft leaves out a language code that Yaksh does not know and names it in `language_note`. If the file has no language that Yaksh knows, the command adds no agent. Without `--brief` and `--number`, the command shows what Yaksh reads from the file and adds no agent. In the console, choose **Import from a JSON file** on the **New agent** page.
 
-`yaksha guide` shows how a coding agent uses the CLI to do tests of a voice agent. The same text is the skill in `cli/skill/yaksha/SKILL.md`. To add the skill for all your projects, use `npx skills add plivo-labs/yaksha -g`. Without `-g`, the skill goes only into the project in the current folder.
+`yaksh guide` shows how a coding agent uses the CLI to do tests of a voice agent. The same text is the skill in `cli/skill/yaksh/SKILL.md`. To add the skill for all your projects, use `npx skills add plivo-labs/yaksh -g`. Without `-g`, the skill goes only into the project in the current folder.
 
-`yaksha --help` and `yaksha <command> --help` show all commands and flags.
+`yaksh --help` and `yaksh <command> --help` show all commands and flags.

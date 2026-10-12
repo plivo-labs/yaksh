@@ -1,7 +1,7 @@
 import pytest
 
-from yaksha.domain.evaluations import Verdict
-from yaksha.evaluation.numbers import (
+from yaksh.domain.evaluations import Verdict
+from yaksh.evaluation.numbers import (
     ScenarioResults,
     coverage,
     inconsistent,

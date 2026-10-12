@@ -2,10 +2,10 @@ from dataclasses import replace
 from datetime import date
 from pathlib import Path
 
-from yaksha.domain.agents import Direction
-from yaksha.domain.conversations import EndReason, Provenance, Role, Turn
-from yaksha.domain.scenarios import Fact
-from yaksha.evaluation.evidence import CallView, render, with_item
+from yaksh.domain.agents import Direction
+from yaksh.domain.conversations import EndReason, Provenance, Role, Turn
+from yaksh.domain.scenarios import Fact
+from yaksh.evaluation.evidence import CallView, render, with_item
 
 FIXTURES = Path(__file__).parent / "fixtures"
 LINES = [
@@ -43,7 +43,7 @@ MAPLE_DENTAL = CallView(
     time_zone="America/New_York",
     direction=Direction.INBOUND,
     agent_number="+15550100",
-    yaksha_number="+15550177",
+    yaksh_number="+15550177",
     agent_caller_id=None,
     hangup_source="Callee",
     end_reason=EndReason.AGENT_HANGUP,
@@ -77,7 +77,7 @@ def test_the_evidence_view_of_the_example_call_matches_its_golden_text() -> None
     assert rendered + "\n" == (FIXTURES / "evidence_c0193.txt").read_text()
 
 
-def test_the_view_marks_yaksha_lines_and_words_the_agent_spoke_over() -> None:
+def test_the_view_marks_yaksh_lines_and_words_the_agent_spoke_over() -> None:
     turns = [
         Turn(role=Role.CALLER, text="Hello?", started_at_ms=0, ended_at_ms=400, scripted=True),
         Turn(role=Role.AGENT, text="Hi, this is RiseBird.", started_at_ms=500, ended_at_ms=900),
@@ -102,7 +102,7 @@ def test_the_view_marks_yaksha_lines_and_words_the_agent_spoke_over() -> None:
 
     rendered = render(outbound)
 
-    assert "The agent called Yaksha's number +15550177 from +15550200." in rendered
+    assert "The agent called Yaksh's number +15550177 from +15550200." in rendered
     assert "The call ended. End reason: unknown. Call length: unknown." in rendered
-    assert "[1] Caller (Yaksha's fixed line): Hello?" in rendered
+    assert "[1] Caller (Yaksh's fixed line): Hello?" in rendered
     assert "[3] Caller (not played: the agent spoke over it): March fourteenth" in rendered

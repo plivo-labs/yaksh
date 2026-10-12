@@ -1,4 +1,4 @@
-// Package api is the client for Yaksha's HTTP API: the code generated from openapi.json, and the
+// Package api is the client for Yaksh's HTTP API: the code generated from openapi.json, and the
 // request setup and error handling that every command shares.
 package api
 

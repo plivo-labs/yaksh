@@ -16,9 +16,9 @@ from tests.conftest import (
     save_settings,
     start_run,
 )
-from yaksha.config import Settings
-from yaksha.db.models import Evaluation, EvaluationItem, JudgeCall, JudgeVersion, MetricValue
-from yaksha.domain.conversations import (
+from yaksh.config import Settings
+from yaksh.db.models import Evaluation, EvaluationItem, JudgeCall, JudgeVersion, MetricValue
+from yaksh.domain.conversations import (
     CallOutcome,
     EndReason,
     Role,
@@ -27,10 +27,10 @@ from yaksha.domain.conversations import (
     WireEvent,
     WireEventKind,
 )
-from yaksha.domain.evaluations import DecidedBy, EvaluationState, MetricKey, Outcome, Verdict
-from yaksha.domain.language_models import ModelAnswer, ModelCallError
-from yaksha.evaluation import judging
-from yaksha.evaluation.evaluations import MAX_ATTEMPTS
+from yaksh.domain.evaluations import DecidedBy, EvaluationState, MetricKey, Outcome, Verdict
+from yaksh.domain.language_models import ModelAnswer, ModelCallError
+from yaksh.evaluation import judging
+from yaksh.evaluation.evaluations import MAX_ATTEMPTS
 
 TURNS = [
     Turn(role=Role.AGENT, text="Thanks for calling, this is Ava.", started_at_ms=0, ended_at_ms=1),

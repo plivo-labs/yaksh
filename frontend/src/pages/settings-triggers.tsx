@@ -33,7 +33,7 @@ function SigningKeyRow({ saved, set }: { saved: string | null; set: boolean }) {
   return (
     <SettingRow
       label="Signing key"
-      help="Lets the agent's system check that a trigger came from Yaksha."
+      help="Lets the agent's system check that a trigger came from Yaksh."
     >
       {shown ? (
         <div className={`grid gap-2 ${APPEAR}`}>

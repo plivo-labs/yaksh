@@ -5,11 +5,11 @@ Status: accepted
 
 ## Decision
 
-An outbound agent has an optional list of numbers it calls from. Empty: Yaksha accepts a call from any number on the reserved Yaksha number. Filled: calls from other numbers are rejected and logged. The actual caller ID is always stored on the conversation.
+An outbound agent has an optional list of numbers it calls from. Empty: Yaksh accepts a call from any number on the reserved Yaksh number. Filled: calls from other numbers are rejected and logged. The actual caller ID is always stored on the conversation.
 
 ## Why
 
-- The reserved Yaksha number identifies the test. The caller ID is only an extra check.
+- The reserved Yaksh number identifies the test. The caller ID is only an extra check.
 - Agents often call from several numbers: local numbers per area, rotation, or one number per region.
 - The stored caller ID lets a scenario check which number the agent used.
 

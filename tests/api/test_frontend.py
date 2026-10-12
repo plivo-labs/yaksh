@@ -3,8 +3,8 @@ from pathlib import Path
 
 from httpx import ASGITransport, AsyncClient
 
-from yaksha.api import create_app
-from yaksha.config import Settings
+from yaksh.api import create_app
+from yaksh.config import Settings
 
 SettingsFactory = Callable[..., Settings]
 

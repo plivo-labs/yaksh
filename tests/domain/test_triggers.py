@@ -4,8 +4,8 @@ from urllib.parse import parse_qsl, urlsplit
 import pytest
 from pydantic import ValidationError
 
-from yaksha.domain.scenarios import Fact
-from yaksha.domain.triggers import (
+from yaksh.domain.scenarios import Fact
+from yaksh.domain.triggers import (
     RenderError,
     Trigger,
     TriggerMethod,
@@ -18,9 +18,9 @@ TRIGGER = Trigger.model_validate(
         "url": "https://agents.example.com/calls",
         "headers": [{"name": "Authorization", "value": "Bearer {{secrets.KEY}}"}],
         "body": {
-            "to": "{{yaksha.number}}",
+            "to": "{{yaksh.number}}",
             "customer": {"name": "{{ agent_data.Customer name }}", "vip": True},
-            "tags": ["run {{yaksha.conversation_id}}", 3],
+            "tags": ["run {{yaksh.conversation_id}}", 3],
         },
     }
 )
@@ -74,9 +74,9 @@ def test_a_value_that_would_break_a_header_is_refused() -> None:
 GET_TRIGGER = Trigger.model_validate(
     {
         "method": "GET",
-        "url": "https://agents.example.com/calls?source=yaksha",
+        "url": "https://agents.example.com/calls?source=yaksh",
         "query": [
-            {"name": "to", "value": "{{yaksha.number}}"},
+            {"name": "to", "value": "{{yaksh.number}}"},
             {"name": "customer", "value": "{{agent_data.Customer name}}"},
         ],
     }
@@ -90,7 +90,7 @@ def test_a_get_trigger_sends_its_values_encoded_after_the_urls_own_query() -> No
 
     assert (rendered.method, rendered.body) == (TriggerMethod.GET, b"")
     assert parse_qsl(urlsplit(rendered.url).query) == [
-        ("source", "yaksha"),
+        ("source", "yaksh"),
         ("to", "+15716535187"),
         ("customer", 'Priya "PR" Raman\nline two'),
     ]

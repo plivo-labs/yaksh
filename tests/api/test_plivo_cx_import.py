@@ -7,7 +7,7 @@ from fastapi import FastAPI, Request, Response
 from httpx import AsyncClient
 
 from tests.conftest import FakeProviders
-from yaksha.caller.plivo_server import PlivoServer
+from yaksh.caller.plivo_server import PlivoServer
 
 AUTH_ID = "MAXXXXXXXXXXXXXXXXXX"
 AUTH_TOKEN = "secret-token"
@@ -263,7 +263,7 @@ async def test_a_flow_a_request_starts_gets_the_start_request_plivo_cx_shows(
     assert request["headers"] == [{"name": "Authorization", "value": f"Basic {basic}"}]
     assert request["body"] == {
         "company_name": "{{agent_data.company_name}}",
-        "phone_number": "{{yaksha.number}}",
+        "phone_number": "{{yaksh.number}}",
         "lead": {"source": "{{agent_data.lead_source}}"},
     }
 

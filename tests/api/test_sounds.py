@@ -1,6 +1,6 @@
 from httpx import AsyncClient
 
-from yaksha.simulation.surroundings import SOUNDS
+from yaksh.simulation.surroundings import SOUNDS
 
 
 async def test_a_preview_plan_names_each_sound_and_the_files_are_served(

@@ -1,11 +1,11 @@
-# 0013 The caller closes the call before Yaksha hangs up
+# 0013 The caller closes the call before Yaksh hangs up
 
 Date: 2026-10-01
 Status: accepted
 
 ## Decision
 
-When the caller ends the call, with end_call or with the goodbye at the turn limit, Yaksha does not hang up at once. It keeps the line open until one of these occurs:
+When the caller ends the call, with end_call or with the goodbye at the turn limit, Yaksh does not hang up at once. It keeps the line open until one of these occurs:
 
 - Both sides are quiet for 8 seconds. Quiet means that the agent is not speaking, and that no caller reply is being written, waits to be spoken, or has audio that Plivo has not reported played.
 - The agent hangs up, a stop arrives, or the pipeline stops.
@@ -15,7 +15,7 @@ While the line is open after end_call, the caller answers the agent. After the g
 
 ## Why
 
-- The caller's last words play in full, and Plivo reports them played, so the transcript marks them transmitted. Before, Yaksha hung up when the pipeline had sent the audio, so the last words were often unconfirmed.
+- The caller's last words play in full, and Plivo reports them played, so the transcript marks them transmitted. Before, Yaksh hung up when the pipeline had sent the audio, so the last words were often unconfirmed.
 - How the agent closes a call is part of the test. The agent's goodbye or last offer is in the transcript and the recording.
 - A real caller says goodbye, waits for the other side, and answers a last question.
 - At the turn limit, an answer from the model goes back to the caller's goal, so the call does not end.

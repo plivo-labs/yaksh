@@ -1,21 +1,21 @@
 ---
 title: Introduction
-description: Yaksha does tests of AI voice agents with a simulated caller.
+description: Yaksh does tests of AI voice agents with a simulated caller.
 ---
 
-Yaksha does tests of AI voice agents. A simulated caller speaks with your agent on a phone call and follows a scenario. Yaksha records each call. Yaksha is open source, and you operate it on your servers. [Plivo](https://plivo.com) makes Yaksha.
+Yaksh does tests of AI voice agents. A simulated caller speaks with your agent on a phone call and follows a scenario. Yaksh records each call. Yaksh is open source, and you operate it on your servers. [Plivo](https://plivo.com) makes Yaksh.
 
 ## Terms
 
 | Term | Description |
 | --- | --- |
-| Agent | The voice agent that you do a test on. Yaksha calls the phone number of an inbound agent. An outbound agent calls Yaksha. |
+| Agent | The voice agent that you do a test on. Yaksh calls the phone number of an inbound agent. An outbound agent calls Yaksh. |
 | Persona | How the caller speaks: a prompt, a language, a voice and surroundings: noise and a person who talks behind the caller. |
 | Scenario | Instructions for the caller, the facts that the caller knows, the facts that the caller does not have, and the criteria. The criteria are the tasks of the agent on the call. The caller gets the instructions and the facts, but not the criteria. Each scenario has a persona. A scenario holds one or more data sets: the values of the facts the caller knows and of the data sent to the agent. A run plays each data set as its own call. |
-| Conversation | One call between the caller and an agent. Yaksha keeps the transcript, the recording and the wire events of the call. |
+| Conversation | One call between the caller and an agent. Yaksh keeps the transcript, the recording and the wire events of the call. |
 | Run | The conversations of one or more scenarios of one agent. A run can start each scenario more than one time. |
 
-## Parts of Yaksha
+## Parts of Yaksh
 
 | Part | Description |
 | --- | --- |
@@ -26,18 +26,18 @@ Yaksha does tests of AI voice agents. A simulated caller speaks with your agent 
 
 To deploy these parts on a server or a platform, refer to [Self-hosting](/docs/self-hosting).
 
-## How Yaksha does a test
+## How Yaksh does a test
 
-1. Yaksha makes the instructions for the caller from the scenario and the persona.
-2. The worker calls the agent. For an outbound agent, the worker sends a trigger, and the agent calls Yaksha.
+1. Yaksh makes the instructions for the caller from the scenario and the persona.
+2. The worker calls the agent. For an outbound agent, the worker sends a trigger, and the agent calls Yaksh.
 3. The caller speaks with the agent. When the caller speaks first, it says the first words of the scenario, with no model call. The caller also says them when an agent that should speak first says nothing for 15 seconds. A scenario without first words uses the default of the persona's language, "Hello" for English and Hindi. The call stops when the caller completes its instructions or when the agent disconnects. The call also stops if the agent does not speak, or if you stop the call. Limits on the duration and on the number of turns also stop the call.
-4. Yaksha keeps the conversation and measures the [response time](/docs/response-time) of the agent.
+4. Yaksh keeps the conversation and measures the [response time](/docs/response-time) of the agent.
 
-Yaksha does not give a pass or fail result at this time. To find if the agent did its tasks correctly, compare the transcript with the criteria of the scenario.
+Yaksh does not give a pass or fail result at this time. To find if the agent did its tasks correctly, compare the transcript with the criteria of the scenario.
 
 ## Services
 
-Yaksha uses these services. You must have an account with Plivo, Deepgram and ElevenLabs. You must also have an account with OpenAI, or with a different service that has the OpenAI Responses endpoint.
+Yaksh uses these services. You must have an account with Plivo, Deepgram and ElevenLabs. You must also have an account with OpenAI, or with a different service that has the OpenAI Responses endpoint.
 
 | Service | Description |
 | --- | --- |

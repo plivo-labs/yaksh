@@ -18,11 +18,11 @@ from tests.conftest import (
     start_run,
 )
 from tests.evaluation.test_judged_calls import CALL, Judge
-from yaksha.config import Settings
-from yaksha.db.models import Evaluation, EvaluationItem, JudgeVersion
-from yaksha.domain.conversations import CallOutcome, EndReason
-from yaksha.domain.evaluations import DecidedBy, EvaluationState, Outcome
-from yaksha.evaluation.jev import Jev, JevAnswer
+from yaksh.config import Settings
+from yaksh.db.models import Evaluation, EvaluationItem, JudgeVersion
+from yaksh.domain.conversations import CallOutcome, EndReason
+from yaksh.domain.evaluations import DecidedBy, EvaluationState, Outcome
+from yaksh.evaluation.jev import Jev, JevAnswer
 
 
 class StubJevClient(JevClient):

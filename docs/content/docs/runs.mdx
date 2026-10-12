@@ -18,7 +18,7 @@ To start a run with the API, send this request:
 
 ```sh
 curl -X POST localhost:8000/api/v1/runs \
-  -H "Authorization: Bearer $YAKSHA_API_TOKEN" \
+  -H "Authorization: Bearer $YAKSH_API_TOKEN" \
   -H 'Content-Type: application/json' \
   -H 'Idempotency-Key: nightly-2026-10-01' \
   -d '{
@@ -33,23 +33,23 @@ curl -X POST localhost:8000/api/v1/runs \
   }'
 ```
 
-The run makes one conversation for each repeat of each scenario, persona and data set. It makes all of them or none. A scenario with no `data_set_ids` plays all of its data sets; give `data_set_ids` to play only some of them, in that order. A scenario with no `persona_ids` uses its own persona. In the example, scenario 2 calls once as persona A and once as persona B, so each repeat makes 3 conversations. Each conversation uses the versions of the agent, the scenario and the persona at the time when Yaksha made the run. Put each scenario only one time in `scenarios`, and each persona only one time in its `persona_ids`. To start the same pair more than one time, use `repeats`.
+The run makes one conversation for each repeat of each scenario, persona and data set. It makes all of them or none. A scenario with no `data_set_ids` plays all of its data sets; give `data_set_ids` to play only some of them, in that order. A scenario with no `persona_ids` uses its own persona. In the example, scenario 2 calls once as persona A and once as persona B, so each repeat makes 3 conversations. Each conversation uses the versions of the agent, the scenario and the persona at the time when Yaksh made the run. Put each scenario only one time in `scenarios`, and each persona only one time in its `persona_ids`. To start the same pair more than one time, use `repeats`.
 
 ## Fields
 
 | Field | Description |
 | --- | --- |
 | `repeats` | How many conversations the run makes for each scenario, persona and data set. The default is 1. |
-| `max_parallel` | The maximum number of conversations of the run that can be in progress at the same time. A conversation is in progress from the time when a worker gets it until it stops. This includes the time while the phone rings, and the time while Yaksha waits for the call of an outbound agent. |
+| `max_parallel` | The maximum number of conversations of the run that can be in progress at the same time. A conversation is in progress from the time when a worker gets it until it stops. This includes the time while the phone rings, and the time while Yaksh waits for the call of an outbound agent. |
 | `start_interval_s` | The minimum time between the starts of two conversations. |
 | `max_duration_s` | The time limit of each call, 10 to 1800 seconds. The default is the call length on the **Limits** tab of Settings (300). |
 | `max_turns` | How many agent turns the caller answers, 1 to 100. The default is the turns per call on the **Limits** tab of Settings (20). |
-| `max_retries` | The maximum number of retries for a conversation that stops with an error in Yaksha or in the phone connection. The default is 1, or 0 if the retries limit in Settings is 0. To prevent retries, set this field to 0. |
+| `max_retries` | The maximum number of retries for a conversation that stops with an error in Yaksh or in the phone connection. The default is 1, or 0 if the retries limit in Settings is 0. To prevent retries, set this field to 0. |
 | `name` | This field is optional. It is a name for the run, 1 to 80 characters. |
 
 ## Start of a conversation
 
-A conversation starts when a worker gets it. If Yaksha calls the agent, the call starts some seconds after the conversation starts. If the agent calls Yaksha, Yaksha sends the trigger when the conversation starts. The call can come during the [dial window](/docs/outbound-agents#trigger) of the agent.
+A conversation starts when a worker gets it. If Yaksh calls the agent, the call starts some seconds after the conversation starts. If the agent calls Yaksh, Yaksh sends the trigger when the conversation starts. The call can come during the [dial window](/docs/outbound-agents#trigger) of the agent.
 
 Without `max_parallel` and `start_interval_s`, the run sets no limit and no minimum time between the starts of two conversations. A conversation also waits until a worker and a number are available. The two fields protect the agent of the run.
 
@@ -57,11 +57,11 @@ Without `max_parallel` and `start_interval_s`, the run sets no limit and no mini
 
 At the turn after `max_turns`, the caller tells the agent goodbye and then does not speak again. The end reason of the conversation is `turn_limit`. Before this limit, the caller stops a call only when it completes its instructions. Thus, this limit stops the calls in which the caller does not complete its instructions.
 
-If the caller tries to stop the call without words, the call does not stop. The caller gets one more reply to answer the agent and to say goodbye. This occurs only one time in each call. If the caller tries again to stop the call without words, Yaksha says the goodbye for the caller. Then Yaksha stops the call.
+If the caller tries to stop the call without words, the call does not stop. The caller gets one more reply to answer the agent and to say goodbye. This occurs only one time in each call. If the caller tries again to stop the call without words, Yaksh says the goodbye for the caller. Then Yaksh stops the call.
 
-When the caller stops the call, Yaksha waits until the caller and the agent do not speak for 8 seconds. The maximum wait is 30 seconds. Then Yaksha disconnects the call. This lets the agent complete its last turn. Yaksha also waits in this way after the goodbye at the turn limit.
+When the caller stops the call, Yaksh waits until the caller and the agent do not speak for 8 seconds. The maximum wait is 30 seconds. Then Yaksh disconnects the call. This lets the agent complete its last turn. Yaksh also waits in this way after the goodbye at the turn limit.
 
-Yaksha makes no retries for the conversations in the `did_not_connect` outcome group. Each retry is a new conversation, with `attempt` and `retry_of`.
+Yaksh makes no retries for the conversations in the `did_not_connect` outcome group. Each retry is a new conversation, with `attempt` and `retry_of`.
 
 ## Run operations
 
@@ -69,13 +69,13 @@ Yaksha makes no retries for the conversations in the `did_not_connect` outcome g
 - The same `Idempotency-Key` with the same body returns the first run. Thus, a client can safely send a request again. The same key with a different body gets an error.
 - `POST /api/v1/runs/<run id>/cancel` cancels the queued conversations and tells the workers to stop the calls that are in progress. The run shows `cancelling` until those calls stop.
 - `GET /api/v1/runs/<run id>` counts the conversations by [outcome group](/docs/results#outcome-groups): `waiting`, `in_progress`, `completed`, `did_not_connect`, `error` and `cancelled`. For a conversation that has retries, it counts only the last retry. These counts are facts about the calls. They are not results for the agent. The run also has `response_p50_ms` and `response_p90_ms`. Refer to [Response time](/docs/response-time).
-- `GET /api/v1/runs?created_from=<time>&created_before=<time>` lists the runs that Yaksha made in this period. `created_from` includes its time. `created_before` does not include its time. Each time must have a time zone, for example `2026-10-01T00:00:00+05:30`. In the CLI, use `yaksha run list --from <time> --before <time>`. In the CLI, a date without a time is midnight in your time zone. To list the runs with one status, add `--status`, for example `--status running`. In the console, select the dates on the **Runs** page or on the **Runs** tab of an agent. You can also select a preset: **Today**, **Last 24 hours**, **Last 7 days** or **Last 30 days**. A preset that starts with "Last" always ends at the current time, also after you load the page again.
+- `GET /api/v1/runs?created_from=<time>&created_before=<time>` lists the runs that Yaksh made in this period. `created_from` includes its time. `created_before` does not include its time. Each time must have a time zone, for example `2026-10-01T00:00:00+05:30`. In the CLI, use `yaksh run list --from <time> --before <time>`. In the CLI, a date without a time is midnight in your time zone. To list the runs with one status, add `--status`, for example `--status running`. In the console, select the dates on the **Runs** page or on the **Runs** tab of an agent. You can also select a preset: **Today**, **Last 24 hours**, **Last 7 days** or **Last 30 days**. A preset that starts with "Last" always ends at the current time, also after you load the page again.
 - `GET /api/v1/conversations?run_id=<run id>&latest_attempts=true` lists the conversations of the run without the conversations that a retry replaced.
 
 ## Calls at the same time
 
-Plivo has a limit for the number of calls of an account that can be in progress at the same time. Keep the sum of `YAKSHA_MAX_ACTIVE_CONVERSATIONS` of all workers, plus all other calls of the account, less than that limit. The `max_parallel` of a run does not protect the account, because two runs can each use their full `max_parallel`.
+Plivo has a limit for the number of calls of an account that can be in progress at the same time. Keep the sum of `YAKSH_MAX_ACTIVE_CONVERSATIONS` of all workers, plus all other calls of the account, less than that limit. The `max_parallel` of a run does not protect the account, because two runs can each use their full `max_parallel`.
 
-If the sum is more than that limit, Plivo rejects the calls that are more than the limit. It rejects the call request (HTTP 403, "Concurrency Limit Breached"), or it stops the call with hangup cause 5030. If Yaksha calls the agent, the conversation stops with an error. If the agent calls Yaksha, the conversation is in the `did_not_connect` outcome group.
+If the sum is more than that limit, Plivo rejects the calls that are more than the limit. It rejects the call request (HTTP 403, "Concurrency Limit Breached"), or it stops the call with hangup cause 5030. If Yaksh calls the agent, the conversation stops with an error. If the agent calls Yaksh, the conversation is in the `did_not_connect` outcome group.
 
 For the limits of runs, refer to [Configuration](/docs/configuration#limits).

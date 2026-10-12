@@ -144,7 +144,7 @@ function Scorecard({ verdicts }: { verdicts: RunVerdicts }) {
       </Stat>
       <Stat
         label="Scored calls"
-        hint="Calls with a pass or a fail. A call is not scored when one of its items could not be decided, for example when Yaksha's own caller broke the test or the judge failed."
+        hint="Calls with a pass or a fail. A call is not scored when one of its items could not be decided, for example when Yaksh's own caller broke the test or the judge failed."
         value={
           <>
             {scored}
@@ -162,8 +162,8 @@ function Scorecard({ verdicts }: { verdicts: RunVerdicts }) {
         </p>
       </Stat>
       <Stat
-        label="Yaksha's caller"
-        hint="The caller check looks for calls where Yaksha's own simulated caller broke its test. A likely effect blocks the criteria it touched: they are not scored, and not blamed on the agent."
+        label="Yaksh's caller"
+        hint="The caller check looks for calls where Yaksh's own simulated caller broke its test. A likely effect blocks the criteria it touched: they are not scored, and not blamed on the agent."
         value={
           <>
             {likely}
@@ -511,7 +511,7 @@ function HowJudged({
         </section>
         {verdicts.callers.length > 0 && (
           <section className="grid content-start gap-2">
-            <h4 className="text-label text-muted-foreground">Yaksha's caller, by persona</h4>
+            <h4 className="text-label text-muted-foreground">Yaksh's caller, by persona</h4>
             <ul className="divide-y rounded-md border">
               {verdicts.callers.map((caller) => (
                 <li

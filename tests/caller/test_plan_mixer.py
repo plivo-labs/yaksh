@@ -2,8 +2,8 @@ import wave
 from array import array
 from pathlib import Path
 
-from yaksha.caller.audio import FRAME_BYTES, SAMPLE_RATE, PlanMixer
-from yaksha.domain.surroundings import Layer, NoiseSound, SoundPlan, SpeakerKind
+from yaksh.caller.audio import FRAME_BYTES, SAMPLE_RATE, PlanMixer
+from yaksh.domain.surroundings import Layer, NoiseSound, SoundPlan, SpeakerKind
 
 TICK = FRAME_BYTES // 2  # samples in one 20 ms frame
 CAFE = NoiseSound.CAFE

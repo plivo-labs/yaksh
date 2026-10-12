@@ -11,7 +11,7 @@ import (
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 
-	"github.com/plivo-labs/yaksha/cli/internal/api"
+	"github.com/plivo-labs/yaksh/cli/internal/api"
 )
 
 // placeholder is a secret in a settings document that names an environment variable; as on the

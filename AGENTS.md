@@ -1,13 +1,13 @@
-# Yaksha
+# Yaksh
 
 Simulate, evaluate and improve AI agents. One Python service plus a React frontend.
 
-Yaksha is open source and self-hosted: users run it on their own infrastructure. Plivo builds it and provides the phone network, but Plivo does not run it as a service. Design for outside users, not for Plivo-internal infrastructure.
+Yaksh is open source and self-hosted: users run it on their own infrastructure. Plivo builds it and provides the phone network, but Plivo does not run it as a service. Design for outside users, not for Plivo-internal infrastructure.
 
 ## Layout
 
 ```
-src/yaksha/
+src/yaksh/
   config.py     what a process needs to start, from environment variables
   settings/     the Settings page's settings: one database row, its secrets encrypted, read again when its version changes
   domain/       shared data models and interfaces
@@ -19,7 +19,7 @@ src/yaksha/
   worker/       claims queued conversations from Postgres and runs them under a lease; evaluator.py does the same for evaluations
   db/           database models and migrations
 frontend/       React UI
-cli/            Go command-line client for the API, its own module; skill/yaksha/SKILL.md is the guide for coding agents
+cli/            Go command-line client for the API, its own module; skill/yaksh/SKILL.md is the guide for coding agents
 docker/         container builds and self-hosted deployment
 docs/           docs site (Fumadocs, pages in docs/content/docs/); decisions, ideas and bugs as Markdown
 tests/          automated tests and fixtures
@@ -44,7 +44,7 @@ Imported call:    api -> queued evaluation -> evaluator -> evaluation -> saved m
 - The database is the store; files are the interchange format for scenarios, personas and rubrics.
 - Default prompts and starter personas ship inside the package. User edits live in the database and are never overwritten by upgrades.
 - What a process needs to start comes from environment variables via `config.py`. Every other setting is on the Settings page: `domain/settings.py` defines it with its default, and `settings/store.py` keeps the values that differ from the defaults in the `app_settings` row. A process reads that row again when its version changes, and a call carries the settings it started with. Per-record choices (voice, model) are fields on the record.
-- Secrets are encrypted in the `app_settings` row with AES-256-GCM under `YAKSHA_ENCRYPTION_KEY`. The API never returns one. See `docs/decisions/0027-settings-in-the-database.md`.
+- Secrets are encrypted in the `app_settings` row with AES-256-GCM under `YAKSH_ENCRYPTION_KEY`. The API never returns one. See `docs/decisions/0027-settings-in-the-database.md`.
 - Uploaded documents and call audio go to the S3-compatible file storage. No process writes local files. See `docs/decisions/0028-call-audio-in-file-storage.md`.
 - Locks are taken in one order: an agent, then its scenarios, then personas, each set in id order; a run before its conversations; a conversation before phone numbers; an evaluation before its items. Starting conversations share-locks the scenarios and personas, so transactions that only reference them do not wait.
 - A time that is written or compared after a possible lock wait uses `statement_timestamp()`. Creation times keep `now()`, the time of the transaction, so the rows one transaction creates share one time.

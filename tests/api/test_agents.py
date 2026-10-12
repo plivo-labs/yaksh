@@ -13,7 +13,7 @@ from tests.conftest import (
     create_scenario,
     wait_for_lock_waiters,
 )
-from yaksha.db.models import Scenario
+from yaksh.db.models import Scenario
 
 
 async def test_changing_config_creates_a_version_but_renaming_does_not(

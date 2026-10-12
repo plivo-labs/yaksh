@@ -1,15 +1,15 @@
 ---
 title: Self-hosting
-description: Deploy Yaksha on a server or on a platform.
+description: Deploy Yaksh on a server or on a platform.
 ---
 
 ## What a deploy needs
 
 | Part | Description |
 | --- | --- |
-| `yaksha-server api` | The console and the API. |
-| `yaksha-server worker` | Makes and gets the test calls. Plivo must get to it at a public HTTPS address. Plivo sends webhooks and one WebSocket audio stream for each call. A stream stays open for up to 30 minutes. |
-| `yaksha-server evaluator` | Measures and judges the saved conversations. It has no port. |
+| `yaksh-server api` | The console and the API. |
+| `yaksh-server worker` | Makes and gets the test calls. Plivo must get to it at a public HTTPS address. Plivo sends webhooks and one WebSocket audio stream for each call. A stream stays open for up to 30 minutes. |
+| `yaksh-server evaluator` | Measures and judges the saved conversations. It has no port. |
 | PostgreSQL | Version 18 or later. |
 | S3-compatible bucket | Required. It keeps the documents that you upload and the audio of each call. |
 
@@ -20,10 +20,10 @@ The three processes use the same image. For the environment variables, refer to 
 | Process | Port |
 | --- | --- |
 | API | `PORT`. The default is 8000. |
-| Worker | `PORT`. The default is 8770. The worker answers `GET /health` on this port, also before `YAKSHA_PUBLIC_URL` is set. |
+| Worker | `PORT`. The default is 8770. The worker answers `GET /health` on this port, also before `YAKSH_PUBLIC_URL` is set. |
 | Evaluator | No port. |
 
-Each process reads `PORT` for its one listener. With Docker Compose, do not set `PORT` in `docker/.env`: all services read that file. `YAKSHA_DATABASE_URL` accepts the `postgres://` or `postgresql://` URL that a host gives. Yaksha uses the asyncpg driver. Remove an option that asyncpg does not take, such as `channel_binding` in a Neon URL: Yaksha names it when it does not start.
+Each process reads `PORT` for its one listener. With Docker Compose, do not set `PORT` in `docker/.env`: all services read that file. `YAKSH_DATABASE_URL` accepts the `postgres://` or `postgresql://` URL that a host gives. Yaksh uses the asyncpg driver. Remove an option that asyncpg does not take, such as `channel_binding` in a Neon URL: Yaksh names it when it does not start.
 
 ## One worker for each public address
 
@@ -37,9 +37,9 @@ The worker keeps the stream of each call in its memory. Thus, the webhooks and t
 
 Each install must have its own Plivo Application and its own numbers.
 
-1. Make a Plivo Application. Set the answer URL to `<YAKSHA_PUBLIC_URL>/incoming` and the hangup URL to `<YAKSHA_PUBLIC_URL>/incoming/hangup`. Set both methods to `POST`.
-2. Set `YAKSHA_PLIVO_APP_ID` to the ID of the Application.
-3. Set `YAKSHA_PLIVO_NUMBERS` to the numbers of this install. Without it, the worker uses all voice numbers of the account.
+1. Make a Plivo Application. Set the answer URL to `<YAKSH_PUBLIC_URL>/incoming` and the hangup URL to `<YAKSH_PUBLIC_URL>/incoming/hangup`. Set both methods to `POST`.
+2. Set `YAKSH_PLIVO_APP_ID` to the ID of the Application.
+3. Set `YAKSH_PLIVO_NUMBERS` to the numbers of this install. Without it, the worker uses all voice numbers of the account.
 
 A Plivo number has only one Application at a time. Thus, two installs must not use the same numbers.
 
@@ -54,12 +54,12 @@ We recommend this option. `docker/compose.yaml` operates the three processes, Po
 Do these steps in this sequence. The worker must have its public address before it starts.
 
 1. Install Docker Engine with the Compose plugin. Refer to [Install Docker Engine](https://docs.docker.com/engine/install/).
-2. Get the code: `git clone https://github.com/plivo-labs/yaksha && cd yaksha`.
+2. Get the code: `git clone https://github.com/plivo-labs/yaksh && cd yaksh`.
 3. Give the worker a fixed public HTTPS address. Use a named Cloudflare tunnel or Caddy (see below). Do not use a Cloudflare quick tunnel on a server: its address changes each time it starts, and then Plivo cannot get to the worker.
-4. Copy `docker/.env.example` to `docker/.env`. Set `YAKSHA_API_TOKEN`, `YAKSHA_ENCRYPTION_KEY` and `YAKSHA_PUBLIC_URL`. Keep a copy of the encryption key.
-5. Start Yaksha in the background: `docker compose -f docker/compose.yaml up --build -d`.
+4. Copy `docker/.env.example` to `docker/.env`. Set `YAKSH_API_TOKEN`, `YAKSH_ENCRYPTION_KEY` and `YAKSH_PUBLIC_URL`. Keep a copy of the encryption key.
+5. Start Yaksh in the background: `docker compose -f docker/compose.yaml up --build -d`.
 6. Open the console on port 8000 and enter the API token. On the Settings page, save the provider keys and the Plivo Auth ID and Auth token.
-7. Make the Plivo Application of this install (see [Plivo](#plivo)). Set `YAKSHA_PLIVO_APP_ID` and `YAKSHA_PLIVO_NUMBERS` in `docker/.env`. Then recreate the API and the worker, so that they read the new values: `docker compose -f docker/compose.yaml up -d yaksha worker`.
+7. Make the Plivo Application of this install (see [Plivo](#plivo)). Set `YAKSH_PLIVO_APP_ID` and `YAKSH_PLIVO_NUMBERS` in `docker/.env`. Then recreate the API and the worker, so that they read the new values: `docker compose -f docker/compose.yaml up -d yaksh worker`.
 8. Add an agent and do one test call.
 
 The console is on port 8000 of the server. Do not make it public without access control. To use it from your computer, connect over SSH: `ssh -L 8000:localhost:8000 <server>`, then open `http://localhost:8000`.
@@ -70,16 +70,16 @@ You do not open ports on the server.
 
 1. In the Cloudflare dashboard, make a tunnel. Copy its token.
 2. Add a public hostname to the tunnel, for example `calls.example.com`. Set the service to `http://worker:8770`.
-3. Start the tunnel on the Compose network of Yaksha:
+3. Start the tunnel on the Compose network of Yaksh:
 
    ```sh
-   docker run -d --name yaksha-tunnel --restart unless-stopped --network yaksha_default \
+   docker run -d --name yaksh-tunnel --restart unless-stopped --network yaksh_default \
      cloudflare/cloudflared:2026.9.1 tunnel --no-autoupdate run --token <token>
    ```
 
-4. Set `YAKSHA_PUBLIC_URL=https://calls.example.com`.
+4. Set `YAKSH_PUBLIC_URL=https://calls.example.com`.
 
-The network `yaksha_default` exists after the first `docker compose up`. If you start the tunnel before, make the network first: `docker network create yaksha_default`.
+The network `yaksh_default` exists after the first `docker compose up`. If you start the tunnel before, make the network first: `docker network create yaksh_default`.
 
 #### Public address with Caddy
 
@@ -95,11 +95,11 @@ Caddy gets a TLS certificate for you. The server must accept ports 80 and 443, a
    ```
 
 3. Reload Caddy: `sudo systemctl reload caddy`.
-4. Set `YAKSHA_PUBLIC_URL=https://calls.example.com`.
+4. Set `YAKSH_PUBLIC_URL=https://calls.example.com`.
 
 Caddy also sends the WebSocket of each call to the worker.
 
-#### Update Yaksha
+#### Update Yaksh
 
 ```sh
 git pull
@@ -110,11 +110,11 @@ Compose stops the old worker before it starts the new one. The calls that are li
 
 ### Railway
 
-We did tests of Yaksha on Railway.
+We did tests of Yaksh on Railway.
 
-- Make the api, the worker and the evaluator from the repository with `docker/Dockerfile`. Use the start commands `yaksha-server api`, `yaksha-server worker` and `yaksha-server evaluator`.
+- Make the api, the worker and the evaluator from the repository with `docker/Dockerfile`. Use the start commands `yaksh-server api`, `yaksh-server worker` and `yaksh-server evaluator`.
 - Set `PORT` on the api and the worker to the port of their public domain: 8000 and 8770.
-- Set `YAKSHA_DATABASE_URL` to `${{Postgres.DATABASE_URL}}`.
+- Set `YAKSH_DATABASE_URL` to `${{Postgres.DATABASE_URL}}`.
 - On the worker, set `RAILWAY_DEPLOYMENT_DRAINING_SECONDS=210`. With the default of 0, Railway stops the worker before it saves the results.
 - Railway starts the new worker, then stops the old worker about 1 second later. The calls that are live at that time end with `worker_stopped`, and the run tries them again.
 - The outbound IP can change on a deploy, unless the service has a Static Outbound IP. A Static Outbound IP costs money. This is important for an IP whitelist.

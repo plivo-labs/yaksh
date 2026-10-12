@@ -12,7 +12,7 @@ func env(vars map[string]string) func(string) string {
 
 func writeConfig(t *testing.T, home, content string) {
 	t.Helper()
-	path := filepath.Join(home, ".config", "yaksha", "config.json")
+	path := filepath.Join(home, ".config", "yaksh", "config.json")
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		t.Fatal(err)
 	}
@@ -32,7 +32,7 @@ func TestLoad(t *testing.T) {
 		{name: "nothing", want: Loaded{ServerFrom: Unset, TokenFrom: Unset}},
 		{
 			name: "environment sets one value", file: saved,
-			vars: map[string]string{"YAKSHA_API_TOKEN": "env-token"},
+			vars: map[string]string{"YAKSH_API_TOKEN": "env-token"},
 			want: Loaded{Settings{"https://saved.example.com", "env-token"}, FromFile, FromEnvironment},
 		},
 	}
@@ -69,7 +69,7 @@ func TestLoadSkipsTheFileWhenTheEnvironmentSetsBoth(t *testing.T) {
 	for name, home := range map[string]string{"broken file": brokenHome, "no HOME": ""} {
 		t.Run(name, func(t *testing.T) {
 			got, err := Load(env(map[string]string{
-				"HOME": home, "YAKSHA_URL": "http://localhost:8000", "YAKSHA_API_TOKEN": "env-token",
+				"HOME": home, "YAKSH_URL": "http://localhost:8000", "YAKSH_API_TOKEN": "env-token",
 			}))
 			if err != nil || got != want {
 				t.Fatalf("Load = %+v, %v; want %+v", got, err, want)
@@ -80,7 +80,7 @@ func TestLoadSkipsTheFileWhenTheEnvironmentSetsBoth(t *testing.T) {
 
 func TestSaveThenLoadThenRemove(t *testing.T) {
 	getenv := env(map[string]string{"HOME": t.TempDir()})
-	want := Settings{Server: "https://yaksha.example.com", Token: "t0k"}
+	want := Settings{Server: "https://yaksh.example.com", Token: "t0k"}
 
 	if err := Save(getenv, want); err != nil {
 		t.Fatal(err)
@@ -103,7 +103,7 @@ func TestSaveThenLoadThenRemove(t *testing.T) {
 
 func TestPath(t *testing.T) {
 	got, err := Path(env(map[string]string{"XDG_CONFIG_HOME": "/xdg", "HOME": "/home/u"}))
-	if err != nil || got != filepath.Join("/xdg", "yaksha", "config.json") {
+	if err != nil || got != filepath.Join("/xdg", "yaksh", "config.json") {
 		t.Fatalf("Path = %q, %v", got, err)
 	}
 	if _, err := Path(env(nil)); err == nil {

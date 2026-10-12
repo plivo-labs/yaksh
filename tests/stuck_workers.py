@@ -11,10 +11,10 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from tests.conftest import ENCRYPTION_KEY
-from yaksha.__main__ import run_worker
-from yaksha.caller.plivo_server import StreamRegistry
-from yaksha.config import Settings
-from yaksha.domain.conversations import (
+from yaksh.__main__ import run_worker
+from yaksh.caller.plivo_server import StreamRegistry
+from yaksh.config import Settings
+from yaksh.domain.conversations import (
     Caller,
     CallObserver,
     CallOutcome,
@@ -23,10 +23,10 @@ from yaksha.domain.conversations import (
     WireEvent,
     WireEventKind,
 )
-from yaksha.domain.settings import AppSettings
-from yaksha.simulation import conversations
-from yaksha.worker import worker as worker_module
-from yaksha.worker.phone_account import PhoneAccount
+from yaksh.domain.settings import AppSettings
+from yaksh.simulation import conversations
+from yaksh.worker import worker as worker_module
+from yaksh.worker.phone_account import PhoneAccount
 
 
 async def stuck(*args: Any, **kwargs: Any) -> Any:

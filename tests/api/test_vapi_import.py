@@ -8,7 +8,7 @@ from fastapi import FastAPI, Request, Response
 from httpx import AsyncClient
 
 from tests.conftest import FakeProviders
-from yaksha.caller.plivo_server import PlivoServer
+from yaksh.caller.plivo_server import PlivoServer
 
 API_KEY = "vapi-test-key"
 INBOUND = "0c7a2a4e-1d0b-4c43-9a51-2f3c8d8f0001"
@@ -228,7 +228,7 @@ async def test_an_assistant_without_a_number_calls_out_with_its_variables(
     assert request["body"] == {
         "assistantId": OUTBOUND,
         "phoneNumberId": "phone_0",
-        "customer": {"number": "{{yaksha.number}}", "name": "{{agent_data.customer_name}}"},
+        "customer": {"number": "{{yaksh.number}}", "name": "{{agent_data.customer_name}}"},
         "assistantOverrides": {
             "variableValues": {
                 "customer_name": "{{agent_data.customer_name}}",

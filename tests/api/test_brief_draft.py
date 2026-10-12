@@ -2,8 +2,8 @@ import pytest
 from httpx import AsyncClient
 
 from tests.conftest import FakeJsonModel
-from yaksha.domain.errors import UnavailableError
-from yaksha.simulation.briefs import draft_brief
+from yaksh.domain.errors import UnavailableError
+from yaksh.simulation.briefs import draft_brief
 
 
 async def test_a_brief_is_drafted_from_the_config(

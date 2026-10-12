@@ -1,8 +1,8 @@
 from httpx import AsyncClient
 
 from tests.conftest import Db, claim, evaluate_queued, finish, new_run
-from yaksha.domain.conversations import CallOutcome, EndReason
-from yaksha.domain.evaluations import Metric, MetricKey
+from yaksh.domain.conversations import CallOutcome, EndReason
+from yaksh.domain.evaluations import Metric, MetricKey
 
 
 async def test_a_conversations_metrics_follow_its_evaluation(client: AsyncClient, db: Db) -> None:

@@ -17,8 +17,8 @@ export interface OutboundDraft {
   dial_window: string;
 }
 
-const EMPTY_BODY = '{\n  "to": "{{yaksha.number}}"\n}';
-const EMPTY_QUERY: QueryParameter[] = [{ name: "to", value: "{{yaksha.number}}" }];
+const EMPTY_BODY = '{\n  "to": "{{yaksh.number}}"\n}';
+const EMPTY_QUERY: QueryParameter[] = [{ name: "to", value: "{{yaksh.number}}" }];
 
 export const EMPTY_OUTBOUND: OutboundDraft = {
   method: "POST",
@@ -90,11 +90,11 @@ function parseBody(text: string): Record<string, unknown> | null {
  * placeholders. */
 function urlProblem(typed: string): string | null {
   const url = typed.trim();
-  if (!url) return "Enter the URL Yaksha sends the request to.";
+  if (!url) return "Enter the URL Yaksh sends the request to.";
   if (url.includes("{{") || url.includes("}}")) {
     return "Put placeholders in the headers, the body or the query parameters, not in the URL.";
   }
-  if (url.includes("#")) return "Remove the # part: Yaksha does not send it.";
+  if (url.includes("#")) return "Remove the # part: Yaksh does not send it.";
   try {
     const { protocol } = new URL(url);
     return protocol === "http:" || protocol === "https:" ? null : "Use an http or https URL.";

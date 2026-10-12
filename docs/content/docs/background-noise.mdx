@@ -3,7 +3,7 @@ title: Surroundings
 description: Noise and a person who talks behind the caller.
 ---
 
-A persona has surroundings: what the agent hears behind the caller. Use them to test whether the agent still understands the caller, ignores other voices, and does not stop at a sudden sound. The surroundings play during the full call, also when the caller does not speak. The recording includes them. The speech to text of Yaksha hears only the agent, so the surroundings change only what the agent hears.
+A persona has surroundings: what the agent hears behind the caller. Use them to test whether the agent still understands the caller, ignores other voices, and does not stop at a sudden sound. The surroundings play during the full call, also when the caller does not speak. The recording includes them. The speech to text of Yaksh hears only the agent, so the surroundings change only what the agent hears.
 
 All levels are in dB relative to the voice of the caller: 0 dB is as loud as the caller, -10 dB is clearly quieter, and +6 dB is louder. The levels are from -30 to +10 dB.
 
@@ -17,7 +17,7 @@ No `sounds`, no `auto` and no `speaker` is a quiet room.
 
 ## When each sound plays
 
-When a run starts a conversation, Yaksha plans the sounds of the call. The plan comes from the surroundings, the scenario version and the repeat number. Thus, the same scenario and repeat play the same sounds in each run, and a fix can be checked under the same conditions. Two repeats of one run play different sounds. A retry plays the same plan.
+When a run starts a conversation, Yaksh plans the sounds of the call. The plan comes from the surroundings, the scenario version and the repeat number. Thus, the same scenario and repeat play the same sounds in each run, and a fix can be checked under the same conditions. Two repeats of one run play different sounds. A retry plays the same plan.
 
 On the page of a call, the **Behind the caller** card in the **Caller** tab shows when each sound played and what the other person said.
 
@@ -25,4 +25,4 @@ Each persona has its own page in the console. In its **Surroundings** card, **Pr
 
 The run results group the calls by their surroundings, so you can compare a quiet persona with a noisy one. Refer to [Results](/docs/results).
 
-The sound files are in `src/yaksha/simulation/sounds/`. The README in that folder tells how the noise loops were made, and `scripts/make_speaker_clips.py` makes the speaker clips from `speakers.yaml`.
+The sound files are in `src/yaksh/simulation/sounds/`. The README in that folder tells how the noise loops were made, and `scripts/make_speaker_clips.py` makes the speaker clips from `speakers.yaml`.

@@ -1,7 +1,7 @@
 import pytest
 
-from yaksha.caller.speech_to_text import deepgram_language
-from yaksha.domain.languages import AgentLanguage, Language
+from yaksh.caller.speech_to_text import deepgram_language
+from yaksh.domain.languages import AgentLanguage, Language
 
 
 @pytest.mark.parametrize(

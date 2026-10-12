@@ -15,15 +15,15 @@ from sqlalchemy import ColumnElement, func, text, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from testcontainers.community.postgres import PostgresContainer
 
-from yaksha.api import create_app
-from yaksha.caller.audio import Clock
-from yaksha.caller.plivo_server import PlivoServer
-from yaksha.config import Settings
-from yaksha.db.migrate import upgrade_to_head
-from yaksha.db.models import Conversation, Voice
-from yaksha.db.session import create_engine, create_sessionmaker
-from yaksha.domain.agent_import import ElevenLabsRegion, VapiRegion
-from yaksha.domain.conversations import (
+from yaksh.api import create_app
+from yaksh.caller.audio import Clock
+from yaksh.caller.plivo_server import PlivoServer
+from yaksh.config import Settings
+from yaksh.db.migrate import upgrade_to_head
+from yaksh.db.models import Conversation, Voice
+from yaksh.db.session import create_engine, create_sessionmaker
+from yaksh.domain.agent_import import ElevenLabsRegion, VapiRegion
+from yaksh.domain.conversations import (
     Admission,
     CallObserver,
     CallOutcome,
@@ -38,28 +38,28 @@ from yaksha.domain.conversations import (
     WireEvent,
     WireEventKind,
 )
-from yaksha.domain.errors import UnavailableError
-from yaksha.domain.evaluations import Metric, MetricKey
-from yaksha.domain.files import FileStore
-from yaksha.domain.language_models import ModelAnswer, ModelCallError
-from yaksha.domain.languages import Language
-from yaksha.domain.numbers import AccountNumber
-from yaksha.domain.settings import AppSettings, SecretName, Secrets
-from yaksha.domain.voices import ProviderVoice, VoiceGender, VoiceProvider, VoiceSettings
-from yaksha.evaluation import evaluations
-from yaksha.evaluation.evaluations import Evaluated
-from yaksha.integrations.elevenlabs import ElevenLabsAgentsApi, as_wav
-from yaksha.integrations.plivo import PlivoApi
-from yaksha.integrations.plivo_signature import signature, signed_text
-from yaksha.integrations.retell import RetellApi
-from yaksha.integrations.vapi import VapiApi
-from yaksha.settings import store
-from yaksha.settings.cipher import Cipher
-from yaksha.settings.store import SettingsSource
-from yaksha.simulation import conversations, numbers
-from yaksha.worker.evaluator import Evaluator, JudgeClients
-from yaksha.worker.phone_account import PhoneAccount
-from yaksha.worker.worker import Worker
+from yaksh.domain.errors import UnavailableError
+from yaksh.domain.evaluations import Metric, MetricKey
+from yaksh.domain.files import FileStore
+from yaksh.domain.language_models import ModelAnswer, ModelCallError
+from yaksh.domain.languages import Language
+from yaksh.domain.numbers import AccountNumber
+from yaksh.domain.settings import AppSettings, SecretName, Secrets
+from yaksh.domain.voices import ProviderVoice, VoiceGender, VoiceProvider, VoiceSettings
+from yaksh.evaluation import evaluations
+from yaksh.evaluation.evaluations import Evaluated
+from yaksh.integrations.elevenlabs import ElevenLabsAgentsApi, as_wav
+from yaksh.integrations.plivo import PlivoApi
+from yaksh.integrations.plivo_signature import signature, signed_text
+from yaksh.integrations.retell import RetellApi
+from yaksh.integrations.vapi import VapiApi
+from yaksh.settings import store
+from yaksh.settings.cipher import Cipher
+from yaksh.settings.store import SettingsSource
+from yaksh.simulation import conversations, numbers
+from yaksh.worker.evaluator import Evaluator, JudgeClients
+from yaksh.worker.phone_account import PhoneAccount
+from yaksh.worker.worker import Worker
 
 type Db = async_sessionmaker[AsyncSession]
 
@@ -86,10 +86,10 @@ APP_SETTINGS = AppSettings(
 )
 """Stored settings for a call request built without the database."""
 POOL = [AccountNumber(number=f"+1555010{n:04d}") for n in range(8)]
-OFFLINE_DATABASE_URL = "postgresql+asyncpg://yaksha:yaksha@localhost:5432/yaksha"
+OFFLINE_DATABASE_URL = "postgresql+asyncpg://yaksh:yaksh@localhost:5432/yaksh"
 FINAL = {"completed", "failed", "invalid", "cancelled"}
-YAKSHA_FAILED = CallOutcome(connected=False, end_reason=EndReason.ERROR, caller_error="boom")
-"""A call that failed on Yaksha's side, which a run tries again."""
+YAKSH_FAILED = CallOutcome(connected=False, end_reason=EndReason.ERROR, caller_error="boom")
+"""A call that failed on Yaksh's side, which a run tries again."""
 LOCK_WAITERS = text(
     "SELECT count(*) FROM pg_stat_activity"
     " WHERE datname = current_database() AND wait_event_type = 'Lock'"
@@ -111,9 +111,9 @@ OUTBOUND_AGENT: dict[str, Any] = {
             "url": "https://agents.example.com/calls",
             "headers": [{"name": "Authorization", "value": "Bearer {{secrets.KEY}}"}],
             "body": {
-                "to": "{{yaksha.number}}",
+                "to": "{{yaksh.number}}",
                 "customer": {"name": "{{agent_data.Customer name}}"},
-                "tags": ["yaksha", "{{yaksha.conversation_id}}"],
+                "tags": ["yaksh", "{{yaksh.conversation_id}}"],
             },
         },
         "calling_numbers": ["+14155550100"],
@@ -558,7 +558,7 @@ def make_settings(tmp_path: Path, **overrides: Any) -> Settings:
         "worker_heartbeat_s": 0.05,
         "worker_lease_s": 2,
         "end_timeout_s": 0.5,
-        "public_url": "http://yaksha.test",
+        "public_url": "http://yaksh.test",
         "encryption_key": ENCRYPTION_KEY,
     }
     return Settings.model_validate({**values, **overrides})

@@ -12,7 +12,7 @@ import { useModelEfforts } from "@/lib/queries";
 
 const UNSET = "unset";
 
-/** The reasoning efforts the model takes, as Yaksha checked them with the provider. `unset`
+/** The reasoning efforts the model takes, as Yaksh checked them with the provider. `unset`
  * names what no effort means for this field. */
 export function EffortSelect({
   id,

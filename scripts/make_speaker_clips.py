@@ -1,4 +1,4 @@
-"""Build the background speaker clips listed in src/yaksha/simulation/sounds/speakers.yaml.
+"""Build the background speaker clips listed in src/yaksh/simulation/sounds/speakers.yaml.
 
 ElevenLabs (eleven_v3) speaks each line on its own; the lines are joined with the clip's pauses,
 a light room effect is added, and the clip is written as 8 kHz 16-bit mono WAV with its active
@@ -26,7 +26,7 @@ from typing import Any
 
 import yaml
 
-SOUNDS = Path(__file__).resolve().parent.parent / "src" / "yaksha" / "simulation" / "sounds"
+SOUNDS = Path(__file__).resolve().parent.parent / "src" / "yaksh" / "simulation" / "sounds"
 LIST = SOUNDS / "speakers.yaml"
 HEADER = (
     "# Background speaker clips: 8 kHz 16-bit mono WAV, active speech at -20 dBFS.\n"

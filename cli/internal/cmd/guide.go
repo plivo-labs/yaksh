@@ -5,7 +5,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/plivo-labs/yaksha/cli/skill"
+	"github.com/plivo-labs/yaksh/cli/skill"
 )
 
 func (a *app) guideCmd() *cobra.Command {

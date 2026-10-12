@@ -5,12 +5,12 @@ Status: accepted
 
 ## Decision
 
-Personas pick voices from Yaksha's own `voices` table, not from a live list of the provider's voices. Built-in voices are seeded; users add a voice by its provider ID, and Yaksha fills the details from the provider. Each voice has its own `languages` list, which the user can edit. A persona keeps its own copy of the voice settings.
+Personas pick voices from Yaksh's own `voices` table, not from a live list of the provider's voices. Built-in voices are seeded; users add a voice by its provider ID, and Yaksh fills the details from the provider. Each voice has its own `languages` list, which the user can edit. A persona keeps its own copy of the voice settings.
 
 ## Why
 
 - The provider's full list is large and paged; loading it made the voice picker slow.
-- The provider's language labels are incomplete. Yaksha needs its own list of the languages a voice can speak.
+- The provider's language labels are incomplete. Yaksh needs its own list of the languages a voice can speak.
 - Editing or deleting a voice never changes a persona version or a past call.
 
 ## Other options

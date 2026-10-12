@@ -1111,7 +1111,7 @@ type AgentConfig struct {
 	Outbound         *OutboundConfig           `json:"outbound,omitempty"`
 	Rules            *[]AgentConfig_Rules_Item `json:"rules,omitempty"`
 
-	// Transport How Yaksha reaches an agent; phone only today, kept as the seam for other ways.
+	// Transport How Yaksh reaches an agent; phone only today, kept as the seam for other ways.
 	Transport *Transport `json:"transport,omitempty"`
 }
 
@@ -1134,10 +1134,10 @@ type AgentCreate struct {
 	Outbound         *OutboundConfig           `json:"outbound,omitempty"`
 	Rules            *[]AgentCreate_Rules_Item `json:"rules,omitempty"`
 
-	// Source Where an agent came from: made in Yaksha, or imported from a file or a provider.
+	// Source Where an agent came from: made in Yaksh, or imported from a file or a provider.
 	Source *AgentSource `json:"source,omitempty"`
 
-	// Transport How Yaksha reaches an agent; phone only today, kept as the seam for other ways.
+	// Transport How Yaksh reaches an agent; phone only today, kept as the seam for other ways.
 	Transport      *Transport `json:"transport,omitempty"`
 	WriteScenarios *bool      `json:"write_scenarios,omitempty"`
 }
@@ -1148,7 +1148,7 @@ type AgentCreate_Rules_Item struct {
 }
 
 // AgentDraft The fields an agent file fills. Nothing is saved: the person adds the rest, such as the
-// brief and how Yaksha reaches the agent, then creates the agent.
+// brief and how Yaksh reaches the agent, then creates the agent.
 type AgentDraft struct {
 	Config       string          `json:"config"`
 	ExternalId   *string         `json:"external_id"`
@@ -1185,10 +1185,10 @@ type AgentRead struct {
 	Outbound         *OutboundConfig         `json:"outbound"`
 	Rules            []AgentRead_Rules_Item  `json:"rules"`
 
-	// Source Where an agent came from: made in Yaksha, or imported from a file or a provider.
+	// Source Where an agent came from: made in Yaksh, or imported from a file or a provider.
 	Source AgentSource `json:"source"`
 
-	// Transport How Yaksha reaches an agent; phone only today, kept as the seam for other ways.
+	// Transport How Yaksh reaches an agent; phone only today, kept as the seam for other ways.
 	Transport Transport `json:"transport"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
@@ -1198,7 +1198,7 @@ type AgentRead_Rules_Item struct {
 	union json.RawMessage
 }
 
-// AgentSource Where an agent came from: made in Yaksha, or imported from a file or a provider.
+// AgentSource Where an agent came from: made in Yaksh, or imported from a file or a provider.
 type AgentSource string
 
 // AgentSummary An agent without its config and knowledge base, for lists.
@@ -1216,10 +1216,10 @@ type AgentSummary struct {
 	Name             string              `json:"name"`
 	Outbound         *OutboundConfig     `json:"outbound"`
 
-	// Source Where an agent came from: made in Yaksha, or imported from a file or a provider.
+	// Source Where an agent came from: made in Yaksh, or imported from a file or a provider.
 	Source AgentSource `json:"source"`
 
-	// Transport How Yaksha reaches an agent; phone only today, kept as the seam for other ways.
+	// Transport How Yaksh reaches an agent; phone only today, kept as the seam for other ways.
 	Transport Transport `json:"transport"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
@@ -1567,7 +1567,7 @@ type ElevenLabsAgentSearch struct {
 // their own API host and keys.
 type ElevenLabsRegion string
 
-// EndReason Who or what ended the conversation, as Yaksha observed it.
+// EndReason Who or what ended the conversation, as Yaksh observed it.
 type EndReason string
 
 // ErrorBody defines model for ErrorBody.
@@ -1872,7 +1872,7 @@ type NoiseSound string
 // NumberState defines model for NumberState.
 type NumberState string
 
-// OutboundConfig How an outbound agent is made to call Yaksha, and how its call is recognized.
+// OutboundConfig How an outbound agent is made to call Yaksh, and how its call is recognized.
 type OutboundConfig struct {
 	CallingNumbers *[]string `json:"calling_numbers,omitempty"`
 	DialWindowS    *int      `json:"dial_window_s,omitempty"`
@@ -2694,7 +2694,7 @@ type SpokenLine struct {
 }
 
 // StartRequestDraft A start request read from a cURL command, for the person to check. `number_field` names
-// the body field or query parameter that now holds `{{yaksha.number}}`, if one looked like the
+// the body field or query parameter that now holds `{{yaksh.number}}`, if one looked like the
 // number to call.
 type StartRequestDraft struct {
 	Body        *map[string]interface{} `json:"body"`
@@ -2727,7 +2727,7 @@ type TextDocumentCreate struct {
 	Text string `json:"text"`
 }
 
-// Transport How Yaksha reaches an agent; phone only today, kept as the seam for other ways.
+// Transport How Yaksh reaches an agent; phone only today, kept as the seam for other ways.
 type Transport string
 
 // Trigger The request sent once for each conversation: a POST carries its values in a JSON body,
@@ -3688,7 +3688,7 @@ type ClientInterface interface {
 	// ImportAgentFileApiV1AgentsImportPostWithBody Import Agent File
 	//
 	// Read an agent file from another platform into a draft. Nothing is saved. A file in a format
-	// that Yaksha does not read fails with the code `not_recognized`; it can still be the config.
+	// that Yaksh does not read fails with the code `not_recognized`; it can still be the config.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -3698,7 +3698,7 @@ type ClientInterface interface {
 	// ImportAgentFileApiV1AgentsImportPost Import Agent File
 	//
 	// Read an agent file from another platform into a draft. Nothing is saved. A file in a format
-	// that Yaksha does not read fails with the code `not_recognized`; it can still be the config.
+	// that Yaksh does not read fails with the code `not_recognized`; it can still be the config.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -3872,9 +3872,9 @@ type ClientInterface interface {
 
 	// ReadCurlCommandApiV1AgentsStartRequestFromCurlPostWithBody Read Curl Command
 	//
-	// Read a cURL command into a start request, for an agent that calls Yaksha. Nothing is
+	// Read a cURL command into a start request, for an agent that calls Yaksh. Nothing is
 	// saved. A body field or query parameter that looks like the number to call gets
-	// `{{yaksha.number}}`.
+	// `{{yaksh.number}}`.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -3883,9 +3883,9 @@ type ClientInterface interface {
 
 	// ReadCurlCommandApiV1AgentsStartRequestFromCurlPost Read Curl Command
 	//
-	// Read a cURL command into a start request, for an agent that calls Yaksha. Nothing is
+	// Read a cURL command into a start request, for an agent that calls Yaksh. Nothing is
 	// saved. A body field or query parameter that looks like the number to call gets
-	// `{{yaksha.number}}`.
+	// `{{yaksh.number}}`.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -4253,7 +4253,7 @@ type ClientInterface interface {
 
 	// ListPhoneNumbersApiV1PhoneNumbersGet List Phone Numbers
 	//
-	// The numbers Yaksha may use, as the worker last synced them from the Plivo account.
+	// The numbers Yaksh may use, as the worker last synced them from the Plivo account.
 	//
 	// Corresponds with GET /api/v1/phone-numbers (the `ListPhoneNumbersApiV1PhoneNumbersGet` operationId).
 	ListPhoneNumbersApiV1PhoneNumbersGet(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -4774,7 +4774,7 @@ func (c *Client) DraftAgentBriefApiV1AgentsDraftBriefPost(ctx context.Context, b
 // ImportAgentFileApiV1AgentsImportPostWithBody Import Agent File
 //
 // Read an agent file from another platform into a draft. Nothing is saved. A file in a format
-// that Yaksha does not read fails with the code `not_recognized`; it can still be the config.
+// that Yaksh does not read fails with the code `not_recognized`; it can still be the config.
 //
 // Takes any type of body and a specified content type.
 //
@@ -4794,7 +4794,7 @@ func (c *Client) ImportAgentFileApiV1AgentsImportPostWithBody(ctx context.Contex
 // ImportAgentFileApiV1AgentsImportPost Import Agent File
 //
 // Read an agent file from another platform into a draft. Nothing is saved. A file in a format
-// that Yaksha does not read fails with the code `not_recognized`; it can still be the config.
+// that Yaksh does not read fails with the code `not_recognized`; it can still be the config.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -5148,9 +5148,9 @@ func (c *Client) ListAgentSourcesApiV1AgentsSourcesGet(ctx context.Context, reqE
 
 // ReadCurlCommandApiV1AgentsStartRequestFromCurlPostWithBody Read Curl Command
 //
-// Read a cURL command into a start request, for an agent that calls Yaksha. Nothing is
+// Read a cURL command into a start request, for an agent that calls Yaksh. Nothing is
 // saved. A body field or query parameter that looks like the number to call gets
-// `{{yaksha.number}}`.
+// `{{yaksh.number}}`.
 //
 // Takes any type of body and a specified content type.
 //
@@ -5169,9 +5169,9 @@ func (c *Client) ReadCurlCommandApiV1AgentsStartRequestFromCurlPostWithBody(ctx 
 
 // ReadCurlCommandApiV1AgentsStartRequestFromCurlPost Read Curl Command
 //
-// Read a cURL command into a start request, for an agent that calls Yaksha. Nothing is
+// Read a cURL command into a start request, for an agent that calls Yaksh. Nothing is
 // saved. A body field or query parameter that looks like the number to call gets
-// `{{yaksha.number}}`.
+// `{{yaksh.number}}`.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -6079,7 +6079,7 @@ func (c *Client) GetVersionApiV1PersonasPersonaIdVersionsVersionGet(ctx context.
 
 // ListPhoneNumbersApiV1PhoneNumbersGet List Phone Numbers
 //
-// The numbers Yaksha may use, as the worker last synced them from the Plivo account.
+// The numbers Yaksh may use, as the worker last synced them from the Plivo account.
 //
 // Corresponds with GET /api/v1/phone-numbers (the `ListPhoneNumbersApiV1PhoneNumbersGet` operationId).
 func (c *Client) ListPhoneNumbersApiV1PhoneNumbersGet(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -11318,7 +11318,7 @@ type ClientWithResponsesInterface interface {
 	// ImportAgentFileApiV1AgentsImportPostWithBodyWithResponse Import Agent File
 	//
 	// Read an agent file from another platform into a draft. Nothing is saved. A file in a format
-	// that Yaksha does not read fails with the code `not_recognized`; it can still be the config.
+	// that Yaksh does not read fails with the code `not_recognized`; it can still be the config.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -11328,7 +11328,7 @@ type ClientWithResponsesInterface interface {
 	// ImportAgentFileApiV1AgentsImportPostWithResponse Import Agent File
 	//
 	// Read an agent file from another platform into a draft. Nothing is saved. A file in a format
-	// that Yaksha does not read fails with the code `not_recognized`; it can still be the config.
+	// that Yaksh does not read fails with the code `not_recognized`; it can still be the config.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -11504,9 +11504,9 @@ type ClientWithResponsesInterface interface {
 
 	// ReadCurlCommandApiV1AgentsStartRequestFromCurlPostWithBodyWithResponse Read Curl Command
 	//
-	// Read a cURL command into a start request, for an agent that calls Yaksha. Nothing is
+	// Read a cURL command into a start request, for an agent that calls Yaksh. Nothing is
 	// saved. A body field or query parameter that looks like the number to call gets
-	// `{{yaksha.number}}`.
+	// `{{yaksh.number}}`.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -11515,9 +11515,9 @@ type ClientWithResponsesInterface interface {
 
 	// ReadCurlCommandApiV1AgentsStartRequestFromCurlPostWithResponse Read Curl Command
 	//
-	// Read a cURL command into a start request, for an agent that calls Yaksha. Nothing is
+	// Read a cURL command into a start request, for an agent that calls Yaksh. Nothing is
 	// saved. A body field or query parameter that looks like the number to call gets
-	// `{{yaksha.number}}`.
+	// `{{yaksh.number}}`.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -11945,7 +11945,7 @@ type ClientWithResponsesInterface interface {
 
 	// ListPhoneNumbersApiV1PhoneNumbersGetWithResponse List Phone Numbers
 	//
-	// The numbers Yaksha may use, as the worker last synced them from the Plivo account.
+	// The numbers Yaksh may use, as the worker last synced them from the Plivo account.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -17141,7 +17141,7 @@ func (c *ClientWithResponses) DraftAgentBriefApiV1AgentsDraftBriefPostWithRespon
 // ImportAgentFileApiV1AgentsImportPostWithBodyWithResponse Import Agent File
 //
 // Read an agent file from another platform into a draft. Nothing is saved. A file in a format
-// that Yaksha does not read fails with the code `not_recognized`; it can still be the config.
+// that Yaksh does not read fails with the code `not_recognized`; it can still be the config.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -17157,7 +17157,7 @@ func (c *ClientWithResponses) ImportAgentFileApiV1AgentsImportPostWithBodyWithRe
 // ImportAgentFileApiV1AgentsImportPostWithResponse Import Agent File
 //
 // Read an agent file from another platform into a draft. Nothing is saved. A file in a format
-// that Yaksha does not read fails with the code `not_recognized`; it can still be the config.
+// that Yaksh does not read fails with the code `not_recognized`; it can still be the config.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -17441,9 +17441,9 @@ func (c *ClientWithResponses) ListAgentSourcesApiV1AgentsSourcesGetWithResponse(
 
 // ReadCurlCommandApiV1AgentsStartRequestFromCurlPostWithBodyWithResponse Read Curl Command
 //
-// Read a cURL command into a start request, for an agent that calls Yaksha. Nothing is
+// Read a cURL command into a start request, for an agent that calls Yaksh. Nothing is
 // saved. A body field or query parameter that looks like the number to call gets
-// `{{yaksha.number}}`.
+// `{{yaksh.number}}`.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -17458,9 +17458,9 @@ func (c *ClientWithResponses) ReadCurlCommandApiV1AgentsStartRequestFromCurlPost
 
 // ReadCurlCommandApiV1AgentsStartRequestFromCurlPostWithResponse Read Curl Command
 //
-// Read a cURL command into a start request, for an agent that calls Yaksha. Nothing is
+// Read a cURL command into a start request, for an agent that calls Yaksh. Nothing is
 // saved. A body field or query parameter that looks like the number to call gets
-// `{{yaksha.number}}`.
+// `{{yaksh.number}}`.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -18212,7 +18212,7 @@ func (c *ClientWithResponses) GetVersionApiV1PersonasPersonaIdVersionsVersionGet
 
 // ListPhoneNumbersApiV1PhoneNumbersGetWithResponse List Phone Numbers
 //
-// The numbers Yaksha may use, as the worker last synced them from the Plivo account.
+// The numbers Yaksh may use, as the worker last synced them from the Plivo account.
 //
 // Returns a wrapper object for the known response body format(s).
 //

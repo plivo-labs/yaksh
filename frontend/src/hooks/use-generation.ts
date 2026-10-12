@@ -90,7 +90,7 @@ export function useGeneration(agentId: string) {
         if (!finished) {
           patch({
             status: abort.signal.aborted ? "stopped" : "failed",
-            error: abort.signal.aborted ? null : "The connection to Yaksha was lost.",
+            error: abort.signal.aborted ? null : "The connection to Yaksh was lost.",
           });
         }
         if (controller.current === abort) controller.current = null;

@@ -21,14 +21,14 @@ from tests.conftest import (
     create_scenario,
     new_persona_id,
 )
-from yaksha.api import create_app
-from yaksha.config import Settings
-from yaksha.db.models import Scenario, ScenarioGeneration
-from yaksha.db.session import create_engine, create_sessionmaker
-from yaksha.domain.errors import UnavailableError
-from yaksha.domain.generation import MAX_PLANNER_CHARS, GenerateScenarios, GenerationStatus
-from yaksha.domain.language_models import ModelAnswer
-from yaksha.simulation import generation
+from yaksh.api import create_app
+from yaksh.config import Settings
+from yaksh.db.models import Scenario, ScenarioGeneration
+from yaksh.db.session import create_engine, create_sessionmaker
+from yaksh.domain.errors import UnavailableError
+from yaksh.domain.generation import MAX_PLANNER_CHARS, GenerateScenarios, GenerationStatus
+from yaksh.domain.language_models import ModelAnswer
+from yaksh.simulation import generation
 
 BRIEF = "Reschedules missed clinic visits. Never gives medical advice; transfers to a nurse."
 OPEN_REQUEST = "Make it a request a caller could plausibly make to this agent.\n"

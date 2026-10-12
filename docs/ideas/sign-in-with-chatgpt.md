@@ -4,7 +4,7 @@ Not decided.
 
 ## Problem
 
-Yaksha needs an OpenAI API key for the persona model and for scenario generation. Many users already pay for ChatGPT Plus or Pro, but they must still open an API account, add billing and manage a key before their first test.
+Yaksh needs an OpenAI API key for the persona model and for scenario generation. Many users already pay for ChatGPT Plus or Pro, but they must still open an API account, add billing and manage a key before their first test.
 
 ## Today
 
@@ -27,12 +27,12 @@ With [Sign in with ChatGPT](https://developers.openai.com/siwc/token-sharing-ope
 
 1. Sign in with ChatGPT is an option next to `OPENAI_API_KEY`. With it, the persona model and scenario generation run on the user's ChatGPT plan.
 2. Sign-in:
-   - When Yaksha runs on the user's computer, the console starts the sign-in and the API receives the loopback redirect.
-   - When Yaksha runs on a server, the CLI signs in on the user's computer and sends the credential record to the server through the API.
+   - When Yaksh runs on the user's computer, the console starts the sign-in and the API receives the loopback redirect.
+   - When Yaksh runs on a server, the CLI signs in on the user's computer and sends the credential record to the server through the API.
 3. The database holds one credential record for each server: the client id, the tokens and the host id. Only one process refreshes the tokens at a time, because each refresh token works once.
 4. The model lists in the console come from `GET /v1/models` with the token.
 5. All model requests follow the preview rules. Scenario generation must stream and send `input` as an array.
-6. A request that hits the plan limit ends the conversation as an error on Yaksha's side, with the reason. The run does not try it again at once, because the next try fails the same way.
+6. A request that hits the plan limit ends the conversation as an error on Yaksh's side, with the reason. The run does not try it again at once, because the next try fails the same way.
 
 ## Risks
 
@@ -44,8 +44,8 @@ With [Sign in with ChatGPT](https://developers.openai.com/siwc/token-sharing-ope
 
 ## Open questions
 
-- Is a self-hosted Yaksha on a remote server an "open-source project" for OpenAI, or must the project fill in the interest form?
-- One plan for each server, or one for each user? Yaksha has no user accounts today.
-- When the plan limit is reached, does Yaksha fall back to an API key, if one is set?
+- Is a self-hosted Yaksh on a remote server an "open-source project" for OpenAI, or must the project fill in the interest form?
+- One plan for each server, or one for each user? Yaksh has no user accounts today.
+- When the plan limit is reached, does Yaksh fall back to an API key, if one is set?
 - Do Anthropic or Google offer plan usage to open-source apps?
 - Is the latency good enough for the persona? Measure it before building.

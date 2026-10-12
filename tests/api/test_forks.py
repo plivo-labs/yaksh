@@ -17,9 +17,9 @@ from tests.conftest import (
     data_sets,
     save_settings,
 )
-from yaksha.domain.forks import ForkRequest
-from yaksha.domain.surroundings import NoiseSound, Sound, Speaker, SpeakerKind, Surroundings
-from yaksha.simulation import forks, personas
+from yaksh.domain.forks import ForkRequest
+from yaksh.domain.surroundings import NoiseSound, Sound, Speaker, SpeakerKind, Surroundings
+from yaksh.simulation import forks, personas
 
 FORKED_FIELDS = (
     "category",

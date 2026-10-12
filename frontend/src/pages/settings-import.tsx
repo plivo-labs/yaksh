@@ -30,7 +30,7 @@ export function ImportExport() {
       const url = URL.createObjectURL(new Blob([text], { type: "application/yaml" }));
       const link = Object.assign(window.document.createElement("a"), {
         href: url,
-        download: "yaksha-settings.yaml",
+        download: "yaksh-settings.yaml",
       });
       link.click();
       URL.revokeObjectURL(url);

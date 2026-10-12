@@ -15,7 +15,7 @@ from tests.conftest import (
     save_settings,
     wait_for_lock_waiters,
 )
-from yaksha.db.models import Agent
+from yaksh.db.models import Agent
 
 
 async def test_a_config_change_writes_a_version_but_a_rename_does_not(

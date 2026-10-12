@@ -599,7 +599,7 @@ export async function draftBrief(config: string): Promise<string> {
   return brief;
 }
 
-/** Reads an agent file into a draft. A file Yaksha does not read fails with `not_recognized`. */
+/** Reads an agent file into a draft. A file Yaksh does not read fails with `not_recognized`. */
 export function useImportAgentFile() {
   return useMutation({
     mutationFn: (content: string) =>

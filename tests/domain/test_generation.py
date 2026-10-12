@@ -3,7 +3,7 @@ from collections import Counter, defaultdict
 
 import pytest
 
-from yaksha.domain.generation import (
+from yaksh.domain.generation import (
     ENTITY_FORMATS,
     MAX_REPEATS,
     Capability,
@@ -16,7 +16,7 @@ from yaksha.domain.generation import (
     question_slots,
     spread_personas,
 )
-from yaksha.domain.scenarios import Category
+from yaksh.domain.scenarios import Category
 
 
 def capability(name: str, priority: Priority, *, tested: bool = False) -> Capability:

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Open a Cloudflare quick tunnel to the worker and print the YAKSHA_PUBLIC_URL line to put in
+# Open a Cloudflare quick tunnel to the worker and print the YAKSH_PUBLIC_URL line to put in
 # docker/.env. Quick tunnels need no account; the hostname changes every time the tunnel starts.
 set -euo pipefail
 
@@ -20,7 +20,7 @@ if [ -z "$url" ]; then
   exit 1
 fi
 
-echo "YAKSHA_PUBLIC_URL=$url"
+echo "YAKSH_PUBLIC_URL=$url"
 echo
 echo "Put that line in docker/.env, then recreate the API and the worker so they pick it up (from the repo root):"
 echo "  docker compose -f docker/compose.dev.yaml create --force-recreate api worker"

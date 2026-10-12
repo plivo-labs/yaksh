@@ -152,7 +152,7 @@ export function DraftDialog<T extends { name: string }>({
       setEnding((current) =>
         abort.signal.aborted
           ? { ...current, stopped: true }
-          : { ...current, failed: "the connection to Yaksha was lost" },
+          : { ...current, failed: "the connection to Yaksh was lost" },
       ),
     );
     controller.current = null;

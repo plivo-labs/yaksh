@@ -257,7 +257,7 @@ export function AgentScenarios({ agent }: { agent: Agent }) {
         ) : items.length === 0 && !shownBatch ? (
           <div className="grid justify-items-center gap-4 px-5 py-10 text-center">
             <p className="text-p-400 text-muted-foreground">
-              No scenarios yet. Generate them from what Yaksha knows about the agent, or write one.
+              No scenarios yet. Generate them from what Yaksh knows about the agent, or write one.
             </p>
             <div className="flex gap-2">
               <Button size="sm" disabled={generation.running} onClick={() => setGenerating(true)}>

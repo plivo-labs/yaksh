@@ -141,7 +141,7 @@ export function GenerateDialog({
         <DialogHeader className="px-6 pt-6 pb-4">
           <DialogTitle>Generate scenarios</DialogTitle>
           <DialogDescription>
-            Yaksha saves each scenario as it is written. Delete the ones you do not want.
+            Yaksh saves each scenario as it is written. Delete the ones you do not want.
           </DialogDescription>
         </DialogHeader>
 

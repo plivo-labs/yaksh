@@ -6,9 +6,9 @@ from alembic.migration import MigrationContext
 from sqlalchemy import Connection, inspect, text
 from sqlalchemy.ext.asyncio import create_async_engine
 
-from yaksha.db.base import Base
+from yaksh.db.base import Base
 
-UPGRADE = "import sys; from yaksha.db.migrate import upgrade_to_head; upgrade_to_head(sys.argv[1])"
+UPGRADE = "import sys; from yaksh.db.migrate import upgrade_to_head; upgrade_to_head(sys.argv[1])"
 
 
 def diff_against_models(connection: Connection) -> list[object]:

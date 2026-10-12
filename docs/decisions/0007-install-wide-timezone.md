@@ -5,7 +5,7 @@ Status: accepted, changed by 0027 (the time zone is on the Settings page)
 
 ## Decision
 
-`YAKSHA_TIMEZONE` (default UTC) sets the caller's "today". Yaksha computes it when the conversation, or the run that creates it, is created and writes it into the caller prompt. A retry copies the prompt, so it keeps the "today" of the attempt it replaces.
+`YAKSH_TIMEZONE` (default UTC) sets the caller's "today". Yaksh computes it when the conversation, or the run that creates it, is created and writes it into the caller prompt. A retry copies the prompt, so it keeps the "today" of the attempt it replaces.
 
 ## Why
 

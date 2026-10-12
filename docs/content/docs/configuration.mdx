@@ -1,33 +1,33 @@
 ---
 title: Configuration
-description: The environment variables Yaksha needs to start, and the Settings page for everything else.
+description: The environment variables Yaksh needs to start, and the Settings page for everything else.
 ---
 
-Yaksha keeps its configuration in two places:
+Yaksh keeps its configuration in two places:
 
-- **Environment variables** hold what Yaksha needs before it can open its database: the database address, the API token, the encryption key, the public URL and file storage. With Docker Compose, put them in `docker/.env`. Without Docker, set them in the environment, or put them in `.env` in the folder where you start Yaksha. The API and the worker read them when they start.
-- **The Settings page** of the console holds the provider keys, the models and the limits. Yaksha keeps them in its database, and keeps each key encrypted. A change applies to the next call. A call in progress keeps the settings that it started with. You do not restart anything.
+- **Environment variables** hold what Yaksh needs before it can open its database: the database address, the API token, the encryption key, the public URL and file storage. With Docker Compose, put them in `docker/.env`. Without Docker, set them in the environment, or put them in `.env` in the folder where you start Yaksh. The API and the worker read them when they start.
+- **The Settings page** of the console holds the provider keys, the models and the limits. Yaksh keeps them in its database, and keeps each key encrypted. A change applies to the next call. A call in progress keeps the settings that it started with. You do not restart anything.
 
 ## First start
 
-1. In `docker/.env`, set `YAKSHA_API_TOKEN` and `YAKSHA_ENCRYPTION_KEY`. To make an encryption key, run `openssl rand -base64 32`. Keep a copy of the key in a safe place.
-2. Start Yaksha with `docker compose -f docker/compose.yaml up --build`.
+1. In `docker/.env`, set `YAKSH_API_TOKEN` and `YAKSH_ENCRYPTION_KEY`. To make an encryption key, run `openssl rand -base64 32`. Keep a copy of the key in a safe place.
+2. Start Yaksh with `docker compose -f docker/compose.yaml up --build`.
 3. Open the console and enter the API token. The console opens on Settings until you save the LLM provider key.
-4. On Settings, add the LLM provider key, the Deepgram key, the ElevenLabs key, and the Plivo Auth ID and Auth token. Yaksha checks each key with its provider before it saves it.
+4. On Settings, add the LLM provider key, the Deepgram key, the ElevenLabs key, and the Plivo Auth ID and Auth token. Yaksh checks each key with its provider before it saves it.
 
 ## Environment variables
 
 | Variable | Description |
 | --- | --- |
-| `YAKSHA_API_TOKEN` | The bearer token of the API. Yaksha does not start without it. |
-| `YAKSHA_DATABASE_URL` | The URL of the Postgres database. Yaksha does not start without it. The URL can start with `postgres://`, `postgresql://` or `postgresql+asyncpg://`, so you can use the URL that your host gives. Yaksha connects with the asyncpg driver for all three. Yaksha does not start with a URL for a different driver, such as `postgresql+psycopg://`. Yaksha also accepts `sslmode`, for example `?sslmode=require`. Yaksha does not start with an option that asyncpg does not take, such as `channel_binding` in a Neon URL: the error names the option to remove. The database must be PostgreSQL 18 or later. Docker Compose sets this variable to its `postgres` service, and a value in `docker/.env` has no effect. |
-| `YAKSHA_ENCRYPTION_KEY` | The key that encrypts the keys on the Settings page. It must have 32 characters or more. Yaksha does not start without it, or when the key cannot decrypt the saved keys. |
-| `YAKSHA_PUBLIC_URL` | The public `https://` URL that goes to port 8770 of the worker. The API and the worker read it. Yaksha cannot make phone calls without it. |
-| `YAKSHA_PLIVO_NUMBERS` | This variable is optional. It is a comma-separated list of E.164 numbers. If you do not set it, the worker calls from all voice numbers of the account. If a number in the list is not in the account, the worker keeps its last number list and the Numbers page shows the problem. |
-| `YAKSHA_PLIVO_APP_ID` | The Plivo Application for outbound tests. The API and the worker read it. Outbound tests are off without it. Refer to [Outbound agents](/docs/outbound-agents). |
-| `YAKSHA_ALLOW_PRIVATE_TRIGGERS` | This variable is optional. It lets trigger URLs use `http` and private addresses, for agents on your own network. The default is off. |
-| `YAKSHA_MAX_ACTIVE_CONVERSATIONS` | The maximum number of conversations on one worker at the same time. The default is 4. |
-| `PORT` | This variable is optional. It sets the port that the process listens on. The default is 8000 for the API and 8770 for the worker. Hosting platforms such as Railway, Render, Fly and Cloud Run set it for each service. `yaksha-server api --port` overrides it. Do not set it in `docker/.env`: the API and the worker read the same file, and the Compose port mappings stay at 8000 and 8770. |
+| `YAKSH_API_TOKEN` | The bearer token of the API. Yaksh does not start without it. |
+| `YAKSH_DATABASE_URL` | The URL of the Postgres database. Yaksh does not start without it. The URL can start with `postgres://`, `postgresql://` or `postgresql+asyncpg://`, so you can use the URL that your host gives. Yaksh connects with the asyncpg driver for all three. Yaksh does not start with a URL for a different driver, such as `postgresql+psycopg://`. Yaksh also accepts `sslmode`, for example `?sslmode=require`. Yaksh does not start with an option that asyncpg does not take, such as `channel_binding` in a Neon URL: the error names the option to remove. The database must be PostgreSQL 18 or later. Docker Compose sets this variable to its `postgres` service, and a value in `docker/.env` has no effect. |
+| `YAKSH_ENCRYPTION_KEY` | The key that encrypts the keys on the Settings page. It must have 32 characters or more. Yaksh does not start without it, or when the key cannot decrypt the saved keys. |
+| `YAKSH_PUBLIC_URL` | The public `https://` URL that goes to port 8770 of the worker. The API and the worker read it. Yaksh cannot make phone calls without it. |
+| `YAKSH_PLIVO_NUMBERS` | This variable is optional. It is a comma-separated list of E.164 numbers. If you do not set it, the worker calls from all voice numbers of the account. If a number in the list is not in the account, the worker keeps its last number list and the Numbers page shows the problem. |
+| `YAKSH_PLIVO_APP_ID` | The Plivo Application for outbound tests. The API and the worker read it. Outbound tests are off without it. Refer to [Outbound agents](/docs/outbound-agents). |
+| `YAKSH_ALLOW_PRIVATE_TRIGGERS` | This variable is optional. It lets trigger URLs use `http` and private addresses, for agents on your own network. The default is off. |
+| `YAKSH_MAX_ACTIVE_CONVERSATIONS` | The maximum number of conversations on one worker at the same time. The default is 4. |
+| `PORT` | This variable is optional. It sets the port that the process listens on. The default is 8000 for the API and 8770 for the worker. Hosting platforms such as Railway, Render, Fly and Cloud Run set it for each service. `yaksh-server api --port` overrides it. Do not set it in `docker/.env`: the API and the worker read the same file, and the Compose port mappings stay at 8000 and 8770. |
 
 After you change `docker/.env`, make the containers again. Use these commands from the root of the repository:
 
@@ -40,9 +40,9 @@ For development, use `docker/compose.dev.yaml` in these commands.
 
 ### The encryption key
 
-Yaksha encrypts each saved key with AES-256-GCM. The encryption key comes from `YAKSHA_ENCRYPTION_KEY`. A copy of the database without this variable shows no key.
+Yaksh encrypts each saved key with AES-256-GCM. The encryption key comes from `YAKSH_ENCRYPTION_KEY`. A copy of the database without this variable shows no key.
 
-If you lose the encryption key, Yaksha cannot read the saved keys. Set a new `YAKSHA_ENCRYPTION_KEY`, remove the old keys in the database with `UPDATE app_settings SET secrets = '{}'`, start Yaksha again and enter each key again on Settings.
+If you lose the encryption key, Yaksh cannot read the saved keys. Set a new `YAKSH_ENCRYPTION_KEY`, remove the old keys in the database with `UPDATE app_settings SET secrets = '{}'`, start Yaksh again and enter each key again on Settings.
 
 ## Settings
 
@@ -55,13 +55,13 @@ The Settings page has four tabs.
 | Phone | The Plivo Auth ID and Auth token. The signing key and the secrets of outbound triggers. The ring timeout, the number rest and the time zone. |
 | Limits | The default turns and length of a call, and the maximum conversations, repeats, retries and start interval of a run. |
 
-- **Keys.** The page shows only the last 4 characters of a saved key. When you save a key, Yaksha first sends one small request to its provider. It saves the key only when the provider accepts it.
-- **Base URLs.** A new base URL of the LLM provider or of Deepgram removes the key of that provider when you save it. To keep a key, type the new base URL, then replace the key and click **Check and save**: Yaksha checks the new key at the new address and saves both. **Test** is off while a base URL has a change that is not saved. Thus, a key goes only to the address that it was checked with.
-- **Plivo.** You save the Auth ID and the Auth token together. Yaksha checks them together with Plivo.
+- **Keys.** The page shows only the last 4 characters of a saved key. When you save a key, Yaksh first sends one small request to its provider. It saves the key only when the provider accepts it.
+- **Base URLs.** A new base URL of the LLM provider or of Deepgram removes the key of that provider when you save it. To keep a key, type the new base URL, then replace the key and click **Check and save**: Yaksh checks the new key at the new address and saves both. **Test** is off while a base URL has a change that is not saved. Thus, a key goes only to the address that it was checked with.
+- **Plivo.** You save the Auth ID and the Auth token together. Yaksh checks them together with Plivo.
 - **Missing keys.** A run cannot start until the LLM provider, Deepgram, ElevenLabs and Plivo keys are saved.
 - **Test.** The Test button of a provider uses the saved settings for a small piece of real work, for example one short answer from the caller model. The provider can charge for this request.
-- **Models.** The model list comes from the LLM provider. You can also type a model name that the list does not have, such as the name of an Azure deployment. When you choose a model, Yaksha checks which reasoning efforts it accepts.
-- **Defaults.** Yaksha keeps only the values that you change. All other settings use their defaults, and a new release can change a default.
+- **Models.** The model list comes from the LLM provider. You can also type a model name that the list does not have, such as the name of an Azure deployment. When you choose a model, Yaksh checks which reasoning efforts it accepts.
+- **Defaults.** Yaksh keeps only the values that you change. All other settings use their defaults, and a new release can change a default.
 - **Time zone.** The time zone sets the "today" of the caller. A run takes the date when it starts. Its conversations and their retries keep that date.
 
 ### Import and export
@@ -71,30 +71,30 @@ Export writes the settings as a YAML file. The file has the values that you chan
 The CLI applies a file and reads each `${NAME}` from its environment:
 
 ```sh
-yaksha settings export > yaksha-settings.yaml
-LLM_API_KEY=... DEEPGRAM_API_KEY=... yaksha settings apply -f yaksha-settings.yaml
+yaksh settings export > yaksh-settings.yaml
+LLM_API_KEY=... DEEPGRAM_API_KEY=... yaksh settings apply -f yaksh-settings.yaml
 ```
 
-`yaksha settings apply` stops before it sends anything if a variable is not set. Yaksha checks each key in the file with its provider. It saves the settings and the keys that pass. It does not save a key that fails: the command lists each one with the reason and exits with status 1. The Settings page shows the same list. Add `--dry-run` to see the changes without saving them. A dry run does not need the variables: it lists each placeholder without a value as skipped.
+`yaksh settings apply` stops before it sends anything if a variable is not set. Yaksh checks each key in the file with its provider. It saves the settings and the keys that pass. It does not save a key that fails: the command lists each one with the reason and exits with status 1. The Settings page shows the same list. Add `--dry-run` to see the changes without saving them. A dry run does not need the variables: it lists each placeholder without a value as skipped.
 
 The Import button of the console applies a file too. A browser cannot read environment variables, so the console skips each `${NAME}` placeholder and lists it.
 
 ## Security
 
-- Yaksha has one API token and no user accounts. A person with the token can read and change all data, and can replace the keys on Settings. The API never returns the value of a key.
+- Yaksh has one API token and no user accounts. A person with the token can read and change all data, and can replace the keys on Settings. The API never returns the value of a key.
 - The API uses HTTP without TLS on port 8000. Before you open port 8000 to a network, put an HTTPS proxy in front of it.
 - `GET /api/v1/health` and `GET /api/v1/defaults` do not use the token. All other API requests must have it.
-- The console keeps the token in the storage of the browser. The CLI keeps it in `$XDG_CONFIG_HOME/yaksha/config.json`, or in `~/.config/yaksha/config.json` if `XDG_CONFIG_HOME` is not set. Only your user can read that file.
+- The console keeps the token in the storage of the browser. The CLI keeps it in `$XDG_CONFIG_HOME/yaksh/config.json`, or in `~/.config/yaksh/config.json` if `XDG_CONFIG_HOME` is not set. Only your user can read that file.
 - Port 8770 of the worker must be public for Plivo. The worker examines the Plivo signature of each request with the saved Plivo Auth token. It rejects a request without a correct signature.
-- `GET /health` on the worker's port (`PORT`, 8770 by default) does not use a Plivo signature. It gives the status and the version, as `GET /api/v1/health` does. Without `YAKSHA_PUBLIC_URL`, the worker serves only this route.
+- `GET /health` on the worker's port (`PORT`, 8770 by default) does not use a Plivo signature. It gives the status and the version, as `GET /api/v1/health` does. Without `YAKSH_PUBLIC_URL`, the worker serves only this route.
 
 ## File storage
 
-Yaksha keeps uploaded files (PDF, TXT and MD documents about an agent) and the audio of each call in S3-compatible storage. Yaksha does not start without it. The Docker Compose files operate [SeaweedFS](https://github.com/seaweedfs/seaweedfs) for this. Its data is in the `storage` volume. To use S3, R2 or a different S3-compatible service, set these variables. They stay in the environment: a change of the storage makes the files uploaded before it unreadable.
+Yaksh keeps uploaded files (PDF, TXT and MD documents about an agent) and the audio of each call in S3-compatible storage. Yaksh does not start without it. The Docker Compose files operate [SeaweedFS](https://github.com/seaweedfs/seaweedfs) for this. Its data is in the `storage` volume. To use S3, R2 or a different S3-compatible service, set these variables. They stay in the environment: a change of the storage makes the files uploaded before it unreadable.
 
 | Variable | Description |
 | --- | --- |
-| `YAKSHA_S3_ENDPOINT` | The URL of the storage. Required. |
-| `YAKSHA_S3_BUCKET` | The bucket. Make it before you start Yaksha. The default is `yaksha`. |
-| `YAKSHA_S3_ACCESS_KEY`, `YAKSHA_S3_SECRET_KEY` | The credentials. Required. |
-| `YAKSHA_S3_REGION` | The default is `us-east-1`. |
+| `YAKSH_S3_ENDPOINT` | The URL of the storage. Required. |
+| `YAKSH_S3_BUCKET` | The bucket. Make it before you start Yaksh. The default is `yaksh`. |
+| `YAKSH_S3_ACCESS_KEY`, `YAKSH_S3_SECRET_KEY` | The credentials. Required. |
+| `YAKSH_S3_REGION` | The default is `us-east-1`. |

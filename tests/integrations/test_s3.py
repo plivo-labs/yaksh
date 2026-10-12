@@ -4,11 +4,11 @@ import pytest
 from testcontainers.core.container import DockerContainer
 from testcontainers.core.wait_strategies import LogMessageWaitStrategy
 
-from yaksha.domain.errors import UnavailableError
-from yaksha.integrations.s3 import S3FileStore
+from yaksh.domain.errors import UnavailableError
+from yaksh.integrations.s3 import S3FileStore
 
-ACCESS_KEY = "yaksha"
-SECRET_KEY = "yaksha-storage"
+ACCESS_KEY = "yaksh"
+SECRET_KEY = "yaksh-storage"
 
 
 @pytest.fixture(scope="module")
@@ -16,11 +16,11 @@ def endpoint() -> Iterator[str]:
     """The same SeaweedFS the compose file runs."""
     storage = (
         DockerContainer("chrislusf/seaweedfs:4.48")
-        .with_command("mini -dir=/data -bucket=yaksha")
+        .with_command("mini -dir=/data -bucket=yaksh")
         .with_env("AWS_ACCESS_KEY_ID", ACCESS_KEY)
         .with_env("AWS_SECRET_ACCESS_KEY", SECRET_KEY)
         .with_exposed_ports(8333)
-        .waiting_for(LogMessageWaitStrategy("created bucket yaksha"))
+        .waiting_for(LogMessageWaitStrategy("created bucket yaksh"))
     )
     with storage:
         yield f"http://{storage.get_container_host_ip()}:{storage.get_exposed_port(8333)}"
@@ -32,7 +32,7 @@ async def stores(endpoint: str) -> AsyncIterator[Callable[[str], S3FileStore]]:
     made: list[S3FileStore] = []
 
     def store(secret_key: str = SECRET_KEY) -> S3FileStore:
-        made.append(S3FileStore(endpoint, "yaksha", ACCESS_KEY, secret_key))
+        made.append(S3FileStore(endpoint, "yaksh", ACCESS_KEY, secret_key))
         return made[-1]
 
     yield store

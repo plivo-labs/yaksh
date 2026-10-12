@@ -1,5 +1,5 @@
-from yaksha.api import create_app
-from yaksha.config import Settings
+from yaksh.api import create_app
+from yaksh.config import Settings
 
 ERROR_BODY = {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}
 

@@ -22,4 +22,4 @@ export const NAV_GROUPS: {
   },
 ];
 
-export const DOCS_URL = "https://github.com/plivo-labs/yaksha/tree/dev/docs/content/docs";
+export const DOCS_URL = "https://github.com/plivo-labs/yaksh/tree/dev/docs/content/docs";

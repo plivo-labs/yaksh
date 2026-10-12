@@ -4,11 +4,11 @@ import pytest
 from pydantic import SecretStr
 
 from tests.conftest import FakeProvider, response_body
-from yaksha.api.providers import Providers
-from yaksha.domain.errors import UnavailableError
-from yaksha.domain.language_models import ModelCallError
-from yaksha.domain.settings import AppSettings, Llm, Secrets
-from yaksha.integrations.openai_models import OpenAIJsonModel
+from yaksh.api.providers import Providers
+from yaksh.domain.errors import UnavailableError
+from yaksh.domain.language_models import ModelCallError
+from yaksh.domain.settings import AppSettings, Llm, Secrets
+from yaksh.integrations.openai_models import OpenAIJsonModel
 
 SCHEMA = {
     "type": "object",

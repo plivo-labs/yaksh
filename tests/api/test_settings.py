@@ -14,10 +14,10 @@ from tests.conftest import (
     save_settings,
     start_run,
 )
-from yaksha.integrations import provider_checks
-from yaksha.integrations.provider_checks import ProviderCheckError
-from yaksha.settings import store
-from yaksha.settings.cipher import Cipher, SecretUnreadableError
+from yaksh.integrations import provider_checks
+from yaksh.integrations.provider_checks import ProviderCheckError
+from yaksh.settings import store
+from yaksh.settings.cipher import Cipher, SecretUnreadableError
 
 LLM_KEY = "sk-live-0123456789abcdef"
 
@@ -416,7 +416,7 @@ async def test_settings_saved_with_another_encryption_key_cannot_be_read(
     await save_settings(db, secrets={"llm_api_key": LLM_KEY})
 
     async with db() as session:
-        with pytest.raises(SecretUnreadableError, match="YAKSHA_ENCRYPTION_KEY"):
+        with pytest.raises(SecretUnreadableError, match="YAKSH_ENCRYPTION_KEY"):
             await store.load(session, Cipher("another-encryption-key-of-32-chars!!"))
         assert (await store.load(session, Cipher(ENCRYPTION_KEY))).secrets.llm_api_key
 

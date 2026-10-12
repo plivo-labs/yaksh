@@ -3,8 +3,8 @@ from httpx import AsyncClient
 
 from tests.api.test_conversations import call_request_of
 from tests.conftest import APP_SETTINGS, create_agent_id, create_scenario, start
-from yaksha.config import Settings
-from yaksha.integrations.provider_checks import ProviderCheckError
+from yaksh.config import Settings
+from yaksh.integrations.provider_checks import ProviderCheckError
 
 ASTRA = {"model": "gpt-6-astra", "reasoning_effort": "low"}
 
@@ -19,7 +19,7 @@ def asked(monkeypatch: pytest.MonkeyPatch) -> list[tuple[str, str | None]]:
         if model.startswith("gone-"):
             raise ProviderCheckError(f"model {model}: The model does not exist")
 
-    monkeypatch.setattr("yaksha.integrations.provider_checks.check_llm", check_llm)
+    monkeypatch.setattr("yaksh.integrations.provider_checks.check_llm", check_llm)
     return seen
 
 

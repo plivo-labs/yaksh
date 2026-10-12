@@ -13,15 +13,15 @@ from tests.conftest import (
     finish,
     start_run,
 )
-from yaksha.db.models import Evaluation as EvaluationRow
-from yaksha.domain.conversations import (
+from yaksh.db.models import Evaluation as EvaluationRow
+from yaksh.domain.conversations import (
     CallOutcome,
     EndReason,
     Transcript,
     WireEvent,
     WireEventKind,
 )
-from yaksha.domain.evaluations import (
+from yaksh.domain.evaluations import (
     DecidedBy,
     EvaluationState,
     ItemRole,
@@ -31,11 +31,11 @@ from yaksha.domain.evaluations import (
     Share,
     Verdict,
 )
-from yaksha.domain.latency import Latency, Reply
-from yaksha.evaluation import evaluations
-from yaksha.evaluation.criteria import AGENT_RULE, CRITERION
-from yaksha.evaluation.evaluations import MAX_ATTEMPTS, Evaluated
-from yaksha.evaluation.judging import ItemResult
+from yaksh.domain.latency import Latency, Reply
+from yaksh.evaluation import evaluations
+from yaksh.evaluation.criteria import AGENT_RULE, CRITERION
+from yaksh.evaluation.evaluations import MAX_ATTEMPTS, Evaluated
+from yaksh.evaluation.judging import ItemResult
 
 CONNECTED = Transcript(wire_events=[WireEvent(kind=WireEventKind.CONNECTED, at_ms=500)])
 
@@ -228,7 +228,7 @@ async def test_run_verdicts_pool_judged_calls_by_scenario(client: AsyncClient, d
                 ),
                 ItemResult(
                     key="caller_check",
-                    subject="Yaksha's caller kept to its test",
+                    subject="Yaksh's caller kept to its test",
                     judge=None,
                     decided_by=DecidedBy.LLM,
                     role=ItemRole.REPORTING,
@@ -302,7 +302,7 @@ async def test_run_verdicts_leave_out_calls_with_no_verdict_yet(
         )
     errored_check = ItemResult(
         key="caller_check",
-        subject="Yaksha's caller kept to its test",
+        subject="Yaksh's caller kept to its test",
         judge=None,
         decided_by=DecidedBy.LLM,
         role=ItemRole.REPORTING,

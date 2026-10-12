@@ -2,9 +2,9 @@ import json
 import uuid
 from typing import Any
 
-from yaksha.domain.errors import ProviderCallError
-from yaksha.domain.numbers import AccountNumber
-from yaksha.simulation.plivo_cx_import import behavior, import_flow
+from yaksh.domain.errors import ProviderCallError
+from yaksh.domain.numbers import AccountNumber
+from yaksh.simulation.plivo_cx_import import behavior, import_flow
 
 FLOW = uuid.UUID("0b9e0c4a-0000-4000-8000-000000000001")
 
@@ -42,7 +42,7 @@ async def test_a_failed_number_lookup_keeps_the_agent_without_plivos_reply() -> 
     assert draft.name == "Front desk" and draft.agent_numbers == []
     assert draft.number_note is not None and "token" not in draft.number_note
     assert draft.number_note == (
-        "Yaksha could not look up its number. Plivo answered with status 500; try again later"
+        "Yaksh could not look up its number. Plivo answered with status 500; try again later"
     )
 
 

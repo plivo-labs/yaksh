@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 export function TokenGate({
   onToken,
   title = "API token",
-  description = "The value of YAKSHA_API_TOKEN on the server.",
+  description = "The value of YAKSH_API_TOKEN on the server.",
 }: {
   onToken: (token: string) => void;
   title?: string;

@@ -191,7 +191,7 @@ export function DataSetsGrid({
                 Data sent to the agent
               </span>
               <FieldDescription className="col-span-full">
-                Yaksha puts these in the request that starts the call, as{" "}
+                Yaksh puts these in the request that starts the call, as{" "}
                 <code>{"{{agent_data.<name>}}"}</code>. The caller does not see them; the judge
                 does.
               </FieldDescription>

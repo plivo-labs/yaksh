@@ -22,11 +22,11 @@ Status: replaced by 0027 (surroundings)
 
 ## Cost
 
-- Yaksha sends audio for the whole call: 50 messages a second, also in the pauses.
+- Yaksh sends audio for the whole call: 50 messages a second, also in the pauses.
 - A missing or broken sound file fails the conversation, with the reason.
 
 ## Other options
 
 - Noise on the scenario. Rejected: the scenario says what the caller wants, not where the caller is.
 - A free volume or ratio. Rejected for now: presets are easier to compare.
-- Mixing in Yaksha's pipeline before the transport. Rejected: the noise would stop between replies, and noise frames would count as caller speech.
+- Mixing in Yaksh's pipeline before the transport. Rejected: the noise would stop between replies, and noise frames would count as caller speech.

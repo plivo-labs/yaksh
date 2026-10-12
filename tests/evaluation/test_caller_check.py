@@ -3,11 +3,11 @@ from dataclasses import replace
 from typing import Any
 
 from tests.conftest import Scripted
-from yaksha.domain.conversations import EndReason, Role, Transcript, Turn, WireEvent, WireEventKind
-from yaksha.domain.evaluations import DecidedBy, ItemRole, Outcome, UnsureKind
-from yaksha.domain.languages import Language
-from yaksha.evaluation.caller_check import applied, check_caller, facts
-from yaksha.evaluation.judging import ItemResult
+from yaksh.domain.conversations import EndReason, Role, Transcript, Turn, WireEvent, WireEventKind
+from yaksh.domain.evaluations import DecidedBy, ItemRole, Outcome, UnsureKind
+from yaksh.domain.languages import Language
+from yaksh.evaluation.caller_check import applied, check_caller, facts
+from yaksh.evaluation.judging import ItemResult
 
 
 def turn(role: Role, text: str, at_ms: int) -> Turn:
@@ -36,7 +36,7 @@ def check(blame: str, *impact: tuple[int, str]) -> ItemResult:
     }
     return ItemResult(
         key="caller_check",
-        subject="Yaksha's caller kept to its test",
+        subject="Yaksh's caller kept to its test",
         judge="caller_check",
         decided_by=DecidedBy.LLM,
         role=ItemRole.REPORTING,

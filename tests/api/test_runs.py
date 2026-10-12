@@ -24,8 +24,8 @@ from tests.conftest import (
     wait_for_lock_waiters,
     wait_for_run,
 )
-from yaksha.db.models import Conversation, Persona, Run, Scenario
-from yaksha.domain.conversations import (
+from yaksh.db.models import Conversation, Persona, Run, Scenario
+from yaksh.domain.conversations import (
     CallerSettings,
     CallerUsage,
     CallOutcome,
@@ -37,9 +37,9 @@ from yaksha.domain.conversations import (
     Transcript,
     Turn,
 )
-from yaksha.domain.evaluations import Metric, MetricKey
-from yaksha.domain.languages import Language
-from yaksha.domain.latency import (
+from yaksh.domain.evaluations import Metric, MetricKey
+from yaksh.domain.languages import Language
+from yaksh.domain.latency import (
     AgentMedia,
     CallerReplyWindow,
     Latency,
@@ -47,9 +47,9 @@ from yaksha.domain.latency import (
     Span,
     waits,
 )
-from yaksha.domain.voices import VoiceProvider, VoiceSettings
-from yaksha.simulation.languages import LANGUAGES
-from yaksha.worker.worker import Worker
+from yaksh.domain.voices import VoiceProvider, VoiceSettings
+from yaksh.simulation.languages import LANGUAGES
+from yaksh.worker.worker import Worker
 
 NO_OUTCOMES = dict.fromkeys(
     ("waiting", "in_progress", "completed", "did_not_connect", "error", "cancelled"), 0

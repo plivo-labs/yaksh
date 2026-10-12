@@ -24,9 +24,9 @@ from pipecat.turns.user_stop import SpeechTimeoutUserTurnStopStrategy
 from pipecat.turns.user_turn_strategies import UserTurnStrategies
 
 from tests.conftest import FakeProvider
-from yaksha.caller import pipeline
-from yaksha.caller.audio import Clock
-from yaksha.caller.pipeline import (
+from yaksh.caller import pipeline
+from yaksh.caller.audio import Clock
+from yaksh.caller.pipeline import (
     CallerKeys,
     CallState,
     Ending,
@@ -35,9 +35,9 @@ from yaksha.caller.pipeline import (
     llm_service,
     watch_silence,
 )
-from yaksha.caller.transcript import TranscriptBuilder
-from yaksha.domain.conversations import CallObserver, CallRequest, EndReason, WireEvent
-from yaksha.domain.settings import AppSettings, CallerModel, Llm
+from yaksh.caller.transcript import TranscriptBuilder
+from yaksh.domain.conversations import CallObserver, CallRequest, EndReason, WireEvent
+from yaksh.domain.settings import AppSettings, CallerModel, Llm
 
 
 def model_settings(base: str, model: str, effort: str | None) -> AppSettings:

@@ -17,9 +17,9 @@ from tests.conftest import (
     new_run,
     reap,
 )
-from yaksha.config import Settings
-from yaksha.db.models import Conversation, Evaluation, MetricValue
-from yaksha.domain.conversations import (
+from yaksh.config import Settings
+from yaksh.db.models import Conversation, Evaluation, MetricValue
+from yaksh.domain.conversations import (
     CallOutcome,
     EndReason,
     StoredAudio,
@@ -27,10 +27,10 @@ from yaksha.domain.conversations import (
     WireEvent,
     WireEventKind,
 )
-from yaksha.domain.evaluations import EvaluationState, Metric, MetricKey
-from yaksha.domain.latency import CallerReplyWindow
-from yaksha.evaluation import evaluations
-from yaksha.evaluation.evaluations import MAX_ATTEMPTS, Evaluated
+from yaksh.domain.evaluations import EvaluationState, Metric, MetricKey
+from yaksh.domain.latency import CallerReplyWindow
+from yaksh.evaluation import evaluations
+from yaksh.evaluation.evaluations import MAX_ATTEMPTS, Evaluated
 
 HUNG_UP = CallOutcome(connected=True, end_reason=EndReason.AGENT_HANGUP)
 RATE = 8000

@@ -7,7 +7,7 @@ from fastapi import FastAPI, Request, Response
 from httpx import AsyncClient
 
 from tests.conftest import FakeProviders
-from yaksha.caller.plivo_server import PlivoServer
+from yaksh.caller.plivo_server import PlivoServer
 
 API_KEY = "retell-test-key"
 INBOUND = "agent_inbound"
@@ -251,7 +251,7 @@ async def test_an_agent_without_a_number_calls_out_with_its_variables(
     assert request["headers"] == [{"name": "Authorization", "value": f"Bearer {API_KEY}"}]
     assert request["body"] == {
         "from_number": "+14155550102",
-        "to_number": "{{yaksha.number}}",
+        "to_number": "{{yaksh.number}}",
         "override_agent_id": OUTBOUND,
         "override_agent_version": 0,
         "retell_llm_dynamic_variables": {

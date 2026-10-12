@@ -3,10 +3,10 @@ import json
 from typing import Any
 
 from tests.conftest import Scripted
-from yaksha.domain.conversations import Role, Turn
-from yaksha.domain.evaluations import Outcome
-from yaksha.domain.language_models import ModelCallError
-from yaksha.evaluation.sources import Document, judge_hallucination, judge_instructions
+from yaksh.domain.conversations import Role, Turn
+from yaksh.domain.evaluations import Outcome
+from yaksh.domain.language_models import ModelCallError
+from yaksh.evaluation.sources import Document, judge_hallucination, judge_instructions
 
 TURNS = [
     Turn(role=Role.AGENT, text="Thanks for calling Maple Dental.", started_at_ms=0, ended_at_ms=1),

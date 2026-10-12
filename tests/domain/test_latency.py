@@ -1,6 +1,6 @@
 from collections.abc import Sequence
 
-from yaksha.domain.latency import Latency, Reply, Span, Wait, nearest_rank, place, waits
+from yaksh.domain.latency import Latency, Reply, Span, Wait, nearest_rank, place, waits
 
 
 def spoke(*starts: int, ms: int = 300) -> list[Span]:
@@ -64,7 +64,7 @@ def test_replies_are_paired_with_the_agent_speech_that_answers_them() -> None:
     # late turn of this reply; the next reply takes the turn after it.
     early, late = Reply(start_ms=1_000, speech_ms=1_500), Reply(start_ms=2_000, speech_ms=2_400)
     assert place([2_350, 2_500], [early, late]) == [early, late]
-    # The agent was already speaking when Yaksha's stream opened: its greeting has no start to
+    # The agent was already speaking when Yaksh's stream opened: its greeting has no start to
     # measure, and its next sentence is not taken for one.
     speaking = paired(1_000, [(3_000, 4_000)], spoke(200, 2_400, 4_500), 6_000)
     assert Latency.answered(speaking).replies == [Reply(start_ms=4_000, speech_ms=4_500)]

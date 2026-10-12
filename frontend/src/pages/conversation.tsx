@@ -100,7 +100,7 @@ function ConversationView({ id }: { id: string }) {
   const [shown, setShown] = useState<ShownTurn | null>(null);
   const player = useRef<PlayerHandle>(null);
   const layout = useDefaultLayout({
-    id: "yaksha.conversation",
+    id: "yaksh.conversation",
     storage,
     onlySaveAfterUserInteractions: true,
   });
@@ -424,7 +424,7 @@ function AudioCard({
       <RecordingPlayer
         ref={player}
         url={conversation.recording_url}
-        name={`yaksha-${conversation.id}`}
+        name={`yaksh-${conversation.id}`}
         start={start}
         onTime={onTime}
         marks={
@@ -764,7 +764,7 @@ function Transcript({
   /** Plays the recording from that second; absent while there is no recording. */
   onPlay?: (seconds: number) => void;
 }) {
-  const [follow, setFollow] = useStoredBoolean("yaksha.transcript.follow", true);
+  const [follow, setFollow] = useStoredBoolean("yaksh.transcript.follow", true);
   /** A live call opens at its newest turn, a finished one at its first. Kept from the first
    * render, so a call that ends while it is open does not jump back to the start. */
   const [openedLive] = useState(active);

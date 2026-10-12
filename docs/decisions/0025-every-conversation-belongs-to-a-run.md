@@ -5,7 +5,7 @@ Status: accepted
 
 ## Decision
 
-Yaksha has no single test calls. To place one call, start a run of one scenario with 1 repeat. `run_id` and `repeat` are required on every conversation. The API has no `POST /api/v1/conversations`, the console has no Start call, Ring or Trigger button, and the CLI has no `conversation start`.
+Yaksh has no single test calls. To place one call, start a run of one scenario with 1 repeat. `run_id` and `repeat` are required on every conversation. The API has no `POST /api/v1/conversations`, the console has no Start call, Ring or Trigger button, and the CLI has no `conversation start`.
 
 ## Why
 

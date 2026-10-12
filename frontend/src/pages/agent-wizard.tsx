@@ -41,7 +41,7 @@ import { DraftRules, type RuleEdit } from "@/pages/agent-wizard-rules";
 
 const STEPS: Step[] = [
   { label: "Agent", hint: "What it is and does" },
-  { label: "Calls", hint: "How Yaksha reaches it" },
+  { label: "Calls", hint: "How Yaksh reaches it" },
   { label: "Knowledge base", hint: "Optional" },
   { label: "Rules", hint: "Optional" },
 ];
@@ -183,7 +183,7 @@ export function AgentWizardPage() {
       <div className="grid gap-1">
         <h1 className="text-h3-500">New agent</h1>
         <p className="text-p-400 text-muted-foreground">
-          Tell Yaksha what the agent does, how to reach it and what every call must follow.
+          Tell Yaksh what the agent does, how to reach it and what every call must follow.
         </p>
       </div>
       <Steps
@@ -263,7 +263,7 @@ export function AgentWizardPage() {
         {step === 3 && (
           <div className="flex flex-1 flex-col gap-6">
             <p className="text-p-400 text-muted-foreground">
-              Optional. Yaksha reads these documents to write test scenarios, and the judges check
+              Optional. Yaksh reads these documents to write test scenarios, and the judges check
               the agent's statements against them. You can add documents later on the agent's Config
               tab.
             </p>

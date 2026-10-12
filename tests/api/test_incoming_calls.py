@@ -8,10 +8,10 @@ from httpx import AsyncClient
 from sqlalchemy import insert, select, update
 
 from tests.conftest import OUTBOUND_AGENT, create_agent, create_scenario
-from yaksha.config import Settings
-from yaksha.db.models import Conversation, PhoneNumber, RefusedCall, Run
-from yaksha.db.session import create_engine, create_sessionmaker
-from yaksha.domain.conversations import (
+from yaksh.config import Settings
+from yaksh.db.models import Conversation, PhoneNumber, RefusedCall, Run
+from yaksh.db.session import create_engine, create_sessionmaker
+from yaksh.domain.conversations import (
     Admission,
     CallOutcome,
     ConversationStatus,
@@ -20,8 +20,8 @@ from yaksha.domain.conversations import (
     StoredAudio,
     Transcript,
 )
-from yaksha.domain.languages import Language
-from yaksha.simulation import conversations
+from yaksh.domain.languages import Language
+from yaksh.simulation import conversations
 
 AGENT_NUMBER = "+14155550100"
 

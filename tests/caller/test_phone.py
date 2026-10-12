@@ -30,22 +30,22 @@ from tests.conftest import (
     plivo_signed,
     refuse_calls,
 )
-from yaksha.caller import phone
-from yaksha.caller.audio import PLAYOUT, Clock, Playout
-from yaksha.caller.phone import Connected, Dialer, PhoneCaller, Receiver
-from yaksha.caller.pipeline import CallState
-from yaksha.caller.plivo_server import PendingStream, PlivoServer, StreamRegistry, create_app
-from yaksha.domain.agents import AgentConfig
-from yaksha.domain.conversations import (
+from yaksh.caller import phone
+from yaksh.caller.audio import PLAYOUT, Clock, Playout
+from yaksh.caller.phone import Connected, Dialer, PhoneCaller, Receiver
+from yaksh.caller.pipeline import CallState
+from yaksh.caller.plivo_server import PendingStream, PlivoServer, StreamRegistry, create_app
+from yaksh.domain.agents import AgentConfig
+from yaksh.domain.conversations import (
     CallOutcome,
     CallRequest,
     EndReason,
     LineFacts,
     WireEventKind,
 )
-from yaksha.domain.settings import Phone
-from yaksha.integrations.plivo import PlivoApi
-from yaksha.integrations.trigger import TriggerOutcome, TriggerResult
+from yaksh.domain.settings import Phone
+from yaksh.integrations.plivo import PlivoApi
+from yaksh.integrations.trigger import TriggerOutcome, TriggerResult
 
 CALL_SETTINGS = APP_SETTINGS.model_copy(
     update={
@@ -245,7 +245,7 @@ async def test_silence_from_plivo_and_a_missing_stream_time_out(rig: Rig) -> Non
     no_stream = await asyncio.wait_for(dialing, 5)
 
     assert nothing.end_reason is EndReason.ERROR and nothing.caller_error
-    assert "YAKSHA_PUBLIC_URL" in nothing.caller_error
+    assert "YAKSH_PUBLIC_URL" in nothing.caller_error
     assert no_stream.end_reason is EndReason.ERROR and no_stream.caller_error
     assert "never reached the worker" in no_stream.caller_error
     assert [action for action in rig.seen if "create" not in action] == [
@@ -300,7 +300,7 @@ def test_the_end_of_a_stream_is_named_by_the_hangup_report_that_follows() -> Non
 
     assert (agent.end_reason, agent.error) == (EndReason.AGENT_HANGUP, None)
     assert (outbound.end_reason, outbound.error) == (EndReason.AGENT_HANGUP, None), (
-        "an outbound agent called Yaksha, so its side is the caller"
+        "an outbound agent called Yaksh, so its side is the caller"
     )
     assert unknown.end_reason is EndReason.STREAM_ENDED
     assert unknown.error == "the stream ended and Plivo did not say which side ended the call"

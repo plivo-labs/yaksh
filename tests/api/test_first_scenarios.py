@@ -6,12 +6,12 @@ import pytest
 from httpx import AsyncClient
 
 from tests.conftest import AGENT, FakeJsonModel, FakeProviders, new_persona_id
-from yaksha.config import Settings
-from yaksha.db.models import ScenarioGeneration
-from yaksha.db.session import create_engine, create_sessionmaker
-from yaksha.domain.generation import GenerationStatus
-from yaksha.domain.language_models import ModelAnswer
-from yaksha.simulation import generation
+from yaksh.config import Settings
+from yaksh.db.models import ScenarioGeneration
+from yaksh.db.session import create_engine, create_sessionmaker
+from yaksh.domain.generation import GenerationStatus
+from yaksh.domain.language_models import ModelAnswer
+from yaksh.simulation import generation
 
 BRIEF = "Reschedules missed clinic visits. Never gives medical advice; transfers to a nurse."
 

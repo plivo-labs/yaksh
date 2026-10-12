@@ -56,7 +56,7 @@ const WHEEL_STEP = 60;
 type Listen = "both" | "agent" | "caller";
 type Output = "mono" | "stereo";
 
-const PREFERENCES_KEY = "yaksha.player";
+const PREFERENCES_KEY = "yaksh.player";
 
 interface Preferences {
   rate: number;

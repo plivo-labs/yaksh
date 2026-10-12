@@ -1,56 +1,56 @@
 ---
 title: Outbound agents
-description: Do tests of an agent that calls Yaksha.
+description: Do tests of an agent that calls Yaksh.
 ---
 
-An outbound agent calls Yaksha. Yaksha sends the trigger of the agent: a POST or GET request that makes the agent call one of the Yaksha numbers. Then Yaksha answers the call.
+An outbound agent calls Yaksh. Yaksh sends the trigger of the agent: a POST or GET request that makes the agent call one of the Yaksh numbers. Then Yaksh answers the call.
 
 ## Prepare for outbound tests
 
-1. In the Plivo console, make an Application. Set the answer URL to `<YAKSHA_PUBLIC_URL>/incoming`. Set the hangup URL to `<YAKSHA_PUBLIC_URL>/incoming/hangup`. Set the answer method and the hangup method to `POST`. Use the value of `YAKSHA_PUBLIC_URL` without a slash at the end.
+1. In the Plivo console, make an Application. Set the answer URL to `<YAKSH_PUBLIC_URL>/incoming`. Set the hangup URL to `<YAKSH_PUBLIC_URL>/incoming/hangup`. Set the answer method and the hangup method to `POST`. Use the value of `YAKSH_PUBLIC_URL` without a slash at the end.
 2. In the Plivo console, set this Application on each number that gets test calls.
-3. In `docker/.env`, set `YAKSHA_PLIVO_APP_ID` to the ID of the Application. Then make the API and worker containers again, because they read this variable only when they start:
+3. In `docker/.env`, set `YAKSH_PLIVO_APP_ID` to the ID of the Application. Then make the API and worker containers again, because they read this variable only when they start:
 
    ```sh
-   docker compose -f docker/compose.yaml create --force-recreate yaksha worker
-   docker compose -f docker/compose.yaml start yaksha worker
+   docker compose -f docker/compose.yaml create --force-recreate yaksh worker
+   docker compose -f docker/compose.yaml start yaksh worker
    ```
 
-4. Add an agent with the direction `outbound`. Give the method, the URL and the headers of its trigger. A POST trigger has a JSON body (`body`). A GET trigger has query parameters (`query`), a list of names and values, and no body. In the Yaksha console, choose **The agent calls Yaksha**. Then complete the fields in **Start request**.
+4. Add an agent with the direction `outbound`. Give the method, the URL and the headers of its trigger. A POST trigger has a JSON body (`body`). A GET trigger has query parameters (`query`), a list of names and values, and no body. In the Yaksh console, choose **The agent calls Yaksh**. Then complete the fields in **Start request**.
 
-The worker reads the Application and its numbers when it starts and when the Plivo keys in Settings change. After you change the Application or its numbers in the Plivo console, start the worker again with `docker compose -f docker/compose.yaml restart worker`. If `YAKSHA_PUBLIC_URL` changes, also change the two URLs of the Application. If outbound tests are off, the **Numbers** page of the Yaksha console shows the cause.
+The worker reads the Application and its numbers when it starts and when the Plivo keys in Settings change. After you change the Application or its numbers in the Plivo console, start the worker again with `docker compose -f docker/compose.yaml restart worker`. If `YAKSH_PUBLIC_URL` changes, also change the two URLs of the Application. If outbound tests are off, the **Numbers** page of the Yaksh console shows the cause.
 
 ## Trigger
 
-The trigger URL must use `https` and a public address. Yaksha saves an `http` URL, but each test then stops with the end reason `trigger_failed`. For an agent on your own network, set `YAKSHA_ALLOW_PRIVATE_TRIGGERS`.
+The trigger URL must use `https` and a public address. Yaksh saves an `http` URL, but each test then stops with the end reason `trigger_failed`. For an agent on your own network, set `YAKSH_ALLOW_PRIVATE_TRIGGERS`.
 
-The dial window (`dial_window_s`) is the time that Yaksha waits for the call of the agent: 10 to 600 seconds. The default is 120. The wait starts when Yaksha gets a number for the conversation. Yaksha adds 15 seconds for the trigger request. If no call comes during this time, the conversation stops with the end reason `no_call`. If you give calling numbers (`calling_numbers`), Yaksha accepts a call only from these numbers.
+The dial window (`dial_window_s`) is the time that Yaksh waits for the call of the agent: 10 to 600 seconds. The default is 120. The wait starts when Yaksh gets a number for the conversation. Yaksh adds 15 seconds for the trigger request. If no call comes during this time, the conversation stops with the end reason `no_call`. If you give calling numbers (`calling_numbers`), Yaksh accepts a call only from these numbers.
 
 ## Placeholders
 
-You can put placeholders in header values, in the string values of the JSON body and in the values of query parameters. The URL, the names of the JSON fields and the names of query parameters cannot have placeholders. Yaksha encodes each query value and adds the parameters after the query that the URL already has.
+You can put placeholders in header values, in the string values of the JSON body and in the values of query parameters. The URL, the names of the JSON fields and the names of query parameters cannot have placeholders. Yaksh encodes each query value and adds the parameters after the query that the URL already has.
 
 | Placeholder | Value |
 | --- | --- |
-| `{{yaksha.number}}` | The number that the agent must call. |
-| `{{yaksha.conversation_id}}` | The ID of the conversation. |
+| `{{yaksh.number}}` | The number that the agent must call. |
+| `{{yaksh.conversation_id}}` | The ID of the conversation. |
 | `{{agent_data.<name>}}` | A value from the agent data of the data set the call plays. |
 | `{{secrets.<NAME>}}` | A trigger secret from the **Phone** tab of Settings. `<NAME>` has only uppercase letters, digits and underscores, and starts with a letter. |
 
-Agent data is a list of names and values in a scenario. Yaksha sends it only in the trigger. The caller does not get it. Each scenario must have each agent data name that the trigger uses. If not, Yaksha rejects the request. For a run, Yaksha starts no conversation.
+Agent data is a list of names and values in a scenario. Yaksh sends it only in the trigger. The caller does not get it. Each scenario must have each agent data name that the trigger uses. If not, Yaksh rejects the request. For a run, Yaksh starts no conversation.
 
-Do not put the value of a secret in a trigger: Yaksha keeps the headers and the body of a trigger in the database without encryption. Save the secret in Settings and use `{{secrets.<NAME>}}`. If Settings has no trigger secret that the trigger uses, the conversation stops with the end reason `trigger_failed`.
+Do not put the value of a secret in a trigger: Yaksh keeps the headers and the body of a trigger in the database without encryption. Save the secret in Settings and use `{{secrets.<NAME>}}`. If Settings has no trigger secret that the trigger uses, the conversation stops with the end reason `trigger_failed`.
 
 ## Signed triggers
 
-Each trigger has the header `X-Yaksha-Delivery` with the ID of the conversation. Yaksha sends each trigger only one time. Thus, a second request with the same ID is a replay.
+Each trigger has the header `X-Yaksh-Delivery` with the ID of the conversation. Yaksh sends each trigger only one time. Thus, a second request with the same ID is a replay.
 
-If Settings has a signing key, each trigger also has these headers. To make the key, click **Generate key** on the **Phone** tab of Settings. Yaksha shows the key one time; copy it to your endpoint.
+If Settings has a signing key, each trigger also has these headers. To make the key, click **Generate key** on the **Phone** tab of Settings. Yaksh shows the key one time; copy it to your endpoint.
 
 | Header | Value |
 | --- | --- |
-| `X-Yaksha-Timestamp` | The time of the request, in Unix seconds. |
-| `X-Yaksha-Signature` | `v1=` and then the HMAC-SHA256 of `<X-Yaksha-Delivery>.<X-Yaksha-Timestamp>.<body>` in lowercase hexadecimal. For a GET trigger, the full URL with its query, as your server receives it, takes the place of the body. The key is the signing key from Settings. |
+| `X-Yaksh-Timestamp` | The time of the request, in Unix seconds. |
+| `X-Yaksh-Signature` | `v1=` and then the HMAC-SHA256 of `<X-Yaksh-Delivery>.<X-Yaksh-Timestamp>.<body>` in lowercase hexadecimal. For a GET trigger, the full URL with its query, as your server receives it, takes the place of the body. The key is the signing key from Settings. |
 
 To examine a trigger in your endpoint:
 

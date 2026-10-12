@@ -2,12 +2,12 @@ import pytest
 from pydantic import SecretStr
 
 from tests.conftest import APP_SETTINGS
-from yaksha.config import Settings
-from yaksha.db.session import create_engine, create_sessionmaker
-from yaksha.domain.settings import AppSettings
-from yaksha.integrations.plivo import PlivoApi
-from yaksha.worker import phone_account
-from yaksha.worker.phone_account import PhoneAccount
+from yaksh.config import Settings
+from yaksh.db.session import create_engine, create_sessionmaker
+from yaksh.domain.settings import AppSettings
+from yaksh.integrations.plivo import PlivoApi
+from yaksh.worker import phone_account
+from yaksh.worker.phone_account import PhoneAccount
 
 
 async def test_a_refresh_cut_short_runs_again_and_a_new_account_is_read_again(

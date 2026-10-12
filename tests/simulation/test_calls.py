@@ -2,8 +2,8 @@ import asyncio
 import uuid
 
 from tests.conftest import AGENT, APP_SETTINGS, CALLER
-from yaksha.domain.agents import AgentConfig
-from yaksha.domain.conversations import (
+from yaksh.domain.agents import AgentConfig
+from yaksh.domain.conversations import (
     CallObserver,
     CallOutcome,
     CallRequest,
@@ -11,7 +11,7 @@ from yaksha.domain.conversations import (
     WireEvent,
     WireEventKind,
 )
-from yaksha.simulation.calls import STOP_IGNORED, LiveCall, run_call
+from yaksh.simulation.calls import STOP_IGNORED, LiveCall, run_call
 
 REQUEST = CallRequest(
     conversation_id=uuid.uuid4(),

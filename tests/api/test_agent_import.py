@@ -5,7 +5,7 @@ import pytest
 from httpx import AsyncClient
 
 from tests.conftest import AGENT
-from yaksha.domain.agents import MAX_CONFIG_CHARS
+from yaksh.domain.agents import MAX_CONFIG_CHARS
 
 
 def plivo_cx_file(language: Any = "hi-IN,en-US") -> str:
@@ -73,8 +73,8 @@ async def test_a_plivo_cx_download_becomes_a_draft_that_creates_an_agent(
         "every language in order",
         "english without a region",
         "the same language twice",
-        "codes yaksha does not know",
-        "no code yaksha knows",
+        "codes yaksh does not know",
+        "no code yaksh knows",
         "empty",
         "missing",
     ],
@@ -89,7 +89,7 @@ async def test_every_language_the_flow_serves_is_taken_and_unknown_codes_are_nam
     assert note == (
         None
         if unknown is None
-        else f"Yaksha does not know the language {unknown}. Choose the agent's languages"
+        else f"Yaksh does not know the language {unknown}. Choose the agent's languages"
     )
 
 
@@ -136,7 +136,7 @@ async def test_a_curl_command_becomes_a_start_request(client: AsyncClient) -> No
         "url": "https://agents.example.com/calls",
         "headers": [],
         "query": [],
-        "body": {"to": "{{yaksha.number}}", "lang": "en"},
+        "body": {"to": "{{yaksh.number}}", "lang": "en"},
         "number_field": "to",
     }
     assert refused.status_code == 422 and "curl" in refused.json()["error"]["message"]

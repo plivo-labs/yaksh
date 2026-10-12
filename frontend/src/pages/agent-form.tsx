@@ -45,19 +45,19 @@ const REACH_CHOICES: {
 }[] = [
   {
     value: "inbound",
-    label: "Yaksha calls the agent",
-    hint: "Yaksha dials the agent's phone number and plays the caller.",
+    label: "Yaksh calls the agent",
+    hint: "Yaksh dials the agent's phone number and plays the caller.",
     icon: PhoneOutgoing,
   },
   {
     value: "outbound",
-    label: "The agent calls Yaksha",
-    hint: "Yaksha asks the agent to call, then answers as the caller.",
+    label: "The agent calls Yaksh",
+    hint: "Yaksh asks the agent to call, then answers as the caller.",
     icon: PhoneIncoming,
   },
 ];
 
-const REQUEST_NOTE = "Yaksha sends this request to make the agent call one of Yaksha's numbers.";
+const REQUEST_NOTE = "Yaksh sends this request to make the agent call one of Yaksh's numbers.";
 
 export function NameField({ form }: { form: AgentDraft }) {
   const { draft, set, submitted, needs } = form;
@@ -84,7 +84,7 @@ export function ReachChoice({ form }: { form: AgentDraft }) {
   const missing = submitted && needs.direction;
   return (
     <FieldSet>
-      <FieldLegend variant="label">How does Yaksha reach the agent?</FieldLegend>
+      <FieldLegend variant="label">How does Yaksh reach the agent?</FieldLegend>
       <div className="grid gap-3 sm:grid-cols-2">
         {REACH_CHOICES.map(({ value, label, hint, icon: Icon }) => (
           <label
@@ -108,7 +108,7 @@ export function ReachChoice({ form }: { form: AgentDraft }) {
         ))}
       </div>
       {missing && (
-        <FieldError id="direction-error">Choose how Yaksha reaches the agent.</FieldError>
+        <FieldError id="direction-error">Choose how Yaksh reaches the agent.</FieldError>
       )}
     </FieldSet>
   );
@@ -235,7 +235,7 @@ export function ContextFields({ form, brief }: { form: AgentDraft; brief: BriefD
           maxLength={MAX_BRIEF_CHARS}
           placeholder={
             brief.drafting
-              ? "Yaksha is drafting the brief from the config."
+              ? "Yaksh is drafting the brief from the config."
               : "What this agent is supposed to do, in your words."
           }
           aria-busy={brief.drafting}
@@ -249,7 +249,7 @@ export function ContextFields({ form, brief }: { form: AgentDraft; brief: BriefD
             Write at least {MIN_BRIEF_CHARS} characters about what the agent does.
           </FieldError>
         ) : brief.error ? (
-          <FieldError id="brief-hint">Yaksha could not draft the brief: {brief.error}</FieldError>
+          <FieldError id="brief-hint">Yaksh could not draft the brief: {brief.error}</FieldError>
         ) : (
           <FieldDescription id="brief-hint">
             At least {MIN_BRIEF_CHARS} characters. Check a drafted brief: it should say what the

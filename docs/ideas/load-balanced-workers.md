@@ -2,7 +2,7 @@
 
 ## Problem
 
-Yaksha supports one worker per public URL. The worker that starts a call waits in memory for the audio stream (`PendingStream`, `src/yaksha/caller/plivo_server.py`). With several workers behind one URL, the stream can reach another worker, which refuses it.
+Yaksh supports one worker per public URL. The worker that starts a call waits in memory for the audio stream (`PendingStream`, `src/yaksh/caller/plivo_server.py`). With several workers behind one URL, the stream can reach another worker, which refuses it.
 
 ## Production
 

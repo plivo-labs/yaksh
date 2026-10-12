@@ -635,7 +635,7 @@ export function RunDialog({
             {waits && (
               <span
                 className="text-xs-400 text-status-warning-text"
-                title={`The agent calls Yaksha, and each Yaksha number takes one call at a time, then rests ${numbers.data?.rest_s} s.`}
+                title={`The agent calls Yaksh, and each Yaksh number takes one call at a time, then rests ${numbers.data?.rest_s} s.`}
               >
                 {counted(total, "call", "calls")} on {counted(usable.length, "number", "numbers")}:
                 they run {usable.length} at a time.

@@ -20,7 +20,7 @@ export function NewAgentPage() {
             to="/agents/new/provider"
             icon={<Link2 />}
             title="Import from a provider"
-            hint="Plivo CX, Vapi, Retell or ElevenLabs. Yaksha reads the agent and fills in what it can."
+            hint="Plivo CX, Vapi, Retell or ElevenLabs. Yaksh reads the agent and fills in what it can."
           />
         </li>
         <li>
@@ -28,7 +28,7 @@ export function NewAgentPage() {
             to="/agents/new/json"
             icon={<FileJson />}
             title="Import from a JSON file"
-            hint="An agent file from your provider. Yaksha fills in what it can."
+            hint="An agent file from your provider. Yaksh fills in what it can."
           />
         </li>
         <li>
@@ -36,7 +36,7 @@ export function NewAgentPage() {
             to="/agents/new/details"
             icon={<PencilLine />}
             title="Enter the details yourself"
-            hint="Tell Yaksha how to reach the agent and what it does."
+            hint="Tell Yaksh how to reach the agent and what it does."
           />
         </li>
       </ul>

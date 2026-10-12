@@ -6,9 +6,9 @@ from itertools import pairwise
 import audioop
 import pytest
 
-from yaksha.caller.audio import FRAME_BYTES, SAMPLE_RATE
-from yaksha.domain.languages import Language
-from yaksha.domain.surroundings import (
+from yaksh.caller.audio import FRAME_BYTES, SAMPLE_RATE
+from yaksh.domain.languages import Language
+from yaksh.domain.surroundings import (
     AutoNoise,
     NoiseSound,
     Sound,
@@ -16,7 +16,7 @@ from yaksha.domain.surroundings import (
     SpeakerKind,
     Surroundings,
 )
-from yaksha.simulation.surroundings import (
+from yaksh.simulation.surroundings import (
     SOUNDS,
     SPEAKER_GAP_S,
     clips_of,

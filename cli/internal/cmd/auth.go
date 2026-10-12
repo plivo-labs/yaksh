@@ -14,17 +14,17 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/plivo-labs/yaksha/cli/internal/api"
-	"github.com/plivo-labs/yaksha/cli/internal/config"
-	"github.com/plivo-labs/yaksha/cli/internal/prompt"
+	"github.com/plivo-labs/yaksh/cli/internal/api"
+	"github.com/plivo-labs/yaksh/cli/internal/config"
+	"github.com/plivo-labs/yaksh/cli/internal/prompt"
 )
 
 func (a *app) authCmd() *cobra.Command {
 	auth := &cobra.Command{
 		Use:   "auth",
 		Short: "Save, check and remove the server and token",
-		Long: "Save, check and remove the server and token. The environment variables YAKSHA_URL and " +
-			"YAKSHA_API_TOKEN win over the saved file.",
+		Long: "Save, check and remove the server and token. The environment variables YAKSH_URL and " +
+			"YAKSH_API_TOKEN win over the saved file.",
 	}
 	auth.AddCommand(a.authLoginCmd(), a.authStatusCmd(), a.authLogoutCmd())
 	return auth
@@ -38,13 +38,13 @@ func (a *app) authLoginCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "login --server <url> [--with-token]",
 		Short: "Check a server and its API token, then save both",
-		Example: `  yaksha auth login --server https://yaksha.example.com
-  echo "$TOKEN" | yaksha auth login --server https://yaksha.example.com --with-token`,
+		Example: `  yaksh auth login --server https://yaksh.example.com
+  echo "$TOKEN" | yaksh auth login --server https://yaksh.example.com --with-token`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			in, stderr := cmd.InOrStdin(), cmd.ErrOrStderr()
 			if server == "" {
-				server = a.getenv("YAKSHA_URL")
+				server = a.getenv("YAKSH_URL")
 			}
 			if server == "" {
 				return errors.New("auth login needs --server <url>")
@@ -76,13 +76,13 @@ func (a *app) authLoginCmd() *cobra.Command {
 			}
 			path, _ := config.Path(a.getenv)
 			fmt.Fprintf(stderr, "logged in to %s; saved in %s\n", server, path)
-			if a.getenv("YAKSHA_URL") != "" || a.getenv("YAKSHA_API_TOKEN") != "" {
-				fmt.Fprintln(stderr, "note: YAKSHA_URL or YAKSHA_API_TOKEN is set, and it wins over the saved file")
+			if a.getenv("YAKSH_URL") != "" || a.getenv("YAKSH_API_TOKEN") != "" {
+				fmt.Fprintln(stderr, "note: YAKSH_URL or YAKSH_API_TOKEN is set, and it wins over the saved file")
 			}
 			return nil
 		},
 	}
-	cmd.Flags().StringVar(&server, "server", "", "the Yaksha server, for example https://yaksha.example.com")
+	cmd.Flags().StringVar(&server, "server", "", "the Yaksh server, for example https://yaksh.example.com")
 	cmd.Flags().BoolVar(&withToken, "with-token", false, "read the token from stdin")
 	return cmd
 }
@@ -92,7 +92,7 @@ func (a *app) authLoginCmd() *cobra.Command {
 func checkServer(server string) (warning string, err error) {
 	u, err := url.Parse(server)
 	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
-		return "", fmt.Errorf("%q is not a server URL: use one like https://yaksha.example.com", server)
+		return "", fmt.Errorf("%q is not a server URL: use one like https://yaksh.example.com", server)
 	}
 	if u.Scheme == "http" && !isLocal(u.Hostname()) {
 		return fmt.Sprintf("%s uses plain http, so the token travels in clear text", server), nil
@@ -167,7 +167,7 @@ func (a *app) authStatusCmd() *cobra.Command {
 	}
 }
 
-// check returns the server's version. It fails unless the server answers as Yaksha and takes
+// check returns the server's version. It fails unless the server answers as Yaksh and takes
 // the token.
 func (a *app) check(ctx context.Context, s config.Settings) (string, error) {
 	c, err := api.New(s.Server, s.Token, a.userAgent())
@@ -204,8 +204,8 @@ func (a *app) authLogoutCmd() *cobra.Command {
 			} else {
 				fmt.Fprintf(stderr, "nothing to delete: %s does not exist\n", path)
 			}
-			if a.getenv("YAKSHA_URL") != "" || a.getenv("YAKSHA_API_TOKEN") != "" {
-				fmt.Fprintln(stderr, "note: YAKSHA_URL or YAKSHA_API_TOKEN is still set in the environment")
+			if a.getenv("YAKSH_URL") != "" || a.getenv("YAKSH_API_TOKEN") != "" {
+				fmt.Fprintln(stderr, "note: YAKSH_URL or YAKSH_API_TOKEN is still set in the environment")
 			}
 			return nil
 		},

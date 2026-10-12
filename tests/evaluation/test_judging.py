@@ -6,16 +6,16 @@ import pytest
 from pydantic import ValidationError
 
 from tests.conftest import Scripted
-from yaksha.diagnostics import describe_exception
-from yaksha.domain.conversations import Role, Transcript, Turn, WireEvent, WireEventKind
-from yaksha.domain.evaluations import DecidedBy, ItemRole, Outcome, UnsureKind, Verdict
-from yaksha.domain.language_models import ModelCallError
-from yaksha.domain.rules import LlmRule, PhraseRule, RuleGate
-from yaksha.evaluation import judging
-from yaksha.evaluation.criteria import judge_criterion, judge_rule
-from yaksha.evaluation.judging import JudgeUnavailable
-from yaksha.evaluation.rules import gate_open, phrase_item
-from yaksha.evaluation.verdicts import verdict
+from yaksh.diagnostics import describe_exception
+from yaksh.domain.conversations import Role, Transcript, Turn, WireEvent, WireEventKind
+from yaksh.domain.evaluations import DecidedBy, ItemRole, Outcome, UnsureKind, Verdict
+from yaksh.domain.language_models import ModelCallError
+from yaksh.domain.rules import LlmRule, PhraseRule, RuleGate
+from yaksh.evaluation import judging
+from yaksh.evaluation.criteria import judge_criterion, judge_rule
+from yaksh.evaluation.judging import JudgeUnavailable
+from yaksh.evaluation.rules import gate_open, phrase_item
+from yaksh.evaluation.verdicts import verdict
 
 TURNS = [
     Turn(role=Role.AGENT, text="Thanks for calling Maple Dental.", started_at_ms=0, ended_at_ms=1),

@@ -7,7 +7,7 @@ from fastapi import FastAPI, Request, Response
 from httpx import AsyncClient
 
 from tests.conftest import FakeProviders
-from yaksha.caller.plivo_server import PlivoServer
+from yaksh.caller.plivo_server import PlivoServer
 
 API_KEY = "sk_test"
 INBOUND = "agent_inbound"
@@ -174,7 +174,7 @@ async def test_an_agent_with_a_number_is_inbound_with_its_behavior_as_the_config
         ["hi", "en-US"],
     )
     assert draft["language_note"] == (
-        "Yaksha does not know the language fr. Choose the agent's languages"
+        "Yaksh does not know the language fr. Choose the agent's languages"
     )
     assert draft["agent_numbers"] == ["+14155550101"] and draft["start_request"] is None
     assert config == {
@@ -225,7 +225,7 @@ async def test_an_agent_without_a_number_calls_out_from_a_workspace_number(
     assert request["body"] == {
         "agent_id": OUTBOUND,
         "agent_phone_number_id": "phnum_sip",
-        "to_number": "{{yaksha.number}}",
+        "to_number": "{{yaksh.number}}",
         "conversation_initiation_client_data": {
             "dynamic_variables": {"customer_name": "{{agent_data.customer_name}}"}
         },

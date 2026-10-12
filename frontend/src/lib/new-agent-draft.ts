@@ -7,9 +7,9 @@ import {
   AGENT_LANGUAGES,
 } from "@/lib/types";
 
-const DRAFT_KEY = "yaksha.new-agent-draft";
+const DRAFT_KEY = "yaksh.new-agent-draft";
 
-/** Where a new agent's draft came from: a file Yaksha read, a file it only kept as the config, or
+/** Where a new agent's draft came from: a file Yaksh read, a file it only kept as the config, or
  * an agent read from a provider. */
 export interface ImportedFrom {
   source: string;
@@ -51,8 +51,8 @@ export function readStoredDraft(): StoredDraft | null {
       ...stored.draft,
       outbound: { ...EMPTY_DRAFT.outbound, ...stored.draft?.outbound },
     };
-    // A language Yaksha no longer has would fail on save. An empty list stays empty: the import
-    // found no language that Yaksha knows, and the person chooses.
+    // A language Yaksh no longer has would fail on save. An empty list stays empty: the import
+    // found no language that Yaksh knows, and the person chooses.
     draft.languages = draft.languages.filter((code) => code in AGENT_LANGUAGES);
     return {
       draft,

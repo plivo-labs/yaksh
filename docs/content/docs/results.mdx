@@ -12,7 +12,7 @@ Each conversation has a status, an outcome group and an end reason. These values
 | `queued` | The conversation waits for a worker and a free number. |
 | `running` | A worker has the conversation. The call starts or is in progress. |
 | `ending` | You stopped the conversation while a worker had it. The worker has not completed the stop. |
-| `completed` | The call connected and stopped, and Yaksha found no error. This status is not a pass result. |
+| `completed` | The call connected and stopped, and Yaksh found no error. This status is not a pass result. |
 | `invalid` | The call connected, but an error occurred in the caller or in the audio stream. Do not use the transcript to examine the agent. |
 | `failed` | The call did not connect, or the worker stopped or lost the conversation. |
 | `cancelled` | You stopped the conversation before its call connected. |
@@ -42,9 +42,9 @@ The outcome group comes from the status and the end reason. If you stopped a con
 | `user_request` | You stopped the conversation, or you cancelled its run. |
 | `no_answer` | The agent did not answer the call. |
 | `no_call` | The outbound agent did not call during its dial window. |
-| `trigger_failed` | The system of the outbound agent rejected the trigger, or Yaksha could not send it. |
+| `trigger_failed` | The system of the outbound agent rejected the trigger, or Yaksh could not send it. |
 | `stream_ended` | The audio stream stopped, and Plivo did not tell which side stopped the call. |
-| `error` | An error occurred in Yaksha or on the phone line. The failure reason gives the cause. |
+| `error` | An error occurred in Yaksh or on the phone line. The failure reason gives the cause. |
 | `worker_stopped` | The worker stopped during the call. The result of the call is not known. |
 | `lease_lost` | The worker lost its claim on the conversation. The result of the call is not known. |
 

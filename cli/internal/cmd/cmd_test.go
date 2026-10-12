@@ -17,8 +17,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/plivo-labs/yaksha/cli/internal/config"
-	"github.com/plivo-labs/yaksha/cli/skill"
+	"github.com/plivo-labs/yaksh/cli/internal/config"
+	"github.com/plivo-labs/yaksh/cli/skill"
 )
 
 const (
@@ -114,7 +114,7 @@ func run(t *testing.T, ctx context.Context, vars map[string]string, stdin string
 }
 
 func against(f *fakeAPI) map[string]string {
-	return map[string]string{"YAKSHA_URL": f.URL, "YAKSHA_API_TOKEN": "t0k"}
+	return map[string]string{"YAKSH_URL": f.URL, "YAKSH_API_TOKEN": "t0k"}
 }
 
 func TestAgentListPrintsTheServersJSON(t *testing.T) {
@@ -176,8 +176,8 @@ func TestAgentImportNeedsBothTheBriefAndTheNumber(t *testing.T) {
 	}
 }
 
-func TestAgentImportAddsNoAgentWithoutALanguageYakshaKnows(t *testing.T) {
-	const draft = `{"provider":"plivo_cx","name":"Front desk","external_id":"flow-1","languages":[],"language_note":"Yaksha does not know the language multi. Choose the agent's languages","config":"{}"}`
+func TestAgentImportAddsNoAgentWithoutALanguageYakshKnows(t *testing.T) {
+	const draft = `{"provider":"plivo_cx","name":"Front desk","external_id":"flow-1","languages":[],"language_note":"Yaksh does not know the language multi. Choose the agent's languages","config":"{}"}`
 	file := filepath.Join(t.TempDir(), "front-desk-config.json")
 	if err := os.WriteFile(file, []byte(`{"flowId":"flow-1"}`), 0o600); err != nil {
 		t.Fatal(err)
@@ -187,7 +187,7 @@ func TestAgentImportAddsNoAgentWithoutALanguageYakshaKnows(t *testing.T) {
 	code, _, stderr := run(t, context.Background(), against(f), "",
 		"agent", "import", file, "--brief", "Books dental appointments for callers.", "--number", "+14155550100")
 
-	if code == 0 || !strings.Contains(stderr, "no language that Yaksha knows") || len(f.requests("POST", "/api/v1/agents")) != 0 {
+	if code == 0 || !strings.Contains(stderr, "no language that Yaksh knows") || len(f.requests("POST", "/api/v1/agents")) != 0 {
 		t.Fatalf("code = %d, stderr = %q", code, stderr)
 	}
 }
@@ -243,11 +243,11 @@ func TestErrorsSayTheNextStep(t *testing.T) {
 		args []string
 		want string
 	}{
-		{"no server", map[string]string{}, []string{"agent", "list"}, `no Yaksha server: run "yaksha auth login" or set YAKSHA_URL`},
-		{"wrong token", against(refuses), []string{"agent", "list"}, `the token is wrong: run "yaksha auth login" or set YAKSHA_API_TOKEN`},
+		{"no server", map[string]string{}, []string{"agent", "list"}, `no Yaksh server: run "yaksh auth login" or set YAKSH_URL`},
+		{"wrong token", against(refuses), []string{"agent", "list"}, `the token is wrong: run "yaksh auth login" or set YAKSH_API_TOKEN`},
 		{"server message", against(missing), []string{"agent", "view", agentID}, "404 Not Found: agent not found"},
-		{"server down", map[string]string{"YAKSHA_URL": stopped.URL}, []string{"agent", "list"}, "cannot reach " + stopped.URL},
-		{"bad agent ID", against(missing), []string{"agent", "view", "support-line"}, `"support-line" is not an agent ID: find it with "yaksha agent list"`},
+		{"server down", map[string]string{"YAKSH_URL": stopped.URL}, []string{"agent", "list"}, "cannot reach " + stopped.URL},
+		{"bad agent ID", against(missing), []string{"agent", "view", "support-line"}, `"support-line" is not an agent ID: find it with "yaksh agent list"`},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -267,7 +267,7 @@ func TestRunStartSendsOnlyTheFieldsThatWereSet(t *testing.T) {
 		"run", "start", "--agent", agentID, "--scenario", scenA+","+scenB, "--repeats", "2",
 		"--idempotency-key", "ci-41")
 
-	if code != 0 || !strings.Contains(stdout, `"status": "queued"`) || stderr != "next: yaksha run wait "+runID+"\n" {
+	if code != 0 || !strings.Contains(stdout, `"status": "queued"`) || stderr != "next: yaksh run wait "+runID+"\n" {
 		t.Fatalf("code = %d, stdout = %q, stderr = %q", code, stdout, stderr)
 	}
 	req := f.requests("POST", "/api/v1/runs")[0]
@@ -362,7 +362,7 @@ func TestRunWaitWaitsForTheJudgesAndFailsUnlessTheyPassEveryCall(t *testing.T) {
 	code, _, stderr := run(t, context.Background(), against(f), "", "run", "wait", runID)
 
 	want := "failed: run " + runID + " done: 3 of 3 calls completed; judges: 1 pass, 1 not scored, 1 evaluation failed\n" +
-		"next: yaksha run metrics " + runID + "\n"
+		"next: yaksh run metrics " + runID + "\n"
 	if code != 1 || !strings.HasSuffix(stderr, want) || len(f.requests("GET", "/api/v1/runs/"+runID+"/metrics")) != 2 {
 		t.Fatalf("code = %d, stderr = %q; want 1, two reads of the metrics and %q", code, stderr, want)
 	}
@@ -375,7 +375,7 @@ func TestRunWaitFailsAndSaysWhatToRunNext(t *testing.T) {
 	code, stdout, stderr := run(t, context.Background(), against(f), "", "run", "wait", runID)
 
 	want := "failed: run " + runID + " done: 3 of 4 calls completed, 1 did not connect\n" +
-		"next: yaksha conversation list --run " + runID + " --latest-attempts --group error,did_not_connect\n"
+		"next: yaksh conversation list --run " + runID + " --latest-attempts --group error,did_not_connect\n"
 	if code != 1 || !strings.Contains(stdout, `"status": "done"`) || stderr != want {
 		t.Fatalf("code = %d, stdout = %q, stderr = %q", code, stdout, stderr)
 	}
@@ -429,7 +429,7 @@ func TestRunStartWaitKeepsTheRunWhenReadingItFails(t *testing.T) {
 	})
 	code, _, stderr := run(t, context.Background(), against(f), "", "run", "start", "--agent", agentID, "--scenario", scenA, "--wait")
 
-	for _, want := range []string{"run " + runID + " started", "could not read run " + runID, "next: yaksha run wait " + runID} {
+	for _, want := range []string{"run " + runID + " started", "could not read run " + runID, "next: yaksh run wait " + runID} {
 		if code != 1 || !strings.Contains(stderr, want) {
 			t.Fatalf("code = %d, stderr = %q; want %q", code, stderr, want)
 		}
@@ -480,7 +480,7 @@ func TestRunCancelSaysWhatToRunNextWhenTheWaitEnds(t *testing.T) {
 			})
 			code, _, stderr := run(t, tt.ctx, against(f), "", "run", "cancel", runID)
 
-			for _, want := range []string{tt.want, "the cancel was sent", "next: yaksha run cancel " + runID} {
+			for _, want := range []string{tt.want, "the cancel was sent", "next: yaksh run cancel " + runID} {
 				if code != 1 || !strings.Contains(stderr, want) {
 					t.Fatalf("code = %d, stderr = %q; want %q", code, stderr, want)
 				}
@@ -521,7 +521,7 @@ func TestAuthLoginSavesNothingWhenTheServerRefusesTheToken(t *testing.T) {
 	if code != 1 || !strings.Contains(stderr, "nothing was saved") {
 		t.Fatalf("code = %d, stderr = %q", code, stderr)
 	}
-	if _, err := os.Stat(home + "/.config/yaksha/config.json"); !os.IsNotExist(err) {
+	if _, err := os.Stat(home + "/.config/yaksh/config.json"); !os.IsNotExist(err) {
 		t.Fatalf("a config file exists: %v", err)
 	}
 }
@@ -548,7 +548,7 @@ func TestAuthStatusThenLogout(t *testing.T) {
 		t.Fatalf("logout: code = %d, stderr = %q", code, stderr)
 	}
 	code, _, stderr = run(t, context.Background(), vars, "", "auth", "status")
-	if code != 1 || !strings.Contains(stderr, "no Yaksha server") {
+	if code != 1 || !strings.Contains(stderr, "no Yaksh server") {
 		t.Fatalf("status after logout: code = %d, stderr = %q", code, stderr)
 	}
 }
@@ -568,12 +568,12 @@ func TestCheckServer(t *testing.T) {
 		warns   bool
 		refused bool
 	}{
-		{"https://yaksha.example.com", false, false},
+		{"https://yaksh.example.com", false, false},
 		{"http://localhost:8000", false, false},
 		{"http://127.0.0.1:8000", false, false},
-		{"http://yaksha.example.com", true, false},
-		{"yaksha.example.com", false, true},
-		{"ftp://yaksha.example.com", false, true},
+		{"http://yaksh.example.com", true, false},
+		{"yaksh.example.com", false, true},
+		{"ftp://yaksh.example.com", false, true},
 	}
 	for _, tt := range tests {
 		warning, err := checkServer(tt.server)

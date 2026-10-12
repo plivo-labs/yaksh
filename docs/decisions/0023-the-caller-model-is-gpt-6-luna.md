@@ -5,7 +5,7 @@ Status: accepted, changed by 0027 (the model is on the Settings page)
 
 ## Decision
 
-The default caller model (`PERSONA_LLM_MODEL`) is `gpt-6-luna`, not `gpt-4.1`. Yaksha sets no reasoning effort for it, so Pipecat sends effort `none`.
+The default caller model (`PERSONA_LLM_MODEL`) is `gpt-6-luna`, not `gpt-4.1`. Yaksh sets no reasoning effort for it, so Pipecat sends effort `none`.
 
 ## Why
 
@@ -34,6 +34,6 @@ The default caller model (`PERSONA_LLM_MODEL`) is `gpt-6-luna`, not `gpt-4.1`. Y
 
 ## Other options
 
-- Go back to Chat Completions. Rejected: Yaksha calls every model through the Responses API, and that API returns one message by design, so it would only hide what the model does.
+- Go back to Chat Completions. Rejected: Yaksh calls every model through the Responses API, and that API returns one message by design, so it would only hide what the model does.
 - Speak only the first message of a response. Not done yet: it would stop any model from doing this. With gpt-6-luna, no replay returned a second message.
 - Change the caller prompt. Rejected: no prompt change that we tested stopped it.

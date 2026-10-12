@@ -35,7 +35,7 @@ import type { Header, TriggerMethod } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 const PLACEHOLDERS: { name: string; meaning: string }[] = [
-  { name: "{{yaksha.conversation_id}}", meaning: "the test call's ID" },
+  { name: "{{yaksh.conversation_id}}", meaning: "the test call's ID" },
   {
     name: "{{agent_data.<name>}}",
     meaning: "a value from the data sent to the agent, in the data set the call plays",
@@ -48,7 +48,7 @@ const METHODS: { value: TriggerMethod; label: string }[] = [
   { value: "GET", label: "GET" },
 ];
 
-/** The start request: where Yaksha sends it and what it sends first, and the details most agents
+/** The start request: where Yaksh sends it and what it sends first, and the details most agents
  * leave as they are folded below. The details open when one of them has a problem. */
 export function OutboundFields({
   draft,
@@ -163,11 +163,11 @@ export function OutboundFields({
           />
         </div>
         <p role="status" className="sr-only">
-          {fromCurl ? "Yaksha filled the start request from the cURL command." : ""}
+          {fromCurl ? "Yaksh filled the start request from the cURL command." : ""}
         </p>
         {urlNote === "error" && (
           <FieldError id="trigger_url-note">
-            Yaksha could not read the cURL command: {curl.error?.message}
+            Yaksh could not read the cURL command: {curl.error?.message}
           </FieldError>
         )}
         {urlNote === "problem" && <FieldError id="trigger_url-note">{problems.url}</FieldError>}
@@ -181,14 +181,14 @@ export function OutboundFields({
             ) : fromCurl?.numberField ? (
               <>
                 Filled from the cURL command.{" "}
-                <code className="font-mono text-foreground">{"{{yaksha.number}}"}</code> is now in{" "}
+                <code className="font-mono text-foreground">{"{{yaksh.number}}"}</code> is now in{" "}
                 <code className="font-mono text-foreground">{fromCurl.numberField}</code>.
                 {fromCurl.fromScenarios && " The other fields come from each scenario."}
               </>
             ) : (
               <>
                 Filled from the cURL command. No field looked like the number to call: put{" "}
-                <code className="font-mono text-foreground">{"{{yaksha.number}}"}</code> where your
+                <code className="font-mono text-foreground">{"{{yaksh.number}}"}</code> where your
                 API takes it.
               </>
             )}
@@ -196,7 +196,7 @@ export function OutboundFields({
         )}
         {urlNote === "hint" && (
           <FieldDescription id="trigger_url-note">
-            Or paste the cURL command that your agent platform shows. Yaksha fills the request from
+            Or paste the cURL command that your agent platform shows. Yaksh fills the request from
             it and keeps the headers as they are, credentials too.
           </FieldDescription>
         )}
@@ -227,7 +227,7 @@ export function OutboundFields({
             pairs={draft.query}
             noun="Parameter"
             namePlaceholder="to"
-            valuePlaceholder="{{yaksha.number}}"
+            valuePlaceholder="{{yaksh.number}}"
             onChange={(next) => set("query", next)}
           />
           {problems.query && <FieldError>{problems.query}</FieldError>}
@@ -397,7 +397,7 @@ function PlaceholderHint({ where }: { where: string }) {
   return (
     <div id="placeholder-hint" className="grid gap-1.5 text-s-400 text-muted-foreground">
       <p>
-        Put <code className="font-mono text-foreground">{"{{yaksha.number}}"}</code> where your API
+        Put <code className="font-mono text-foreground">{"{{yaksh.number}}"}</code> where your API
         takes the number to call.
       </p>
       <details>

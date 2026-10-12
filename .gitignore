@@ -26,7 +26,7 @@ frontend/dist/
 *.ogg
 *.pcm
 !tests/fixtures/**
-!src/yaksha/simulation/sounds/**/*.wav
+!src/yaksh/simulation/sounds/**/*.wav
 
 # editors and os
 .DS_Store

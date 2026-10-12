@@ -2,9 +2,9 @@ import json
 
 import pytest
 
-from yaksha.domain.errors import ValidationError
-from yaksha.domain.scenarios import MAX_FACTS
-from yaksha.simulation.curl_import import start_request_from_curl, without_continuations
+from yaksh.domain.errors import ValidationError
+from yaksh.domain.scenarios import MAX_FACTS
+from yaksh.simulation.curl_import import start_request_from_curl, without_continuations
 
 PLIVO_CX = """curl --location 'https://agentflow.example.com/v1/account/MA0000/flow/c7a9' \\
 --header 'Content-Type: application/json' \\
@@ -15,7 +15,7 @@ PLIVO_CX = """curl --location 'https://agentflow.example.com/v1/account/MA0000/f
 }'"""
 
 
-def test_a_post_command_keeps_its_url_headers_and_body_and_calls_yaksha() -> None:
+def test_a_post_command_keeps_its_url_headers_and_body_and_calls_yaksh() -> None:
     draft = start_request_from_curl(PLIVO_CX)
 
     assert (draft.method, draft.url) == (
@@ -27,7 +27,7 @@ def test_a_post_command_keeps_its_url_headers_and_body_and_calls_yaksha() -> Non
     ]
     assert draft.body == {
         "company_name": "{{agent_data.company_name}}",
-        "phone_number": "{{yaksha.number}}",
+        "phone_number": "{{yaksh.number}}",
     }
     assert draft.number_field == "phone_number" and draft.query == []
 
@@ -43,7 +43,7 @@ def test_a_get_command_moves_the_url_query_into_parameters() -> None:
         None,
     )
     assert [(pair.name, pair.value) for pair in draft.query] == [
-        ("to", "{{yaksha.number}}"),
+        ("to", "{{yaksh.number}}"),
         ("campaign", "spring"),
     ]
     assert [(pair.name, pair.value) for pair in draft.headers] == [
@@ -67,7 +67,7 @@ def test_options_read_as_curl_reads_them() -> None:
 
     assert (draft.method, draft.url) == ("POST", "https://agents.example.com/start")
     assert [(pair.name, pair.value) for pair in draft.headers] == [("Accept", "application/json")]
-    assert draft.body == {"mobile": "{{yaksha.number}}"}
+    assert draft.body == {"mobile": "{{yaksh.number}}"}
 
 
 def test_a_query_value_to_fill_comes_from_each_scenario() -> None:
@@ -76,7 +76,7 @@ def test_a_query_value_to_fill_comes_from_each_scenario() -> None:
     )
 
     assert [(pair.name, pair.value) for pair in draft.query] == [
-        ("to", "{{yaksha.number}}"),
+        ("to", "{{yaksh.number}}"),
         ("campaign", "{{agent_data.campaign}}"),
         ("lang", "en"),
     ]
@@ -86,7 +86,7 @@ def test_only_the_first_number_parameter_is_replaced() -> None:
     draft = start_request_from_curl("curl 'https://agents.example.com/start?to=1&to=2'")
 
     assert [(pair.name, pair.value) for pair in draft.query] == [
-        ("to", "{{yaksha.number}}"),
+        ("to", "{{yaksh.number}}"),
         ("to", "2"),
     ]
 

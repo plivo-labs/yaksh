@@ -3,8 +3,8 @@ the app does not connect to the database, so the placeholder settings are never 
 
 import json
 
-from yaksha.api import create_app
-from yaksha.config import REPO_ROOT, Settings
+from yaksh.api import create_app
+from yaksh.config import REPO_ROOT, Settings
 
 SPEC_PATH = REPO_ROOT / "cli" / "openapi.json"
 

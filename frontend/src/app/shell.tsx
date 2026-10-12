@@ -61,7 +61,7 @@ export function Shell() {
               <SidebarMenuItem>
                 <SidebarMenuButton size="lg" render={<NavLink to="/agents" />}>
                   <img src="/favicon.svg" alt="" className="size-8 shrink-0" />
-                  <span className="text-h4-500">Yaksha</span>
+                  <span className="text-h4-500">Yaksh</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>

@@ -1,6 +1,6 @@
 ---
 title: Languages
-description: The languages of agents and callers, and how Yaksha hears a call.
+description: The languages of agents and callers, and how Yaksh hears a call.
 ---
 
 An agent serves one or more languages. A persona, which is the caller, speaks one language.
@@ -9,7 +9,7 @@ An agent serves one or more languages. A persona, which is the caller, speaks on
 
 Set the languages of an agent on its page, in order. The first language is the main language of the agent. English has a region: English (US), English (India), English (UK) or English (Australia). A new agent gets English (US).
 
-An import takes all the languages of the agent from its provider. If the provider gives a code that Yaksha does not know, for example `multi`, the draft leaves it out and names it in `language_note`. Then you choose the languages.
+An import takes all the languages of the agent from its provider. If the provider gives a code that Yaksh does not know, for example `multi`, the draft leaves it out and names it in `language_note`. Then you choose the languages.
 
 ## Caller languages
 
@@ -25,20 +25,20 @@ To test an agent in more than one language, make one run for each language, with
 
 A phrase rule checks the words of the agent as they are written. For an agent with more than one language, write the rule so that it matches in each language, for example a regular expression with the phrase in each: `thank you for calling|कॉल करने के लिए धन्यवाद`.
 
-## How Yaksha hears the agent
+## How Yaksh hears the agent
 
-Yaksha writes what the agent says with Deepgram. Each call uses one language setting. Yaksha chooses it from the languages of the agent and the language of the persona:
+Yaksh writes what the agent says with Deepgram. Each call uses one language setting. Yaksh chooses it from the languages of the agent and the language of the persona:
 
 1. The agent should answer in the language of the persona. If the agent does not serve that language, it should answer in its main language.
-2. From the settings that hear that language, Yaksha uses the one that hears the most of the other languages of the call. On a tie, a model for one language comes first.
+2. From the settings that hear that language, Yaksh uses the one that hears the most of the other languages of the call. On a tie, a model for one language comes first.
 
 | Setting | Hears |
 | --- | --- |
 | One language, for example `en-IN`, `hi` or `ta` | That language |
 | `hi` | Hindi, and the English words in Hindi speech |
 | `mr` | Marathi and Hindi, but not English |
-| `multi` | English, Hindi and Spanish, and 7 languages that Yaksha does not have |
+| `multi` | English, Hindi and Spanish, and 7 languages that Yaksh does not have |
 
-For English, Yaksha uses the English variant of the agent. The call page shows the setting after the speech-to-text model, for example `nova-3 (hi)`.
+For English, Yaksh uses the English variant of the agent. The call page shows the setting after the speech-to-text model, for example `nova-3 (hi)`.
 
 No setting hears English together with Bengali, Gujarati, Kannada, Tamil or Telugu. For an agent that serves English and one of these, the call uses the model of the language that the agent should answer in. When a reply is in a language that the setting does not hear, the transcript of that reply is wrong, and the judges read the wrong transcript.

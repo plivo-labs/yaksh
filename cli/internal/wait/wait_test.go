@@ -14,7 +14,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/plivo-labs/yaksha/cli/internal/api"
+	"github.com/plivo-labs/yaksh/cli/internal/api"
 )
 
 var runID = uuid.MustParse("7c1e2a0b-0000-4000-8000-000000000001")

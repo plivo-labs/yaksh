@@ -3,13 +3,13 @@ package cmd
 import (
 	"github.com/spf13/cobra"
 
-	"github.com/plivo-labs/yaksha/cli/internal/api"
+	"github.com/plivo-labs/yaksh/cli/internal/api"
 )
 
 func (a *app) personaCmd() *cobra.Command {
 	persona := &cobra.Command{
 		Use:   "persona",
-		Short: "The callers Yaksha plays: a prompt, a voice and their surroundings",
+		Short: "The callers Yaksh plays: a prompt, a voice and their surroundings",
 	}
 	persona.AddCommand(a.personaListCmd())
 	return persona

@@ -17,7 +17,7 @@ export const MAX_BRIEF_CHARS = 10_000;
 export interface Draft {
   name: string;
   external_id: string;
-  /** Null until the user chooses how Yaksha reaches a new agent. */
+  /** Null until the user chooses how Yaksh reaches a new agent. */
   direction: Direction | null;
   agent_number: string;
   outbound: OutboundDraft;
@@ -54,12 +54,12 @@ export function toDraft(agent: Agent): Draft {
 }
 
 export const CONTEXT_NOTE =
-  "Yaksha writes test scenarios from these, and the judges check calls against the config.";
+  "Yaksh writes test scenarios from these, and the judges check calls against the config.";
 
 /** The agent to send. Only a draft with no problems is sent, so it has a direction. */
 export function toInput(draft: Draft): AgentInput {
   const { direction } = draft;
-  if (direction === null) throw new Error("Choose how Yaksha reaches the agent.");
+  if (direction === null) throw new Error("Choose how Yaksh reaches the agent.");
   const outbound = direction === "outbound";
   return {
     name: draft.name.trim(),

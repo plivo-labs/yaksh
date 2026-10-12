@@ -8,10 +8,10 @@ People practice hard conversations with a friend, or not at all. A friend plays 
 
 ## Idea
 
-Point Yaksha at a person instead of an agent. Yaksha already generates many scenarios, plays each one with any persona, places real phone calls, records them and keeps a timed transcript. The same parts can call a person who wants to practice:
+Point Yaksh at a person instead of an agent. Yaksh already generates many scenarios, plays each one with any persona, places real phone calls, records them and keeps a timed transcript. The same parts can call a person who wants to practice:
 
 1. The person adds their own phone number in place of an agent, and describes what they practice, for example "a product manager interview at a fintech company".
-2. Yaksha generates scenarios for it. Each scenario sets what the caller wants and the criteria that the person should meet.
+2. Yaksh generates scenarios for it. Each scenario sets what the caller wants and the criteria that the person should meet.
 3. A run calls the person once for each scenario and persona, for example 10 interviewers, each with a different style.
 4. After each call, the person gets the recording, the transcript, a verdict for each criterion with quotes from the call, and voice metrics: talk ratio, long pauses, interruptions, response time.
 
@@ -32,13 +32,13 @@ The person sees what to improve across many kinds of counterpart, not one.
 
 ## What it needs
 
-- A caller that leads. The caller prompt says "The agent drives the call" (`src/yaksha/simulation/templates/caller.j2`). An interviewer or a trainer drives the call, so the caller needs a leading mode: its own questions, follow-up questions on weak answers, and its own end of the call.
+- A caller that leads. The caller prompt says "The agent drives the call" (`src/yaksh/simulation/templates/caller.j2`). An interviewer or a trainer drives the call, so the caller needs a leading mode: its own questions, follow-up questions on weak answers, and its own end of the call.
 - Criteria about the person, and feedback written for a person: what went well and what to change, with quotes, not only pass or fail.
-- Consent. Yaksha may call and record only the person who signed up, at their own number.
+- Consent. Yaksh may call and record only the person who signed up, at their own number.
 - Possibly calls in the browser instead of the phone, so that practice needs no phone line.
 
 ## Open questions
 
-- Is this a mode of Yaksha, or a separate product on the same parts?
+- Is this a mode of Yaksh, or a separate product on the same parts?
 - Who is the user: one person, or a company that trains its staff and wants results across a team?
 - How do we know the feedback is right? The questions about judge quality are the same as for agents.

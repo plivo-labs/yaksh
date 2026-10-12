@@ -26,7 +26,7 @@ export function AgentImportJsonPage() {
   const client = useQueryClient();
   const picker = useRef<HTMLInputElement>(null);
   /** The chosen file; `content` is null until the browser has read it. `briefDraftId` names
-   * the brief Yaksha starts to draft as soon as it has the text, so it is ready sooner. */
+   * the brief Yaksh starts to draft as soon as it has the text, so it is ready sooner. */
   const [file, setFile] = useState<{
     name: string;
     content: string | null;
@@ -90,7 +90,7 @@ export function AgentImportJsonPage() {
     if (started) navigate("/agents/new/details?step=1");
     else
       setProblem(
-        "The browser blocks the storage that takes the file to the next step. Allow site data for Yaksha, then try again.",
+        "The browser blocks the storage that takes the file to the next step. Allow site data for Yaksh, then try again.",
       );
   };
 
@@ -99,7 +99,7 @@ export function AgentImportJsonPage() {
       <div className="grid gap-1">
         <h1 className="text-h3-500">Import from a JSON file</h1>
         <p className="text-p-400 text-muted-foreground">
-          Choose the agent file from your provider. Yaksha fills in what it can.
+          Choose the agent file from your provider. Yaksh fills in what it can.
         </p>
       </div>
       <input
@@ -148,7 +148,7 @@ export function AgentImportJsonPage() {
 
         {problem && <FieldError>{problem}</FieldError>}
         <p role="status" className="sr-only">
-          {read.data ? "Yaksha read the file. Import is ready." : ""}
+          {read.data ? "Yaksh read the file. Import is ready." : ""}
         </p>
         {reading && (
           <p className="flex items-center gap-2 text-p-400 text-muted-foreground">
@@ -158,7 +158,7 @@ export function AgentImportJsonPage() {
         )}
         {read.data && (
           <div className="grid gap-3">
-            <p className="text-p-400">A Plivo CX agent download. Yaksha fills in:</p>
+            <p className="text-p-400">A Plivo CX agent download. Yaksh fills in:</p>
             <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-1.5 text-p-400">
               <dt className="text-muted-foreground">Name</dt>
               <dd>{read.data.name ?? "Not in the file"}</dd>
@@ -191,9 +191,9 @@ export function AgentImportJsonPage() {
             className="grid grid-cols-[auto_1fr] gap-x-2.5 gap-y-1 rounded-md bg-warning px-4 py-3 text-warning-foreground"
           >
             <TriangleAlert aria-hidden className="mt-0.5 size-4" />
-            <p className="text-p-500">Yaksha does not know this format</p>
+            <p className="text-p-500">Yaksh does not know this format</p>
             <p className="col-start-2 text-p-400">
-              It is not an agent file that Yaksha reads. You can still use the whole file as the
+              It is not an agent file that Yaksh reads. You can still use the whole file as the
               agent's config, and fill in the rest yourself.
             </p>
             <div className="col-start-2 pt-1">

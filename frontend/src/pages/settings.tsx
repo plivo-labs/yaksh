@@ -35,7 +35,7 @@ type Change = <S extends Section, K extends keyof SettingsValues[S]>(
   value: SettingsValues[S][K],
 ) => void;
 
-/** The settings of this Yaksha. Keys save one by one, after their provider accepts them; the
+/** The settings of this Yaksh. Keys save one by one, after their provider accepts them; the
  * other values save together from the bar at the bottom. A change applies to the next call. */
 export function SettingsPage() {
   const settings = useSettings();
@@ -502,7 +502,7 @@ function Form({
       <p className="text-xs-400 text-muted-foreground">
         Database, API token, encryption key, ports and file storage are set in the environment.{" "}
         <a
-          href="https://github.com/plivo-labs/yaksha/tree/dev/docs/content/docs/configuration.mdx"
+          href="https://github.com/plivo-labs/yaksh/tree/dev/docs/content/docs/configuration.mdx"
           target="_blank"
           rel="noreferrer"
           className="underline"

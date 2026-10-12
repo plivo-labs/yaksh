@@ -119,7 +119,7 @@ export function AgentsPage() {
             </EmptyMedia>
             <EmptyTitle>No agents yet</EmptyTitle>
             <EmptyDescription>
-              An agent is the phone number Yaksha calls. Add one, give it a scenario, and Yaksha
+              An agent is the phone number Yaksh calls. Add one, give it a scenario, and Yaksh
               phones it with a simulated caller.
             </EmptyDescription>
           </EmptyHeader>

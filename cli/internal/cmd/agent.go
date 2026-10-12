@@ -8,13 +8,13 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/plivo-labs/yaksha/cli/internal/api"
+	"github.com/plivo-labs/yaksh/cli/internal/api"
 )
 
 func (a *app) agentCmd() *cobra.Command {
 	agent := &cobra.Command{
 		Use:   "agent",
-		Short: "The voice agents that Yaksha tests",
+		Short: "The voice agents that Yaksh tests",
 	}
 	agent.AddCommand(a.agentListCmd(), a.agentViewCmd(), a.agentImportCmd(), a.agentUpdateCmd())
 	return agent
@@ -24,7 +24,7 @@ func (a *app) agentUpdateCmd() *cobra.Command {
 	var configFile string
 	cmd := &cobra.Command{
 		Use:   "update <id> --config-file <path>",
-		Short: "Change an agent's configuration in Yaksha, which the judges read; a change makes a new agent version",
+		Short: "Change an agent's configuration in Yaksh, which the judges read; a change makes a new agent version",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			id, err := parseID("agent", args[0])
@@ -60,7 +60,7 @@ func (a *app) agentImportCmd() *cobra.Command {
 		Short: "Read a Plivo CX agent download into a draft; with --brief and --number, add the agent",
 		Long: `Read a Plivo CX agent download (the console's {name}-config.json) into a draft: the name,
 the agent ID, the languages and the whole file as the config. Without flags, print the draft.
-With --brief and --number, add the agent, which Yaksha then calls on that number.`,
+With --brief and --number, add the agent, which Yaksh then calls on that number.`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			content, err := os.ReadFile(args[0])
@@ -93,7 +93,7 @@ With --brief and --number, add the agent, which Yaksha then calls on that number
 				return errors.New("the file has no agent name; set one with --name")
 			}
 			if len(draft.Languages) == 0 {
-				return errors.New("the file has no language that Yaksha knows; see language_note in the draft")
+				return errors.New("the file has no language that Yaksh knows; see language_note in the draft")
 			}
 			created, err := api.Body(c.CreateAgentApiV1AgentsPost(cmd.Context(), api.AgentCreate{
 				Name:        *draft.Name,

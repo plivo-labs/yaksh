@@ -15,14 +15,14 @@ from tests.conftest import (
     start_run,
     wait_for_lock_waiters,
 )
-from yaksha.db.models import Evaluation, EvaluationItem
-from yaksha.domain.conversations import CallOutcome, EndReason
-from yaksha.domain.evaluations import DecidedBy, ItemRole, Outcome, Verdict
-from yaksha.evaluation import evaluations, labels
-from yaksha.evaluation.criteria import CRITERION
-from yaksha.evaluation.evaluations import Evaluated
-from yaksha.evaluation.judging import ItemResult
-from yaksha.evaluation.verdicts import verdict
+from yaksh.db.models import Evaluation, EvaluationItem
+from yaksh.domain.conversations import CallOutcome, EndReason
+from yaksh.domain.evaluations import DecidedBy, ItemRole, Outcome, Verdict
+from yaksh.evaluation import evaluations, labels
+from yaksh.evaluation.criteria import CRITERION
+from yaksh.evaluation.evaluations import Evaluated
+from yaksh.evaluation.judging import ItemResult
+from yaksh.evaluation.verdicts import verdict
 
 
 async def judged_calls(

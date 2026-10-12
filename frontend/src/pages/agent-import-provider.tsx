@@ -82,16 +82,16 @@ const VAPI_REGIONS: { value: VapiRegion; label: string }[] = [
   { value: "eu", label: "EU" },
 ];
 
-/** Where each provider's API key comes from, and what Yaksha does with it. */
+/** Where each provider's API key comes from, and what Yaksh does with it. */
 const KEY_HELP: Record<Exclude<ProviderId, "plivo-cx">, string> = {
   elevenlabs:
-    "An API key with ElevenAgents access, from the developers page of ElevenLabs. Yaksha uses it for this import and does not save it, except in the start request of an agent that calls out.",
-  vapi: "The private API key, from the API keys page of the Vapi dashboard. Yaksha uses it for this import and does not save it, except in the start request of an assistant that calls out.",
+    "An API key with ElevenAgents access, from the developers page of ElevenLabs. Yaksh uses it for this import and does not save it, except in the start request of an agent that calls out.",
+  vapi: "The private API key, from the API keys page of the Vapi dashboard. Yaksh uses it for this import and does not save it, except in the start request of an assistant that calls out.",
   retell:
-    "An API key from the API keys page of Retell. Yaksha uses it for this import and does not save it, except in the start request of an agent that calls out.",
+    "An API key from the API keys page of Retell. Yaksh uses it for this import and does not save it, except in the start request of an agent that calls out.",
 };
 
-/** How each kind of flow that Yaksha lists takes calls; the server leaves out the others. */
+/** How each kind of flow that Yaksh lists takes calls; the server leaves out the others. */
 const CALL_TYPES: Record<string, string> = {
   incoming_call: "Answers calls",
   api_request: "Calls out on a request",
@@ -115,7 +115,7 @@ export function AgentImportProviderPage() {
       <div className="grid gap-1">
         <h1 className="text-h3-500">Import from a provider</h1>
         <p className="text-p-400 text-muted-foreground">
-          Choose where the agent runs, and give Yaksha the credentials that can read it.
+          Choose where the agent runs, and give Yaksh the credentials that can read it.
         </p>
       </div>
       {connected?.provider === "plivo-cx" ? (
@@ -262,7 +262,7 @@ function Credentials({
               </div>
               <FieldDescription>
                 From the overview page of the Plivo console. Use the main account: a subaccount
-                cannot read agent flows. Yaksha uses them for this import and does not save them,
+                cannot read agent flows. Yaksh uses them for this import and does not save them,
                 except in the start request of a flow that calls out.
               </FieldDescription>
             </>
@@ -644,7 +644,7 @@ function AgentChoice({
     if (started) navigate("/agents/new/details?step=1");
     else
       setProblem(
-        `The browser blocks the storage that takes the ${words.one} to the next step. Allow site data for Yaksha, then try again.`,
+        `The browser blocks the storage that takes the ${words.one} to the next step. Allow site data for Yaksh, then try again.`,
       );
   };
 
@@ -754,7 +754,7 @@ function AgentChoice({
 
       {chosen && (
         <Panel ref={fills} className={cn("grid scroll-mb-24 gap-3 px-5 py-5", APPEAR)}>
-          <h2 className="text-p-500">What Yaksha fills in</h2>
+          <h2 className="text-p-500">What Yaksh fills in</h2>
           {read.isPending ? (
             <p className="flex items-center gap-2 text-p-400 text-muted-foreground">
               <Spinner />
@@ -762,7 +762,7 @@ function AgentChoice({
             </p>
           ) : read.error ? (
             <FieldError>
-              Yaksha could not read {chosen.name}: {read.error.message}
+              Yaksh could not read {chosen.name}: {read.error.message}
             </FieldError>
           ) : (
             read.data && (
@@ -827,7 +827,7 @@ function Fills({
       </Fact>
       {request ? (
         <>
-          <Fact term="Calls">The agent calls Yaksha</Fact>
+          <Fact term="Calls">The agent calls Yaksh</Fact>
           <Fact term="Number field">
             {request.number_field ? (
               <code className="font-mono">{request.number_field}</code>
@@ -858,7 +858,7 @@ function Fills({
             <span className="font-mono tabular-nums">{phone(numbers[0])}</span>
           ) : (
             <fieldset className="grid gap-1.5">
-              <legend className="sr-only">The number Yaksha calls</legend>
+              <legend className="sr-only">The number Yaksh calls</legend>
               {numbers.map((candidate) => (
                 <label key={candidate} className="flex cursor-pointer items-center gap-2">
                   <input

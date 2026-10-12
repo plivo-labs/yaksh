@@ -6,7 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/plivo-labs/yaksha/cli/internal/api"
+	"github.com/plivo-labs/yaksh/cli/internal/api"
 )
 
 func (a *app) versionCmd() *cobra.Command {

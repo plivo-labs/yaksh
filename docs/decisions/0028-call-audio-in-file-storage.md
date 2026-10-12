@@ -9,7 +9,7 @@ Status: accepted
 - After the call ends, and before it saves the result, the worker uploads both files side by side to the file storage under `recordings/<conversation id>/`. The lease stays held during the upload. The upload gets one attempt and at most 60 s: enough for a 30-minute call, about 58 MB, at about 8 Mbit/s.
 - The conversation row keeps the keys of the files, not paths. The API and the evaluator read the files from the storage by these keys.
 - If the upload of a file fails, the worker logs the error and saves the call without that file. If the upload runs out of time, the call is saved without both. The evaluation reports a missing recording, as for any call without one.
-- File storage is required. Yaksha does not start without `YAKSHA_S3_ENDPOINT`, `YAKSHA_S3_ACCESS_KEY` and `YAKSHA_S3_SECRET_KEY`.
+- File storage is required. Yaksh does not start without `YAKSH_S3_ENDPOINT`, `YAKSH_S3_ACCESS_KEY` and `YAKSH_S3_SECRET_KEY`.
 
 ## Why
 

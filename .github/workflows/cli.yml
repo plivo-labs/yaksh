@@ -6,7 +6,7 @@ on:
   pull_request:
     paths:
       - cli/**
-      - src/yaksha/**
+      - src/yaksh/**
       - scripts/export_openapi.py
       - pyproject.toml
       - uv.lock

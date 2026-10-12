@@ -24,11 +24,11 @@ from tests.conftest import (
     start,
     start_run,
 )
-from yaksha.config import Settings
-from yaksha.db.models import Conversation, PhoneNumber, RunningWorker
-from yaksha.db.session import create_engine, create_sessionmaker
-from yaksha.simulation import conversations
-from yaksha.simulation.workers import report_worker
+from yaksh.config import Settings
+from yaksh.db.models import Conversation, PhoneNumber, RunningWorker
+from yaksh.db.session import create_engine, create_sessionmaker
+from yaksh.simulation import conversations
+from yaksh.simulation.workers import report_worker
 
 APP_ID = "31216907353261579"
 RECEIVING = "+15716535187"

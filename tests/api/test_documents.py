@@ -6,9 +6,9 @@ import pytest
 from httpx import AsyncClient
 
 from tests.conftest import FakeFileStore
-from yaksha.api.app import MAX_REQUEST_BYTES
-from yaksha.domain.documents import MAX_FILE_BYTES, MAX_NAME_CHARS, MAX_TEXT_CHARS
-from yaksha.simulation import extraction
+from yaksh.api.app import MAX_REQUEST_BYTES
+from yaksh.domain.documents import MAX_FILE_BYTES, MAX_NAME_CHARS, MAX_TEXT_CHARS
+from yaksh.simulation import extraction
 
 
 def pdf(*pages: str) -> bytes:
@@ -110,7 +110,7 @@ async def test_text_files_are_read_as_utf8_and_the_same_file_is_stored_once(
         "long name",
     ],
 )
-async def test_files_yaksha_cannot_read_are_refused_and_not_stored(
+async def test_files_yaksh_cannot_read_are_refused_and_not_stored(
     client: AsyncClient, file_store: FakeFileStore, name: str, data: bytes, message: str
 ) -> None:
     refused = await upload(client, name, data)

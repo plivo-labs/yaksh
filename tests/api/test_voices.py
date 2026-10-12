@@ -10,9 +10,9 @@ from tests.conftest import (
     FakeVoiceClient,
     listed_voice_id,
 )
-from yaksha.domain.languages import Language
-from yaksha.domain.voices import VoiceProvider
-from yaksha.simulation.languages import LANGUAGES
+from yaksh.domain.languages import Language
+from yaksh.domain.voices import VoiceProvider
+from yaksh.simulation.languages import LANGUAGES
 
 NEW_VOICE = {"provider": "elevenlabs", "provider_voice_id": UNLISTED_VOICE.id}
 

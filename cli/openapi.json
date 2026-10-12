@@ -1,7 +1,7 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "Yaksha",
+    "title": "Yaksh",
     "version": "0.1.0"
   },
   "paths": {
@@ -224,7 +224,7 @@
           "agents"
         ],
         "summary": "Import Agent File",
-        "description": "Read an agent file from another platform into a draft. Nothing is saved. A file in a format\nthat Yaksha does not read fails with the code `not_recognized`; it can still be the config.",
+        "description": "Read an agent file from another platform into a draft. Nothing is saved. A file in a format\nthat Yaksh does not read fails with the code `not_recognized`; it can still be the config.",
         "operationId": "import_agent_file_api_v1_agents_import_post",
         "requestBody": {
           "content": {
@@ -727,7 +727,7 @@
           "agents"
         ],
         "summary": "Read Curl Command",
-        "description": "Read a cURL command into a start request, for an agent that calls Yaksha. Nothing is\nsaved. A body field or query parameter that looks like the number to call gets\n`{{yaksha.number}}`.",
+        "description": "Read a cURL command into a start request, for an agent that calls Yaksh. Nothing is\nsaved. A body field or query parameter that looks like the number to call gets\n`{{yaksh.number}}`.",
         "operationId": "read_curl_command_api_v1_agents_start_request_from_curl_post",
         "requestBody": {
           "content": {
@@ -2968,7 +2968,7 @@
           "phone-numbers"
         ],
         "summary": "List Phone Numbers",
-        "description": "The numbers Yaksha may use, as the worker last synced them from the Plivo account.",
+        "description": "The numbers Yaksh may use, as the worker last synced them from the Plivo account.",
         "operationId": "list_phone_numbers_api_v1_phone_numbers_get",
         "responses": {
           "200": {
@@ -5686,7 +5686,7 @@
           "config"
         ],
         "title": "AgentDraft",
-        "description": "The fields an agent file fills. Nothing is saved: the person adds the rest, such as the\nbrief and how Yaksha reaches the agent, then creates the agent."
+        "description": "The fields an agent file fills. Nothing is saved: the person adds the rest, such as the\nbrief and how Yaksh reaches the agent, then creates the agent."
       },
       "AgentFile": {
         "properties": {
@@ -5888,7 +5888,7 @@
           "retell"
         ],
         "title": "AgentSource",
-        "description": "Where an agent came from: made in Yaksha, or imported from a file or a provider."
+        "description": "Where an agent came from: made in Yaksh, or imported from a file or a provider."
       },
       "AgentSummary": {
         "properties": {
@@ -7777,7 +7777,7 @@
           "turn_limit"
         ],
         "title": "EndReason",
-        "description": "Who or what ended the conversation, as Yaksha observed it."
+        "description": "Who or what ended the conversation, as Yaksh observed it."
       },
       "ErrorBody": {
         "properties": {
@@ -9055,7 +9055,7 @@
           "trigger"
         ],
         "title": "OutboundConfig",
-        "description": "How an outbound agent is made to call Yaksha, and how its call is recognized."
+        "description": "How an outbound agent is made to call Yaksh, and how its call is recognized."
       },
       "Outcome": {
         "type": "string",
@@ -12957,7 +12957,7 @@
           "number_field"
         ],
         "title": "StartRequestDraft",
-        "description": "A start request read from a cURL command, for the person to check. `number_field` names\nthe body field or query parameter that now holds `{{yaksha.number}}`, if one looked like the\nnumber to call."
+        "description": "A start request read from a cURL command, for the person to check. `number_field` names\nthe body field or query parameter that now holds `{{yaksh.number}}`, if one looked like the\nnumber to call."
       },
       "Surroundings": {
         "properties": {
@@ -13038,7 +13038,7 @@
           "phone"
         ],
         "title": "Transport",
-        "description": "How Yaksha reaches an agent; phone only today, kept as the seam for other ways."
+        "description": "How Yaksh reaches an agent; phone only today, kept as the seam for other ways."
       },
       "Trigger": {
         "properties": {

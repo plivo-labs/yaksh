@@ -2,11 +2,11 @@ from datetime import date
 
 import pytest
 
-from yaksha.domain.languages import Language
-from yaksha.domain.personas import PersonaConfig
-from yaksha.domain.voices import VoiceGender, VoiceProvider, VoiceSettings
-from yaksha.simulation.languages import HINDI_FORMS, LANGUAGES, SPANISH_FORMS, SPEAKER_FORMS
-from yaksha.simulation.prompts import caller_instructions
+from yaksh.domain.languages import Language
+from yaksh.domain.personas import PersonaConfig
+from yaksh.domain.voices import VoiceGender, VoiceProvider, VoiceSettings
+from yaksh.simulation.languages import HINDI_FORMS, LANGUAGES, SPANISH_FORMS, SPEAKER_FORMS
+from yaksh.simulation.prompts import caller_instructions
 
 VOICE = VoiceSettings(provider=VoiceProvider.ELEVENLABS, id="v1")
 

@@ -9,7 +9,7 @@ Until the first release, schema changes go into `0001_initial_schema.py` in plac
 
 ## Why
 
-- Nobody runs Yaksha yet, so no database needs to be kept.
+- Nobody runs Yaksh yet, so no database needs to be kept.
 - One migration file shows the whole schema in one place.
 - Cost: every schema change means resetting local databases.
 

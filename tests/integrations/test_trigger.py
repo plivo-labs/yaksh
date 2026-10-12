@@ -10,10 +10,10 @@ from aiohttp.abc import AbstractResolver, ResolveResult
 from fastapi import FastAPI, Request, Response
 from fastapi.responses import RedirectResponse, StreamingResponse
 
-from yaksha.caller.plivo_server import PlivoServer
-from yaksha.domain.scenarios import Fact
-from yaksha.domain.triggers import RenderedTrigger, Trigger, TriggerMethod, render
-from yaksha.integrations.trigger import (
+from yaksh.caller.plivo_server import PlivoServer
+from yaksh.domain.scenarios import Fact
+from yaksh.domain.triggers import RenderedTrigger, Trigger, TriggerMethod, render
+from yaksh.integrations.trigger import (
     PublicOnlyResolver,
     TriggerResult,
     is_public,
@@ -98,20 +98,20 @@ async def test_a_delivered_trigger_carries_its_delivery_id_and_signature(
     )
 
     headers = seen[0].headers
-    timestamp = headers["x-yaksha-timestamp"]
+    timestamp = headers["x-yaksh-timestamp"]
     expected = hmac.new(b"signing", f"conv-1.{timestamp}.".encode() + BODY, hashlib.sha256)
     assert outcome.result is TriggerResult.DELIVERED
     assert outcome.detail == 'HTTP 200: {"id": "call-9", "echo": "Bearer [secret]"}'
-    assert headers["x-yaksha-delivery"] == "conv-1"
+    assert headers["x-yaksh-delivery"] == "conv-1"
     assert headers["content-type"] == "application/json"
-    assert headers["x-yaksha-signature"] == f"v1={expected.hexdigest()}"
+    assert headers["x-yaksh-signature"] == f"v1={expected.hexdigest()}"
 
 
 async def test_a_get_trigger_is_sent_as_rendered_and_signed_over_its_url(
     agent_system: tuple[str, list[Request]],
 ) -> None:
     base, seen = agent_system
-    url = f"{base}/start?source=yaksha&to=%2B15716535187&customer=Priya+%22PR%22+Raman"
+    url = f"{base}/start?source=yaksh&to=%2B15716535187&customer=Priya+%22PR%22+Raman"
 
     outcome = await send_trigger(
         RenderedTrigger(TriggerMethod.GET, url, {}, b"", ()),
@@ -121,12 +121,12 @@ async def test_a_get_trigger_is_sent_as_rendered_and_signed_over_its_url(
     )
 
     received = seen[0]
-    timestamp = received.headers["x-yaksha-timestamp"]
+    timestamp = received.headers["x-yaksh-timestamp"]
     expected = hmac.new(b"signing", f"conv-2.{timestamp}.{url}".encode(), hashlib.sha256)
     assert outcome.result is TriggerResult.DELIVERED
     assert (received.method, str(received.url)) == ("GET", url)
     assert "content-type" not in received.headers
-    assert received.headers["x-yaksha-signature"] == f"v1={expected.hexdigest()}"
+    assert received.headers["x-yaksh-signature"] == f"v1={expected.hexdigest()}"
 
 
 async def test_a_rendered_url_is_signed_in_the_form_the_agent_receives(
@@ -141,10 +141,10 @@ async def test_a_rendered_url_is_signed_in_the_form_the_agent_receives(
     await send_trigger(rendered, "conv-4", signing_key="signing", allow_private=True)
 
     received = seen[0]
-    timestamp = received.headers["x-yaksha-timestamp"]
+    timestamp = received.headers["x-yaksh-timestamp"]
     signed = f"conv-4.{timestamp}.{received.url}".encode()
     expected = hmac.new(b"signing", signed, hashlib.sha256)
-    assert received.headers["x-yaksha-signature"] == f"v1={expected.hexdigest()}"
+    assert received.headers["x-yaksh-signature"] == f"v1={expected.hexdigest()}"
 
 
 async def test_a_get_trigger_is_not_sent_again_after_a_dropped_connection() -> None:

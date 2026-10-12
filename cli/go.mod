@@ -1,4 +1,4 @@
-module github.com/plivo-labs/yaksha/cli
+module github.com/plivo-labs/yaksh/cli
 
 go 1.27.0
 

@@ -7,11 +7,11 @@ import pytest
 from fastapi import FastAPI, Request, Response
 from fastapi.responses import JSONResponse, RedirectResponse
 
-from yaksha.caller.plivo_server import PlivoServer
-from yaksha.domain.errors import UnavailableError
-from yaksha.domain.languages import Language
-from yaksha.domain.voices import VoiceGender, VoiceProvider, VoiceSettings
-from yaksha.integrations.elevenlabs import ElevenLabsClient
+from yaksh.caller.plivo_server import PlivoServer
+from yaksh.domain.errors import UnavailableError
+from yaksh.domain.languages import Language
+from yaksh.domain.voices import VoiceGender, VoiceProvider, VoiceSettings
+from yaksh.integrations.elevenlabs import ElevenLabsClient
 
 API_KEY = "el-key"
 VOICE = {

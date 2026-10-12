@@ -254,7 +254,7 @@ function Purpose({ agent, edit }: { agent: Agent; edit: ReactNode }) {
   );
 }
 
-/** The agent's identity first, and how it calls under "Show more". "Number" is the number Yaksha
+/** The agent's identity first, and how it calls under "Show more". "Number" is the number Yaksh
  * dials, or for an outbound agent the numbers it may call from. */
 function Settings({ agent, edit }: { agent: Agent; edit: ReactNode }) {
   const { outbound } = agent;
@@ -303,7 +303,7 @@ function Settings({ agent, edit }: { agent: Agent; edit: ReactNode }) {
   );
 }
 
-/** What Yaksha sends to start an outbound agent's call, and how long it waits for the call. */
+/** What Yaksh sends to start an outbound agent's call, and how long it waits for the call. */
 function OutboundFacts({ outbound }: { outbound: OutboundSettings }) {
   const { trigger } = outbound;
   return (

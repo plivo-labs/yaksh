@@ -58,7 +58,7 @@ export function NewPersonaDialog({ onClose }: { onClose: () => void }) {
           <DialogHeader>
             <DialogTitle>New persona</DialogTitle>
             <DialogDescription>
-              Describe the caller in a few words. Yaksha writes the persona from it: behavior,
+              Describe the caller in a few words. Yaksh writes the persona from it: behavior,
               language, voice and surroundings. You can change any of it before you save.
             </DialogDescription>
           </DialogHeader>

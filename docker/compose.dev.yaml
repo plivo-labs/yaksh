@@ -1,6 +1,6 @@
-name: yaksha
+name: yaksh
 
-x-yaksha: &yaksha
+x-yaksh: &yaksh
   build:
     context: ..
     dockerfile: docker/Dockerfile
@@ -11,12 +11,12 @@ x-yaksha: &yaksha
     - path: .env
       required: false
   environment:
-    YAKSHA_API_HOST: 0.0.0.0
-    YAKSHA_DATABASE_URL: postgresql+asyncpg://yaksha:yaksha@postgres:5432/yaksha
-    YAKSHA_S3_ENDPOINT: ${YAKSHA_S3_ENDPOINT:-http://storage:8333}
-    YAKSHA_S3_BUCKET: ${YAKSHA_S3_BUCKET:-yaksha}
-    YAKSHA_S3_ACCESS_KEY: ${YAKSHA_S3_ACCESS_KEY:-yaksha}
-    YAKSHA_S3_SECRET_KEY: ${YAKSHA_S3_SECRET_KEY:-yaksha-storage}
+    YAKSH_API_HOST: 0.0.0.0
+    YAKSH_DATABASE_URL: postgresql+asyncpg://yaksh:yaksh@postgres:5432/yaksh
+    YAKSH_S3_ENDPOINT: ${YAKSH_S3_ENDPOINT:-http://storage:8333}
+    YAKSH_S3_BUCKET: ${YAKSH_S3_BUCKET:-yaksh}
+    YAKSH_S3_ACCESS_KEY: ${YAKSH_S3_ACCESS_KEY:-yaksh}
+    YAKSH_S3_SECRET_KEY: ${YAKSH_S3_SECRET_KEY:-yaksh-storage}
   depends_on:
     postgres:
       condition: service_healthy
@@ -25,14 +25,14 @@ x-yaksha: &yaksha
 
 services:
   api:
-    <<: *yaksha
+    <<: *yaksh
     ports:
       - "8000:8000"
 
   worker:
-    <<: *yaksha
+    <<: *yaksh
     command:
-      - yaksha-server
+      - yaksh-server
       - worker
     ports:
       - "8770:8770"
@@ -47,9 +47,9 @@ services:
         - import os, urllib.request; urllib.request.urlopen(f"http://127.0.0.1:{os.environ.get('PORT', '8770')}/health")
 
   evaluator:
-    <<: *yaksha
+    <<: *yaksh
     command:
-      - yaksha-server
+      - yaksh-server
       - evaluator
 
   web:
@@ -81,11 +81,11 @@ services:
     command:
       - mini
       - -dir=/data
-      - -bucket=yaksha
+      - -bucket=yaksh
       - -admin.ui=false
     environment:
-      AWS_ACCESS_KEY_ID: yaksha
-      AWS_SECRET_ACCESS_KEY: yaksha-storage
+      AWS_ACCESS_KEY_ID: yaksh
+      AWS_SECRET_ACCESS_KEY: yaksh-storage
     ports:
       - "127.0.0.1:8333:8333"
     volumes:
@@ -94,9 +94,9 @@ services:
   postgres:
     image: postgres:18-alpine
     environment:
-      POSTGRES_USER: yaksha
-      POSTGRES_PASSWORD: yaksha
-      POSTGRES_DB: yaksha
+      POSTGRES_USER: yaksh
+      POSTGRES_PASSWORD: yaksh
+      POSTGRES_DB: yaksh
     ports:
       - "127.0.0.1:5433:5432"
     volumes:
@@ -104,7 +104,7 @@ services:
     healthcheck:
       test:
         - CMD-SHELL
-        - pg_isready -U yaksha -d yaksha
+        - pg_isready -U yaksh -d yaksh
       interval: 5s
       timeout: 3s
       retries: 10

@@ -1,6 +1,6 @@
 ---
 title: Quickstart
-description: Start Yaksha with Docker Compose. Then make a test call.
+description: Start Yaksh with Docker Compose. Then make a test call.
 ---
 
 ## Before you start
@@ -12,13 +12,13 @@ You must have:
 - A voice number in your Plivo account.
 - A voice agent with a phone number.
 
-## Start Yaksha
+## Start Yaksh
 
 1. Get the code:
 
    ```sh
-   git clone https://github.com/plivo-labs/yaksha.git
-   cd yaksha
+   git clone https://github.com/plivo-labs/yaksh.git
+   cd yaksh
    ```
 
 2. Make the configuration file:
@@ -27,9 +27,9 @@ You must have:
    cp docker/.env.example docker/.env
    ```
 
-3. In `docker/.env`, set `YAKSHA_API_TOKEN` to a secret value. Clients send this token to the API.
-4. In `docker/.env`, set `YAKSHA_ENCRYPTION_KEY`. It encrypts the keys that you save in Settings. To make one, run `openssl rand -base64 32`. Keep a copy of it: without it, Yaksha cannot read the saved keys.
-5. Start Yaksha:
+3. In `docker/.env`, set `YAKSH_API_TOKEN` to a secret value. Clients send this token to the API.
+4. In `docker/.env`, set `YAKSH_ENCRYPTION_KEY`. It encrypts the keys that you save in Settings. To make one, run `openssl rand -base64 32`. Keep a copy of it: without it, Yaksh cannot read the saved keys.
+5. Start Yaksh:
 
    ```sh
    docker compose -f docker/compose.yaml up --build
@@ -37,22 +37,22 @@ You must have:
 
    Do not stop this command. Do the next steps in a second terminal. If you stop this command, all the containers stop.
 
-6. Open the console at http://localhost:8000. Enter the value of `YAKSHA_API_TOKEN`.
-7. The console opens on **Settings**. Add the LLM provider key, the Deepgram key, the ElevenLabs key, and the Plivo Auth ID and Auth token. Yaksha checks each key with its provider before it saves it. Refer to [Configuration](/docs/configuration).
+6. Open the console at http://localhost:8000. Enter the value of `YAKSH_API_TOKEN`.
+7. The console opens on **Settings**. Add the LLM provider key, the Deepgram key, the ElevenLabs key, and the Plivo Auth ID and Auth token. Yaksh checks each key with its provider before it saves it. Refer to [Configuration](/docs/configuration).
 
 The API is at `/api/v1`. Send the token in the `Authorization` header as a bearer token. If a request fails, the body of the response is `{"error": {"code": "...", "message": "..."}}`. For a validation error, `error` also has `details`.
 
 ## Connect Plivo to the worker
 
-Plivo sends the call audio to the worker. Thus, the worker must have a public HTTPS URL. Yaksha cannot make phone calls until you set this URL.
+Plivo sends the call audio to the worker. Thus, the worker must have a public HTTPS URL. Yaksh cannot make phone calls until you set this URL.
 
 1. Make a public HTTPS URL that goes to port 8770 of the worker. The URL must also accept WebSocket connections. For example, use a [Cloudflare named tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/). If cloudflared operates on your computer and not in a container, point your hostname to `http://localhost:8770`.
-2. In `docker/.env`, set `YAKSHA_PUBLIC_URL` to this URL.
-3. Make the API and worker containers again. The API and the worker read `YAKSHA_PUBLIC_URL` only when they start. In `docker/compose.yaml`, the API service has the name `yaksha`.
+2. In `docker/.env`, set `YAKSH_PUBLIC_URL` to this URL.
+3. Make the API and worker containers again. The API and the worker read `YAKSH_PUBLIC_URL` only when they start. In `docker/compose.yaml`, the API service has the name `yaksh`.
 
    ```sh
-   docker compose -f docker/compose.yaml create --force-recreate yaksha worker
-   docker compose -f docker/compose.yaml start yaksha worker
+   docker compose -f docker/compose.yaml create --force-recreate yaksh worker
+   docker compose -f docker/compose.yaml start yaksh worker
    ```
 
 With `docker/compose.dev.yaml`, `scripts/tunnel.sh` opens a quick tunnel. Refer to [Development](/docs/development).
@@ -61,11 +61,11 @@ With `docker/compose.dev.yaml`, `scripts/tunnel.sh` opens a quick tunnel. Refer 
 
 You can do these steps in the console or with the API. The commands below use the API.
 
-1. In your shell, set `YAKSHA_API_TOKEN` to the same value as in `docker/.env`.
+1. In your shell, set `YAKSH_API_TOKEN` to the same value as in `docker/.env`.
 2. Get the built-in personas:
 
    ```sh
-   curl localhost:8000/api/v1/personas -H "Authorization: Bearer $YAKSHA_API_TOKEN"
+   curl localhost:8000/api/v1/personas -H "Authorization: Bearer $YAKSH_API_TOKEN"
    ```
 
    Copy the ID of one persona.
@@ -74,7 +74,7 @@ You can do these steps in the console or with the API. The commands below use th
 
    ```sh
    curl -X POST localhost:8000/api/v1/agents \
-     -H "Authorization: Bearer $YAKSHA_API_TOKEN" \
+     -H "Authorization: Bearer $YAKSH_API_TOKEN" \
      -H 'Content-Type: application/json' \
      -d '{"name": "Support line", "agent_number": "+14155550100", "brief": "Answers billing questions and resets passwords."}'
    ```
@@ -83,7 +83,7 @@ You can do these steps in the console or with the API. The commands below use th
 
    ```sh
    curl -X POST localhost:8000/api/v1/agents/<agent id>/scenarios \
-     -H "Authorization: Bearer $YAKSHA_API_TOKEN" \
+     -H "Authorization: Bearer $YAKSH_API_TOKEN" \
      -H 'Content-Type: application/json' \
      -d '{
        "name": "Book a table",
@@ -98,7 +98,7 @@ You can do these steps in the console or with the API. The commands below use th
 
    ```sh
    curl -X POST localhost:8000/api/v1/runs \
-     -H "Authorization: Bearer $YAKSHA_API_TOKEN" \
+     -H "Authorization: Bearer $YAKSH_API_TOKEN" \
      -H 'Content-Type: application/json' \
      -d '{"agent_id": "<agent id>", "scenarios": [{"scenario_id": "<scenario id>"}]}'
    ```

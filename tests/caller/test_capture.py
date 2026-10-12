@@ -1,7 +1,7 @@
 import io
 import wave
 
-from yaksha.caller.audio import (
+from yaksh.caller.audio import (
     SAMPLE_RATE,
     CallerReply,
     CallRecording,
@@ -9,7 +9,7 @@ from yaksha.caller.audio import (
     caller_voice,
     placed,
 )
-from yaksha.domain.latency import AgentMedia, CallerReplyWindow, Span
+from yaksh.domain.latency import AgentMedia, CallerReplyWindow, Span
 
 
 def silence(seconds: float) -> bytes:

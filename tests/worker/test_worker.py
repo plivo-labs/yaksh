@@ -6,10 +6,10 @@ import uuid
 import pytest
 
 from tests.conftest import FakeCaller, FixedSource, make_worker
-from yaksha.config import Settings
-from yaksha.db.session import create_engine, create_sessionmaker
-from yaksha.domain.conversations import EndReason
-from yaksha.simulation.calls import LiveCall
+from yaksh.config import Settings
+from yaksh.db.session import create_engine, create_sessionmaker
+from yaksh.domain.conversations import EndReason
+from yaksh.simulation.calls import LiveCall
 
 
 async def survives_cancellation() -> bool:
@@ -52,7 +52,7 @@ async def test_a_poll_that_survives_cancellation_marks_the_worker_fatal(
         await asyncio.sleep(3600)
         return 0
 
-    monkeypatch.setattr("yaksha.simulation.conversations.reap_expired", stuck)
+    monkeypatch.setattr("yaksh.simulation.conversations.reap_expired", stuck)
     settings = offline_settings.model_copy(update={"end_timeout_s": 0.1})
     worker = make_worker(
         create_sessionmaker(create_engine(settings.database_url.encoded_string())),
@@ -79,7 +79,7 @@ async def test_a_renewal_that_survives_cancellation_stops_the_call_and_marks_fat
             await asyncio.sleep(3600)
         await asyncio.sleep(3600)
 
-    monkeypatch.setattr("yaksha.simulation.conversations.renew_lease", stuck)
+    monkeypatch.setattr("yaksh.simulation.conversations.renew_lease", stuck)
     settings = offline_settings.model_copy(
         update={"worker_lease_s": 0.2, "worker_heartbeat_s": 0.02, "end_timeout_s": 0.1}
     )
@@ -106,7 +106,7 @@ async def test_cancelling_maintenance_during_a_stuck_renewal_abandons_it(
             await asyncio.sleep(3600)
         await asyncio.sleep(3600)
 
-    monkeypatch.setattr("yaksha.simulation.conversations.renew_lease", stuck)
+    monkeypatch.setattr("yaksh.simulation.conversations.renew_lease", stuck)
     settings = offline_settings.model_copy(
         update={"worker_lease_s": 5, "worker_heartbeat_s": 0.02, "end_timeout_s": 0.1}
     )
@@ -138,7 +138,7 @@ async def test_the_lease_is_measured_from_when_a_renewal_was_sent(
             return "running"
         await asyncio.sleep(3600)
 
-    monkeypatch.setattr("yaksha.simulation.conversations.renew_lease", slow_then_stuck)
+    monkeypatch.setattr("yaksh.simulation.conversations.renew_lease", slow_then_stuck)
     settings = offline_settings.model_copy(
         update={"worker_lease_s": 1.0, "worker_heartbeat_s": 0.05, "end_timeout_s": 0.1}
     )
@@ -168,7 +168,7 @@ async def test_a_stalled_poll_is_cancelled_and_retried_without_a_shutdown_signal
         await asyncio.sleep(3600)
         return 0
 
-    monkeypatch.setattr("yaksha.simulation.conversations.reap_expired", stalled)
+    monkeypatch.setattr("yaksh.simulation.conversations.reap_expired", stalled)
     settings = offline_settings.model_copy(
         update={"worker_lease_s": 0.2, "worker_poll_interval_s": 0.02, "end_timeout_s": 0.1}
     )
