@@ -550,9 +550,6 @@ def make_settings(tmp_path: Path, **overrides: Any) -> Settings:
     values: dict[str, Any] = {
         "api_token": TOKEN,
         "database_url": OFFLINE_DATABASE_URL,
-        "s3_endpoint": "http://storage.test",
-        "s3_access_key": "test-access-key",
-        "s3_secret_key": "test-secret-key",
         "frontend_dist": tmp_path / "missing",
         "worker_poll_interval_s": 0.05,
         "worker_heartbeat_s": 0.05,

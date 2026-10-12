@@ -1,9 +1,16 @@
 import inspect
 from pathlib import Path
-from typing import Annotated, Any
+from typing import Annotated, Any, Self
 
 import asyncpg
-from pydantic import Field, PostgresDsn, SecretStr, UrlConstraints, field_validator
+from pydantic import (
+    Field,
+    PostgresDsn,
+    SecretStr,
+    UrlConstraints,
+    field_validator,
+    model_validator,
+)
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 from sqlalchemy.engine import make_url
 
@@ -50,11 +57,13 @@ class Settings(BaseSettings):
     allow_private_triggers: bool = False
     """Allow trigger URLs on private or local addresses, for development."""
     public_url: str | None = None
-    s3_endpoint: str
-    """Where files are kept, uploaded documents and call audio: any S3-compatible service."""
+    s3_endpoint: str | None = None
+    """Where files are kept, uploaded documents and call audio: any S3-compatible service.
+    Unset: AWS S3."""
     s3_bucket: str = "yaksh"
-    s3_access_key: SecretStr
-    s3_secret_key: SecretStr
+    s3_access_key: SecretStr | None = None
+    s3_secret_key: SecretStr | None = None
+    """Both or neither. Neither: the AWS credential chain, such as an IAM role."""
     s3_region: str = "us-east-1"
     encryption_key: SecretStr = Field(min_length=32)
     """Encrypts the secrets stored with the settings. Without the key they are lost."""
@@ -85,6 +94,12 @@ class Settings(BaseSettings):
             )
         asyncpg_url = parsed.set(drivername="postgresql+asyncpg", query=query)
         return PostgresDsn(asyncpg_url.render_as_string(hide_password=False))
+
+    @model_validator(mode="after")
+    def s3_keys_together(self) -> Self:
+        if (self.s3_access_key is None) != (self.s3_secret_key is None):
+            raise ValueError("give the S3 access key and secret key together, or neither")
+        return self
 
     # Required fields come from the environment; without this pyright demands them as arguments.
     def __init__(self, **values: Any) -> None:

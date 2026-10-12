@@ -1,5 +1,6 @@
 """The file store over the S3 API: SeaweedFS in the bundled compose file, or any S3-compatible
-service a deployment points it at."""
+service a deployment points it at. Without an endpoint it is AWS S3, and without keys botocore
+finds the credentials itself, from an IAM role for example."""
 
 import asyncio
 from collections.abc import AsyncGenerator
@@ -28,14 +29,15 @@ class S3FileStore:
 
     def __init__(
         self,
-        endpoint: str,
+        endpoint: str | None,
         bucket: str,
-        access_key: str,
-        secret_key: str,
+        access_key: str | None,
+        secret_key: str | None,
         *,
         region: str = "us-east-1",
     ) -> None:
         self.bucket = bucket
+        self.location = endpoint or "AWS S3"
         self._client_args = {
             "endpoint_url": endpoint,
             "aws_access_key_id": access_key,
@@ -59,6 +61,16 @@ class S3FileStore:
         async with self._opening:
             await self._open.aclose()
             self._client = None
+
+    async def check(self) -> None:
+        """Reaches the bucket with the configured credentials. HeadBucket needs s3:ListBucket."""
+        try:
+            client = await self._connected()
+            await client.head_bucket(Bucket=self.bucket)
+        except (BotoCoreError, ClientError) as error:
+            raise UnavailableError(
+                f"cannot use bucket {self.bucket!r} at {self.location}: {reason(error)}"
+            ) from error
 
     async def put(self, key: str, data: bytes, media_type: str) -> None:
         try:

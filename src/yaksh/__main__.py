@@ -15,6 +15,8 @@ from yaksh.config import Settings
 from yaksh.db.migrate import upgrade_to_head
 from yaksh.db.session import create_engine, create_sessionmaker
 from yaksh.domain.conversations import Caller
+from yaksh.domain.errors import UnavailableError
+from yaksh.integrations.s3 import S3FileStore
 from yaksh.settings.cipher import Cipher, SecretUnreadableError
 from yaksh.settings.store import SettingsSource
 from yaksh.storage import file_store
@@ -82,6 +84,19 @@ async def settings_source(settings: Settings, engine: AsyncEngine) -> SettingsSo
     return source
 
 
+async def checked_file_store(settings: Settings) -> S3FileStore:
+    """The file store, reached once now: wrong storage settings stop the process here, not at
+    its first upload."""
+    store = file_store(settings)
+    try:
+        await store.check()
+    except UnavailableError as error:
+        await store.close()
+        logging.critical("%s", error)
+        raise SystemExit(1) from None
+    return store
+
+
 async def run_evaluator(settings: Settings) -> None:
     from yaksh.worker.evaluator import Evaluator
 
@@ -91,7 +106,7 @@ async def run_evaluator(settings: Settings) -> None:
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGINT, signal.SIGTERM):
         loop.add_signal_handler(sig, stop.set)
-    store = file_store(settings)
+    store = await checked_file_store(settings)
     evaluator = Evaluator(create_sessionmaker(engine), settings, source, store)
     try:
         await evaluator.run(stop)
@@ -124,7 +139,7 @@ async def run_worker(settings: Settings, caller: Caller, registry: StreamRegistr
     engine = create_engine(str(settings.database_url))
     sessionmaker = create_sessionmaker(engine)
     source = await settings_source(settings, engine)
-    store = file_store(settings)
+    store = await checked_file_store(settings)
     worker = Worker(
         sessionmaker,
         caller,

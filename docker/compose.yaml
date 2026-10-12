@@ -19,7 +19,7 @@ x-yaksh: &yaksh
     postgres:
       condition: service_healthy
     storage:
-      condition: service_started
+      condition: service_healthy
   restart: unless-stopped
 
 services:
@@ -63,6 +63,14 @@ services:
     environment:
       AWS_ACCESS_KEY_ID: yaksh
       AWS_SECRET_ACCESS_KEY: yaksh-storage
+    # The S3 port opens before the bucket exists; the filer lists the bucket once it does.
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - nc -z 127.0.0.1 8333 && wget -q -O /dev/null http://127.0.0.1:8888/buckets/yaksh/
+      interval: 2s
+      timeout: 3s
+      retries: 30
     volumes:
       - storage:/data
     restart: unless-stopped

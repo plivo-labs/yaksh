@@ -24,6 +24,7 @@ from yaksh.domain.conversations import (
     WireEventKind,
 )
 from yaksh.domain.settings import AppSettings
+from yaksh.integrations.s3 import S3FileStore
 from yaksh.simulation import conversations
 from yaksh.worker import worker as worker_module
 from yaksh.worker.phone_account import PhoneAccount
@@ -71,11 +72,16 @@ async def offline(self: PhoneAccount, app: AppSettings) -> None:
     """The test database holds made-up Plivo keys; the account is never asked."""
 
 
+async def reachable(self: S3FileStore) -> None:
+    """The storage address is made up; these workers store no files."""
+
+
 KINDS = {"immortal": immortal, "stuck_write": stuck_write, "stuck_disposal": stuck_disposal}
 
 if __name__ == "__main__":
     kind, database_url = sys.argv[1:]
     PhoneAccount.refresh = offline
+    S3FileStore.check = reachable
     settings = Settings.model_validate(
         {
             "api_token": "t",
