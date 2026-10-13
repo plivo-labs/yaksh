@@ -1,6 +1,8 @@
 import { createGetUrl } from 'fumadocs-core/source';
 
 export const appName = 'Yaksh';
+export const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? '';
+export const siteUrl = process.env.NEXT_PUBLIC_SITE_URL;
 export const docsRoute = '/docs';
 export const docsImageRoute = '/og/docs';
 export const docsContentRoute = '/llms.mdx/docs';
