@@ -94,7 +94,9 @@ Yaksh keeps uploaded files (PDF, TXT and MD documents about an agent) and the au
 
 | Variable | Description |
 | --- | --- |
-| `YAKSH_S3_ENDPOINT` | The URL of the storage. Required. |
+| `YAKSH_S3_ENDPOINT` | The URL of the storage. If you do not set it, Yaksh uses AWS S3. |
 | `YAKSH_S3_BUCKET` | The bucket. Make it before you start Yaksh. The default is `yaksh`. |
-| `YAKSH_S3_ACCESS_KEY`, `YAKSH_S3_SECRET_KEY` | The credentials. Required. |
+| `YAKSH_S3_ACCESS_KEY`, `YAKSH_S3_SECRET_KEY` | The credentials. Set both or neither. If you set neither, Yaksh uses the AWS credential chain, for example the IAM role of the server. |
 | `YAKSH_S3_REGION` | The default is `us-east-1`. |
+
+When the API, the worker and the evaluator start, each one reaches the bucket once. If this fails, the process stops and the log gives the cause. The credentials need `s3:ListBucket` on the bucket, and `s3:GetObject` and `s3:PutObject` on its objects.

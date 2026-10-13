@@ -1,3 +1,4 @@
+import re
 from collections.abc import AsyncIterator, Callable, Iterator
 
 import pytest
@@ -63,3 +64,32 @@ async def test_a_wrong_key_and_a_missing_file_are_reported_as_storage_failures(
         await anext(store.stream("documents/missing"))
     with pytest.raises(UnavailableError, match="could not return the file: NoSuchKey"):
         await store.get("documents/missing")
+
+
+async def test_a_store_without_keys_takes_the_credentials_from_the_environment(
+    endpoint: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("AWS_ACCESS_KEY_ID", ACCESS_KEY)
+    monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", SECRET_KEY)
+    store = S3FileStore(endpoint, "yaksh", None, None)
+    try:
+        await store.put("documents/chain", b"x", "text/plain")
+
+        assert await store.get("documents/chain") == b"x"
+    finally:
+        await store.close()
+
+
+async def test_the_check_reaches_the_bucket_or_names_what_failed(
+    endpoint: str, stores: Callable[[str], S3FileStore]
+) -> None:
+    await stores(SECRET_KEY).check()
+
+    with pytest.raises(UnavailableError, match=re.escape(f"'yaksh' at {endpoint}: 403")):
+        await stores("not-the-secret").check()
+    missing = S3FileStore(endpoint, "missing", ACCESS_KEY, SECRET_KEY)
+    try:
+        with pytest.raises(UnavailableError, match=re.escape(f"'missing' at {endpoint}: 404")):
+            await missing.check()
+    finally:
+        await missing.close()

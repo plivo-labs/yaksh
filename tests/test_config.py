@@ -11,9 +11,6 @@ REQUIRED = {
     "api_token": "token",
     "database_url": "postgresql+asyncpg://yaksh@localhost/yaksh",
     "encryption_key": "k" * 32,
-    "s3_endpoint": "http://storage.test",
-    "s3_access_key": "access",
-    "s3_secret_key": "secret",
 }
 
 
@@ -37,6 +34,13 @@ def test_yaksh_refuses_to_start_without_a_long_enough_encryption_key(key: str | 
 
     with pytest.raises(pydantic.ValidationError, match="encryption_key"):
         Settings(_env_file=None, **values)
+
+
+def test_s3_keys_come_together_or_not_at_all() -> None:
+    assert Settings(_env_file=None, **REQUIRED).s3_access_key is None
+
+    with pytest.raises(pydantic.ValidationError, match="together"):
+        Settings(_env_file=None, **REQUIRED, s3_access_key="access")
 
 
 def test_port_comes_from_the_platform_port_variable(monkeypatch: pytest.MonkeyPatch) -> None:

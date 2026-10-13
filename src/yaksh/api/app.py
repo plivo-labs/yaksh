@@ -34,6 +34,7 @@ from yaksh.config import Settings
 from yaksh.db.migrate import upgrade_to_head
 from yaksh.db.session import create_engine, create_sessionmaker
 from yaksh.domain.documents import MAX_FILE_BYTES
+from yaksh.domain.errors import UnavailableError
 from yaksh.settings.cipher import Cipher, SecretUnreadableError
 from yaksh.settings.store import SettingsSource
 from yaksh.simulation.generation import stop_running
@@ -55,6 +56,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
         await app.state.source.current()
     except SecretUnreadableError as error:
         raise RuntimeError(f"cannot read the stored settings: {error}") from None
+    try:
+        await app.state.file_store.check()
+    except UnavailableError as error:
+        raise RuntimeError(str(error)) from None
     async with app.state.sessionmaker() as session:
         voices = await seed_builtin_voices(session)
         personas = await seed_builtin_personas(session)
