@@ -456,6 +456,8 @@ class FakePlivoAccount:
             for app in ([POOL_APPLICATION] if applications is None else applications)
         }
         self.down = False
+        self.links_fail = False
+        """Plivo makes the link change but its answer does not come."""
         self.links: list[tuple[str, str | None]] = []
 
     def _reach(self) -> None:
@@ -465,6 +467,10 @@ class FakePlivoAccount:
     async def list_numbers(self) -> list[AccountNumber]:
         self._reach()
         return list(self.numbers.values())
+
+    async def get_number(self, number: str) -> AccountNumber:
+        self._reach()
+        return self.numbers[number]
 
     async def get_application(self, app_id: str) -> PlivoApplication:
         self._reach()
@@ -499,6 +505,8 @@ class FakePlivoAccount:
         self._reach()
         self.links.append((number, app_id))
         self.numbers[number] = self.numbers[number].model_copy(update={"application_id": app_id})
+        if self.links_fail:
+            raise PlivoError("no answer", reason="Plivo did not answer")
 
 
 class FakeProviders:
@@ -589,7 +597,7 @@ def make_worker(
     *,
     worker_id: str | None = None,
     pool_app_id: str | None = POOL_APP_ID,
-    receiving_app_id: str | None = None,
+    receiving_app_id: str | None = POOL_APP_ID,
     outbound_problem: str | None = None,
     source: SettingsSource | None = None,
     store: FileStore | None = None,

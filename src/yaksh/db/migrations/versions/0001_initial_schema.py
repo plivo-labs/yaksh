@@ -901,6 +901,7 @@ def upgrade() -> None:
         sa.Column("checked_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("error", sa.Text(), nullable=True),
         sa.Column("claimed_until", sa.DateTime(timezone=True), nullable=True),
+        sa.Column("generation", sa.Integer(), server_default="0", nullable=False),
         sa.CheckConstraint("id = 1", name=op.f("ck_phone_checks_one_row")),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_phone_checks")),
     )

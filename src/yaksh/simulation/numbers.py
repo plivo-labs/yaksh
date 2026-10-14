@@ -12,7 +12,7 @@ from yaksh.config import Settings
 from yaksh.db.models import Conversation, PhoneNumber
 from yaksh.domain.numbers import AccountNumber
 from yaksh.domain.settings import AppSettings
-from yaksh.simulation.workers import receiving_problem
+from yaksh.simulation.workers import application_problem, receiving_problem
 from yaksh.timings import TIMINGS
 
 
@@ -55,10 +55,18 @@ async def account_numbers(session: AsyncSession) -> list[PhoneNumber]:
 async def sync_numbers(
     session: AsyncSession, numbers: list[AccountNumber], application_names: dict[str, str]
 ) -> None:
-    """Make the stored numbers match the Plivo account: each number's application, name and
-    region as Plivo lists them; numbers gone from the account are dropped once free. A lease
-    is never touched, so a number that leaves the receiving application keeps its test until
-    the test ends."""
+    await store_numbers(session, numbers, application_names)
+    await session.commit()
+
+
+async def store_numbers(
+    session: AsyncSession, numbers: list[AccountNumber], application_names: dict[str, str]
+) -> None:
+    """Make the stored numbers match the Plivo account, without committing: each number's
+    application, name and region as Plivo lists them; numbers gone from the account are
+    dropped once free. A lease is never touched, so a number that leaves the receiving
+    application, or the account, keeps its test until the test ends; one gone from the account
+    leaves the pool at once."""
     listed = {entry.number for entry in numbers}
     if numbers:
         rows = insert(PhoneNumber).values(
@@ -86,12 +94,13 @@ async def sync_numbers(
                 },
             )
         )
+    gone = PhoneNumber.number.notin_(listed)
     await session.execute(
-        delete(PhoneNumber).where(
-            PhoneNumber.number.notin_(listed), PhoneNumber.conversation_id.is_(None)
-        )
+        update(PhoneNumber)
+        .where(gone, PhoneNumber.conversation_id.is_not(None))
+        .values(application_id=None, application_name=None)
     )
-    await session.commit()
+    await session.execute(delete(PhoneNumber).where(gone, PhoneNumber.conversation_id.is_(None)))
 
 
 async def lease_number(
@@ -170,7 +179,9 @@ NO_APPLICATION = "choose the receiving application in Settings"
 async def no_numbers_problem(session: AsyncSession, app_id: str) -> str | None:
     """Why no test can get a number: the receiving application has none."""
     linked = await session.scalar(
-        select(PhoneNumber.number).where(PhoneNumber.application_id == app_id).limit(1)
+        select(PhoneNumber.number)
+        .where(PhoneNumber.application_id == app_id, PhoneNumber.voice.is_(True))
+        .limit(1)
     )
     if linked is None:
         return "choose test numbers on the Numbers page"
@@ -187,4 +198,7 @@ async def inbound_problem(
     app_id = app.phone.application_id
     if app_id is None:
         return NO_APPLICATION
-    return await no_numbers_problem(session, app_id)
+    problem = await no_numbers_problem(session, app_id)
+    if problem is not None:
+        return problem
+    return await application_problem(session, app_id, TIMINGS.worker_lease_s)

@@ -119,6 +119,19 @@ class PlivoApi:
             raise PlivoError(f"listing numbers did not end after {MAX_PAGES} pages")
         return numbers
 
+    async def get_number(self, number: str) -> AccountNumber:
+        body = await self._get(
+            f"{self._account}/Number/{number.lstrip('+')}/", {}, f"reading {number}"
+        )
+        try:
+            entry = json.loads(body)
+        except ValueError as error:
+            raise PlivoError(f"reading {number} answered with an unreadable body") from error
+        found = account_numbers([entry] if isinstance(entry, dict) else [])
+        if not found:
+            raise PlivoError(f"reading {number} answered without a phone number")
+        return found[0]
+
     async def list_agent_flows(self, *, name: str | None, offset: int) -> dict[str, Any]:
         """One page of the account's active Plivo CX agent flows, newest first, as Plivo returns
         it. A draft or paused flow takes no calls, so it is left out."""

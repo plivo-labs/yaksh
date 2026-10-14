@@ -53,3 +53,13 @@ async def receiving_problem(session: AsyncSession, app_id: str, lease_s: float) 
         "; ".join(filter(None, problems))
         or f"no running worker receives calls for application {app_id}"
     )
+
+
+async def application_problem(session: AsyncSession, app_id: str, lease_s: float) -> str | None:
+    """Why the running workers use no number of the application: it sends calls to another
+    install, or Plivo cannot be read. None when no worker runs yet, since a run then waits for
+    one."""
+    running = await session.scalar(select(RunningWorker.id).where(seen_within(lease_s)).limit(1))
+    if running is None:
+        return None
+    return await receiving_problem(session, app_id, lease_s)

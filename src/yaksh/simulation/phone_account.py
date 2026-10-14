@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 from sqlalchemy import func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from yaksh.db.models import PhoneCheck, PhoneNumber
+from yaksh.db.models import PhoneCheck, PhoneNumber, StoredSettings
 from yaksh.domain.errors import ConflictError, NotFoundError, ProviderCallError, UnavailableError
 from yaksh.domain.numbers import (
     CX_AGENT_PREFIX,
@@ -19,7 +19,7 @@ from yaksh.domain.numbers import (
     PlivoApplication,
     receiving_urls,
 )
-from yaksh.simulation.numbers import sync_numbers
+from yaksh.simulation.numbers import store_numbers
 
 log = logging.getLogger(__name__)
 
@@ -66,22 +66,48 @@ async def application_names(api: PhoneAccountApi, numbers: list[AccountNumber]) 
     return names
 
 
+CHECK_TRIES = 3
+
+
+async def fence(session: AsyncSession, *, lock: bool = False) -> tuple[int, int]:
+    """What a check must find unchanged to store what it read: the count of Yaksh's changes to
+    numbers, and the settings version, which grows when the account changes."""
+    query = select(PhoneCheck.generation).where(PhoneCheck.id == 1)
+    generation = await session.scalar(query.with_for_update() if lock else query)
+    version = await session.scalar(select(StoredSettings.version).where(StoredSettings.id == 1))
+    return generation or 0, version or 0
+
+
 async def check_numbers(session: AsyncSession, api: PhoneAccountApi) -> str | None:
     """Read the account's numbers again and store them with their applications; returns why
-    that failed. When Plivo cannot be reached, or lists no numbers, the stored numbers stand."""
+    that failed. When Plivo cannot be reached, or lists no numbers, the stored numbers stand.
+    A check that a change to a number, or to the settings, overtook reads again, so it never
+    stores what Plivo said before the change."""
     error: str | None = None
-    try:
-        numbers = await api.list_numbers()
-    except ProviderCallError as failure:
-        log.warning("keeping the stored numbers: %s", failure)
-        error = failure.reason or "Plivo could not be reached"
-    else:
-        if numbers:
-            await sync_numbers(session, numbers, await application_names(api, numbers))
-            log.info("checked %d numbers of the Plivo account", len(numbers))
-        else:
+    for _ in range(CHECK_TRIES):
+        before = await fence(session)
+        await session.commit()
+        try:
+            numbers = await api.list_numbers()
+        except ProviderCallError as failure:
+            log.warning("keeping the stored numbers: %s", failure)
+            error = failure.reason or "Plivo could not be reached"
+            break
+        if not numbers:
             log.warning("keeping the stored numbers: the account listed no numbers")
             error = "the Plivo account lists no numbers"
+            break
+        names = await application_names(api, numbers)
+        if await fence(session, lock=True) != before:
+            await session.rollback()
+            continue
+        await store_numbers(session, numbers, names)
+        log.info("checked %d numbers of the Plivo account", len(numbers))
+        break
+    else:
+        await session.rollback()
+        log.warning("the numbers kept changing during the check; the next check reads them")
+        return None
     await session.execute(
         update(PhoneCheck)
         .where(PhoneCheck.id == 1)
@@ -160,9 +186,29 @@ async def locked_number(session: AsyncSession, number: str) -> PhoneNumber:
     return row
 
 
+async def changed(session: AsyncSession, row: PhoneNumber, app_id: str | None) -> None:
+    """Store the number's application and commit, counting the change against running checks."""
+    row.application_id = app_id
+    row.application_name = None
+    await session.execute(
+        update(PhoneCheck).where(PhoneCheck.id == 1).values(generation=PhoneCheck.generation + 1)
+    )
+    await session.commit()
+
+
+async def current_application(api: PhoneAccountApi, number: str) -> str | None:
+    try:
+        return (await api.get_number(number)).application_id
+    except ProviderCallError as error:
+        raise unavailable(f"read {number}", error) from error
+
+
 async def use_number(session: AsyncSession, api: PhoneAccountApi, number: str, app_id: str) -> None:
     """Make a free number a test number: link it to the receiving application in Plivo. A
-    number another application receives is never taken."""
+    number another application receives is never taken: Yaksh asks Plivo again just before
+    the change, since another install may have taken the number since the last check. Plivo
+    cannot change a number only if it is still free, so two installs that use one number at
+    the same moment can still both link it; the later one wins."""
     row = await locked_number(session, number)
     if not row.voice:
         raise ConflictError(f"{number} cannot take calls")
@@ -172,13 +218,18 @@ async def use_number(session: AsyncSession, api: PhoneAccountApi, number: str, a
     if row.application_id is not None:
         owner = row.application_name or row.application_id
         raise ConflictError(f"{number} belongs to the application {owner}")
+    linked = await current_application(api, number)
+    if linked == app_id:
+        await changed(session, row, app_id)
+        return
+    if linked is not None:
+        await changed(session, row, linked)
+        raise ConflictError(f"{number} belongs to the application {linked}")
     try:
         await api.link_number(number, app_id)
     except ProviderCallError as error:
         raise unavailable(f"link {number}", error) from error
-    row.application_id = app_id
-    row.application_name = None
-    await session.commit()
+    await changed(session, row, app_id)
 
 
 async def stop_number(
@@ -186,7 +237,9 @@ async def stop_number(
 ) -> None:
     """Stop using a test number: remove its application in Plivo. Not while a test holds the
     number, nor while it rests after one, so no test loses a call it waits for. The row stays
-    locked until Plivo answers, so no test leases the number meanwhile."""
+    locked until Plivo answers, so no test leases the number meanwhile. When Plivo's answer
+    does not come, the number leaves the pool anyway, since Plivo may have made the change;
+    the next check stores what Plivo has."""
     row = await locked_number(session, number)
     if row.application_id != app_id:
         raise ConflictError(f"{number} is not a test number")
@@ -195,10 +248,13 @@ async def stop_number(
     now = await session.scalar(select(func.statement_timestamp()))
     if row.available_after is not None and now is not None and row.available_after > now:
         raise ConflictError(f"{number} rests after a test")
+    linked = await current_application(api, number)
+    if linked != app_id:
+        await changed(session, row, linked)
+        raise ConflictError(f"{number} is no longer linked to the receiving application")
     try:
         await api.link_number(number, None)
     except ProviderCallError as error:
+        await changed(session, row, None)
         raise unavailable(f"unlink {number}", error) from error
-    row.application_id = None
-    row.application_name = None
-    await session.commit()
+    await changed(session, row, None)

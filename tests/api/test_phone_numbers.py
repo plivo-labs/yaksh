@@ -29,6 +29,7 @@ from yaksh.domain.conversations import (
 )
 from yaksh.domain.numbers import AccountNumber, PlivoApplication
 from yaksh.simulation import conversations, numbers, phone_account
+from yaksh.simulation.workers import report_worker
 from yaksh.worker.worker import Worker
 
 NUMBER = "+17862242321"
@@ -325,3 +326,122 @@ async def test_a_test_number_stops_only_when_no_test_holds_it_and_it_is_not_rest
     assert resting.json()["error"]["message"] == f"{free} rests after a test"
     assert {item["number"]: item["owner"] for item in stopped.json()["items"]}[free] == "free"
     assert providers.account.links == [(free, None)]
+
+
+async def test_a_number_another_install_took_since_the_last_check_is_not_taken(
+    client: AsyncClient, providers: FakeProviders
+) -> None:
+    providers.account = FakePlivoAccount(account(FREE, app_id=None))
+    await client.post("/api/v1/phone-numbers/check")
+    await providers.account.link_number(FREE, "99")
+    providers.account.links.clear()
+
+    taken = await client.post(f"/api/v1/phone-numbers/{FREE}/use")
+    listed = (await client.get("/api/v1/phone-numbers")).json()
+
+    assert taken.status_code == 409
+    assert providers.account.links == []
+    assert [(item["number"], item["owner"]) for item in listed["items"]] == [(FREE, "other")]
+
+
+async def test_a_stop_without_plivos_answer_takes_the_number_out_of_the_pool(
+    client: AsyncClient, providers: FakeProviders
+) -> None:
+    providers.account = FakePlivoAccount(account(NUMBER, OTHER))
+    await client.post("/api/v1/phone-numbers/check")
+    await providers.account.link_number(OTHER, "99")
+    providers.account.links_fail = True
+
+    moved = await client.post(f"/api/v1/phone-numbers/{OTHER}/stop")
+    unanswered = await client.post(f"/api/v1/phone-numbers/{NUMBER}/stop")
+    listed = (await client.get("/api/v1/phone-numbers")).json()
+
+    assert moved.status_code == 409
+    assert moved.json()["error"]["message"] == (
+        f"{OTHER} is no longer linked to the receiving application"
+    )
+    assert unanswered.status_code == 503
+    owners = {item["number"]: item["owner"] for item in listed["items"]}
+    assert owners == {NUMBER: "free", OTHER: "other"}
+
+
+class Overtaken(FakePlivoAccount):
+    """A Plivo account whose first listing comes back after Yaksh changed a number: by then
+    what it lists is out of date."""
+
+    def __init__(self, settings: Settings) -> None:
+        super().__init__(account(NUMBER))
+        self.settings = settings
+        self.listings = 0
+
+    async def list_numbers(self) -> list[AccountNumber]:
+        self.listings += 1
+        stale = await super().list_numbers()
+        if self.listings == 1:
+            engine = create_engine(self.settings.database_url.encoded_string())
+            async with create_sessionmaker(engine)() as session:
+                row = await phone_account.locked_number(session, NUMBER)
+                await phone_account.changed(session, row, None)
+            await engine.dispose()
+            self.numbers[NUMBER] = self.numbers[NUMBER].model_copy(update={"application_id": None})
+        return stale
+
+
+async def test_a_check_that_a_change_overtook_reads_again_and_stores_the_change(
+    client: AsyncClient, settings: Settings
+) -> None:
+    engine = create_engine(settings.database_url.encoded_string())
+    sessions = create_sessionmaker(engine)
+    async with sessions() as session:
+        await numbers.sync_numbers(session, account(NUMBER), {})
+        plivo = Overtaken(settings)
+        await phone_account.check_numbers(session, plivo)
+        linked = await session.scalar(
+            select(PhoneNumber.application_id).where(PhoneNumber.number == NUMBER)
+        )
+    await engine.dispose()
+
+    assert plivo.listings == 2
+    assert linked is None, "the stale listing would have linked the number again"
+
+
+async def test_a_number_gone_from_the_account_leaves_the_pool_but_keeps_its_test(
+    client: AsyncClient, settings: Settings
+) -> None:
+    engine = create_engine(settings.database_url.encoded_string())
+    sessions = create_sessionmaker(engine)
+    conversation_id = await queue_phone_conversation(client)
+    async with sessions() as session:
+        await numbers.sync_numbers(session, account(NUMBER), {})
+        assert await numbers.lease_number(session, conversation_id, POOL_APP_ID) == NUMBER
+        await numbers.sync_numbers(session, account(OTHER), {})
+        await numbers.release_numbers(session, [conversation_id], 0)
+        await session.commit()
+        later = await queue_phone_conversation(client)
+        leased = await numbers.lease_number(session, later, POOL_APP_ID)
+    await engine.dispose()
+
+    assert leased == OTHER, "the gone number is not leased again after its test"
+
+
+async def test_an_inbound_run_is_refused_while_the_running_workers_cannot_use_the_application(
+    client: AsyncClient, settings: Settings
+) -> None:
+    agent_id = await create_agent_id(client)
+    engine = create_engine(settings.database_url.encoded_string())
+    async with create_sessionmaker(engine)() as session:
+        await report_worker(
+            session,
+            "w1",
+            receiving_app_id=None,
+            outbound_problem="Plivo application Yaksh-Test has answer URL 'x'; set it to 'y'",
+            lease_s=FAST.worker_lease_s,
+        )
+    await engine.dispose()
+
+    refused = await start_run(client, agent_id, [str(uuid.uuid4())])
+
+    assert refused.status_code == 422
+    assert refused.json()["error"]["message"] == (
+        "phone calls are off: Plivo application Yaksh-Test has answer URL 'x'; set it to 'y'"
+    )

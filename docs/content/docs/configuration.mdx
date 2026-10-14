@@ -81,7 +81,7 @@ The **Numbers** page shows the numbers of the account in three groups:
 | Free numbers | Voice numbers without an application. **Use for tests** links the number to the receiving application in Plivo. |
 | Used elsewhere | Numbers that a different application receives, for example a Plivo CX agent or another Yaksh install, and numbers that cannot take calls. Yaksh never takes these numbers. |
 
-The worker reads the numbers of the account again at the interval in **Check numbers every**. The default is 5 minutes. **Check now** reads them at once. Thus, after you change a number in the Plivo console, you do not restart the worker. Only one process reads the numbers at a time. If Plivo cannot be reached, Yaksh keeps the numbers of the last check, and the **Numbers** page shows the error.
+The worker reads the numbers of the account again at the interval in **Check numbers every**. The default is 5 minutes. **Check now** reads them at once. Thus, after you change a number in the Plivo console, you do not restart the worker. The workers take turns to read them, and a read never stores numbers that a newer change in Yaksh replaced. If Plivo cannot be reached, Yaksh keeps the numbers of the last check, and the **Numbers** page shows the error.
 
 Inbound tests and outbound tests use only test numbers. Each conversation uses one number until it stops. Then the number rests for the number rest of Settings before an outbound test uses it again.
 

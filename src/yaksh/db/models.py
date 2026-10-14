@@ -643,7 +643,7 @@ class RunningWorker(Base):
 
 class PhoneCheck(Base):
     """When Yaksh last read the numbers of the Plivo account, and why that failed if it did.
-    claimed_until lets one process check at a time."""
+    claimed_until lets the workers take turns with the periodic check."""
 
     __tablename__ = "phone_checks"
     __table_args__ = (CheckConstraint("id = 1", name="one_row"),)
@@ -652,6 +652,9 @@ class PhoneCheck(Base):
     checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     error: Mapped[str | None] = mapped_column(Text)
     claimed_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    generation: Mapped[int] = mapped_column(Integer, server_default="0")
+    """Grows with every change Yaksh makes to a number, so a check that read Plivo before the
+    change does not store what it read."""
 
 
 class StoredSettings(Base):
