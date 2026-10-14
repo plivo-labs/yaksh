@@ -686,3 +686,74 @@ func TestSettingsApplyDryRunSendsTheFileWhenAVariableIsNotSet(t *testing.T) {
 		t.Fatalf("code = %d, stderr = %q", code, stderr)
 	}
 }
+
+const phoneListing = `{"items":[` +
+	`{"number":"+14155550100","owner":"test","state":"ready"},` +
+	`{"number":"+14155550101","owner":"free","state":null},` +
+	`{"number":"+14155550102","owner":"cx_agent","state":null}],` +
+	`"application_id":"7001","problem":null,"rest_s":300}`
+
+func TestNumbersListOwnerKeepsOnlyThatOwnersNumbers(t *testing.T) {
+	f := newFakeAPI(t, map[string]http.HandlerFunc{"GET /api/v1/phone-numbers": reply(200, phoneListing)})
+	code, stdout, stderr := run(t, context.Background(), against(f), "", "numbers", "list", "--owner", "free")
+	if code != 0 || stderr != "" {
+		t.Fatalf("code = %d, stderr = %q", code, stderr)
+	}
+	var got struct {
+		Items []struct {
+			Number string `json:"number"`
+		} `json:"items"`
+		ApplicationID string `json:"application_id"`
+		RestS         int    `json:"rest_s"`
+	}
+	if err := json.Unmarshal([]byte(stdout), &got); err != nil {
+		t.Fatalf("stdout is not JSON: %v\n%s", err, stdout)
+	}
+	if len(got.Items) != 1 || got.Items[0].Number != "+14155550101" || got.ApplicationID != "7001" || got.RestS != 300 {
+		t.Fatalf("stdout = %s", stdout)
+	}
+}
+
+func TestNumbersListRefusesAnUnknownOwnerBeforeTheServer(t *testing.T) {
+	f := newFakeAPI(t, map[string]http.HandlerFunc{"GET /api/v1/phone-numbers": reply(200, phoneListing)})
+	code, stdout, stderr := run(t, context.Background(), against(f), "", "numbers", "list", "--owner", "mine")
+	if code != 1 || stdout != "" || !strings.Contains(stderr, `"mine" is not an owner`) {
+		t.Fatalf("code = %d, stdout = %q, stderr = %q", code, stdout, stderr)
+	}
+	if n := len(f.requests("GET", "/api/v1/phone-numbers")); n != 0 {
+		t.Fatalf("requests = %d, want 0", n)
+	}
+}
+
+func TestNumbersChangesPostToTheNumberAndPrintTheListing(t *testing.T) {
+	tests := []struct {
+		args []string
+		path string
+	}{
+		{[]string{"numbers", "use", "+14155550101"}, "/api/v1/phone-numbers/+14155550101/use"},
+		{[]string{"numbers", "stop", "+14155550100"}, "/api/v1/phone-numbers/+14155550100/stop"},
+		{[]string{"numbers", "check"}, "/api/v1/phone-numbers/check"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.args[1], func(t *testing.T) {
+			f := newFakeAPI(t, map[string]http.HandlerFunc{"POST " + tt.path: reply(200, phoneListing)})
+			code, stdout, stderr := run(t, context.Background(), against(f), "", tt.args...)
+			if code != 0 || stderr != "" || !strings.Contains(stdout, `"application_id": "7001"`) {
+				t.Fatalf("code = %d, stdout = %q, stderr = %q", code, stdout, stderr)
+			}
+			if n := len(f.requests("POST", tt.path)); n != 1 {
+				t.Fatalf("POST %s requests = %d, want 1", tt.path, n)
+			}
+		})
+	}
+}
+
+func TestNumbersStopShowsWhyTheServerRefused(t *testing.T) {
+	f := newFakeAPI(t, map[string]http.HandlerFunc{
+		"POST /api/v1/phone-numbers/{number}/stop": reply(409, `{"error":{"code":"conflict","message":"+14155550100 is in a test"}}`),
+	})
+	code, stdout, stderr := run(t, context.Background(), against(f), "", "numbers", "stop", "+14155550100")
+	if code != 1 || stdout != "" || !strings.Contains(stderr, "409 Conflict: +14155550100 is in a test") {
+		t.Fatalf("code = %d, stdout = %q, stderr = %q", code, stdout, stderr)
+	}
+}

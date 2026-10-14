@@ -576,17 +576,17 @@ func (e NoiseSound) Valid() bool {
 
 // Defines values for NumberState.
 const (
-	Free    NumberState = "free"
 	InUse   NumberState = "in_use"
+	Ready   NumberState = "ready"
 	Resting NumberState = "resting"
 )
 
 // Valid indicates whether the value is a known member of the NumberState enum.
 func (e NumberState) Valid() bool {
 	switch e {
-	case Free:
-		return true
 	case InUse:
+		return true
+	case Ready:
 		return true
 	case Resting:
 		return true
@@ -652,6 +652,33 @@ func (e OutcomeGroup) Valid() bool {
 	case OutcomeGroupInProgress:
 		return true
 	case OutcomeGroupWaiting:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for Owner.
+const (
+	OwnerCxAgent Owner = "cx_agent"
+	OwnerFree    Owner = "free"
+	OwnerNoVoice Owner = "no_voice"
+	OwnerOther   Owner = "other"
+	OwnerTest    Owner = "test"
+)
+
+// Valid indicates whether the value is a known member of the Owner enum.
+func (e Owner) Valid() bool {
+	switch e {
+	case OwnerCxAgent:
+		return true
+	case OwnerFree:
+		return true
+	case OwnerNoVoice:
+		return true
+	case OwnerOther:
+		return true
+	case OwnerTest:
 		return true
 	default:
 		return false
@@ -1254,6 +1281,19 @@ type AgentVersionRead struct {
 	Version   int                `json:"version"`
 }
 
+// ApplicationChoice defines model for ApplicationChoice.
+type ApplicationChoice struct {
+	ApplicationId string `json:"application_id"`
+}
+
+// ApplicationRead defines model for ApplicationRead.
+type ApplicationRead struct {
+	AnswerUrl *string  `json:"answer_url"`
+	Id        string   `json:"id"`
+	Name      *string  `json:"name"`
+	Problems  []string `json:"problems"`
+}
+
 // AssignPersona One persona for several scenarios of one agent: all of them, or none if one is missing.
 type AssignPersona struct {
 	PersonaId   openapi_types.UUID   `json:"persona_id"`
@@ -1582,6 +1622,12 @@ type ErrorResponse struct {
 	Error ErrorBody `json:"error"`
 }
 
+// EvaluationLimits How much one evaluator does at once, within the LLM provider's rate limits.
+type EvaluationLimits struct {
+	EvaluationsAtOnce *int `json:"evaluations_at_once,omitempty"`
+	JudgeCallsAtOnce  *int `json:"judge_calls_at_once,omitempty"`
+}
+
 // EvaluationState defines model for EvaluationState.
 type EvaluationState string
 
@@ -1889,6 +1935,9 @@ type Outcome string
 // groups say what happened, not who is at fault.
 type OutcomeGroup string
 
+// Owner Who receives the calls of a number on the account.
+type Owner string
+
 // PageAgentSummary defines model for Page_AgentSummary_.
 type PageAgentSummary struct {
 	Items    []AgentSummary `json:"items"`
@@ -2083,26 +2132,43 @@ type PersonaVersionRead struct {
 
 // Phone defines model for Phone.
 type Phone struct {
-	NumberRestS  *int    `json:"number_rest_s,omitempty"`
-	RingTimeoutS *int    `json:"ring_timeout_s,omitempty"`
-	Timezone     *string `json:"timezone,omitempty"`
+	ApplicationId  *string `json:"application_id,omitempty"`
+	CheckIntervalS *int    `json:"check_interval_s,omitempty"`
+	NumberRestS    *int    `json:"number_rest_s,omitempty"`
+	RingTimeoutS   *int    `json:"ring_timeout_s,omitempty"`
+	Timezone       *string `json:"timezone,omitempty"`
+}
+
+// PhoneAccountRead defines model for PhoneAccountRead.
+type PhoneAccountRead struct {
+	Application      *ApplicationRead `json:"application"`
+	CredentialsSaved bool             `json:"credentials_saved"`
+	Provider         string           `json:"provider"`
+	TestNumbers      int              `json:"test_numbers"`
 }
 
 // PhoneNumberRead defines model for PhoneNumberRead.
 type PhoneNumberRead struct {
-	Alias                 *string     `json:"alias"`
-	ApplicationId         *string     `json:"application_id"`
-	ApplicationName       *string     `json:"application_name"`
-	Number                string      `json:"number"`
-	OnOutboundApplication bool        `json:"on_outbound_application"`
-	Region                *string     `json:"region"`
-	State                 NumberState `json:"state"`
+	Alias           *string `json:"alias"`
+	ApplicationId   *string `json:"application_id"`
+	ApplicationName *string `json:"application_name"`
+	Number          string  `json:"number"`
+
+	// Owner Who receives the calls of a number on the account.
+	Owner      Owner        `json:"owner"`
+	Region     *string      `json:"region"`
+	RestsUntil *time.Time   `json:"rests_until"`
+	State      *NumberState `json:"state"`
 }
 
 // PhoneNumbers defines model for PhoneNumbers.
 type PhoneNumbers struct {
+	ApplicationId   *string           `json:"application_id"`
+	CheckError      *string           `json:"check_error"`
+	CheckedAt       *time.Time        `json:"checked_at"`
 	Items           []PhoneNumberRead `json:"items"`
 	OutboundProblem *string           `json:"outbound_problem"`
+	Problem         *string           `json:"problem"`
 	RestS           int               `json:"rest_s"`
 }
 
@@ -2625,12 +2691,15 @@ type SettingsValues struct {
 	Audit *Audit `json:"audit,omitempty"`
 
 	// Brief The model that drafts an agent's brief from its config while the person waits.
-	Brief      *BriefModel      `json:"brief,omitempty"`
-	Caller     *CallerModel     `json:"caller,omitempty"`
-	Deepgram   *Deepgram        `json:"deepgram,omitempty"`
-	Generation *GenerationModel `json:"generation,omitempty"`
-	Judges     *JudgeModel      `json:"judges,omitempty"`
-	Limits     *Limits          `json:"limits,omitempty"`
+	Brief    *BriefModel  `json:"brief,omitempty"`
+	Caller   *CallerModel `json:"caller,omitempty"`
+	Deepgram *Deepgram    `json:"deepgram,omitempty"`
+
+	// Evaluation How much one evaluator does at once, within the LLM provider's rate limits.
+	Evaluation *EvaluationLimits `json:"evaluation,omitempty"`
+	Generation *GenerationModel  `json:"generation,omitempty"`
+	Judges     *JudgeModel       `json:"judges,omitempty"`
+	Limits     *Limits           `json:"limits,omitempty"`
 
 	// Llm Any API with OpenAI's Responses endpoint. The caller, scenario writing and the judges
 	// use it.
@@ -3054,6 +3123,9 @@ type UpdatePersonaApiV1PersonasPersonaIdPatchJSONRequestBody = PersonaUpdate
 
 // DraftPersonaForksApiV1PersonasPersonaIdForksDraftPostJSONRequestBody defines body for DraftPersonaForksApiV1PersonasPersonaIdForksDraftPost for application/json ContentType.
 type DraftPersonaForksApiV1PersonasPersonaIdForksDraftPostJSONRequestBody = ForkRequest
+
+// ChooseApplicationApiV1PhoneAccountApplicationPutJSONRequestBody defines body for ChooseApplicationApiV1PhoneAccountApplicationPut for application/json ContentType.
+type ChooseApplicationApiV1PhoneAccountApplicationPutJSONRequestBody = ApplicationChoice
 
 // LabelItemApiV1ReviewItemsItemIdLabelsPostJSONRequestBody defines body for LabelItemApiV1ReviewItemsItemIdLabelsPost for application/json ContentType.
 type LabelItemApiV1ReviewItemsItemIdLabelsPostJSONRequestBody = LabelCreate
@@ -4251,12 +4323,83 @@ type ClientInterface interface {
 	// Corresponds with GET /api/v1/personas/{persona_id}/versions/{version} (the `GetVersionApiV1PersonasPersonaIdVersionsVersionGet` operationId).
 	GetVersionApiV1PersonasPersonaIdVersionsVersionGet(ctx context.Context, personaId openapi_types.UUID, version int, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// GetPhoneAccountApiV1PhoneAccountGet Get Phone Account
+	//
+	// The phone account: whether its credentials are saved, and the receiving application
+	// with why it does not send calls to this install, if it does not.
+	//
+	// Corresponds with GET /api/v1/phone-account (the `GetPhoneAccountApiV1PhoneAccountGet` operationId).
+	GetPhoneAccountApiV1PhoneAccountGet(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ChooseApplicationApiV1PhoneAccountApplicationPutWithBody Choose Application
+	//
+	// Choose the application that receives test calls. Its numbers become the test numbers.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PUT /api/v1/phone-account/application (the `ChooseApplicationApiV1PhoneAccountApplicationPut` operationId).
+	ChooseApplicationApiV1PhoneAccountApplicationPutWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ChooseApplicationApiV1PhoneAccountApplicationPut Choose Application
+	//
+	// Choose the application that receives test calls. Its numbers become the test numbers.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PUT /api/v1/phone-account/application (the `ChooseApplicationApiV1PhoneAccountApplicationPut` operationId).
+	ChooseApplicationApiV1PhoneAccountApplicationPut(ctx context.Context, body ChooseApplicationApiV1PhoneAccountApplicationPutJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// FixApplicationApiV1PhoneAccountApplicationFixPost Fix Application
+	//
+	// Point the receiving application's answer and hangup URLs at this install.
+	//
+	// Corresponds with POST /api/v1/phone-account/application/fix (the `FixApplicationApiV1PhoneAccountApplicationFixPost` operationId).
+	FixApplicationApiV1PhoneAccountApplicationFixPost(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// MakeApplicationApiV1PhoneAccountApplicationNewPost Make Application
+	//
+	// Make an application that sends calls to this install, and choose it.
+	//
+	// Corresponds with POST /api/v1/phone-account/application/new (the `MakeApplicationApiV1PhoneAccountApplicationNewPost` operationId).
+	MakeApplicationApiV1PhoneAccountApplicationNewPost(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListApplicationsApiV1PhoneAccountApplicationsGet List Applications
+	//
+	// The applications people may choose to receive test calls, without Plivo CX agents'.
+	//
+	// Corresponds with GET /api/v1/phone-account/applications (the `ListApplicationsApiV1PhoneAccountApplicationsGet` operationId).
+	ListApplicationsApiV1PhoneAccountApplicationsGet(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// ListPhoneNumbersApiV1PhoneNumbersGet List Phone Numbers
 	//
-	// The numbers Yaksh may use, as the worker last synced them from the Plivo account.
+	// Every number of the phone account with its owner, as the last check found them. A
+	// number linked to the receiving application is a test number.
 	//
 	// Corresponds with GET /api/v1/phone-numbers (the `ListPhoneNumbersApiV1PhoneNumbersGet` operationId).
 	ListPhoneNumbersApiV1PhoneNumbersGet(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CheckPhoneNumbersApiV1PhoneNumbersCheckPost Check Phone Numbers
+	//
+	// Read the account's numbers again now, to see changes made in the Plivo console.
+	//
+	// Corresponds with POST /api/v1/phone-numbers/check (the `CheckPhoneNumbersApiV1PhoneNumbersCheckPost` operationId).
+	CheckPhoneNumbersApiV1PhoneNumbersCheckPost(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// StopPhoneNumberApiV1PhoneNumbersNumberStopPost Stop Phone Number
+	//
+	// Stop using a test number: Yaksh removes its application in Plivo. Refused while a test
+	// holds the number or it rests after one.
+	//
+	// Corresponds with POST /api/v1/phone-numbers/{number}/stop (the `StopPhoneNumberApiV1PhoneNumbersNumberStopPost` operationId).
+	StopPhoneNumberApiV1PhoneNumbersNumberStopPost(ctx context.Context, number string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UsePhoneNumberApiV1PhoneNumbersNumberUsePost Use Phone Number
+	//
+	// Make a free number a test number: Yaksh links it to the receiving application in
+	// Plivo. A number another application receives is refused.
+	//
+	// Corresponds with POST /api/v1/phone-numbers/{number}/use (the `UsePhoneNumberApiV1PhoneNumbersNumberUsePost` operationId).
+	UsePhoneNumberApiV1PhoneNumbersNumberUsePost(ctx context.Context, number string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetReviewApiV1ReviewConversationsConversationIdGet Get Review
 	//
@@ -6077,13 +6220,174 @@ func (c *Client) GetVersionApiV1PersonasPersonaIdVersionsVersionGet(ctx context.
 	return c.Client.Do(req)
 }
 
+// GetPhoneAccountApiV1PhoneAccountGet Get Phone Account
+//
+// The phone account: whether its credentials are saved, and the receiving application
+// with why it does not send calls to this install, if it does not.
+//
+// Corresponds with GET /api/v1/phone-account (the `GetPhoneAccountApiV1PhoneAccountGet` operationId).
+func (c *Client) GetPhoneAccountApiV1PhoneAccountGet(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetPhoneAccountApiV1PhoneAccountGetRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ChooseApplicationApiV1PhoneAccountApplicationPutWithBody Choose Application
+//
+// Choose the application that receives test calls. Its numbers become the test numbers.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PUT /api/v1/phone-account/application (the `ChooseApplicationApiV1PhoneAccountApplicationPut` operationId).
+func (c *Client) ChooseApplicationApiV1PhoneAccountApplicationPutWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewChooseApplicationApiV1PhoneAccountApplicationPutRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ChooseApplicationApiV1PhoneAccountApplicationPut Choose Application
+//
+// Choose the application that receives test calls. Its numbers become the test numbers.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PUT /api/v1/phone-account/application (the `ChooseApplicationApiV1PhoneAccountApplicationPut` operationId).
+func (c *Client) ChooseApplicationApiV1PhoneAccountApplicationPut(ctx context.Context, body ChooseApplicationApiV1PhoneAccountApplicationPutJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewChooseApplicationApiV1PhoneAccountApplicationPutRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// FixApplicationApiV1PhoneAccountApplicationFixPost Fix Application
+//
+// Point the receiving application's answer and hangup URLs at this install.
+//
+// Corresponds with POST /api/v1/phone-account/application/fix (the `FixApplicationApiV1PhoneAccountApplicationFixPost` operationId).
+func (c *Client) FixApplicationApiV1PhoneAccountApplicationFixPost(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewFixApplicationApiV1PhoneAccountApplicationFixPostRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// MakeApplicationApiV1PhoneAccountApplicationNewPost Make Application
+//
+// Make an application that sends calls to this install, and choose it.
+//
+// Corresponds with POST /api/v1/phone-account/application/new (the `MakeApplicationApiV1PhoneAccountApplicationNewPost` operationId).
+func (c *Client) MakeApplicationApiV1PhoneAccountApplicationNewPost(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewMakeApplicationApiV1PhoneAccountApplicationNewPostRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListApplicationsApiV1PhoneAccountApplicationsGet List Applications
+//
+// The applications people may choose to receive test calls, without Plivo CX agents'.
+//
+// Corresponds with GET /api/v1/phone-account/applications (the `ListApplicationsApiV1PhoneAccountApplicationsGet` operationId).
+func (c *Client) ListApplicationsApiV1PhoneAccountApplicationsGet(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListApplicationsApiV1PhoneAccountApplicationsGetRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // ListPhoneNumbersApiV1PhoneNumbersGet List Phone Numbers
 //
-// The numbers Yaksh may use, as the worker last synced them from the Plivo account.
+// Every number of the phone account with its owner, as the last check found them. A
+// number linked to the receiving application is a test number.
 //
 // Corresponds with GET /api/v1/phone-numbers (the `ListPhoneNumbersApiV1PhoneNumbersGet` operationId).
 func (c *Client) ListPhoneNumbersApiV1PhoneNumbersGet(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewListPhoneNumbersApiV1PhoneNumbersGetRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CheckPhoneNumbersApiV1PhoneNumbersCheckPost Check Phone Numbers
+//
+// Read the account's numbers again now, to see changes made in the Plivo console.
+//
+// Corresponds with POST /api/v1/phone-numbers/check (the `CheckPhoneNumbersApiV1PhoneNumbersCheckPost` operationId).
+func (c *Client) CheckPhoneNumbersApiV1PhoneNumbersCheckPost(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCheckPhoneNumbersApiV1PhoneNumbersCheckPostRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// StopPhoneNumberApiV1PhoneNumbersNumberStopPost Stop Phone Number
+//
+// Stop using a test number: Yaksh removes its application in Plivo. Refused while a test
+// holds the number or it rests after one.
+//
+// Corresponds with POST /api/v1/phone-numbers/{number}/stop (the `StopPhoneNumberApiV1PhoneNumbersNumberStopPost` operationId).
+func (c *Client) StopPhoneNumberApiV1PhoneNumbersNumberStopPost(ctx context.Context, number string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewStopPhoneNumberApiV1PhoneNumbersNumberStopPostRequest(c.Server, number)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// UsePhoneNumberApiV1PhoneNumbersNumberUsePost Use Phone Number
+//
+// Make a free number a test number: Yaksh links it to the receiving application in
+// Plivo. A number another application receives is refused.
+//
+// Corresponds with POST /api/v1/phone-numbers/{number}/use (the `UsePhoneNumberApiV1PhoneNumbersNumberUsePost` operationId).
+func (c *Client) UsePhoneNumberApiV1PhoneNumbersNumberUsePost(ctx context.Context, number string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUsePhoneNumberApiV1PhoneNumbersNumberUsePostRequest(c.Server, number)
 	if err != nil {
 		return nil, err
 	}
@@ -9524,6 +9828,154 @@ func NewGetVersionApiV1PersonasPersonaIdVersionsVersionGetRequest(server string,
 	return req, nil
 }
 
+// NewGetPhoneAccountApiV1PhoneAccountGetRequest constructs an http.Request for the GetPhoneAccountApiV1PhoneAccountGet method
+func NewGetPhoneAccountApiV1PhoneAccountGetRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/phone-account")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewChooseApplicationApiV1PhoneAccountApplicationPutRequest calls the generic ChooseApplicationApiV1PhoneAccountApplicationPut builder with application/json body
+func NewChooseApplicationApiV1PhoneAccountApplicationPutRequest(server string, body ChooseApplicationApiV1PhoneAccountApplicationPutJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewChooseApplicationApiV1PhoneAccountApplicationPutRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewChooseApplicationApiV1PhoneAccountApplicationPutRequestWithBody constructs an http.Request for the ChooseApplicationApiV1PhoneAccountApplicationPut method, with any body, and a specified content type
+func NewChooseApplicationApiV1PhoneAccountApplicationPutRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/phone-account/application")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPut, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewFixApplicationApiV1PhoneAccountApplicationFixPostRequest constructs an http.Request for the FixApplicationApiV1PhoneAccountApplicationFixPost method
+func NewFixApplicationApiV1PhoneAccountApplicationFixPostRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/phone-account/application/fix")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewMakeApplicationApiV1PhoneAccountApplicationNewPostRequest constructs an http.Request for the MakeApplicationApiV1PhoneAccountApplicationNewPost method
+func NewMakeApplicationApiV1PhoneAccountApplicationNewPostRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/phone-account/application/new")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewListApplicationsApiV1PhoneAccountApplicationsGetRequest constructs an http.Request for the ListApplicationsApiV1PhoneAccountApplicationsGet method
+func NewListApplicationsApiV1PhoneAccountApplicationsGetRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/phone-account/applications")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewListPhoneNumbersApiV1PhoneNumbersGetRequest constructs an http.Request for the ListPhoneNumbersApiV1PhoneNumbersGet method
 func NewListPhoneNumbersApiV1PhoneNumbersGetRequest(server string) (*http.Request, error) {
 	var err error
@@ -9544,6 +9996,101 @@ func NewListPhoneNumbersApiV1PhoneNumbersGetRequest(server string) (*http.Reques
 	}
 
 	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewCheckPhoneNumbersApiV1PhoneNumbersCheckPostRequest constructs an http.Request for the CheckPhoneNumbersApiV1PhoneNumbersCheckPost method
+func NewCheckPhoneNumbersApiV1PhoneNumbersCheckPostRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/phone-numbers/check")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewStopPhoneNumberApiV1PhoneNumbersNumberStopPostRequest constructs an http.Request for the StopPhoneNumberApiV1PhoneNumbersNumberStopPost method
+func NewStopPhoneNumberApiV1PhoneNumbersNumberStopPostRequest(server string, number string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "number", number, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/phone-numbers/%s/stop", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewUsePhoneNumberApiV1PhoneNumbersNumberUsePostRequest constructs an http.Request for the UsePhoneNumberApiV1PhoneNumbersNumberUsePost method
+func NewUsePhoneNumberApiV1PhoneNumbersNumberUsePostRequest(server string, number string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "number", number, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/phone-numbers/%s/use", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -11943,14 +12490,99 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with GET /api/v1/personas/{persona_id}/versions/{version} (the `GetVersionApiV1PersonasPersonaIdVersionsVersionGet` operationId).
 	GetVersionApiV1PersonasPersonaIdVersionsVersionGetWithResponse(ctx context.Context, personaId openapi_types.UUID, version int, reqEditors ...RequestEditorFn) (*GetVersionApiV1PersonasPersonaIdVersionsVersionGetResponse, error)
 
+	// GetPhoneAccountApiV1PhoneAccountGetWithResponse Get Phone Account
+	//
+	// The phone account: whether its credentials are saved, and the receiving application
+	// with why it does not send calls to this install, if it does not.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/phone-account (the `GetPhoneAccountApiV1PhoneAccountGet` operationId).
+	GetPhoneAccountApiV1PhoneAccountGetWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetPhoneAccountApiV1PhoneAccountGetResponse, error)
+
+	// ChooseApplicationApiV1PhoneAccountApplicationPutWithBodyWithResponse Choose Application
+	//
+	// Choose the application that receives test calls. Its numbers become the test numbers.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /api/v1/phone-account/application (the `ChooseApplicationApiV1PhoneAccountApplicationPut` operationId).
+	ChooseApplicationApiV1PhoneAccountApplicationPutWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ChooseApplicationApiV1PhoneAccountApplicationPutResponse, error)
+
+	// ChooseApplicationApiV1PhoneAccountApplicationPutWithResponse Choose Application
+	//
+	// Choose the application that receives test calls. Its numbers become the test numbers.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /api/v1/phone-account/application (the `ChooseApplicationApiV1PhoneAccountApplicationPut` operationId).
+	ChooseApplicationApiV1PhoneAccountApplicationPutWithResponse(ctx context.Context, body ChooseApplicationApiV1PhoneAccountApplicationPutJSONRequestBody, reqEditors ...RequestEditorFn) (*ChooseApplicationApiV1PhoneAccountApplicationPutResponse, error)
+
+	// FixApplicationApiV1PhoneAccountApplicationFixPostWithResponse Fix Application
+	//
+	// Point the receiving application's answer and hangup URLs at this install.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/phone-account/application/fix (the `FixApplicationApiV1PhoneAccountApplicationFixPost` operationId).
+	FixApplicationApiV1PhoneAccountApplicationFixPostWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*FixApplicationApiV1PhoneAccountApplicationFixPostResponse, error)
+
+	// MakeApplicationApiV1PhoneAccountApplicationNewPostWithResponse Make Application
+	//
+	// Make an application that sends calls to this install, and choose it.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/phone-account/application/new (the `MakeApplicationApiV1PhoneAccountApplicationNewPost` operationId).
+	MakeApplicationApiV1PhoneAccountApplicationNewPostWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*MakeApplicationApiV1PhoneAccountApplicationNewPostResponse, error)
+
+	// ListApplicationsApiV1PhoneAccountApplicationsGetWithResponse List Applications
+	//
+	// The applications people may choose to receive test calls, without Plivo CX agents'.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/phone-account/applications (the `ListApplicationsApiV1PhoneAccountApplicationsGet` operationId).
+	ListApplicationsApiV1PhoneAccountApplicationsGetWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListApplicationsApiV1PhoneAccountApplicationsGetResponse, error)
+
 	// ListPhoneNumbersApiV1PhoneNumbersGetWithResponse List Phone Numbers
 	//
-	// The numbers Yaksh may use, as the worker last synced them from the Plivo account.
+	// Every number of the phone account with its owner, as the last check found them. A
+	// number linked to the receiving application is a test number.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with GET /api/v1/phone-numbers (the `ListPhoneNumbersApiV1PhoneNumbersGet` operationId).
 	ListPhoneNumbersApiV1PhoneNumbersGetWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListPhoneNumbersApiV1PhoneNumbersGetResponse, error)
+
+	// CheckPhoneNumbersApiV1PhoneNumbersCheckPostWithResponse Check Phone Numbers
+	//
+	// Read the account's numbers again now, to see changes made in the Plivo console.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/phone-numbers/check (the `CheckPhoneNumbersApiV1PhoneNumbersCheckPost` operationId).
+	CheckPhoneNumbersApiV1PhoneNumbersCheckPostWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*CheckPhoneNumbersApiV1PhoneNumbersCheckPostResponse, error)
+
+	// StopPhoneNumberApiV1PhoneNumbersNumberStopPostWithResponse Stop Phone Number
+	//
+	// Stop using a test number: Yaksh removes its application in Plivo. Refused while a test
+	// holds the number or it rests after one.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/phone-numbers/{number}/stop (the `StopPhoneNumberApiV1PhoneNumbersNumberStopPost` operationId).
+	StopPhoneNumberApiV1PhoneNumbersNumberStopPostWithResponse(ctx context.Context, number string, reqEditors ...RequestEditorFn) (*StopPhoneNumberApiV1PhoneNumbersNumberStopPostResponse, error)
+
+	// UsePhoneNumberApiV1PhoneNumbersNumberUsePostWithResponse Use Phone Number
+	//
+	// Make a free number a test number: Yaksh links it to the receiving application in
+	// Plivo. A number another application receives is refused.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/phone-numbers/{number}/use (the `UsePhoneNumberApiV1PhoneNumbersNumberUsePost` operationId).
+	UsePhoneNumberApiV1PhoneNumbersNumberUsePostWithResponse(ctx context.Context, number string, reqEditors ...RequestEditorFn) (*UsePhoneNumberApiV1PhoneNumbersNumberUsePostResponse, error)
 
 	// GetReviewApiV1ReviewConversationsConversationIdGetWithResponse Get Review
 	//
@@ -15141,6 +15773,246 @@ func (r GetVersionApiV1PersonasPersonaIdVersionsVersionGetResponse) ContentType(
 	return ""
 }
 
+type GetPhoneAccountApiV1PhoneAccountGetResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *PhoneAccountRead
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetPhoneAccountApiV1PhoneAccountGetResponse) GetJSON200() *PhoneAccountRead {
+	return r.JSON200
+}
+
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r GetPhoneAccountApiV1PhoneAccountGetResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
+}
+
+// GetBody returns the raw response body bytes
+func (r GetPhoneAccountApiV1PhoneAccountGetResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetPhoneAccountApiV1PhoneAccountGetResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetPhoneAccountApiV1PhoneAccountGetResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetPhoneAccountApiV1PhoneAccountGetResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type ChooseApplicationApiV1PhoneAccountApplicationPutResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *PhoneAccountRead
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ChooseApplicationApiV1PhoneAccountApplicationPutResponse) GetJSON200() *PhoneAccountRead {
+	return r.JSON200
+}
+
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r ChooseApplicationApiV1PhoneAccountApplicationPutResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
+}
+
+// GetBody returns the raw response body bytes
+func (r ChooseApplicationApiV1PhoneAccountApplicationPutResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ChooseApplicationApiV1PhoneAccountApplicationPutResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ChooseApplicationApiV1PhoneAccountApplicationPutResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ChooseApplicationApiV1PhoneAccountApplicationPutResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type FixApplicationApiV1PhoneAccountApplicationFixPostResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *PhoneAccountRead
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r FixApplicationApiV1PhoneAccountApplicationFixPostResponse) GetJSON200() *PhoneAccountRead {
+	return r.JSON200
+}
+
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r FixApplicationApiV1PhoneAccountApplicationFixPostResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
+}
+
+// GetBody returns the raw response body bytes
+func (r FixApplicationApiV1PhoneAccountApplicationFixPostResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r FixApplicationApiV1PhoneAccountApplicationFixPostResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r FixApplicationApiV1PhoneAccountApplicationFixPostResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r FixApplicationApiV1PhoneAccountApplicationFixPostResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type MakeApplicationApiV1PhoneAccountApplicationNewPostResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *PhoneAccountRead
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r MakeApplicationApiV1PhoneAccountApplicationNewPostResponse) GetJSON200() *PhoneAccountRead {
+	return r.JSON200
+}
+
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r MakeApplicationApiV1PhoneAccountApplicationNewPostResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
+}
+
+// GetBody returns the raw response body bytes
+func (r MakeApplicationApiV1PhoneAccountApplicationNewPostResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r MakeApplicationApiV1PhoneAccountApplicationNewPostResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r MakeApplicationApiV1PhoneAccountApplicationNewPostResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r MakeApplicationApiV1PhoneAccountApplicationNewPostResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type ListApplicationsApiV1PhoneAccountApplicationsGetResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *[]ApplicationRead
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListApplicationsApiV1PhoneAccountApplicationsGetResponse) GetJSON200() *[]ApplicationRead {
+	return r.JSON200
+}
+
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r ListApplicationsApiV1PhoneAccountApplicationsGetResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
+}
+
+// GetBody returns the raw response body bytes
+func (r ListApplicationsApiV1PhoneAccountApplicationsGetResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListApplicationsApiV1PhoneAccountApplicationsGetResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListApplicationsApiV1PhoneAccountApplicationsGetResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListApplicationsApiV1PhoneAccountApplicationsGetResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type ListPhoneNumbersApiV1PhoneNumbersGetResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -15183,6 +16055,150 @@ func (r ListPhoneNumbersApiV1PhoneNumbersGetResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r ListPhoneNumbersApiV1PhoneNumbersGetResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type CheckPhoneNumbersApiV1PhoneNumbersCheckPostResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *PhoneNumbers
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r CheckPhoneNumbersApiV1PhoneNumbersCheckPostResponse) GetJSON200() *PhoneNumbers {
+	return r.JSON200
+}
+
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r CheckPhoneNumbersApiV1PhoneNumbersCheckPostResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
+}
+
+// GetBody returns the raw response body bytes
+func (r CheckPhoneNumbersApiV1PhoneNumbersCheckPostResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r CheckPhoneNumbersApiV1PhoneNumbersCheckPostResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CheckPhoneNumbersApiV1PhoneNumbersCheckPostResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r CheckPhoneNumbersApiV1PhoneNumbersCheckPostResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type StopPhoneNumberApiV1PhoneNumbersNumberStopPostResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *PhoneNumbers
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r StopPhoneNumberApiV1PhoneNumbersNumberStopPostResponse) GetJSON200() *PhoneNumbers {
+	return r.JSON200
+}
+
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r StopPhoneNumberApiV1PhoneNumbersNumberStopPostResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
+}
+
+// GetBody returns the raw response body bytes
+func (r StopPhoneNumberApiV1PhoneNumbersNumberStopPostResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r StopPhoneNumberApiV1PhoneNumbersNumberStopPostResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r StopPhoneNumberApiV1PhoneNumbersNumberStopPostResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r StopPhoneNumberApiV1PhoneNumbersNumberStopPostResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type UsePhoneNumberApiV1PhoneNumbersNumberUsePostResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *PhoneNumbers
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r UsePhoneNumberApiV1PhoneNumbersNumberUsePostResponse) GetJSON200() *PhoneNumbers {
+	return r.JSON200
+}
+
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r UsePhoneNumberApiV1PhoneNumbersNumberUsePostResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
+}
+
+// GetBody returns the raw response body bytes
+func (r UsePhoneNumberApiV1PhoneNumbersNumberUsePostResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r UsePhoneNumberApiV1PhoneNumbersNumberUsePostResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UsePhoneNumberApiV1PhoneNumbersNumberUsePostResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r UsePhoneNumberApiV1PhoneNumbersNumberUsePostResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -18210,9 +19226,101 @@ func (c *ClientWithResponses) GetVersionApiV1PersonasPersonaIdVersionsVersionGet
 	return ParseGetVersionApiV1PersonasPersonaIdVersionsVersionGetResponse(rsp)
 }
 
+// GetPhoneAccountApiV1PhoneAccountGetWithResponse Get Phone Account
+//
+// The phone account: whether its credentials are saved, and the receiving application
+// with why it does not send calls to this install, if it does not.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/phone-account (the `GetPhoneAccountApiV1PhoneAccountGet` operationId).
+func (c *ClientWithResponses) GetPhoneAccountApiV1PhoneAccountGetWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetPhoneAccountApiV1PhoneAccountGetResponse, error) {
+	rsp, err := c.GetPhoneAccountApiV1PhoneAccountGet(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetPhoneAccountApiV1PhoneAccountGetResponse(rsp)
+}
+
+// ChooseApplicationApiV1PhoneAccountApplicationPutWithBodyWithResponse Choose Application
+//
+// Choose the application that receives test calls. Its numbers become the test numbers.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /api/v1/phone-account/application (the `ChooseApplicationApiV1PhoneAccountApplicationPut` operationId).
+func (c *ClientWithResponses) ChooseApplicationApiV1PhoneAccountApplicationPutWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ChooseApplicationApiV1PhoneAccountApplicationPutResponse, error) {
+	rsp, err := c.ChooseApplicationApiV1PhoneAccountApplicationPutWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseChooseApplicationApiV1PhoneAccountApplicationPutResponse(rsp)
+}
+
+// ChooseApplicationApiV1PhoneAccountApplicationPutWithResponse Choose Application
+//
+// Choose the application that receives test calls. Its numbers become the test numbers.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /api/v1/phone-account/application (the `ChooseApplicationApiV1PhoneAccountApplicationPut` operationId).
+func (c *ClientWithResponses) ChooseApplicationApiV1PhoneAccountApplicationPutWithResponse(ctx context.Context, body ChooseApplicationApiV1PhoneAccountApplicationPutJSONRequestBody, reqEditors ...RequestEditorFn) (*ChooseApplicationApiV1PhoneAccountApplicationPutResponse, error) {
+	rsp, err := c.ChooseApplicationApiV1PhoneAccountApplicationPut(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseChooseApplicationApiV1PhoneAccountApplicationPutResponse(rsp)
+}
+
+// FixApplicationApiV1PhoneAccountApplicationFixPostWithResponse Fix Application
+//
+// Point the receiving application's answer and hangup URLs at this install.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/phone-account/application/fix (the `FixApplicationApiV1PhoneAccountApplicationFixPost` operationId).
+func (c *ClientWithResponses) FixApplicationApiV1PhoneAccountApplicationFixPostWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*FixApplicationApiV1PhoneAccountApplicationFixPostResponse, error) {
+	rsp, err := c.FixApplicationApiV1PhoneAccountApplicationFixPost(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseFixApplicationApiV1PhoneAccountApplicationFixPostResponse(rsp)
+}
+
+// MakeApplicationApiV1PhoneAccountApplicationNewPostWithResponse Make Application
+//
+// Make an application that sends calls to this install, and choose it.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/phone-account/application/new (the `MakeApplicationApiV1PhoneAccountApplicationNewPost` operationId).
+func (c *ClientWithResponses) MakeApplicationApiV1PhoneAccountApplicationNewPostWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*MakeApplicationApiV1PhoneAccountApplicationNewPostResponse, error) {
+	rsp, err := c.MakeApplicationApiV1PhoneAccountApplicationNewPost(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseMakeApplicationApiV1PhoneAccountApplicationNewPostResponse(rsp)
+}
+
+// ListApplicationsApiV1PhoneAccountApplicationsGetWithResponse List Applications
+//
+// The applications people may choose to receive test calls, without Plivo CX agents'.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/phone-account/applications (the `ListApplicationsApiV1PhoneAccountApplicationsGet` operationId).
+func (c *ClientWithResponses) ListApplicationsApiV1PhoneAccountApplicationsGetWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListApplicationsApiV1PhoneAccountApplicationsGetResponse, error) {
+	rsp, err := c.ListApplicationsApiV1PhoneAccountApplicationsGet(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListApplicationsApiV1PhoneAccountApplicationsGetResponse(rsp)
+}
+
 // ListPhoneNumbersApiV1PhoneNumbersGetWithResponse List Phone Numbers
 //
-// The numbers Yaksh may use, as the worker last synced them from the Plivo account.
+// Every number of the phone account with its owner, as the last check found them. A
+// number linked to the receiving application is a test number.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -18223,6 +19331,53 @@ func (c *ClientWithResponses) ListPhoneNumbersApiV1PhoneNumbersGetWithResponse(c
 		return nil, err
 	}
 	return ParseListPhoneNumbersApiV1PhoneNumbersGetResponse(rsp)
+}
+
+// CheckPhoneNumbersApiV1PhoneNumbersCheckPostWithResponse Check Phone Numbers
+//
+// Read the account's numbers again now, to see changes made in the Plivo console.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/phone-numbers/check (the `CheckPhoneNumbersApiV1PhoneNumbersCheckPost` operationId).
+func (c *ClientWithResponses) CheckPhoneNumbersApiV1PhoneNumbersCheckPostWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*CheckPhoneNumbersApiV1PhoneNumbersCheckPostResponse, error) {
+	rsp, err := c.CheckPhoneNumbersApiV1PhoneNumbersCheckPost(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCheckPhoneNumbersApiV1PhoneNumbersCheckPostResponse(rsp)
+}
+
+// StopPhoneNumberApiV1PhoneNumbersNumberStopPostWithResponse Stop Phone Number
+//
+// Stop using a test number: Yaksh removes its application in Plivo. Refused while a test
+// holds the number or it rests after one.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/phone-numbers/{number}/stop (the `StopPhoneNumberApiV1PhoneNumbersNumberStopPost` operationId).
+func (c *ClientWithResponses) StopPhoneNumberApiV1PhoneNumbersNumberStopPostWithResponse(ctx context.Context, number string, reqEditors ...RequestEditorFn) (*StopPhoneNumberApiV1PhoneNumbersNumberStopPostResponse, error) {
+	rsp, err := c.StopPhoneNumberApiV1PhoneNumbersNumberStopPost(ctx, number, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseStopPhoneNumberApiV1PhoneNumbersNumberStopPostResponse(rsp)
+}
+
+// UsePhoneNumberApiV1PhoneNumbersNumberUsePostWithResponse Use Phone Number
+//
+// Make a free number a test number: Yaksh links it to the receiving application in
+// Plivo. A number another application receives is refused.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/phone-numbers/{number}/use (the `UsePhoneNumberApiV1PhoneNumbersNumberUsePost` operationId).
+func (c *ClientWithResponses) UsePhoneNumberApiV1PhoneNumbersNumberUsePostWithResponse(ctx context.Context, number string, reqEditors ...RequestEditorFn) (*UsePhoneNumberApiV1PhoneNumbersNumberUsePostResponse, error) {
+	rsp, err := c.UsePhoneNumberApiV1PhoneNumbersNumberUsePost(ctx, number, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUsePhoneNumberApiV1PhoneNumbersNumberUsePostResponse(rsp)
 }
 
 // GetReviewApiV1ReviewConversationsConversationIdGetWithResponse Get Review
@@ -20918,6 +22073,171 @@ func ParseGetVersionApiV1PersonasPersonaIdVersionsVersionGetResponse(rsp *http.R
 	return response, nil
 }
 
+// ParseGetPhoneAccountApiV1PhoneAccountGetResponse parses an HTTP response from a GetPhoneAccountApiV1PhoneAccountGetWithResponse call
+func ParseGetPhoneAccountApiV1PhoneAccountGetResponse(rsp *http.Response) (*GetPhoneAccountApiV1PhoneAccountGetResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetPhoneAccountApiV1PhoneAccountGetResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest PhoneAccountRead
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseChooseApplicationApiV1PhoneAccountApplicationPutResponse parses an HTTP response from a ChooseApplicationApiV1PhoneAccountApplicationPutWithResponse call
+func ParseChooseApplicationApiV1PhoneAccountApplicationPutResponse(rsp *http.Response) (*ChooseApplicationApiV1PhoneAccountApplicationPutResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ChooseApplicationApiV1PhoneAccountApplicationPutResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest PhoneAccountRead
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseFixApplicationApiV1PhoneAccountApplicationFixPostResponse parses an HTTP response from a FixApplicationApiV1PhoneAccountApplicationFixPostWithResponse call
+func ParseFixApplicationApiV1PhoneAccountApplicationFixPostResponse(rsp *http.Response) (*FixApplicationApiV1PhoneAccountApplicationFixPostResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &FixApplicationApiV1PhoneAccountApplicationFixPostResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest PhoneAccountRead
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseMakeApplicationApiV1PhoneAccountApplicationNewPostResponse parses an HTTP response from a MakeApplicationApiV1PhoneAccountApplicationNewPostWithResponse call
+func ParseMakeApplicationApiV1PhoneAccountApplicationNewPostResponse(rsp *http.Response) (*MakeApplicationApiV1PhoneAccountApplicationNewPostResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &MakeApplicationApiV1PhoneAccountApplicationNewPostResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest PhoneAccountRead
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListApplicationsApiV1PhoneAccountApplicationsGetResponse parses an HTTP response from a ListApplicationsApiV1PhoneAccountApplicationsGetWithResponse call
+func ParseListApplicationsApiV1PhoneAccountApplicationsGetResponse(rsp *http.Response) (*ListApplicationsApiV1PhoneAccountApplicationsGetResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListApplicationsApiV1PhoneAccountApplicationsGetResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest []ApplicationRead
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseListPhoneNumbersApiV1PhoneNumbersGetResponse parses an HTTP response from a ListPhoneNumbersApiV1PhoneNumbersGetWithResponse call
 func ParseListPhoneNumbersApiV1PhoneNumbersGetResponse(rsp *http.Response) (*ListPhoneNumbersApiV1PhoneNumbersGetResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -20927,6 +22247,105 @@ func ParseListPhoneNumbersApiV1PhoneNumbersGetResponse(rsp *http.Response) (*Lis
 	}
 
 	response := &ListPhoneNumbersApiV1PhoneNumbersGetResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest PhoneNumbers
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseCheckPhoneNumbersApiV1PhoneNumbersCheckPostResponse parses an HTTP response from a CheckPhoneNumbersApiV1PhoneNumbersCheckPostWithResponse call
+func ParseCheckPhoneNumbersApiV1PhoneNumbersCheckPostResponse(rsp *http.Response) (*CheckPhoneNumbersApiV1PhoneNumbersCheckPostResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CheckPhoneNumbersApiV1PhoneNumbersCheckPostResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest PhoneNumbers
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseStopPhoneNumberApiV1PhoneNumbersNumberStopPostResponse parses an HTTP response from a StopPhoneNumberApiV1PhoneNumbersNumberStopPostWithResponse call
+func ParseStopPhoneNumberApiV1PhoneNumbersNumberStopPostResponse(rsp *http.Response) (*StopPhoneNumberApiV1PhoneNumbersNumberStopPostResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &StopPhoneNumberApiV1PhoneNumbersNumberStopPostResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest PhoneNumbers
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseUsePhoneNumberApiV1PhoneNumbersNumberUsePostResponse parses an HTTP response from a UsePhoneNumberApiV1PhoneNumbersNumberUsePostWithResponse call
+func ParseUsePhoneNumberApiV1PhoneNumbersNumberUsePostResponse(rsp *http.Response) (*UsePhoneNumberApiV1PhoneNumbersNumberUsePostResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UsePhoneNumberApiV1PhoneNumbersNumberUsePostResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}

@@ -63,6 +63,14 @@ The agent's response time is the wait from the end of the caller's speech to the
 
 The judges check only completed calls that no one stopped.
 
+## No test numbers
+
+Yaksh calls only from its test numbers, and receives calls only on them. When a run says that no number is free, or that there are no test numbers:
+
+- `yaksh numbers list` shows each number of the Plivo account and its `owner`. `problem` says why no test can get a number now. `--owner test` shows only the test numbers.
+- A test number with `state` `in_use` or `resting` is not free. Wait for the other tests to end, or ask the user for more test numbers.
+- Do not run `yaksh numbers use` without the user's approval. The user chooses the test numbers on the Numbers page of the console.
+
 ## Rules
 
 - Never print the API token, and never write it to a file.

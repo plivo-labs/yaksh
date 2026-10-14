@@ -2968,7 +2968,7 @@
           "phone-numbers"
         ],
         "summary": "List Phone Numbers",
-        "description": "The numbers Yaksh may use, as the worker last synced them from the Plivo account.",
+        "description": "Every number of the phone account with its owner, as the last check found them. A\nnumber linked to the receiving application is a test number.",
         "operationId": "list_phone_numbers_api_v1_phone_numbers_get",
         "responses": {
           "200": {
@@ -2977,6 +2977,340 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/PhoneNumbers"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "The request failed. The error tells why.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/phone-numbers/check": {
+      "post": {
+        "tags": [
+          "phone-numbers"
+        ],
+        "summary": "Check Phone Numbers",
+        "description": "Read the account's numbers again now, to see changes made in the Plivo console.",
+        "operationId": "check_phone_numbers_api_v1_phone_numbers_check_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhoneNumbers"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "The request failed. The error tells why.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/phone-numbers/{number}/use": {
+      "post": {
+        "tags": [
+          "phone-numbers"
+        ],
+        "summary": "Use Phone Number",
+        "description": "Make a free number a test number: Yaksh links it to the receiving application in\nPlivo. A number another application receives is refused.",
+        "operationId": "use_phone_number_api_v1_phone_numbers__number__use_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^\\+[1-9]\\d{6,14}$",
+              "title": "Number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhoneNumbers"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "The request failed. The error tells why.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/phone-numbers/{number}/stop": {
+      "post": {
+        "tags": [
+          "phone-numbers"
+        ],
+        "summary": "Stop Phone Number",
+        "description": "Stop using a test number: Yaksh removes its application in Plivo. Refused while a test\nholds the number or it rests after one.",
+        "operationId": "stop_phone_number_api_v1_phone_numbers__number__stop_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^\\+[1-9]\\d{6,14}$",
+              "title": "Number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhoneNumbers"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "The request failed. The error tells why.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/phone-account": {
+      "get": {
+        "tags": [
+          "phone-account"
+        ],
+        "summary": "Get Phone Account",
+        "description": "The phone account: whether its credentials are saved, and the receiving application\nwith why it does not send calls to this install, if it does not.",
+        "operationId": "get_phone_account_api_v1_phone_account_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhoneAccountRead"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "The request failed. The error tells why.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/phone-account/applications": {
+      "get": {
+        "tags": [
+          "phone-account"
+        ],
+        "summary": "List Applications",
+        "description": "The applications people may choose to receive test calls, without Plivo CX agents'.",
+        "operationId": "list_applications_api_v1_phone_account_applications_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ApplicationRead"
+                  },
+                  "type": "array",
+                  "title": "Response List Applications Api V1 Phone Account Applications Get"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "The request failed. The error tells why.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/phone-account/application": {
+      "put": {
+        "tags": [
+          "phone-account"
+        ],
+        "summary": "Choose Application",
+        "description": "Choose the application that receives test calls. Its numbers become the test numbers.",
+        "operationId": "choose_application_api_v1_phone_account_application_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApplicationChoice"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhoneAccountRead"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "The request failed. The error tells why.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/phone-account/application/new": {
+      "post": {
+        "tags": [
+          "phone-account"
+        ],
+        "summary": "Make Application",
+        "description": "Make an application that sends calls to this install, and choose it.",
+        "operationId": "make_application_api_v1_phone_account_application_new_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhoneAccountRead"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "The request failed. The error tells why.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/phone-account/application/fix": {
+      "post": {
+        "tags": [
+          "phone-account"
+        ],
+        "summary": "Fix Application",
+        "description": "Point the receiving application's answer and hangup URLs at this install.",
+        "operationId": "fix_application_api_v1_phone_account_application_fix_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhoneAccountRead"
                 }
               }
             }
@@ -6207,6 +6541,64 @@
         ],
         "title": "AgentVersionRead"
       },
+      "ApplicationChoice": {
+        "properties": {
+          "application_id": {
+            "type": "string",
+            "title": "Application Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "application_id"
+        ],
+        "title": "ApplicationChoice"
+      },
+      "ApplicationRead": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "answer_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Answer Url"
+          },
+          "problems": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Problems"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "answer_url",
+          "problems"
+        ],
+        "title": "ApplicationRead"
+      },
       "AssignPersona": {
         "properties": {
           "scenario_ids": {
@@ -7824,6 +8216,28 @@
         "title": "ErrorResponse",
         "description": "The body of every error response."
       },
+      "EvaluationLimits": {
+        "properties": {
+          "evaluations_at_once": {
+            "type": "integer",
+            "maximum": 32.0,
+            "minimum": 1.0,
+            "title": "Evaluations At Once",
+            "default": 2
+          },
+          "judge_calls_at_once": {
+            "type": "integer",
+            "maximum": 64.0,
+            "minimum": 1.0,
+            "title": "Judge Calls At Once",
+            "default": 8
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "EvaluationLimits",
+        "description": "How much one evaluator does at once, within the LLM provider's rate limits."
+      },
       "EvaluationState": {
         "type": "string",
         "enum": [
@@ -9023,7 +9437,7 @@
         "enum": [
           "in_use",
           "resting",
-          "free"
+          "ready"
         ],
         "title": "NumberState"
       },
@@ -9083,6 +9497,18 @@
         ],
         "title": "OutcomeGroup",
         "description": "How a conversation went, from its status and end reason only. Before any judge, the\ngroups say what happened, not who is at fault."
+      },
+      "Owner": {
+        "type": "string",
+        "enum": [
+          "test",
+          "free",
+          "cx_agent",
+          "other",
+          "no_voice"
+        ],
+        "title": "Owner",
+        "description": "Who receives the calls of a number on the account."
       },
       "Page_AgentSummary_": {
         "properties": {
@@ -9852,11 +10278,64 @@
             "type": "string",
             "title": "Timezone",
             "default": "UTC"
+          },
+          "application_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[0-9]{1,40}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Application Id"
+          },
+          "check_interval_s": {
+            "type": "integer",
+            "maximum": 86400.0,
+            "minimum": 60.0,
+            "title": "Check Interval S",
+            "default": 300
           }
         },
         "additionalProperties": false,
         "type": "object",
         "title": "Phone"
+      },
+      "PhoneAccountRead": {
+        "properties": {
+          "provider": {
+            "type": "string",
+            "title": "Provider"
+          },
+          "credentials_saved": {
+            "type": "boolean",
+            "title": "Credentials Saved"
+          },
+          "application": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ApplicationRead"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "test_numbers": {
+            "type": "integer",
+            "title": "Test Numbers"
+          }
+        },
+        "type": "object",
+        "required": [
+          "provider",
+          "credentials_saved",
+          "application",
+          "test_numbers"
+        ],
+        "title": "PhoneAccountRead"
       },
       "PhoneNumberRead": {
         "properties": {
@@ -9886,6 +10365,9 @@
             ],
             "title": "Region"
           },
+          "owner": {
+            "$ref": "#/components/schemas/Owner"
+          },
           "application_id": {
             "anyOf": [
               {
@@ -9908,12 +10390,27 @@
             ],
             "title": "Application Name"
           },
-          "on_outbound_application": {
-            "type": "boolean",
-            "title": "On Outbound Application"
-          },
           "state": {
-            "$ref": "#/components/schemas/NumberState"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NumberState"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "rests_until": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rests Until"
           }
         },
         "type": "object",
@@ -9921,10 +10418,11 @@
           "number",
           "alias",
           "region",
+          "owner",
           "application_id",
           "application_name",
-          "on_outbound_application",
-          "state"
+          "state",
+          "rests_until"
         ],
         "title": "PhoneNumberRead"
       },
@@ -9936,6 +10434,51 @@
             },
             "type": "array",
             "title": "Items"
+          },
+          "application_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Application Id"
+          },
+          "checked_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checked At"
+          },
+          "check_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Check Error"
+          },
+          "problem": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Problem"
           },
           "outbound_problem": {
             "anyOf": [
@@ -9956,6 +10499,10 @@
         "type": "object",
         "required": [
           "items",
+          "application_id",
+          "checked_at",
+          "check_error",
+          "problem",
           "outbound_problem",
           "rest_s"
         ],
@@ -12658,6 +13205,13 @@
               "jev_pass_bar": 0.95
             }
           },
+          "evaluation": {
+            "$ref": "#/components/schemas/EvaluationLimits",
+            "default": {
+              "evaluations_at_once": 2,
+              "judge_calls_at_once": 8
+            }
+          },
           "audit": {
             "$ref": "#/components/schemas/Audit",
             "default": {
@@ -12670,7 +13224,8 @@
             "default": {
               "ring_timeout_s": 30,
               "number_rest_s": 300,
-              "timezone": "UTC"
+              "timezone": "UTC",
+              "check_interval_s": 300
             }
           },
           "limits": {
