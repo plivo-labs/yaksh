@@ -828,7 +828,7 @@ def upgrade() -> None:
         sa.Column("number", sa.Text(), nullable=False),
         sa.Column("alias", sa.Text(), nullable=True),
         sa.Column("region", sa.Text(), nullable=True),
-        sa.Column("enabled", sa.Boolean(), server_default=sa.text("true"), nullable=False),
+        sa.Column("voice", sa.Boolean(), server_default=sa.text("true"), nullable=False),
         sa.Column("application_id", sa.Text(), nullable=True),
         sa.Column("application_name", sa.Text(), nullable=True),
         sa.Column("conversation_id", sa.UUID(), nullable=True),
@@ -895,9 +895,20 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id", name=op.f("pk_app_settings")),
     )
     op.execute("INSERT INTO app_settings (id) VALUES (1)")
+    op.create_table(
+        "phone_checks",
+        sa.Column("id", sa.Integer(), nullable=False),
+        sa.Column("checked_at", sa.DateTime(timezone=True), nullable=True),
+        sa.Column("error", sa.Text(), nullable=True),
+        sa.Column("claimed_until", sa.DateTime(timezone=True), nullable=True),
+        sa.CheckConstraint("id = 1", name=op.f("ck_phone_checks_one_row")),
+        sa.PrimaryKeyConstraint("id", name=op.f("pk_phone_checks")),
+    )
+    op.execute("INSERT INTO phone_checks (id) VALUES (1)")
 
 
 def downgrade() -> None:
+    op.drop_table("phone_checks")
     op.drop_table("app_settings")
     op.drop_table("workers")
     op.drop_table("documents")

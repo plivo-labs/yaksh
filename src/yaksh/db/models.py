@@ -583,15 +583,16 @@ class ScenarioVersion(Base):
 
 
 class PhoneNumber(Base):
-    """A number on the Plivo account; when enabled, leased to one conversation at a time and
-    rotated by last use."""
+    """A number on the Plivo account, as the last check found it. A number linked to the
+    receiving application in the settings is a test number: leased to one conversation at a
+    time and rotated by last use."""
 
     __tablename__ = "phone_numbers"
 
     number: Mapped[str] = mapped_column(Text, primary_key=True)
     alias: Mapped[str | None] = mapped_column(Text)
     region: Mapped[str | None] = mapped_column(Text)
-    enabled: Mapped[bool] = mapped_column(Boolean, default=True, server_default=true())
+    voice: Mapped[bool] = mapped_column(Boolean, default=True, server_default=true())
     application_id: Mapped[str | None] = mapped_column(Text)
     application_name: Mapped[str | None] = mapped_column(Text)
     conversation_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("conversations.id"))
@@ -638,6 +639,19 @@ class RunningWorker(Base):
     outbound_problem: Mapped[str | None] = mapped_column(Text)
     """Why the worker runs no outbound tests, when it was set up for them."""
     seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class PhoneCheck(Base):
+    """When Yaksh last read the numbers of the Plivo account, and why that failed if it did.
+    claimed_until lets one process check at a time."""
+
+    __tablename__ = "phone_checks"
+    __table_args__ = (CheckConstraint("id = 1", name="one_row"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    error: Mapped[str | None] = mapped_column(Text)
+    claimed_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class StoredSettings(Base):

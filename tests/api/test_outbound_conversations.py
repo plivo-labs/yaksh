@@ -21,6 +21,7 @@ from tests.conftest import (
     make_worker,
     reap,
     run_conversations,
+    save_settings,
     start,
     start_run,
 )
@@ -38,7 +39,13 @@ WITH_DATA = data_sets(agent_data=AGENT_DATA)
 
 @pytest.fixture
 def settings(database_url: str, tmp_path: Path) -> Settings:
-    return make_settings(tmp_path, database_url=database_url, plivo_app_id=APP_ID)
+    return make_settings(tmp_path, database_url=database_url)
+
+
+@pytest.fixture(autouse=True)
+async def receiving(client: AsyncClient, db: Db) -> None:
+    """The receiving application is APP_ID: RECEIVING, once linked, is the only test number."""
+    await save_settings(db, values={"phone": {"application_id": APP_ID}})
 
 
 async def link_number(settings: Settings, **columns: Any) -> None:
@@ -90,7 +97,7 @@ async def test_an_outbound_run_needs_a_linked_number_and_names_a_scenario_withou
 
     assert unlinked.status_code == 422
     assert unlinked.json()["error"]["message"] == (
-        f"outbound tests are off: no enabled number is linked to Plivo application {APP_ID}"
+        "outbound tests are off: choose test numbers on the Numbers page"
     )
     assert lacking.status_code == 422
     assert lacking.json()["error"]["message"] == (
@@ -138,7 +145,9 @@ async def test_preparing_the_call_opens_the_dial_window_and_keeps_the_pinned_dat
 
     async with db() as session:
         conversation = await session.get_one(Conversation, uuid.UUID(claimed))
-        request = await conversations.prepare_call(session, APP_SETTINGS, conversation, APP_ID)
+        request = await conversations.prepare_call(
+            session, APP_SETTINGS, conversation, APP_ID, APP_ID
+        )
         window = await session.scalar(
             select(Conversation.dial_deadline_at - func.now()).where(
                 Conversation.id == conversation.id
@@ -177,8 +186,8 @@ async def test_the_numbers_page_shows_the_outbound_numbers_and_their_rest(
     assert (
         listed["outbound_problem"] is None and listed["rest_s"] == APP_SETTINGS.phone.number_rest_s
     )
-    assert receiving["on_outbound_application"] and receiving["state"] == "resting"
-    assert others and not any(n["on_outbound_application"] for n in others)
+    assert receiving["owner"] == "test" and receiving["state"] == "resting"
+    assert others and all(n["owner"] == "other" and n["state"] is None for n in others)
 
 
 async def test_an_outbound_start_needs_a_running_worker_that_receives_its_calls(

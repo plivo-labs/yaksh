@@ -71,7 +71,7 @@ class Worker:
         worker_id: str | None = None,
     ) -> None:
         """source gives the stored settings, read again at each poll when they changed; account
-        follows the Plivo account in them."""
+        follows the phone account in them."""
         self.worker_id = worker_id or f"{socket.gethostname()}:{os.getpid()}:{uuid.uuid4().hex[:8]}"
         self.fatal = asyncio.Event()
         self._stop = asyncio.Event()
@@ -133,7 +133,11 @@ class Worker:
             await self._report_if_due()
             async with self._sessionmaker() as session:
                 conversation = await conversations.claim_next(
-                    session, self.worker_id, lease_s, self._account.receiving_app_id
+                    session,
+                    self.worker_id,
+                    lease_s,
+                    self._account.pool_app_id,
+                    self._account.receiving_app_id,
                 )
             if conversation is None:
                 break
@@ -186,7 +190,11 @@ class Worker:
     async def _prepare(self, conversation: Conversation) -> CallRequest:
         async with self._sessionmaker() as session:
             return await conversations.prepare_call(
-                session, self._app, conversation, self._account.receiving_app_id
+                session,
+                self._app,
+                conversation,
+                self._account.pool_app_id,
+                self._account.receiving_app_id,
             )
 
     async def _requeue(self, conversation_id: uuid.UUID) -> None:

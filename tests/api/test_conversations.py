@@ -29,6 +29,7 @@ from tests.conftest import (
     data_sets,
     eventually,
     make_worker,
+    save_settings,
     start,
     start_run,
     wait_for,
@@ -41,7 +42,6 @@ from yaksh.domain.agents import AgentConfig
 from yaksh.domain.conversations import CallRequest, ConversationStatus
 from yaksh.domain.languages import Language
 from yaksh.domain.runs import RunCreate
-from yaksh.domain.settings import Phone
 from yaksh.domain.surroundings import Layer, NoiseSound, SoundPlan
 from yaksh.simulation import conversations, runs
 from yaksh.simulation.calls import STOP_IGNORED
@@ -287,20 +287,23 @@ async def test_a_refused_connection_is_failed_and_still_readable(
 
 
 async def test_a_conversation_gets_its_number_from_the_pool_and_outbound_tests_need_an_application(
-    client: AsyncClient,
+    client: AsyncClient, db: Db
 ) -> None:
     agent = await create_agent_id(client)
     outbound = await create_agent_id(client, **OUTBOUND_AGENT)
 
     queued = await start(client, agent)
     chosen = await start_run(client, agent, [str(uuid.uuid4())], caller_number="+15550100000")
+    await save_settings(db, values={"phone": {"application_id": None}})
     refused = await start_run(client, outbound, [str(uuid.uuid4())])
 
     assert queued["status"] == "queued" and queued["caller_number"] is None
     assert chosen.status_code == 422
     assert chosen.json()["error"]["details"][0]["loc"][-1] == "caller_number"
     assert refused.status_code == 422
-    assert refused.json()["error"]["message"] == "outbound tests are off: set YAKSH_PLIVO_APP_ID"
+    assert refused.json()["error"]["message"] == (
+        "outbound tests are off: choose the receiving application in Settings"
+    )
 
 
 async def test_conversations_cannot_start_while_phone_calls_are_off(
@@ -843,7 +846,9 @@ async def test_the_caller_knows_its_facts_and_today_but_never_the_criteria(
     command = RunCreate.model_validate(
         {"agent_id": agent_id, "scenarios": [{"scenario_id": scenario["id"]}]}
     )
-    zoned = APP_SETTINGS.model_copy(update={"phone": Phone(timezone=timezone)})
+    zoned = APP_SETTINGS.model_copy(
+        update={"phone": APP_SETTINGS.phone.model_copy(update={"timezone": timezone})}
+    )
 
     engine = create_engine(settings.database_url.encoded_string())
     async with create_sessionmaker(engine)() as session:

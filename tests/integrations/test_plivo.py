@@ -83,6 +83,36 @@ async def plivo() -> AsyncIterator[tuple[PlivoApi, list[dict[str, Any]]]]:
             }
         )
 
+    @app.get("/v1/Account/{auth_id}/Application/")
+    async def applications(auth_id: str, offset: int = 0) -> dict[str, Any]:
+        entry = {
+            "app_id": f"{100 + offset}",
+            "app_name": f"app-{offset}",
+            "answer_url": "https://yaksh.example/incoming",
+            "answer_method": "POST",
+            "hangup_url": "https://yaksh.example/incoming/hangup",
+            "hangup_method": "POST",
+        }
+        more = "/v1/Account/x/Application/?offset=20" if offset == 0 else None
+        return {"meta": {"next": more}, "objects": [entry]}
+
+    @app.post("/v1/Account/{auth_id}/Application/")
+    async def create_application(auth_id: str, request: Request) -> Response:
+        seen.append({"created": await request.json()})
+        return JSONResponse({"app_id": "31", "message": "created"}, status_code=201)
+
+    @app.post("/v1/Account/{auth_id}/Application/{app_id}/")
+    async def update_application(auth_id: str, app_id: str, request: Request) -> Response:
+        seen.append({"updated": app_id, **await request.json()})
+        return JSONResponse({"message": "changed"}, status_code=202)
+
+    @app.post("/v1/Account/{auth_id}/Number/{number}/")
+    async def link(auth_id: str, number: str, request: Request) -> Response:
+        if number == "10000000000":
+            return Response('{"error": "number not found"}', status_code=404)
+        seen.append({"linked": number, **await request.json()})
+        return JSONResponse({"message": "changed"}, status_code=202)
+
     @app.delete("/v1/Account/{auth_id}/Request/{request_uuid}/")
     async def cancel(auth_id: str, request_uuid: str) -> Response:
         seen.append({"cancelled": request_uuid})
@@ -208,3 +238,34 @@ async def test_a_failed_request_never_reports_the_credentials(
         await api.create_call(call("+10000000002"))
 
     assert AUTH_TOKEN not in str(failed.value) and basic not in str(failed.value)
+
+
+async def test_applications_are_listed_across_pages_made_changed_and_linked_to_numbers(
+    plivo: tuple[PlivoApi, list[dict[str, Any]]],
+) -> None:
+    api, seen = plivo
+    urls = ("https://yaksh.example/incoming", "https://yaksh.example/incoming/hangup")
+
+    listed = await api.list_applications()
+    made = await api.create_application("Yaksh", *urls)
+    await api.update_application("31", *urls)
+    await api.link_number("+17862242321", "31")
+    await api.link_number("+17862242321", None)
+    with pytest.raises(PlivoError) as refused:
+        await api.link_number("+10000000000", "31")
+
+    assert [(app.app_id, app.name) for app in listed] == [("100", "app-0"), ("120", "app-20")]
+    assert made == "31"
+    receiving = {
+        "answer_url": urls[0],
+        "answer_method": "POST",
+        "hangup_url": urls[1],
+        "hangup_method": "POST",
+    }
+    assert seen == [
+        {"created": {"app_name": "Yaksh", **receiving}},
+        {"updated": "31", **receiving},
+        {"linked": "17862242321", "app_id": "31"},
+        {"linked": "17862242321", "app_id": ""},
+    ]
+    assert (refused.value.status, refused.value.reason) == (404, "number not found")

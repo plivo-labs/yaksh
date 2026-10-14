@@ -26,19 +26,18 @@ def phone_problem(settings: Settings, app: AppSettings) -> str | None:
     return None
 
 
-class UnknownNumbersError(Exception):
-    """The allowlist names numbers the Plivo account does not have."""
-
-
-def free_numbers(receiving_app_id: str | None = None) -> ColumnElement[bool]:
-    """Numbers a conversation may lease: enabled and free; to receive an outbound call, also
-    linked to Yaksh's Plivo application and rested since their last test."""
-    free = and_(PhoneNumber.enabled.is_(True), PhoneNumber.conversation_id.is_(None))
-    if receiving_app_id is None:
+def free_numbers(app_id: str, *, rested: bool = False) -> ColumnElement[bool]:
+    """Test numbers a conversation may lease: linked to the receiving application app_id and
+    held by no conversation; to receive an outbound call, also rested since their last test."""
+    free = and_(
+        PhoneNumber.application_id == app_id,
+        PhoneNumber.voice.is_(True),
+        PhoneNumber.conversation_id.is_(None),
+    )
+    if not rested:
         return free
     return and_(
         free,
-        PhoneNumber.application_id == receiving_app_id,
         or_(
             PhoneNumber.available_after.is_(None),
             PhoneNumber.available_after <= func.statement_timestamp(),
@@ -46,36 +45,20 @@ def free_numbers(receiving_app_id: str | None = None) -> ColumnElement[bool]:
     )
 
 
-async def enabled_pool(session: AsyncSession) -> list[PhoneNumber]:
-    rows = await session.scalars(
-        select(PhoneNumber).where(PhoneNumber.enabled.is_(True)).order_by(PhoneNumber.number)
-    )
+async def account_numbers(session: AsyncSession) -> list[PhoneNumber]:
+    """Every number of the account as the last check found it."""
+    rows = await session.scalars(select(PhoneNumber).order_by(PhoneNumber.number))
     return list(rows)
 
 
-def enabled_numbers(numbers: list[AccountNumber], allowlist: list[str]) -> list[str]:
-    """The allowlisted numbers, or every voice number when there is no allowlist."""
-    return [
-        entry.number
-        for entry in numbers
-        if (entry.number in allowlist if allowlist else entry.voice)
-    ]
-
-
 async def sync_numbers(
-    session: AsyncSession,
-    numbers: list[AccountNumber],
-    allowlist: list[str],
-    application_names: dict[str, str],
-) -> list[str]:
-    """Make the pool match the Plivo account: every voice number is enabled, or only the
-    allowlisted ones when there is an allowlist; numbers gone from the account are dropped once
-    free. Returns the enabled numbers."""
+    session: AsyncSession, numbers: list[AccountNumber], application_names: dict[str, str]
+) -> None:
+    """Make the stored numbers match the Plivo account: each number's application, name and
+    region as Plivo lists them; numbers gone from the account are dropped once free. A lease
+    is never touched, so a number that leaves the receiving application keeps its test until
+    the test ends."""
     listed = {entry.number for entry in numbers}
-    missing = [number for number in allowlist if number not in listed]
-    if missing:
-        raise UnknownNumbersError(f"the Plivo account does not have {', '.join(missing)}")
-    enabled = enabled_numbers(numbers, allowlist)
     if numbers:
         rows = insert(PhoneNumber).values(
             [
@@ -83,7 +66,7 @@ async def sync_numbers(
                     "number": entry.number,
                     "alias": entry.alias,
                     "region": entry.region,
-                    "enabled": entry.number in enabled,
+                    "voice": entry.voice,
                     "application_id": entry.application_id,
                     "application_name": application_names.get(entry.application_id or ""),
                 }
@@ -96,7 +79,7 @@ async def sync_numbers(
                 set_={
                     "alias": rows.excluded.alias,
                     "region": rows.excluded.region,
-                    "enabled": rows.excluded.enabled,
+                    "voice": rows.excluded.voice,
                     "application_id": rows.excluded.application_id,
                     "application_name": rows.excluded.application_name,
                 },
@@ -108,21 +91,21 @@ async def sync_numbers(
         )
     )
     await session.commit()
-    return enabled
 
 
 async def lease_number(
     session: AsyncSession,
     conversation_id: uuid.UUID,
+    app_id: str,
     *,
-    receiving_app_id: str | None = None,
     accept_calls_for_s: int | None = None,
 ) -> str | None:
-    """Lease the least recently used number the conversation may use, or None when all are
-    taken. An outbound lease opens the window for the agent's call to arrive."""
+    """Lease the least recently used test number the conversation may use, or None when all
+    are taken. An outbound lease, the one with accept_calls_for_s, needs a rested number and
+    opens the window for the agent's call to arrive."""
     candidate = (
         select(PhoneNumber.number)
-        .where(free_numbers(receiving_app_id))
+        .where(free_numbers(app_id, rested=accept_calls_for_s is not None))
         .order_by(PhoneNumber.leased_at.nulls_first(), PhoneNumber.number)
         .limit(1)
         .with_for_update(skip_locked=True)
@@ -171,17 +154,36 @@ async def outbound_problem(
     problem = phone_problem(settings, app)
     if problem is not None:
         return problem
-    app_id = settings.plivo_app_id
+    app_id = app.phone.application_id
     if app_id is None:
-        return "set YAKSH_PLIVO_APP_ID"
+        return NO_APPLICATION
     problem = await receiving_problem(session, app_id, settings.worker_lease_s)
     if problem is not None:
         return problem
+    return await no_numbers_problem(session, app_id)
+
+
+NO_APPLICATION = "choose the receiving application in Settings"
+
+
+async def no_numbers_problem(session: AsyncSession, app_id: str) -> str | None:
+    """Why no test can get a number: the receiving application has none."""
     linked = await session.scalar(
-        select(PhoneNumber.number)
-        .where(PhoneNumber.enabled.is_(True), PhoneNumber.application_id == app_id)
-        .limit(1)
+        select(PhoneNumber.number).where(PhoneNumber.application_id == app_id).limit(1)
     )
     if linked is None:
-        return f"no enabled number is linked to Plivo application {app_id}"
+        return "choose test numbers on the Numbers page"
     return None
+
+
+async def inbound_problem(
+    session: AsyncSession, settings: Settings, app: AppSettings
+) -> str | None:
+    """Why an inbound test could not get a number to call from, or None when it could."""
+    problem = phone_problem(settings, app)
+    if problem is not None:
+        return problem
+    app_id = app.phone.application_id
+    if app_id is None:
+        return NO_APPLICATION
+    return await no_numbers_problem(session, app_id)

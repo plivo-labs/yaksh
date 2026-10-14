@@ -101,6 +101,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     api.include_router(labelers.router)
     api.include_router(personas.router)
     api.include_router(phone_numbers.router)
+    api.include_router(phone_numbers.account_router)
     api.include_router(review.router)
     api.include_router(runs.router)
     api.include_router(scenarios.router)

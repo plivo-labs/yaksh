@@ -21,7 +21,7 @@ from yaksh.domain.settings import AppSettings
 from yaksh.domain.triggers import check_agent_data
 from yaksh.simulation.agents import config_of as agent_config_of
 from yaksh.simulation.languages import LANGUAGES
-from yaksh.simulation.numbers import outbound_problem, phone_problem
+from yaksh.simulation.numbers import inbound_problem, outbound_problem, phone_problem
 from yaksh.simulation.personas import config_of as persona_config_of
 from yaksh.simulation.personas import live_personas
 from yaksh.simulation.prompts import caller_instructions
@@ -72,6 +72,10 @@ async def snapshot(
         problem = await outbound_problem(session, settings, app)
         if problem is not None:
             raise ValidationError(f"outbound tests are off: {problem}")
+    else:
+        problem = await inbound_problem(session, settings, app)
+        if problem is not None:
+            raise ValidationError(f"phone calls are off: {problem}")
     scenario_ids = [item.scenario_id for item in wanted]
     scenarios = await scenarios_to_start(session, agent, scenario_ids)
     plays = [

@@ -11,11 +11,10 @@ from pydantic import (
     field_validator,
     model_validator,
 )
-from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy.engine import make_url
 
 from yaksh.db.session import SQLALCHEMY_ONLY
-from yaksh.domain.numbers import E164
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DatabaseUrl = Annotated[
@@ -51,9 +50,6 @@ class Settings(BaseSettings):
     evaluator_judge_concurrency: int = Field(default=8, gt=0)
     """Judge model calls in flight across one evaluator's evaluations."""
     end_timeout_s: float = 5.0
-    plivo_numbers: Annotated[list[E164], NoDecode] = []
-    plivo_app_id: str | None = None
-    """The Plivo Application that sends outbound test calls to this worker."""
     allow_private_triggers: bool = False
     """Allow trigger URLs on private or local addresses, for development."""
     public_url: str | None = None
@@ -67,13 +63,6 @@ class Settings(BaseSettings):
     s3_region: str = "us-east-1"
     encryption_key: SecretStr = Field(min_length=32)
     """Encrypts the secrets stored with the settings. Without the key they are lost."""
-
-    @field_validator("plivo_numbers", mode="before")
-    @classmethod
-    def split_numbers(cls, value: Any) -> Any:
-        if isinstance(value, str):
-            return [number.strip() for number in value.split(",") if number.strip()]
-        return value
 
     @field_validator("database_url")
     @classmethod

@@ -242,22 +242,22 @@ async def end_conversation(session: AsyncSession, conversation_id: uuid.UUID) ->
     return conversation
 
 
-def runnable_now(receiving_app_id: str | None) -> ColumnElement[bool]:
-    """A queued conversation that can start now: one that needs a number waits while none it
-    may use is free, and outbound conversations run only on a worker that receives calls for
-    receiving_app_id."""
+def runnable_now(pool_app_id: str | None, receiving_app_id: str | None) -> ColumnElement[bool]:
+    """A queued conversation that can start now: one that needs a number waits while no test
+    number of pool_app_id is free, and outbound conversations run only on a worker that
+    receives calls for receiving_app_id."""
+    has_number = Conversation.caller_number.is_not(None)
     inbound = and_(
         Conversation.direction == Direction.INBOUND,
-        or_(
-            Conversation.caller_number.is_not(None),
-            select(PhoneNumber).where(free_numbers()).exists(),
-        ),
+        has_number
+        if pool_app_id is None
+        else or_(has_number, select(PhoneNumber).where(free_numbers(pool_app_id)).exists()),
     )
     if receiving_app_id is None:
         return inbound
     outbound = and_(
         Conversation.direction == Direction.OUTBOUND,
-        select(PhoneNumber).where(free_numbers(receiving_app_id)).exists(),
+        select(PhoneNumber).where(free_numbers(receiving_app_id, rested=True)).exists(),
     )
     return or_(inbound, outbound)
 
@@ -272,7 +272,11 @@ def claim_values(worker_id: str, lease_s: int) -> dict[str, Any]:
 
 
 async def claim_next(
-    session: AsyncSession, worker_id: str, lease_s: int, receiving_app_id: str | None
+    session: AsyncSession,
+    worker_id: str,
+    lease_s: int,
+    pool_app_id: str | None,
+    receiving_app_id: str | None,
 ) -> Conversation | None:
     """Claim the oldest queued conversation that can run now, in the order the runs were
     created. The claim holds the run's lock, so no two workers pass a run's max parallel or its
@@ -280,7 +284,7 @@ async def claim_next(
     its run no longer ready, the next candidate is tried."""
     ready = and_(
         Conversation.status == ConversationStatus.QUEUED,
-        runnable_now(receiving_app_id),
+        runnable_now(pool_app_id, receiving_app_id),
         ~run_full(),
         ~run_waiting(),
     )
@@ -315,6 +319,7 @@ async def prepare_call(
     session: AsyncSession,
     app: AppSettings,
     conversation: Conversation,
+    pool_app_id: str | None,
     receiving_app_id: str | None,
 ) -> CallRequest:
     """Lease the conversation's Yaksh number when it has none yet (the caller ID of an inbound
@@ -328,11 +333,11 @@ async def prepare_call(
         number = await lease_number(
             session,
             conversation.id,
-            receiving_app_id=receiving_app_id,
+            receiving_app_id,
             accept_calls_for_s=SEND_TIMEOUT_S + agent.outbound.dial_window_s,
         )
-    elif number is None:
-        number = await lease_number(session, conversation.id)
+    elif number is None and pool_app_id is not None:
+        number = await lease_number(session, conversation.id, pool_app_id)
     if number is None:
         raise PoolExhaustedError("no pool number is free")
     leased = await session.get_one(Conversation, conversation.id, populate_existing=True)

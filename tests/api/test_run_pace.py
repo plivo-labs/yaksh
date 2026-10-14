@@ -9,6 +9,7 @@ from sqlalchemy import func, select, update
 
 from tests.conftest import (
     FINAL,
+    POOL_APP_ID,
     Db,
     FakeCaller,
     checked_counts,
@@ -230,7 +231,7 @@ async def test_a_reaper_that_waited_for_its_run_still_rests_the_number(
     lost = await claim(db)
     assert lost is not None
     async with db() as session:
-        number = await numbers.lease_number(session, uuid.UUID(lost))
+        number = await numbers.lease_number(session, uuid.UUID(lost), POOL_APP_ID)
     await expire_leases(db, Conversation.id == uuid.UUID(lost))
 
     async with db() as holder:

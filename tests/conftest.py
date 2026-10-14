@@ -43,13 +43,13 @@ from yaksh.domain.evaluations import Metric, MetricKey
 from yaksh.domain.files import FileStore
 from yaksh.domain.language_models import ModelAnswer, ModelCallError
 from yaksh.domain.languages import Language
-from yaksh.domain.numbers import AccountNumber
-from yaksh.domain.settings import AppSettings, SecretName, Secrets
+from yaksh.domain.numbers import AccountNumber, PlivoApplication
+from yaksh.domain.settings import AppSettings, Phone, SecretName, Secrets
 from yaksh.domain.voices import ProviderVoice, VoiceGender, VoiceProvider, VoiceSettings
 from yaksh.evaluation import evaluations
 from yaksh.evaluation.evaluations import Evaluated
 from yaksh.integrations.elevenlabs import ElevenLabsAgentsApi, as_wav
-from yaksh.integrations.plivo import PlivoApi
+from yaksh.integrations.plivo import PlivoApi, PlivoError
 from yaksh.integrations.plivo_signature import signature, signed_text
 from yaksh.integrations.retell import RetellApi
 from yaksh.integrations.vapi import VapiApi
@@ -75,17 +75,20 @@ STORED_SECRETS: dict[str, str | None] = {
     SecretName.ELEVENLABS_API_KEY: "elevenlabs-test-key",
 }
 """The secrets every API test starts with, so runs can start."""
+POOL_APP_ID = "10000000000000001"
+"""The receiving application of the tests: the pool numbers are linked to it."""
 APP_SETTINGS = AppSettings(
+    phone=Phone(application_id=POOL_APP_ID),
     secrets=Secrets(
         plivo_auth_id=SecretStr(PLIVO_AUTH_ID),
         plivo_auth_token=SecretStr(PLIVO_TOKEN),
         llm_api_key=SecretStr("llm-test-key"),
         deepgram_api_key=SecretStr("deepgram-test-key"),
         elevenlabs_api_key=SecretStr("elevenlabs-test-key"),
-    )
+    ),
 )
 """Stored settings for a call request built without the database."""
-POOL = [AccountNumber(number=f"+1555010{n:04d}") for n in range(8)]
+POOL = [AccountNumber(number=f"+1555010{n:04d}", application_id=POOL_APP_ID) for n in range(8)]
 OFFLINE_DATABASE_URL = "postgresql+asyncpg://yaksh:yaksh@localhost:5432/yaksh"
 FINAL = {"completed", "failed", "invalid", "cancelled"}
 YAKSH_FAILED = CallOutcome(connected=False, end_reason=EndReason.ERROR, caller_error="boom")
@@ -284,11 +287,14 @@ async def claim(
     db: Db,
     *,
     worker_id: str = "w1",
+    pool_app_id: str | None = POOL_APP_ID,
     receiving_app_id: str | None = None,
 ) -> str | None:
     """The id of the conversation a worker claims next, if any."""
     async with db() as session:
-        claimed = await conversations.claim_next(session, worker_id, 30, receiving_app_id)
+        claimed = await conversations.claim_next(
+            session, worker_id, 30, pool_app_id, receiving_app_id
+        )
     return None if claimed is None else str(claimed.id)
 
 
@@ -421,12 +427,87 @@ def plivo_signed(
     }
 
 
+POOL_APPLICATION = PlivoApplication(
+    app_id=POOL_APP_ID,
+    name="Yaksh-Test",
+    answer_url="http://yaksh.test/incoming",
+    answer_method="POST",
+    hangup_url="http://yaksh.test/incoming/hangup",
+    hangup_method="POST",
+)
+"""The receiving application, sending calls to the public URL of make_settings."""
+
+
+class FakePlivoAccount:
+    """A Plivo account held in memory: its numbers, each with the application it is linked to,
+    and its applications. down makes every call fail as when Plivo cannot be reached."""
+
+    def __init__(
+        self,
+        numbers: list[AccountNumber] | None = None,
+        applications: list[PlivoApplication] | None = None,
+    ) -> None:
+        self.numbers = {entry.number: entry for entry in (POOL if numbers is None else numbers)}
+        self.applications = {
+            app.app_id: app
+            for app in ([POOL_APPLICATION] if applications is None else applications)
+        }
+        self.down = False
+        self.links: list[tuple[str, str | None]] = []
+
+    def _reach(self) -> None:
+        if self.down:
+            raise PlivoError("plivo is down", status=503, reason="Plivo is down")
+
+    async def list_numbers(self) -> list[AccountNumber]:
+        self._reach()
+        return list(self.numbers.values())
+
+    async def get_application(self, app_id: str) -> PlivoApplication:
+        self._reach()
+        if app_id not in self.applications:
+            raise PlivoError(f"no application {app_id}", status=404, reason="not found")
+        return self.applications[app_id]
+
+    async def list_applications(self) -> list[PlivoApplication]:
+        self._reach()
+        return list(self.applications.values())
+
+    async def create_application(self, name: str, answer_url: str, hangup_url: str) -> str:
+        self._reach()
+        app_id = str(20_000_000_000_000_000 + len(self.applications))
+        self.applications[app_id] = PlivoApplication(
+            app_id=app_id,
+            name=name,
+            answer_url=answer_url,
+            answer_method="POST",
+            hangup_url=hangup_url,
+            hangup_method="POST",
+        )
+        return app_id
+
+    async def update_application(self, app_id: str, answer_url: str, hangup_url: str) -> None:
+        self._reach()
+        self.applications[app_id] = self.applications[app_id].model_copy(
+            update={"answer_url": answer_url, "hangup_url": hangup_url}
+        )
+
+    async def link_number(self, number: str, app_id: str | None) -> None:
+        self._reach()
+        self.links.append((number, app_id))
+        self.numbers[number] = self.numbers[number].model_copy(update={"application_id": app_id})
+
+
 class FakeProviders:
     """The API's provider clients, whatever the stored settings say."""
 
     def __init__(self, voice_clients: Any, generation_model: Any) -> None:
         self.voice_clients_ = voice_clients
         self.generation_model_ = generation_model
+        self.account = FakePlivoAccount()
+
+    def phone_account(self, _auth_id: str, _auth_token: str) -> FakePlivoAccount:
+        return self.account
 
     def voice_clients(self, _settings: AppSettings) -> Any:
         return self.voice_clients_
@@ -468,16 +549,19 @@ class FakeProviders:
 
 
 class FixedAccount(PhoneAccount):
-    """A Plivo account that is never asked: the worker receives on receiving_app_id."""
+    """A Plivo account that is never asked: the worker leases the numbers of pool_app_id and
+    receives on receiving_app_id."""
 
     def __init__(
         self,
         sessionmaker: Db,
         settings: Settings,
+        pool_app_id: str | None,
         receiving_app_id: str | None,
         problem: str | None,
     ) -> None:
         super().__init__(sessionmaker, settings)
+        self.pool_app_id = pool_app_id
         self.receiving_app_id = receiving_app_id
         self.outbound_problem = problem
 
@@ -501,6 +585,7 @@ def make_worker(
     settings: Settings,
     *,
     worker_id: str | None = None,
+    pool_app_id: str | None = POOL_APP_ID,
     receiving_app_id: str | None = None,
     outbound_problem: str | None = None,
     source: SettingsSource | None = None,
@@ -511,7 +596,7 @@ def make_worker(
         caller,
         settings,
         source or SettingsSource(sessionmaker, Cipher(ENCRYPTION_KEY)),
-        FixedAccount(sessionmaker, settings, receiving_app_id, outbound_problem),
+        FixedAccount(sessionmaker, settings, pool_app_id, receiving_app_id, outbound_problem),
         store or FakeFileStore(),
         worker_id=worker_id,
     )
@@ -880,9 +965,14 @@ async def client(
     app.state.providers = providers
     app.state.file_store = file_store
     async with create_sessionmaker(app.state.engine)() as session:
-        await store.change(session, app.state.source.cipher, secrets=STORED_SECRETS)
+        await store.change(
+            session,
+            app.state.source.cipher,
+            values={"phone": {"application_id": POOL_APP_ID}},
+            secrets=STORED_SECRETS,
+        )
     async with create_sessionmaker(app.state.engine)() as session:
-        await numbers.sync_numbers(session, POOL, [], {})
+        await numbers.sync_numbers(session, POOL, {})
         session.add(listed_voice(ENGLISH_VOICE, Language.EN))
         session.add(listed_voice(HINDI_VOICE, Language.EN, Language.HI))
         await session.commit()
@@ -904,6 +994,9 @@ async def client(
         )
         await connection.execute(
             text("UPDATE app_settings SET values = '{}', secrets = '{}', version = version + 1")
+        )
+        await connection.execute(
+            text("UPDATE phone_checks SET checked_at = NULL, error = NULL, claimed_until = NULL")
         )
     await engine.dispose()
 

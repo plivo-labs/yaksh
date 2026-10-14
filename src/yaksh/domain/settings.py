@@ -15,6 +15,7 @@ TRIGGER_SECRET_NAME = re.compile(r"[A-Z][A-Z0-9_]{0,63}")
 Url = Annotated[str, StringConstraints(strip_whitespace=True, pattern=r"^https?://\S+$")]
 ModelName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
 Effort = Annotated[str, StringConstraints(pattern=r"^[a-z]{1,20}$")]
+ApplicationId = Annotated[str, StringConstraints(strip_whitespace=True, pattern=r"^[0-9]{1,40}$")]
 
 
 class Section(BaseModel):
@@ -84,6 +85,12 @@ class Phone(Section):
     earlier test does not reach the next one."""
     timezone: str = "UTC"
     """The zone of the date the caller is told is today; a run takes it when it starts."""
+    application_id: ApplicationId | None = None
+    """The Plivo application that receives the calls of the test numbers. A number linked to it
+    is a test number; without it Yaksh has no numbers."""
+    check_interval_s: int = Field(default=300, ge=60, le=86_400)
+    """How often a worker reads the numbers of the Plivo account again, to see changes made in
+    the Plivo console."""
 
     @field_validator("timezone")
     @classmethod

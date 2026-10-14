@@ -69,7 +69,9 @@ def stuck_disposal() -> Caller:
 
 
 async def offline(self: PhoneAccount, app: AppSettings) -> None:
-    """The test database holds made-up Plivo keys; the account is never asked."""
+    """The test database holds made-up Plivo keys; the account is never asked, and the numbers
+    of the receiving application in the settings are the test numbers."""
+    self.pool_app_id = app.phone.application_id
 
 
 async def reachable(self: S3FileStore) -> None:

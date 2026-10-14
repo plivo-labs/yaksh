@@ -3,6 +3,7 @@ settings they depend on change."""
 
 from yaksh.domain.agent_import import ElevenLabsRegion, VapiRegion
 from yaksh.domain.language_models import JsonModel
+from yaksh.domain.numbers import PhoneAccountApi
 from yaksh.domain.settings import AppSettings, reveal
 from yaksh.domain.voices import VoiceProvider
 from yaksh.integrations.elevenlabs import REGION_APIS, ElevenLabsAgentsApi, ElevenLabsClient
@@ -48,6 +49,10 @@ class Providers:
         """A fast model that drafts an agent's brief while the person waits."""
         brief = settings.brief
         return self._model("brief", settings, brief.model, brief.timeout_s, brief.reasoning_effort)
+
+    def phone_account(self, auth_id: str, auth_token: str) -> PhoneAccountApi:
+        """A client for the phone account in the settings."""
+        return PlivoApi(auth_id, auth_token)
 
     def plivo_cx(self, auth_id: str, auth_token: str) -> PlivoApi:
         """A client for a Plivo account that someone imports an agent from; its credentials come
