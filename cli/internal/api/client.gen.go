@@ -239,6 +239,7 @@ const (
 	EndReasonLeaseLost     EndReason = "lease_lost"
 	EndReasonNoAnswer      EndReason = "no_answer"
 	EndReasonNoCall        EndReason = "no_call"
+	EndReasonStartRefused  EndReason = "start_refused"
 	EndReasonStreamEnded   EndReason = "stream_ended"
 	EndReasonTriggerFailed EndReason = "trigger_failed"
 	EndReasonTurnLimit     EndReason = "turn_limit"
@@ -264,6 +265,8 @@ func (e EndReason) Valid() bool {
 	case EndReasonNoAnswer:
 		return true
 	case EndReasonNoCall:
+		return true
+	case EndReasonStartRefused:
 		return true
 	case EndReasonStreamEnded:
 		return true
@@ -922,12 +925,15 @@ func (e SpeakerKind) Valid() bool {
 // Defines values for Transport.
 const (
 	TransportPhone Transport = "phone"
+	TransportText  Transport = "text"
 )
 
 // Valid indicates whether the value is a known member of the Transport enum.
 func (e Transport) Valid() bool {
 	switch e {
 	case TransportPhone:
+		return true
+	case TransportText:
 		return true
 	default:
 		return false
@@ -1133,12 +1139,13 @@ type AgentConfig struct {
 	Brief            string                    `json:"brief"`
 	Config           *string                   `json:"config,omitempty"`
 	Direction        *Direction                `json:"direction,omitempty"`
+	Endpoint         *Endpoint                 `json:"endpoint,omitempty"`
 	KnowledgeBase    *[]KnowledgeBaseEntry     `json:"knowledge_base,omitempty"`
 	Languages        *[]AgentLanguage          `json:"languages,omitempty"`
 	Outbound         *OutboundConfig           `json:"outbound,omitempty"`
 	Rules            *[]AgentConfig_Rules_Item `json:"rules,omitempty"`
 
-	// Transport How Yaksh reaches an agent; phone only today, kept as the seam for other ways.
+	// Transport How Yaksh reaches an agent.
 	Transport *Transport `json:"transport,omitempty"`
 }
 
@@ -1154,6 +1161,7 @@ type AgentCreate struct {
 	Brief            string                    `json:"brief"`
 	Config           *string                   `json:"config,omitempty"`
 	Direction        *Direction                `json:"direction,omitempty"`
+	Endpoint         *Endpoint                 `json:"endpoint,omitempty"`
 	ExternalId       *string                   `json:"external_id,omitempty"`
 	KnowledgeBase    *[]KnowledgeBaseEntry     `json:"knowledge_base,omitempty"`
 	Languages        *[]AgentLanguage          `json:"languages,omitempty"`
@@ -1164,7 +1172,7 @@ type AgentCreate struct {
 	// Source Where an agent came from: made in Yaksh, or imported from a file or a provider.
 	Source *AgentSource `json:"source,omitempty"`
 
-	// Transport How Yaksh reaches an agent; phone only today, kept as the seam for other ways.
+	// Transport How Yaksh reaches an agent.
 	Transport      *Transport `json:"transport,omitempty"`
 	WriteScenarios *bool      `json:"write_scenarios,omitempty"`
 }
@@ -1203,6 +1211,7 @@ type AgentRead struct {
 	CreatedAt        time.Time               `json:"created_at"`
 	CurrentVersion   int                     `json:"current_version"`
 	Direction        Direction               `json:"direction"`
+	Endpoint         *Endpoint               `json:"endpoint"`
 	ExternalId       *string                 `json:"external_id"`
 	ForkedFromId     *openapi_types.UUID     `json:"forked_from_id"`
 	Id               openapi_types.UUID      `json:"id"`
@@ -1215,7 +1224,7 @@ type AgentRead struct {
 	// Source Where an agent came from: made in Yaksh, or imported from a file or a provider.
 	Source AgentSource `json:"source"`
 
-	// Transport How Yaksh reaches an agent; phone only today, kept as the seam for other ways.
+	// Transport How Yaksh reaches an agent.
 	Transport Transport `json:"transport"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
@@ -1236,6 +1245,7 @@ type AgentSummary struct {
 	CreatedAt        time.Time           `json:"created_at"`
 	CurrentVersion   int                 `json:"current_version"`
 	Direction        Direction           `json:"direction"`
+	Endpoint         *Endpoint           `json:"endpoint"`
 	ExternalId       *string             `json:"external_id"`
 	ForkedFromId     *openapi_types.UUID `json:"forked_from_id"`
 	Id               openapi_types.UUID  `json:"id"`
@@ -1246,7 +1256,7 @@ type AgentSummary struct {
 	// Source Where an agent came from: made in Yaksh, or imported from a file or a provider.
 	Source AgentSource `json:"source"`
 
-	// Transport How Yaksh reaches an agent; phone only today, kept as the seam for other ways.
+	// Transport How Yaksh reaches an agent.
 	Transport Transport `json:"transport"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
@@ -1258,6 +1268,7 @@ type AgentUpdate struct {
 	Brief            *string                   `json:"brief,omitempty"`
 	Config           *string                   `json:"config,omitempty"`
 	Direction        *Direction                `json:"direction,omitempty"`
+	Endpoint         *Endpoint                 `json:"endpoint,omitempty"`
 	ExternalId       *string                   `json:"external_id,omitempty"`
 	KnowledgeBase    *[]KnowledgeBaseEntry     `json:"knowledge_base,omitempty"`
 	Languages        *[]AgentLanguage          `json:"languages,omitempty"`
@@ -1439,8 +1450,11 @@ type ConversationRead struct {
 	Surroundings Surroundings `json:"surroundings"`
 	TalkMs       *int         `json:"talk_ms"`
 	Transcript   []TurnRead   `json:"transcript"`
-	Validity     *Validity    `json:"validity"`
-	WireEvents   []WireEvent  `json:"wire_events"`
+
+	// Transport How Yaksh reaches an agent.
+	Transport  Transport   `json:"transport"`
+	Validity   *Validity   `json:"validity"`
+	WireEvents []WireEvent `json:"wire_events"`
 }
 
 // ConversationStatus defines model for ConversationStatus.
@@ -1492,6 +1506,9 @@ type ConversationSummary struct {
 	// Surroundings What the agent hears behind the caller. No sounds and no auto noise is a quiet room.
 	Surroundings Surroundings `json:"surroundings"`
 	TalkMs       *int         `json:"talk_ms"`
+
+	// Transport How Yaksh reaches an agent.
+	Transport Transport `json:"transport"`
 }
 
 // CriterionCounts defines model for CriterionCounts.
@@ -1609,6 +1626,13 @@ type ElevenLabsRegion string
 
 // EndReason Who or what ended the conversation, as Yaksh observed it.
 type EndReason string
+
+// Endpoint An address on the agent's system that Yaksh sends requests to, with the headers each
+// request carries.
+type Endpoint struct {
+	Headers *[]Header `json:"headers,omitempty"`
+	Url     string    `json:"url"`
+}
 
 // ErrorBody defines model for ErrorBody.
 type ErrorBody struct {
@@ -2796,7 +2820,15 @@ type TextDocumentCreate struct {
 	Text string `json:"text"`
 }
 
-// Transport How Yaksh reaches an agent; phone only today, kept as the seam for other ways.
+// ToolItem A tool the text agent called in its turn, as the agent reported it.
+type ToolItem struct {
+	Arguments string  `json:"arguments"`
+	Id        string  `json:"id"`
+	Name      string  `json:"name"`
+	Output    *string `json:"output,omitempty"`
+}
+
+// Transport How Yaksh reaches an agent.
 type Transport string
 
 // Trigger The request sent once for each conversation: a POST carries its values in a JSON body,
@@ -2822,6 +2854,7 @@ type TurnRead struct {
 	StartedAtMs int         `json:"started_at_ms"`
 	TalkedOver  *bool       `json:"talked_over,omitempty"`
 	Text        string      `json:"text"`
+	Tools       *[]ToolItem `json:"tools,omitempty"`
 }
 
 // UnsureKind defines model for UnsureKind.
