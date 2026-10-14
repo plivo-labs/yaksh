@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import { toast } from "sonner";
 
 import {
@@ -15,6 +15,58 @@ import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { useEndConversation } from "@/lib/queries";
 import type { ConversationStatus } from "@/lib/types";
+
+/** Asks before an action. `onConfirm` gets `close`, to call when the request ends; a failure
+ * shows `error` in the dialog so the reason is not lost. */
+export function ConfirmDialog({
+  title,
+  description,
+  note,
+  action,
+  cancel = "Cancel",
+  destructive = false,
+  pending,
+  error,
+  open,
+  onOpenChange,
+  onConfirm,
+}: {
+  title: ReactNode;
+  description: ReactNode;
+  note?: ReactNode;
+  action: string;
+  cancel?: string;
+  destructive?: boolean;
+  pending: boolean;
+  error?: string;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onConfirm: (close: () => void) => void;
+}) {
+  return (
+    <AlertDialog open={open} onOpenChange={onOpenChange}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>{title}</AlertDialogTitle>
+          <AlertDialogDescription>{description}</AlertDialogDescription>
+        </AlertDialogHeader>
+        {note && <p className="text-s-400 text-muted-foreground">{note}</p>}
+        {error && <p className="text-p-400 text-destructive">{error}</p>}
+        <AlertDialogFooter>
+          <AlertDialogCancel>{cancel}</AlertDialogCancel>
+          <AlertDialogAction
+            variant={destructive ? "destructive" : "default"}
+            disabled={pending}
+            onClick={() => onConfirm(() => onOpenChange(false))}
+          >
+            {pending && <Spinner />}
+            {action}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
 
 /** Asks before a delete. `onDelete` gets `close`, to call when the request ends; a failure
  * shows `error` in the dialog so the reason is not lost. */
@@ -36,26 +88,18 @@ export function DeleteDialog({
   onDelete: (close: () => void) => void;
 }) {
   return (
-    <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>Delete {name}?</AlertDialogTitle>
-          <AlertDialogDescription>{description}</AlertDialogDescription>
-        </AlertDialogHeader>
-        {error && <p className="text-p-400 text-destructive">{error}</p>}
-        <AlertDialogFooter>
-          <AlertDialogCancel>Keep</AlertDialogCancel>
-          <AlertDialogAction
-            variant="destructive"
-            disabled={pending}
-            onClick={() => onDelete(() => onOpenChange(false))}
-          >
-            {pending && <Spinner />}
-            Delete
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+    <ConfirmDialog
+      title={`Delete ${name}?`}
+      description={description}
+      action="Delete"
+      cancel="Keep"
+      destructive
+      pending={pending}
+      error={error}
+      open={open}
+      onOpenChange={onOpenChange}
+      onConfirm={onDelete}
+    />
   );
 }
 

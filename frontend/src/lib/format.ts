@@ -63,6 +63,20 @@ export function surroundingsLabel(surroundings: Surroundings, exact = false): st
   return label[0].toUpperCase() + label.slice(1);
 }
 
+export function upperFirst(text: string): string {
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+/** How long ago a time was, in whole minutes, hours or days. */
+export function ago(iso: string, now: number): string {
+  const minutes = Math.floor((now - new Date(iso).getTime()) / 60_000);
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return `${minutes} min ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${counted(hours, "hour", "hours")} ago`;
+  return `${counted(Math.floor(hours / 24), "day", "days")} ago`;
+}
+
 export function words(value: string): string {
   return value.replaceAll("_", " ");
 }

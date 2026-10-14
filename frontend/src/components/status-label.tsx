@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 
 import { Settle } from "@/components/settle";
-import { words } from "@/lib/format";
+import { upperFirst, words } from "@/lib/format";
 import { CONVERSATION_TONE, RUN_TONE, type Tone } from "@/lib/status";
 import type { ConversationStatus, RunStatus } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -61,10 +61,7 @@ export function StatusLabel({
 }) {
   return (
     <span
-      className={cn(
-        "inline-flex items-center gap-1.5 text-s-400 whitespace-nowrap capitalize",
-        TEXT[tone],
-      )}
+      className={cn("inline-flex items-center gap-1.5 text-s-400 whitespace-nowrap", TEXT[tone])}
     >
       <Dot tone={tone} live={live} />
       {children}
@@ -76,7 +73,7 @@ export function ConversationStatusLabel({ status }: { status: ConversationStatus
   return (
     <Settle value={status}>
       <StatusLabel tone={CONVERSATION_TONE[status]} live={status === "running"}>
-        {words(status)}
+        {upperFirst(words(status))}
       </StatusLabel>
     </Settle>
   );
@@ -86,7 +83,7 @@ export function RunStatusLabel({ status }: { status: RunStatus }) {
   return (
     <Settle value={status}>
       <StatusLabel tone={RUN_TONE[status]} live={status === "running"}>
-        {status}
+        {upperFirst(status)}
       </StatusLabel>
     </Settle>
   );

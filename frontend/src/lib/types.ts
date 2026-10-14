@@ -539,21 +539,50 @@ export interface AgentInput {
   source?: AgentSource;
 }
 
+/** Who receives the calls of a number: the receiving application in Settings makes it a test
+ * number; a free number has no application. */
+export type NumberOwner = "test" | "free" | "cx_agent" | "other" | "no_voice";
+
 export interface PhoneNumber {
   number: string;
   alias: string | null;
   region: string | null;
+  owner: NumberOwner;
   application_id: string | null;
   application_name: string | null;
-  on_outbound_application: boolean;
-  state: "in_use" | "resting" | "free";
+  /** A test number's state; null for every other number. */
+  state: "in_use" | "resting" | "ready" | null;
+  /** When a resting test number may take an outbound test again; null in every other state. */
+  rests_until: string | null;
 }
 
 export interface PhoneNumbers {
   items: PhoneNumber[];
+  application_id: string | null;
+  checked_at: string | null;
+  /** Why the last check of the account failed; the numbers from before it stand. */
+  check_error: string | null;
+  /** Why no test can get a number now. */
+  problem: string | null;
+  /** Why an outbound test could not get its call now. */
   outbound_problem: string | null;
   /** How long a released number rests before an outbound test may use it. */
   rest_s: number;
+}
+
+export interface PhoneApplication {
+  id: string;
+  name: string | null;
+  answer_url: string | null;
+  /** Why the application does not send calls to this install; empty when it does. */
+  problems: string[];
+}
+
+export interface PhoneAccount {
+  provider: "plivo";
+  credentials_saved: boolean;
+  application: PhoneApplication | null;
+  test_numbers: number;
 }
 
 export type VoiceProvider = "elevenlabs";
@@ -1386,8 +1415,16 @@ export interface SettingsValues {
     max_input_chars: number;
     jev_pass_bar: number;
   };
+  /** How much one evaluator does at once, within the LLM provider's rate limits. */
+  evaluation: { evaluations_at_once: number; judge_calls_at_once: number };
   audit: { sample_rate: number; weekly_budget: number };
-  phone: { ring_timeout_s: number; number_rest_s: number; timezone: string };
+  phone: {
+    ring_timeout_s: number;
+    number_rest_s: number;
+    timezone: string;
+    application_id: string | null;
+    check_interval_s: number;
+  };
   limits: {
     default_max_turns: number;
     default_max_duration_s: number;

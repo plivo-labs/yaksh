@@ -1,6 +1,6 @@
 import { Check, Shuffle, XIcon } from "lucide-react";
 import { type SubmitEvent, useState } from "react";
-import { useNavigate } from "react-router";
+import { Link, useNavigate } from "react-router";
 
 import { PersonaChips } from "@/components/persona-chips";
 import { ScenarioAdder } from "@/components/scenario-adder";
@@ -235,10 +235,15 @@ export function RunDialog({
         : `${repeatCount} times`;
 
   const outbound = agent.direction === "outbound";
-  const usable = (numbers.data?.items ?? []).filter(
-    (number) => !outbound || number.on_outbound_application,
-  );
-  const waits = outbound && usable.length > 0 && total > usable.length;
+  const blocked = numbers.data
+    ? outbound
+      ? numbers.data.outbound_problem
+      : numbers.data.problem
+    : null;
+  const usable = blocked
+    ? []
+    : (numbers.data?.items ?? []).filter((number) => number.owner === "test");
+  const waits = usable.length > 0 && total > usable.length;
 
   const submit = (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -635,10 +640,22 @@ export function RunDialog({
             {waits && (
               <span
                 className="text-xs-400 text-status-warning-text"
-                title={`The agent calls Yaksh, and each Yaksh number takes one call at a time, then rests ${numbers.data?.rest_s} s.`}
+                title={
+                  outbound
+                    ? `The agent calls Yaksh, and each test number takes one call at a time, then rests ${numbers.data?.rest_s} s.`
+                    : "Yaksh calls the agent from its test numbers, one call at a time on each."
+                }
               >
                 {counted(total, "call", "calls")} on {counted(usable.length, "number", "numbers")}:
                 they run {usable.length} at a time.
+              </span>
+            )}
+            {blocked && (
+              <span className="text-xs-400 text-status-warning-text">
+                Calls can't start: {blocked}.{" "}
+                <Link to="/numbers" className="underline underline-offset-2">
+                  Open Numbers
+                </Link>
               </span>
             )}
             {start.error && <FieldError>{start.error.message}</FieldError>}
@@ -655,7 +672,9 @@ export function RunDialog({
             <Button
               type="submit"
               form="run-form"
-              disabled={start.isPending || rows === null || scenarios.length === 0}
+              disabled={
+                start.isPending || rows === null || scenarios.length === 0 || Boolean(blocked)
+              }
             >
               {start.isPending && <Spinner />}
               Start {counted(total, "call", "calls")}

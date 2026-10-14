@@ -43,6 +43,8 @@ import {
   type PersonaDraft,
   type PersonaInput,
   type PersonaScenario,
+  type PhoneAccount,
+  type PhoneApplication,
   type PhoneNumbers,
   type PlivoCxAccount,
   type PlivoCxFlowPage,
@@ -96,6 +98,8 @@ export const keys = {
   voices: ["voices"] as const,
   voicesFor: (language: Language | "all") => ["voices", language] as const,
   phoneNumbers: ["phone-numbers"] as const,
+  phoneAccount: ["phone-account"] as const,
+  applications: ["phone-account", "applications"] as const,
   runs: (filters: RunFilters) =>
     [
       "runs",
@@ -884,10 +888,106 @@ function peaks(samples: Float32Array, size: number): Float32Array {
   return out;
 }
 
+/** The account's numbers. It refreshes faster while a test number is in a test or resting. */
 export function usePhoneNumbers() {
   return useQuery({
     queryKey: keys.phoneNumbers,
     queryFn: () => api<PhoneNumbers>("/phone-numbers"),
+    refetchInterval: (query) =>
+      query.state.data?.items.some((item) => item.state === "in_use" || item.state === "resting")
+        ? 5_000
+        : 30_000,
+  });
+}
+
+/** Each change on the Numbers page answers with the whole list; the account's count of test
+ * numbers follows it. */
+function numbersChanged(client: QueryClient, numbers: PhoneNumbers) {
+  client.setQueryData(keys.phoneNumbers, numbers);
+  void client.invalidateQueries({ queryKey: keys.phoneAccount, exact: true });
+}
+
+/** Reads the Plivo account's numbers again, to see changes made in the Plivo console. */
+export function useCheckNumbers() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: () => api<PhoneNumbers>("/phone-numbers/check", { method: "POST" }),
+    onSuccess: (numbers) => numbersChanged(client, numbers),
+  });
+}
+
+/** Makes a free number a test number: Yaksh links it to the receiving application. */
+export function useUseNumber() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (number: string) =>
+      api<PhoneNumbers>(`/phone-numbers/${encodeURIComponent(number)}/use`, { method: "POST" }),
+    onSuccess: (numbers) => numbersChanged(client, numbers),
+  });
+}
+
+/** Stops using a test number: Yaksh removes its application in Plivo. */
+export function useStopNumber() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (number: string) =>
+      api<PhoneNumbers>(`/phone-numbers/${encodeURIComponent(number)}/stop`, { method: "POST" }),
+    onSuccess: (numbers) => numbersChanged(client, numbers),
+  });
+}
+
+export function usePhoneAccount() {
+  return useQuery({
+    queryKey: keys.phoneAccount,
+    queryFn: () => api<PhoneAccount>("/phone-account"),
+  });
+}
+
+/** The applications that may receive test calls; Plivo CX agents' are left out. */
+export function useApplications() {
+  return useQuery({
+    queryKey: keys.applications,
+    queryFn: () => api<PhoneApplication[]>("/phone-account/applications"),
+    retry: false,
+  });
+}
+
+/** After a change of the receiving application: the test numbers and the saved settings
+ * change with it. */
+function accountChanged(client: QueryClient, account: PhoneAccount) {
+  client.setQueryData(keys.phoneAccount, account);
+  void client.invalidateQueries({ queryKey: keys.applications });
+  void client.invalidateQueries({ queryKey: keys.phoneNumbers });
+  void client.invalidateQueries({ queryKey: settingsKey, exact: true });
+}
+
+export function useChooseApplication() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (applicationId: string) =>
+      api<PhoneAccount>("/phone-account/application", {
+        method: "PUT",
+        json: { application_id: applicationId },
+      }),
+    onSuccess: (account) => accountChanged(client, account),
+  });
+}
+
+/** Makes an application that sends calls to this install, and chooses it. */
+export function useMakeApplication() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: () => api<PhoneAccount>("/phone-account/application/new", { method: "POST" }),
+    onSuccess: (account) => accountChanged(client, account),
+  });
+}
+
+/** Points the receiving application's URLs at this install. */
+export function useFixApplication() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: () => api<PhoneAccount>("/phone-account/application/fix", { method: "POST" }),
+    onSuccess: (account) => accountChanged(client, account),
   });
 }
 
@@ -993,6 +1093,7 @@ function settingsChanged(client: QueryClient, settings: AppSettings) {
   void client.invalidateQueries({ queryKey: [...settingsKey, "efforts"] });
   void client.invalidateQueries({ queryKey: ["defaults"] });
   void client.invalidateQueries({ queryKey: keys.phoneNumbers });
+  void client.invalidateQueries({ queryKey: keys.phoneAccount });
 }
 
 export function useSaveSettingsValues() {

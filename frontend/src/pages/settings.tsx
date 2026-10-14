@@ -16,7 +16,8 @@ import { MAX_DATA_SETS } from "@/lib/types";
 import { RISE } from "@/lib/motion";
 import { useSaveSettingsValues, useSettings } from "@/lib/queries";
 import type { AppSettings, SettingsValues } from "@/lib/types";
-import { KeyRow, PlivoAccountRow, ProviderPanel, SettingRow } from "@/pages/settings-keys";
+import { KeyRow, ProviderPanel, SettingRow } from "@/pages/settings-keys";
+import { PhoneAccountPanel } from "@/pages/settings-phone";
 import { ImportExport } from "@/pages/settings-import";
 import { TriggersPanel } from "@/pages/settings-triggers";
 
@@ -91,6 +92,13 @@ function Form({
     // The saved values changed, here or in another tab: an untouched form follows them.
     setBase(settings.values);
     if (JSON.stringify(draft) === JSON.stringify(base)) setDraft(settings.values);
+    // The Phone account panel saves the receiving application on its own; a changed form takes
+    // it over, so saving the form does not undo that choice.
+    else
+      setDraft({
+        ...draft,
+        phone: { ...draft.phone, application_id: settings.values.phone.application_id },
+      });
   }
   const save = useSaveSettingsValues();
   const dirty = JSON.stringify(draft) !== saved;
@@ -356,6 +364,27 @@ function Form({
             </details>
           </Panel>
           <Panel>
+            <PanelHeader title="Evaluation" />
+            <NumberRow
+              id="evaluations-at-once"
+              label="Evaluations at once"
+              help="For each evaluator. Keep within the LLM provider's rate limits."
+              min={1}
+              max={32}
+              value={draft.evaluation.evaluations_at_once}
+              onValueChange={(value) => change("evaluation", "evaluations_at_once", value)}
+            />
+            <NumberRow
+              id="judge-calls-at-once"
+              label="Judge calls at once"
+              help="Judge model calls across one evaluator's evaluations. Keep within the LLM provider's rate limits."
+              min={1}
+              max={64}
+              value={draft.evaluation.judge_calls_at_once}
+              onValueChange={(value) => change("evaluation", "judge_calls_at_once", value)}
+            />
+          </Panel>
+          <Panel>
             <PanelHeader title="Jev and audit" />
             <NumberRow
               id="jev-bar"
@@ -389,13 +418,7 @@ function Form({
         </TabsContent>
 
         <TabsContent value="phone" className="grid gap-5">
-          <ProviderPanel
-            title="Plivo account"
-            provider="plivo"
-            canTest={Boolean(secrets.plivo_auth_id && secrets.plivo_auth_token)}
-          >
-            <PlivoAccountRow settings={settings} />
-          </ProviderPanel>
+          <PhoneAccountPanel settings={settings} />
           <TriggersPanel settings={settings} />
           <Panel>
             <PanelHeader title="Calls" />
@@ -414,6 +437,16 @@ function Form({
               unit="seconds"
               value={draft.phone.number_rest_s}
               onValueChange={(value) => change("phone", "number_rest_s", value)}
+            />
+            <NumberRow
+              id="check-interval"
+              label="Check numbers every"
+              help="To see changes made in the Plivo console."
+              unit="minutes"
+              min={1}
+              max={1440}
+              value={draft.phone.check_interval_s / 60}
+              onValueChange={(value) => change("phone", "check_interval_s", Math.round(value * 60))}
             />
             <SettingRow label="Time zone" htmlFor="timezone" help="Sets the caller's “today”.">
               <Input
@@ -500,7 +533,8 @@ function Form({
         </TabsContent>
       </Tabs>
       <p className="text-xs-400 text-muted-foreground">
-        Database, API token, encryption key, ports and file storage are set in the environment.{" "}
+        Database, API token, encryption key, public URL, ports and file storage are set in the
+        environment.{" "}
         <a
           href="https://github.com/plivo-labs/yaksh/tree/dev/docs/content/docs/configuration.mdx"
           target="_blank"
