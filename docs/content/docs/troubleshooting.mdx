@@ -18,13 +18,15 @@ docker compose -f docker/compose.yaml logs worker
 | `phone calls are off: add the Plivo Auth ID and Auth token in Settings` | Save the Plivo Auth ID and Auth token on the **Phone** tab of Settings. |
 | `phone calls are off: set YAKSH_PUBLIC_URL to the address Plivo can reach` | Set `YAKSH_PUBLIC_URL` in `docker/.env`. Then make the API and worker containers again. |
 | `the caller needs the ... key; add it in Settings` | Save the key that the message names on the **Providers** tab of Settings. |
+| `phone calls are off: choose the receiving application in Settings` | Choose the receiving application on the **Phone** tab of Settings. Refer to [Phone numbers](/docs/configuration#phone-numbers). |
+| `phone calls are off: choose test numbers on the Numbers page` | The receiving application has no numbers. On the **Numbers** page, click **Use for tests** on a free number. |
 | `outbound tests are off: ...` | The outbound setup is not complete. The **Numbers** page shows the cause. Refer to [Outbound agents](/docs/outbound-agents). |
 
 ## The conversation stays queued
 
 - No worker operates. Read the log of the worker.
-- No number is free. Each phone conversation uses one number until it stops. The **Numbers** page shows the numbers.
-- The worker stopped when it started. If its log shows `the caller needs`, set the keys that the log names. If its log shows `YAKSH_PLIVO_NUMBERS:`, remove the numbers that are not in the Plivo account.
+- No test number is free. Each phone conversation uses one test number until it stops. The **Numbers** page shows the test numbers and their state. To add test numbers, click **Use for tests** on free numbers.
+- The worker stopped when it started. If its log shows `the caller needs`, set the keys that the log names.
 
 ## The call fails
 
@@ -46,6 +48,8 @@ If the log of the worker shows `refused an unsigned request`, the worker could n
 
 When a worker with a correct setup starts, its log shows these lines:
 
-- `number pool: N of M account numbers enabled: ...`
-- `outbound tests: application <name> sends calls here`, if you set `YAKSH_PLIVO_APP_ID`.
 - `plivo server listening on port 8770`
+- `checked N numbers of the Plivo account`
+- `outbound tests: application <name> sends calls here`
+
+The worker writes `checked N numbers of the Plivo account` again after each check that it does. If the log shows `keeping the stored numbers: ...`, the check failed, and Yaksh uses the numbers of the last check. The **Numbers** page shows the error. Examine the Plivo Auth ID and Auth token in Settings.

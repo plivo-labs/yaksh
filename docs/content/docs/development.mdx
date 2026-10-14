@@ -49,14 +49,14 @@ To do the automated tests, use `uv run pytest`. These tests use Docker to start 
 
 Do this procedure only with `docker/compose.dev.yaml`. `scripts/tunnel.sh` opens a Cloudflare quick tunnel to the worker container. A Cloudflare account is not necessary for a quick tunnel. The script shows the `YAKSH_PUBLIC_URL` line.
 
-Put this line in `docker/.env`. For outbound tests, also change the two URLs of the Plivo Application, because the worker examines the Application only when it starts. Then make the `api` and `worker` containers again, because they read `YAKSH_PUBLIC_URL` only when they start:
+Put this line in `docker/.env`. Then make the `api` and `worker` containers again, because they read `YAKSH_PUBLIC_URL` only when they start:
 
 ```sh
 docker compose -f docker/compose.dev.yaml create --force-recreate api worker
 docker compose -f docker/compose.dev.yaml start api worker
 ```
 
-The hostname of a quick tunnel changes each time that the tunnel starts.
+The hostname of a quick tunnel changes each time that the tunnel starts. After each change, fix the URLs of the receiving application on the **Phone** tab of Settings.
 
 ## Documentation
 

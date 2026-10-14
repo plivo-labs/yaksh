@@ -9,7 +9,7 @@ You must have:
 
 - Docker with Docker Compose 2.24 or later.
 - An account with Plivo, Deepgram, OpenAI and ElevenLabs.
-- A voice number in your Plivo account.
+- A voice number in your Plivo account that no Plivo application receives.
 - A voice agent with a phone number.
 
 ## Start Yaksh
@@ -54,6 +54,9 @@ Plivo sends the call audio to the worker. Thus, the worker must have a public HT
    docker compose -f docker/compose.yaml create --force-recreate yaksh worker
    docker compose -f docker/compose.yaml start yaksh worker
    ```
+
+4. In the console, open the **Phone** tab of Settings. Click **Make application**. Yaksh makes a Plivo application that sends calls to the worker.
+5. On the **Numbers** page, click **Use for tests** on your number. Yaksh calls from its test numbers only. Refer to [Phone numbers](/docs/configuration#phone-numbers).
 
 With `docker/compose.dev.yaml`, `scripts/tunnel.sh` opens a quick tunnel. Refer to [Development](/docs/development).
 

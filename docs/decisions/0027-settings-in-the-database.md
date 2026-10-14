@@ -1,7 +1,7 @@
 # 0027 Settings in the database, the environment only to start
 
 Date: 2026-10-07
-Status: accepted. Replaces 0002. Changes 0004, 0007 and 0023.
+Status: accepted, changed by 0029 (the receiving application is on the Settings page) and 0030 (worker timings in code). Replaces 0002. Changes 0004, 0007 and 0023.
 
 ## Decision
 
@@ -10,7 +10,7 @@ The provider keys, the models, the limits, the Plivo Auth ID and Auth token, the
 - The row holds the values that differ from the defaults. The defaults stay in code, so a release can change a default.
 - Each secret is encrypted with AES-256-GCM. The key comes from `YAKSH_ENCRYPTION_KEY` through HKDF-SHA256. Each write has a random 96-bit nonce. The name of the secret is the associated data, so a value cannot move to another secret. A stored value starts with a format byte.
 - The row has a version that grows with every change. Each process compares the version at the start of each piece of work (a call, an evaluation, an API request) and reads the row again when it changed. A call keeps the settings it started with.
-- The environment keeps what Yaksh needs before it can open the database, and what changes the deployment: the database URL, the API token, `YAKSH_ENCRYPTION_KEY`, the ports, `YAKSH_PUBLIC_URL`, `YAKSH_PLIVO_APP_ID`, `YAKSH_PLIVO_NUMBERS`, file storage and the worker's own tuning.
+- The environment keeps what Yaksh needs before it can open the database, and what changes the deployment: the database URL, the API token, `YAKSH_ENCRYPTION_KEY`, the ports, `YAKSH_PUBLIC_URL`, file storage and the maximum number of conversations on one worker. 0030 moved the other worker and evaluator values out of the environment. The Plivo application and the test numbers moved out of the environment with 0029.
 - Yaksh does not start without `YAKSH_ENCRYPTION_KEY`, or when the key cannot decrypt the stored secrets.
 - Before Yaksh saves a key, it sends one small request to the provider, and saves the key only when the provider accepts it. The Plivo Auth ID and Auth token are saved and checked together.
 - A key is bound to its address. A new `llm.base_url` or `deepgram.base_url` removes the key of that provider, unless the same change saves a new key, which is then checked at the new address. Otherwise a token holder could point the base URL at their own server and receive the saved key with the next request.

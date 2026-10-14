@@ -7,18 +7,11 @@ An outbound agent calls Yaksh. Yaksh sends the trigger of the agent: a POST or G
 
 ## Prepare for outbound tests
 
-1. In the Plivo console, make an Application. Set the answer URL to `<YAKSH_PUBLIC_URL>/incoming`. Set the hangup URL to `<YAKSH_PUBLIC_URL>/incoming/hangup`. Set the answer method and the hangup method to `POST`. Use the value of `YAKSH_PUBLIC_URL` without a slash at the end.
-2. In the Plivo console, set this Application on each number that gets test calls.
-3. In `docker/.env`, set `YAKSH_PLIVO_APP_ID` to the ID of the Application. Then make the API and worker containers again, because they read this variable only when they start:
+1. On the **Phone** tab of Settings, choose the receiving application. Click **Make application**, or choose an application of the account. The answer URL of the application must be `<YAKSH_PUBLIC_URL>/incoming` and its hangup URL `<YAKSH_PUBLIC_URL>/incoming/hangup`, both with the method `POST`. Refer to [Phone numbers](/docs/configuration#phone-numbers).
+2. On the **Numbers** page, click **Use for tests** on each number that gets test calls.
+3. Add an agent with the direction `outbound`. Give the method, the URL and the headers of its trigger. A POST trigger has a JSON body (`body`). A GET trigger has query parameters (`query`), a list of names and values, and no body. In the Yaksh console, choose **The agent calls Yaksh**. Then complete the fields in **Start request**.
 
-   ```sh
-   docker compose -f docker/compose.yaml create --force-recreate yaksh worker
-   docker compose -f docker/compose.yaml start yaksh worker
-   ```
-
-4. Add an agent with the direction `outbound`. Give the method, the URL and the headers of its trigger. A POST trigger has a JSON body (`body`). A GET trigger has query parameters (`query`), a list of names and values, and no body. In the Yaksh console, choose **The agent calls Yaksh**. Then complete the fields in **Start request**.
-
-The worker reads the Application and its numbers when it starts and when the Plivo keys in Settings change. After you change the Application or its numbers in the Plivo console, start the worker again with `docker compose -f docker/compose.yaml restart worker`. If `YAKSH_PUBLIC_URL` changes, also change the two URLs of the Application. If outbound tests are off, the **Numbers** page of the Yaksh console shows the cause.
+The worker reads the numbers of the account again every 5 minutes by default, and at once when you click **Check now** on the **Numbers** page. You do not restart the worker after a change in the Plivo console. If `YAKSH_PUBLIC_URL` changes, fix the URLs of the receiving application on the **Phone** tab of Settings. If outbound tests are off, the **Numbers** page shows the cause.
 
 ## Trigger
 
@@ -58,4 +51,4 @@ To examine a trigger in your endpoint:
 2. Calculate the signature from the bytes of the body that you received, or from the full URL for a GET. Compare it with the header in constant time.
 3. Record the delivery ID. Reject a delivery ID that you recorded before.
 
-For the variables of outbound tests, refer to [Configuration](/docs/configuration#outbound-agents).
+For the variables of outbound tests, refer to [Configuration](/docs/configuration#environment-variables).

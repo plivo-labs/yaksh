@@ -35,13 +35,13 @@ The worker keeps the stream of each call in its memory. Thus, the webhooks and t
 
 ## Plivo
 
-Each install must have its own Plivo Application and its own numbers.
+Each install must have its own Plivo Application, the receiving application. A number linked to it in Plivo is a test number of the install. Yaksh never takes a number that another application receives, so installs on the same Plivo account do not use the same numbers.
 
-1. Make a Plivo Application. Set the answer URL to `<YAKSH_PUBLIC_URL>/incoming` and the hangup URL to `<YAKSH_PUBLIC_URL>/incoming/hangup`. Set both methods to `POST`.
-2. Set `YAKSH_PLIVO_APP_ID` to the ID of the Application.
-3. Set `YAKSH_PLIVO_NUMBERS` to the numbers of this install. Without it, the worker uses all voice numbers of the account.
+1. On the **Phone** tab of Settings, save the Plivo Auth ID and Auth token.
+2. Choose the receiving application. Click **Make application**, or choose an application of the account. Refer to [Phone numbers](/docs/configuration#phone-numbers).
+3. On the **Numbers** page, click **Use for tests** on each number that this install uses.
 
-A Plivo number has only one Application at a time. Thus, two installs must not use the same numbers.
+You do not restart anything. By default, the worker reads the numbers of the account again every 5 minutes. To see a change at once, click **Check now** on the **Numbers** page.
 
 If the Plivo account has an IP whitelist, add the outbound IP of the server. If not, Plivo refuses the calls. The import then shows "Plivo blocked the request: IP … is not in this account's IP whitelist".
 
@@ -59,7 +59,7 @@ Do these steps in this sequence. The worker must have its public address before 
 4. Copy `docker/.env.example` to `docker/.env`. Set `YAKSH_API_TOKEN`, `YAKSH_ENCRYPTION_KEY` and `YAKSH_PUBLIC_URL`. Keep a copy of the encryption key.
 5. Start Yaksh in the background: `docker compose -f docker/compose.yaml up --build -d`.
 6. Open the console on port 8000 and enter the API token. On the Settings page, save the provider keys and the Plivo Auth ID and Auth token.
-7. Make the Plivo Application of this install (see [Plivo](#plivo)). Set `YAKSH_PLIVO_APP_ID` and `YAKSH_PLIVO_NUMBERS` in `docker/.env`. Then recreate the API and the worker, so that they read the new values: `docker compose -f docker/compose.yaml up -d yaksh worker`.
+7. Choose the receiving application and the test numbers of this install (see [Plivo](#plivo)).
 8. Add an agent and do one test call.
 
 The console is on port 8000 of the server. Do not make it public without access control. To use it from your computer, connect over SSH: `ssh -L 8000:localhost:8000 <server>`, then open `http://localhost:8000`.

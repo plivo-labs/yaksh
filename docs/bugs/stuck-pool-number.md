@@ -8,7 +8,7 @@ A pool number can stay in use after its conversation has ended, and nothing free
 
 ## Cause
 
-1. A worker claims a conversation. Its lease on the conversation lasts `YAKSH_WORKER_LEASE_S`, 30 seconds by default.
+1. A worker claims a conversation. Its lease on the conversation lasts `YAKSH_WORKER_LEASE_S`, 30 seconds by default. (Note: decision 0030 removed this variable. The lease is now fixed at 30 seconds in `src/yaksh/timings.py`.)
 2. The worker checks that it owns the conversation, then prepares the call. When the conversation has no number yet, `prepare_call` leases one with `lease_number` (`simulation/numbers.py`).
 3. `lease_number` takes a free number and writes it to the conversation. It does not check that the conversation is still live and still claimed by this worker.
 4. When the worker stops for longer than its lease between steps 2 and 3, the reaper fails the conversation with `lease_lost` and frees its numbers. It has none yet. The lease that follows gives a number to an ended conversation.

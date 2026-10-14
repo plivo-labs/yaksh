@@ -23,8 +23,6 @@ Yaksh keeps its configuration in two places:
 | `YAKSH_DATABASE_URL` | The URL of the Postgres database. Yaksh does not start without it. The URL can start with `postgres://`, `postgresql://` or `postgresql+asyncpg://`, so you can use the URL that your host gives. Yaksh connects with the asyncpg driver for all three. Yaksh does not start with a URL for a different driver, such as `postgresql+psycopg://`. Yaksh also accepts `sslmode`, for example `?sslmode=require`. Yaksh does not start with an option that asyncpg does not take, such as `channel_binding` in a Neon URL: the error names the option to remove. The database must be PostgreSQL 18 or later. Docker Compose sets this variable to its `postgres` service, and a value in `docker/.env` has no effect. |
 | `YAKSH_ENCRYPTION_KEY` | The key that encrypts the keys on the Settings page. It must have 32 characters or more. Yaksh does not start without it, or when the key cannot decrypt the saved keys. |
 | `YAKSH_PUBLIC_URL` | The public `https://` URL that goes to port 8770 of the worker. The API and the worker read it. Yaksh cannot make phone calls without it. |
-| `YAKSH_PLIVO_NUMBERS` | This variable is optional. It is a comma-separated list of E.164 numbers. If you do not set it, the worker calls from all voice numbers of the account. If a number in the list is not in the account, the worker keeps its last number list and the Numbers page shows the problem. |
-| `YAKSH_PLIVO_APP_ID` | The Plivo Application for outbound tests. The API and the worker read it. Outbound tests are off without it. Refer to [Outbound agents](/docs/outbound-agents). |
 | `YAKSH_ALLOW_PRIVATE_TRIGGERS` | This variable is optional. It lets trigger URLs use `http` and private addresses, for agents on your own network. The default is off. |
 | `YAKSH_MAX_ACTIVE_CONVERSATIONS` | The maximum number of conversations on one worker at the same time. The default is 4. |
 | `PORT` | This variable is optional. It sets the port that the process listens on. The default is 8000 for the API and 8770 for the worker. Hosting platforms such as Railway, Render, Fly and Cloud Run set it for each service. `yaksh-server api --port` overrides it. Do not set it in `docker/.env`: the API and the worker read the same file, and the Compose port mappings stay at 8000 and 8770. |
@@ -51,8 +49,8 @@ The Settings page has four tabs.
 | Tab | Settings |
 | --- | --- |
 | Providers | The LLM provider (an API with the OpenAI Responses endpoint, such as OpenAI or Azure OpenAI): its base URL and key. Deepgram: its key, base URL and model. ElevenLabs: its key. TypeSafe: its key, which is optional. |
-| Models | The models and reasoning efforts of the caller, of scenario writing, of brief drafting and of the judges. The timeouts of the judges and of scenario writing. The Jev pass bar and the audit sample. |
-| Phone | The Plivo Auth ID and Auth token. The signing key and the secrets of outbound triggers. The ring timeout, the number rest and the time zone. |
+| Models | The models and reasoning efforts of the caller, of scenario writing, of brief drafting and of the judges. The timeouts of the judges and of scenario writing. The Jev pass bar and the audit sample. In the **Evaluation** panel, the number of evaluations that one evaluator does at the same time (**Evaluations at once**, 1 to 32, default 2) and the number of judge model calls that it sends at the same time (**Judge calls at once**, 1 to 64, default 8). Keep these two values within the rate limits of the LLM provider. The evaluator reads them each time it looks for work, so a change applies without a restart. |
+| Phone | The Plivo Auth ID and Auth token. The receiving application. How often the worker checks the numbers (**Check numbers every**). The signing key and the secrets of outbound triggers. The ring timeout, the number rest and the time zone. |
 | Limits | The default turns and length of a call, and the maximum conversations, repeats, retries and start interval of a run. |
 
 - **Keys.** The page shows only the last 4 characters of a saved key. When you save a key, Yaksh first sends one small request to its provider. It saves the key only when the provider accepts it.
@@ -62,7 +60,32 @@ The Settings page has four tabs.
 - **Test.** The Test button of a provider uses the saved settings for a small piece of real work, for example one short answer from the caller model. The provider can charge for this request.
 - **Models.** The model list comes from the LLM provider. You can also type a model name that the list does not have, such as the name of an Azure deployment. When you choose a model, Yaksh checks which reasoning efforts it accepts.
 - **Defaults.** Yaksh keeps only the values that you change. All other settings use their defaults, and a new release can change a default.
+- **Timings.** How often the worker and the evaluator look for work, their leases and their heartbeats are fixed in the code. They are not settings or environment variables, because the API and all workers must use the same lease. Refer to decision 0030 in `docs/decisions`.
 - **Time zone.** The time zone sets the "today" of the caller. A run takes the date when it starts. Its conversations and their retries keep that date.
+
+### Phone numbers
+
+Yaksh calls from its test numbers, and receives calls on them. A number is a test number when it is linked, in Plivo, to the receiving application on the **Phone** tab of Settings. Plivo keeps this link. Thus, all Yaksh installs on the same Plivo account see the same owner for each number.
+
+The receiving application sends the calls of the test numbers to the worker. Its answer URL is `<YAKSH_PUBLIC_URL>/incoming` and its hangup URL is `<YAKSH_PUBLIC_URL>/incoming/hangup`, both with the method `POST`. On the **Phone** tab, do one of these steps:
+
+- Click **Make application**. Yaksh makes an application with the name `Yaksh` and these URLs, and chooses it.
+- Choose an application of the account. The list does not show the applications of Plivo CX agents.
+- If the URLs of the chosen application go to a different address, Yaksh shows the problem. Fix the URLs from the **Phone** tab. Do this also after `YAKSH_PUBLIC_URL` changes.
+
+The **Numbers** page shows the numbers of the account in three groups:
+
+| Group | Numbers |
+| --- | --- |
+| Test numbers | The numbers linked to the receiving application. **Stop using** removes the link in Plivo. Yaksh refuses while a test uses the number, or while the number rests after a test. |
+| Free numbers | Voice numbers without an application. **Use for tests** links the number to the receiving application in Plivo. |
+| Used elsewhere | Numbers that a different application receives, for example a Plivo CX agent or another Yaksh install, and numbers that cannot take calls. Yaksh never takes these numbers. |
+
+The worker reads the numbers of the account again at the interval in **Check numbers every**. The default is 5 minutes. **Check now** reads them at once. Thus, after you change a number in the Plivo console, you do not restart the worker. Only one process reads the numbers at a time. If Plivo cannot be reached, Yaksh keeps the numbers of the last check, and the **Numbers** page shows the error.
+
+Inbound tests and outbound tests use only test numbers. Each conversation uses one number until it stops. Then the number rests for the number rest of Settings before an outbound test uses it again.
+
+The CLI has the same operations: `yaksh numbers list`, `yaksh numbers use <number>`, `yaksh numbers stop <number>`, `yaksh numbers check` and `yaksh numbers account`. Refer to [CLI](/docs/cli).
 
 ### Import and export
 

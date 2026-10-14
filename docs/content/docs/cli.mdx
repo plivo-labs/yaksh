@@ -62,3 +62,18 @@ Yaksh takes the name, the agent ID and the languages from the file, and keeps th
 `yaksh guide` shows how a coding agent uses the CLI to do tests of a voice agent. The same text is the skill in `cli/skill/yaksh/SKILL.md`. To add the skill for all your projects, use `npx skills add plivo-labs/yaksh -g`. Without `-g`, the skill goes only into the project in the current folder.
 
 `yaksh --help` and `yaksh <command> --help` show all commands and flags.
+
+## Phone numbers
+
+```sh
+yaksh numbers list --owner test
+```
+
+This command shows the test numbers and their state: `in_use`, `resting` or `ready`. Without `--owner`, it shows all numbers of the Plivo account. The owner of a number is `test`, `free`, `cx_agent`, `other` or `no_voice`. `problem` tells why no test can get a number now.
+
+- `yaksh numbers use <number>` makes a free number a test number. Give the number with its country code, for example `+14155550100`.
+- `yaksh numbers stop <number>` stops the use of a test number. Yaksh refuses while a test uses the number, or while the number rests after a test.
+- `yaksh numbers check` reads the numbers of the account again now.
+- `yaksh numbers account` shows the receiving application and its problems.
+
+Refer to [Phone numbers](/docs/configuration#phone-numbers).
