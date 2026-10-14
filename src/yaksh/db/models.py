@@ -62,6 +62,7 @@ class Agent(Base):
     transport: Mapped[Transport] = mapped_column(pg_enum(Transport, "agent_transport"))
     agent_number: Mapped[str | None] = mapped_column(Text)
     outbound: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    endpoint: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     agent_speaks_first: Mapped[bool] = mapped_column(Boolean, default=True)
     languages: Mapped[list[AgentLanguage]] = mapped_column(
         ARRAY(pg_enum(AgentLanguage, "agent_language"))
@@ -153,6 +154,9 @@ class Conversation(Base):
     channel: Mapped[Channel] = mapped_column(pg_enum(Channel, "channel"), default=Channel.VOICE)
     direction: Mapped[Direction] = mapped_column(
         pg_enum(Direction, "agent_direction"), default=Direction.INBOUND
+    )
+    transport: Mapped[Transport] = mapped_column(
+        pg_enum(Transport, "agent_transport"), default=Transport.PHONE
     )
     persona_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("personas.id"))
     persona_version_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))

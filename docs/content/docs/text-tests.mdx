@@ -1,0 +1,133 @@
+---
+title: Text tests
+description: Test the LLM layer of a voice agent over text, with no phone call.
+---
+
+A text test runs the same scenarios, personas, data sets and judges as a call, but with no phone call. Yaksh plays the caller in text and sends each turn to a URL of the agent. Text tests are fast and use no phone numbers. They do not replace calls: see [What text tests do not test](#what-text-tests-do-not-test).
+
+## Add a text agent
+
+In the Yaksh console, choose **Yaksh texts the agent**. Give the URL and the headers. Through the API, set `transport` to `text` and give `endpoint`:
+
+```json
+{
+  "transport": "text",
+  "endpoint": {
+    "url": "https://agents.example.com/v1/agent/123/text-test",
+    "headers": [{ "name": "Authorization", "value": "Bearer {{secrets.AGENT_TOKEN}}" }]
+  }
+}
+```
+
+The URL names the agent: each text agent has its own URL. Put tokens in a header as `{{secrets.<NAME>}}`, a trigger secret from the **Phone** tab of Settings. A literal token in a header shows in the API. Header values can also use `{{yaksh.conversation_id}}`, but no other placeholder: the agent gets the agent data in `customData`.
+
+The URL must use `https` and a public address. For an agent on your own network, set `YAKSH_ALLOW_PRIVATE_HOSTS`.
+
+A text test needs only the LLM provider key in Settings. It needs no Plivo, Deepgram or ElevenLabs keys.
+
+## The contract
+
+Your agent implements one endpoint. Yaksh sends a `POST` with a JSON body for each turn, and waits up to 60 seconds for the reply. Yaksh sends each request once and never sends it again.
+
+Each request has these headers, and the headers of the agent:
+
+| Header | Value |
+| --- | --- |
+| `Yaksh-Contract` | `1`, the version of this contract. It changes only for a change that is not compatible. |
+| `Yaksh-Conversation-Id` | The ID of the conversation in Yaksh. Log it, so you can find the conversation on both sides. |
+
+Both sides ignore fields that they do not know.
+
+### The first request starts a session
+
+```json
+{ "message": "", "modality": "audio", "customData": { "Patient name": "Ananya" } }
+```
+
+- `message` is the first line of the caller. It is `""` when the agent speaks first.
+- `modality` is always `audio`: use the prompts and rules of your voice agent.
+- `customData` is the agent data of the data set that the conversation plays. It is `{}` when the data set has none. The caller does not get it. Name the agent data in the data set with the variable names of your agent.
+
+The reply must give a session id:
+
+```json
+{ "sessionId": "abc123", "messages": [{ "role": "assistant", "content": "Hello, Maple Dental." }] }
+```
+
+`sessionId` is a string of 1 to 255 characters. Yaksh does not read it. It sends it back as it is. Send a number as a string, such as `"42"`.
+
+### Each later request continues the session
+
+```json
+{ "sessionId": "abc123", "message": "I want to book a cleaning." }
+```
+
+Your agent keeps the state of the session, such as its history, by `sessionId`. Yaksh does not send the history. If your agent does not know the `sessionId`, for example after a restart, reply `410`. Never start a new session for a `sessionId` that you do not know.
+
+Each conversation in Yaksh is a new session. A retry is a new conversation, so it starts a new session.
+
+### The reply
+
+```json
+{
+  "messages": [
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        { "id": "c1", "type": "function", "function": { "name": "find_slots", "arguments": "{\"day\":\"Fri\"}" } }
+      ]
+    },
+    { "role": "tool", "tool_call_id": "c1", "content": "{\"slots\":[\"10:00\"]}" },
+    { "role": "assistant", "content": "I have 10 AM on Friday." }
+  ],
+  "status": "ended"
+}
+```
+
+`messages` holds only the new items of this turn, in the OpenAI chat format:
+
+- `assistant` with `content`: the words to the caller, as a string.
+- `assistant` with `tool_calls`: the tools that the agent called.
+- `tool`: the output of a tool call, with its `tool_call_id`. Yaksh ignores an output whose call is not in the same reply.
+
+Yaksh ignores items with other roles. The words of the turn are the `content` of the `assistant` items, in order. A turn with no words is a silent turn: Yaksh sends a fixed nudge, and after two nudges the conversation ends with `agent_silent`.
+
+Send `"status": "ended"` when your agent ends the conversation.
+
+Limit: the reply body is at most 256 KiB.
+
+### The close request
+
+When the caller ends the conversation, or the test reaches its turn limit, Yaksh first sends the last words of the caller as a normal turn. Then, when the conversation ends for a reason other than `"status": "ended"`, Yaksh sends one more request:
+
+```json
+{ "sessionId": "abc123", "status": "ended", "reason": "caller_hangup" }
+```
+
+`reason` is `caller_hangup`, `turn_limit`, `agent_silent`, `stopped` or `error`. A request with `status` is always a close, never a turn. Free the session and reply `200`. Yaksh waits at most 3 seconds and does not read the reply.
+
+### Errors
+
+| Reply | Result |
+| --- | --- |
+| A `4xx` to the first request, other than `408`, `410`, `425` and `429` | The conversation fails with `start_refused`. The run does not try it again, because the URL or the headers are wrong. |
+| `410` | The agent lost the session. The conversation fails, and the run tries it again. |
+| Any other status that is not `2xx`, no reply in 60 seconds, or an invalid reply | The conversation fails, and the run tries it again. |
+
+The conversation shows the status and the start of the reply, with the secrets hidden.
+
+## Results
+
+The judges score a text test the same way as a call. The conversation page shows the transcript, the tools of each agent turn and the session id of the agent.
+
+Text tests are cheap, so run them with 3 or more repeats and read pass^k first.
+
+## What text tests do not test
+
+- Speech-to-text and text-to-speech: how the agent hears names and numbers, and how its words sound. The caller writes the spoken form, such as "priya dot k at gmail dot com", but writes it with no errors.
+- Interruptions, silence on the line and background sound.
+- The response time of a call.
+- Endpointing: a number that the caller says in two parts arrives in one message.
+
+Yaksh has no tool mocks: your agent runs its tools as it does on a call.

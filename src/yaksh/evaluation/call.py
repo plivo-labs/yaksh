@@ -8,7 +8,7 @@ from dataclasses import dataclass, replace
 from functools import partial
 
 from yaksh.db.models import Conversation
-from yaksh.domain.agents import AgentConfig, Direction
+from yaksh.domain.agents import AgentConfig, Direction, Transport
 from yaksh.domain.conversations import (
     CallerSettings,
     CallerUsage,
@@ -265,13 +265,16 @@ def call_view(
     line = parsed(LineFacts, conversation.line_facts)
     return CallView(
         brief=agent.brief,
-        agent_data=list(scenario.agent_data) if agent.direction is Direction.OUTBOUND else [],
+        agent_data=list(scenario.agent_data)
+        if agent.direction is Direction.OUTBOUND or agent.transport is Transport.TEXT
+        else [],
         instructions=scenario.instructions,
         known_facts=list(scenario.known_facts),
         unknown_facts=list(scenario.unknown_facts),
         today=conversation.today,
         time_zone=conversation.time_zone,
         direction=agent.direction,
+        transport=agent.transport,
         agent_number=agent.agent_number,
         yaksh_number=conversation.caller_number,
         agent_caller_id=conversation.agent_caller_id,
@@ -301,6 +304,8 @@ async def measure_call(
     if not transcript.connected:
         return found
     found[MetricKey.AGENT_REPETITION] = metrics.agent_repetition(transcript.turns)
+    if conversation.transport is Transport.TEXT:
+        return found
     opened = transcript.stream_opened_ms
     if opened is None:
         found[MetricKey.CAPTURE_FAULTS] = metrics.incomplete_record()

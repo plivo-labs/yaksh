@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from yaksh.config import Settings
 from yaksh.db.models import Conversation
 from yaksh.diagnostics import describe_exception
+from yaksh.domain.agents import TEXT_TURN_TIMEOUT_S, Transport
 from yaksh.domain.conversations import (
     Admission,
     Caller,
@@ -301,8 +302,10 @@ class Worker:
             )
 
     def _connect_timeout_s(self, request: CallRequest) -> float:
-        """How long a call may take to connect: ringing the agent, or for an outbound agent,
-        its trigger and dial window."""
+        """How long a call may take to connect: ringing the agent, for an outbound agent its
+        trigger and dial window, or for a text agent its first reply."""
+        if request.agent.transport is Transport.TEXT:
+            return TEXT_TURN_TIMEOUT_S + DIAL_MARGIN_S
         outbound = request.agent.outbound
         if outbound is None:
             return request.app_settings.phone.ring_timeout_s + DIAL_MARGIN_S

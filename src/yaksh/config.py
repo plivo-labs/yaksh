@@ -41,8 +41,8 @@ class Settings(BaseSettings):
     database_url: DatabaseUrl
     frontend_dist: Path = REPO_ROOT / "frontend" / "dist"
     max_active_conversations: int = 4
-    allow_private_triggers: bool = False
-    """Allow trigger URLs on private or local addresses, for development."""
+    allow_private_hosts: bool = False
+    """Allow trigger and text agent URLs on private or local addresses, for development."""
     public_url: str | None = None
     s3_endpoint: str | None = None
     """Where files are kept, uploaded documents and call audio: any S3-compatible service.

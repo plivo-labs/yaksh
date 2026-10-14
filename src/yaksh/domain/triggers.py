@@ -132,17 +132,14 @@ class TriggerMethod(StrEnum):
     GET = "GET"
 
 
-class Trigger(BaseModel):
-    """The request sent once for each conversation: a POST carries its values in a JSON body,
-    a GET in query parameters."""
+class Endpoint(BaseModel):
+    """An address on the agent's system that Yaksh sends requests to, with the headers each
+    request carries."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    method: TriggerMethod = TriggerMethod.POST
     url: HttpUrl
     headers: list[Header] = Field(default_factory=list, max_length=30)
-    query: list[QueryParameter] = Field(default_factory=list, max_length=30)
-    body: dict[str, Any] | None = None
 
     @field_validator("url", mode="before")
     @classmethod
@@ -170,6 +167,15 @@ class Trigger(BaseModel):
         if len(set(names)) != len(names):
             raise ValueError("header names must be unique")
         return headers
+
+
+class Trigger(Endpoint):
+    """The request sent once for each conversation: a POST carries its values in a JSON body,
+    a GET in query parameters."""
+
+    method: TriggerMethod = TriggerMethod.POST
+    query: list[QueryParameter] = Field(default_factory=list, max_length=30)
+    body: dict[str, Any] | None = None
 
     @field_validator("body")
     @classmethod
@@ -233,6 +239,56 @@ class RenderedTrigger:
     """The secret values the request carries, to mask wherever it is stored."""
 
 
+class Filler:
+    """Replaces the placeholders in template values, and keeps the secret values it put in."""
+
+    def __init__(
+        self,
+        *,
+        number: str | None,
+        conversation_id: str,
+        agent_data: list[Fact],
+        secrets: Mapping[str, str],
+    ) -> None:
+        self._number = number
+        self._conversation_id = conversation_id
+        self._facts = {normalized(fact.name): fact.value for fact in agent_data}
+        self._secrets = secrets
+        self.carried: list[str] = []
+
+    def value_of(self, name: str) -> str:
+        kind, _, rest = name.partition(".")
+        if name == "yaksh.number":
+            assert self._number is not None, "only a trigger has a Yaksh number to send"
+            return self._number
+        if name == "yaksh.conversation_id":
+            return self._conversation_id
+        if kind == "agent_data":
+            if normalized(rest) not in self._facts:
+                raise RenderError(f"the scenario has no agent data named {rest!r}")
+            return self._facts[normalized(rest)]
+        if rest not in self._secrets:
+            raise RenderError(f"the trigger secret {rest} is not set; add it in Settings")
+        self.carried.append(self._secrets[rest])
+        return self._secrets[rest]
+
+    def fill(self, value: Any) -> Any:
+        if isinstance(value, str):
+            return PLACEHOLDER.sub(lambda match: self.value_of(match.group(1).strip()), value)
+        if isinstance(value, dict):
+            return {key: self.fill(item) for key, item in value.items()}
+        if isinstance(value, list):
+            return [self.fill(item) for item in value]
+        return value
+
+    def headers(self, headers: list[Header]) -> dict[str, str]:
+        filled = {header.name: self.fill(header.value) for header in headers}
+        for name, value in filled.items():
+            if "\r" in value or "\n" in value:
+                raise RenderError(f"a placeholder puts a line break into the {name} header")
+        return filled
+
+
 def render(
     trigger: Trigger,
     *,
@@ -243,47 +299,22 @@ def render(
 ) -> RenderedTrigger:
     """The request with every placeholder replaced. Values go inside JSON strings of the parsed
     body, or are percent-encoded into query values, so no value can change the request's shape."""
-    facts = {normalized(fact.name): fact.value for fact in agent_data}
-    carried: list[str] = []
-
-    def value_of(name: str) -> str:
-        kind, _, rest = name.partition(".")
-        if name == "yaksh.number":
-            return number
-        if name == "yaksh.conversation_id":
-            return conversation_id
-        if kind == "agent_data":
-            if normalized(rest) not in facts:
-                raise RenderError(f"the scenario has no agent data named {rest!r}")
-            return facts[normalized(rest)]
-        if rest not in secrets:
-            raise RenderError(f"the trigger secret {rest} is not set; add it in Settings")
-        carried.append(secrets[rest])
-        return secrets[rest]
-
-    def fill(value: Any) -> Any:
-        if isinstance(value, str):
-            return PLACEHOLDER.sub(lambda match: value_of(match.group(1).strip()), value)
-        if isinstance(value, dict):
-            return {key: fill(item) for key, item in value.items()}
-        if isinstance(value, list):
-            return [fill(item) for item in value]
-        return value
-
-    headers = {header.name: fill(header.value) for header in trigger.headers}
-    for name, value in headers.items():
-        if "\r" in value or "\n" in value:
-            raise RenderError(f"a placeholder puts a line break into the {name} header")
+    filler = Filler(
+        number=number, conversation_id=conversation_id, agent_data=agent_data, secrets=secrets
+    )
+    headers = filler.headers(trigger.headers)
     url = str(trigger.url)
     if trigger.query:
-        query = urlencode([(parameter.name, fill(parameter.value)) for parameter in trigger.query])
+        query = urlencode(
+            [(parameter.name, filler.fill(parameter.value)) for parameter in trigger.query]
+        )
         fixed = urlsplit(url).query
         url = urlsplit(url)._replace(query=f"{fixed}&{query}" if fixed else query).geturl()
     # The form the HTTP client sends, so a signature over the URL matches what the agent receives.
     url = str(URL(url, encoded=True))
-    body = b"" if trigger.body is None else json.dumps(fill(trigger.body)).encode()
+    body = b"" if trigger.body is None else json.dumps(filler.fill(trigger.body)).encode()
     # A secret in a query value travels percent-encoded, and an echo of the URL shows it that way.
-    masked = {*carried, *(quote_plus(secret) for secret in carried)}
+    masked = {*filler.carried, *(quote_plus(secret) for secret in filler.carried)}
     return RenderedTrigger(trigger.method, url, headers, body, tuple(masked))
 
 

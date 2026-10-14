@@ -22,7 +22,7 @@ from yaksh.db.models import (
     Scenario,
     ScenarioVersion,
 )
-from yaksh.domain.agents import AgentConfig, Direction
+from yaksh.domain.agents import AgentConfig, Direction, Transport
 from yaksh.domain.conversations import (
     ACTIVE_STATUSES,
     LIVE_STATUSES,
@@ -243,23 +243,26 @@ async def end_conversation(session: AsyncSession, conversation_id: uuid.UUID) ->
 
 
 def runnable_now(pool_app_id: str | None, receiving_app_id: str | None) -> ColumnElement[bool]:
-    """A queued conversation that can start now: one that needs a number waits while no test
-    number of pool_app_id is free, and outbound conversations run only on a worker that
-    receives calls for receiving_app_id."""
+    """A queued conversation that can start now: a text one always can; a phone one that needs
+    a number waits while no test number of pool_app_id is free, and outbound phone
+    conversations run only on a worker that receives calls for receiving_app_id."""
+    text = Conversation.transport == Transport.TEXT
     has_number = Conversation.caller_number.is_not(None)
     inbound = and_(
+        Conversation.transport == Transport.PHONE,
         Conversation.direction == Direction.INBOUND,
         has_number
         if pool_app_id is None
         else or_(has_number, select(PhoneNumber).where(free_numbers(pool_app_id)).exists()),
     )
     if receiving_app_id is None:
-        return inbound
+        return or_(text, inbound)
     outbound = and_(
+        Conversation.transport == Transport.PHONE,
         Conversation.direction == Direction.OUTBOUND,
         select(PhoneNumber).where(free_numbers(receiving_app_id, rested=True)).exists(),
     )
-    return or_(inbound, outbound)
+    return or_(text, inbound, outbound)
 
 
 def claim_values(worker_id: str, lease_s: float) -> dict[str, Any]:
@@ -324,9 +327,11 @@ async def prepare_call(
 ) -> CallRequest:
     """Lease the conversation's Yaksh number when it has none yet (the caller ID of an inbound
     test, or the number an outbound agent must call) and build the call from the pinned
-    versions."""
+    versions. A text agent needs no number."""
     agent_version = await session.get_one(AgentVersion, conversation.agent_version_id)
     agent = AgentConfig.model_validate(agent_version.config)
+    if agent.transport is Transport.TEXT:
+        return await call_request(session, app, conversation, None, agent)
     number = conversation.caller_number
     if number is None and agent.outbound is not None:
         assert receiving_app_id is not None
@@ -348,7 +353,7 @@ async def call_request(
     session: AsyncSession,
     app: AppSettings,
     conversation: Conversation,
-    number: str,
+    number: str | None,
     agent: AgentConfig,
 ) -> CallRequest:
     persona_version = await session.get_one(PersonaVersion, conversation.persona_version_id)

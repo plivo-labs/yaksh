@@ -18,7 +18,7 @@ from yaksh.domain.documents import DocumentName
 from yaksh.domain.languages import AgentLanguage
 from yaksh.domain.numbers import E164
 from yaksh.domain.rules import AgentRules
-from yaksh.domain.triggers import OutboundConfig
+from yaksh.domain.triggers import Endpoint, OutboundConfig, placeholders
 
 
 class Direction(StrEnum):
@@ -38,11 +38,15 @@ class AgentSource(StrEnum):
 
 
 class Transport(StrEnum):
-    """How Yaksh reaches an agent; phone only today, kept as the seam for other ways."""
+    """How Yaksh reaches an agent."""
 
     PHONE = "phone"
+    TEXT = "text"
+    """Over HTTP, one request a turn, with no audio: docs/content/docs/text-tests.mdx."""
 
 
+TEXT_TURN_TIMEOUT_S = 60.0
+"""How long Yaksh waits for a text agent's reply to one turn."""
 MIN_BRIEF_CHARS = 20
 MAX_BRIEF_CHARS = 10_000
 MAX_CONFIG_CHARS = 1_000_000
@@ -114,6 +118,8 @@ class AgentConfig(BaseModel):
     agent_number: E164 | None = None
     """The number Yaksh dials; inbound agents only."""
     outbound: OutboundConfig | None = None
+    endpoint: Endpoint | None = None
+    """Where Yaksh sends each turn; text agents only."""
     agent_speaks_first: bool = True
     languages: AgentLanguages = [AgentLanguage.EN_US]
     brief: Brief
@@ -125,7 +131,23 @@ class AgentConfig(BaseModel):
     """Checks for every call of the agent, beside each scenario's criteria."""
 
     @model_validator(mode="after")
-    def fits_direction(self) -> AgentConfig:
+    def fits_transport(self) -> AgentConfig:
+        if self.transport is Transport.TEXT:
+            if self.endpoint is None:
+                raise ValueError("a text agent needs an endpoint with a URL")
+            if self.agent_number is not None or self.outbound is not None:
+                raise ValueError("a text agent has no agent_number and no outbound settings")
+            for header in self.endpoint.headers:
+                for name in placeholders(header.value):
+                    if name != "yaksh.conversation_id" and not name.startswith("secrets."):
+                        raise ValueError(
+                            f"a text agent's headers take only {{{{secrets.<NAME>}}}} and "
+                            f"{{{{yaksh.conversation_id}}}}, not {{{{{name}}}}}; the agent gets "
+                            "the agent data in customData"
+                        )
+            return self
+        if self.endpoint is not None:
+            raise ValueError("an endpoint is only for text agents")
         if self.direction is Direction.INBOUND:
             if self.agent_number is None:
                 raise ValueError("an inbound agent needs agent_number")
@@ -172,6 +194,7 @@ class AgentUpdate(BaseModel):
     transport: Transport | None = None
     agent_number: E164 | None = None
     outbound: OutboundConfig | None = None
+    endpoint: Endpoint | None = None
     agent_speaks_first: bool | None = None
     languages: AgentLanguages | None = None
     brief: Brief | None = None

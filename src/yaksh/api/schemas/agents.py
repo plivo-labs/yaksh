@@ -8,7 +8,7 @@ from yaksh.db.models import Agent, Document
 from yaksh.domain.agents import AgentConfig, AgentSource, Direction, Transport
 from yaksh.domain.languages import AgentLanguage
 from yaksh.domain.rules import AgentRules
-from yaksh.domain.triggers import OutboundConfig
+from yaksh.domain.triggers import Endpoint, OutboundConfig
 
 
 class AgentSummary(BaseModel):
@@ -24,6 +24,7 @@ class AgentSummary(BaseModel):
     transport: Transport
     agent_number: str | None
     outbound: OutboundConfig | None
+    endpoint: Endpoint | None
     agent_speaks_first: bool
     languages: list[AgentLanguage]
     brief: str
