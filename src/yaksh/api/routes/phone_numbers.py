@@ -77,6 +77,9 @@ async def listing(session: SessionDep, settings: Settings, app: AppSettings) -> 
                 application_id=row.application_id,
                 application_name=row.application_name,
                 state=state(row, now) if who is Owner.TEST else None,
+                rests_until=row.available_after
+                if who is Owner.TEST and state(row, now) is NumberState.RESTING
+                else None,
             )
         )
     return PhoneNumbers(

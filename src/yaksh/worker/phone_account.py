@@ -43,7 +43,8 @@ class PhoneAccount:
         self._seen_check: datetime | None = None
         self._claim_tried_at = -math.inf
         self.pool_app_id: str | None = None
-        """The receiving application in the settings: its numbers are the test numbers."""
+        """The receiving application in the settings while it sends calls to this install: its
+        numbers are the test numbers."""
         self.receiving_app_id: str | None = None
         """The receiving application when it sends outbound agents' calls to this worker;
         without it the worker runs only inbound conversations."""
@@ -71,6 +72,8 @@ class PhoneAccount:
             return
         receiving_app_id, problem = None, None
         if app_id is not None:
+            # The application belongs to the install it sends calls to: another install that
+            # chose it too uses none of its numbers until someone points it here.
             receiving = await receiving_application(api, app_id, self._settings.public_url)
             if receiving.problems:
                 problem = "; ".join(receiving.problems)
@@ -81,7 +84,7 @@ class PhoneAccount:
                 log.info(
                     "outbound tests: application %s sends calls here", receiving.application.name
                 )
-        self.pool_app_id = app_id
+        self.pool_app_id = receiving_app_id
         self.receiving_app_id, self.outbound_problem = receiving_app_id, problem
         self._read = (credentials, app_id)
         self._seen_check = checked_at

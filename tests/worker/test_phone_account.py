@@ -54,7 +54,7 @@ async def test_a_refresh_cut_short_runs_again_and_new_credentials_are_read_again
     assert (account.pool_app_id, account.receiving_app_id) == (None, None)
 
 
-async def test_outbound_waits_until_the_receiving_application_sends_calls_here(
+async def test_no_number_is_used_until_the_receiving_application_sends_calls_here(
     settings: Settings, db: Db
 ) -> None:
     elsewhere = POOL_APPLICATION.model_copy(update={"answer_url": "https://old.example/incoming"})
@@ -73,10 +73,11 @@ async def test_outbound_waits_until_the_receiving_application_sends_calls_here(
     await account.refresh(APP_SETTINGS)
 
     assert before == (
-        POOL_APP_ID,
+        None,
         None,
         "Plivo application Yaksh-Test has answer URL 'https://old.example/incoming'; "
         "set it to 'http://yaksh.test/incoming'",
     )
     assert unchanged is None, "the application is read again only after a check"
-    assert account.receiving_app_id == POOL_APP_ID and account.outbound_problem is None
+    assert (account.pool_app_id, account.receiving_app_id) == (POOL_APP_ID, POOL_APP_ID)
+    assert account.outbound_problem is None

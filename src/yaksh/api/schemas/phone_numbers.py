@@ -22,6 +22,8 @@ class PhoneNumberRead(BaseModel):
     application_name: str | None
     state: NumberState | None
     """A test number's state; None for every other number."""
+    rests_until: datetime | None
+    """When a resting test number may take an outbound test again."""
 
 
 class PhoneNumbers(BaseModel):
