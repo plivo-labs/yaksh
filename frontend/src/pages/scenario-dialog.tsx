@@ -66,6 +66,7 @@ import {
   type ScenarioInput,
 } from "@/lib/types";
 import { DataSetsGrid } from "@/pages/data-sets-grid";
+import { sendsAgentData } from "@/lib/agent-draft";
 
 const EMPTY: ScenarioInput = {
   name: "",
@@ -178,7 +179,7 @@ export function ScenarioDialog({
   const defaults = useDefaults();
   const persona = personas.data?.find((item) => item.id === input.persona_id);
   const opening = persona ? defaults.data?.first_words[persona.language] : undefined;
-  const outbound = agent.direction === "outbound";
+  const agentData = sendsAgentData(agent);
   const limit = settings.data?.values.limits.max_scenario_data_sets ?? MAX_DATA_SETS;
   const problem = dataSetsProblem(input.data_sets);
   const factNames = input.data_sets[0].known_facts.map((fact) => fact.name);
@@ -356,7 +357,7 @@ export function ScenarioDialog({
 
             <DataSetsGrid
               dataSets={draft.data_sets}
-              outbound={outbound}
+              agentData={agentData}
               limit={limit}
               submitted={submitted}
               problem={problem}

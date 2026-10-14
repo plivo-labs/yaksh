@@ -79,6 +79,7 @@ import {
   LANGUAGE_NAMES,
   type Reply,
   type PlayedScenario,
+  type ToolItem,
   type Turn,
   WIRE_EVENT_HELP,
   type WireEvent,
@@ -348,6 +349,11 @@ function ConversationFacts({ conversation }: { conversation: Conversation }) {
           <CopyId id={conversation.call_uuid} label="Plivo call id" />
         </Fact>
       )}
+      {agentSession(conversation) && (
+        <Fact label="Agent session">
+          <CopyId id={agentSession(conversation) ?? ""} label="agent session id" />
+        </Fact>
+      )}
     </dl>
   );
 }
@@ -467,14 +473,17 @@ export function CallPane({
 }) {
   const [heard, setHeard] = useState<number | null>(null);
   const connectedMs = connectedAt(conversation);
+  const overText = conversation.transport === "text";
   return (
     <div className="flex h-full flex-col gap-6 p-px pr-3">
-      <AudioCard
-        conversation={conversation}
-        player={player}
-        start={start}
-        onTime={(seconds) => setHeard(turnAt(conversation.transcript, connectedMs ?? 0, seconds))}
-      />
+      {!overText && (
+        <AudioCard
+          conversation={conversation}
+          player={player}
+          start={start}
+          onTime={(seconds) => setHeard(turnAt(conversation.transcript, connectedMs ?? 0, seconds))}
+        />
+      )}
       <Transcript
         turns={conversation.transcript}
         active={ACTIVE_STATUSES.includes(conversation.status)}
@@ -492,7 +501,14 @@ export function CallPane({
   );
 }
 
+/** The session id a text agent made for this conversation, from its first reply. */
+function agentSession(conversation: Conversation): string | null {
+  if (conversation.transport !== "text") return null;
+  return conversation.wire_events.find((event) => event.kind === "connected")?.detail ?? null;
+}
+
 function CallerLine({ conversation }: { conversation: Conversation }) {
+  if (conversation.transport === "text") return <>over text, with no phone call</>;
   const number = conversation.caller_number ?? "a number assigned at call time";
   if (conversation.direction === "inbound") return <>from {number}</>;
   return (
@@ -850,6 +866,7 @@ function Transcript({
                                 {turn.text}
                               </BubbleContent>
                             </Bubble>
+                            {turn.tools?.length > 0 && <ToolItems tools={turn.tools} />}
                           </MessageContent>
                         </Message>
                       </MessageScrollerItem>
@@ -869,6 +886,27 @@ function Transcript({
         )}
       </CardContent>
     </Card>
+  );
+}
+
+/** The tools a text agent called in one turn, folded: name, arguments and output. */
+function ToolItems({ tools }: { tools: ToolItem[] }) {
+  return (
+    <details className="text-xs-400 text-muted-foreground">
+      <summary className="w-fit cursor-pointer rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/50">
+        {tools.length} tool call{tools.length === 1 ? "" : "s"}
+      </summary>
+      <ul className="mt-1.5 grid gap-1.5">
+        {tools.map((tool) => (
+          <li key={tool.id} className="grid gap-0.5 rounded-md bg-muted p-2 font-mono break-all">
+            <span className="text-foreground">
+              {tool.name}({tool.arguments})
+            </span>
+            {tool.output !== null && <span>{tool.output}</span>}
+          </li>
+        ))}
+      </ul>
+    </details>
   );
 }
 

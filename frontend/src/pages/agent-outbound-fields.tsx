@@ -334,7 +334,7 @@ export function OutboundFields({
 }
 
 /** Name and value rows, for headers or query parameters; values may hold placeholders. */
-function Pairs({
+export function Pairs({
   pairs,
   noun,
   namePlaceholder,
