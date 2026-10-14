@@ -57,6 +57,7 @@ from yaksh.settings import store
 from yaksh.settings.cipher import Cipher
 from yaksh.settings.store import SettingsSource
 from yaksh.simulation import conversations, numbers
+from yaksh.timings import Timings
 from yaksh.worker.evaluator import Evaluator, JudgeClients
 from yaksh.worker.phone_account import PhoneAccount
 from yaksh.worker.worker import Worker
@@ -75,6 +76,8 @@ STORED_SECRETS: dict[str, str | None] = {
     SecretName.ELEVENLABS_API_KEY: "elevenlabs-test-key",
 }
 """The secrets every API test starts with, so runs can start."""
+FAST = Timings(worker_poll_s=0.05, worker_heartbeat_s=0.05, worker_lease_s=2, end_timeout_s=0.5)
+"""Worker timings fast enough for tests."""
 POOL_APP_ID = "10000000000000001"
 """The receiving application of the tests: the pool numbers are linked to it."""
 APP_SETTINGS = AppSettings(
@@ -590,6 +593,7 @@ def make_worker(
     outbound_problem: str | None = None,
     source: SettingsSource | None = None,
     store: FileStore | None = None,
+    timings: Timings = FAST,
 ) -> Worker:
     return Worker(
         sessionmaker,
@@ -599,6 +603,7 @@ def make_worker(
         FixedAccount(sessionmaker, settings, pool_app_id, receiving_app_id, outbound_problem),
         store or FakeFileStore(),
         worker_id=worker_id,
+        timings=timings,
     )
 
 
@@ -636,10 +641,6 @@ def make_settings(tmp_path: Path, **overrides: Any) -> Settings:
         "api_token": TOKEN,
         "database_url": OFFLINE_DATABASE_URL,
         "frontend_dist": tmp_path / "missing",
-        "worker_poll_interval_s": 0.05,
-        "worker_heartbeat_s": 0.05,
-        "worker_lease_s": 2,
-        "end_timeout_s": 0.5,
         "public_url": "http://yaksh.test",
         "encryption_key": ENCRYPTION_KEY,
     }

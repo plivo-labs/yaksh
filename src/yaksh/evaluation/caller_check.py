@@ -2,7 +2,6 @@
 never blamed for it. Code finds some facts first; one model call finds the rest and the
 effect on each criterion."""
 
-import asyncio
 import re
 from collections.abc import Sequence
 from dataclasses import replace
@@ -14,6 +13,7 @@ from yaksh.domain.language_models import JsonModel
 from yaksh.domain.languages import Language
 from yaksh.evaluation.criteria import schema
 from yaksh.evaluation.judging import Check, ItemResult, JudgeSpec, ask, prompt
+from yaksh.evaluation.limit import Slots
 
 OWNERS = ("caller", "scenario", "test_settings")
 BLAME = ("none", "possible", "likely")
@@ -113,7 +113,7 @@ async def check_caller(
     end_reason: EndReason | None,
     language: Language,
     *,
-    slots: asyncio.Semaphore,
+    slots: Slots,
     retry_later: bool,
 ) -> ItemResult:
     """`persona` is how the caller talks; the caller's instructions and facts come from the view."""

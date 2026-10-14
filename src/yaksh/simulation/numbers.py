@@ -13,6 +13,7 @@ from yaksh.db.models import Conversation, PhoneNumber
 from yaksh.domain.numbers import AccountNumber
 from yaksh.domain.settings import AppSettings
 from yaksh.simulation.workers import receiving_problem
+from yaksh.timings import TIMINGS
 
 
 def phone_problem(settings: Settings, app: AppSettings) -> str | None:
@@ -157,7 +158,7 @@ async def outbound_problem(
     app_id = app.phone.application_id
     if app_id is None:
         return NO_APPLICATION
-    problem = await receiving_problem(session, app_id, settings.worker_lease_s)
+    problem = await receiving_problem(session, app_id, TIMINGS.worker_lease_s)
     if problem is not None:
         return problem
     return await no_numbers_problem(session, app_id)

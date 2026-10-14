@@ -31,6 +31,7 @@ from yaksh.evaluation.evaluations import Evaluated
 from yaksh.evaluation.evidence import CallView, render
 from yaksh.evaluation.jev import JEV, Jev
 from yaksh.evaluation.judging import ItemResult
+from yaksh.evaluation.limit import Slots
 from yaksh.evaluation.rules import gate_open, gated, phrase_item
 from yaksh.evaluation.sources import (
     HALLUCINATION,
@@ -52,7 +53,7 @@ class Judging:
     """The same judge model with a longer timeout, for the judges that read the agent's whole
     instructions or documents."""
     versions: Mapping[str, uuid.UUID]
-    slots: asyncio.Semaphore
+    slots: Slots
     max_input_chars: int
     """The most text one judge request holds; a judge whose sources do not fit is an error."""
     jev: Jev | None = None

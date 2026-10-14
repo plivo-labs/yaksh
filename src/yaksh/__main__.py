@@ -20,6 +20,7 @@ from yaksh.integrations.s3 import S3FileStore
 from yaksh.settings.cipher import Cipher, SecretUnreadableError
 from yaksh.settings.store import SettingsSource
 from yaksh.storage import file_store
+from yaksh.timings import TIMINGS, Timings
 from yaksh.worker.phone_account import PhoneAccount
 from yaksh.worker.worker import Worker
 
@@ -113,7 +114,7 @@ async def run_evaluator(settings: Settings) -> None:
     finally:
         await evaluator.close()
         await store.close()
-        if not await bounded_dispose(engine, settings.end_timeout_s):
+        if not await bounded_dispose(engine, TIMINGS.end_timeout_s):
             logging.shutdown()
             os._exit(1)
 
@@ -135,7 +136,9 @@ def plivo_auth_token(source: SettingsSource) -> str | None:
     return None if credentials is None else credentials[1]
 
 
-async def run_worker(settings: Settings, caller: Caller, registry: StreamRegistry) -> None:
+async def run_worker(
+    settings: Settings, caller: Caller, registry: StreamRegistry, timings: Timings = TIMINGS
+) -> None:
     engine = create_engine(str(settings.database_url))
     sessionmaker = create_sessionmaker(engine)
     source = await settings_source(settings, engine)
@@ -147,6 +150,7 @@ async def run_worker(settings: Settings, caller: Caller, registry: StreamRegistr
         source,
         PhoneAccount(sessionmaker, settings),
         store,
+        timings=timings,
     )
     server = PlivoServer(
         create_app(
@@ -162,9 +166,9 @@ async def run_worker(settings: Settings, caller: Caller, registry: StreamRegistr
     try:
         await worker.run(stop)
     finally:
-        await server.stop(settings.end_timeout_s)
+        await server.stop(timings.end_timeout_s)
         await store.close()
-        if worker.fatal.is_set() or not await bounded_dispose(engine, settings.end_timeout_s):
+        if worker.fatal.is_set() or not await bounded_dispose(engine, timings.end_timeout_s):
             # A leaked task would keep asyncio.run's teardown waiting forever.
             logging.shutdown()
             os._exit(1)

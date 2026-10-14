@@ -8,6 +8,7 @@ from httpx import AsyncClient
 from sqlalchemy import func, select, update
 
 from tests.conftest import (
+    FAST,
     YAKSH_FAILED,
     Db,
     FakeCaller,
@@ -205,7 +206,7 @@ async def test_the_reaper_makes_the_retry_when_every_result_write_fails(
     monkeypatch.setattr("yaksh.worker.worker.FINALIZE_RETRY_S", 0.05)
     run = await new_run(client)
 
-    await wait_for_run(client, run["id"], "done", timeout=settings.worker_lease_s * 3 + 5)
+    await wait_for_run(client, run["id"], "done", timeout=FAST.worker_lease_s * 3 + 5)
 
     attempts = await run_conversations(client, run["id"])
     assert [(c["attempt"], c["end_reason"]) for c in attempts] == [

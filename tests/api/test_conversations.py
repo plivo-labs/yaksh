@@ -2,6 +2,7 @@ import asyncio
 import sys
 import uuid
 import wave
+from dataclasses import replace
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -15,6 +16,7 @@ from sqlalchemy.ext.asyncio import create_async_engine
 
 from tests.conftest import (
     APP_SETTINGS,
+    FAST,
     FINAL,
     OUTBOUND_AGENT,
     PERSONA,
@@ -47,6 +49,9 @@ from yaksh.simulation import conversations, runs
 from yaksh.simulation.calls import STOP_IGNORED
 from yaksh.simulation.surroundings import NOISE_DBFS, SOUNDS, gain
 from yaksh.worker.worker import FINALIZE_ATTEMPTS, Worker
+
+UNHURRIED = replace(FAST, worker_lease_s=30)
+"""A lease long enough that a slow shutdown is not reaped meanwhile."""
 
 
 async def stuck_worker(kind: str, settings: Settings) -> asyncio.subprocess.Process:
@@ -408,14 +413,14 @@ async def test_worker_shutdown_stops_the_caller_and_keeps_the_evidence(
     caller.caller_voice = b"VOICE"
     agent_id = await create_agent_id(client)
     started = await start(client, agent_id)
-    unhurried = settings.model_copy(update={"worker_lease_s": 30})
     engine = create_engine(settings.database_url.encoded_string())
     worker = make_worker(
         create_sessionmaker(engine),
         caller,
-        unhurried,
+        settings,
         worker_id="shutting-down",
         store=file_store,
+        timings=UNHURRIED,
     )
     stop = asyncio.Event()
     task = asyncio.create_task(worker.run(stop))
@@ -449,7 +454,7 @@ async def test_shutdown_waits_while_result_writes_time_out_and_unwind_slowly(
             try:
                 await asyncio.sleep(3600)
             except asyncio.CancelledError:
-                await asyncio.sleep(settings.end_timeout_s * 0.8)
+                await asyncio.sleep(FAST.end_timeout_s * 0.8)
                 raise
         return await real_finalize(*args, **kwargs)
 
@@ -459,9 +464,10 @@ async def test_shutdown_waits_while_result_writes_time_out_and_unwind_slowly(
     caller.release.clear()
     agent_id = await create_agent_id(client)
     started = await start(client, agent_id)
-    unhurried = settings.model_copy(update={"worker_lease_s": 30})
     engine = create_engine(settings.database_url.encoded_string())
-    worker = make_worker(create_sessionmaker(engine), caller, unhurried, worker_id="shutting-down")
+    worker = make_worker(
+        create_sessionmaker(engine), caller, settings, worker_id="shutting-down", timings=UNHURRIED
+    )
     stop = asyncio.Event()
     task = asyncio.create_task(worker.run(stop))
     await wait_for_event(client, started["id"], "connected")
@@ -510,7 +516,7 @@ async def test_a_result_write_that_fails_past_the_lease_is_retried_and_kept(
     async def slow_then_flaky(*args: Any, **kwargs: Any) -> bool:
         if failures["left"]:
             failures["left"] -= 1
-            await asyncio.sleep(settings.worker_lease_s + 0.5)
+            await asyncio.sleep(FAST.worker_lease_s + 0.5)
             raise RuntimeError("connection reset")
         return await real_finalize(*args, **kwargs)
 
@@ -519,7 +525,7 @@ async def test_a_result_write_that_fails_past_the_lease_is_retried_and_kept(
     agent_id = await create_agent_id(client)
     started = await start(client, agent_id)
 
-    done = await wait_for(client, started["id"], FINAL, timeout=settings.worker_lease_s + 5)
+    done = await wait_for(client, started["id"], FINAL, timeout=FAST.worker_lease_s + 5)
 
     assert done["status"] == "completed" and failures["left"] == 0
     assert [turn["role"] for turn in done["transcript"]] == ["agent", "caller"]
@@ -671,7 +677,7 @@ async def test_a_call_whose_preparation_outlives_the_lease_is_not_started(
     real_call_request = conversations.call_request
 
     async def slow(*args: Any, **kwargs: Any) -> Any:
-        await asyncio.sleep(settings.worker_lease_s + 0.5)
+        await asyncio.sleep(FAST.worker_lease_s + 0.5)
         return await real_call_request(*args, **kwargs)
 
     monkeypatch.setattr("yaksh.simulation.conversations.call_request", slow)

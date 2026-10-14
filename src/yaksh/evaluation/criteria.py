@@ -1,7 +1,6 @@
 """The criterion judge and the LLM agent rule judge: one model call per item, its reasoning
 before its verdict, and quotes that code checks."""
 
-import asyncio
 from collections.abc import Sequence
 from typing import Any
 
@@ -11,6 +10,7 @@ from yaksh.domain.language_models import JsonModel
 from yaksh.domain.rules import LlmRule
 from yaksh.evaluation.evidence import with_item
 from yaksh.evaluation.judging import Answered, Check, ItemResult, JudgeSpec, ask, prompt
+from yaksh.evaluation.limit import Slots
 from yaksh.evaluation.quotes import absence_problems, quote_problems
 from yaksh.evaluation.verdicts import RULE
 
@@ -106,7 +106,7 @@ async def judge_criterion(
     number: int,
     criterion: str,
     *,
-    slots: asyncio.Semaphore,
+    slots: Slots,
     retry_later: bool,
 ) -> ItemResult:
     answered = await ask(
@@ -138,7 +138,7 @@ async def judge_rule(
     turns: Sequence[Turn],
     rule: LlmRule,
     *,
-    slots: asyncio.Semaphore,
+    slots: Slots,
     retry_later: bool,
 ) -> ItemResult:
     answered = await ask(

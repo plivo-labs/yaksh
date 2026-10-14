@@ -41,15 +41,6 @@ class Settings(BaseSettings):
     database_url: DatabaseUrl
     frontend_dist: Path = REPO_ROOT / "frontend" / "dist"
     max_active_conversations: int = 4
-    worker_poll_interval_s: float = 0.5
-    worker_heartbeat_s: float = 1.0
-    worker_lease_s: int = 30
-    evaluator_poll_interval_s: float = 2.0
-    evaluator_lease_s: int = 60
-    evaluator_concurrency: int = 2
-    evaluator_judge_concurrency: int = Field(default=8, gt=0)
-    """Judge model calls in flight across one evaluator's evaluations."""
-    end_timeout_s: float = 5.0
     allow_private_triggers: bool = False
     """Allow trigger URLs on private or local addresses, for development."""
     public_url: str | None = None

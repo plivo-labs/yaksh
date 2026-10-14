@@ -71,6 +71,14 @@ class JudgeModel(Section):
     """How sure Jev must be that an item is met to publish it as a pass."""
 
 
+class EvaluationLimits(Section):
+    """How much one evaluator does at once, within the LLM provider's rate limits."""
+
+    evaluations_at_once: int = Field(default=2, ge=1, le=32)
+    judge_calls_at_once: int = Field(default=8, ge=1, le=64)
+    """Judge model calls in flight across one evaluator's evaluations."""
+
+
 class Audit(Section):
     sample_rate: float = Field(default=0.1, ge=0, le=1)
     """The share of judged calls in the audit lane, chosen by a hash of the conversation id."""
@@ -226,6 +234,7 @@ class SettingsValues(Section):
     generation: GenerationModel = GenerationModel()
     brief: BriefModel = BriefModel()
     judges: JudgeModel = JudgeModel()
+    evaluation: EvaluationLimits = EvaluationLimits()
     audit: Audit = Audit()
     phone: Phone = Phone()
     limits: Limits = Limits()

@@ -6,11 +6,12 @@ Run as `python -m tests.stuck_workers <kind> <database url>`.
 import asyncio
 import contextlib
 import sys
+from dataclasses import replace
 from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncEngine
 
-from tests.conftest import ENCRYPTION_KEY
+from tests.conftest import ENCRYPTION_KEY, FAST
 from yaksh.__main__ import run_worker
 from yaksh.caller.plivo_server import StreamRegistry
 from yaksh.config import Settings
@@ -91,12 +92,9 @@ if __name__ == "__main__":
             "s3_endpoint": "http://storage.test",
             "s3_access_key": "k",
             "s3_secret_key": "s",
-            "worker_poll_interval_s": 0.05,
-            "worker_heartbeat_s": 0.05,
-            "worker_lease_s": 2,
-            "end_timeout_s": 0.3,
             "PORT": 0,
             "encryption_key": ENCRYPTION_KEY,
         }
     )
-    asyncio.run(run_worker(settings, KINDS[kind](), StreamRegistry()))
+    timings = replace(FAST, end_timeout_s=0.3)
+    asyncio.run(run_worker(settings, KINDS[kind](), StreamRegistry(), timings))

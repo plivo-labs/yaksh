@@ -29,13 +29,15 @@ from yaksh.domain.files import FileStore
 from yaksh.domain.language_models import JsonModel
 from yaksh.domain.personas import PersonaConfig
 from yaksh.domain.scenarios import ScenarioConfig
-from yaksh.domain.settings import AppSettings, reveal
+from yaksh.domain.settings import AppSettings, EvaluationLimits, reveal
 from yaksh.evaluation import call, evaluations, labels
 from yaksh.evaluation.call import JUDGES, SOURCE_JUDGES, Judging
 from yaksh.evaluation.jev import JEV, JEV_MODEL, Jev
+from yaksh.evaluation.limit import Limit
 from yaksh.evaluation.sources import Document
 from yaksh.integrations.openai_models import OpenAIJsonModel
 from yaksh.settings.store import SettingsSource
+from yaksh.timings import TIMINGS, Timings
 
 log = logging.getLogger(__name__)
 
@@ -133,10 +135,12 @@ class Evaluator:
         source: SettingsSource,
         store: FileStore,
         clients: Callable[[AppSettings], JudgeClients] = judge_clients,
+        timings: Timings = TIMINGS,
     ) -> None:
         """clients builds the judge clients for a version of the stored settings."""
         self._sessionmaker = sessionmaker
         self._settings = settings
+        self._timings = timings
         self._source = source
         self._store = store
         self._clients = clients
@@ -147,7 +151,9 @@ class Evaluator:
         so all are closed at the end."""
         self._prepared = asyncio.Lock()
         self.evaluator_id = f"{socket.gethostname()}:{os.getpid()}:{uuid.uuid4().hex[:8]}"
-        self._slots = asyncio.Semaphore(settings.evaluator_concurrency)
+        self._judge_calls = Limit(EvaluationLimits().judge_calls_at_once)
+        """Bounds the judge calls in flight across evaluations; resized when the settings
+        change, so it outlives the clients."""
         self._tasks: set[asyncio.Task[None]] = set()
 
     async def close(self) -> None:
@@ -200,7 +206,7 @@ class Evaluator:
             model=clients.model,
             sources_model=clients.sources_model or clients.model,
             versions=versions,
-            slots=asyncio.Semaphore(self._settings.evaluator_judge_concurrency),
+            slots=self._judge_calls,
             max_input_chars=judges.max_input_chars,
             jev=jev,
         )
@@ -216,9 +222,7 @@ class Evaluator:
                     claimed = 0
                 if not claimed:
                     with contextlib.suppress(TimeoutError):
-                        await asyncio.wait_for(
-                            stop.wait(), self._settings.evaluator_poll_interval_s
-                        )
+                        await asyncio.wait_for(stop.wait(), self._timings.evaluator_poll_s)
             if self._tasks:
                 await asyncio.wait(self._tasks, timeout=DRAIN_S)
         finally:
@@ -227,16 +231,18 @@ class Evaluator:
             await asyncio.gather(*self._tasks, return_exceptions=True)
 
     async def poll(self, stop: asyncio.Event) -> int:
-        """Claim evaluations while a slot is free; return how many were claimed."""
+        """Claim evaluations while fewer than the settings' evaluations at once run; return how
+        many were claimed. A smaller number lets the running ones finish."""
+        limits = (await self._source.current()).evaluation
+        await self._judge_calls.resize(limits.judge_calls_at_once)
         claimed = 0
-        while not stop.is_set() and not self._slots.locked():
+        while not stop.is_set() and len(self._tasks) < limits.evaluations_at_once:
             async with self._sessionmaker() as session:
                 evaluation = await evaluations.claim(
-                    session, self.evaluator_id, self._settings.evaluator_lease_s
+                    session, self.evaluator_id, self._timings.evaluator_lease_s
                 )
             if evaluation is None:
                 break
-            await self._slots.acquire()
             task = asyncio.create_task(self._evaluate(evaluation))
             self._tasks.add(task)
             task.add_done_callback(self._tasks.discard)
@@ -290,7 +296,6 @@ class Evaluator:
             heartbeat.cancel()
             with contextlib.suppress(asyncio.CancelledError):
                 await heartbeat
-            self._slots.release()
 
     async def _fail(self, evaluation: Evaluation, failure: str) -> None:
         try:
@@ -304,7 +309,7 @@ class Evaluator:
     async def _keep(self, evaluation: Evaluation, held: asyncio.Event) -> None:
         """Renew the lease while the evaluation runs; clear held when another evaluator has
         claimed it since. A renewal that fails is tried again at the next beat."""
-        lease_s = self._settings.evaluator_lease_s
+        lease_s = self._timings.evaluator_lease_s
         while True:
             await asyncio.sleep(lease_s / 3)
             try:

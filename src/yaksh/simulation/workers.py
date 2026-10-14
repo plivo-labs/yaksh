@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from yaksh.db.models import RunningWorker
 
 
-def seen_within(lease_s: int) -> ColumnElement[bool]:
+def seen_within(lease_s: float) -> ColumnElement[bool]:
     return RunningWorker.seen_at > func.statement_timestamp() - timedelta(seconds=lease_s)
 
 
@@ -17,7 +17,7 @@ async def report_worker(
     *,
     receiving_app_id: str | None,
     outbound_problem: str | None,
-    lease_s: int,
+    lease_s: float,
 ) -> None:
     """Record the worker as running, and forget workers not seen for a lease."""
     await session.execute(delete(RunningWorker).where(~seen_within(lease_s)))
@@ -34,7 +34,7 @@ async def report_worker(
     await session.commit()
 
 
-async def receiving_problem(session: AsyncSession, app_id: str, lease_s: int) -> str | None:
+async def receiving_problem(session: AsyncSession, app_id: str, lease_s: float) -> str | None:
     """Why no running worker receives calls for the Plivo application, or None when one does."""
     receiving = await session.scalar(
         select(RunningWorker.id)

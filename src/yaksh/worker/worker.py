@@ -32,6 +32,7 @@ from yaksh.settings.store import SettingsSource
 from yaksh.simulation import conversations
 from yaksh.simulation.calls import CallerUnresponsiveError, LiveCall, run_call
 from yaksh.simulation.workers import report_worker
+from yaksh.timings import TIMINGS, Timings
 from yaksh.worker.phone_account import PhoneAccount
 
 log = logging.getLogger(__name__)
@@ -69,6 +70,7 @@ class Worker:
         store: FileStore,
         *,
         worker_id: str | None = None,
+        timings: Timings = TIMINGS,
     ) -> None:
         """source gives the stored settings, read again at each poll when they changed; account
         follows the phone account in them."""
@@ -78,6 +80,7 @@ class Worker:
         self._sessionmaker = sessionmaker
         self._caller = caller
         self._settings = settings
+        self._timings = timings
         self._source = source
         self._account = account
         self._store = store
@@ -98,20 +101,20 @@ class Worker:
     async def run(self, stop: asyncio.Event) -> None:
         log.info("worker %s started", self.worker_id)
         self._stop = stop
-        delay = self._settings.worker_poll_interval_s
+        delay = self._timings.worker_poll_s
         try:
             while not self.stopping:
                 poll = asyncio.ensure_future(self.poll())
-                await wait_any([stop, self.fatal], self._settings.worker_lease_s, poll)
+                await wait_any([stop, self.fatal], self._timings.worker_lease_s, poll)
                 if not poll.done():
                     if not self.stopping:
                         log.error(
-                            "polling stalled for %ss; cancelling it", self._settings.worker_lease_s
+                            "polling stalled for %ss; cancelling it", self._timings.worker_lease_s
                         )
                     await self._abandon(poll, "polling")
                     delay = min(delay * 2, MAX_BACKOFF_S)
                 elif poll.exception() is None:
-                    delay = self._settings.worker_poll_interval_s
+                    delay = self._timings.worker_poll_s
                 else:
                     log.error("polling failed: %r; retrying in %.1fs", poll.exception(), delay)
                     delay = min(delay * 2, MAX_BACKOFF_S)
@@ -128,7 +131,7 @@ class Worker:
             log.warning("marked %d conversations failed after their lease expired", reaped)
         await self._report_if_due()
         claimed = 0
-        lease_s = self._settings.worker_lease_s
+        lease_s = self._timings.worker_lease_s
         while self.active < self._settings.max_active_conversations and not self.stopping:
             await self._report_if_due()
             async with self._sessionmaker() as session:
@@ -175,7 +178,7 @@ class Worker:
         return claimed
 
     async def _report_if_due(self) -> None:
-        if time.monotonic() - self._reported_at < self._settings.worker_heartbeat_s:
+        if time.monotonic() - self._reported_at < self._timings.worker_heartbeat_s:
             return
         async with self._sessionmaker() as session:
             await report_worker(
@@ -183,7 +186,7 @@ class Worker:
                 self.worker_id,
                 receiving_app_id=self._account.receiving_app_id,
                 outbound_problem=self._account.outbound_problem,
-                lease_s=self._settings.worker_lease_s,
+                lease_s=self._timings.worker_lease_s,
             )
         self._reported_at = time.monotonic()
 
@@ -223,7 +226,7 @@ class Worker:
             return
         for task in pending:
             task.cancel()
-        _, pending = await asyncio.wait(pending, timeout=self._settings.end_timeout_s * 2)
+        _, pending = await asyncio.wait(pending, timeout=self._timings.end_timeout_s * 2)
         if pending:
             log.critical("%d calls did not stop; abandoning them on exit", len(pending))
 
@@ -233,7 +236,7 @@ class Worker:
         A bounded call end, the audio upload with its cancellation cleanup, every result write
         with its cancellation cleanup and retry delay, then the maintenance teardown.
         """
-        end = self._settings.end_timeout_s
+        end = self._timings.end_timeout_s
         return (
             end * 2
             + STORE_TIMEOUT_S
@@ -266,7 +269,7 @@ class Worker:
             await self._abandon(
                 maintenance,
                 f"lease maintenance for {request.conversation_id}",
-                timeout=self._settings.end_timeout_s * 2,
+                timeout=self._timings.end_timeout_s * 2,
             )
 
     async def _call(self, request: CallRequest, live: LiveCall) -> CallOutcome:
@@ -275,7 +278,7 @@ class Worker:
                 self._caller,
                 request,
                 live,
-                end_timeout_s=self._settings.end_timeout_s,
+                end_timeout_s=self._timings.end_timeout_s,
                 dial_timeout_s=self._connect_timeout_s(request),
             )
         except CallerUnresponsiveError:
@@ -394,12 +397,12 @@ class Worker:
 
         The lease is measured from the moment a renewal was sent, never from when it returned.
         """
-        lease_s = self._settings.worker_lease_s
+        lease_s = self._timings.worker_lease_s
         what = f"lease renewal for {conversation_id}"
         last_confirmed = confirmed_at
         while True:
             remaining = lease_s - (time.monotonic() - last_confirmed)
-            await asyncio.sleep(min(self._settings.worker_heartbeat_s, max(remaining, 0.0)))
+            await asyncio.sleep(min(self._timings.worker_heartbeat_s, max(remaining, 0.0)))
             remaining = lease_s - (time.monotonic() - last_confirmed)
             if remaining <= 0:
                 log.warning("lease on conversation %s ran out; stopping the call", conversation_id)
@@ -433,7 +436,7 @@ class Worker:
     ) -> ConversationStatus | None:
         async with self._sessionmaker() as session:
             return await conversations.renew_lease(
-                session, conversation_id, self.worker_id, self._settings.worker_lease_s, progress
+                session, conversation_id, self.worker_id, self._timings.worker_lease_s, progress
             )
 
     async def _run_bounded[T](
@@ -457,7 +460,7 @@ class Worker:
         """Cancel with a bound. Returns False, and marks the worker fatal, when it will not stop."""
         task.cancel()
         try:
-            await asyncio.wait({task}, timeout=timeout or self._settings.end_timeout_s)
+            await asyncio.wait({task}, timeout=timeout or self._timings.end_timeout_s)
         finally:
             if not task.done():
                 log.critical("%s cannot be stopped; worker will exit", what)

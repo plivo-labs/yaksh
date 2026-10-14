@@ -35,7 +35,7 @@ async def enqueue(session: AsyncSession, conversation_ids: Sequence[uuid.UUID]) 
     )
 
 
-async def claim(session: AsyncSession, evaluator_id: str, lease_s: int) -> Evaluation | None:
+async def claim(session: AsyncSession, evaluator_id: str, lease_s: float) -> Evaluation | None:
     """Claim the oldest evaluation that is due: queued and past its back-off, or running under
     a lease that expired, as when its evaluator stopped. An evaluation whose evaluator stopped
     during its last attempt ends failed instead: it can stop every evaluator that claims it."""
@@ -96,7 +96,7 @@ def held(evaluation_id: uuid.UUID, claim_seq: int) -> ColumnElement[bool]:
 
 
 async def renew(
-    session: AsyncSession, evaluation_id: uuid.UUID, claim_seq: int, lease_s: int
+    session: AsyncSession, evaluation_id: uuid.UUID, claim_seq: int, lease_s: float
 ) -> bool:
     """Extend the lease; False when another evaluator has claimed it since."""
     renewed = await session.scalar(

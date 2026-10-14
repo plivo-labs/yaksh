@@ -4,7 +4,6 @@ gives one item; a fail must quote the agent's line and the source word for word.
 judge's request is large, so it gets one try with the source model's longer timeout, and a
 failure is its item's error: it never puts the whole evaluation off."""
 
-import asyncio
 import json
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -17,6 +16,7 @@ from yaksh.evaluation.canonical import contains
 from yaksh.evaluation.criteria import schema
 from yaksh.evaluation.evidence import with_item
 from yaksh.evaluation.judging import Check, ItemResult, JudgeSpec, ask, prompt
+from yaksh.evaluation.limit import Slots
 from yaksh.evaluation.quotes import quote_problems
 
 VERDICTS = {"type": "string", "enum": ["pass", "fail", "not_applicable"]}
@@ -144,7 +144,7 @@ async def judge_instructions(
     config: str,
     max_chars: int,
     *,
-    slots: asyncio.Semaphore,
+    slots: Slots,
 ) -> ItemResult:
     subject = "Follows its instructions"
     user = with_item(view, f"AGENT INSTRUCTIONS\n{config}")
@@ -220,7 +220,7 @@ async def judge_hallucination(
     config: str | None,
     max_chars: int,
     *,
-    slots: asyncio.Semaphore,
+    slots: Slots,
 ) -> ItemResult:
     subject = "States no fact its documents contradict"
     sources = "\n\n".join(f"DOCUMENT: {document.name}\n{document.text}" for document in documents)

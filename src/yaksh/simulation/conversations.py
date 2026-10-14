@@ -262,7 +262,7 @@ def runnable_now(pool_app_id: str | None, receiving_app_id: str | None) -> Colum
     return or_(inbound, outbound)
 
 
-def claim_values(worker_id: str, lease_s: int) -> dict[str, Any]:
+def claim_values(worker_id: str, lease_s: float) -> dict[str, Any]:
     return {
         "status": ConversationStatus.RUNNING,
         "started_at": func.statement_timestamp(),
@@ -274,7 +274,7 @@ def claim_values(worker_id: str, lease_s: int) -> dict[str, Any]:
 async def claim_next(
     session: AsyncSession,
     worker_id: str,
-    lease_s: int,
+    lease_s: float,
     pool_app_id: str | None,
     receiving_app_id: str | None,
 ) -> Conversation | None:
@@ -378,7 +378,7 @@ async def renew_lease(
     session: AsyncSession,
     conversation_id: uuid.UUID,
     worker_id: str,
-    lease_s: int,
+    lease_s: float,
     progress: Transcript | None,
 ) -> ConversationStatus | None:
     values: dict[str, object] = {

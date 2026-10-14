@@ -13,6 +13,7 @@ from typing import Any
 from yaksh.domain.evaluations import DecidedBy, ItemRole, Outcome, UnsureKind
 from yaksh.domain.language_models import JsonModel, ModelAnswer, ModelCallError
 from yaksh.evaluation.evidence import EVIDENCE_VIEW_VERSION
+from yaksh.evaluation.limit import Slots
 
 CODE_CHECKS_VERSION = 1
 
@@ -110,7 +111,7 @@ async def ask(
     user: str,
     check: Check,
     *,
-    slots: asyncio.Semaphore,
+    slots: Slots,
     retry_later: bool,
     patient: bool = True,
 ) -> Answered:
@@ -141,7 +142,7 @@ async def answer(
     request: str,
     attempts: list[Attempt],
     *,
-    slots: asyncio.Semaphore,
+    slots: Slots,
     retry_later: bool,
     patient: bool,
 ) -> ModelAnswer | str:

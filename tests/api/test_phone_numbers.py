@@ -6,6 +6,7 @@ from httpx import AsyncClient
 from sqlalchemy import select, update
 
 from tests.conftest import (
+    FAST,
     POOL_APP_ID,
     FakeCaller,
     FakePlivoAccount,
@@ -151,7 +152,7 @@ async def test_phone_conversations_run_from_a_leased_number_and_wait_for_a_free_
     second = await queue_phone_conversation(client)
 
     await wait_until(lambda: caller.calls == 1)
-    await asyncio.sleep(settings.worker_poll_interval_s * 4)
+    await asyncio.sleep(FAST.worker_poll_s * 4)
     running = (await client.get(f"/api/v1/conversations/{first}")).json()
     waiting = (await client.get(f"/api/v1/conversations/{second}")).json()
     caller.release.set()

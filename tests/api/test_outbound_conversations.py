@@ -9,6 +9,7 @@ from sqlalchemy import func, insert, select, update
 
 from tests.conftest import (
     APP_SETTINGS,
+    FAST,
     OUTBOUND_AGENT,
     Db,
     FakeCaller,
@@ -30,6 +31,7 @@ from yaksh.db.models import Conversation, PhoneNumber, RunningWorker
 from yaksh.db.session import create_engine, create_sessionmaker
 from yaksh.simulation import conversations
 from yaksh.simulation.workers import report_worker
+from yaksh.timings import TIMINGS
 
 APP_ID = "31216907353261579"
 RECEIVING = "+15716535187"
@@ -71,7 +73,7 @@ async def report(
             worker_id,
             receiving_app_id=receiving_app_id,
             outbound_problem=outbound_problem,
-            lease_s=settings.worker_lease_s,
+            lease_s=FAST.worker_lease_s,
         )
     await engine.dispose()
 
@@ -204,7 +206,7 @@ async def test_an_outbound_start_needs_a_running_worker_that_receives_its_calls(
             insert(RunningWorker).values(
                 id="gone",
                 receiving_app_id=APP_ID,
-                seen_at=func.now() - timedelta(seconds=settings.worker_lease_s + 1),
+                seen_at=func.now() - timedelta(seconds=TIMINGS.worker_lease_s + 1),
             )
         )
     await engine.dispose()

@@ -3,6 +3,7 @@ import io
 import uuid
 import wave
 
+import pytest
 from httpx import AsyncClient
 from sqlalchemy import func, select, update
 
@@ -16,6 +17,7 @@ from tests.conftest import (
     make_evaluator,
     new_run,
     reap,
+    save_settings,
 )
 from yaksh.config import Settings
 from yaksh.db.models import Conversation, Evaluation, MetricValue
@@ -258,3 +260,30 @@ async def test_an_evaluation_that_cannot_read_its_files_is_tried_again_later(
         evaluation.failure or ""
     )
     assert await stored(db, evaluation.id) == {}
+
+
+async def test_an_evaluator_runs_as_many_evaluations_at_once_as_the_settings_allow(
+    client: AsyncClient, db: Db, settings: Settings, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    hold = asyncio.Event()
+
+    async def held(*_args: object, **_kwargs: object) -> Evaluated:
+        await hold.wait()
+        raise RuntimeError("released")
+
+    monkeypatch.setattr("yaksh.evaluation.call.evaluate", held)
+    for _ in range(3):
+        await saved_call(client, db)
+    await save_settings(db, values={"evaluation": {"evaluations_at_once": 1}})
+    evaluator = make_evaluator(db, settings)
+    stop = asyncio.Event()
+
+    first = await evaluator.poll(stop)
+    again = await evaluator.poll(stop)
+    await save_settings(db, values={"evaluation": {"evaluations_at_once": 3}})
+    raised = await evaluator.poll(stop)
+    hold.set()
+    stop.set()
+    await evaluator.run(stop)
+
+    assert (first, again, raised) == (1, 0, 2)
