@@ -40,6 +40,16 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["src/yaksh"]
 
+# Pipecat declares these, but Yaksh never imports them: resampy (and numba, llvmlite) serves only
+# pipecat's resampy resampler, and onnxruntime needs sympy only for its model tools. A marker that
+# never matches keeps them out of the environment and the image.
+[tool.uv]
+override-dependencies = [
+    "numba; sys_platform == 'never'",
+    "resampy; sys_platform == 'never'",
+    "sympy; sys_platform == 'never'",
+]
+
 [dependency-groups]
 dev = [
     "ruff",

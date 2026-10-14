@@ -1,30 +1,37 @@
 FROM oven/bun:1.3.9-slim AS frontend
 WORKDIR /build
 COPY frontend/package.json frontend/bun.lock ./
-RUN bun install --frozen-lockfile
+RUN --mount=type=cache,target=/root/.bun/install/cache bun install --frozen-lockfile
 COPY frontend/ ./
 RUN bun run build
 
-FROM python:3.14-slim-trixie AS backend
+FROM python:3.14-slim-trixie AS deps
 COPY --from=ghcr.io/astral-sh/uv:0.12.15 /uv /uvx /bin/
 ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy UV_PYTHON_DOWNLOADS=0
 WORKDIR /app
 COPY pyproject.toml uv.lock ./
-RUN uv sync --locked --no-dev --no-install-project
+RUN --mount=type=cache,target=/root/.cache/uv uv sync --locked --no-dev --no-install-project
+
+FROM deps AS backend
 COPY README.md LICENSE ./
 COPY src ./src
-RUN uv sync --locked --no-dev --no-editable
+RUN --mount=type=cache,target=/root/.cache/uv uv build --wheel --out-dir /dist
 
 FROM backend AS dev
-RUN uv sync --locked
+RUN --mount=type=cache,target=/root/.cache/uv uv sync --locked
 ENV PATH="/app/.venv/bin:$PATH" YAKSH_API_HOST=0.0.0.0
 CMD ["yaksh-server", "api", "--reload"]
 
+# Dependencies, the console and Yaksh are separate layers, from the least to the most often
+# changed, so a code change ships only the last one.
 FROM python:3.14-slim-trixie
 RUN groupadd --system yaksh && useradd --system --gid yaksh --home-dir /app yaksh
 WORKDIR /app
-COPY --from=backend --chown=yaksh:yaksh /app/.venv ./.venv
+COPY --from=deps --chown=yaksh:yaksh /app/.venv ./.venv
 COPY --from=frontend --chown=yaksh:yaksh /build/dist ./frontend/dist
+RUN --mount=from=backend,source=/dist,target=/dist \
+    --mount=from=ghcr.io/astral-sh/uv:0.12.15,source=/uv,target=/bin/uv \
+    uv pip install --python /app/.venv/bin/python --no-deps --no-cache --compile-bytecode /dist/*.whl
 ENV PATH="/app/.venv/bin:$PATH" \
     YAKSH_API_HOST=0.0.0.0 \
     YAKSH_FRONTEND_DIST=/app/frontend/dist
