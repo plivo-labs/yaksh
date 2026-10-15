@@ -106,6 +106,12 @@ async def plivo() -> AsyncIterator[tuple[PlivoApi, list[dict[str, Any]]]]:
         seen.append({"updated": app_id, **await request.json()})
         return JSONResponse({"message": "changed"}, status_code=202)
 
+    @app.get("/v1/Account/{auth_id}/Number/{number}/")
+    async def number(auth_id: str, number: str) -> Response:
+        if auth_id == "REFUSED":
+            return Response("Could not verify your access level for that URL.", status_code=401)
+        return JSONResponse({"number": number, "voice_enabled": True})
+
     @app.post("/v1/Account/{auth_id}/Number/{number}/")
     async def link(auth_id: str, number: str, request: Request) -> Response:
         if number == "10000000000":
@@ -269,3 +275,18 @@ async def test_applications_are_listed_across_pages_made_changed_and_linked_to_n
         {"linked": "17862242321", "app_id": ""},
     ]
     assert (refused.value.status, refused.value.reason) == (404, "number not found")
+
+
+async def test_refused_credentials_get_a_reason_people_can_act_on(
+    plivo: tuple[PlivoApi, list[dict[str, Any]]],
+) -> None:
+    api, _ = plivo
+    refused = PlivoApi("REFUSED", "wrong", base_url=api.base_url)
+
+    with pytest.raises(PlivoError) as error:
+        await refused.get_number("+17862242321")
+
+    assert (error.value.status, error.value.reason) == (
+        401,
+        "Plivo refused the Auth ID and Auth token in Settings",
+    )

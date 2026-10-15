@@ -25,16 +25,20 @@ class PlivoError(ProviderCallError):
     pass
 
 
-def plivo_reason(body: str) -> str | None:
-    """The text of the error field of Plivo's reply, when it is text."""
+REFUSED_CREDENTIALS = "Plivo refused the Auth ID and Auth token in Settings"
+
+
+def plivo_reason(body: str, status: int) -> str | None:
+    """The text of the error field of Plivo's reply, when it is text. Plivo answers wrong
+    credentials with plain text, so a 401 gets its own reason."""
     try:
         reply = json.loads(body)
     except ValueError:
-        return None
+        reply = None
     reason = reply.get("error") if isinstance(reply, dict) else None
-    if not isinstance(reason, str):
-        return None
-    return reason.strip() or None
+    if isinstance(reason, str) and reason.strip():
+        return reason.strip()
+    return REFUSED_CREDENTIALS if status == 401 else None
 
 
 @dataclass(frozen=True)
@@ -105,7 +109,7 @@ class PlivoApi:
                             raise PlivoError(
                                 f"listing numbers failed with {response.status}: {body}",
                                 status=response.status,
-                                reason=plivo_reason(body),
+                                reason=plivo_reason(body, response.status),
                             )
                     page = json.loads(body)
                     numbers.extend(account_numbers(page.get("objects") or []))
@@ -177,7 +181,7 @@ class PlivoApi:
             raise PlivoError(
                 f"{doing} failed with {response.status}: {body}",
                 status=response.status,
-                reason=plivo_reason(body),
+                reason=plivo_reason(body, response.status),
             )
         return body
 
@@ -193,7 +197,7 @@ class PlivoApi:
                     raise PlivoError(
                         f"reading application {app_id} failed with {response.status}: {body}",
                         status=response.status,
-                        reason=plivo_reason(body),
+                        reason=plivo_reason(body, response.status),
                     )
             return plivo_application(json.loads(body))
         except (aiohttp.ClientError, TimeoutError, ValueError, KeyError, TypeError) as error:
@@ -263,7 +267,7 @@ class PlivoApi:
             raise PlivoError(
                 f"{doing} failed with {response.status}: {body}",
                 status=response.status,
-                reason=plivo_reason(body),
+                reason=plivo_reason(body, response.status),
             )
         return body
 
