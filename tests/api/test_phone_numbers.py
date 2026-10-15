@@ -415,13 +415,20 @@ async def test_a_number_gone_from_the_account_leaves_the_pool_but_keeps_its_test
         await numbers.sync_numbers(session, account(NUMBER), {})
         assert await numbers.lease_number(session, conversation_id, POOL_APP_ID) == NUMBER
         await numbers.sync_numbers(session, account(OTHER), {})
+        held = await session.scalar(
+            select(PhoneNumber.conversation_id).where(PhoneNumber.number == NUMBER)
+        )
         await numbers.release_numbers(session, [conversation_id], 0)
         await session.commit()
-        later = await queue_phone_conversation(client)
-        leased = await numbers.lease_number(session, later, POOL_APP_ID)
+        first, second = [await queue_phone_conversation(client) for _ in range(2)]
+        leased = [
+            await numbers.lease_number(session, first, POOL_APP_ID),
+            await numbers.lease_number(session, second, POOL_APP_ID),
+        ]
     await engine.dispose()
 
-    assert leased == OTHER, "the gone number is not leased again after its test"
+    assert held == conversation_id, "the check keeps the running test's lease"
+    assert leased == [OTHER, None], "the gone number is not leased again after its test"
 
 
 async def test_an_inbound_run_is_refused_while_the_running_workers_cannot_use_the_application(

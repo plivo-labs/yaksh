@@ -98,7 +98,13 @@ async def check_numbers(session: AsyncSession, api: PhoneAccountApi) -> str | No
             error = "the Plivo account lists no numbers"
             break
         names = await application_names(api, numbers)
-        if await fence(session, lock=True) != before:
+        generation, version = await fence(session, lock=True)
+        if version != before[1]:
+            # The account may have changed: what this client read is not the account's now.
+            await session.rollback()
+            log.info("the settings changed during the check; the next check reads the numbers")
+            return None
+        if generation != before[0]:
             await session.rollback()
             continue
         await store_numbers(session, numbers, names)
@@ -178,6 +184,8 @@ async def fix_application(api: PhoneAccountApi, app_id: str, public_url: str) ->
 
 
 async def locked_number(session: AsyncSession, number: str) -> PhoneNumber:
+    """The number's row, locked after the check row, the order a check takes them in too."""
+    await session.execute(select(PhoneCheck.id).where(PhoneCheck.id == 1).with_for_update())
     row = await session.scalar(
         select(PhoneNumber).where(PhoneNumber.number == number).with_for_update()
     )

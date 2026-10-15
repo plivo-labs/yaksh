@@ -166,7 +166,9 @@ async def account_read(
     test_numbers = 0
     if app_id is not None:
         test_numbers = sum(
-            1 for row in await numbers.account_numbers(session) if row.application_id == app_id
+            1
+            for row in await numbers.account_numbers(session)
+            if row.application_id == app_id and row.voice
         )
     return PhoneAccountRead(
         provider="plivo",

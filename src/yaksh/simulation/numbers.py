@@ -96,9 +96,7 @@ async def store_numbers(
         )
     gone = PhoneNumber.number.notin_(listed)
     await session.execute(
-        update(PhoneNumber)
-        .where(gone, PhoneNumber.conversation_id.is_not(None))
-        .values(application_id=None, application_name=None)
+        update(PhoneNumber).where(gone).values(application_id=None, application_name=None)
     )
     await session.execute(delete(PhoneNumber).where(gone, PhoneNumber.conversation_id.is_(None)))
 
