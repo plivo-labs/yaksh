@@ -65,7 +65,7 @@ class PhoneAccount:
         api = self._api_for(*credentials)
         changed = self._read != (credentials, app_id)
         async with self._sessionmaker() as session:
-            if changed or await self._due(session, app.phone.check_interval_s):
+            if changed or await self._due(session, app.phone.refresh_interval_s):
                 await check_numbers(session, api)
             checked_at, _ = await last_check(session)
         if not changed and checked_at == self._seen_check:

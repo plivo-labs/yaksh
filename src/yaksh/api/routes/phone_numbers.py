@@ -85,8 +85,8 @@ async def listing(session: SessionDep, settings: Settings, app: AppSettings) -> 
     return PhoneNumbers(
         items=items,
         application_id=app_id,
-        checked_at=checked_at,
-        check_error=check_error,
+        refreshed_at=checked_at,
+        refresh_error=check_error,
         problem=await numbers.inbound_problem(session, settings, app),
         outbound_problem=await numbers.outbound_problem(session, settings, app),
         rest_s=app.phone.number_rest_s,
@@ -102,8 +102,8 @@ async def list_phone_numbers(
     return await listing(session, settings, app)
 
 
-@router.post("/check")
-async def check_phone_numbers(
+@router.post("/refresh")
+async def refresh_phone_numbers(
     session: SessionDep, settings: SettingsDep, app: AppSettingsDep, api: AccountApiDep
 ) -> PhoneNumbers:
     """Read the account's numbers again now, to see changes made in the Plivo console."""

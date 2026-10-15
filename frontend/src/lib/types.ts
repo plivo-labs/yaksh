@@ -559,9 +559,9 @@ export interface PhoneNumber {
 export interface PhoneNumbers {
   items: PhoneNumber[];
   application_id: string | null;
-  checked_at: string | null;
+  refreshed_at: string | null;
   /** Why the last check of the account failed; the numbers from before it stand. */
-  check_error: string | null;
+  refresh_error: string | null;
   /** Why no test can get a number now. */
   problem: string | null;
   /** Why an outbound test could not get its call now. */
@@ -1423,7 +1423,7 @@ export interface SettingsValues {
     number_rest_s: number;
     timezone: string;
     application_id: string | null;
-    check_interval_s: number;
+    refresh_interval_s: number;
   };
   limits: {
     default_max_turns: number;

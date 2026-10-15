@@ -440,13 +440,15 @@ function Form({
             />
             <NumberRow
               id="check-interval"
-              label="Check numbers every"
+              label="Refresh numbers every"
               help="To see changes made in the Plivo console."
               unit="minutes"
               min={1}
               max={1440}
-              value={draft.phone.check_interval_s / 60}
-              onValueChange={(value) => change("phone", "check_interval_s", Math.round(value * 60))}
+              value={draft.phone.refresh_interval_s / 60}
+              onValueChange={(value) =>
+                change("phone", "refresh_interval_s", Math.round(value * 60))
+              }
             />
             <SettingRow label="Time zone" htmlFor="timezone" help="Sets the caller's “today”.">
               <Input

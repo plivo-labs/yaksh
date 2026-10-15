@@ -261,7 +261,7 @@ async def test_the_numbers_page_lists_every_number_with_its_owner_and_a_test_num
         + account("+18005550103", app_id=None, voice=False),
         applications=[*FakePlivoAccount().applications.values(), CX],
     )
-    await client.post("/api/v1/phone-numbers/check")
+    await client.post("/api/v1/phone-numbers/refresh")
     assert await lease_one(settings, await queue_phone_conversation(client)) == NUMBER
 
     listed = (await client.get("/api/v1/phone-numbers")).json()
@@ -275,7 +275,7 @@ async def test_the_numbers_page_lists_every_number_with_its_owner_and_a_test_num
         "+18005550103": ("no_voice", None),
     }
     assert listed["application_id"] == POOL_APP_ID
-    assert listed["checked_at"] is not None and listed["check_error"] is None
+    assert listed["refreshed_at"] is not None and listed["refresh_error"] is None
     assert listed["problem"] is None
 
 
@@ -283,7 +283,7 @@ async def test_a_free_number_becomes_a_test_number_and_another_applications_numb
     client: AsyncClient, providers: FakeProviders
 ) -> None:
     providers.account = FakePlivoAccount(account(FREE, app_id=None) + account(OTHER, app_id="99"))
-    await client.post("/api/v1/phone-numbers/check")
+    await client.post("/api/v1/phone-numbers/refresh")
 
     used = await client.post(f"/api/v1/phone-numbers/{FREE}/use")
     taken = await client.post(f"/api/v1/phone-numbers/{OTHER}/use")
@@ -299,7 +299,7 @@ async def test_a_test_number_stops_only_when_no_test_holds_it_and_it_is_not_rest
     client: AsyncClient, settings: Settings, providers: FakeProviders
 ) -> None:
     providers.account = FakePlivoAccount(account(NUMBER, OTHER))
-    await client.post("/api/v1/phone-numbers/check")
+    await client.post("/api/v1/phone-numbers/refresh")
     held = await lease_one(settings, await queue_phone_conversation(client))
     free = OTHER if held == NUMBER else NUMBER
     engine = create_engine(settings.database_url.encoded_string())
@@ -332,7 +332,7 @@ async def test_a_number_another_install_took_since_the_last_check_is_not_taken(
     client: AsyncClient, providers: FakeProviders
 ) -> None:
     providers.account = FakePlivoAccount(account(FREE, app_id=None))
-    await client.post("/api/v1/phone-numbers/check")
+    await client.post("/api/v1/phone-numbers/refresh")
     await providers.account.link_number(FREE, "99")
     providers.account.links.clear()
 
@@ -348,7 +348,7 @@ async def test_a_stop_without_plivos_answer_takes_the_number_out_of_the_pool(
     client: AsyncClient, providers: FakeProviders
 ) -> None:
     providers.account = FakePlivoAccount(account(NUMBER, OTHER))
-    await client.post("/api/v1/phone-numbers/check")
+    await client.post("/api/v1/phone-numbers/refresh")
     await providers.account.link_number(OTHER, "99")
     providers.account.links_fail = True
 

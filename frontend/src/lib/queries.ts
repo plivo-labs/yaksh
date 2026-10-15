@@ -908,10 +908,10 @@ function numbersChanged(client: QueryClient, numbers: PhoneNumbers) {
 }
 
 /** Reads the Plivo account's numbers again, to see changes made in the Plivo console. */
-export function useCheckNumbers() {
+export function useRefreshNumbers() {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: () => api<PhoneNumbers>("/phone-numbers/check", { method: "POST" }),
+    mutationFn: () => api<PhoneNumbers>("/phone-numbers/refresh", { method: "POST" }),
     onSuccess: (numbers) => numbersChanged(client, numbers),
   });
 }

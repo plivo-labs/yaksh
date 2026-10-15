@@ -732,7 +732,7 @@ func TestNumbersChangesPostToTheNumberAndPrintTheListing(t *testing.T) {
 	}{
 		{[]string{"numbers", "use", "+14155550101"}, "/api/v1/phone-numbers/+14155550101/use"},
 		{[]string{"numbers", "stop", "+14155550100"}, "/api/v1/phone-numbers/+14155550100/stop"},
-		{[]string{"numbers", "check"}, "/api/v1/phone-numbers/check"},
+		{[]string{"numbers", "refresh"}, "/api/v1/phone-numbers/refresh"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.args[1], func(t *testing.T) {

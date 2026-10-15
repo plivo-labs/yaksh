@@ -96,7 +96,7 @@ class Phone(Section):
     application_id: ApplicationId | None = None
     """The Plivo application that receives the calls of the test numbers. A number linked to it
     is a test number; without it Yaksh has no numbers."""
-    check_interval_s: int = Field(default=300, ge=60, le=86_400)
+    refresh_interval_s: int = Field(default=300, ge=60, le=86_400)
     """How often a worker reads the numbers of the Plivo account again, to see changes made in
     the Plivo console."""
 

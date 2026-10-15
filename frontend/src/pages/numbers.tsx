@@ -12,7 +12,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ago, counted, phone, region, upperFirst } from "@/lib/format";
 import {
-  useCheckNumbers,
+  useRefreshNumbers,
   usePhoneAccount,
   usePhoneNumbers,
   useStopNumber,
@@ -94,11 +94,11 @@ function Groups({
   const firstSetup = numbers.application_id !== null && tests.length === 0;
   return (
     <>
-      {numbers.check_error && (
+      {numbers.refresh_error && (
         <Alert variant="destructive">
           <AlertTitle>Could not check the numbers with Plivo</AlertTitle>
           <AlertDescription>
-            <p className="break-words">{upperFirst(numbers.check_error)}</p>
+            <p className="break-words">{upperFirst(numbers.refresh_error)}</p>
             <p>The numbers below are from the last good check.</p>
           </AlertDescription>
         </Alert>
@@ -148,7 +148,7 @@ function Groups({
           count={free.length}
           description={
             free.length === 0
-              ? "No free numbers on this Plivo account. A number is free when no application receives its calls. Remove a number's application in the Plivo console, or buy a number there, then select Check now."
+              ? "No free numbers on this Plivo account. A number is free when no application receives its calls. Remove a number's application in the Plivo console, or buy a number there, then select Refresh."
               : "On your Plivo account, and no application receives their calls."
           }
         />
@@ -188,15 +188,15 @@ function restingLabel(until: string | null, now: number): string {
 
 /** The last check's time, which ages while the page is open, and a button to check again. */
 function CheckNow({ numbers }: { numbers: PhoneNumbers }) {
-  const check = useCheckNumbers();
+  const check = useRefreshNumbers();
   const now = useNow(30_000);
   return (
     <div className="grid justify-items-end gap-1">
       <div className="flex items-center gap-3">
         <span className="text-s-400 text-muted-foreground">
-          {numbers.checked_at
-            ? `Checked with Plivo ${ago(numbers.checked_at, now)}`
-            : "Not checked with Plivo yet"}
+          {numbers.refreshed_at
+            ? `Refreshed from Plivo ${ago(numbers.refreshed_at, now)}`
+            : "Not refreshed from Plivo yet"}
         </span>
         <Button
           variant="outline"
@@ -205,7 +205,7 @@ function CheckNow({ numbers }: { numbers: PhoneNumbers }) {
           onClick={() => check.mutate()}
         >
           {check.isPending && <Spinner />}
-          Check now
+          Refresh
         </Button>
       </div>
       {check.isError && <p className="text-xs-400 text-destructive">{check.error.message}</p>}

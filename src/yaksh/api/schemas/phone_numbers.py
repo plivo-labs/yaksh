@@ -31,9 +31,10 @@ class PhoneNumbers(BaseModel):
     """Every number of the phone account, as the last check found it."""
     application_id: str | None
     """The receiving application: its numbers are the test numbers."""
-    checked_at: datetime | None
-    check_error: str | None
-    """Why the last check of the account's numbers failed; the numbers before it stand."""
+    refreshed_at: datetime | None
+    """When Yaksh last read the account's numbers from Plivo."""
+    refresh_error: str | None
+    """Why the last read failed; the numbers before it stand."""
     problem: str | None
     """Why no test can get a number now; None when one can."""
     outbound_problem: str | None

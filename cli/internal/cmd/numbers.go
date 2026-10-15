@@ -19,7 +19,7 @@ func (a *app) numbersCmd() *cobra.Command {
 			"receiving application in Settings. Yaksh never takes a number that another application receives.",
 	}
 	numbers.AddCommand(
-		a.numbersListCmd(), a.numbersUseCmd(), a.numbersStopCmd(), a.numbersCheckCmd(), a.numbersAccountCmd(),
+		a.numbersListCmd(), a.numbersUseCmd(), a.numbersStopCmd(), a.numbersRefreshCmd(), a.numbersAccountCmd(),
 	)
 	return numbers
 }
@@ -134,9 +134,9 @@ func (a *app) numbersStopCmd() *cobra.Command {
 		})
 }
 
-func (a *app) numbersCheckCmd() *cobra.Command {
+func (a *app) numbersRefreshCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "check",
+		Use:   "refresh",
 		Short: "Read the numbers of the account again now, to see changes made in the Plivo console",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
@@ -144,7 +144,7 @@ func (a *app) numbersCheckCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			body, err := api.Body(c.CheckPhoneNumbersApiV1PhoneNumbersCheckPost(cmd.Context()))
+			body, err := api.Body(c.RefreshPhoneNumbersApiV1PhoneNumbersRefreshPost(cmd.Context()))
 			if err != nil {
 				return err
 			}

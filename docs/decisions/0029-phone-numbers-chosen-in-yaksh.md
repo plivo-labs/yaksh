@@ -19,14 +19,14 @@ Status: accepted. Changes 0027.
 - The user chooses the test numbers on the **Numbers** page or with `yaksh numbers`. **Use for tests** links a free number to the receiving application. **Stop using** removes the link.
 - Yaksh never takes a number that a different application receives. It never buys a number.
 - **Stop using** is refused while a test holds the number, or while the number rests after a test. Thus no test loses a call that it waits for.
-- A worker reads the numbers of the account again every `phone.check_interval_s` (default 300 s), and the API reads them at once on **Check now** and after each change. A database row holds the periodic check: one worker takes it for at most 60 s, so the workers take turns. Each change Yaksh makes to a number increases a counter in that row; a check that the counter or the settings version overtook reads Plivo again, so it never stores numbers from before the change. Before Yaksh links or unlinks a number, it reads the number from Plivo again. Plivo cannot change a number only if it is still free, so two installs that take one number at the same moment can both link it; the later one wins.
+- A worker reads the numbers of the account again every `phone.refresh_interval_s` (default 300 s), and the API reads them at once on **Refresh** and after each change. A database row holds the periodic check: one worker takes it for at most 60 s, so the workers take turns. Each change Yaksh makes to a number increases a counter in that row; a check that the counter or the settings version overtook reads Plivo again, so it never stores numbers from before the change. Before Yaksh links or unlinks a number, it reads the number from Plivo again. Plivo cannot change a number only if it is still free, so two installs that take one number at the same moment can both link it; the later one wins.
 - When a check fails, or the account lists no numbers, Yaksh keeps the numbers of the last check and shows the error.
 - Inbound tests and outbound tests use only test numbers.
 
 ## Why
 
 - Plivo already holds one application for each number. With that link as the owner, all installs and the Plivo console agree, and no install needs to know about the others.
-- A change in the Plivo console shows within one check interval, or at once with **Check now**. No restart is necessary.
+- A change in the Plivo console shows within one check interval, or at once with **Refresh**. No restart is necessary.
 - A new install takes no number until the user chooses it. The numbers of the agents under test stay out of the pool.
 
 ## Cost

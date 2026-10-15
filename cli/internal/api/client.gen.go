@@ -2132,11 +2132,11 @@ type PersonaVersionRead struct {
 
 // Phone defines model for Phone.
 type Phone struct {
-	ApplicationId  *string `json:"application_id,omitempty"`
-	CheckIntervalS *int    `json:"check_interval_s,omitempty"`
-	NumberRestS    *int    `json:"number_rest_s,omitempty"`
-	RingTimeoutS   *int    `json:"ring_timeout_s,omitempty"`
-	Timezone       *string `json:"timezone,omitempty"`
+	ApplicationId    *string `json:"application_id,omitempty"`
+	NumberRestS      *int    `json:"number_rest_s,omitempty"`
+	RefreshIntervalS *int    `json:"refresh_interval_s,omitempty"`
+	RingTimeoutS     *int    `json:"ring_timeout_s,omitempty"`
+	Timezone         *string `json:"timezone,omitempty"`
 }
 
 // PhoneAccountRead defines model for PhoneAccountRead.
@@ -2164,11 +2164,11 @@ type PhoneNumberRead struct {
 // PhoneNumbers defines model for PhoneNumbers.
 type PhoneNumbers struct {
 	ApplicationId   *string           `json:"application_id"`
-	CheckError      *string           `json:"check_error"`
-	CheckedAt       *time.Time        `json:"checked_at"`
 	Items           []PhoneNumberRead `json:"items"`
 	OutboundProblem *string           `json:"outbound_problem"`
 	Problem         *string           `json:"problem"`
+	RefreshError    *string           `json:"refresh_error"`
+	RefreshedAt     *time.Time        `json:"refreshed_at"`
 	RestS           int               `json:"rest_s"`
 }
 
@@ -4378,12 +4378,12 @@ type ClientInterface interface {
 	// Corresponds with GET /api/v1/phone-numbers (the `ListPhoneNumbersApiV1PhoneNumbersGet` operationId).
 	ListPhoneNumbersApiV1PhoneNumbersGet(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// CheckPhoneNumbersApiV1PhoneNumbersCheckPost Check Phone Numbers
+	// RefreshPhoneNumbersApiV1PhoneNumbersRefreshPost Refresh Phone Numbers
 	//
 	// Read the account's numbers again now, to see changes made in the Plivo console.
 	//
-	// Corresponds with POST /api/v1/phone-numbers/check (the `CheckPhoneNumbersApiV1PhoneNumbersCheckPost` operationId).
-	CheckPhoneNumbersApiV1PhoneNumbersCheckPost(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+	// Corresponds with POST /api/v1/phone-numbers/refresh (the `RefreshPhoneNumbersApiV1PhoneNumbersRefreshPost` operationId).
+	RefreshPhoneNumbersApiV1PhoneNumbersRefreshPost(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// StopPhoneNumberApiV1PhoneNumbersNumberStopPost Stop Phone Number
 	//
@@ -6345,13 +6345,13 @@ func (c *Client) ListPhoneNumbersApiV1PhoneNumbersGet(ctx context.Context, reqEd
 	return c.Client.Do(req)
 }
 
-// CheckPhoneNumbersApiV1PhoneNumbersCheckPost Check Phone Numbers
+// RefreshPhoneNumbersApiV1PhoneNumbersRefreshPost Refresh Phone Numbers
 //
 // Read the account's numbers again now, to see changes made in the Plivo console.
 //
-// Corresponds with POST /api/v1/phone-numbers/check (the `CheckPhoneNumbersApiV1PhoneNumbersCheckPost` operationId).
-func (c *Client) CheckPhoneNumbersApiV1PhoneNumbersCheckPost(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewCheckPhoneNumbersApiV1PhoneNumbersCheckPostRequest(c.Server)
+// Corresponds with POST /api/v1/phone-numbers/refresh (the `RefreshPhoneNumbersApiV1PhoneNumbersRefreshPost` operationId).
+func (c *Client) RefreshPhoneNumbersApiV1PhoneNumbersRefreshPost(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRefreshPhoneNumbersApiV1PhoneNumbersRefreshPostRequest(c.Server)
 	if err != nil {
 		return nil, err
 	}
@@ -10003,8 +10003,8 @@ func NewListPhoneNumbersApiV1PhoneNumbersGetRequest(server string) (*http.Reques
 	return req, nil
 }
 
-// NewCheckPhoneNumbersApiV1PhoneNumbersCheckPostRequest constructs an http.Request for the CheckPhoneNumbersApiV1PhoneNumbersCheckPost method
-func NewCheckPhoneNumbersApiV1PhoneNumbersCheckPostRequest(server string) (*http.Request, error) {
+// NewRefreshPhoneNumbersApiV1PhoneNumbersRefreshPostRequest constructs an http.Request for the RefreshPhoneNumbersApiV1PhoneNumbersRefreshPost method
+func NewRefreshPhoneNumbersApiV1PhoneNumbersRefreshPostRequest(server string) (*http.Request, error) {
 	var err error
 
 	serverURL, err := url.Parse(server)
@@ -10012,7 +10012,7 @@ func NewCheckPhoneNumbersApiV1PhoneNumbersCheckPostRequest(server string) (*http
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/v1/phone-numbers/check")
+	operationPath := fmt.Sprintf("/api/v1/phone-numbers/refresh")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -12555,14 +12555,14 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with GET /api/v1/phone-numbers (the `ListPhoneNumbersApiV1PhoneNumbersGet` operationId).
 	ListPhoneNumbersApiV1PhoneNumbersGetWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListPhoneNumbersApiV1PhoneNumbersGetResponse, error)
 
-	// CheckPhoneNumbersApiV1PhoneNumbersCheckPostWithResponse Check Phone Numbers
+	// RefreshPhoneNumbersApiV1PhoneNumbersRefreshPostWithResponse Refresh Phone Numbers
 	//
 	// Read the account's numbers again now, to see changes made in the Plivo console.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
-	// Corresponds with POST /api/v1/phone-numbers/check (the `CheckPhoneNumbersApiV1PhoneNumbersCheckPost` operationId).
-	CheckPhoneNumbersApiV1PhoneNumbersCheckPostWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*CheckPhoneNumbersApiV1PhoneNumbersCheckPostResponse, error)
+	// Corresponds with POST /api/v1/phone-numbers/refresh (the `RefreshPhoneNumbersApiV1PhoneNumbersRefreshPost` operationId).
+	RefreshPhoneNumbersApiV1PhoneNumbersRefreshPostWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*RefreshPhoneNumbersApiV1PhoneNumbersRefreshPostResponse, error)
 
 	// StopPhoneNumberApiV1PhoneNumbersNumberStopPostWithResponse Stop Phone Number
 	//
@@ -16061,7 +16061,7 @@ func (r ListPhoneNumbersApiV1PhoneNumbersGetResponse) ContentType() string {
 	return ""
 }
 
-type CheckPhoneNumbersApiV1PhoneNumbersCheckPostResponse struct {
+type RefreshPhoneNumbersApiV1PhoneNumbersRefreshPostResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
@@ -16071,22 +16071,22 @@ type CheckPhoneNumbersApiV1PhoneNumbersCheckPostResponse struct {
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
-func (r CheckPhoneNumbersApiV1PhoneNumbersCheckPostResponse) GetJSON200() *PhoneNumbers {
+func (r RefreshPhoneNumbersApiV1PhoneNumbersRefreshPostResponse) GetJSON200() *PhoneNumbers {
 	return r.JSON200
 }
 
 // GetJSON4XX returns the response for an HTTP 4XX `application/json` response
-func (r CheckPhoneNumbersApiV1PhoneNumbersCheckPostResponse) GetJSON4XX() *ErrorResponse {
+func (r RefreshPhoneNumbersApiV1PhoneNumbersRefreshPostResponse) GetJSON4XX() *ErrorResponse {
 	return r.JSON4XX
 }
 
 // GetBody returns the raw response body bytes
-func (r CheckPhoneNumbersApiV1PhoneNumbersCheckPostResponse) GetBody() []byte {
+func (r RefreshPhoneNumbersApiV1PhoneNumbersRefreshPostResponse) GetBody() []byte {
 	return r.Body
 }
 
 // Status returns HTTPResponse.Status
-func (r CheckPhoneNumbersApiV1PhoneNumbersCheckPostResponse) Status() string {
+func (r RefreshPhoneNumbersApiV1PhoneNumbersRefreshPostResponse) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -16094,7 +16094,7 @@ func (r CheckPhoneNumbersApiV1PhoneNumbersCheckPostResponse) Status() string {
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r CheckPhoneNumbersApiV1PhoneNumbersCheckPostResponse) StatusCode() int {
+func (r RefreshPhoneNumbersApiV1PhoneNumbersRefreshPostResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -16102,7 +16102,7 @@ func (r CheckPhoneNumbersApiV1PhoneNumbersCheckPostResponse) StatusCode() int {
 }
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r CheckPhoneNumbersApiV1PhoneNumbersCheckPostResponse) ContentType() string {
+func (r RefreshPhoneNumbersApiV1PhoneNumbersRefreshPostResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -19333,19 +19333,19 @@ func (c *ClientWithResponses) ListPhoneNumbersApiV1PhoneNumbersGetWithResponse(c
 	return ParseListPhoneNumbersApiV1PhoneNumbersGetResponse(rsp)
 }
 
-// CheckPhoneNumbersApiV1PhoneNumbersCheckPostWithResponse Check Phone Numbers
+// RefreshPhoneNumbersApiV1PhoneNumbersRefreshPostWithResponse Refresh Phone Numbers
 //
 // Read the account's numbers again now, to see changes made in the Plivo console.
 //
 // Returns a wrapper object for the known response body format(s).
 //
-// Corresponds with POST /api/v1/phone-numbers/check (the `CheckPhoneNumbersApiV1PhoneNumbersCheckPost` operationId).
-func (c *ClientWithResponses) CheckPhoneNumbersApiV1PhoneNumbersCheckPostWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*CheckPhoneNumbersApiV1PhoneNumbersCheckPostResponse, error) {
-	rsp, err := c.CheckPhoneNumbersApiV1PhoneNumbersCheckPost(ctx, reqEditors...)
+// Corresponds with POST /api/v1/phone-numbers/refresh (the `RefreshPhoneNumbersApiV1PhoneNumbersRefreshPost` operationId).
+func (c *ClientWithResponses) RefreshPhoneNumbersApiV1PhoneNumbersRefreshPostWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*RefreshPhoneNumbersApiV1PhoneNumbersRefreshPostResponse, error) {
+	rsp, err := c.RefreshPhoneNumbersApiV1PhoneNumbersRefreshPost(ctx, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParseCheckPhoneNumbersApiV1PhoneNumbersCheckPostResponse(rsp)
+	return ParseRefreshPhoneNumbersApiV1PhoneNumbersRefreshPostResponse(rsp)
 }
 
 // StopPhoneNumberApiV1PhoneNumbersNumberStopPostWithResponse Stop Phone Number
@@ -22271,15 +22271,15 @@ func ParseListPhoneNumbersApiV1PhoneNumbersGetResponse(rsp *http.Response) (*Lis
 	return response, nil
 }
 
-// ParseCheckPhoneNumbersApiV1PhoneNumbersCheckPostResponse parses an HTTP response from a CheckPhoneNumbersApiV1PhoneNumbersCheckPostWithResponse call
-func ParseCheckPhoneNumbersApiV1PhoneNumbersCheckPostResponse(rsp *http.Response) (*CheckPhoneNumbersApiV1PhoneNumbersCheckPostResponse, error) {
+// ParseRefreshPhoneNumbersApiV1PhoneNumbersRefreshPostResponse parses an HTTP response from a RefreshPhoneNumbersApiV1PhoneNumbersRefreshPostWithResponse call
+func ParseRefreshPhoneNumbersApiV1PhoneNumbersRefreshPostResponse(rsp *http.Response) (*RefreshPhoneNumbersApiV1PhoneNumbersRefreshPostResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &CheckPhoneNumbersApiV1PhoneNumbersCheckPostResponse{
+	response := &RefreshPhoneNumbersApiV1PhoneNumbersRefreshPostResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}

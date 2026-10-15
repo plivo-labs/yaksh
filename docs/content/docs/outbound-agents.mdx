@@ -11,7 +11,7 @@ An outbound agent calls Yaksh. Yaksh sends the trigger of the agent: a POST or G
 2. On the **Numbers** page, click **Use for tests** on each number that gets test calls.
 3. Add an agent with the direction `outbound`. Give the method, the URL and the headers of its trigger. A POST trigger has a JSON body (`body`). A GET trigger has query parameters (`query`), a list of names and values, and no body. In the Yaksh console, choose **The agent calls Yaksh**. Then complete the fields in **Start request**.
 
-The worker reads the numbers of the account again every 5 minutes by default, and at once when you click **Check now** on the **Numbers** page. You do not restart the worker after a change in the Plivo console. If `YAKSH_PUBLIC_URL` changes, fix the URLs of the receiving application on the **Phone** tab of Settings. If outbound tests are off, the **Numbers** page shows the cause.
+The worker reads the numbers of the account again every 5 minutes by default, and at once when you click **Refresh** on the **Numbers** page. You do not restart the worker after a change in the Plivo console. If `YAKSH_PUBLIC_URL` changes, fix the URLs of the receiving application on the **Phone** tab of Settings. If outbound tests are off, the **Numbers** page shows the cause.
 
 ## Trigger
 

@@ -2999,14 +2999,14 @@
         ]
       }
     },
-    "/api/v1/phone-numbers/check": {
+    "/api/v1/phone-numbers/refresh": {
       "post": {
         "tags": [
           "phone-numbers"
         ],
-        "summary": "Check Phone Numbers",
+        "summary": "Refresh Phone Numbers",
         "description": "Read the account's numbers again now, to see changes made in the Plivo console.",
-        "operationId": "check_phone_numbers_api_v1_phone_numbers_check_post",
+        "operationId": "refresh_phone_numbers_api_v1_phone_numbers_refresh_post",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -10291,11 +10291,11 @@
             ],
             "title": "Application Id"
           },
-          "check_interval_s": {
+          "refresh_interval_s": {
             "type": "integer",
             "maximum": 86400.0,
             "minimum": 60.0,
-            "title": "Check Interval S",
+            "title": "Refresh Interval S",
             "default": 300
           }
         },
@@ -10446,7 +10446,7 @@
             ],
             "title": "Application Id"
           },
-          "checked_at": {
+          "refreshed_at": {
             "anyOf": [
               {
                 "type": "string",
@@ -10456,9 +10456,9 @@
                 "type": "null"
               }
             ],
-            "title": "Checked At"
+            "title": "Refreshed At"
           },
-          "check_error": {
+          "refresh_error": {
             "anyOf": [
               {
                 "type": "string"
@@ -10467,7 +10467,7 @@
                 "type": "null"
               }
             ],
-            "title": "Check Error"
+            "title": "Refresh Error"
           },
           "problem": {
             "anyOf": [
@@ -10500,8 +10500,8 @@
         "required": [
           "items",
           "application_id",
-          "checked_at",
-          "check_error",
+          "refreshed_at",
+          "refresh_error",
           "problem",
           "outbound_problem",
           "rest_s"
@@ -13225,7 +13225,7 @@
               "ring_timeout_s": 30,
               "number_rest_s": 300,
               "timezone": "UTC",
-              "check_interval_s": 300
+              "refresh_interval_s": 300
             }
           },
           "limits": {
