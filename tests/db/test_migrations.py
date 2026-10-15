@@ -1,12 +1,15 @@
 import asyncio
 import sys
 
+from alembic import command
 from alembic.autogenerate import compare_metadata
+from alembic.config import Config
 from alembic.migration import MigrationContext
 from sqlalchemy import Connection, inspect, text
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from yaksh.db.base import Base
+from yaksh.db.migrate import MIGRATIONS_DIR, upgrade_to_head
 
 UPGRADE = "import sys; from yaksh.db.migrate import upgrade_to_head; upgrade_to_head(sys.argv[1])"
 
@@ -54,3 +57,35 @@ async def test_processes_starting_together_migrate_a_fresh_database_once(
         tables = await connection.run_sync(lambda sync: inspect(sync).get_table_names())
     await engine.dispose()
     assert {"agents", "agent_versions", "conversations"} <= set(tables)
+
+
+async def test_a_database_made_before_phone_checks_upgrades_and_keeps_its_numbers(
+    database_url: str,
+) -> None:
+    admin = create_async_engine(database_url, isolation_level="AUTOCOMMIT")
+    async with admin.connect() as connection:
+        await connection.execute(text("CREATE DATABASE before_phone_checks"))
+    await admin.dispose()
+    old_url = database_url.rsplit("/", 1)[0] + "/before_phone_checks"
+    config = Config()
+    config.set_main_option("script_location", str(MIGRATIONS_DIR))
+    config.attributes["database_url"] = old_url
+    await asyncio.to_thread(command.upgrade, config, "0001")
+    engine = create_async_engine(old_url)
+    async with engine.begin() as connection:
+        await connection.execute(
+            text("INSERT INTO phone_numbers (number, enabled) VALUES ('+15550100', false)")
+        )
+    await engine.dispose()
+
+    await asyncio.to_thread(upgrade_to_head, old_url)
+
+    engine = create_async_engine(old_url)
+    async with engine.connect() as connection:
+        numbers = (await connection.execute(text("SELECT number, voice FROM phone_numbers"))).all()
+        checks = (await connection.execute(text("SELECT id, generation FROM phone_checks"))).all()
+        diff = await connection.run_sync(diff_against_models)
+    await engine.dispose()
+    assert numbers == [("+15550100", True)]
+    assert checks == [(1, 0)]
+    assert diff == []
