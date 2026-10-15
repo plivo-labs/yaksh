@@ -44,7 +44,9 @@ export function NumbersPage() {
   const account = usePhoneAccount();
   const data = numbers.data;
   const applicationName =
-    account.data?.application?.name ?? account.data?.application?.id ?? data?.application_id;
+    account.data?.application?.name ??
+    data?.items.find((item) => item.owner === "test" && item.application_name)?.application_name ??
+    data?.application_id;
   return (
     <div className="grid max-w-5xl gap-6">
       <div className="flex flex-wrap items-end gap-x-4 gap-y-3">

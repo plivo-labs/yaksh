@@ -132,6 +132,8 @@ function ReceivingApplication({
 }) {
   const fix = useFixApplication();
   const broken = application.problems.length > 0;
+  // Only an application Plivo could read has URLs to fix.
+  const fixable = broken && application.answer_url !== null;
   return (
     <SettingRow label="Receiving application">
       <div className="flex flex-wrap items-start gap-x-4 gap-y-2">
@@ -158,7 +160,7 @@ function ReceivingApplication({
           {fix.isError && <p className="text-xs-400 text-destructive">{fix.error.message}</p>}
         </div>
         <div className="flex gap-2">
-          {broken && (
+          {fixable && (
             <Button size="sm" disabled={fix.isPending} onClick={() => fix.mutate()}>
               {fix.isPending && <Spinner />}
               Fix URLs
