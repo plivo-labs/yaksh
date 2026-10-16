@@ -41,6 +41,9 @@ class Settings(BaseSettings):
     database_url: DatabaseUrl
     frontend_dist: Path = REPO_ROOT / "frontend" / "dist"
     max_active_conversations: int = 4
+    """Phone conversations on one worker at the same time."""
+    max_active_text_conversations: int = 20
+    """Text conversations on one worker at the same time: they use no audio and no number."""
     allow_private_hosts: bool = False
     """Allow trigger and text agent URLs on private or local addresses, for development."""
     public_url: str | None = None

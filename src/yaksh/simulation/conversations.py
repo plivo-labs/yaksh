@@ -5,7 +5,7 @@ from datetime import timedelta
 from typing import Any
 
 from pydantic import BaseModel
-from sqlalchemy import ColumnElement, Row, String, and_, cast, func, or_, select, update
+from sqlalchemy import ColumnElement, Row, String, and_, cast, false, func, or_, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from sqlalchemy.orm import defer
@@ -242,10 +242,13 @@ async def end_conversation(session: AsyncSession, conversation_id: uuid.UUID) ->
     return conversation
 
 
-def runnable_now(pool_app_id: str | None, receiving_app_id: str | None) -> ColumnElement[bool]:
-    """A queued conversation that can start now: a text one always can; a phone one that needs
-    a number waits while no test number of pool_app_id is free, and outbound phone
-    conversations run only on a worker that receives calls for receiving_app_id."""
+def runnable_now(
+    pool_app_id: str | None, receiving_app_id: str | None, transports: frozenset[Transport]
+) -> ColumnElement[bool]:
+    """A queued conversation of one of `transports` that can start now: a text one always can;
+    a phone one that needs a number waits while no test number of pool_app_id is free, and
+    outbound phone conversations run only on a worker that receives calls for
+    receiving_app_id."""
     text = Conversation.transport == Transport.TEXT
     has_number = Conversation.caller_number.is_not(None)
     inbound = and_(
@@ -255,14 +258,16 @@ def runnable_now(pool_app_id: str | None, receiving_app_id: str | None) -> Colum
         if pool_app_id is None
         else or_(has_number, select(PhoneNumber).where(free_numbers(pool_app_id)).exists()),
     )
-    if receiving_app_id is None:
-        return or_(text, inbound)
-    outbound = and_(
-        Conversation.transport == Transport.PHONE,
-        Conversation.direction == Direction.OUTBOUND,
-        select(PhoneNumber).where(free_numbers(receiving_app_id, rested=True)).exists(),
-    )
-    return or_(text, inbound, outbound)
+    phone = inbound
+    if receiving_app_id is not None:
+        outbound = and_(
+            Conversation.transport == Transport.PHONE,
+            Conversation.direction == Direction.OUTBOUND,
+            select(PhoneNumber).where(free_numbers(receiving_app_id, rested=True)).exists(),
+        )
+        phone = or_(inbound, outbound)
+    allowed = {Transport.TEXT: text, Transport.PHONE: phone}
+    return or_(false(), *(allowed[transport] for transport in transports))
 
 
 def claim_values(worker_id: str, lease_s: float) -> dict[str, Any]:
@@ -280,14 +285,15 @@ async def claim_next(
     lease_s: float,
     pool_app_id: str | None,
     receiving_app_id: str | None,
+    transports: frozenset[Transport],
 ) -> Conversation | None:
-    """Claim the oldest queued conversation that can run now, in the order the runs were
-    created. The claim holds the run's lock, so no two workers pass a run's max parallel or its
-    start interval. The candidate is picked without a lock; when the claim finds it taken, or
-    its run no longer ready, the next candidate is tried."""
+    """Claim the oldest queued conversation of one of `transports` that can run now, in the
+    order the runs were created. The claim holds the run's lock, so no two workers pass a run's
+    max parallel or its start interval. The candidate is picked without a lock; when the claim
+    finds it taken, or its run no longer ready, the next candidate is tried."""
     ready = and_(
         Conversation.status == ConversationStatus.QUEUED,
-        runnable_now(pool_app_id, receiving_app_id),
+        runnable_now(pool_app_id, receiving_app_id, transports),
         ~run_full(),
         ~run_waiting(),
     )

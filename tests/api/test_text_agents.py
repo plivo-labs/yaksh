@@ -5,6 +5,7 @@ from sqlalchemy import update
 
 from tests.conftest import AGENT, APP_SETTINGS, POOL_APP_ID, Db, claim, create_agent, start
 from yaksh.db.models import Conversation, PhoneNumber
+from yaksh.domain.agents import Transport
 from yaksh.simulation import conversations
 
 TEXT_AGENT: dict[str, Any] = {
@@ -60,3 +61,13 @@ async def test_a_text_run_starts_and_is_claimed_with_no_voice_number_and_leases_
     assert claimed == conversation["id"]
     assert call.caller_number is None
     assert call.agent.endpoint is not None
+
+
+async def test_text_and_phone_conversations_are_claimed_within_their_own_limits(
+    client: AsyncClient, db: Db
+) -> None:
+    agent = await create_agent(client, **TEXT_AGENT)
+    conversation = await start(client, agent["id"])
+
+    assert await claim(db, transports=frozenset({Transport.PHONE})) is None
+    assert await claim(db, transports=frozenset({Transport.TEXT})) == conversation["id"]
