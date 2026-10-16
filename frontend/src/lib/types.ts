@@ -907,6 +907,8 @@ export interface RunInput {
 export interface RunSummary {
   id: string;
   agent_id: string;
+  /** How the run's pinned agent version reaches the agent. */
+  transport: Transport;
   agent_version_id: string;
   agent_version: number;
   agent_name: string;

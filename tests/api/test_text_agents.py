@@ -71,3 +71,12 @@ async def test_text_and_phone_conversations_are_claimed_within_their_own_limits(
 
     assert await claim(db, transports=frozenset({Transport.PHONE})) is None
     assert await claim(db, transports=frozenset({Transport.TEXT})) == conversation["id"]
+
+
+async def test_a_text_run_reports_the_transport_of_its_pinned_agent(client: AsyncClient) -> None:
+    agent = await create_agent(client, **TEXT_AGENT)
+    conversation = await start(client, agent["id"])
+
+    run = (await client.get(f"/api/v1/runs/{conversation['run_id']}")).json()
+
+    assert run["transport"] == "text"

@@ -176,6 +176,18 @@ async def pinned_agents(
     return {row.id: (row.version, row.name) for row in rows}
 
 
+async def pinned_transports(
+    session: AsyncSession, version_ids: Iterable[uuid.UUID]
+) -> dict[uuid.UUID, Transport]:
+    """How each agent version reaches its agent; versions saved before text agents are phone."""
+    rows = await session.execute(
+        select(AgentVersion.id, AgentVersion.config["transport"].astext).where(
+            AgentVersion.id.in_(set(version_ids))
+        )
+    )
+    return {row[0]: Transport(row[1] or Transport.PHONE) for row in rows}
+
+
 async def pinned_scenarios(
     session: AsyncSession, version_ids: Iterable[uuid.UUID]
 ) -> dict[uuid.UUID, tuple[int, str, int]]:

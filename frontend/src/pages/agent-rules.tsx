@@ -35,7 +35,7 @@ import { type Agent, type AgentRule, type RuleResults, servedLanguages } from "@
 import { RuleFields } from "@/pages/agent-rules-field";
 
 const RESULTS_NOTE =
-  "Over the judged calls that ran the rule as it is written now. A change to what a rule checks starts its results again. The judge model reads an LLM rule's name, so a new name starts an LLM rule's results again too. A change to whether a rule counts does not.";
+  "Over the judged conversations that ran the rule as it is written now. A change to what a rule checks starts its results again. The judge model reads an LLM rule's name, so a new name starts an LLM rule's results again too. A change to whether a rule counts does not.";
 
 /** The agent's rules with how each did, and the dialog that adds or edits one. A rule with no key
  * is not saved yet. An address that ends in `#rules` scrolls to the panel. */
@@ -56,7 +56,7 @@ export function AgentRules({ agent }: { agent: Agent }) {
       action={
         <>
           <p className="mr-auto max-w-prose text-s-400 text-muted-foreground">
-            Checks on every judged call of this agent, beside each scenario's criteria.
+            Checks on every judged conversation of this agent, beside each scenario's criteria.
             {full && ` An agent has at most ${MAX_RULES} rules: delete one to add another.`}
           </p>
           <div className="flex gap-2">
@@ -185,7 +185,7 @@ function Results({
   if (!result || Object.keys(result.counts).length === 0) {
     return (
       <span className="col-span-2 text-right text-xs-400 text-muted-foreground">
-        No judged calls yet
+        No judged conversations yet
       </span>
     );
   }
@@ -269,7 +269,7 @@ function RuleDialog({
           {!adding && (
             <DeleteConfirm
               name={rule.name}
-              description="Calls already judged keep their results for it."
+              description="Conversations already judged keep their results for it."
               pending={save.isPending}
               onDelete={(close) =>
                 save.mutate((current) => current.filter((saved) => saved.key !== rule.key), {

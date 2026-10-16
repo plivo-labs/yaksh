@@ -147,7 +147,7 @@ export function AgentsPage() {
             <SortHeader label="Agent" field="name" sort={sort} onSort={sortBy} />
             <SortHeader label="Languages" field="languages" sort={sort} onSort={sortBy} />
             <span>Scenarios</span>
-            <span>Last call</span>
+            <span>Last conversation</span>
             <SortHeader
               label="Last updated"
               field="updated_at"
@@ -267,7 +267,7 @@ function AgentRow({ agent }: { agent: AgentSummary }) {
             </span>
           </>
         ) : (
-          <span className="text-muted-foreground">Never called</span>
+          <span className="text-muted-foreground">No runs yet</span>
         )}
       </div>
       <div className="col-span-2 text-xs-400 text-muted-foreground md:col-span-1">
@@ -305,7 +305,7 @@ function AgentMenu({ agent }: { agent: AgentSummary }) {
               fork.mutate(agent.id, {
                 onSuccess: (copy) => {
                   toast.success("Fork created", {
-                    description: `"${copy.name}" calls the same agent until you change its number or trigger.`,
+                    description: `"${copy.name}" tests the same agent until you change how Yaksh reaches it.`,
                     action: {
                       label: "Undo",
                       onClick: () =>

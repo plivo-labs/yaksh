@@ -11914,6 +11914,9 @@
             "type": "string",
             "title": "Agent Name"
           },
+          "transport": {
+            "$ref": "#/components/schemas/Transport"
+          },
           "name": {
             "anyOf": [
               {
@@ -12021,6 +12024,7 @@
           "agent_version_id",
           "agent_version",
           "agent_name",
+          "transport",
           "name",
           "repeats",
           "max_duration_s",
@@ -12204,6 +12208,9 @@
             "type": "string",
             "title": "Agent Name"
           },
+          "transport": {
+            "$ref": "#/components/schemas/Transport"
+          },
           "name": {
             "anyOf": [
               {
@@ -12304,6 +12311,7 @@
           "agent_version_id",
           "agent_version",
           "agent_name",
+          "transport",
           "name",
           "repeats",
           "max_duration_s",

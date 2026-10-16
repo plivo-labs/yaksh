@@ -136,17 +136,24 @@ function LineState({
     return (
       <div className="flex items-center gap-2 text-p-400">
         <StatusLabel tone="off">Idle</StatusLabel>
-        <span className="text-muted-foreground">Never called</span>
+        <span className="text-muted-foreground">No runs yet</span>
       </div>
     );
   }
   const active = ACTIVE_STATUSES.includes(call.status);
+  const text = call.transport === "text";
   const state =
     call.status === "queued"
-      ? "Waiting to dial"
+      ? text
+        ? "Waiting to start"
+        : "Waiting to dial"
       : call.status === "ending"
-        ? "Hanging up"
-        : "On a call";
+        ? text
+          ? "Ending"
+          : "Hanging up"
+        : text
+          ? "In a conversation"
+          : "On a call";
   return (
     <Link
       to={`/conversations/${call.id}`}
@@ -163,7 +170,7 @@ function LineState({
       <span className="text-muted-foreground">
         {active
           ? call.scenario_name
-          : `Last call ${call.status} ${when(call.started_at ?? call.created_at)}`}
+          : `Last conversation ${call.status} ${when(call.started_at ?? call.created_at)}`}
       </span>
     </Link>
   );

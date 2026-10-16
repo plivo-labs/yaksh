@@ -187,7 +187,7 @@ export function EndCallDialog({
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>End this call?</AlertDialogTitle>
+          <AlertDialogTitle>End this conversation?</AlertDialogTitle>
           <AlertDialogDescription>
             {conversation.status === "queued"
               ? "It has not connected yet, so it will be cancelled."
@@ -203,15 +203,15 @@ export function EndCallDialog({
               end.mutate(undefined, {
                 onSuccess: () => {
                   onOpenChange(false);
-                  toast.success("Ending the call");
+                  toast.success("Ending the conversation");
                 },
                 onError: (error) =>
-                  toast.error("Could not end the call", { description: error.message }),
+                  toast.error("Could not end the conversation", { description: error.message }),
               })
             }
           >
             {end.isPending && <Spinner />}
-            End call
+            End conversation
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

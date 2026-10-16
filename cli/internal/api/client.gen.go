@@ -2506,7 +2506,10 @@ type RunRead struct {
 	StartIntervalS *int               `json:"start_interval_s"`
 	StartedAt      *time.Time         `json:"started_at"`
 	Status         RunStatus          `json:"status"`
-	WaitingReason  *WaitingReason     `json:"waiting_reason"`
+
+	// Transport How Yaksh reaches an agent.
+	Transport     Transport      `json:"transport"`
+	WaitingReason *WaitingReason `json:"waiting_reason"`
 }
 
 // RunScenario A scenario of a run, the personas that call it and the data sets they play. No personas
@@ -2546,7 +2549,10 @@ type RunSummary struct {
 	StartIntervalS *int               `json:"start_interval_s"`
 	StartedAt      *time.Time         `json:"started_at"`
 	Status         RunStatus          `json:"status"`
-	WaitingReason  *WaitingReason     `json:"waiting_reason"`
+
+	// Transport How Yaksh reaches an agent.
+	Transport     Transport      `json:"transport"`
+	WaitingReason *WaitingReason `json:"waiting_reason"`
 }
 
 // RunVerdicts The run's verdict numbers over its judged calls: completed calls that no one stopped,

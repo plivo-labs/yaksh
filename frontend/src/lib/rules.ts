@@ -3,7 +3,7 @@ import type { AgentRule, LlmRule, PhraseRule } from "@/lib/types";
 export const MAX_RULES = 20;
 
 export const ROLE_TEXT: Record<AgentRule["role"], string> = {
-  deciding: "Counts in the call's verdict",
+  deciding: "Counts in the conversation's verdict",
   reporting: "Reports only",
 };
 
@@ -85,12 +85,12 @@ function slug(name: string): string {
 export const KIND: Record<AgentRule["kind"], { label: string; note: string; edit: string }> = {
   llm: {
     label: "LLM rule",
-    note: "The judge model decides it on every judged call, beside the scenario's criteria.",
-    edit: "A change to its name, its text or the calls it is judged on starts its results again.",
+    note: "The judge model decides it on every judged conversation, beside the scenario's criteria.",
+    edit: "A change to its name, its text or the conversations it is judged on starts its results again.",
   },
   phrase: {
     label: "phrase rule",
-    note: "Code looks for it in the agent's lines on every judged call.",
+    note: "Code looks for it in the agent's lines on every judged conversation.",
     edit: "A change to what it looks for, or where, starts its results again; a new name does not.",
   },
 };
@@ -104,8 +104,8 @@ const PHRASE_VERB = {
 export function summary(rule: AgentRule): string {
   if (rule.kind === "llm") {
     return rule.gate === "always"
-      ? "Judge model, every call"
-      : "Judge model, calls where the agent spoke";
+      ? "Judge model, every conversation"
+      : "Judge model, conversations where the agent spoke";
   }
   const value = rule.match === "phrase" ? `"${rule.value}"` : rule.value;
   const where = rule.where === "first_agent_turn" ? " in its first turn" : "";

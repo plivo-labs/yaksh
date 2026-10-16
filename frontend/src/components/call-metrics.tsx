@@ -25,8 +25,10 @@ export function CallMetricsCard({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Call metrics</CardTitle>
-        {evaluationPending(evaluation) && <CardDescription>Measuring the call.</CardDescription>}
+        <CardTitle>Conversation metrics</CardTitle>
+        {evaluationPending(evaluation) && (
+          <CardDescription>Measuring the conversation.</CardDescription>
+        )}
         {evaluation === "failed" && (
           <CardDescription className="text-status-danger wrap-anywhere">
             The measurement failed{found.data?.failure ? `: ${found.data.failure}` : "."}
@@ -119,7 +121,7 @@ function Metrics({ found }: { found: ConversationEvaluation }) {
           </Line>
         )}
         {usage && (
-          <Line label="Connection, from the start of the call">
+          <Line label="Connection, from the start of the conversation">
             {[
               usage.value.ringing_ms !== null && `ringing at ${seconds(usage.value.ringing_ms)}`,
               usage.value.answered_ms !== null && `answered at ${seconds(usage.value.answered_ms)}`,
@@ -141,7 +143,7 @@ function Metrics({ found }: { found: ConversationEvaluation }) {
 /** The record's problems as counts. The flags above name them; these say how many. */
 function problems(faults: CaptureFaults): string {
   if ("incomplete_record" in faults) {
-    return "The worker stopped before it saved the call in full.";
+    return "The worker stopped before it saved the conversation in full.";
   }
   const found = [
     faults.caller_error.length > 0 && `caller error: ${faults.caller_error.join("; ")}`,

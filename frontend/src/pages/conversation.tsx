@@ -158,7 +158,7 @@ function ConversationView({ id }: { id: string }) {
             <ConversationStatusLabel status={data.status} />
             {active && (
               <Button variant="outline" size="sm" onClick={() => setEnding(true)}>
-                End call
+                End
               </Button>
             )}
             <EndCallDialog conversation={data} open={ending} onOpenChange={setEnding} />
