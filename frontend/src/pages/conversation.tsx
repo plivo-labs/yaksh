@@ -4,6 +4,7 @@ import { Fragment, type RefObject, useEffect, useRef, useState } from "react";
 import { useDefaultLayout } from "react-resizable-panels";
 import { Link, useParams, useSearchParams } from "react-router";
 
+import { ToolCalls } from "@/components/tool-calls";
 import { CallMetricsCard } from "@/components/call-metrics";
 import { CallResults } from "@/components/call-results";
 import { CallSounds } from "@/components/call-sounds";
@@ -79,7 +80,6 @@ import {
   LANGUAGE_NAMES,
   type Reply,
   type PlayedScenario,
-  type ToolItem,
   type Turn,
   WIRE_EVENT_HELP,
   type WireEvent,
@@ -866,7 +866,7 @@ function Transcript({
                                 {turn.text}
                               </BubbleContent>
                             </Bubble>
-                            {turn.tools?.length > 0 && <ToolItems tools={turn.tools} />}
+                            {turn.tools?.length > 0 && <ToolCalls tools={turn.tools} />}
                           </MessageContent>
                         </Message>
                       </MessageScrollerItem>
@@ -886,27 +886,6 @@ function Transcript({
         )}
       </CardContent>
     </Card>
-  );
-}
-
-/** The tools a text agent called in one turn, folded: name, arguments and output. */
-function ToolItems({ tools }: { tools: ToolItem[] }) {
-  return (
-    <details className="text-xs-400 text-muted-foreground">
-      <summary className="w-fit cursor-pointer rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/50">
-        {tools.length} tool call{tools.length === 1 ? "" : "s"}
-      </summary>
-      <ul className="mt-1.5 grid gap-1.5">
-        {tools.map((tool) => (
-          <li key={tool.id} className="grid gap-0.5 rounded-md bg-muted p-2 font-mono break-all">
-            <span className="text-foreground">
-              {tool.name}({tool.arguments})
-            </span>
-            {tool.output !== null && <span>{tool.output}</span>}
-          </li>
-        ))}
-      </ul>
-    </details>
   );
 }
 
