@@ -6,9 +6,14 @@ from typing import Any
 
 from yaksh.domain.conversations import Turn
 from yaksh.evaluation.canonical import canonical, contains
+from yaksh.evaluation.evidence import turn_evidence
 
 
-def quote_problems(evidence: Sequence[dict[str, Any]], turns: Sequence[Turn]) -> list[str]:
+def quote_problems(
+    evidence: Sequence[dict[str, Any]], turns: Sequence[Turn], *, tools: bool = False
+) -> list[str]:
+    """With tools, a quote can come from a turn's tool calls too: for what the agent did, not
+    for what it said."""
     problems = []
     for quote in evidence:
         turn, words = quote["turn"], quote["quote"]
@@ -18,7 +23,7 @@ def quote_problems(evidence: Sequence[dict[str, Any]], turns: Sequence[Turn]) ->
             problems.append(
                 f'The quote "{words}" names turn {turn}; the call has turns 1 to {len(turns)}.'
             )
-        elif not contains(turns[turn - 1].text, words):
+        elif not contains(turn_evidence(turns[turn - 1]) if tools else turns[turn - 1].text, words):
             problems.append(
                 f'The quote "{words}" is not in turn {turn}. '
                 f"Quote the words as turn {turn} has them."

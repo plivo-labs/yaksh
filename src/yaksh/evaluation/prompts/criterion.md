@@ -7,7 +7,7 @@ Verdicts:
 - fail: the transcript shows that the agent did not do it, or did the opposite.
 - not_applicable: the criterion asks something only in a situation that did not come up in this call.
 - unsure, with a kind:
-  - hidden_action: the answer needs a tool call or a stored record that a call cannot show, such as a booking saved or an email sent.
+  - hidden_action: the answer needs a tool call or a stored record that the transcript does not show, such as a booking saved or an email sent.
   - not_confirmed_played: the only evidence is in caller turns marked "audio not confirmed played" or "not played".
   - unclear: the transcript does not give a clear answer.
 

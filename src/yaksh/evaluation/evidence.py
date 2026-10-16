@@ -6,10 +6,10 @@ from dataclasses import dataclass
 from datetime import date
 
 from yaksh.domain.agents import Direction, Transport
-from yaksh.domain.conversations import EndReason, Provenance, Role, Turn
+from yaksh.domain.conversations import EndReason, Provenance, Role, ToolItem, Turn
 from yaksh.domain.scenarios import Fact
 
-EVIDENCE_VIEW_VERSION = 2
+EVIDENCE_VIEW_VERSION = 3
 
 TRANSCRIPTION_NOTE = {
     Transport.PHONE: (
@@ -19,7 +19,8 @@ TRANSCRIPTION_NOTE = {
     Transport.TEXT: (
         "This test ran over text, with no phone call: the agent's lines are the exact text it "
         "sent. The agent ran its voice rules, so spelled and spoken-form read-backs are "
-        "expected."
+        'expected. A "Tool call" line under an agent line is a tool that the agent called in '
+        "that turn, with its arguments and output, as the agent reported them."
     ),
 }
 
@@ -118,7 +119,19 @@ def how_it_ended(view: CallView) -> str:
 
 
 def transcript(turns: list[Turn]) -> list[str]:
-    return [f"[{number}] {speaker(turn)}: {turn.text}" for number, turn in enumerate(turns, 1)]
+    return [
+        f"[{number}] {speaker(turn)}: {turn_evidence(turn)}" for number, turn in enumerate(turns, 1)
+    ]
+
+
+def tool_line(tool: ToolItem) -> str:
+    output = "no output reported" if tool.output is None else f"output {tool.output}"
+    return f"    Tool call: {tool.name} {tool.arguments}, {output}"
+
+
+def turn_evidence(turn: Turn) -> str:
+    """What a judge can quote from a turn: its words and its tool calls."""
+    return "\n".join([turn.text, *map(tool_line, turn.tools)])
 
 
 def speaker(turn: Turn) -> str:
