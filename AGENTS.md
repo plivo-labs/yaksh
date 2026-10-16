@@ -56,6 +56,7 @@ Imported call:    api -> queued evaluation -> evaluator -> evaluation -> saved m
 - The CLI is Go with cobra; its API client is generated with oapi-codegen from `cli/openapi.json`. After an API change, run `uv run python scripts/export_openapi.py` and `go -C cli generate ./...`; CI fails when the spec or the client is out of date.
 - The console's colors, type ramp and radius come from `@plivo/tokens` (pinned in `frontend/package.json`), and its `DESIGN.md` is the style guide. Use the token classes, such as `text-p-400`, `bg-bg1` and the tag pairs, and not Tailwind's default text sizes or a literal color. The token classes take no variant prefix: choose them in TSX. Indigo (`brand`) never colors a control.
 - Records that a conversation depends on are versioned: every change to an agent's configuration writes an `agent_versions` row, and a conversation pins the version it ran against.
+- Until the first public release, the schema is one migration: a schema change edits `0001_initial_schema.py`, and each install made before it is reset or stamped by hand. From that release, `0001` is frozen: every change is a new revision, and a column is dropped one release after the code stops using it, so the old version keeps working during a rolling deploy.
 - Work on `dev`; `main` is for releases.
 - Commit messages follow commitlint: conventional commits, one line, no trailers.
 - US English, no em dashes.
