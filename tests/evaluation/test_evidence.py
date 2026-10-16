@@ -3,9 +3,10 @@ from datetime import date
 from pathlib import Path
 
 from yaksh.domain.agents import Direction, Transport
-from yaksh.domain.conversations import EndReason, Provenance, Role, Turn
+from yaksh.domain.conversations import EndReason, Provenance, Role, ToolItem, Turn
 from yaksh.domain.scenarios import Fact
 from yaksh.evaluation.evidence import CallView, render, with_item
+from yaksh.evaluation.quotes import quote_problems
 
 FIXTURES = Path(__file__).parent / "fixtures"
 LINES = [
@@ -124,3 +125,18 @@ def test_a_text_conversation_has_its_own_transcript_note_and_no_phone_facts() ->
     assert "speech-to-text" not in view
     assert "Yaksh's caller started the conversation with the agent, over text." in view
     assert "Yaksh called the agent" not in view
+
+
+def test_a_judge_sees_and_can_quote_the_tools_of_a_text_turn() -> None:
+    saved = ToolItem(id="c1", name="save_feedback", arguments='{"value": "liked it"}', output="ok")
+    turns = [
+        Turn(role=Role.AGENT, text="Thanks!", started_at_ms=0, ended_at_ms=1, tools=[saved]),
+        Turn(role=Role.CALLER, text="Bye.", started_at_ms=2, ended_at_ms=3),
+    ]
+    view = render(replace(MAPLE_DENTAL, transport=Transport.TEXT, turns=turns))
+
+    call = 'save_feedback {"value": "liked it"}'
+    assert f"[1] Agent: Thanks!\n    Tool call: {call}, output ok\n[2]" in view
+    assert quote_problems([{"turn": 1, "quote": call}], turns, tools=True) == []
+    assert quote_problems([{"turn": 2, "quote": "save_feedback"}], turns, tools=True) != []
+    assert quote_problems([{"turn": 1, "quote": call}], turns) != []

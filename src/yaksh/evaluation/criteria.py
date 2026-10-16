@@ -62,7 +62,7 @@ AGENT_RULE = JudgeSpec(
 
 def answer_problems(turns: Sequence[Turn]) -> Check:
     def check(answer: dict[str, Any]) -> tuple[list[str], list[str]]:
-        hard = quote_problems(answer["evidence"], turns)
+        hard = quote_problems(answer["evidence"], turns, tools=True)
         if answer["verdict"] == "unsure" and answer["kind"] is None:
             hard.append("An unsure verdict needs a kind.")
         if answer["verdict"] == "fail" and not answer["evidence"] and not answer["absence"]:

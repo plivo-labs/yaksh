@@ -7,7 +7,7 @@ Verdicts:
 - fail: the rule applies, and the transcript shows its fail condition.
 - not_applicable: the rule does not apply to this call.
 - unsure, with a kind:
-  - hidden_action: the answer needs a tool call or a stored record that a call cannot show.
+  - hidden_action: the answer needs a tool call or a stored record that the transcript does not show.
   - not_confirmed_played: the only evidence is in caller turns marked "audio not confirmed played" or "not played".
   - unclear: the transcript does not give a clear answer.
 
