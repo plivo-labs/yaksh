@@ -5,7 +5,7 @@ from datetime import timedelta
 from typing import Any
 
 from pydantic import BaseModel
-from sqlalchemy import ColumnElement, Row, String, and_, cast, func, or_, select, update
+from sqlalchemy import ColumnElement, Row, String, and_, cast, false, func, or_, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from sqlalchemy.orm import defer
@@ -22,7 +22,7 @@ from yaksh.db.models import (
     Scenario,
     ScenarioVersion,
 )
-from yaksh.domain.agents import AgentConfig, Direction
+from yaksh.domain.agents import AgentConfig, Direction, Transport
 from yaksh.domain.conversations import (
     ACTIVE_STATUSES,
     LIVE_STATUSES,
@@ -176,6 +176,18 @@ async def pinned_agents(
     return {row.id: (row.version, row.name) for row in rows}
 
 
+async def pinned_transports(
+    session: AsyncSession, version_ids: Iterable[uuid.UUID]
+) -> dict[uuid.UUID, Transport]:
+    """How each agent version reaches its agent; versions saved before text agents are phone."""
+    rows = await session.execute(
+        select(AgentVersion.id, AgentVersion.config["transport"].astext).where(
+            AgentVersion.id.in_(set(version_ids))
+        )
+    )
+    return {row[0]: Transport(row[1] or Transport.PHONE) for row in rows}
+
+
 async def pinned_scenarios(
     session: AsyncSession, version_ids: Iterable[uuid.UUID]
 ) -> dict[uuid.UUID, tuple[int, str, int]]:
@@ -242,24 +254,32 @@ async def end_conversation(session: AsyncSession, conversation_id: uuid.UUID) ->
     return conversation
 
 
-def runnable_now(pool_app_id: str | None, receiving_app_id: str | None) -> ColumnElement[bool]:
-    """A queued conversation that can start now: one that needs a number waits while no test
-    number of pool_app_id is free, and outbound conversations run only on a worker that
-    receives calls for receiving_app_id."""
+def runnable_now(
+    pool_app_id: str | None, receiving_app_id: str | None, transports: frozenset[Transport]
+) -> ColumnElement[bool]:
+    """A queued conversation of one of `transports` that can start now: a text one always can;
+    a phone one that needs a number waits while no test number of pool_app_id is free, and
+    outbound phone conversations run only on a worker that receives calls for
+    receiving_app_id."""
+    text = Conversation.transport == Transport.TEXT
     has_number = Conversation.caller_number.is_not(None)
     inbound = and_(
+        Conversation.transport == Transport.PHONE,
         Conversation.direction == Direction.INBOUND,
         has_number
         if pool_app_id is None
         else or_(has_number, select(PhoneNumber).where(free_numbers(pool_app_id)).exists()),
     )
-    if receiving_app_id is None:
-        return inbound
-    outbound = and_(
-        Conversation.direction == Direction.OUTBOUND,
-        select(PhoneNumber).where(free_numbers(receiving_app_id, rested=True)).exists(),
-    )
-    return or_(inbound, outbound)
+    phone = inbound
+    if receiving_app_id is not None:
+        outbound = and_(
+            Conversation.transport == Transport.PHONE,
+            Conversation.direction == Direction.OUTBOUND,
+            select(PhoneNumber).where(free_numbers(receiving_app_id, rested=True)).exists(),
+        )
+        phone = or_(inbound, outbound)
+    allowed = {Transport.TEXT: text, Transport.PHONE: phone}
+    return or_(false(), *(allowed[transport] for transport in transports))
 
 
 def claim_values(worker_id: str, lease_s: float) -> dict[str, Any]:
@@ -277,14 +297,15 @@ async def claim_next(
     lease_s: float,
     pool_app_id: str | None,
     receiving_app_id: str | None,
+    transports: frozenset[Transport],
 ) -> Conversation | None:
-    """Claim the oldest queued conversation that can run now, in the order the runs were
-    created. The claim holds the run's lock, so no two workers pass a run's max parallel or its
-    start interval. The candidate is picked without a lock; when the claim finds it taken, or
-    its run no longer ready, the next candidate is tried."""
+    """Claim the oldest queued conversation of one of `transports` that can run now, in the
+    order the runs were created. The claim holds the run's lock, so no two workers pass a run's
+    max parallel or its start interval. The candidate is picked without a lock; when the claim
+    finds it taken, or its run no longer ready, the next candidate is tried."""
     ready = and_(
         Conversation.status == ConversationStatus.QUEUED,
-        runnable_now(pool_app_id, receiving_app_id),
+        runnable_now(pool_app_id, receiving_app_id, transports),
         ~run_full(),
         ~run_waiting(),
     )
@@ -324,9 +345,11 @@ async def prepare_call(
 ) -> CallRequest:
     """Lease the conversation's Yaksh number when it has none yet (the caller ID of an inbound
     test, or the number an outbound agent must call) and build the call from the pinned
-    versions."""
+    versions. A text agent needs no number."""
     agent_version = await session.get_one(AgentVersion, conversation.agent_version_id)
     agent = AgentConfig.model_validate(agent_version.config)
+    if agent.transport is Transport.TEXT:
+        return await call_request(session, app, conversation, None, agent)
     number = conversation.caller_number
     if number is None and agent.outbound is not None:
         assert receiving_app_id is not None
@@ -348,7 +371,7 @@ async def call_request(
     session: AsyncSession,
     app: AppSettings,
     conversation: Conversation,
-    number: str,
+    number: str | None,
     agent: AgentConfig,
 ) -> CallRequest:
     persona_version = await session.get_one(PersonaVersion, conversation.persona_version_id)

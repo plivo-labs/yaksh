@@ -44,6 +44,7 @@ import {
   type Scenario,
 } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { sendsAgentData } from "@/lib/agent-draft";
 
 const MAX_DATA_SET_NAME_CHARS = 40;
 
@@ -282,7 +283,7 @@ function DataSetDialog({
   const [submitted, setSubmitted] = useState(false);
   const { change, pending } = useDataSetChange(agent, scenario);
   const [error, setError] = useState<string | null>(null);
-  const outbound = agent.direction === "outbound";
+  const agentData = sendsAgentData(agent);
   const others = scenario.data_sets.filter((dataSet) => dataSet.id !== editing?.id);
   const name = draft.name.trim();
   const nameProblem = !name
@@ -290,7 +291,7 @@ function DataSetDialog({
     : others.some((dataSet) => normalized(dataSet.name) === normalized(name))
       ? `There is already a data set named ${name}.`
       : null;
-  const empty = [...draft.known_facts, ...(outbound ? draft.agent_data : [])].some(
+  const empty = [...draft.known_facts, ...(agentData ? draft.agent_data : [])].some(
     (fact) => !fact.value.trim(),
   );
   const trimmed: DataSet = {
@@ -420,7 +421,7 @@ function DataSetDialog({
                 </span>
               )}
             </FieldSet>
-            {outbound && draft.agent_data.length > 0 && (
+            {agentData && draft.agent_data.length > 0 && (
               <FieldSet>
                 <FieldLegend variant="label">Data sent to the agent</FieldLegend>
                 <FieldDescription>The caller does not see these.</FieldDescription>
@@ -480,7 +481,7 @@ function WriteDataSets({
   onClosed: () => void;
 }) {
   const { change } = useDataSetChange(agent, scenario);
-  const outbound = agent.direction === "outbound";
+  const agentData = sendsAgentData(agent);
   const first = scenario.data_sets[0];
   const line = (facts: Fact[]) => facts.map((fact) => `${fact.name} ${fact.value}`).join(" · ");
 
@@ -504,13 +505,13 @@ function WriteDataSets({
           <span className="text-s-400">
             {first.known_facts.map((fact) => fact.name).join(", ") || "No facts yet"}
           </span>
-          {outbound && first.agent_data.length > 0 && (
+          {agentData && first.agent_data.length > 0 && (
             <span className="font-mono text-s-400 text-muted-foreground">
               {first.agent_data.map((fact) => fact.name).join(", ")}
             </span>
           )}
           <span className="text-xs-400 text-muted-foreground">
-            {outbound && first.agent_data.length > 0
+            {agentData && first.agent_data.length > 0
               ? "The instructions and the criteria stay the same. The values agree: the city the caller names is the city in the agent data."
               : "The instructions and the criteria stay the same."}
           </span>
@@ -518,7 +519,7 @@ function WriteDataSets({
       }
       changes={(draft) => [
         line(draft.known_facts),
-        ...(outbound && draft.agent_data.length > 0
+        ...(agentData && draft.agent_data.length > 0
           ? [`Agent data: ${line(draft.agent_data)}`]
           : []),
       ]}

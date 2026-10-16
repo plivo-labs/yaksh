@@ -49,13 +49,13 @@ export function CallResults({
 }) {
   const found = useConversationEvaluation(conversationId, evaluation);
   if (evaluation === null) {
-    return <Note>Results appear once the call has ended and been judged.</Note>;
+    return <Note>Results appear once the conversation has ended and been judged.</Note>;
   }
   if (evaluationPending(evaluation)) {
     return (
       <Note>
         <Spinner className="size-3.5" />
-        Judging the call.
+        Judging the conversation.
       </Note>
     );
   }
@@ -70,8 +70,8 @@ export function CallResults({
   if (data.scenario_verdict === null && data.items.length === 0) {
     return (
       <Note>
-        Not judged. The judges read completed calls that no one stopped, when the server has a judge
-        model.
+        Not judged. The judges read completed conversations that no one stopped, when the server has
+        a judge model.
       </Note>
     );
   }
@@ -105,7 +105,7 @@ export function CallResults({
               to={`/review/${conversationId}?seen=1`}
               className="rounded-sm text-xs-500 text-muted-foreground underline-offset-4 outline-none hover:text-foreground hover:underline focus-visible:ring-2 focus-visible:ring-ring/50"
             >
-              Label this call
+              Label this conversation
             </Link>
           </div>
         </section>
@@ -185,7 +185,7 @@ const VERDICT_KINDS = {
   },
   conversation: {
     label: "With agent rules",
-    hint: "The scenario's criteria plus the agent rules set to count in the call's verdict. Rules that only report do not change it.",
+    hint: "The scenario's criteria plus the agent rules set to count in the conversation's verdict. Rules that only report do not change it.",
   },
 } as const;
 
@@ -277,7 +277,7 @@ function summary(item: EvaluationItem): string {
 }
 
 function callerEffectShort(found: NonNullable<EvaluationItem["caller_effect"]>): string {
-  if (found.blame === null) return "the caller check failed on a call a test limit ended";
+  if (found.blame === null) return "the caller check failed on a conversation a test limit ended";
   if (found.owner === "test_settings") return "the test's turn or time limit cut it off";
   if (found.owner === "scenario") return "the scenario cannot pass as written";
   return found.blame === "likely"
@@ -288,7 +288,7 @@ function callerEffectShort(found: NonNullable<EvaluationItem["caller_effect"]>):
 /** What the caller check found for a criterion, by who caused it. */
 function callerEffect(found: NonNullable<EvaluationItem["caller_effect"]>): string {
   if (found.blame === null) {
-    return "The caller check failed on a call that a test limit ended, so this is not scored.";
+    return "The caller check failed on a conversation that a test limit ended, so this is not scored.";
   }
   if (found.owner === "test_settings") {
     return `The test's turn or time limit cut this off: ${found.effect}`;
@@ -386,7 +386,9 @@ function ItemDetails({
   const kind = machineOnly ? item.unsure_kind : item.effective_unsure_kind;
   const facts = [
     `Decided by ${decidedBy(item).toLowerCase().replace("jev", "Jev")}`,
-    item.role === "deciding" && item.item_key.startsWith("rule-") && "counts in the call's verdict",
+    item.role === "deciding" &&
+      item.item_key.startsWith("rule-") &&
+      "counts in the conversation's verdict",
     outcome === "unsure" && kind && UNSURE_TEXT[kind],
     !machineOnly &&
       outcome !== item.machine_outcome &&

@@ -183,7 +183,8 @@ function missingKeys(settings: AppSettings): string[] {
   ].filter((name): name is string => Boolean(name));
 }
 
-/** A strip across the top of every page while calls cannot start. */
+/** A strip across the top of every page while tests cannot start: without the LLM key none
+ * can, without a speech or Plivo key only phone tests are blocked. */
 function MissingKeys() {
   const settings = useSettings();
   if (!settings.data) return null;
@@ -196,7 +197,10 @@ function MissingKeys() {
     >
       <TriangleAlert className="size-4 shrink-0" aria-hidden />
       <span>
-        <span className="text-s-500">Calls can't start.</span> Missing keys: {missing.join(", ")}.
+        <span className="text-s-500">
+          {settings.data.secrets.llm_api_key ? "Phone tests can't start." : "Tests can't start."}
+        </span>{" "}
+        Missing keys: {missing.join(", ")}.
       </span>
       <Link to="/settings" className="text-s-500 underline underline-offset-2">
         Open Settings

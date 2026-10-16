@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from yaksh.config import Settings
 from yaksh.db.models import Conversation
 from yaksh.diagnostics import describe_exception
+from yaksh.domain.agents import TEXT_TURN_TIMEOUT_S, Transport
 from yaksh.domain.conversations import (
     Admission,
     Caller,
@@ -88,11 +89,21 @@ class Worker:
         """The stored settings as of the latest poll."""
         self._reported_at = -math.inf
         self._tasks: dict[uuid.UUID, asyncio.Task[None]] = {}
+        self._transports: dict[uuid.UUID, Transport] = {}
         self._live: dict[uuid.UUID, LiveCall] = {}
 
     @property
     def active(self) -> int:
         return len(self._tasks)
+
+    def _room(self) -> frozenset[Transport]:
+        """The transports with a free slot: phone and text tests have their own limits."""
+        limits = {
+            Transport.PHONE: self._settings.max_active_conversations,
+            Transport.TEXT: self._settings.max_active_text_conversations,
+        }
+        running = list(self._transports.values())
+        return frozenset(kind for kind, limit in limits.items() if running.count(kind) < limit)
 
     @property
     def stopping(self) -> bool:
@@ -132,7 +143,7 @@ class Worker:
         await self._report_if_due()
         claimed = 0
         lease_s = self._timings.worker_lease_s
-        while self.active < self._settings.max_active_conversations and not self.stopping:
+        while (room := self._room()) and not self.stopping:
             await self._report_if_due()
             async with self._sessionmaker() as session:
                 conversation = await conversations.claim_next(
@@ -141,6 +152,7 @@ class Worker:
                     lease_s,
                     self._account.pool_app_id,
                     self._account.receiving_app_id,
+                    room,
                 )
             if conversation is None:
                 break
@@ -250,10 +262,12 @@ class Worker:
         self._live[request.conversation_id] = live
         task = asyncio.create_task(self._execute(request, live, confirmed_at))
         self._tasks[request.conversation_id] = task
+        self._transports[request.conversation_id] = request.agent.transport
         task.add_done_callback(lambda _: self._forget(request.conversation_id))
 
     def _forget(self, conversation_id: uuid.UUID) -> None:
         self._tasks.pop(conversation_id, None)
+        self._transports.pop(conversation_id, None)
         self._live.pop(conversation_id, None)
 
     async def _execute(self, request: CallRequest, live: LiveCall, confirmed_at: float) -> None:
@@ -301,8 +315,10 @@ class Worker:
             )
 
     def _connect_timeout_s(self, request: CallRequest) -> float:
-        """How long a call may take to connect: ringing the agent, or for an outbound agent,
-        its trigger and dial window."""
+        """How long a call may take to connect: ringing the agent, for an outbound agent its
+        trigger and dial window, or for a text agent its first reply."""
+        if request.agent.transport is Transport.TEXT:
+            return TEXT_TURN_TIMEOUT_S + DIAL_MARGIN_S
         outbound = request.agent.outbound
         if outbound is None:
             return request.app_settings.phone.ring_timeout_s + DIAL_MARGIN_S

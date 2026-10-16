@@ -76,7 +76,11 @@ export function RunPage() {
         agentId={data.agent_id}
         active={ACTIVE_RUN_STATUSES.includes(data.status)}
       />
-      <RunMetricsPanel runId={data.id} active={ACTIVE_RUN_STATUSES.includes(data.status)} />
+      <RunMetricsPanel
+        runId={data.id}
+        text={data.transport === "text"}
+        active={ACTIVE_RUN_STATUSES.includes(data.status)}
+      />
       <Conversations run={data} />
     </div>
   );
@@ -153,7 +157,7 @@ function Overview({ run }: { run: Run }) {
         <GroupFilter run={run} />
         {endReasons.length > 0 && (
           <div className="flex flex-wrap items-center gap-1.5 text-xs-400">
-            <span className="mr-1 text-muted-foreground">How calls ended</span>
+            <span className="mr-1 text-muted-foreground">How conversations ended</span>
             {endReasons.map(([reason, count]) => (
               <Badge key={reason} variant="tag">
                 {END_REASON_LABELS[reason]} · {count}
@@ -210,8 +214,8 @@ function RunActions({ run }: { run: Run }) {
             <AlertDialogHeader>
               <AlertDialogTitle>Cancel this run?</AlertDialogTitle>
               <AlertDialogDescription>
-                Conversations that have not started are cancelled. Calls on the line end, and what
-                was said so far is kept. No conversation is tried again.
+                Conversations that have not started are cancelled. Running conversations end, and
+                what was said so far is kept. No conversation is tried again.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>

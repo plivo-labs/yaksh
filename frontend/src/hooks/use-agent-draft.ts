@@ -3,7 +3,7 @@ import { useState } from "react";
 import { briefLength, type Draft, MIN_BRIEF_CHARS } from "@/lib/agent-draft";
 import { revealErrors } from "@/lib/forms";
 import { APPEAR } from "@/lib/motion";
-import { isPhoneNumber, outboundProblems } from "@/lib/outbound";
+import { endpointProblems, isPhoneNumber, outboundProblems } from "@/lib/outbound";
 import { MAX_CONFIG_CHARS } from "@/pages/agent-config-field";
 
 /** An agent being added or edited: the draft, what it still needs, and a check that shows the
@@ -13,18 +13,21 @@ export function useAgentDraft(baseline: Draft, start: Draft = baseline) {
   const [submitted, setSubmitted] = useState(false);
   const [switched, setSwitched] = useState(false);
   const set = <K extends keyof Draft>(key: K, value: Draft[K]) => {
-    if (key === "direction") setSwitched(true);
+    if (key === "direction" || key === "transport") setSwitched(true);
     setDraft((current) => ({ ...current, [key]: value }));
   };
-  const outbound = draft.direction === "outbound";
+  const text = draft.transport === "text";
+  const outbound = !text && draft.direction === "outbound";
   const needs = {
     name: draft.name.trim() === "",
     direction: draft.direction === null,
     reach:
       draft.direction !== null &&
-      (outbound
-        ? Object.keys(outboundProblems(draft.outbound)).length > 0
-        : !isPhoneNumber(draft.agent_number)),
+      (text
+        ? Object.keys(endpointProblems(draft.endpoint)).length > 0
+        : outbound
+          ? Object.keys(outboundProblems(draft.outbound)).length > 0
+          : !isPhoneNumber(draft.agent_number)),
     languages: draft.languages.length === 0,
     brief: briefLength(draft.brief) < MIN_BRIEF_CHARS,
     config: draft.config.length > MAX_CONFIG_CHARS,

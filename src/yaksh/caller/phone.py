@@ -126,6 +126,7 @@ class Dialer:
     ) -> Connected | CallOutcome:
         if request.agent.agent_number is None:
             return unreached(EndReason.ERROR, "the agent has no phone number")
+        assert request.caller_number is not None
         conversation_id = request.conversation_id
         call = OutboundCall(
             from_number=request.caller_number,
@@ -736,7 +737,7 @@ class PhoneCaller:
         self, request: CallRequest, observer: CallObserver, clock: Clock
     ) -> TriggerOutcome:
         """Send the outbound agent's trigger once and record its result on the wire."""
-        assert request.agent.outbound is not None
+        assert request.agent.outbound is not None and request.caller_number is not None
         try:
             rendered = render(
                 request.agent.outbound.trigger,
@@ -756,7 +757,7 @@ class PhoneCaller:
                 rendered,
                 str(request.conversation_id),
                 signing_key=key.get_secret_value() if key else None,
-                allow_private=self._settings.allow_private_triggers,
+                allow_private=self._settings.allow_private_hosts,
             )
         observer.wire_event(
             WireEvent(kind=WireEventKind.TRIGGER_SENT, at_ms=clock.ms(), detail=outcome.detail)

@@ -5,16 +5,23 @@ setting, the agent's configuration and its documents. A change to the text is a 
 from dataclasses import dataclass
 from datetime import date
 
-from yaksh.domain.agents import Direction
+from yaksh.domain.agents import Direction, Transport
 from yaksh.domain.conversations import EndReason, Provenance, Role, Turn
 from yaksh.domain.scenarios import Fact
 
-EVIDENCE_VIEW_VERSION = 1
+EVIDENCE_VIEW_VERSION = 2
 
-TRANSCRIPTION_NOTE = (
-    "The agent's lines are Yaksh's speech-to-text of the agent's audio. Judge what was said, "
-    'not the spelling: "for" can mean "four", and "to" can mean "two".'
-)
+TRANSCRIPTION_NOTE = {
+    Transport.PHONE: (
+        "The agent's lines are Yaksh's speech-to-text of the agent's audio. Judge what was said, "
+        'not the spelling: "for" can mean "four", and "to" can mean "two".'
+    ),
+    Transport.TEXT: (
+        "This test ran over text, with no phone call: the agent's lines are the exact text it "
+        "sent. The agent ran its voice rules, so spelled and spoken-form read-backs are "
+        "expected."
+    ),
+}
 
 ENDED_BY = {
     EndReason.AGENT_HANGUP: "The agent hung up",
@@ -34,6 +41,7 @@ class CallView:
     today: date
     time_zone: str
     direction: Direction
+    transport: Transport
     agent_number: str | None
     """The number Yaksh called; inbound agents only."""
     yaksh_number: str | None
@@ -72,7 +80,7 @@ def render(view: CallView) -> str:
                 ]
             ),
             "\n".join(["CALL FACTS", who_called(view), how_it_ended(view)]),
-            "\n".join(["TRANSCRIPT", TRANSCRIPTION_NOTE, *transcript(view.turns)]),
+            "\n".join(["TRANSCRIPT", TRANSCRIPTION_NOTE[view.transport], *transcript(view.turns)]),
         ]
     )
 
@@ -86,6 +94,10 @@ def facts(found: list[Fact]) -> str:
 
 
 def who_called(view: CallView) -> str:
+    if view.transport is Transport.TEXT:
+        if view.direction is Direction.INBOUND:
+            return "Yaksh's caller started the conversation with the agent, over text."
+        return "The agent started the conversation with Yaksh's caller, over text."
     if view.direction is Direction.INBOUND:
         return (
             f"Yaksh called the agent at {view.agent_number or 'an unknown number'} "

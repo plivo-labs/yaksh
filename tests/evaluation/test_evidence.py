@@ -2,7 +2,7 @@ from dataclasses import replace
 from datetime import date
 from pathlib import Path
 
-from yaksh.domain.agents import Direction
+from yaksh.domain.agents import Direction, Transport
 from yaksh.domain.conversations import EndReason, Provenance, Role, Turn
 from yaksh.domain.scenarios import Fact
 from yaksh.evaluation.evidence import CallView, render, with_item
@@ -42,6 +42,7 @@ MAPLE_DENTAL = CallView(
     today=date(2026, 10, 1),
     time_zone="America/New_York",
     direction=Direction.INBOUND,
+    transport=Transport.PHONE,
     agent_number="+15550100",
     yaksh_number="+15550177",
     agent_caller_id=None,
@@ -106,3 +107,20 @@ def test_the_view_marks_yaksh_lines_and_words_the_agent_spoke_over() -> None:
     assert "The call ended. End reason: unknown. Call length: unknown." in rendered
     assert "[1] Caller (Yaksh's fixed line): Hello?" in rendered
     assert "[3] Caller (not played: the agent spoke over it): March fourteenth" in rendered
+
+
+def test_a_text_conversation_has_its_own_transcript_note_and_no_phone_facts() -> None:
+    view = render(
+        replace(
+            MAPLE_DENTAL,
+            transport=Transport.TEXT,
+            agent_number=None,
+            yaksh_number=None,
+            hangup_source=None,
+        )
+    )
+
+    assert "over text, with no phone call" in view
+    assert "speech-to-text" not in view
+    assert "Yaksh's caller started the conversation with the agent, over text." in view
+    assert "Yaksh called the agent" not in view

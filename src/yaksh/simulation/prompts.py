@@ -20,6 +20,7 @@ def caller_instructions(
     unknown_facts: Sequence[str],
     today: date,
     direction: Direction = Direction.INBOUND,
+    over_text: bool = False,
 ) -> str:
     """The caller's system prompt. It takes the scenario's instructions and facts, never the
     scenario itself, so the criteria cannot reach the caller."""
@@ -36,4 +37,5 @@ def caller_instructions(
         known_facts=known_facts,
         unknown_facts=unknown_facts,
         language=language,
+        over_text=over_text,
     )

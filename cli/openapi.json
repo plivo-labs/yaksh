@@ -5755,6 +5755,16 @@
               }
             ]
           },
+          "endpoint": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Endpoint"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "agent_speaks_first": {
             "type": "boolean",
             "title": "Agent Speaks First",
@@ -5855,6 +5865,16 @@
             "anyOf": [
               {
                 "$ref": "#/components/schemas/OutboundConfig"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "endpoint": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Endpoint"
               },
               {
                 "type": "null"
@@ -6106,6 +6126,16 @@
               }
             ]
           },
+          "endpoint": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Endpoint"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "agent_speaks_first": {
             "type": "boolean",
             "title": "Agent Speaks First"
@@ -6198,6 +6228,7 @@
           "transport",
           "agent_number",
           "outbound",
+          "endpoint",
           "agent_speaks_first",
           "languages",
           "brief",
@@ -6276,6 +6307,16 @@
               }
             ]
           },
+          "endpoint": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Endpoint"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "agent_speaks_first": {
             "type": "boolean",
             "title": "Agent Speaks First"
@@ -6328,6 +6369,7 @@
           "transport",
           "agent_number",
           "outbound",
+          "endpoint",
           "agent_speaks_first",
           "languages",
           "brief",
@@ -6400,6 +6442,16 @@
             "anyOf": [
               {
                 "$ref": "#/components/schemas/OutboundConfig"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "endpoint": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Endpoint"
               },
               {
                 "type": "null"
@@ -7042,6 +7094,9 @@
           "direction": {
             "$ref": "#/components/schemas/Direction"
           },
+          "transport": {
+            "$ref": "#/components/schemas/Transport"
+          },
           "language": {
             "$ref": "#/components/schemas/Language"
           },
@@ -7300,6 +7355,7 @@
           "data_set_name",
           "scenario_data_sets",
           "direction",
+          "transport",
           "language",
           "channel",
           "caller_number",
@@ -7423,6 +7479,9 @@
           },
           "direction": {
             "$ref": "#/components/schemas/Direction"
+          },
+          "transport": {
+            "$ref": "#/components/schemas/Transport"
           },
           "language": {
             "$ref": "#/components/schemas/Language"
@@ -7625,6 +7684,7 @@
           "data_set_name",
           "scenario_data_sets",
           "direction",
+          "transport",
           "language",
           "channel",
           "caller_number",
@@ -8166,10 +8226,37 @@
           "lease_lost",
           "trigger_failed",
           "no_call",
-          "turn_limit"
+          "turn_limit",
+          "start_refused"
         ],
         "title": "EndReason",
         "description": "Who or what ended the conversation, as Yaksh observed it."
+      },
+      "Endpoint": {
+        "properties": {
+          "url": {
+            "type": "string",
+            "maxLength": 2083,
+            "minLength": 1,
+            "format": "uri",
+            "title": "Url"
+          },
+          "headers": {
+            "items": {
+              "$ref": "#/components/schemas/Header"
+            },
+            "type": "array",
+            "maxItems": 30,
+            "title": "Headers"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "url"
+        ],
+        "title": "Endpoint",
+        "description": "An address on the agent's system that Yaksh sends requests to, with the headers each\nrequest carries."
       },
       "ErrorBody": {
         "properties": {
@@ -11827,6 +11914,9 @@
             "type": "string",
             "title": "Agent Name"
           },
+          "transport": {
+            "$ref": "#/components/schemas/Transport"
+          },
           "name": {
             "anyOf": [
               {
@@ -11934,6 +12024,7 @@
           "agent_version_id",
           "agent_version",
           "agent_name",
+          "transport",
           "name",
           "repeats",
           "max_duration_s",
@@ -12117,6 +12208,9 @@
             "type": "string",
             "title": "Agent Name"
           },
+          "transport": {
+            "$ref": "#/components/schemas/Transport"
+          },
           "name": {
             "anyOf": [
               {
@@ -12217,6 +12311,7 @@
           "agent_version_id",
           "agent_version",
           "agent_name",
+          "transport",
           "name",
           "repeats",
           "max_duration_s",
@@ -13587,20 +13682,52 @@
         ],
         "title": "TextDocumentCreate"
       },
+      "ToolItem": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "arguments": {
+            "type": "string",
+            "title": "Arguments"
+          },
+          "output": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Output"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "arguments"
+        ],
+        "title": "ToolItem",
+        "description": "A tool the text agent called in its turn, as the agent reported it."
+      },
       "Transport": {
         "type": "string",
         "enum": [
-          "phone"
+          "phone",
+          "text"
         ],
         "title": "Transport",
-        "description": "How Yaksh reaches an agent; phone only today, kept as the seam for other ways."
+        "description": "How Yaksh reaches an agent."
       },
       "Trigger": {
         "properties": {
-          "method": {
-            "$ref": "#/components/schemas/TriggerMethod",
-            "default": "POST"
-          },
           "url": {
             "type": "string",
             "maxLength": 2083,
@@ -13615,6 +13742,10 @@
             "type": "array",
             "maxItems": 30,
             "title": "Headers"
+          },
+          "method": {
+            "$ref": "#/components/schemas/TriggerMethod",
+            "default": "POST"
           },
           "query": {
             "items": {
@@ -13684,6 +13815,13 @@
             "type": "boolean",
             "title": "Scripted",
             "default": false
+          },
+          "tools": {
+            "items": {
+              "$ref": "#/components/schemas/ToolItem"
+            },
+            "type": "array",
+            "title": "Tools"
           },
           "response_ms": {
             "anyOf": [

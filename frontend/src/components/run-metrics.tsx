@@ -22,6 +22,9 @@ import { useRunMetrics } from "@/lib/queries";
 import { CATEGORY_LABELS, FLAG_TEXT, type RunNumbers, type Share } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
+/** Read from the audio, so a text test has none of them but `unanswered`. */
+const AUDIO_PROBLEMS = new Set(["talked_over", "long_wait", "dead_air"]);
+
 const PROBLEMS: {
   key: "unanswered" | "talked_over" | "long_wait" | "dead_air";
   label: string;
@@ -30,29 +33,39 @@ const PROBLEMS: {
   {
     key: "unanswered",
     label: "A reply was not answered",
-    hint: "Calls where the caller said something that expected an answer, and the agent never answered it.",
+    hint: "Conversations where the caller said something that expected an answer, and the agent never answered it.",
   },
   {
     key: "talked_over",
     label: "The agent spoke over the caller",
-    hint: "Calls where the agent started to speak before the caller finished.",
+    hint: "Conversations where the agent started to speak before the caller finished.",
   },
   {
     key: "long_wait",
     label: "A wait of 5 s or more",
-    hint: "Calls where the caller waited 5 s or more for the agent's answer.",
+    hint: "Conversations where the caller waited 5 s or more for the agent's answer.",
   },
   {
     key: "dead_air",
     label: "A silence of 10 s or more",
-    hint: "Calls with 10 s or more of silence.",
+    hint: "Conversations with 10 s or more of silence.",
   },
 ];
 
 /** The run's numbers over its counted calls: how fast the agent answered, which problems the
  * calls had and how often, and the same by group. */
-export function RunMetricsPanel({ runId, active }: { runId: string; active: boolean }) {
+export function RunMetricsPanel({
+  runId,
+  text,
+  active,
+}: {
+  runId: string;
+  /** A text test: the audio-only numbers are left out. */
+  text: boolean;
+  active: boolean;
+}) {
   const metrics = useRunMetrics(runId, active);
+  const problems = text ? PROBLEMS.filter((problem) => !AUDIO_PROBLEMS.has(problem.key)) : PROBLEMS;
   if (metrics.isPending) return <Skeleton className="h-48 w-full rounded-lg" />;
   if (metrics.isError) {
     return (
@@ -66,46 +79,53 @@ export function RunMetricsPanel({ runId, active }: { runId: string; active: bool
   return (
     <Panel className="overflow-hidden">
       <PanelHeader
-        title="Call metrics"
+        title="Conversation metrics"
         action={
           <span className="text-xs-400 text-muted-foreground">
-            The latest attempt of each repeat, without cancelled calls
+            The latest attempt of each repeat, without cancelled conversations
           </span>
         }
       />
-      <div className="grid grid-cols-1 gap-3 border-b bg-muted/30 px-5 py-4 sm:grid-cols-3">
-        <Stat
-          label="Response time"
-          hint="How long the agent took to start its answer after the caller finished, over every reply of the run: half the replies were faster than the first number, nine in ten faster than the second."
-          value={
-            overall.response_p50_ms === null ? (
-              "None yet"
-            ) : (
-              <span className={BAND_TEXT[responseBand(overall.response_p50_ms)]}>
-                {seconds(overall.response_p50_ms)}
-              </span>
-            )
-          }
-        >
-          <p className="text-xs-400 text-muted-foreground">
-            {overall.response_p90_ms === null ? (
-              "Measured once calls are evaluated."
-            ) : (
-              <>
-                Half the replies were faster. Nine in ten were faster than{" "}
-                <span
-                  className={cn("font-medium", BAND_TEXT[responseBand(overall.response_p90_ms)])}
-                >
-                  {seconds(overall.response_p90_ms)}
+      <div
+        className={cn(
+          "grid grid-cols-1 gap-3 border-b bg-muted/30 px-5 py-4",
+          text ? "sm:grid-cols-2" : "sm:grid-cols-3",
+        )}
+      >
+        {!text && (
+          <Stat
+            label="Response time"
+            hint="How long the agent took to start its answer after the caller finished, over every reply of the run: half the replies were faster than the first number, nine in ten faster than the second."
+            value={
+              overall.response_p50_ms === null ? (
+                "None yet"
+              ) : (
+                <span className={BAND_TEXT[responseBand(overall.response_p50_ms)]}>
+                  {seconds(overall.response_p50_ms)}
                 </span>
-                .
-              </>
-            )}
-          </p>
-        </Stat>
+              )
+            }
+          >
+            <p className="text-xs-400 text-muted-foreground">
+              {overall.response_p90_ms === null ? (
+                "Measured once conversations are evaluated."
+              ) : (
+                <>
+                  Half the replies were faster. Nine in ten were faster than{" "}
+                  <span
+                    className={cn("font-medium", BAND_TEXT[responseBand(overall.response_p90_ms)])}
+                  >
+                    {seconds(overall.response_p90_ms)}
+                  </span>
+                  .
+                </>
+              )}
+            </p>
+          </Stat>
+        )}
         <Stat
           label="Connected"
-          hint="Calls where Yaksh and the agent were on the line together."
+          hint="Conversations where Yaksh and the agent were on the line together."
           value={
             <>
               {overall.connected.count}
@@ -129,7 +149,7 @@ export function RunMetricsPanel({ runId, active }: { runId: string; active: bool
         </Stat>
         <Stat
           label="Evaluated"
-          hint="Calls whose metrics and verdicts are done."
+          hint="Conversations whose metrics and verdicts are done."
           value={
             <>
               {overall.evaluated}
@@ -152,9 +172,9 @@ export function RunMetricsPanel({ runId, active }: { runId: string; active: bool
           </p>
         </Stat>
       </div>
-      <section aria-label="Problems in the calls" className="grid gap-1 px-5 py-4">
-        <h3 className="mb-1 text-s-500">Problems in the calls</h3>
-        {PROBLEMS.map((problem) => (
+      <section aria-label="Problems in the conversations" className="grid gap-1 px-5 py-4">
+        <h3 className="mb-1 text-s-500">Problems in the conversations</h3>
+        {problems.map((problem) => (
           <ProblemRow
             key={problem.key}
             label={problem.label}
@@ -174,10 +194,12 @@ export function RunMetricsPanel({ runId, active }: { runId: string; active: bool
         )}
       </section>
       <Breakdown
+        audio={!text}
         title="Scenario category"
         rows={by_category.map((group) => [CATEGORY_LABELS[group.category], group.numbers])}
       />
       <Breakdown
+        audio={!text}
         title="Surroundings"
         rows={by_surroundings.map((group) => [
           surroundingsLabel(group.surroundings, true) ?? "Quiet",
@@ -190,7 +212,7 @@ export function RunMetricsPanel({ runId, active }: { runId: string; active: bool
 
 function intervalText(share: Share): string {
   if (share.low === null || share.high === null) return "";
-  return ` With this many calls, the true share is likely between ${percent(share.low)} and ${percent(share.high)}.`;
+  return ` With this many conversations, the true share is likely between ${percent(share.low)} and ${percent(share.high)}.`;
 }
 
 function ProblemRow({ label, hint, share }: { label: string; hint: string; share: Share }) {
@@ -223,19 +245,27 @@ function ProblemRow({ label, hint, share }: { label: string; hint: string; share
 }
 
 /** One row for each group; nothing when all the calls are in one group. */
-function Breakdown({ title, rows }: { title: string; rows: [string, RunNumbers][] }) {
+function Breakdown({
+  title,
+  rows,
+  audio,
+}: {
+  title: string;
+  rows: [string, RunNumbers][];
+  audio: boolean;
+}) {
   if (rows.length < 2) return null;
   return (
     <Table className="border-t">
       <TableHeader>
         <TableRow>
           <TableHead className="pl-5">{title}</TableHead>
-          <TableHead>Calls</TableHead>
+          <TableHead>Conversations</TableHead>
           <TableHead>Connected</TableHead>
-          <TableHead>Response p90</TableHead>
-          <TableHead>Unanswered</TableHead>
-          <TableHead>5 s wait</TableHead>
-          <TableHead className="pr-5">10 s silence</TableHead>
+          {audio && <TableHead>Response p90</TableHead>}
+          <TableHead className={audio ? undefined : "pr-5"}>Unanswered</TableHead>
+          {audio && <TableHead>5 s wait</TableHead>}
+          {audio && <TableHead className="pr-5">10 s silence</TableHead>}
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -244,18 +274,22 @@ function Breakdown({ title, rows }: { title: string; rows: [string, RunNumbers][
             <TableCell className="pl-5">{label}</TableCell>
             <TableCell className="tabular-nums">{numbers.conversations}</TableCell>
             <TableCell className="tabular-nums">{cell(numbers.connected)}</TableCell>
-            <TableCell className="tabular-nums">
-              {numbers.response_p90_ms === null ? (
-                <span className="text-muted-foreground">None yet</span>
-              ) : (
-                <span className={BAND_TEXT[responseBand(numbers.response_p90_ms)]}>
-                  {seconds(numbers.response_p90_ms)}
-                </span>
-              )}
+            {audio && (
+              <TableCell className="tabular-nums">
+                {numbers.response_p90_ms === null ? (
+                  <span className="text-muted-foreground">None yet</span>
+                ) : (
+                  <span className={BAND_TEXT[responseBand(numbers.response_p90_ms)]}>
+                    {seconds(numbers.response_p90_ms)}
+                  </span>
+                )}
+              </TableCell>
+            )}
+            <TableCell className={audio ? "tabular-nums" : "pr-5 tabular-nums"}>
+              {cell(numbers.unanswered)}
             </TableCell>
-            <TableCell className="tabular-nums">{cell(numbers.unanswered)}</TableCell>
-            <TableCell className="tabular-nums">{cell(numbers.long_wait)}</TableCell>
-            <TableCell className="pr-5 tabular-nums">{cell(numbers.dead_air)}</TableCell>
+            {audio && <TableCell className="tabular-nums">{cell(numbers.long_wait)}</TableCell>}
+            {audio && <TableCell className="pr-5 tabular-nums">{cell(numbers.dead_air)}</TableCell>}
           </TableRow>
         ))}
       </TableBody>

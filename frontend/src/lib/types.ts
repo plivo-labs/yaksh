@@ -1,5 +1,5 @@
 export type Direction = "inbound" | "outbound";
-type Transport = "phone";
+export type Transport = "phone" | "text";
 export type ConversationStatus =
   | "queued"
   | "running"
@@ -21,7 +21,8 @@ export type EndReason =
   | "lease_lost"
   | "trigger_failed"
   | "no_call"
-  | "turn_limit";
+  | "turn_limit"
+  | "start_refused";
 
 export const END_REASON_LABELS: Record<EndReason, string> = {
   user_request: "Stopped on request",
@@ -37,6 +38,7 @@ export const END_REASON_LABELS: Record<EndReason, string> = {
   trigger_failed: "Trigger failed",
   no_call: "Agent did not call",
   turn_limit: "Turn limit reached",
+  start_refused: "Agent refused to start",
 };
 
 type Role = "agent" | "caller";
@@ -303,6 +305,12 @@ export interface Trigger {
   body: Record<string, unknown> | null;
 }
 
+/** Where Yaksh sends each turn of a text agent. */
+export interface Endpoint {
+  url: string;
+  headers: Header[];
+}
+
 export interface OutboundSettings {
   trigger: Trigger;
   calling_numbers: string[];
@@ -318,6 +326,7 @@ export interface AgentSummary {
   transport: Transport;
   agent_number: string | null;
   outbound: OutboundSettings | null;
+  endpoint: Endpoint | null;
   agent_speaks_first: boolean;
   /** The first is the agent's main language. */
   languages: AgentLanguage[];
@@ -527,6 +536,7 @@ export interface AgentInput {
   transport: Transport;
   agent_number: string | null;
   outbound: OutboundSettings | null;
+  endpoint: Endpoint | null;
   agent_speaks_first: boolean;
   languages: AgentLanguage[];
   brief: string;
@@ -762,6 +772,14 @@ export interface Scenario extends ScenarioInput {
   updated_at: string;
 }
 
+/** A tool a text agent called in its turn. */
+export interface ToolItem {
+  id: string;
+  name: string;
+  arguments: string;
+  output: string | null;
+}
+
 export interface Turn {
   role: Role;
   text: string;
@@ -769,6 +787,8 @@ export interface Turn {
   ended_at_ms: number;
   provenance: Provenance | null;
   scripted: boolean;
+  /** The text agent's tool calls in this turn; empty on a phone call. */
+  tools: ToolItem[];
   /** On an agent turn that starts a reply: how long the agent made the caller wait. Turns that
    * arrive live during the call have neither field. */
   response_ms?: number | null;
@@ -823,6 +843,7 @@ export interface ConversationSummary {
   scenario_data_sets: number;
   language: Language;
   channel: "voice";
+  transport: Transport;
   caller_number: string | null;
   agent_caller_id: string | null;
   direction: Direction;
@@ -886,6 +907,8 @@ export interface RunInput {
 export interface RunSummary {
   id: string;
   agent_id: string;
+  /** How the run's pinned agent version reaches the agent. */
+  transport: Transport;
   agent_version_id: string;
   agent_version: number;
   agent_name: string;
@@ -1016,10 +1039,11 @@ export interface Usage {
     reasoning_effort: string | null;
     /** The scenario chose the model, not the settings. */
     scenario_model: boolean;
-    stt_model: string;
+    /** Null on a text test, which has no speech-to-text or text-to-speech. */
+    stt_model: string | null;
     /** The language setting the speech-to-text heard the agent with; null on older calls. */
     stt_language: string | null;
-    tts_model: string;
+    tts_model: string | null;
   } | null;
   usage: {
     llm_prompt_tokens: number | null;

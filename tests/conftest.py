@@ -23,6 +23,7 @@ from yaksh.db.migrate import upgrade_to_head
 from yaksh.db.models import Conversation, Voice
 from yaksh.db.session import create_engine, create_sessionmaker
 from yaksh.domain.agent_import import ElevenLabsRegion, VapiRegion
+from yaksh.domain.agents import Transport
 from yaksh.domain.conversations import (
     Admission,
     CallObserver,
@@ -292,11 +293,12 @@ async def claim(
     worker_id: str = "w1",
     pool_app_id: str | None = POOL_APP_ID,
     receiving_app_id: str | None = None,
+    transports: frozenset[Transport] = frozenset(Transport),
 ) -> str | None:
     """The id of the conversation a worker claims next, if any."""
     async with db() as session:
         claimed = await conversations.claim_next(
-            session, worker_id, 30, pool_app_id, receiving_app_id
+            session, worker_id, 30, pool_app_id, receiving_app_id, transports
         )
     return None if claimed is None else str(claimed.id)
 

@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from yaksh.config import Settings
 from yaksh.db.models import Agent, AgentVersion, Persona, PersonaVersion, Scenario, ScenarioVersion
-from yaksh.domain.agents import Direction
+from yaksh.domain.agents import Direction, Transport
 from yaksh.domain.errors import NotFoundError, ValidationError
 from yaksh.domain.languages import Language
 from yaksh.domain.runs import RunScenario
@@ -36,6 +36,7 @@ class Inputs:
     agent_id: uuid.UUID
     agent_version_id: uuid.UUID
     direction: Direction
+    transport: Transport
     persona_id: uuid.UUID
     persona_version_id: uuid.UUID
     scenario_id: uuid.UUID
@@ -65,17 +66,17 @@ async def snapshot(
     data sets asked for, or every data set. The inputs are in the order asked: scenario, then
     persona, then data set. The caller holds the agent's lock.
     A refusal about a scenario names it."""
-    problem = phone_problem(settings, app)
-    if problem is not None:
+    if agent.transport is Transport.TEXT:
+        if app.secrets.llm_api_key is None:
+            raise ValidationError("text tests are off: add the LLM provider key in Settings")
+    elif (problem := phone_problem(settings, app)) is not None:
         raise ValidationError(f"phone calls are off: {problem}")
-    if agent.direction is Direction.OUTBOUND:
+    elif agent.direction is Direction.OUTBOUND:
         problem = await outbound_problem(session, settings, app)
         if problem is not None:
             raise ValidationError(f"outbound tests are off: {problem}")
-    else:
-        problem = await inbound_problem(session, settings, app)
-        if problem is not None:
-            raise ValidationError(f"phone calls are off: {problem}")
+    elif (problem := await inbound_problem(session, settings, app)) is not None:
+        raise ValidationError(f"phone calls are off: {problem}")
     scenario_ids = [item.scenario_id for item in wanted]
     scenarios = await scenarios_to_start(session, agent, scenario_ids)
     plays = [
@@ -123,7 +124,7 @@ async def snapshot(
         .all()
     )
     today = datetime.now(ZoneInfo(app.phone.timezone)).date()
-    outbound = agent_config_of(agent).outbound if agent.direction is Direction.OUTBOUND else None
+    outbound = agent_config_of(agent).outbound
     inputs = []
     for scenario, persona_id, data_set in plays:
         persona = personas[persona_id]
@@ -137,6 +138,7 @@ async def snapshot(
                 agent_id=agent.id,
                 agent_version_id=agent_version_id,
                 direction=agent.direction,
+                transport=agent.transport,
                 persona_id=persona.id,
                 persona_version_id=persona_versions[persona.id],
                 scenario_id=scenario.id,
@@ -151,6 +153,7 @@ async def snapshot(
                     unknown_facts=played.unknown_facts,
                     today=today,
                     direction=agent.direction,
+                    over_text=agent.transport is Transport.TEXT,
                 ),
                 nudge=LANGUAGES[config.language].nudge,
                 today=today,

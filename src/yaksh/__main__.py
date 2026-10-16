@@ -14,7 +14,8 @@ from yaksh.caller.unavailable import UnavailableCaller
 from yaksh.config import Settings
 from yaksh.db.migrate import upgrade_to_head
 from yaksh.db.session import create_engine, create_sessionmaker
-from yaksh.domain.conversations import Caller
+from yaksh.domain.agents import Transport
+from yaksh.domain.conversations import Caller, CallObserver, CallOutcome, CallRequest
 from yaksh.domain.errors import UnavailableError
 from yaksh.integrations.s3 import S3FileStore
 from yaksh.settings.cipher import Cipher, SecretUnreadableError
@@ -119,14 +120,30 @@ async def run_evaluator(settings: Settings) -> None:
             os._exit(1)
 
 
+class TransportCaller:
+    """Runs each call with the caller of its agent's transport."""
+
+    def __init__(self, phone: Caller, text: Caller) -> None:
+        self._phone = phone
+        self._text = text
+
+    async def run(
+        self, request: CallRequest, observer: CallObserver, stop: asyncio.Event
+    ) -> CallOutcome:
+        caller = self._text if request.agent.transport is Transport.TEXT else self._phone
+        return await caller.run(request, observer, stop)
+
+
 def caller_of(settings: Settings, registry: StreamRegistry) -> Caller:
     from yaksh.caller.phone import PhoneCaller
+    from yaksh.caller.text import TextCaller
 
+    text = TextCaller(settings)
     if settings.public_url is None:
         reason = "phone calls are off: set YAKSH_PUBLIC_URL to the address Plivo can reach"
         logging.warning(reason)
-        return UnavailableCaller(reason)
-    return PhoneCaller(settings, registry)
+        return TransportCaller(UnavailableCaller(reason), text)
+    return TransportCaller(PhoneCaller(settings, registry), text)
 
 
 def plivo_auth_token(source: SettingsSource) -> str | None:

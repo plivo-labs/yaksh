@@ -56,8 +56,8 @@ export function RunVerdictsPanel({
       ) : (
         <p className="px-5 py-4 text-s-400 text-muted-foreground">
           {verdicts.pending > 0
-            ? "The first calls are being judged."
-            : "No call was judged: the server had no judge model."}
+            ? "The first conversations are being judged."
+            : "No conversation was judged: the server had no judge model."}
         </p>
       )}
     </Panel>
@@ -92,8 +92,8 @@ function Scorecard({ verdicts }: { verdicts: RunVerdicts }) {
         label="Pass rate"
         hint={
           ranged
-            ? "The mean of each scenario's pass rate, so a scenario with more calls does not count more. Fewer than 95% of the calls are scored, so the band runs from every unscored call as a fail to every unscored call as a pass."
-            : "The mean of each scenario's pass rate, so a scenario with more calls does not count more. The band is the 95% range for this set of scenarios."
+            ? "The mean of each scenario's pass rate, so a scenario with more conversations does not count more. Fewer than 95% of the conversations are scored, so the band runs from every unscored conversation as a fail to every unscored conversation as a pass."
+            : "The mean of each scenario's pass rate, so a scenario with more conversations does not count more. The band is the 95% range for this set of scenarios."
         }
         value={
           ranged
@@ -114,10 +114,10 @@ function Scorecard({ verdicts }: { verdicts: RunVerdicts }) {
         )}
         <p className="text-xs-400 text-muted-foreground">
           {ranged
-            ? "Calls that were not scored count as fails, then as passes."
+            ? "Conversations that were not scored count as fails, then as passes."
             : verdicts.interval_low !== null && verdicts.interval_high !== null
               ? `95% range ${percent(verdicts.interval_low)} to ${percent(verdicts.interval_high)}`
-              : "A range needs five scenarios with a scored call."}
+              : "A range needs five scenarios with a scored conversation."}
         </p>
       </Stat>
       <Stat
@@ -143,8 +143,8 @@ function Scorecard({ verdicts }: { verdicts: RunVerdicts }) {
         </p>
       </Stat>
       <Stat
-        label="Scored calls"
-        hint="Calls with a pass or a fail. A call is not scored when one of its items could not be decided, for example when Yaksh's own caller broke the test or the judge failed."
+        label="Scored conversations"
+        hint="Conversations with a pass or a fail. A conversation is not scored when one of its items could not be decided, for example when Yaksh's own caller broke the test or the judge failed."
         value={
           <>
             {scored}
@@ -152,10 +152,10 @@ function Scorecard({ verdicts }: { verdicts: RunVerdicts }) {
           </>
         }
       >
-        <Meter value={calls ? scored / calls : 0} tone="neutral" label="Scored calls" />
+        <Meter value={calls ? scored / calls : 0} tone="neutral" label="Scored conversations" />
         <p className="text-xs-400 text-muted-foreground">
           {calls - scored === 0
-            ? "Every judged call has a verdict."
+            ? "Every judged conversation has a verdict."
             : full
               ? `${calls - scored} not scored.`
               : `${calls - scored} not scored, so the pass rate is a range.`}
@@ -163,7 +163,7 @@ function Scorecard({ verdicts }: { verdicts: RunVerdicts }) {
       </Stat>
       <Stat
         label="Yaksh's caller"
-        hint="The caller check looks for calls where Yaksh's own simulated caller broke its test. A likely effect blocks the criteria it touched: they are not scored, and not blamed on the agent."
+        hint="The caller check looks for conversations where Yaksh's own simulated caller broke its test. A likely effect blocks the criteria it touched: they are not scored, and not blamed on the agent."
         value={
           <>
             {likely}
@@ -173,8 +173,8 @@ function Scorecard({ verdicts }: { verdicts: RunVerdicts }) {
       >
         <p className="text-xs-400 text-muted-foreground">
           {checked === 0
-            ? "No call was checked."
-            : `Likely affected the test in ${likely} of ${checked} calls; ${possible} more possibly.`}
+            ? "No conversation was checked."
+            : `Likely affected the test in ${likely} of ${checked} conversations; ${possible} more possibly.`}
         </p>
       </Stat>
     </div>
@@ -219,7 +219,7 @@ function ScenarioList({ verdicts }: { verdicts: RunVerdicts }) {
         className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-6 border-b px-5 pb-2 text-label text-secondary sm:grid-cols-[minmax(0,1fr)_auto_8rem]"
       >
         <span className="pl-6">Scenario</span>
-        <span>{repeats === 1 ? "Call" : `Repeats 1 to ${repeats}`}</span>
+        <span>{repeats === 1 ? "Conversation" : `Repeats 1 to ${repeats}`}</span>
         <span className="hidden sm:block">Passed</span>
       </div>
       <ul className="divide-y">
@@ -328,7 +328,7 @@ function ScenarioRow({
                 <span
                   key={key}
                   role="img"
-                  aria-label={`${named(repeat, persona)}: no judged call`}
+                  aria-label={`${named(repeat, persona)}: no judged conversation`}
                   className="size-6 rounded-md border border-dashed"
                 />
               );
@@ -340,7 +340,7 @@ function ScenarioRow({
                   render={
                     <Link
                       to={`/conversations/${call.conversation_id}`}
-                      aria-label={`${named(repeat, persona)} ${said}. Open the call.`}
+                      aria-label={`${named(repeat, persona)} ${said}. Open the conversation.`}
                     />
                   }
                   className={cn(
@@ -354,7 +354,7 @@ function ScenarioRow({
                   />
                 </TooltipTrigger>
                 <TooltipContent>
-                  {named(repeat, persona)} {said}. Open the call.
+                  {named(repeat, persona)} {said}. Open the conversation.
                 </TooltipContent>
               </Tooltip>
             );
@@ -462,7 +462,7 @@ function HowJudged({
           aria-hidden
           className="size-4 shrink-0 text-muted-foreground transition-transform duration-150 ease-out group-open:rotate-90 motion-reduce:transition-none"
         />
-        <span className="shrink-0 text-s-500">How the calls were judged</span>
+        <span className="shrink-0 text-s-500">How the conversations were judged</span>
         <span className="truncate text-xs-400 text-muted-foreground">{summary}</span>
       </summary>
       <div className="grid gap-6 px-5 pt-1 pb-5 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">

@@ -4,7 +4,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
-from yaksh.domain.agents import Direction
+from yaksh.domain.agents import Direction, Transport
 from yaksh.domain.conversations import (
     Channel,
     ConversationStatus,
@@ -77,6 +77,7 @@ class ConversationSummary(BaseModel):
     """How many data sets the pinned scenario version holds; the data set's name tells a call
     apart only when it holds more than one."""
     direction: Direction
+    transport: Transport
     language: Language
     channel: Channel
     caller_number: str | None

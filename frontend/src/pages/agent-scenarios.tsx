@@ -31,6 +31,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { type GenerationProgress, useGeneration } from "@/hooks/use-generation";
 import { usePersonaNames } from "@/hooks/use-persona-names";
+import { sendsAgentData } from "@/lib/agent-draft";
 import { counted, when } from "@/lib/format";
 import { APPEAR, REVEAL, RISE } from "@/lib/motion";
 import { useAssignPersona, useDeleteScenarios, useGenerations, useScenarios } from "@/lib/queries";
@@ -636,7 +637,7 @@ function ScenarioDetail({
   onFork: () => void;
   onRun: () => void;
 }) {
-  const outbound = agent.direction === "outbound";
+  const agentData = sendsAgentData(agent);
   const [chosen, setChosen] = useState<string | null>(null);
   const selected =
     scenario.data_sets.find((dataSet) => dataSet.id === chosen) ?? scenario.data_sets[0];
@@ -708,7 +709,7 @@ function ScenarioDetail({
                 <span className="text-muted-foreground">None</span>
               )}
             </Section>
-            {outbound && (
+            {agentData && (
               <Section label="Data sent to the agent" wide>
                 <FactList facts={selected.agent_data} />
               </Section>

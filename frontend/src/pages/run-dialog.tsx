@@ -234,15 +234,19 @@ export function RunDialog({
         ? "twice"
         : `${repeatCount} times`;
 
+  // Text tests use no phone number, so phone readiness never blocks them.
+  const phone = agent.transport === "phone";
   const outbound = agent.direction === "outbound";
-  const blocked = numbers.data
-    ? outbound
-      ? numbers.data.outbound_problem
-      : numbers.data.problem
-    : null;
-  const usable = blocked
-    ? []
-    : (numbers.data?.items ?? []).filter((number) => number.owner === "test");
+  const blocked =
+    phone && numbers.data
+      ? outbound
+        ? numbers.data.outbound_problem
+        : numbers.data.problem
+      : null;
+  const usable =
+    !phone || blocked
+      ? []
+      : (numbers.data?.items ?? []).filter((number) => number.owner === "test");
   const waits = usable.length > 0 && total > usable.length;
 
   const submit = (event: SubmitEvent<HTMLFormElement>) => {

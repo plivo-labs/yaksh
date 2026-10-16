@@ -14,14 +14,14 @@ const MAX_ROWS = 30;
  * with one data set shows its values without a name. */
 export function DataSetsGrid({
   dataSets,
-  outbound,
+  agentData,
   limit,
   submitted,
   problem,
   onChange,
 }: {
   dataSets: DataSet[];
-  outbound: boolean;
+  agentData: boolean;
   /** The most data sets a scenario holds, from Settings. */
   limit: number;
   submitted: boolean;
@@ -185,15 +185,15 @@ export function DataSetsGrid({
           )}
           {rows("known_facts", "Fact", false)}
           {addRowButton("known_facts", "Add fact")}
-          {outbound && (
+          {agentData && (
             <>
               <span className="col-span-full pt-3 text-xs-500 text-muted-foreground">
                 Data sent to the agent
               </span>
               <FieldDescription className="col-span-full">
                 Yaksh puts these in the request that starts the call, as{" "}
-                <code>{"{{agent_data.<name>}}"}</code>. The caller does not see them; the judge
-                does.
+                <code>{"{{agent_data.<name>}}"}</code>, or sends a text agent its customData. The
+                caller does not see them; the judge does.
               </FieldDescription>
               {rows("agent_data", "Agent data", true)}
               {addRowButton("agent_data", "Add item")}

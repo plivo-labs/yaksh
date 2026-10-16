@@ -31,9 +31,10 @@ def upgrade() -> None:
         sa.Column(
             "direction", sa.Enum("inbound", "outbound", name="agent_direction"), nullable=False
         ),
-        sa.Column("transport", sa.Enum("phone", name="agent_transport"), nullable=False),
+        sa.Column("transport", sa.Enum("phone", "text", name="agent_transport"), nullable=False),
         sa.Column("agent_number", sa.Text(), nullable=True),
         sa.Column("outbound", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
+        sa.Column("endpoint", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
         sa.Column("agent_speaks_first", sa.Boolean(), nullable=False),
         sa.Column(
             "languages",
@@ -403,6 +404,7 @@ def upgrade() -> None:
         sa.Column(
             "direction", sa.Enum("inbound", "outbound", name="agent_direction"), nullable=False
         ),
+        sa.Column("transport", sa.Enum("phone", "text", name="agent_transport"), nullable=False),
         sa.Column("persona_id", sa.UUID(), nullable=False),
         sa.Column("persona_version_id", sa.UUID(), nullable=False),
         sa.Column("scenario_id", sa.UUID(), nullable=False),
@@ -456,6 +458,7 @@ def upgrade() -> None:
                 "trigger_failed",
                 "no_call",
                 "turn_limit",
+                "start_refused",
                 name="end_reason",
             ),
             nullable=True,

@@ -1,4 +1,5 @@
 import type {
+  Endpoint,
   Header,
   OutboundSettings,
   QueryParameter,
@@ -126,6 +127,21 @@ export function outboundProblems(
       ? {}
       : { dial_window: "Enter a whole number from 10 to 600." }),
   };
+}
+
+export const EMPTY_ENDPOINT: Endpoint = { url: "", headers: [] };
+
+/** Problems that keep a text agent's endpoint from being saved, by field. */
+export function endpointProblems(draft: Endpoint): Partial<Record<keyof Endpoint, string>> {
+  const url = urlProblem(draft.url);
+  return {
+    ...(url ? { url } : {}),
+    ...(unnamed(draft.headers) ? { headers: "Give each header a name, or remove it." } : {}),
+  };
+}
+
+export function toEndpoint(draft: Endpoint): Endpoint {
+  return { url: draft.url.trim(), headers: named(draft.headers) };
 }
 
 export function toOutbound(draft: OutboundDraft): OutboundSettings {

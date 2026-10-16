@@ -51,6 +51,8 @@ class EndReason(StrEnum):
     """The outbound agent did not call within its dial window."""
     TURN_LIMIT = "turn_limit"
     """The caller answered its most agent turns, said goodbye and hung up."""
+    START_REFUSED = "start_refused"
+    """A text agent refused the first request with a 4xx: its URL or headers are wrong."""
 
 
 ACTIVE_STATUSES = frozenset(
@@ -73,7 +75,13 @@ class OutcomeGroup(StrEnum):
 
 
 NOT_CONNECTED = frozenset(
-    {EndReason.NO_ANSWER, EndReason.NO_CALL, EndReason.TRIGGER_FAILED, EndReason.AGENT_HANGUP}
+    {
+        EndReason.NO_ANSWER,
+        EndReason.NO_CALL,
+        EndReason.TRIGGER_FAILED,
+        EndReason.AGENT_HANGUP,
+        EndReason.START_REFUSED,
+    }
 )
 """End reasons of a failed conversation whose call never connected. A failed conversation
 ends with agent_hangup only when the agent hung up before the audio started."""
@@ -114,7 +122,8 @@ class WireEventKind(StrEnum):
     ANSWERED = "answered"
     CONNECTED = "connected"
     """The call's audio started: when Plivo's stream opened, or earlier when the agent's first
-    frame is stamped before that. Talk time and the recording count from here."""
+    frame is stamped before that. Talk time and the recording count from here. For a text
+    agent, its first reply; the detail is the session id it made."""
     CALLER_AUDIO_START = "caller_audio_start"
     """Yaksh's output started sending caller audio; not proof it played on the line."""
     CALLER_AUDIO_END = "caller_audio_end"
@@ -132,6 +141,17 @@ class WireEventKind(StrEnum):
     WAITING_FOR_CALL = "waiting_for_call"
 
 
+class ToolItem(BaseModel):
+    """A tool the text agent called in its turn, as the agent reported it."""
+
+    model_config = ConfigDict(frozen=True)
+
+    id: str
+    name: str
+    arguments: str
+    output: str | None = None
+
+
 class Turn(BaseModel):
     model_config = ConfigDict(frozen=True)
 
@@ -142,6 +162,8 @@ class Turn(BaseModel):
     provenance: Provenance | None = None
     scripted: bool = False
     """Fixed text Yaksh spoke for the caller, such as the idle nudge, not model output."""
+    tools: list[ToolItem] = Field(default_factory=list)
+    """The text agent's tool calls in this turn, in its order."""
 
 
 class WireEvent(BaseModel):
@@ -206,12 +228,13 @@ class CallerSettings(BaseModel):
     reasoning model that accepts it for none."""
     scenario_model: bool = False
     """The scenario chose the model and effort, not the settings."""
-    stt_model: str
+    stt_model: str | None = None
+    """None for a text agent, which Yaksh reads with no speech-to-text."""
     stt_language: str | None = None
     """The language setting the speech-to-text heard the agent with; None on calls from before
     Yaksh recorded it."""
-    tts_model: str
-    voice: VoiceSettings
+    tts_model: str | None = None
+    voice: VoiceSettings | None = None
 
 
 class CallerUsage(BaseModel):
@@ -261,7 +284,8 @@ class CallRequest(BaseModel):
     voice: VoiceSettings
     sound_plan: SoundPlan = SoundPlan()
     """The sounds mixed under the caller's voice, with full file paths."""
-    caller_number: str
+    caller_number: str | None
+    """None for a text agent, which Yaksh reaches with no number."""
     max_duration_s: int
     max_turns: int
     """How many agent turns the caller answers; at the next one it says `goodbye` and hangs

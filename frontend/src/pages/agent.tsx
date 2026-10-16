@@ -136,17 +136,24 @@ function LineState({
     return (
       <div className="flex items-center gap-2 text-p-400">
         <StatusLabel tone="off">Idle</StatusLabel>
-        <span className="text-muted-foreground">Never called</span>
+        <span className="text-muted-foreground">No runs yet</span>
       </div>
     );
   }
   const active = ACTIVE_STATUSES.includes(call.status);
+  const text = call.transport === "text";
   const state =
     call.status === "queued"
-      ? "Waiting to dial"
+      ? text
+        ? "Waiting to start"
+        : "Waiting to dial"
       : call.status === "ending"
-        ? "Hanging up"
-        : "On a call";
+        ? text
+          ? "Ending"
+          : "Hanging up"
+        : text
+          ? "In a conversation"
+          : "On a call";
   return (
     <Link
       to={`/conversations/${call.id}`}
@@ -163,7 +170,7 @@ function LineState({
       <span className="text-muted-foreground">
         {active
           ? call.scenario_name
-          : `Last call ${call.status} ${when(call.started_at ?? call.created_at)}`}
+          : `Last conversation ${call.status} ${when(call.started_at ?? call.created_at)}`}
       </span>
     </Link>
   );
@@ -255,27 +262,33 @@ function Purpose({ agent, edit }: { agent: Agent; edit: ReactNode }) {
 }
 
 /** The agent's identity first, and how it calls under "Show more". "Number" is the number Yaksh
- * dials, or for an outbound agent the numbers it may call from. */
+ * dials, or for an outbound agent the numbers it may call from; a text agent has its URL. */
 function Settings({ agent, edit }: { agent: Agent; edit: ReactNode }) {
-  const { outbound } = agent;
+  const { outbound, endpoint } = agent;
   const none = <span className="font-normal text-muted-foreground">None</span>;
   return (
     <Panel>
       <PanelHeader title="Settings" action={edit} />
       <dl className="grid grid-cols-2 gap-x-6 gap-y-4 px-5 pt-4">
-        <Fact label="Number" wrap>
-          {outbound ? (
-            outbound.calling_numbers.length > 0 ? (
-              outbound.calling_numbers.map(phone).join(", ")
+        {endpoint ? (
+          <Fact label="Text URL" wrap>
+            <span className="break-all">{endpoint.url}</span>
+          </Fact>
+        ) : (
+          <Fact label="Number" wrap>
+            {outbound ? (
+              outbound.calling_numbers.length > 0 ? (
+                outbound.calling_numbers.map(phone).join(", ")
+              ) : (
+                <span className="font-normal text-muted-foreground">Any number</span>
+              )
+            ) : agent.agent_number ? (
+              phone(agent.agent_number)
             ) : (
-              <span className="font-normal text-muted-foreground">Any number</span>
-            )
-          ) : agent.agent_number ? (
-            phone(agent.agent_number)
-          ) : (
-            none
-          )}
-        </Fact>
+              none
+            )}
+          </Fact>
+        )}
         <Fact label="Source">{SOURCE_NAMES[agent.source]}</Fact>
         <Fact label="External id" wrap>
           {agent.external_id ?? none}
@@ -297,6 +310,13 @@ function Settings({ agent, edit }: { agent: Agent; edit: ReactNode }) {
             {agent.agent_speaks_first ? "Agent speaks first" : "Caller speaks first"}
           </Fact>
           {outbound && <OutboundFacts outbound={outbound} />}
+          {endpoint && (
+            <Fact label="Headers" wrap>
+              {endpoint.headers.length > 0
+                ? endpoint.headers.map((header) => header.name).join(", ")
+                : none}
+            </Fact>
+          )}
         </dl>
       </details>
     </Panel>

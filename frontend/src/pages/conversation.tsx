@@ -4,6 +4,7 @@ import { Fragment, type RefObject, useEffect, useRef, useState } from "react";
 import { useDefaultLayout } from "react-resizable-panels";
 import { Link, useParams, useSearchParams } from "react-router";
 
+import { ToolCalls } from "@/components/tool-calls";
 import { CallMetricsCard } from "@/components/call-metrics";
 import { CallResults } from "@/components/call-results";
 import { CallSounds } from "@/components/call-sounds";
@@ -157,7 +158,7 @@ function ConversationView({ id }: { id: string }) {
             <ConversationStatusLabel status={data.status} />
             {active && (
               <Button variant="outline" size="sm" onClick={() => setEnding(true)}>
-                End call
+                End
               </Button>
             )}
             <EndCallDialog conversation={data} open={ending} onOpenChange={setEnding} />
@@ -348,6 +349,11 @@ function ConversationFacts({ conversation }: { conversation: Conversation }) {
           <CopyId id={conversation.call_uuid} label="Plivo call id" />
         </Fact>
       )}
+      {agentSession(conversation) && (
+        <Fact label="Agent session">
+          <CopyId id={agentSession(conversation) ?? ""} label="agent session id" />
+        </Fact>
+      )}
     </dl>
   );
 }
@@ -467,14 +473,17 @@ export function CallPane({
 }) {
   const [heard, setHeard] = useState<number | null>(null);
   const connectedMs = connectedAt(conversation);
+  const overText = conversation.transport === "text";
   return (
     <div className="flex h-full flex-col gap-6 p-px pr-3">
-      <AudioCard
-        conversation={conversation}
-        player={player}
-        start={start}
-        onTime={(seconds) => setHeard(turnAt(conversation.transcript, connectedMs ?? 0, seconds))}
-      />
+      {!overText && (
+        <AudioCard
+          conversation={conversation}
+          player={player}
+          start={start}
+          onTime={(seconds) => setHeard(turnAt(conversation.transcript, connectedMs ?? 0, seconds))}
+        />
+      )}
       <Transcript
         turns={conversation.transcript}
         active={ACTIVE_STATUSES.includes(conversation.status)}
@@ -492,7 +501,14 @@ export function CallPane({
   );
 }
 
+/** The session id a text agent made for this conversation, from its first reply. */
+function agentSession(conversation: Conversation): string | null {
+  if (conversation.transport !== "text") return null;
+  return conversation.wire_events.find((event) => event.kind === "connected")?.detail ?? null;
+}
+
 function CallerLine({ conversation }: { conversation: Conversation }) {
+  if (conversation.transport === "text") return <>over text, with no phone call</>;
   const number = conversation.caller_number ?? "a number assigned at call time";
   if (conversation.direction === "inbound") return <>from {number}</>;
   return (
@@ -850,6 +866,7 @@ function Transcript({
                                 {turn.text}
                               </BubbleContent>
                             </Bubble>
+                            {turn.tools?.length > 0 && <ToolCalls tools={turn.tools} />}
                           </MessageContent>
                         </Message>
                       </MessageScrollerItem>

@@ -5,7 +5,7 @@ Status: accepted
 
 ## Decision
 
-Yaksh resolves the trigger host and refuses the request if any address is loopback, private, link-local, a cloud metadata address, IPv6 unique-local, or an IPv6 address that carries a private IPv4 address (IPv4-mapped, NAT64 or IPv4-compatible). It then connects to the address it checked, keeps the TLS host name check, and does not follow redirects. `YAKSH_ALLOW_PRIVATE_TRIGGERS=true` turns the check off.
+Yaksh resolves the trigger host and refuses the request if any address is loopback, private, link-local, a cloud metadata address, IPv6 unique-local, or an IPv6 address that carries a private IPv4 address (IPv4-mapped, NAT64 or IPv4-compatible). It then connects to the address it checked, keeps the TLS host name check, and does not follow redirects. `YAKSH_ALLOW_PRIVATE_HOSTS=true` turns the check off. The same check covers the URL of a text agent.
 
 ## Why
 

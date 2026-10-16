@@ -100,13 +100,19 @@ def mask(text: str, secrets: tuple[str, ...]) -> str:
     return text
 
 
-async def read_bounded(response: aiohttp.ClientResponse) -> str:
+async def read_at_most(response: aiohttp.ClientResponse, limit: int) -> tuple[bytes, bool]:
+    """The body up to `limit` bytes, and whether it was longer."""
     body = b""
-    async for chunk in response.content.iter_chunked(READ_LIMIT):
+    async for chunk in response.content.iter_chunked(limit):
         body += chunk
-        if len(body) >= READ_LIMIT:
-            break
-    return body[:READ_LIMIT].decode(errors="replace")
+        if len(body) > limit:
+            return body[:limit], True
+    return body, False
+
+
+async def read_bounded(response: aiohttp.ClientResponse) -> str:
+    body, _ = await read_at_most(response, READ_LIMIT)
+    return body.decode(errors="replace")
 
 
 def address_problem(url: str, allow_private: bool) -> str | None:
@@ -115,7 +121,7 @@ def address_problem(url: str, allow_private: bool) -> str | None:
     if allow_private:
         return None
     if parts.scheme != "https":
-        return "the trigger URL must use https"
+        return "the URL must use https"
     try:
         literal = ipaddress.ip_address(parts.hostname or "")
     except ValueError:
@@ -139,24 +145,20 @@ async def send_trigger(
         headers["Content-Type"] = "application/json"
     if signing_key:
         headers |= signed_headers(signing_key, delivery_id, signed_payload(request))
-    resolver = None if allow_private else PublicOnlyResolver()
     status: int | None = None
     try:
-        async with aiohttp.ClientSession(
-            timeout=timeout, connector=aiohttp.TCPConnector(resolver=resolver)
-        ) as session:
-            # aiohttp sends a GET again after a dropped connection, and a trigger must start one
-            # call only. This private switch is the one aiohttp's own test client uses.
-            session._retry_connection = False
-            async with session.request(
+        async with (
+            guarded_session(allow_private=allow_private, timeout=timeout) as session,
+            session.request(
                 request.method,
                 URL(request.url, encoded=True),
                 data=request.body or None,
                 headers=headers,
                 allow_redirects=False,
-            ) as response:
-                status = response.status
-                text = await read_bounded(response)
+            ) as response,
+        ):
+            status = response.status
+            text = await read_bounded(response)
     except (aiohttp.ClientConnectorError, aiohttp.ConnectionTimeoutError) as error:
         return TriggerOutcome(
             TriggerResult.NOT_SENT, mask(describe_exception(error), request.secrets)
@@ -168,6 +170,21 @@ async def send_trigger(
         return TriggerOutcome(result_of(status), f"HTTP {status}, body not read: {failure}")
     detail = f"HTTP {status}: {mask(text, request.secrets)[:EXCERPT_CHARS]}"
     return TriggerOutcome(result_of(status), detail)
+
+
+def guarded_session(
+    *, allow_private: bool, timeout: aiohttp.ClientTimeout
+) -> aiohttp.ClientSession:
+    """A session that sends each request once and connects only to addresses it checked as
+    public, unless private ones are allowed."""
+    resolver = None if allow_private else PublicOnlyResolver()
+    session = aiohttp.ClientSession(
+        timeout=timeout, connector=aiohttp.TCPConnector(resolver=resolver)
+    )
+    # aiohttp sends a GET again after a dropped connection, and a trigger must start one call
+    # only. This private switch is the one aiohttp's own test client uses.
+    session._retry_connection = False
+    return session
 
 
 def result_of(status: int) -> TriggerResult:
