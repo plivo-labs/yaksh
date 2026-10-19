@@ -1144,9 +1144,6 @@ type AgentConfig struct {
 	Languages        *[]AgentLanguage          `json:"languages,omitempty"`
 	Outbound         *OutboundConfig           `json:"outbound,omitempty"`
 	Rules            *[]AgentConfig_Rules_Item `json:"rules,omitempty"`
-
-	// Transport How Yaksh reaches an agent.
-	Transport *Transport `json:"transport,omitempty"`
 }
 
 // AgentConfig_Rules_Item defines model for AgentConfig.rules.Item.
@@ -1170,11 +1167,8 @@ type AgentCreate struct {
 	Rules            *[]AgentCreate_Rules_Item `json:"rules,omitempty"`
 
 	// Source Where an agent came from: made in Yaksh, or imported from a file or a provider.
-	Source *AgentSource `json:"source,omitempty"`
-
-	// Transport How Yaksh reaches an agent.
-	Transport      *Transport `json:"transport,omitempty"`
-	WriteScenarios *bool      `json:"write_scenarios,omitempty"`
+	Source         *AgentSource `json:"source,omitempty"`
+	WriteScenarios *bool        `json:"write_scenarios,omitempty"`
 }
 
 // AgentCreate_Rules_Item defines model for AgentCreate.rules.Item.
@@ -1224,9 +1218,9 @@ type AgentRead struct {
 	// Source Where an agent came from: made in Yaksh, or imported from a file or a provider.
 	Source AgentSource `json:"source"`
 
-	// Transport How Yaksh reaches an agent.
-	Transport Transport `json:"transport"`
-	UpdatedAt time.Time `json:"updated_at"`
+	// Transports The ways a run can reach the agent, in a fixed order.
+	Transports *[]Transport `json:"transports,omitempty"`
+	UpdatedAt  time.Time    `json:"updated_at"`
 }
 
 // AgentRead_Rules_Item defines model for AgentRead.rules.Item.
@@ -1256,9 +1250,9 @@ type AgentSummary struct {
 	// Source Where an agent came from: made in Yaksh, or imported from a file or a provider.
 	Source AgentSource `json:"source"`
 
-	// Transport How Yaksh reaches an agent.
-	Transport Transport `json:"transport"`
-	UpdatedAt time.Time `json:"updated_at"`
+	// Transports The ways a run can reach the agent, in a fixed order.
+	Transports *[]Transport `json:"transports,omitempty"`
+	UpdatedAt  time.Time    `json:"updated_at"`
 }
 
 // AgentUpdate defines model for AgentUpdate.
@@ -1275,7 +1269,6 @@ type AgentUpdate struct {
 	Name             *string                   `json:"name,omitempty"`
 	Outbound         *OutboundConfig           `json:"outbound,omitempty"`
 	Rules            *[]AgentUpdate_Rules_Item `json:"rules,omitempty"`
-	Transport        *Transport                `json:"transport,omitempty"`
 }
 
 // AgentUpdate_Rules_Item defines model for AgentUpdate.rules.Item.
@@ -2293,6 +2286,7 @@ type ProviderDraft struct {
 	AgentSpeaksFirst *bool              `json:"agent_speaks_first,omitempty"`
 	Config           string             `json:"config"`
 	Direction        Direction          `json:"direction"`
+	Endpoint         *Endpoint          `json:"endpoint,omitempty"`
 	ExternalId       string             `json:"external_id"`
 	LanguageNote     *string            `json:"language_note,omitempty"`
 	Languages        []AgentLanguage    `json:"languages"`
@@ -2433,6 +2427,7 @@ type RunCreate struct {
 	Repeats        *int               `json:"repeats,omitempty"`
 	Scenarios      []RunScenario      `json:"scenarios"`
 	StartIntervalS *int               `json:"start_interval_s,omitempty"`
+	Transport      *Transport         `json:"transport,omitempty"`
 }
 
 // RunMetrics defines model for RunMetrics.
@@ -3057,6 +3052,7 @@ type GetReviewApiV1ReviewConversationsConversationIdGetParams struct {
 // ListRunsApiV1RunsGetParams defines parameters for ListRunsApiV1RunsGet.
 type ListRunsApiV1RunsGetParams struct {
 	AgentId       *openapi_types.UUID `form:"agent_id,omitempty" json:"agent_id,omitempty"`
+	Transport     *Transport          `form:"transport,omitempty" json:"transport,omitempty"`
 	Status        *RunStatus          `form:"status,omitempty" json:"status,omitempty"`
 	CreatedFrom   *time.Time          `form:"created_from,omitempty" json:"created_from,omitempty"`
 	CreatedBefore *time.Time          `form:"created_before,omitempty" json:"created_before,omitempty"`
@@ -10337,6 +10333,18 @@ func NewListRunsApiV1RunsGetRequest(server string, params *ListRunsApiV1RunsGetP
 		if params.AgentId != nil {
 
 			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "agent_id", *params.AgentId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Transport != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "transport", *params.Transport, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "", Format: ""}); err != nil {
 				return nil, err
 			} else {
 				for _, qp := range strings.Split(queryFrag, "&") {

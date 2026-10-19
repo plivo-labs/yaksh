@@ -5,6 +5,7 @@ import { Link, useParams, useSearchParams } from "react-router";
 import { CopyId } from "@/components/copy-id";
 import { DateFilter } from "@/components/date-filter";
 import { ActionPanel, Fact, Panel, PanelHeader } from "@/components/panel";
+import { TransportFilter } from "@/components/transport-filter";
 import { Pager } from "@/components/pager";
 import { RunList } from "@/components/run-list";
 import { Settle } from "@/components/settle";
@@ -14,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { createdBetween, useDatesParam } from "@/hooks/use-dates-param";
+import { useTransportParam } from "@/hooks/use-transport-param";
 import { usePageParam } from "@/hooks/use-page-param";
 import { copyText } from "@/lib/clipboard";
 import { phone, reach, textSize, when } from "@/lib/format";
@@ -178,15 +180,23 @@ function LineState({
 
 function Runs({ agent }: { agent: Agent }) {
   const [dates, setDates] = useDatesParam();
-  const runs = useRuns({ agentId: agent.id, ...createdBetween(dates) }, usePageParam());
+  const [transport, setTransport] = useTransportParam();
+  const runs = useRuns({ agentId: agent.id, transport, ...createdBetween(dates) }, usePageParam());
   return (
-    <ActionPanel action={<DateFilter dates={dates} onDatesChange={setDates} />}>
+    <ActionPanel
+      action={
+        <div className="flex gap-2">
+          <TransportFilter transport={transport} onTransportChange={setTransport} />
+          <DateFilter dates={dates} onDatesChange={setDates} />
+        </div>
+      }
+    >
       <RunList
         query={runs}
         place="panel"
         empty={
-          dates
-            ? "No runs in these dates."
+          dates || transport
+            ? "No runs match these filters."
             : "No runs yet. Select scenarios on the Scenarios tab and click Run."
         }
       />
@@ -262,7 +272,8 @@ function Purpose({ agent, edit }: { agent: Agent; edit: ReactNode }) {
 }
 
 /** The agent's identity first, and how it calls under "Show more". "Number" is the number Yaksh
- * dials, or for an outbound agent the numbers it may call from; a text agent has its URL. */
+ * dials, or for an outbound agent the numbers it may call from; "Text URL" is its text endpoint.
+ * An agent can have both. */
 function Settings({ agent, edit }: { agent: Agent; edit: ReactNode }) {
   const { outbound, endpoint } = agent;
   const none = <span className="font-normal text-muted-foreground">None</span>;
@@ -270,11 +281,7 @@ function Settings({ agent, edit }: { agent: Agent; edit: ReactNode }) {
     <Panel>
       <PanelHeader title="Settings" action={edit} />
       <dl className="grid grid-cols-2 gap-x-6 gap-y-4 px-5 pt-4">
-        {endpoint ? (
-          <Fact label="Text URL" wrap>
-            <span className="break-all">{endpoint.url}</span>
-          </Fact>
-        ) : (
+        {agent.transports.includes("phone") && (
           <Fact label="Number" wrap>
             {outbound ? (
               outbound.calling_numbers.length > 0 ? (
@@ -287,6 +294,11 @@ function Settings({ agent, edit }: { agent: Agent; edit: ReactNode }) {
             ) : (
               none
             )}
+          </Fact>
+        )}
+        {endpoint && (
+          <Fact label="Text URL" wrap>
+            <span className="break-all">{endpoint.url}</span>
           </Fact>
         )}
         <Fact label="Source">{SOURCE_NAMES[agent.source]}</Fact>
@@ -311,7 +323,7 @@ function Settings({ agent, edit }: { agent: Agent; edit: ReactNode }) {
           </Fact>
           {outbound && <OutboundFacts outbound={outbound} />}
           {endpoint && (
-            <Fact label="Headers" wrap>
+            <Fact label="Text headers" wrap>
               {endpoint.headers.length > 0
                 ? endpoint.headers.map((header) => header.name).join(", ")
                 : none}

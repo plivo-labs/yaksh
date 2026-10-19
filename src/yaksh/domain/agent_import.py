@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 from yaksh.domain.agents import Direction
 from yaksh.domain.languages import AgentLanguage
 from yaksh.domain.numbers import AccountNumber
-from yaksh.domain.triggers import TriggerMethod
+from yaksh.domain.triggers import Endpoint, TriggerMethod
 
 MAX_CURL_CHARS = 100_000
 
@@ -102,6 +102,8 @@ class ProviderDraft(BaseModel):
     direction: Direction
     agent_numbers: list[str]
     start_request: StartRequestDraft | None
+    endpoint: Endpoint | None = None
+    """The agent's text endpoint, when the provider serves Yaksh's text contract."""
     agent_speaks_first: bool = True
     number_note: str | None = None
     """Why an agent that answers calls has no number: none reaches it, or the lookup failed.

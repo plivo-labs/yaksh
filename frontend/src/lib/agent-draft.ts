@@ -14,7 +14,6 @@ import type {
   AgentSummary,
   Direction,
   Endpoint,
-  Transport,
 } from "@/lib/types";
 
 /** The API's limits for the brief, which every agent has. */
@@ -27,9 +26,12 @@ export const MAX_BRIEF_CHARS = 10_000;
 export interface Draft {
   name: string;
   external_id: string;
-  /** Null until the user chooses how Yaksh reaches a new agent. */
+  /** Null until the user chooses who starts the conversation. */
   direction: Direction | null;
-  transport: Transport;
+  /** Yaksh reaches the agent by phone: its number, or its start request when it is outbound. */
+  phone: boolean;
+  /** Yaksh reaches the agent over text, at its endpoint. */
+  text: boolean;
   agent_number: string;
   outbound: OutboundDraft;
   endpoint: Endpoint;
@@ -43,7 +45,8 @@ export const EMPTY_DRAFT: Draft = {
   name: "",
   external_id: "",
   direction: null,
-  transport: "phone",
+  phone: true,
+  text: false,
   agent_number: "",
   outbound: EMPTY_OUTBOUND,
   endpoint: EMPTY_ENDPOINT,
@@ -58,7 +61,8 @@ export function toDraft(agent: Agent): Draft {
     name: agent.name,
     external_id: agent.external_id ?? "",
     direction: agent.direction,
-    transport: agent.transport,
+    phone: agent.transports.includes("phone"),
+    text: agent.transports.includes("text"),
     agent_number: agent.agent_number ?? "",
     outbound: agent.outbound ? toOutboundDraft(agent.outbound) : EMPTY_OUTBOUND,
     endpoint: agent.endpoint ?? EMPTY_ENDPOINT,
@@ -69,27 +73,25 @@ export function toDraft(agent: Agent): Draft {
   };
 }
 
-/** Whether the agent gets the data sets' agent data: an outbound agent in its start request, a
- * text agent in its first request. */
+/** Whether the agent gets the data sets' agent data: an outbound agent in its start request, an
+ * agent with a text endpoint in its first request. */
 export const sendsAgentData = (agent: AgentSummary) =>
-  agent.transport === "text" || agent.direction === "outbound";
+  agent.endpoint !== null || agent.direction === "outbound";
 
 export const CONTEXT_NOTE =
   "Yaksh writes test scenarios from these, and the judges check calls against the config.";
 
 /** The agent to send. Only a draft with no problems is sent, so it has a direction. */
 export function toInput(draft: Draft): AgentInput {
-  const { direction, transport } = draft;
-  if (direction === null) throw new Error("Choose how Yaksh reaches the agent.");
-  const text = transport === "text";
-  const outbound = !text && direction === "outbound";
+  const { direction, phone, text } = draft;
+  if (direction === null) throw new Error("Choose who starts the conversation.");
+  const outbound = direction === "outbound";
   return {
     name: draft.name.trim(),
     external_id: draft.external_id.trim() || null,
     direction,
-    transport,
-    agent_number: text || outbound ? null : normalizeNumber(draft.agent_number),
-    outbound: outbound ? toOutbound(draft.outbound) : null,
+    agent_number: phone && !outbound ? normalizeNumber(draft.agent_number) : null,
+    outbound: phone && outbound ? toOutbound(draft.outbound) : null,
     endpoint: text ? toEndpoint(draft.endpoint) : null,
     agent_speaks_first: draft.agent_speaks_first,
     languages: draft.languages,

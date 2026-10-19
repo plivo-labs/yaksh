@@ -93,7 +93,7 @@ async def test_invalid_updates_are_rejected_before_the_database(client: AsyncCli
     )
     assert created.status_code == 422
     assert created.json()["error"]["code"] == "validation_error"
-    assert "an inbound agent needs agent_number" in created.json()["error"]["message"]
+    assert "a way to reach it" in created.json()["error"]["message"]
 
     agent = await create_agent(client)
     url = f"/api/v1/agents/{agent['id']}"

@@ -44,8 +44,14 @@ import {
   LANGUAGE_NAMES,
   type RunSummary,
   type Scenario,
+  type Transport,
   servedLanguages,
 } from "@/lib/types";
+
+const CONNECTIONS: { value: Transport; label: string }[] = [
+  { value: "phone", label: "Phone" },
+  { value: "text", label: "Text" },
+];
 
 /** The ids of the scenario's data sets that are still there, of `wanted` when given and any
  * of them is left, else all of them. */
@@ -105,6 +111,12 @@ export function RunDialog({
   const [maxParallel, setMaxParallel] = useState(() => text(earlier?.max_parallel));
   const [delay, setDelay] = useState(() => text(earlier?.start_interval_s));
   const [retries, setRetries] = useState(earlier ? text(earlier.max_retries) : null);
+  const [transport, setTransport] = useState<Transport>(() =>
+    earlier && agent.transports.includes(earlier.transport)
+      ? earlier.transport
+      : agent.transports[0],
+  );
+  const [one, many] = transport === "text" ? ["conversation", "conversations"] : ["call", "calls"];
   const [editLimits, setEditLimits] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   /** The run's scenarios and the personas on each card, copied once when they load, so a
@@ -235,7 +247,7 @@ export function RunDialog({
         : `${repeatCount} times`;
 
   // Text tests use no phone number, so phone readiness never blocks them.
-  const phone = agent.transport === "phone";
+  const phone = transport === "phone";
   const outbound = agent.direction === "outbound";
   const blocked =
     phone && numbers.data
@@ -261,6 +273,7 @@ export function RunDialog({
     start.mutate(
       {
         agent_id: agent.id,
+        transport,
         scenarios: scenarios.map((scenario) => ({
           scenario_id: scenario.id,
           persona_ids: cards[scenario.id],
@@ -467,7 +480,7 @@ export function RunDialog({
                         <span className="text-s-500">{scenario.name}</span>
                         <span className="flex shrink-0 items-center gap-2">
                           <span className="text-xs-400 text-muted-foreground tabular-nums">
-                            {counted(calls, "call", "calls")}
+                            {counted(calls, one, many)}
                           </span>
                           <button
                             type="button"
@@ -529,6 +542,36 @@ export function RunDialog({
 
           <aside className="flex min-h-0 flex-col gap-6 overflow-y-auto border-t bg-muted/40 px-6 py-5 sm:border-t-0 sm:border-l">
             <div className="grid gap-4">
+              {agent.transports.length > 1 && (
+                <Field>
+                  <FieldLabel htmlFor="run-transport">Connection</FieldLabel>
+                  <Select
+                    items={CONNECTIONS}
+                    value={transport}
+                    onValueChange={(value) => value && setTransport(value)}
+                  >
+                    <SelectTrigger id="run-transport" className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        {CONNECTIONS.map((item) => (
+                          <SelectItem key={item.value} value={item.value}>
+                            {item.label}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                  <FieldDescription>The agent has both. Each run uses one.</FieldDescription>
+                </Field>
+              )}
+              {earlier && !agent.transports.includes(earlier.transport) && (
+                <p className="text-s-400 text-muted-foreground">
+                  The earlier run used {earlier.transport}. The agent no longer has that connection,
+                  so this run uses {transport}.
+                </p>
+              )}
               <Field>
                 <FieldLabel htmlFor="run-name">Name</FieldLabel>
                 <Input
@@ -551,14 +594,14 @@ export function RunDialog({
                   value={repeats}
                   onChange={(event) => setRepeats(event.target.value)}
                 />
-                <FieldDescription>How many times each call runs.</FieldDescription>
+                <FieldDescription>How many times each {one} runs.</FieldDescription>
                 {submitted && !repeatsOk && <FieldError>Enter a whole number from 1.</FieldError>}
               </Field>
             </div>
 
             <div className="grid gap-1">
               <div className="flex items-baseline justify-between">
-                <span className="text-label text-secondary">Call limits</span>
+                <span className="text-label text-secondary">Limits</span>
                 <button
                   type="button"
                   className="text-s-400 text-brand-text"
@@ -599,7 +642,7 @@ export function RunDialog({
                   />
                   <LimitField
                     id="run-delay"
-                    label="Delay between calls, seconds"
+                    label={`Delay between ${many}, seconds`}
                     value={delay}
                     placeholder="None"
                     invalid={submitted && !intervalOk}
@@ -634,7 +677,7 @@ export function RunDialog({
           <div className="grid gap-0.5">
             {rows !== null && repeatsOk && (
               <span className="text-s-400 text-muted-foreground tabular-nums">
-                {counted(different, "different call", "different calls")}, each run {times} ·{" "}
+                {counted(different, `different ${one}`, `different ${many}`)}, each run {times} ·{" "}
                 {counted(scenarios.length, "scenario", "scenarios")},{" "}
                 {counted(personaCount, "persona", "personas")}
                 {dataSetCount > scenarios.length &&
@@ -681,7 +724,7 @@ export function RunDialog({
               }
             >
               {start.isPending && <Spinner />}
-              Start {counted(total, "call", "calls")}
+              Start {counted(total, one, many)}
             </Button>
           </div>
         </DialogFooter>

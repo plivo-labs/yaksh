@@ -110,16 +110,28 @@ AgentLanguages = Annotated[
 """The first is the agent's main language."""
 
 
+def transports_of(
+    direction: Direction, agent_number: object, outbound: object, endpoint: object
+) -> frozenset[Transport]:
+    """The ways Yaksh can reach an agent, one for each connection it has."""
+    phone = agent_number if direction is Direction.INBOUND else outbound
+    return frozenset(
+        transport
+        for transport, connection in ((Transport.PHONE, phone), (Transport.TEXT, endpoint))
+        if connection is not None
+    )
+
+
 class AgentConfig(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     direction: Direction = Direction.INBOUND
-    transport: Transport = Transport.PHONE
     agent_number: E164 | None = None
-    """The number Yaksh dials; inbound agents only."""
+    """The number Yaksh dials: the phone connection of an inbound agent."""
     outbound: OutboundConfig | None = None
+    """The phone connection of an outbound agent."""
     endpoint: Endpoint | None = None
-    """Where Yaksh sends each turn; text agents only."""
+    """Where Yaksh sends each turn: the text connection."""
     agent_speaks_first: bool = True
     languages: AgentLanguages = [AgentLanguage.EN_US]
     brief: Brief
@@ -130,37 +142,33 @@ class AgentConfig(BaseModel):
     rules: AgentRules = []
     """Checks for every call of the agent, beside each scenario's criteria."""
 
+    @property
+    def transports(self) -> frozenset[Transport]:
+        return transports_of(self.direction, self.agent_number, self.outbound, self.endpoint)
+
     @model_validator(mode="after")
-    def fits_transport(self) -> AgentConfig:
-        if self.transport is Transport.TEXT:
-            if self.endpoint is None:
-                raise ValueError("a text agent needs an endpoint with a URL")
-            if self.agent_number is not None or self.outbound is not None:
-                raise ValueError("a text agent has no agent_number and no outbound settings")
+    def fits_direction(self) -> AgentConfig:
+        if self.direction is Direction.INBOUND and self.outbound is not None:
+            raise ValueError("outbound settings are only for outbound agents")
+        if self.direction is Direction.OUTBOUND and self.agent_number is not None:
+            raise ValueError(
+                "an outbound agent has no agent_number; list the numbers it calls from "
+                "in outbound.calling_numbers"
+            )
+        if not self.transports:
+            raise ValueError(
+                "an agent needs a way to reach it: agent_number for an inbound agent, outbound "
+                "settings for an outbound agent, or a text endpoint"
+            )
+        if self.endpoint is not None:
             for header in self.endpoint.headers:
                 for name in placeholders(header.value):
                     if name != "yaksh.conversation_id" and not name.startswith("secrets."):
                         raise ValueError(
-                            f"a text agent's headers take only {{{{secrets.<NAME>}}}} and "
+                            f"a text endpoint's headers take only {{{{secrets.<NAME>}}}} and "
                             f"{{{{yaksh.conversation_id}}}}, not {{{{{name}}}}}; the agent gets "
                             "the agent data in customData"
                         )
-            return self
-        if self.endpoint is not None:
-            raise ValueError("an endpoint is only for text agents")
-        if self.direction is Direction.INBOUND:
-            if self.agent_number is None:
-                raise ValueError("an inbound agent needs agent_number")
-            if self.outbound is not None:
-                raise ValueError("outbound settings are only for outbound agents")
-        else:
-            if self.outbound is None:
-                raise ValueError("an outbound agent needs outbound settings with a trigger")
-            if self.agent_number is not None:
-                raise ValueError(
-                    "an outbound agent has no agent_number; list the numbers it calls from "
-                    "in outbound.calling_numbers"
-                )
         return self
 
 
@@ -191,7 +199,6 @@ class AgentUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1)
     external_id: str | None = None
     direction: Direction | None = None
-    transport: Transport | None = None
     agent_number: E164 | None = None
     outbound: OutboundConfig | None = None
     endpoint: Endpoint | None = None

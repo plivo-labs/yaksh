@@ -11,6 +11,7 @@ from tests.conftest import OUTBOUND_AGENT, create_agent, create_scenario
 from yaksh.config import Settings
 from yaksh.db.models import Conversation, PhoneNumber, RefusedCall, Run
 from yaksh.db.session import create_engine, create_sessionmaker
+from yaksh.domain.agents import Transport
 from yaksh.domain.conversations import (
     Admission,
     CallOutcome,
@@ -51,6 +52,7 @@ async def waiting_conversation(
             .values(
                 agent_id=uuid.UUID(agent["id"]),
                 agent_version_id=agent_version_id,
+                transport=Transport.PHONE,
                 repeats=1,
                 max_duration_s=120,
                 max_turns=20,

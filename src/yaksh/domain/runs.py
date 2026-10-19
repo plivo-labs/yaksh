@@ -18,6 +18,7 @@ from pydantic import (
     field_validator,
 )
 
+from yaksh.domain.agents import Transport
 from yaksh.domain.conversations import EndReason, OutcomeGroup
 
 RunName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=80)]
@@ -52,6 +53,8 @@ class RunCreate(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     agent_id: uuid.UUID
+    transport: Transport | None = None
+    """How the conversations reach the agent; None takes the agent's only connection."""
     scenarios: list[RunScenario] = Field(min_length=1)
     """In the order the conversations of each repeat start."""
     repeats: int = Field(default=1, ge=1)

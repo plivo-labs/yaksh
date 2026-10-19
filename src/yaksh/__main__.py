@@ -121,7 +121,7 @@ async def run_evaluator(settings: Settings) -> None:
 
 
 class TransportCaller:
-    """Runs each call with the caller of its agent's transport."""
+    """Runs each call with the caller of its transport."""
 
     def __init__(self, phone: Caller, text: Caller) -> None:
         self._phone = phone
@@ -130,7 +130,7 @@ class TransportCaller:
     async def run(
         self, request: CallRequest, observer: CallObserver, stop: asyncio.Event
     ) -> CallOutcome:
-        caller = self._text if request.agent.transport is Transport.TEXT else self._phone
+        caller = self._text if request.transport is Transport.TEXT else self._phone
         return await caller.run(request, observer, stop)
 
 

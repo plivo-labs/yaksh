@@ -35,7 +35,7 @@ from yaksh.caller.audio import PLAYOUT, Clock, Playout
 from yaksh.caller.phone import Connected, Dialer, PhoneCaller, Receiver
 from yaksh.caller.pipeline import CallState
 from yaksh.caller.plivo_server import PendingStream, PlivoServer, StreamRegistry, create_app
-from yaksh.domain.agents import AgentConfig
+from yaksh.domain.agents import AgentConfig, Transport
 from yaksh.domain.conversations import (
     CallOutcome,
     CallRequest,
@@ -143,6 +143,7 @@ def request() -> CallRequest:
     return CallRequest(
         conversation_id=uuid.uuid4(),
         agent=AgentConfig.model_validate({"agent_number": AGENT_NUMBER, "brief": AGENT["brief"]}),
+        transport=Transport.PHONE,
         **CALLER,
         caller_number=POOL_NUMBER,
         max_duration_s=120,
@@ -425,6 +426,7 @@ def outbound_request(window_s: float = 5) -> CallRequest:
     return CallRequest(
         conversation_id=uuid.uuid4(),
         agent=agent,
+        transport=Transport.PHONE,
         **CALLER,
         caller_number=POOL_NUMBER,
         max_duration_s=120,

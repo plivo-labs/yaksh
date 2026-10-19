@@ -6,7 +6,7 @@ from typing import Protocol
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from yaksh.domain.agents import AgentConfig
+from yaksh.domain.agents import AgentConfig, Transport
 from yaksh.domain.languages import Language
 from yaksh.domain.latency import AgentMedia, CallerReplyWindow, LoopLag
 from yaksh.domain.scenarios import Fact
@@ -276,6 +276,8 @@ class CallRequest(BaseModel):
 
     conversation_id: uuid.UUID
     agent: AgentConfig
+    transport: Transport
+    """How Yaksh reaches the agent: its run's transport."""
     instructions: str
     first_words: str
     """What the caller says first when it speaks first."""

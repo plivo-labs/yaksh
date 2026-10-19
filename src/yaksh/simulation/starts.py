@@ -59,6 +59,7 @@ async def snapshot(
     app: AppSettings,
     agent: Agent,
     wanted: Sequence[RunScenario],
+    asked: Transport | None,
 ) -> list[Inputs]:
     """Check that conversations of the agent's scenarios can start now, and read what they pin,
     once for all of them: the current agent, scenario and persona versions, and today. Each
@@ -66,7 +67,9 @@ async def snapshot(
     data sets asked for, or every data set. The inputs are in the order asked: scenario, then
     persona, then data set. The caller holds the agent's lock.
     A refusal about a scenario names it."""
-    if agent.transport is Transport.TEXT:
+    current = agent_config_of(agent)
+    transport = chosen_transport(current.transports, asked)
+    if transport is Transport.TEXT:
         if app.secrets.llm_api_key is None:
             raise ValidationError("text tests are off: add the LLM provider key in Settings")
     elif (problem := phone_problem(settings, app)) is not None:
@@ -124,21 +127,25 @@ async def snapshot(
         .all()
     )
     today = datetime.now(ZoneInfo(app.phone.timezone)).date()
-    outbound = agent_config_of(agent).outbound
+    trigger = (
+        current.outbound.trigger
+        if transport is Transport.PHONE and current.outbound is not None
+        else None
+    )
     inputs = []
     for scenario, persona_id, data_set in plays:
         persona = personas[persona_id]
         config = persona_config_of(persona)
         wants = scenario_config_of(scenario)
-        if outbound is not None:
-            check_agent_data(outbound.trigger, wants, scenario.name)
+        if trigger is not None:
+            check_agent_data(trigger, wants, scenario.name)
         played = wants.played(data_set.id)
         inputs.append(
             Inputs(
                 agent_id=agent.id,
                 agent_version_id=agent_version_id,
                 direction=agent.direction,
-                transport=agent.transport,
+                transport=transport,
                 persona_id=persona.id,
                 persona_version_id=persona_versions[persona.id],
                 scenario_id=scenario.id,
@@ -153,7 +160,7 @@ async def snapshot(
                     unknown_facts=played.unknown_facts,
                     today=today,
                     direction=agent.direction,
-                    over_text=agent.transport is Transport.TEXT,
+                    over_text=transport is Transport.TEXT,
                 ),
                 nudge=LANGUAGES[config.language].nudge,
                 today=today,
@@ -162,6 +169,19 @@ async def snapshot(
             )
         )
     return inputs
+
+
+def chosen_transport(has: frozenset[Transport], asked: Transport | None) -> Transport:
+    """The transport asked for, or the agent's only one."""
+    if asked is None:
+        if len(has) > 1:
+            raise ValidationError("choose phone or text: the agent has both connections")
+        (only,) = has
+        return only
+    if asked not in has:
+        missing = "text endpoint" if asked is Transport.TEXT else "phone connection"
+        raise ValidationError(f"the agent has no {missing}")
+    return asked
 
 
 def data_sets_to_play(scenario: Scenario, ids: Sequence[uuid.UUID] | None) -> list[DataSet]:

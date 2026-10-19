@@ -176,18 +176,6 @@ async def pinned_agents(
     return {row.id: (row.version, row.name) for row in rows}
 
 
-async def pinned_transports(
-    session: AsyncSession, version_ids: Iterable[uuid.UUID]
-) -> dict[uuid.UUID, Transport]:
-    """How each agent version reaches its agent; versions saved before text agents are phone."""
-    rows = await session.execute(
-        select(AgentVersion.id, AgentVersion.config["transport"].astext).where(
-            AgentVersion.id.in_(set(version_ids))
-        )
-    )
-    return {row[0]: Transport(row[1] or Transport.PHONE) for row in rows}
-
-
 async def pinned_scenarios(
     session: AsyncSession, version_ids: Iterable[uuid.UUID]
 ) -> dict[uuid.UUID, tuple[int, str, int]]:
@@ -348,7 +336,7 @@ async def prepare_call(
     versions. A text agent needs no number."""
     agent_version = await session.get_one(AgentVersion, conversation.agent_version_id)
     agent = AgentConfig.model_validate(agent_version.config)
-    if agent.transport is Transport.TEXT:
+    if conversation.transport is Transport.TEXT:
         return await call_request(session, app, conversation, None, agent)
     number = conversation.caller_number
     if number is None and agent.outbound is not None:
@@ -379,6 +367,7 @@ async def call_request(
     return CallRequest(
         conversation_id=conversation.id,
         agent=agent,
+        transport=conversation.transport,
         instructions=conversation.instructions,
         first_words=scenario.first_words or LANGUAGES[conversation.language].first_words,
         nudge=conversation.nudge,

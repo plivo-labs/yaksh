@@ -60,6 +60,7 @@ import {
   type RunInput,
   type RunMetrics,
   type RunStatus,
+  type Transport,
   type RunSummary,
   type Scenario,
   type ScenarioFork,
@@ -727,6 +728,7 @@ export const RUNS_PAGE = 25;
 /** Runs of one agent, of one status, or both; every run when neither is set. */
 export interface RunFilters {
   agentId?: string;
+  transport?: Transport;
   status?: RunStatus;
   createdFrom?: string;
   createdBefore?: string;
@@ -737,6 +739,7 @@ export interface RunFilters {
 export function useRuns(filters: RunFilters, page: number) {
   const search = new URLSearchParams({ page: String(page), page_size: String(RUNS_PAGE) });
   if (filters.agentId) search.set("agent_id", filters.agentId);
+  if (filters.transport) search.set("transport", filters.transport);
   if (filters.status) search.set("status", filters.status);
   if (filters.createdFrom) search.set("created_from", filters.createdFrom);
   if (filters.createdBefore) search.set("created_before", filters.createdBefore);

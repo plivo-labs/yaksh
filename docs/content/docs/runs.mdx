@@ -39,6 +39,7 @@ The run makes one conversation for each repeat of each scenario, persona and dat
 
 | Field | Description |
 | --- | --- |
+| `transport` | `phone` or `text`: how the conversations reach the agent. An agent with one connection needs no value. An agent with a phone connection and a text endpoint needs one, or the run is refused. See [Text tests](/docs/text-tests). |
 | `repeats` | How many conversations the run makes for each scenario, persona and data set. The default is 1. |
 | `max_parallel` | The maximum number of conversations of the run that can be in progress at the same time. A conversation is in progress from the time when a worker gets it until it stops. This includes the time while the phone rings, and the time while Yaksh waits for the call of an outbound agent. |
 | `start_interval_s` | The minimum time between the starts of two conversations. |

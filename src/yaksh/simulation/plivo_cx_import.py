@@ -27,7 +27,7 @@ from yaksh.domain.errors import (
     ValidationError,
 )
 from yaksh.domain.languages import AgentLanguage
-from yaksh.domain.triggers import TriggerMethod
+from yaksh.domain.triggers import Endpoint, Header, TriggerMethod
 from yaksh.simulation.agent_import import pruned, text
 from yaksh.simulation.curl_import import FILL, NUMBER, NUMBER_NAME, check, scenario_body
 
@@ -84,6 +84,7 @@ async def import_flow(api: PlivoCxAccountApi, flow_id: uuid.UUID) -> ProviderDra
         direction=Direction.INBOUND,
         agent_numbers=[],
         start_request=None,
+        endpoint=text_endpoint(api, flow_id),
     )
     if "call" in triggers:
         try:
@@ -153,6 +154,19 @@ async def flow_numbers(api: PlivoCxAccountApi, flow_id: uuid.UUID) -> list[str]:
     ]
 
 
+def basic_auth(api: PlivoCxAccountApi) -> str:
+    token = base64.b64encode(f"{api.auth_id}:{api.auth_token}".encode()).decode()
+    return f"Basic {token}"
+
+
+def text_endpoint(api: PlivoCxAccountApi, flow_id: uuid.UUID) -> Endpoint:
+    """The flow's text-test URL: its run URL plus /text-test, always with Basic auth."""
+    return Endpoint(
+        url=f"{RUNNER}/v1/account/{api.auth_id}/flow/{flow_id}/text-test",
+        headers=[Header(name="Authorization", value=basic_auth(api))],
+    )
+
+
 def start_request(
     api: PlivoCxAccountApi, flow_id: uuid.UUID, start: dict[str, Any]
 ) -> StartRequestDraft:
@@ -164,8 +178,7 @@ def start_request(
         body[field] = NUMBER
     headers = []
     if start.get("require_http_auth", True):
-        token = base64.b64encode(f"{api.auth_id}:{api.auth_token}".encode()).decode()
-        headers.append(Pair(name="Authorization", value=f"Basic {token}"))
+        headers.append(Pair(name="Authorization", value=basic_auth(api)))
     request = StartRequestDraft(
         method=TriggerMethod.POST,
         url=f"{RUNNER}/v1/account/{api.auth_id}/flow/{flow_id}",

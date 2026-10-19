@@ -15,6 +15,7 @@ from sqlalchemy.orm import aliased
 
 from yaksh.config import Settings
 from yaksh.db.models import Agent, Conversation, Persona, Run, Scenario, ScenarioVersion
+from yaksh.domain.agents import Transport
 from yaksh.domain.conversations import (
     ACTIVE_STATUSES,
     LIVE_STATUSES,
@@ -150,7 +151,7 @@ async def create_run(
     if earlier is not None:
         await session.commit()
         return earlier
-    inputs = await snapshot(session, settings, app, agent, command.scenarios)
+    inputs = await snapshot(session, settings, app, agent, command.scenarios, command.transport)
     count = len(inputs) * command.repeats
     if count > app.limits.max_run_conversations:
         raise ValidationError(
@@ -162,6 +163,7 @@ async def create_run(
     run = Run(
         agent_id=agent.id,
         agent_version_id=inputs[0].agent_version_id,
+        transport=inputs[0].transport,
         name=command.name,
         repeats=command.repeats,
         max_duration_s=command.max_duration_s,
@@ -389,6 +391,7 @@ async def list_runs(
     offset: int,
     limit: int,
     agent_id: uuid.UUID | None = None,
+    transport: Transport | None = None,
     status: RunStatus | None = None,
     created_from: datetime | None = None,
     created_before: datetime | None = None,
@@ -396,6 +399,8 @@ async def list_runs(
     query = select(Run)
     if agent_id is not None:
         query = query.where(Run.agent_id == agent_id)
+    if transport is not None:
+        query = query.where(Run.transport == transport)
     if status is not None:
         query = query.where(has_status(status))
     if created_from is not None:

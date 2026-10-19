@@ -62,7 +62,7 @@ export function Fact({
   children: ReactNode;
 }) {
   return (
-    <div className={cn("grid min-w-0 gap-0.5", className)}>
+    <div className={cn("grid min-w-0 content-start gap-0.5", className)}>
       <dt className="text-xs-400 text-muted-foreground">{label}</dt>
       <dd className={cn("text-s-400", wrap ? "wrap-anywhere" : "truncate")}>{children}</dd>
     </div>

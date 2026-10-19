@@ -31,7 +31,6 @@ def upgrade() -> None:
         sa.Column(
             "direction", sa.Enum("inbound", "outbound", name="agent_direction"), nullable=False
         ),
-        sa.Column("transport", sa.Enum("phone", "text", name="agent_transport"), nullable=False),
         sa.Column("agent_number", sa.Text(), nullable=True),
         sa.Column("outbound", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
         sa.Column("endpoint", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
@@ -88,6 +87,10 @@ def upgrade() -> None:
         sa.Column("forked_from_id", sa.UUID(), nullable=True),
         sa.ForeignKeyConstraint(
             ["forked_from_id"], ["agents.id"], name=op.f("fk_agents_forked_from_id_agents")
+        ),
+        sa.CheckConstraint(
+            "agent_number IS NOT NULL OR outbound IS NOT NULL OR endpoint IS NOT NULL",
+            name=op.f("ck_agents_has_connection"),
         ),
         sa.CheckConstraint(
             "cardinality(languages) > 0", name=op.f("ck_agents_languages_not_empty")
@@ -359,6 +362,7 @@ def upgrade() -> None:
         sa.Column("id", sa.UUID(), server_default=sa.text("uuidv7()"), nullable=False),
         sa.Column("agent_id", sa.UUID(), nullable=False),
         sa.Column("agent_version_id", sa.UUID(), nullable=False),
+        sa.Column("transport", sa.Enum("phone", "text", name="agent_transport"), nullable=False),
         sa.Column("name", sa.Text(), nullable=True),
         sa.Column("repeats", sa.Integer(), nullable=False),
         sa.Column("max_duration_s", sa.Integer(), nullable=False),
@@ -393,6 +397,12 @@ def upgrade() -> None:
         "ix_runs_agent_created",
         "runs",
         ["agent_id", sa.literal_column("created_at DESC")],
+        unique=False,
+    )
+    op.create_index(
+        "ix_runs_agent_transport_created",
+        "runs",
+        ["agent_id", "transport", sa.literal_column("created_at DESC")],
         unique=False,
     )
     op.create_table(

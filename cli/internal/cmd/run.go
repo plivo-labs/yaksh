@@ -47,7 +47,7 @@ type runStartFlags struct {
 	scenarios                                                                []string
 	all, wait                                                                bool
 	repeats, maxDurationS, maxTurns, maxParallel, startIntervalS, maxRetries int
-	name, idempotencyKey                                                     string
+	name, idempotencyKey, transport                                          string
 	timeout                                                                  time.Duration
 }
 
@@ -63,6 +63,7 @@ func (a *app) runStartCmd() *cobra.Command {
 	}
 	fl := cmd.Flags()
 	fl.StringVar(&f.agent, "agent", "", "the agent's ID")
+	fl.StringVar(&f.transport, "transport", "", "phone or text; needed when the agent has both")
 	fl.StringSliceVar(&f.scenarios, "scenario", nil, "a scenario's ID; repeat the flag or separate IDs with commas")
 	fl.BoolVar(&f.all, "all", false, "every scenario of the agent")
 	fl.IntVar(&f.repeats, "repeats", 0, "how many times each scenario runs")
@@ -106,6 +107,7 @@ func (a *app) startRun(cmd *cobra.Command, f runStartFlags) error {
 	}
 	body := api.RunCreate{
 		AgentId:        agentID,
+		Transport:      changed(cmd, "transport", api.Transport(f.transport)),
 		Scenarios:      ownPersonas(scenarioIDs),
 		Repeats:        changed(cmd, "repeats", f.repeats),
 		MaxDurationS:   changed(cmd, "max-duration-s", f.maxDurationS),
@@ -331,6 +333,7 @@ func (a *app) runMetricsCmd() *cobra.Command {
 func (a *app) runListCmd() *cobra.Command {
 	var (
 		agent, status  string
+		transport      string
 		from, before   time.Time
 		page, pageSize int
 	)
@@ -342,6 +345,7 @@ func (a *app) runListCmd() *cobra.Command {
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			params := api.ListRunsApiV1RunsGetParams{
+				Transport:     changed(cmd, "transport", api.Transport(transport)),
 				Status:        changed(cmd, "status", api.RunStatus(status)),
 				CreatedFrom:   changed(cmd, "from", from),
 				CreatedBefore: changed(cmd, "before", before),
@@ -368,6 +372,7 @@ func (a *app) runListCmd() *cobra.Command {
 	}
 	cmd.Flags().StringVar(&agent, "agent", "", "only the runs of this agent")
 	cmd.Flags().StringVar(&status, "status", "", "only the runs with this status: queued, running, cancelling, done or cancelled")
+	cmd.Flags().StringVar(&transport, "transport", "", "only the runs of this transport: phone or text")
 	cmd.Flags().Var(timeFlag{&from}, "from", "only the runs created at or after this time; a date alone is local midnight")
 	cmd.Flags().Var(timeFlag{&before}, "before", "only the runs created before this time; a date alone is local midnight")
 	addPageFlags(cmd, &page, &pageSize)

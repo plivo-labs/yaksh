@@ -262,7 +262,7 @@ class Worker:
         self._live[request.conversation_id] = live
         task = asyncio.create_task(self._execute(request, live, confirmed_at))
         self._tasks[request.conversation_id] = task
-        self._transports[request.conversation_id] = request.agent.transport
+        self._transports[request.conversation_id] = request.transport
         task.add_done_callback(lambda _: self._forget(request.conversation_id))
 
     def _forget(self, conversation_id: uuid.UUID) -> None:
@@ -317,7 +317,7 @@ class Worker:
     def _connect_timeout_s(self, request: CallRequest) -> float:
         """How long a call may take to connect: ringing the agent, for an outbound agent its
         trigger and dial window, or for a text agent its first reply."""
-        if request.agent.transport is Transport.TEXT:
+        if request.transport is Transport.TEXT:
             return TEXT_TURN_TIMEOUT_S + DIAL_MARGIN_S
         outbound = request.agent.outbound
         if outbound is None:

@@ -323,10 +323,11 @@ export interface AgentSummary {
   external_id: string | null;
   source: AgentSource;
   direction: Direction;
-  transport: Transport;
   agent_number: string | null;
   outbound: OutboundSettings | null;
   endpoint: Endpoint | null;
+  /** The ways a run can reach the agent, phone first. */
+  transports: Transport[];
   agent_speaks_first: boolean;
   /** The first is the agent's main language. */
   languages: AgentLanguage[];
@@ -524,6 +525,8 @@ export interface ProviderDraft {
   direction: Direction;
   agent_numbers: string[];
   start_request: StartRequestDraft | null;
+  /** The agent's text endpoint, when the provider serves Yaksh's text contract. */
+  endpoint: Endpoint | null;
   agent_speaks_first: boolean;
   /** Why an agent that answers calls has no number: none reaches it, or the lookup failed. */
   number_note: string | null;
@@ -533,7 +536,6 @@ export interface AgentInput {
   name: string;
   external_id: string | null;
   direction: Direction;
-  transport: Transport;
   agent_number: string | null;
   outbound: OutboundSettings | null;
   endpoint: Endpoint | null;
@@ -887,6 +889,8 @@ export interface Conversation extends ConversationSummary {
 
 export interface RunInput {
   agent_id: string;
+  /** Needed when the agent has both connections. */
+  transport: Transport;
   /** In the order the conversations of each repeat start. */
   scenarios: RunScenario[];
   repeats: number;
@@ -907,7 +911,7 @@ export interface RunInput {
 export interface RunSummary {
   id: string;
   agent_id: string;
-  /** How the run's pinned agent version reaches the agent. */
+  /** How the run's conversations reach the agent. */
   transport: Transport;
   agent_version_id: string;
   agent_version: number;

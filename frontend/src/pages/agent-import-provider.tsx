@@ -634,9 +634,13 @@ function AgentChoice({
         languages: draft.languages,
         config: draft.config,
         direction: draft.direction,
+        // An inbound agent that no number reaches can still be tested over text.
+        phone: Boolean(draft.start_request || number || !draft.endpoint),
+        text: draft.endpoint !== null,
         agent_number: number ?? "",
         agent_speaks_first: draft.agent_speaks_first,
         outbound,
+        endpoint: draft.endpoint ?? EMPTY_DRAFT.endpoint,
       },
       { source: words.source(chosen.name), kind },
       briefDraftId,
@@ -872,6 +876,13 @@ function Fills({
               ))}
             </fieldset>
           )}
+        </Fact>
+      )}
+      {draft.endpoint && (
+        <Fact term="Text">
+          <span className="font-mono" title={draft.endpoint.url}>
+            {draft.endpoint.url}
+          </span>
         </Fact>
       )}
       <Fact term="Config">The {source}</Fact>
