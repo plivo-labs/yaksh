@@ -58,6 +58,27 @@ docker compose -f docker/compose.dev.yaml start api worker
 
 The hostname of a quick tunnel changes each time that the tunnel starts. After each change, fix the URLs of the receiving application on the **Phone** tab of Settings.
 
+`docker/compose.yaml` uses the released image. `docker/compose.dev.yaml` builds the image from your code.
+
+## Release
+
+A release is a version tag on `main`. Refer to [Versions and upgrades](/docs/versions) for what each version number means.
+
+1. Merge `dev` into `main`.
+2. On `main`, run `uv run cz bump`. Commitizen finds the next version from the commit messages since the last tag. It writes the version in `pyproject.toml`, `uv.lock`, `docker/compose.yaml` and `cli/openapi.json`, adds the changes to `CHANGELOG.md`, and makes the commit and the tag.
+3. Read the new section of `CHANGELOG.md`. If an upgrade needs a step by hand, add it to that section before you push. Then make the commit and the tag again:
+
+   ```sh
+   git add CHANGELOG.md
+   git commit --amend --no-edit
+   git tag -f -a v<version> -m v<version>
+   ```
+
+4. Push the commit and the tag: `git push --follow-tags`.
+5. Merge `main` into `dev`.
+
+The tag starts two workflows. `image.yml` pushes the image with the version tags. `release.yml` makes the GitHub release with the notes from `CHANGELOG.md` and the CLI builds for Linux and macOS. Push the tag from your computer: a tag that a workflow pushes does not start other workflows.
+
 ## Documentation
 
 The documentation site is in `docs/`. It uses [Fumadocs](https://fumadocs.dev).

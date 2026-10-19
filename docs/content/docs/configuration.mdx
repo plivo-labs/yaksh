@@ -11,7 +11,7 @@ Yaksh keeps its configuration in two places:
 ## First start
 
 1. In `docker/.env`, set `YAKSH_API_TOKEN` and `YAKSH_ENCRYPTION_KEY`. To make an encryption key, run `openssl rand -base64 32`. Keep a copy of the key in a safe place.
-2. Start Yaksh with `docker compose -f docker/compose.yaml up --build`.
+2. Start Yaksh with `docker compose -f docker/compose.yaml up`.
 3. Open the console and enter the API token. The console opens on Settings until you save the LLM provider key.
 4. On Settings, add the LLM provider key, the Deepgram key, the ElevenLabs key, and the Plivo Auth ID and Auth token. Yaksh checks each key with its provider before it saves it.
 

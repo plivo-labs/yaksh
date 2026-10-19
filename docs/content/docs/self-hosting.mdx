@@ -57,7 +57,7 @@ Do these steps in this sequence. The worker must have its public address before 
 2. Get the code: `git clone https://github.com/plivo-labs/yaksh && cd yaksh`.
 3. Give the worker a fixed public HTTPS address. Use a named Cloudflare tunnel or Caddy (see below). Do not use a Cloudflare quick tunnel on a server: its address changes each time it starts, and then Plivo cannot get to the worker.
 4. Copy `docker/.env.example` to `docker/.env`. Set `YAKSH_API_TOKEN`, `YAKSH_ENCRYPTION_KEY` and `YAKSH_PUBLIC_URL`. Keep a copy of the encryption key.
-5. Start Yaksh in the background: `docker compose -f docker/compose.yaml up --build -d`.
+5. Start Yaksh in the background: `docker compose -f docker/compose.yaml up -d`. Docker gets the image of the newest release. To use a different version, refer to [Versions and upgrades](/docs/versions#container-image).
 6. Open the console on port 8000 and enter the API token. On the Settings page, save the provider keys and the Plivo Auth ID and Auth token.
 7. Choose the receiving application and the test numbers of this install (see [Plivo](#plivo)).
 8. Add an agent and do one test call.
@@ -101,9 +101,12 @@ Caddy also sends the WebSocket of each call to the worker.
 
 #### Update Yaksh
 
+Before you update, read the release notes and make a backup of the database. Refer to [Versions and upgrades](/docs/versions#upgrade).
+
 ```sh
 git pull
-docker compose -f docker/compose.yaml up --build -d
+docker compose -f docker/compose.yaml pull
+docker compose -f docker/compose.yaml up -d
 ```
 
 Compose stops the old worker before it starts the new one. The calls that are live at that time end with `worker_stopped`, and the run tries them again.

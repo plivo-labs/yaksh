@@ -1,0 +1,57 @@
+---
+title: Versions and upgrades
+description: How Yaksh numbers its releases, and how to upgrade an install.
+---
+
+## Version numbers
+
+Yaksh uses [semantic versioning](https://semver.org). One version number applies to the server, the console, the container image and the CLI. The [releases](https://github.com/plivo-labs/yaksh/releases) on GitHub list the changes in each version.
+
+Yaksh is at 0.x. In 0.x, the minor number shows a breaking change: 0.3.0 can break what worked with 0.2.x. A patch, such as 0.2.1 after 0.2.0, does not break anything. From 1.0, only the major number shows a breaking change.
+
+A breaking change is one of these:
+
+- A change or removal of a path or a field in the API at `/api/v1`.
+- A change of the output of a CLI command.
+- A new, renamed or removed environment variable, or a new default value.
+- An upgrade that needs a step by hand.
+- A new minimum version of PostgreSQL.
+
+A change of the database schema is not a breaking change, because Yaksh changes the schema itself. The routes that only the console uses are not part of the API.
+
+## Container image
+
+The image is `ghcr.io/plivo-labs/yaksh`. Each release has these tags:
+
+| Tag | Description |
+| --- | --- |
+| `0.2.1` | This release. It never changes. |
+| `0.2` | The newest patch of 0.2. |
+| `latest` | The newest release. Do not use it on a server: an upgrade to a new minor version can then occur when you do not expect it. |
+| `main`, `dev`, `sha-<commit>` | Builds of a branch or a commit. They are not releases. |
+
+`docker/compose.yaml` on the `main` branch uses the newest release. To use a different version, set `YAKSH_VERSION` in your shell or in `docker/.env`, for example `YAKSH_VERSION=0.2.1`.
+
+## Upgrade
+
+1. Read the release notes of each version after yours. Do the steps by hand that they give.
+2. Make a backup of the database.
+3. Get the new version and start it. With Docker Compose:
+
+   ```sh
+   git pull
+   docker compose -f docker/compose.yaml pull
+   docker compose -f docker/compose.yaml up -d
+   ```
+
+Each process changes the database schema when it starts. You can go from any version to a newer version in one step.
+
+You cannot go back to an older version on the same database. To go back, restore the backup that you made before the upgrade.
+
+## Fixes
+
+Only the newest release gets fixes. There are no fixes for older versions. To get a fix, upgrade to the newest release.
+
+## CLI
+
+The CLI keeps itself at the version of the server. Before each command, it reads the version of the server. If the minor version of the server is different, the CLI changes itself to the newest release of that minor version. Then it does the command again. One time each day, it also gets a newer patch of its minor version. Refer to [CLI](/docs/cli#install).

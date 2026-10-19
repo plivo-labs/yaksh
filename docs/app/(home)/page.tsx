@@ -41,7 +41,7 @@ const steps = [
 
 const quickStart = `git clone ${repoUrl} && cd ${gitConfig.repo}
 cp docker/.env.example docker/.env
-docker compose -f docker/compose.yaml up --build`;
+docker compose -f docker/compose.yaml up`;
 
 export default function HomePage() {
   return (

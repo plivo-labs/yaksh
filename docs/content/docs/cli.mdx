@@ -9,20 +9,36 @@ description: The yaksh CLI is a command-line client for coding agents, CI and pe
 
 ## Install
 
-Until the first release, build the CLI from the source code. Clone the repository (refer to [Quickstart](/docs/quickstart)). Then, at the root of the clone, build the CLI with Go 1.27 or later:
+Install the CLI on macOS or Linux:
 
 ```sh
-cd cli && go build -o ~/.yaksh/bin/yaksh .
+curl -fsSL https://raw.githubusercontent.com/plivo-labs/yaksh/main/install.sh | bash
 export PATH="$HOME/.yaksh/bin:$PATH"   # also add this line to your shell profile
 ```
 
-After the first release, you can give this text to your coding agent. It installs the CLI and its skill:
+The script installs the newest release in `~/.yaksh/bin`. It checks the download against the checksums of the release. To install one version, set `YAKSH_VERSION`, for example `YAKSH_VERSION=0.2.1`. To install in a different folder, set `YAKSH_INSTALL_DIR`.
+
+You can also give this text to your coding agent. It installs the CLI and its skill:
 
 ```text
 Install the Yaksh CLI with
 curl -fsSL https://raw.githubusercontent.com/plivo-labs/yaksh/main/install.sh | bash,
 then run npx skills add plivo-labs/yaksh -g
 and follow the yaksh skill to test my voice agent.
+```
+
+### Updates
+
+The CLI keeps itself at the version of the server. Before each command that uses the server, it reads the version of the server. If the minor version of the server is different, the CLI changes itself to the newest release of that minor version, then does the command again. One time each day, it also gets a newer patch of its minor version. The `auth` commands do not update the CLI.
+
+If the CLI cannot update itself, it writes a warning and does the command. For example, this occurs when it cannot write to its folder, or when no release of the CLI has the minor version of the server.
+
+### Build from the source code
+
+A CLI that you build from the source code has the version `dev`. It never updates itself. At the root of a clone of the repository, build it with Go 1.27 or later:
+
+```sh
+cd cli && go build -o ~/.yaksh/bin/yaksh .
 ```
 
 ## Log in

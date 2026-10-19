@@ -21,8 +21,9 @@ import (
 
 func (a *app) authCmd() *cobra.Command {
 	auth := &cobra.Command{
-		Use:   "auth",
-		Short: "Save, check and remove the server and token",
+		Use:         "auth",
+		Short:       "Save, check and remove the server and token",
+		Annotations: map[string]string{offline: "true"},
 		Long: "Save, check and remove the server and token. The environment variables YAKSH_URL and " +
 			"YAKSH_API_TOKEN win over the saved file.",
 	}
