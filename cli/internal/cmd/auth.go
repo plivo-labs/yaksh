@@ -21,8 +21,9 @@ import (
 
 func (a *app) authCmd() *cobra.Command {
 	auth := &cobra.Command{
-		Use:   "auth",
-		Short: "Save, check and remove the server and token",
+		Use:         "auth",
+		Short:       "Save, check and remove the server and token",
+		Annotations: map[string]string{offline: "true"},
 		Long: "Save, check and remove the server and token. The environment variables YAKSH_URL and " +
 			"YAKSH_API_TOKEN win over the saved file.",
 	}
@@ -174,17 +175,13 @@ func (a *app) check(ctx context.Context, s config.Settings) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	body, err := api.Body(c.HealthApiV1HealthGet(ctx))
+	version, err := c.ServerVersion(ctx)
 	if err != nil {
 		return "", err
 	}
-	var health api.HealthResponse
-	if err := json.Unmarshal(body, &health); err != nil {
-		return "", fmt.Errorf("read the server's version: %w", err)
-	}
 	one := 1
 	_, err = api.Body(c.ListAgentsApiV1AgentsGet(ctx, &api.ListAgentsApiV1AgentsGetParams{PageSize: &one}))
-	return health.Version, err
+	return version, err
 }
 
 func (a *app) authLogoutCmd() *cobra.Command {

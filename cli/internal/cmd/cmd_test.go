@@ -107,7 +107,26 @@ func run(t *testing.T, ctx context.Context, vars map[string]string, stdin string
 	if _, ok := vars["HOME"]; !ok {
 		vars["HOME"] = t.TempDir()
 	}
-	a := &app{version: "0.1.0", getenv: func(k string) string { return vars[k] }, pollInterval: time.Millisecond}
+	a := testApp(t, "0.1.0", vars, newFakeReleases(t))
+	return execute(a, ctx, stdin, args...)
+}
+
+// testApp is the app that the binary makes, with a fake GitHub and no restart.
+func testApp(t *testing.T, version string, vars map[string]string, releases *fakeReleases) *app {
+	t.Helper()
+	exe := filepath.Join(t.TempDir(), "yaksh")
+	if err := os.WriteFile(exe, []byte("old binary"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	return &app{
+		version: version, getenv: func(k string) string { return vars[k] }, pollInterval: time.Millisecond,
+		releases:   releases.Releases,
+		executable: func() (string, error) { return exe, nil },
+		restart:    func(string) error { t.Fatal("the CLI restarted"); return nil },
+	}
+}
+
+func execute(a *app, ctx context.Context, stdin string, args ...string) (code int, stdout, stderr string) {
 	var out, errOut bytes.Buffer
 	code = a.execute(ctx, args, strings.NewReader(stdin), &out, &errOut)
 	return code, out.String(), errOut.String()

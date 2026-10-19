@@ -37,7 +37,7 @@ You need Docker, a Plivo account with a phone number, and API keys for an LLM pr
 ```sh
 git clone https://github.com/plivo-labs/yaksh && cd yaksh
 cp docker/.env.example docker/.env   # set YAKSH_API_TOKEN and YAKSH_ENCRYPTION_KEY
-docker compose -f docker/compose.yaml up --build
+docker compose -f docker/compose.yaml up
 ```
 
 1. Open http://localhost:8000 and enter your API token.
@@ -49,13 +49,15 @@ To install Yaksh on a server, see [Self-hosting](docs/content/docs/self-hosting.
 
 ## Test from your coding agent
 
-Build the CLI with Go:
+Install the CLI:
 
 ```sh
-cd cli && go build -o ~/.yaksh/bin/yaksh .
+curl -fsSL https://raw.githubusercontent.com/plivo-labs/yaksh/main/install.sh | bash
 export PATH="$HOME/.yaksh/bin:$PATH"
 yaksh auth login --server http://localhost:8000
 ```
+
+The CLI keeps itself at the version of your server. See [Versions and upgrades](docs/content/docs/versions.mdx).
 
 Then add the skill to your coding agent with `npx skills add plivo-labs/yaksh`, and ask it to test your voice agent.
 

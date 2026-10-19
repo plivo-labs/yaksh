@@ -161,8 +161,15 @@ forbidden_modules = ["yaksh.simulation", "yaksh.evaluation", "yaksh.caller", "ya
 [tool.commitizen]
 name = "cz_conventional_commits"
 tag_format = "v$version"
-version_scheme = "pep440"
-version_provider = "pep621"
+version_scheme = "semver2"
+version_provider = "uv"
+major_version_zero = true
+update_changelog_on_bump = true
+annotated_tag = true
+version_files = [
+    "docker/compose.yaml:ghcr.io/plivo-labs/yaksh:",
+    "cli/openapi.json:^    \"version\": ",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

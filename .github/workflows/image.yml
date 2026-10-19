@@ -3,6 +3,7 @@ name: image
 on:
   push:
     branches: [dev, main]
+    tags: ["v*"]
   pull_request:
     paths:
       - docker/Dockerfile
@@ -23,6 +24,11 @@ jobs:
       packages: write
     steps:
       - uses: actions/checkout@v7
+      - name: The tag is the version in pyproject.toml
+        if: github.ref_type == 'tag'
+        run: |
+          version=$(python3 -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')
+          test "$GITHUB_REF_NAME" = "v$version"
       - uses: docker/login-action@v4.6.0
         if: github.event_name == 'push'
         with:
@@ -33,9 +39,16 @@ jobs:
         uses: docker/metadata-action@v6.2.0
         with:
           images: ghcr.io/${{ github.repository }}
+          # A prerelease tag such as v0.3.0-rc.1 gets only its exact tag. The major-only tag
+          # starts at 1.0, because each 0.x minor can break the one before it.
+          flavor: latest=false
           tags: |
             type=ref,event=branch
             type=sha
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}},enable=${{ !startsWith(github.ref, 'refs/tags/v0.') }}
+            type=raw,value=latest,enable=${{ github.ref_type == 'tag' && !contains(github.ref_name, '-') }}
       - uses: docker/build-push-action@v7.4.0
         with:
           context: .

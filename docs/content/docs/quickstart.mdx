@@ -32,10 +32,10 @@ You must have:
 5. Start Yaksh:
 
    ```sh
-   docker compose -f docker/compose.yaml up --build
+   docker compose -f docker/compose.yaml up
    ```
 
-   Do not stop this command. Do the next steps in a second terminal. If you stop this command, all the containers stop.
+   Docker gets the image of the newest Yaksh release. Do not stop this command. Do the next steps in a second terminal. If you stop this command, all the containers stop.
 
 6. Open the console at http://localhost:8000. Enter the value of `YAKSH_API_TOKEN`.
 7. The console opens on **Settings**. Add the LLM provider key, the Deepgram key, the ElevenLabs key, and the Plivo Auth ID and Auth token. Yaksh checks each key with its provider before it saves it. Refer to [Configuration](/docs/configuration).

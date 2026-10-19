@@ -1,7 +1,7 @@
 # 0018 Install the CLI with a script and keep it at the server's version
 
 Date: 2026-10-04
-Status: accepted; not built yet
+Status: accepted; built for v0.1.0
 
 ## Decision
 

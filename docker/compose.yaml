@@ -1,10 +1,7 @@
 name: yaksh
 
 x-yaksh: &yaksh
-  build:
-    context: ..
-    dockerfile: docker/Dockerfile
-  image: yaksh:local
+  image: ghcr.io/plivo-labs/yaksh:${YAKSH_VERSION:-0.1.0}
   env_file:
     - path: .env
       required: false

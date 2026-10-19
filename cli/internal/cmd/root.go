@@ -21,6 +21,7 @@ import (
 
 	"github.com/plivo-labs/yaksh/cli/internal/api"
 	"github.com/plivo-labs/yaksh/cli/internal/config"
+	"github.com/plivo-labs/yaksh/cli/internal/update"
 )
 
 var errNoServer = errors.New(`no Yaksh server: run "yaksh auth login" or set YAKSH_URL`)
@@ -33,6 +34,9 @@ type app struct {
 	version      string
 	getenv       func(string) string
 	pollInterval time.Duration
+	releases     update.Releases
+	executable   func() (string, error)
+	restart      func(exe string) error
 }
 
 // Execute runs the command line in args and returns the exit code: 0 when the command worked,
@@ -41,17 +45,23 @@ func Execute(
 	ctx context.Context, version string, args []string, getenv func(string) string,
 	stdin io.Reader, stdout, stderr io.Writer,
 ) int {
-	a := &app{version: version, getenv: getenv, pollInterval: pollInterval}
+	a := &app{
+		version: version, getenv: getenv, pollInterval: pollInterval,
+		releases:   update.GitHub(&http.Client{}),
+		executable: os.Executable,
+		restart:    restart,
+	}
 	return a.execute(ctx, args, stdin, stdout, stderr)
 }
 
 func (a *app) execute(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	root := &cobra.Command{
-		Use:           "yaksh",
-		Short:         "Command-line client for a Yaksh server",
-		Long:          "Command-line client for a Yaksh server. Coding agents: run \"yaksh guide\" first.",
-		SilenceUsage:  true,
-		SilenceErrors: true,
+		Use:               "yaksh",
+		Short:             "Command-line client for a Yaksh server",
+		Long:              "Command-line client for a Yaksh server. Coding agents: run \"yaksh guide\" first.",
+		SilenceUsage:      true,
+		SilenceErrors:     true,
+		PersistentPreRunE: a.followServer,
 	}
 	root.AddCommand(
 		a.authCmd(), a.versionCmd(), a.guideCmd(),

@@ -2,11 +2,8 @@ package cmd
 
 import (
 	"encoding/json"
-	"fmt"
 
 	"github.com/spf13/cobra"
-
-	"github.com/plivo-labs/yaksh/cli/internal/api"
 )
 
 func (a *app) versionCmd() *cobra.Command {
@@ -19,15 +16,11 @@ func (a *app) versionCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			body, err := api.Body(c.HealthApiV1HealthGet(cmd.Context()))
+			server, err := c.ServerVersion(cmd.Context())
 			if err != nil {
 				return err
 			}
-			var health api.HealthResponse
-			if err := json.Unmarshal(body, &health); err != nil {
-				return fmt.Errorf("read the server's version: %w", err)
-			}
-			out, err := json.Marshal(map[string]string{"cli": a.version, "server": health.Version})
+			out, err := json.Marshal(map[string]string{"cli": a.version, "server": server})
 			if err != nil {
 				return err
 			}
