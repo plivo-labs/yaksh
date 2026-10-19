@@ -2,20 +2,15 @@ package cmd
 
 import (
 	"context"
-	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
-	"io/fs"
 	"os"
 	"path/filepath"
-	"strings"
 	"syscall"
 	"time"
 
 	"github.com/spf13/cobra"
 
-	"github.com/plivo-labs/yaksh/cli/internal/api"
 	"github.com/plivo-labs/yaksh/cli/internal/config"
 	"github.com/plivo-labs/yaksh/cli/internal/update"
 )
@@ -37,39 +32,33 @@ const (
 // once a day, on the newest patch of that version. After an update it starts the command again
 // with the new binary. Any problem is a warning: the command still runs.
 func (a *app) followServer(cmd *cobra.Command, _ []string) error {
-	if update.Line(a.version) == "" || a.getenv(updatedVar) != "" || isOffline(cmd) || !validFlags(cmd) {
+	cliLine := update.Line(a.version)
+	if cliLine == "" || a.getenv(updatedVar) != "" || isOffline(cmd) || !validFlags(cmd) {
 		return nil
 	}
 	server, ok := a.serverVersion(cmd.Context())
-	if !ok || update.Line(server) == "" {
+	line := update.Line(server)
+	if !ok || line == "" {
 		return nil
 	}
-	stderr := cmd.ErrOrStderr()
+	why := "to match the server " + server
+	if line == cliLine {
+		if !a.patchCheckDue() {
+			return nil
+		}
+		why = "to its newest patch"
+	}
 	ctx, cancel := context.WithTimeout(cmd.Context(), updateTimeout)
 	defer cancel()
-
-	if update.Line(server) != update.Line(a.version) {
-		target, err := a.releases.Newest(ctx, update.Line(server))
-		switch {
-		case err != nil:
-			fmt.Fprintf(stderr, "warning: the CLI is %s and the server is %s, and the CLI cannot update: %v\n", a.version, server, err)
-		case target == "":
-			fmt.Fprintf(stderr, "warning: the CLI is %s and the server is %s, and no CLI release matches the server\n", a.version, server)
-		default:
-			return a.updateTo(ctx, stderr, target, "to match the server "+server)
-		}
-		return nil
-	}
-	if !a.patchCheckDue() {
-		return nil
-	}
-	target, err := a.releases.Newest(ctx, update.Line(a.version))
-	if err != nil {
-		fmt.Fprintf(stderr, "warning: cannot look for a newer CLI: %v\n", err)
-		return nil
-	}
-	if update.Newer(target, a.version) {
-		return a.updateTo(ctx, stderr, target, "its newest patch")
+	target, err := a.releases.Newest(ctx, line)
+	stderr := cmd.ErrOrStderr()
+	switch {
+	case err != nil:
+		fmt.Fprintf(stderr, "warning: cannot look for a CLI release: %v\n", err)
+	case target == "" && line != cliLine:
+		fmt.Fprintf(stderr, "warning: the CLI is %s and no CLI release matches the server %s\n", a.version, server)
+	case target != "" && (line != cliLine || update.Newer(target, a.version)):
+		return a.updateTo(ctx, stderr, target, why)
 	}
 	return nil
 }
@@ -77,25 +66,14 @@ func (a *app) followServer(cmd *cobra.Command, _ []string) error {
 // serverVersion reads the version of the saved server. It reports false when there is no server
 // or it does not answer: the command itself then reports the problem.
 func (a *app) serverVersion(ctx context.Context) (string, bool) {
-	s, err := config.Load(a.getenv)
-	if err != nil || s.Server == "" {
-		return "", false
-	}
-	c, err := api.New(s.Server, s.Token, a.userAgent())
+	c, err := a.client()
 	if err != nil {
 		return "", false
 	}
 	ctx, cancel := context.WithTimeout(ctx, healthTimeout)
 	defer cancel()
-	body, err := api.Body(c.HealthApiV1HealthGet(ctx))
-	if err != nil {
-		return "", false
-	}
-	var health api.HealthResponse
-	if json.Unmarshal(body, &health) != nil {
-		return "", false
-	}
-	return health.Version, true
+	version, err := c.ServerVersion(ctx)
+	return version, err == nil
 }
 
 // updateTo installs version over the running binary, then starts the command again with it. If
@@ -121,24 +99,20 @@ func (a *app) updateTo(ctx context.Context, stderr io.Writer, version, why strin
 }
 
 // patchCheckDue reports whether the last look for a newer patch was a day ago or more, and
-// records this look. A CLI that cannot record it looks again at the next command.
+// records this look in the time of a file. A CLI that cannot record it looks again at the next
+// command.
 func (a *app) patchCheckDue() bool {
 	path, err := config.Path(a.getenv)
 	if err != nil {
 		return false
 	}
 	path = filepath.Join(filepath.Dir(path), "update-check")
-	data, err := os.ReadFile(path)
-	if err == nil {
-		last, err := time.Parse(time.RFC3339, strings.TrimSpace(string(data)))
-		if err == nil && time.Since(last) < patchCheckInterval {
-			return false
-		}
-	} else if !errors.Is(err, fs.ErrNotExist) {
+	if info, err := os.Stat(path); err == nil && time.Since(info.ModTime()) < patchCheckInterval {
 		return false
 	}
+	// Opening with O_TRUNC sets the modification time, also of a file that is already empty.
 	if os.MkdirAll(filepath.Dir(path), 0o700) == nil {
-		_ = os.WriteFile(path, []byte(time.Now().UTC().Format(time.RFC3339)+"\n"), 0o600)
+		_ = os.WriteFile(path, nil, 0o600)
 	}
 	return true
 }

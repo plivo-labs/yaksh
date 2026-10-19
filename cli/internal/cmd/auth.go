@@ -175,17 +175,13 @@ func (a *app) check(ctx context.Context, s config.Settings) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	body, err := api.Body(c.HealthApiV1HealthGet(ctx))
+	version, err := c.ServerVersion(ctx)
 	if err != nil {
 		return "", err
 	}
-	var health api.HealthResponse
-	if err := json.Unmarshal(body, &health); err != nil {
-		return "", fmt.Errorf("read the server's version: %w", err)
-	}
 	one := 1
 	_, err = api.Body(c.ListAgentsApiV1AgentsGet(ctx, &api.ListAgentsApiV1AgentsGetParams{PageSize: &one}))
-	return health.Version, err
+	return version, err
 }
 
 func (a *app) authLogoutCmd() *cobra.Command {

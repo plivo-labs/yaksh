@@ -9,6 +9,8 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+
+	"github.com/plivo-labs/yaksh/cli/internal/atomicfile"
 )
 
 // Settings are the server URL and the API token. Either can be empty.
@@ -74,8 +76,7 @@ func Load(getenv func(string) string) (Loaded, error) {
 	return l, nil
 }
 
-// Save writes s to the file, readable by the user only. It writes a temporary file and renames
-// it, so a crash never leaves half a file behind.
+// Save writes s to the file, readable by the user only. A crash never leaves half a file behind.
 func Save(getenv func(string) string, s Settings) error {
 	path, err := Path(getenv)
 	if err != nil {
@@ -89,22 +90,7 @@ func Save(getenv func(string) string, s Settings) error {
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return fmt.Errorf("create %s: %w", dir, err)
 	}
-	tmp, err := os.CreateTemp(dir, "config-*.json")
-	if err != nil {
-		return fmt.Errorf("write %s: %w", path, err)
-	}
-	defer os.Remove(tmp.Name())
-	if _, err := tmp.Write(append(data, '\n')); err != nil {
-		tmp.Close()
-		return fmt.Errorf("write %s: %w", path, err)
-	}
-	if err := tmp.Close(); err != nil {
-		return fmt.Errorf("write %s: %w", path, err)
-	}
-	if err := os.Rename(tmp.Name(), path); err != nil {
-		return fmt.Errorf("write %s: %w", path, err)
-	}
-	return nil
+	return atomicfile.Write(path, append(data, '\n'), 0o600)
 }
 
 // Remove deletes the file. It reports false when there was no file.

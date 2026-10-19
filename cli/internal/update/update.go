@@ -14,12 +14,13 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
 
 	"golang.org/x/mod/semver"
+
+	"github.com/plivo-labs/yaksh/cli/internal/atomicfile"
 )
 
 // Releases is where the releases are: a list in the shape of the GitHub API, and the base URL of
@@ -92,12 +93,12 @@ func nextPage(link string) string {
 }
 
 // Install downloads the archive of version for this OS and architecture, checks it against the
-// release's checksums.txt, and replaces the file at exe with the binary in it. It writes a
-// temporary file next to exe and renames it, so exe is always a whole binary.
+// release's checksums.txt, and replaces the file at exe with the binary in it. exe is always a
+// whole binary.
 func (r Releases) Install(ctx context.Context, version, exe string) error {
 	base := fmt.Sprintf("%s/v%s/", strings.TrimRight(r.Download, "/"), version)
 	archive := fmt.Sprintf("yaksh_%s_%s.tar.gz", runtime.GOOS, runtime.GOARCH)
-	sums, err := r.get(ctx, base+"checksums.txt")
+	sums, _, err := r.fetch(ctx, base+"checksums.txt")
 	if err != nil {
 		return fmt.Errorf("download the checksums: %w", err)
 	}
@@ -105,7 +106,7 @@ func (r Releases) Install(ctx context.Context, version, exe string) error {
 	if err != nil {
 		return err
 	}
-	data, err := r.get(ctx, base+archive)
+	data, _, err := r.fetch(ctx, base+archive)
 	if err != nil {
 		return fmt.Errorf("download %s: %w", archive, err)
 	}
@@ -116,12 +117,7 @@ func (r Releases) Install(ctx context.Context, version, exe string) error {
 	if err != nil {
 		return fmt.Errorf("read %s: %w", archive, err)
 	}
-	return replace(exe, binary)
-}
-
-func (r Releases) get(ctx context.Context, url string) ([]byte, error) {
-	body, _, err := r.fetch(ctx, url)
-	return body, err
+	return atomicfile.Write(exe, binary, 0o755)
 }
 
 func (r Releases) fetch(ctx context.Context, url string) ([]byte, http.Header, error) {
@@ -171,26 +167,4 @@ func extract(data []byte, name string) ([]byte, error) {
 			return io.ReadAll(tr)
 		}
 	}
-}
-
-func replace(exe string, binary []byte) error {
-	tmp, err := os.CreateTemp(filepath.Dir(exe), ".yaksh-update-*")
-	if err != nil {
-		return fmt.Errorf("write next to %s: %w", exe, err)
-	}
-	defer os.Remove(tmp.Name())
-	if _, err := tmp.Write(binary); err != nil {
-		tmp.Close()
-		return fmt.Errorf("write next to %s: %w", exe, err)
-	}
-	if err := tmp.Close(); err != nil {
-		return fmt.Errorf("write next to %s: %w", exe, err)
-	}
-	if err := os.Chmod(tmp.Name(), 0o755); err != nil {
-		return err
-	}
-	if err := os.Rename(tmp.Name(), exe); err != nil {
-		return fmt.Errorf("replace %s: %w", exe, err)
-	}
-	return nil
 }

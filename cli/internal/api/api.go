@@ -32,6 +32,19 @@ func New(server, token, userAgent string) (*Client, error) {
 	)
 }
 
+// ServerVersion reads the server's version from its health route.
+func (c *Client) ServerVersion(ctx context.Context) (string, error) {
+	body, err := Body(c.HealthApiV1HealthGet(ctx))
+	if err != nil {
+		return "", err
+	}
+	var health HealthResponse
+	if err := json.Unmarshal(body, &health); err != nil {
+		return "", fmt.Errorf("read the server's version: %w", err)
+	}
+	return health.Version, nil
+}
+
 // Error is a response with a status that is not 2xx.
 type Error struct {
 	Status  int

@@ -182,7 +182,8 @@ func TestTheCLILooksForANewerPatchOnceADay(t *testing.T) {
 	}
 
 	stamp := filepath.Join(vars["HOME"], ".config", "yaksh", "update-check")
-	if err := os.WriteFile(stamp, []byte(time.Now().Add(-25*time.Hour).Format(time.RFC3339)), 0o600); err != nil {
+	dayAgo := time.Now().Add(-25 * time.Hour)
+	if err := os.Chtimes(stamp, dayAgo, dayAgo); err != nil {
 		t.Fatal(err)
 	}
 	a = testApp(t, "0.2.1", vars, releases)
