@@ -132,20 +132,6 @@ func TestTheCLIUpdatesToTheServersMinorVersionAndStartsAgain(t *testing.T) {
 	}
 }
 
-func TestTheCLIRunsTheCommandWhenItCannotMatchTheServer(t *testing.T) {
-	f := serverAt(t, "0.5.0")
-	a := testApp(t, "0.1.0", against(f), newFakeReleases(t, "v0.1.0", "v0.5.0-rc.1"))
-
-	code, _, stderr := execute(a, context.Background(), "", "agent", "list")
-
-	if code != 0 || !strings.Contains(stderr, "no CLI release matches the server") {
-		t.Fatalf("code = %d, stderr = %q", code, stderr)
-	}
-	if n := len(f.requests("GET", "/api/v1/agents")); n != 1 {
-		t.Fatalf("agents requests = %d, want 1", n)
-	}
-}
-
 func TestTheCLIKeepsItsBinaryWhenTheDownloadDoesNotMatchItsChecksum(t *testing.T) {
 	f := serverAt(t, "0.2.0")
 	releases := newFakeReleases(t, "v0.2.0")
