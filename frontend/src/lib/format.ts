@@ -93,10 +93,12 @@ export function stamp(seconds: number): string {
   return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, "0")}`;
 }
 
-/** How Yaksh reaches an agent: over text, the number it dials, or that the agent calls Yaksh. */
+/** How Yaksh reaches an agent: the number it dials or that the agent calls Yaksh, and text. */
 export function reach(agent: AgentSummary): string {
-  if (agent.transport === "text") return "Text";
-  return agent.agent_number ? phone(agent.agent_number) : "Calls Yaksh";
+  const ways = agent.transports.map((transport) =>
+    transport === "text" ? "Text" : agent.agent_number ? phone(agent.agent_number) : "Calls Yaksh",
+  );
+  return ways.join(" · ");
 }
 
 /** A text's length as the model sees it: about four characters per token in English. */

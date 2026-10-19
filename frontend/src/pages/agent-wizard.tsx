@@ -41,7 +41,7 @@ import { DraftRules, type RuleEdit } from "@/pages/agent-wizard-rules";
 
 const STEPS: Step[] = [
   { label: "Agent", hint: "What it is and does" },
-  { label: "Calls", hint: "How Yaksh reaches it" },
+  { label: "Connections", hint: "How Yaksh reaches it" },
   { label: "Knowledge base", hint: "Optional" },
   { label: "Rules", hint: "Optional" },
 ];
@@ -77,7 +77,7 @@ export function AgentWizardPage() {
   const { needs } = form;
   const stepProblems = [
     needs.name || needs.brief || needs.config,
-    needs.direction || needs.reach || needs.languages,
+    needs.direction || needs.connection || needs.reach || needs.languages,
     false,
     false,
   ];

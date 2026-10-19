@@ -1,4 +1,11 @@
-import { MessageSquareText, PhoneIncoming, PhoneOutgoing, Sparkles } from "lucide-react";
+import {
+  Check,
+  MessageSquareText,
+  Phone,
+  PhoneIncoming,
+  PhoneOutgoing,
+  Sparkles,
+} from "lucide-react";
 import { type ReactNode, type SubmitEvent, useState } from "react";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";
@@ -33,44 +40,57 @@ import {
   toInput,
 } from "@/lib/agent-draft";
 import { useDeleteAgent, useSaveAgent } from "@/lib/queries";
-import { endpointProblems } from "@/lib/outbound";
-import type { Agent, Direction, Transport } from "@/lib/types";
+import { cn } from "@/lib/utils";
+import { endpointProblems, isPhoneNumber } from "@/lib/outbound";
+import type { Agent, Direction } from "@/lib/types";
 import { ConfigField } from "@/pages/agent-config-field";
 import { OutboundFields, Pairs } from "@/pages/agent-outbound-fields";
 
-const REACH_CHOICES: {
-  key: string;
+const DIRECTION_CHOICES: {
   direction: Direction;
-  transport: Transport;
   label: string;
   hint: string;
   icon: typeof PhoneOutgoing;
 }[] = [
   {
-    key: "inbound",
     direction: "inbound",
-    transport: "phone",
-    label: "Yaksh calls the agent",
-    hint: "Yaksh dials the agent's phone number and plays the caller.",
+    label: "The caller",
+    hint: "Yaksh calls or texts the agent and plays the caller.",
     icon: PhoneOutgoing,
   },
   {
-    key: "outbound",
     direction: "outbound",
-    transport: "phone",
-    label: "The agent calls Yaksh",
-    hint: "Yaksh asks the agent to call, then answers as the caller.",
+    label: "The agent",
+    hint: "Yaksh asks the agent to start, then answers as the caller.",
     icon: PhoneIncoming,
+  },
+];
+
+const CONNECTION_CHOICES: {
+  key: "phone" | "text";
+  label: string;
+  hint: (direction: Direction) => string;
+  icon: typeof Phone;
+}[] = [
+  {
+    key: "phone",
+    label: "Phone",
+    hint: (direction) =>
+      direction === "inbound"
+        ? "Yaksh dials the agent's phone number."
+        : "The agent calls one of Yaksh's numbers.",
+    icon: Phone,
   },
   {
     key: "text",
-    direction: "inbound",
-    transport: "text",
-    label: "Yaksh texts the agent",
-    hint: "No phone call: Yaksh sends each turn to the agent's URL as text.",
+    label: "Text",
+    hint: () => "No phone call: Yaksh sends each turn to the agent's URL.",
     icon: MessageSquareText,
   },
 ];
+
+const CHOICE_CARD =
+  "grid cursor-pointer content-start gap-1.5 rounded-md border bg-background px-4 py-3.5 transition-colors hover:bg-hv1 has-checked:border-foreground has-checked:ring-1 has-checked:ring-foreground has-focus-visible:ring-2 has-focus-visible:ring-ring/50";
 
 const TEXT_NOTE =
   "Yaksh sends each turn of the test to this URL. Put tokens in a header as {{secrets.<NAME>}}, from Settings.";
@@ -96,82 +116,130 @@ export function NameField({ form }: { form: AgentDraft }) {
   );
 }
 
-/** Who calls whom, as two cards; each card is a radio button. */
+/** Who starts the conversation, then how Yaksh can reach the agent; each card is a radio
+ * button or a checkbox. */
 export function ReachChoice({ form }: { form: AgentDraft }) {
   const { draft, set, submitted, needs } = form;
   const missing = submitted && needs.direction;
+  const noConnection = submitted && needs.connection;
+  const { direction } = draft;
   return (
-    <FieldSet>
-      <FieldLegend variant="label">How does Yaksh reach the agent?</FieldLegend>
-      <div className="grid gap-3 sm:grid-cols-3">
-        {REACH_CHOICES.map(({ key, direction, transport, label, hint, icon: Icon }) => (
-          <label
-            key={key}
-            className="grid cursor-pointer content-start gap-1.5 rounded-md border bg-background px-4 py-3.5 transition-colors hover:bg-hv1 has-checked:border-foreground has-checked:ring-1 has-checked:ring-foreground has-focus-visible:ring-2 has-focus-visible:ring-ring/50"
-          >
-            <input
-              type="radio"
-              name="direction"
-              value={key}
-              className="sr-only"
-              checked={draft.direction === direction && draft.transport === transport}
-              aria-invalid={missing}
-              aria-describedby={missing ? "direction-error" : undefined}
-              onChange={() => {
-                set("direction", direction);
-                set("transport", transport);
-              }}
-            />
-            <Icon aria-hidden className="size-4.5" />
-            <span className="text-p-500">{label}</span>
-            <span className="text-s-400 text-muted-foreground">{hint}</span>
-          </label>
-        ))}
-      </div>
-      {missing && <FieldError id="direction-error">Choose how Yaksh reaches the agent.</FieldError>}
+    <>
+      <FieldSet>
+        <FieldLegend variant="label">Who starts the conversation?</FieldLegend>
+        <div className="grid gap-3 sm:grid-cols-2">
+          {DIRECTION_CHOICES.map(({ direction: choice, label, hint, icon: Icon }) => (
+            <label key={choice} className={CHOICE_CARD}>
+              <input
+                type="radio"
+                name="direction"
+                value={choice}
+                className="sr-only"
+                checked={direction === choice}
+                aria-invalid={missing}
+                aria-describedby={missing ? "direction-error" : undefined}
+                onChange={() => set("direction", choice)}
+              />
+              <Icon aria-hidden className="size-4.5" />
+              <span className="text-p-500">{label}</span>
+              <span className="text-s-400 text-muted-foreground">{hint}</span>
+            </label>
+          ))}
+        </div>
+        {missing && (
+          <FieldError id="direction-error">Choose who starts the conversation.</FieldError>
+        )}
+      </FieldSet>
+      {direction && (
+        <FieldSet>
+          <FieldLegend variant="label">How can Yaksh reach it?</FieldLegend>
+          <FieldDescription>Choose one or both. Each run uses one.</FieldDescription>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {CONNECTION_CHOICES.map(({ key, label, hint, icon: Icon }) => (
+              <label key={key} className={cn("group", CHOICE_CARD)}>
+                <input
+                  type="checkbox"
+                  name={key}
+                  className="sr-only"
+                  checked={draft[key]}
+                  aria-invalid={noConnection}
+                  aria-describedby={noConnection ? "connection-error" : undefined}
+                  onChange={(e) => set(key, e.target.checked)}
+                />
+                <span className="flex items-center justify-between">
+                  <Icon aria-hidden className="size-4.5" />
+                  <span
+                    aria-hidden
+                    className="grid size-4 place-items-center rounded-sm border border-input dark:bg-input/30 group-has-checked:border-primary group-has-checked:bg-primary group-has-checked:text-primary-foreground dark:group-has-checked:bg-primary"
+                  >
+                    <Check className="hidden size-3 group-has-checked:block" />
+                  </span>
+                </span>
+                <span className="text-p-500">{label}</span>
+                <span className="text-s-400 text-muted-foreground">{hint(direction)}</span>
+              </label>
+            ))}
+          </div>
+          {noConnection && (
+            <FieldError id="connection-error">Choose phone, text or both.</FieldError>
+          )}
+        </FieldSet>
+      )}
+    </>
+  );
+}
+
+/** The fields of each chosen connection: the agent's number or the request that makes it call,
+ * and the URL Yaksh texts. */
+export function ReachFields({ form }: { form: AgentDraft }) {
+  const { draft } = form;
+  if (draft.direction === null) return null;
+  return (
+    <>
+      {draft.phone && <PhoneFields form={form} />}
+      {draft.text && <TextFields form={form} />}
+    </>
+  );
+}
+
+function TextFields({ form }: { form: AgentDraft }) {
+  const { draft, set, submitted, swap } = form;
+  const problems = submitted ? endpointProblems(draft.endpoint) : {};
+  return (
+    <FieldSet className={swap}>
+      <FieldLegend variant="label">The agent's text endpoint</FieldLegend>
+      <FieldDescription>{TEXT_NOTE}</FieldDescription>
+      <Field>
+        <FieldLabel htmlFor="endpoint_url">URL</FieldLabel>
+        <Input
+          id="endpoint_url"
+          required
+          placeholder="https://agents.example.com/v1/agent/123/text-test"
+          className="font-mono text-xs-400"
+          aria-invalid={Boolean(problems.url)}
+          aria-describedby={problems.url ? "endpoint_url-error" : undefined}
+          value={draft.endpoint.url}
+          onChange={(e) => set("endpoint", { ...draft.endpoint, url: e.target.value })}
+        />
+        {problems.url && <FieldError id="endpoint_url-error">{problems.url}</FieldError>}
+      </Field>
+      <Field>
+        <FieldLabel>Headers</FieldLabel>
+        <Pairs
+          pairs={draft.endpoint.headers}
+          noun="Header"
+          namePlaceholder="Authorization"
+          valuePlaceholder="Bearer {{secrets.AGENT_TOKEN}}"
+          onChange={(headers) => set("endpoint", { ...draft.endpoint, headers })}
+        />
+        {problems.headers && <FieldError>{problems.headers}</FieldError>}
+      </Field>
     </FieldSet>
   );
 }
 
-/** The fields for the chosen way: the agent's number, the request that makes it call, or the
- * URL Yaksh texts. */
-export function ReachFields({ form }: { form: AgentDraft }) {
-  const { draft, set, submitted, needs, swap } = form;
-  if (draft.direction === null) return null;
-  if (draft.transport === "text") {
-    const problems = submitted ? endpointProblems(draft.endpoint) : {};
-    return (
-      <FieldSet className={swap}>
-        <FieldLegend variant="label">The agent's text endpoint</FieldLegend>
-        <FieldDescription>{TEXT_NOTE}</FieldDescription>
-        <Field>
-          <FieldLabel htmlFor="endpoint_url">URL</FieldLabel>
-          <Input
-            id="endpoint_url"
-            required
-            placeholder="https://agents.example.com/v1/agent/123/text-test"
-            className="font-mono text-xs-400"
-            aria-invalid={Boolean(problems.url)}
-            aria-describedby={problems.url ? "endpoint_url-error" : undefined}
-            value={draft.endpoint.url}
-            onChange={(e) => set("endpoint", { ...draft.endpoint, url: e.target.value })}
-          />
-          {problems.url && <FieldError id="endpoint_url-error">{problems.url}</FieldError>}
-        </Field>
-        <Field>
-          <FieldLabel>Headers</FieldLabel>
-          <Pairs
-            pairs={draft.endpoint.headers}
-            noun="Header"
-            namePlaceholder="Authorization"
-            valuePlaceholder="Bearer {{secrets.AGENT_TOKEN}}"
-            onChange={(headers) => set("endpoint", { ...draft.endpoint, headers })}
-          />
-          {problems.headers && <FieldError>{problems.headers}</FieldError>}
-        </Field>
-      </FieldSet>
-    );
-  }
+function PhoneFields({ form }: { form: AgentDraft }) {
+  const { draft, set, submitted, swap } = form;
   if (draft.direction === "outbound") {
     return (
       <FieldSet className={swap}>
@@ -185,7 +253,8 @@ export function ReachFields({ form }: { form: AgentDraft }) {
       </FieldSet>
     );
   }
-  const numberProblem = (submitted || draft.agent_number !== "") && needs.reach;
+  const numberProblem =
+    (submitted || draft.agent_number !== "") && !isPhoneNumber(draft.agent_number);
   return (
     <Field className={swap}>
       <FieldLabel htmlFor="agent_number">The agent's phone number</FieldLabel>
@@ -387,7 +456,7 @@ function AgentForm({
         </FieldGroup>
       </FieldSet>
       <FieldSet>
-        <FieldLegend>Calls</FieldLegend>
+        <FieldLegend>Connections</FieldLegend>
         <FieldGroup>
           <ReachChoice form={form} />
           <ReachFields form={form} />

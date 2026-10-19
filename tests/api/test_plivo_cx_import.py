@@ -248,6 +248,24 @@ async def test_a_refused_number_lookup_still_imports_the_agent_with_plivos_reaso
     assert "IP 203.0.113.9 is not in this account's IP whitelist" in draft["number_note"]
 
 
+@pytest.mark.parametrize(
+    "flow_id", [INBOUND, LONELY, OUTBOUND], ids=["call", "no number", "request"]
+)
+async def test_every_imported_flow_gets_its_text_test_url_with_basic_auth(
+    client: AsyncClient, plivo: list[dict[str, Any]], flow_id: str
+) -> None:
+    imported = await client.post(
+        "/api/v1/agents/import/plivo-cx/flow", json=account(flow_id=flow_id)
+    )
+
+    endpoint = imported.json()["endpoint"]
+    basic = base64.b64encode(f"{AUTH_ID}:{AUTH_TOKEN}".encode()).decode()
+    assert endpoint == {
+        "url": f"https://agentflow.plivo.com/v1/account/{AUTH_ID}/flow/{flow_id}/text-test",
+        "headers": [{"name": "Authorization", "value": f"Basic {basic}"}],
+    }
+
+
 async def test_a_flow_a_request_starts_gets_the_start_request_plivo_cx_shows(
     client: AsyncClient, plivo: list[dict[str, Any]]
 ) -> None:

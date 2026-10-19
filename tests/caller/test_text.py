@@ -15,7 +15,7 @@ from pydantic import SecretStr
 from tests.conftest import APP_SETTINGS, CALLER, Observer, make_settings
 from yaksh.caller.plivo_server import PlivoServer
 from yaksh.caller.text import TextCaller, TextConversation
-from yaksh.domain.agents import AgentConfig
+from yaksh.domain.agents import AgentConfig, Transport
 from yaksh.domain.conversations import CallOutcome, CallRequest, EndReason, Role, WireEventKind
 from yaksh.domain.scenarios import Fact
 from yaksh.integrations.text_agent import TextAgent
@@ -84,11 +84,12 @@ class FakeModel:
 
 def request(**agent: Any) -> CallRequest:
     config = AgentConfig.model_validate(
-        {"transport": "text", "endpoint": {"url": "http://unused"}, "brief": BRIEF, **agent}
+        {"endpoint": {"url": "http://unused"}, "brief": BRIEF, **agent}
     )
     return CallRequest(
         conversation_id=uuid.uuid4(),
         agent=config,
+        transport=Transport.TEXT,
         **CALLER,
         caller_number=None,
         max_duration_s=120,

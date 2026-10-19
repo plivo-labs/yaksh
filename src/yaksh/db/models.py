@@ -59,7 +59,6 @@ class Agent(Base):
     external_id: Mapped[str | None] = mapped_column(Text)
     source: Mapped[AgentSource] = mapped_column(pg_enum(AgentSource, "agent_source"))
     direction: Mapped[Direction] = mapped_column(pg_enum(Direction, "agent_direction"))
-    transport: Mapped[Transport] = mapped_column(pg_enum(Transport, "agent_transport"))
     agent_number: Mapped[str | None] = mapped_column(Text)
     outbound: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     endpoint: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
@@ -91,6 +90,10 @@ class Agent(Base):
             unique=True,
             postgresql_where=text("deleted_at IS NULL"),
         ),
+        CheckConstraint(
+            "agent_number IS NOT NULL OR outbound IS NOT NULL OR endpoint IS NOT NULL",
+            name="has_connection",
+        ),
         CheckConstraint("cardinality(languages) > 0", name="languages_not_empty"),
     )
 
@@ -118,6 +121,8 @@ class Run(Base):
     id: Mapped[uuid.UUID] = uuid_primary_key()
     agent_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("agents.id"))
     agent_version_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
+    transport: Mapped[Transport] = mapped_column(pg_enum(Transport, "agent_transport"))
+    """How the run's conversations reach the agent: one of the pinned version's connections."""
     name: Mapped[str | None] = mapped_column(Text)
     repeats: Mapped[int] = mapped_column(Integer)
     max_duration_s: Mapped[int] = mapped_column(Integer)
@@ -142,6 +147,7 @@ class Run(Base):
         UniqueConstraint("id", "agent_id"),
         CheckConstraint("(request_key IS NULL) = (request_hash IS NULL)", name="request_together"),
         Index("ix_runs_agent_created", "agent_id", text("created_at DESC")),
+        Index("ix_runs_agent_transport_created", "agent_id", "transport", text("created_at DESC")),
     )
 
 

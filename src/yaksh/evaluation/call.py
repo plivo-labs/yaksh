@@ -266,7 +266,7 @@ def call_view(
     return CallView(
         brief=agent.brief,
         agent_data=list(scenario.agent_data)
-        if agent.direction is Direction.OUTBOUND or agent.transport is Transport.TEXT
+        if agent.direction is Direction.OUTBOUND or conversation.transport is Transport.TEXT
         else [],
         instructions=scenario.instructions,
         known_facts=list(scenario.known_facts),
@@ -274,7 +274,7 @@ def call_view(
         today=conversation.today,
         time_zone=conversation.time_zone,
         direction=agent.direction,
-        transport=agent.transport,
+        transport=conversation.transport,
         agent_number=agent.agent_number,
         yaksh_number=conversation.caller_number,
         agent_caller_id=conversation.agent_caller_id,

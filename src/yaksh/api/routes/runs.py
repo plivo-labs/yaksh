@@ -10,6 +10,7 @@ from yaksh.api.deps import AppSettingsDep, SessionDep, SettingsDep
 from yaksh.api.pagination import Page, PageDep
 from yaksh.api.schemas.runs import RunRead, RunSummary
 from yaksh.db.models import Run
+from yaksh.domain.agents import Transport
 from yaksh.domain.evaluations import RunMetrics
 from yaksh.domain.latency import pooled
 from yaksh.domain.runs import RunCreate, RunStatus
@@ -23,9 +24,6 @@ router = APIRouter(prefix="/runs", tags=["runs"], dependencies=[Depends(require_
 
 async def summaries(session: AsyncSession, rows: list[Run]) -> list[RunSummary]:
     agents = await conversations.pinned_agents(session, (row.agent_version_id for row in rows))
-    transports = await conversations.pinned_transports(
-        session, (row.agent_version_id for row in rows)
-    )
     progress = await runs.progress(session, rows)
     languages = await runs.caller_languages(session, [row.id for row in rows])
     counted = await runs.counted_conversations(session, [row.id for row in rows])
@@ -35,7 +33,6 @@ async def summaries(session: AsyncSession, rows: list[Run]) -> list[RunSummary]:
         RunSummary.of(
             row,
             agents[row.agent_version_id],
-            transports[row.agent_version_id],
             progress[row.id],
             pooled([measured[c] for c in counted.get(row.id, []) if c in measured]),
             languages.get(row.id, []),
@@ -85,6 +82,7 @@ async def list_runs(
     session: SessionDep,
     page: PageDep,
     agent_id: uuid.UUID | None = None,
+    transport: Transport | None = None,
     status: RunStatus | None = None,
     created_from: AwareDatetime | None = None,
     created_before: AwareDatetime | None = None,
@@ -96,6 +94,7 @@ async def list_runs(
         offset=page.offset,
         limit=page.page_size,
         agent_id=agent_id,
+        transport=transport,
         status=status,
         created_from=created_from,
         created_before=created_before,

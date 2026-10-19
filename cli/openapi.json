@@ -3639,6 +3639,22 @@
             }
           },
           {
+            "name": "transport",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/Transport"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Transport"
+            }
+          },
+          {
             "name": "status",
             "in": "query",
             "required": false,
@@ -5729,10 +5745,6 @@
             "$ref": "#/components/schemas/Direction",
             "default": "inbound"
           },
-          "transport": {
-            "$ref": "#/components/schemas/Transport",
-            "default": "phone"
-          },
           "agent_number": {
             "anyOf": [
               {
@@ -5844,10 +5856,6 @@
           "direction": {
             "$ref": "#/components/schemas/Direction",
             "default": "inbound"
-          },
-          "transport": {
-            "$ref": "#/components/schemas/Transport",
-            "default": "phone"
           },
           "agent_number": {
             "anyOf": [
@@ -6102,9 +6110,6 @@
           "direction": {
             "$ref": "#/components/schemas/Direction"
           },
-          "transport": {
-            "$ref": "#/components/schemas/Transport"
-          },
           "agent_number": {
             "anyOf": [
               {
@@ -6216,6 +6221,15 @@
             "type": "array",
             "maxItems": 20,
             "title": "Rules"
+          },
+          "transports": {
+            "items": {
+              "$ref": "#/components/schemas/Transport"
+            },
+            "type": "array",
+            "title": "Transports",
+            "description": "The ways a run can reach the agent, in a fixed order.",
+            "readOnly": true
           }
         },
         "type": "object",
@@ -6225,7 +6239,6 @@
           "external_id",
           "source",
           "direction",
-          "transport",
           "agent_number",
           "outbound",
           "endpoint",
@@ -6238,7 +6251,8 @@
           "updated_at",
           "config",
           "knowledge_base",
-          "rules"
+          "rules",
+          "transports"
         ],
         "title": "AgentRead"
       },
@@ -6282,9 +6296,6 @@
           },
           "direction": {
             "$ref": "#/components/schemas/Direction"
-          },
-          "transport": {
-            "$ref": "#/components/schemas/Transport"
           },
           "agent_number": {
             "anyOf": [
@@ -6357,6 +6368,15 @@
             "type": "string",
             "format": "date-time",
             "title": "Updated At"
+          },
+          "transports": {
+            "items": {
+              "$ref": "#/components/schemas/Transport"
+            },
+            "type": "array",
+            "title": "Transports",
+            "description": "The ways a run can reach the agent, in a fixed order.",
+            "readOnly": true
           }
         },
         "type": "object",
@@ -6366,7 +6386,6 @@
           "external_id",
           "source",
           "direction",
-          "transport",
           "agent_number",
           "outbound",
           "endpoint",
@@ -6376,7 +6395,8 @@
           "current_version",
           "forked_from_id",
           "created_at",
-          "updated_at"
+          "updated_at",
+          "transports"
         ],
         "title": "AgentSummary",
         "description": "An agent without its config and knowledge base, for lists."
@@ -6410,16 +6430,6 @@
             "anyOf": [
               {
                 "$ref": "#/components/schemas/Direction"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "transport": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Transport"
               },
               {
                 "type": "null"
@@ -11026,6 +11036,16 @@
               }
             ]
           },
+          "endpoint": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Endpoint"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "agent_speaks_first": {
             "type": "boolean",
             "title": "Agent Speaks First",
@@ -11587,6 +11607,16 @@
             "type": "string",
             "format": "uuid",
             "title": "Agent Id"
+          },
+          "transport": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Transport"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "scenarios": {
             "items": {

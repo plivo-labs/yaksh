@@ -2,10 +2,10 @@ import uuid
 from collections.abc import Mapping
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, computed_field
 
 from yaksh.db.models import Agent, Document
-from yaksh.domain.agents import AgentConfig, AgentSource, Direction, Transport
+from yaksh.domain.agents import AgentConfig, AgentSource, Direction, Transport, transports_of
 from yaksh.domain.languages import AgentLanguage
 from yaksh.domain.rules import AgentRules
 from yaksh.domain.triggers import Endpoint, OutboundConfig
@@ -21,7 +21,6 @@ class AgentSummary(BaseModel):
     external_id: str | None
     source: AgentSource
     direction: Direction
-    transport: Transport
     agent_number: str | None
     outbound: OutboundConfig | None
     endpoint: Endpoint | None
@@ -32,6 +31,13 @@ class AgentSummary(BaseModel):
     forked_from_id: uuid.UUID | None
     created_at: datetime
     updated_at: datetime
+
+    @computed_field
+    @property
+    def transports(self) -> list[Transport]:
+        """The ways a run can reach the agent, in a fixed order."""
+        found = transports_of(self.direction, self.agent_number, self.outbound, self.endpoint)
+        return [transport for transport in Transport if transport in found]
 
 
 class KnowledgeBaseDocument(BaseModel):

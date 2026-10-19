@@ -1,6 +1,7 @@
 import { DateFilter } from "@/components/date-filter";
 import { Pager } from "@/components/pager";
 import { RunList } from "@/components/run-list";
+import { TransportFilter } from "@/components/transport-filter";
 import {
   Select,
   SelectContent,
@@ -12,6 +13,7 @@ import {
 import { createdBetween, useDatesParam } from "@/hooks/use-dates-param";
 import { useFilterParams } from "@/hooks/use-filter-params";
 import { usePageParam } from "@/hooks/use-page-param";
+import { useTransportParam } from "@/hooks/use-transport-param";
 import { RUNS_PAGE, useAgents, useRuns } from "@/lib/queries";
 import type { RunStatus } from "@/lib/types";
 
@@ -24,17 +26,20 @@ export function RunsPage() {
   const [params, update] = useFilterParams();
   const agentId = params.get("agent_id") ?? ANY;
   const status = params.get("status") ?? ANY;
+  const [transport, setTransport] = useTransportParam();
   const [dates, setDates] = useDatesParam();
   const agents = useAgents();
   const runs = useRuns(
     {
       agentId: agentId === ANY ? undefined : agentId,
+      transport,
       status: STATUSES.find((value) => value === status),
       ...createdBetween(dates),
     },
     usePageParam(),
   );
-  const filtered = agentId !== ANY || status !== ANY || dates !== undefined;
+  const filtered =
+    agentId !== ANY || status !== ANY || transport !== undefined || dates !== undefined;
 
   const agentItems = [
     { value: ANY, label: "All agents" },
@@ -98,6 +103,11 @@ export function RunsPage() {
             </SelectGroup>
           </SelectContent>
         </Select>
+        <TransportFilter
+          transport={transport}
+          onTransportChange={setTransport}
+          className="min-w-0 flex-1 sm:w-36 sm:flex-none"
+        />
         <DateFilter
           dates={dates}
           onDatesChange={setDates}

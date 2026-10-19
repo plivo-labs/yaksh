@@ -3,6 +3,7 @@ import { Link } from "react-router";
 import { Timestamp } from "@/components/timestamp";
 import { ResponseTime } from "@/components/response-time";
 import { RunStatusLabel } from "@/components/status-label";
+import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { counted, runFinished, runTitle, runTotal } from "@/lib/format";
 import {
@@ -130,7 +131,10 @@ function RunRow({ run, grid, showAgent }: { run: RunSummary; grid: string; showA
         >
           {runTitle(run)}
         </Link>
-        <span className="truncate text-s-400 text-muted-foreground">{outcomes(run)}</span>
+        <span className="flex min-w-0 items-center gap-1.5 text-s-400 text-muted-foreground">
+          {run.transport === "text" && <Badge>Text</Badge>}
+          <span className="truncate">{outcomes(run)}</span>
+        </span>
         <span className="truncate text-s-400 text-muted-foreground @3xl/runs:hidden">
           {finished} finished,{" "}
           {run.started_at ? (

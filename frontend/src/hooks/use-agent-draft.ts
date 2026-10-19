@@ -13,21 +13,21 @@ export function useAgentDraft(baseline: Draft, start: Draft = baseline) {
   const [submitted, setSubmitted] = useState(false);
   const [switched, setSwitched] = useState(false);
   const set = <K extends keyof Draft>(key: K, value: Draft[K]) => {
-    if (key === "direction" || key === "transport") setSwitched(true);
+    if (key === "direction" || key === "phone" || key === "text") setSwitched(true);
     setDraft((current) => ({ ...current, [key]: value }));
   };
-  const text = draft.transport === "text";
-  const outbound = !text && draft.direction === "outbound";
+  const outbound = draft.direction === "outbound";
+  const phoneProblem = outbound
+    ? Object.keys(outboundProblems(draft.outbound)).length > 0
+    : !isPhoneNumber(draft.agent_number);
   const needs = {
     name: draft.name.trim() === "",
     direction: draft.direction === null,
+    connection: !draft.phone && !draft.text,
     reach:
       draft.direction !== null &&
-      (text
-        ? Object.keys(endpointProblems(draft.endpoint)).length > 0
-        : outbound
-          ? Object.keys(outboundProblems(draft.outbound)).length > 0
-          : !isPhoneNumber(draft.agent_number)),
+      ((draft.phone && phoneProblem) ||
+        (draft.text && Object.keys(endpointProblems(draft.endpoint)).length > 0)),
     languages: draft.languages.length === 0,
     brief: briefLength(draft.brief) < MIN_BRIEF_CHARS,
     config: draft.config.length > MAX_CONFIG_CHARS,
@@ -36,7 +36,7 @@ export function useAgentDraft(baseline: Draft, start: Draft = baseline) {
   /** Shows the problems; `valid` narrows the check to the fields in view. */
   const check = (element: HTMLFormElement, valid = ready) =>
     revealErrors(element, () => setSubmitted(true), valid);
-  /** Who calls changed, so fields that swap with it may fade in; the first render stays still. */
+  /** Who calls or a connection changed, so fields that swap with it may fade in; the first render stays still. */
   const swap = switched ? APPEAR : undefined;
   const dirty = JSON.stringify(draft) !== JSON.stringify(baseline);
   return {

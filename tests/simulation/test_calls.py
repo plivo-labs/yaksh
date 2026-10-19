@@ -2,7 +2,7 @@ import asyncio
 import uuid
 
 from tests.conftest import AGENT, APP_SETTINGS, CALLER
-from yaksh.domain.agents import AgentConfig
+from yaksh.domain.agents import AgentConfig, Transport
 from yaksh.domain.conversations import (
     CallObserver,
     CallOutcome,
@@ -16,6 +16,7 @@ from yaksh.simulation.calls import STOP_IGNORED, LiveCall, run_call
 REQUEST = CallRequest(
     conversation_id=uuid.uuid4(),
     agent=AgentConfig.model_validate({"agent_number": "+14155550100", "brief": AGENT["brief"]}),
+    transport=Transport.PHONE,
     **CALLER,
     caller_number="+15550100000",
     max_duration_s=10,

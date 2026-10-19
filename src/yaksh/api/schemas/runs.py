@@ -15,7 +15,6 @@ class RunSummary(RunProgress):
     agent_version: int
     agent_name: str
     transport: Transport
-    """How the pinned agent version reaches the agent."""
     name: str | None
     repeats: int
     max_duration_s: int
@@ -35,7 +34,6 @@ class RunSummary(RunProgress):
         cls,
         run: Run,
         agent: tuple[int, str],
-        transport: Transport,
         progress: RunProgress,
         response: Latency,
         languages: list[Language],
@@ -49,7 +47,7 @@ class RunSummary(RunProgress):
             agent_version_id=run.agent_version_id,
             agent_version=agent_version,
             agent_name=agent_name,
-            transport=transport,
+            transport=run.transport,
             name=run.name,
             repeats=run.repeats,
             max_duration_s=run.max_duration_s,

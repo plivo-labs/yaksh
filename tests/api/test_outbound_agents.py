@@ -94,7 +94,7 @@ async def test_an_inbound_agent_can_become_outbound(client: AsyncClient) -> None
         },
     )
 
-    assert half.status_code == 422 and "outbound settings" in half.text
+    assert half.status_code == 422 and "no agent_number" in half.text
     assert switched.status_code == 200 and switched.json()["current_version"] == 2
     assert switched.json()["agent_number"] is None
 
