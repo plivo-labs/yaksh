@@ -351,8 +351,9 @@ async def test_capacity_queues_extra_conversations(
     agent_id = await create_agent_id(client)
     first, second = await start(client, agent_id), await start(client, agent_id)
     engine = create_engine(settings.database_url.encoded_string())
-    limited = settings.model_copy(update={"max_active_conversations": 1})
-    worker = make_worker(create_sessionmaker(engine), caller, limited, worker_id="one-at-a-time")
+    sessionmaker = create_sessionmaker(engine)
+    await save_settings(sessionmaker, values={"worker": {"phone_conversations_at_once": 1}})
+    worker = make_worker(sessionmaker, caller, settings, worker_id="one-at-a-time")
     stop = asyncio.Event()
     task = asyncio.create_task(worker.run(stop))
 
@@ -365,6 +366,63 @@ async def test_capacity_queues_extra_conversations(
     stop.set()
     await task
     await engine.dispose()
+
+
+async def test_a_raised_limit_starts_a_queued_conversation_while_the_worker_runs(
+    client: AsyncClient, settings: Settings, caller: FakeCaller
+) -> None:
+    caller.release.clear()
+    agent_id = await create_agent_id(client)
+    first, second = await start(client, agent_id), await start(client, agent_id)
+    engine = create_engine(settings.database_url.encoded_string())
+    sessionmaker = create_sessionmaker(engine)
+    await save_settings(sessionmaker, values={"worker": {"phone_conversations_at_once": 1}})
+    worker = make_worker(sessionmaker, caller, settings, worker_id="raised")
+    stop = asyncio.Event()
+    task = asyncio.create_task(worker.run(stop))
+
+    await wait_for(client, first["id"], {"running"})
+    await asyncio.sleep(0.2)
+    assert (await client.get(f"/api/v1/conversations/{second['id']}")).json()["status"] == "queued"
+    await save_settings(sessionmaker, values={"worker": {"phone_conversations_at_once": 2}})
+    await wait_for(client, second["id"], {"running"})
+    caller.release.set()
+    await wait_for(client, first["id"], {"completed"})
+    await wait_for(client, second["id"], {"completed"})
+    stop.set()
+    await task
+    await engine.dispose()
+
+
+async def test_a_lowered_limit_stops_no_live_conversation(
+    client: AsyncClient, settings: Settings, caller: FakeCaller
+) -> None:
+    caller.release.clear()
+    agent_id = await create_agent_id(client)
+    started = [await start(client, agent_id) for _ in range(3)]
+    engine = create_engine(settings.database_url.encoded_string())
+    sessionmaker = create_sessionmaker(engine)
+    await save_settings(sessionmaker, values={"worker": {"phone_conversations_at_once": 2}})
+    worker = make_worker(sessionmaker, caller, settings, worker_id="lowered")
+    stop = asyncio.Event()
+    task = asyncio.create_task(worker.run(stop))
+
+    await wait_for(client, started[0]["id"], {"running"})
+    await wait_for(client, started[1]["id"], {"running"})
+    await save_settings(sessionmaker, values={"worker": {"phone_conversations_at_once": 1}})
+    await asyncio.sleep(0.2)
+    statuses = [
+        (await client.get(f"/api/v1/conversations/{conversation['id']}")).json()["status"]
+        for conversation in started
+    ]
+    caller.release.set()
+    for conversation in started:
+        await wait_for(client, conversation["id"], {"completed"})
+    stop.set()
+    await task
+    await engine.dispose()
+
+    assert statuses == ["running", "running", "queued"]
 
 
 async def test_events_stream_turns_and_the_final_status(
@@ -706,8 +764,9 @@ async def test_a_stalled_result_write_does_not_hold_capacity(
     await start(client, agent_id)
     await start(client, agent_id)
     engine = create_engine(settings.database_url.encoded_string())
-    limited = settings.model_copy(update={"max_active_conversations": 1})
-    worker = make_worker(create_sessionmaker(engine), caller, limited, worker_id="one-at-a-time")
+    sessionmaker = create_sessionmaker(engine)
+    await save_settings(sessionmaker, values={"worker": {"phone_conversations_at_once": 1}})
+    worker = make_worker(sessionmaker, caller, settings, worker_id="one-at-a-time")
     stop = asyncio.Event()
     task = asyncio.create_task(worker.run(stop))
 

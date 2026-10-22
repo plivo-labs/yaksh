@@ -608,7 +608,6 @@ def make_worker(
     return Worker(
         sessionmaker,
         caller,
-        settings,
         source or SettingsSource(sessionmaker, Cipher(ENCRYPTION_KEY)),
         FixedAccount(sessionmaker, settings, pool_app_id, receiving_app_id, outbound_problem),
         store or FakeFileStore(),

@@ -10,7 +10,6 @@ from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from yaksh.config import Settings
 from yaksh.db.models import Conversation
 from yaksh.diagnostics import describe_exception
 from yaksh.domain.agents import TEXT_TURN_TIMEOUT_S, Transport
@@ -65,7 +64,6 @@ class Worker:
         self,
         sessionmaker: async_sessionmaker[AsyncSession],
         caller: Caller,
-        settings: Settings,
         source: SettingsSource,
         account: PhoneAccount,
         store: FileStore,
@@ -80,7 +78,6 @@ class Worker:
         self._stop = asyncio.Event()
         self._sessionmaker = sessionmaker
         self._caller = caller
-        self._settings = settings
         self._timings = timings
         self._source = source
         self._account = account
@@ -99,8 +96,8 @@ class Worker:
     def _room(self) -> frozenset[Transport]:
         """The transports with a free slot: phone and text tests have their own limits."""
         limits = {
-            Transport.PHONE: self._settings.max_active_conversations,
-            Transport.TEXT: self._settings.max_active_text_conversations,
+            Transport.PHONE: self._app.worker.phone_conversations_at_once,
+            Transport.TEXT: self._app.worker.text_conversations_at_once,
         }
         running = list(self._transports.values())
         return frozenset(kind for kind, limit in limits.items() if running.count(kind) < limit)

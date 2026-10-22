@@ -2730,6 +2730,10 @@ type SettingsValues struct {
 	// use it.
 	Llm   *Llm   `json:"llm,omitempty"`
 	Phone *Phone `json:"phone,omitempty"`
+
+	// Worker How many conversations one worker runs at once. A worker reads them at each poll: a lower
+	// value stops no live conversation, the worker only takes no new one until it is under it.
+	Worker *WorkerLimits `json:"worker,omitempty"`
 }
 
 // Share How many of a total, with the 95% Wilson interval of the rate: few calls give a wide
@@ -2984,6 +2988,13 @@ type WireEvent struct {
 
 // WireEventKind defines model for WireEventKind.
 type WireEventKind string
+
+// WorkerLimits How many conversations one worker runs at once. A worker reads them at each poll: a lower
+// value stops no live conversation, the worker only takes no new one until it is under it.
+type WorkerLimits struct {
+	PhoneConversationsAtOnce *int `json:"phone_conversations_at_once,omitempty"`
+	TextConversationsAtOnce  *int `json:"text_conversations_at_once,omitempty"`
+}
 
 // ListAgentsApiV1AgentsGetParams defines parameters for ListAgentsApiV1AgentsGet.
 type ListAgentsApiV1AgentsGetParams struct {
