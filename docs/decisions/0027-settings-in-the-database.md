@@ -1,7 +1,7 @@
 # 0027 Settings in the database, the environment only to start
 
 Date: 2026-10-07
-Status: accepted, changed by 0029 (the receiving application is on the Settings page), 0030 (worker timings in code) and 0032 (the worker's conversation limits are settings). Replaces 0002. Changes 0004, 0007 and 0023.
+Status: accepted, changed by 0029 (the receiving application is on the Settings page) and 0030 (worker timings in code). Replaces 0002. Changes 0004, 0007 and 0023.
 
 ## Decision
 

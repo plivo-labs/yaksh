@@ -14416,8 +14416,7 @@
         },
         "additionalProperties": false,
         "type": "object",
-        "title": "WorkerLimits",
-        "description": "How many conversations one worker runs at once. A worker reads them at each poll: a lower\nvalue stops no live conversation, the worker only takes no new one until it is under it."
+        "title": "WorkerLimits"
       }
     },
     "securitySchemes": {

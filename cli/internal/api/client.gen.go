@@ -2728,11 +2728,8 @@ type SettingsValues struct {
 
 	// Llm Any API with OpenAI's Responses endpoint. The caller, scenario writing and the judges
 	// use it.
-	Llm   *Llm   `json:"llm,omitempty"`
-	Phone *Phone `json:"phone,omitempty"`
-
-	// Worker How many conversations one worker runs at once. A worker reads them at each poll: a lower
-	// value stops no live conversation, the worker only takes no new one until it is under it.
+	Llm    *Llm          `json:"llm,omitempty"`
+	Phone  *Phone        `json:"phone,omitempty"`
 	Worker *WorkerLimits `json:"worker,omitempty"`
 }
 
@@ -2989,8 +2986,7 @@ type WireEvent struct {
 // WireEventKind defines model for WireEventKind.
 type WireEventKind string
 
-// WorkerLimits How many conversations one worker runs at once. A worker reads them at each poll: a lower
-// value stops no live conversation, the worker only takes no new one until it is under it.
+// WorkerLimits defines model for WorkerLimits.
 type WorkerLimits struct {
 	PhoneConversationsAtOnce *int `json:"phone_conversations_at_once,omitempty"`
 	TextConversationsAtOnce  *int `json:"text_conversations_at_once,omitempty"`

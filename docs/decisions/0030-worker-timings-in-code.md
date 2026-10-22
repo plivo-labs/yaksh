@@ -1,7 +1,7 @@
 # 0030 Worker timings are fixed in code
 
 Date: 2026-10-14
-Status: accepted, changed by 0032 (the worker's conversation limits are settings). Changes 0027.
+Status: accepted. Changes 0027.
 
 ## Context
 

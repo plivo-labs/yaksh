@@ -80,13 +80,8 @@ class EvaluationLimits(Section):
 
 
 class WorkerLimits(Section):
-    """How many conversations one worker runs at once. A worker reads them at each poll: a lower
-    value stops no live conversation, the worker only takes no new one until it is under it."""
-
     phone_conversations_at_once: int = Field(default=4, ge=1, le=50)
-    """Follows the CPU and memory of the worker host and the call limit of the phone account."""
     text_conversations_at_once: int = Field(default=20, ge=1, le=100)
-    """Text conversations use no audio and no phone number, so their limit is separate."""
 
 
 class Audit(Section):
