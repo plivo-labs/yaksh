@@ -469,6 +469,26 @@ function Form({
 
         <TabsContent value="limits" className="grid gap-5">
           <Panel>
+            <PanelHeader title="Each worker" />
+            <NumberRow
+              id="phone-at-once"
+              label="Phone calls at once"
+              help="Fit the worker's CPU and memory, and your Plivo account's call limit."
+              min={1}
+              max={50}
+              value={draft.worker.phone_conversations_at_once}
+              onValueChange={(value) => change("worker", "phone_conversations_at_once", value)}
+            />
+            <NumberRow
+              id="text-at-once"
+              label="Text conversations at once"
+              min={1}
+              max={100}
+              value={draft.worker.text_conversations_at_once}
+              onValueChange={(value) => change("worker", "text_conversations_at_once", value)}
+            />
+          </Panel>
+          <Panel>
             <PanelHeader title="Defaults for a run" />
             <NumberRow
               id="max-turns"

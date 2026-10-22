@@ -79,6 +79,11 @@ class EvaluationLimits(Section):
     """Judge model calls in flight across one evaluator's evaluations."""
 
 
+class WorkerLimits(Section):
+    phone_conversations_at_once: int = Field(default=4, ge=1, le=50)
+    text_conversations_at_once: int = Field(default=20, ge=1, le=100)
+
+
 class Audit(Section):
     sample_rate: float = Field(default=0.1, ge=0, le=1)
     """The share of judged calls in the audit lane, chosen by a hash of the conversation id."""
@@ -235,6 +240,7 @@ class SettingsValues(Section):
     brief: BriefModel = BriefModel()
     judges: JudgeModel = JudgeModel()
     evaluation: EvaluationLimits = EvaluationLimits()
+    worker: WorkerLimits = WorkerLimits()
     audit: Audit = Audit()
     phone: Phone = Phone()
     limits: Limits = Limits()

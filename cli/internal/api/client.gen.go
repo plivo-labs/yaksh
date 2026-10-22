@@ -2728,8 +2728,9 @@ type SettingsValues struct {
 
 	// Llm Any API with OpenAI's Responses endpoint. The caller, scenario writing and the judges
 	// use it.
-	Llm   *Llm   `json:"llm,omitempty"`
-	Phone *Phone `json:"phone,omitempty"`
+	Llm    *Llm          `json:"llm,omitempty"`
+	Phone  *Phone        `json:"phone,omitempty"`
+	Worker *WorkerLimits `json:"worker,omitempty"`
 }
 
 // Share How many of a total, with the 95% Wilson interval of the rate: few calls give a wide
@@ -2984,6 +2985,12 @@ type WireEvent struct {
 
 // WireEventKind defines model for WireEventKind.
 type WireEventKind string
+
+// WorkerLimits defines model for WorkerLimits.
+type WorkerLimits struct {
+	PhoneConversationsAtOnce *int `json:"phone_conversations_at_once,omitempty"`
+	TextConversationsAtOnce  *int `json:"text_conversations_at_once,omitempty"`
+}
 
 // ListAgentsApiV1AgentsGetParams defines parameters for ListAgentsApiV1AgentsGet.
 type ListAgentsApiV1AgentsGetParams struct {

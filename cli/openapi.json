@@ -13337,6 +13337,13 @@
               "judge_calls_at_once": 8
             }
           },
+          "worker": {
+            "$ref": "#/components/schemas/WorkerLimits",
+            "default": {
+              "phone_conversations_at_once": 4,
+              "text_conversations_at_once": 20
+            }
+          },
           "audit": {
             "$ref": "#/components/schemas/Audit",
             "default": {
@@ -14389,6 +14396,27 @@
           "waiting_for_call"
         ],
         "title": "WireEventKind"
+      },
+      "WorkerLimits": {
+        "properties": {
+          "phone_conversations_at_once": {
+            "type": "integer",
+            "maximum": 50.0,
+            "minimum": 1.0,
+            "title": "Phone Conversations At Once",
+            "default": 4
+          },
+          "text_conversations_at_once": {
+            "type": "integer",
+            "maximum": 100.0,
+            "minimum": 1.0,
+            "title": "Text Conversations At Once",
+            "default": 20
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "WorkerLimits"
       }
     },
     "securitySchemes": {

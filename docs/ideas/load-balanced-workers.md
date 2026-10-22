@@ -10,7 +10,7 @@ The flow runner stores the call config in Redis and returns a stream URL for the
 
 ## Options
 
-1. **One worker.** Keep one worker per URL and raise `max_active_conversations`.
+1. **One worker.** Keep one worker per URL and raise **Phone calls at once** in Settings.
 2. **Store the owner's URL.** Each worker has its own public URL, stored on the conversation at claim. Any worker that gets a Plivo webhook points the stream at the owner's URL.
 3. **Any worker runs the call** (as in production), with Postgres or Redis:
    - Any worker can answer Plivo webhooks.

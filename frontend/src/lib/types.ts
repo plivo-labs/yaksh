@@ -1445,6 +1445,7 @@ export interface SettingsValues {
   };
   /** How much one evaluator does at once, within the LLM provider's rate limits. */
   evaluation: { evaluations_at_once: number; judge_calls_at_once: number };
+  worker: { phone_conversations_at_once: number; text_conversations_at_once: number };
   audit: { sample_rate: number; weekly_budget: number };
   phone: {
     ring_timeout_s: number;

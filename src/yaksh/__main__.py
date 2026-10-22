@@ -163,7 +163,6 @@ async def run_worker(
     worker = Worker(
         sessionmaker,
         caller,
-        settings,
         source,
         PhoneAccount(sessionmaker, settings),
         store,

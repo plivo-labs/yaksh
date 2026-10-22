@@ -75,7 +75,7 @@ Yaksh makes no retries for the conversations in the `did_not_connect` outcome gr
 
 ## Calls at the same time
 
-Plivo has a limit for the number of calls of an account that can be in progress at the same time. Keep the sum of `YAKSH_MAX_ACTIVE_CONVERSATIONS` of all workers, plus all other calls of the account, less than that limit. The `max_parallel` of a run does not protect the account, because two runs can each use their full `max_parallel`.
+Plivo has a limit for the number of calls of an account that can be in progress at the same time. Keep **Phone calls at once** (Settings, **Limits** tab) times the number of workers, plus all other calls of the account, less than that limit. The `max_parallel` of a run does not protect the account, because two runs can each use their full `max_parallel`.
 
 If the sum is more than that limit, Plivo rejects the calls that are more than the limit. It rejects the call request (HTTP 403, "Concurrency Limit Breached"), or it stops the call with hangup cause 5030. If Yaksh calls the agent, the conversation stops with an error. If the agent calls Yaksh, the conversation is in the `did_not_connect` outcome group.
 
