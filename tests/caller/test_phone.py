@@ -575,7 +575,7 @@ async def test_a_reply_keeps_its_playout_even_when_a_barge_in_cuts_it_off() -> N
     cut, whole = Playout(), Playout()
 
     def words(playout: Playout) -> TTSTextFrame:
-        frame = TTSTextFrame("Hello", aggregated_by="word")
+        frame = TTSTextFrame("Hello", text_type="word")
         frame.metadata[PLAYOUT] = playout
         return frame
 

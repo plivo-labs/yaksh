@@ -121,9 +121,9 @@ def caller_keys(settings: AppSettings) -> CallerKeys:
 def llm_service(
     settings: AppSettings, caller: CallerModel, keys: CallerKeys, instructions: str
 ) -> OpenAIResponsesHttpLLMService:
-    """The persona's model over the Responses API. With no effort configured, Pipecat asks a
-    reasoning model that accepts it for effort none, for the fastest first word; other models
-    get no effort. A reply calls at most one tool, so it can end the call only once."""
+    """The persona's model over the Responses API. With no effort configured, Pipecat sends the
+    lowest effort that it lists for the model, for the fastest first word; a model it does not
+    list gets no effort. A reply calls at most one tool, so it can end the call only once."""
     effort = caller.reasoning_effort
     return OpenAIResponsesHttpLLMService(
         api_key=keys.llm,

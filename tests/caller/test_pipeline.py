@@ -101,12 +101,13 @@ async def test_a_call_that_is_ending_gets_no_nudge() -> None:
     ("model", "effort", "reasoning"),
     [
         ("gpt-6-luna", None, {"effort": "none"}),
+        ("o3", None, {"effort": "low"}),
         ("gpt-4.1", None, None),
         ("gpt-6-luna", "low", {"effort": "low"}),
     ],
-    ids=["reasoning model", "gpt-4.x", "configured effort"],
+    ids=["reasoning model", "model without effort none", "gpt-4.x", "configured effort"],
 )
-async def test_the_persona_asks_the_responses_api_with_reasoning_off_unless_configured(
+async def test_the_persona_asks_the_responses_api_for_the_lowest_effort_unless_configured(
     provider: tuple[str, FakeProvider],
     model: str,
     effort: str | None,

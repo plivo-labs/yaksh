@@ -9,7 +9,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 
 from pipecat.classifiers.base_classifier import ChoiceQuestion
-from pipecat.classifiers.jev.classifier import JevClassifier
+from pipecat.classifiers.typesafe.jev.classifier import JevClassifier
 
 from yaksh.diagnostics import describe_exception
 from yaksh.evaluation.judging import JudgeSpec

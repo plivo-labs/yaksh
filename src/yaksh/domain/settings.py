@@ -37,8 +37,8 @@ class Deepgram(Section):
 class CallerModel(Section):
     model: ModelName = "gpt-6-luna"
     reasoning_effort: Effort | None = None
-    """None asks a reasoning model that takes it for none, for the fastest answer, and sends
-    other models no effort: a model without reasoning refuses any value."""
+    """None sends the lowest effort that Pipecat lists for the model, for the fastest answer, and
+    sends other models no effort: a model without reasoning refuses any value."""
 
 
 class GenerationModel(Section):

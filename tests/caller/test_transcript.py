@@ -225,7 +225,7 @@ async def test_a_cancelled_pipeline_leaves_unplayed_words_unconfirmed_not_cut() 
     playout = played(arrived=0, sent=0)
     started = TTSStartedFrame()
     started.metadata[PLAYOUT] = playout
-    word = TTSTextFrame("Yes", aggregated_by="word")
+    word = TTSTextFrame("Yes", text_type="word")
     word.metadata[PLAYOUT] = playout
     word.metadata[OFFSET] = 0
 
@@ -250,7 +250,7 @@ async def test_words_queued_before_an_interruption_are_counted_before_the_cut() 
     playout = played(arrived=3_200, sent=3_200)
     started = TTSStartedFrame()
     started.metadata[PLAYOUT] = playout
-    word = TTSTextFrame("Yes.", aggregated_by="word")
+    word = TTSTextFrame("Yes.", text_type="word")
     word.metadata[PLAYOUT] = playout
     word.metadata[OFFSET] = 0
 
