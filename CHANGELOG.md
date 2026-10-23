@@ -1,3 +1,14 @@
+## v0.1.2 (2026-10-23)
+
+### Perf
+
+- **caller**: share the VAD and end-of-turn model sessions across calls (#9)
+
+### Changed
+
+- **deps**: upgrade Pipecat to 1.13.0 (#8). For the same audio, a response time measured with this version is about 65 ms shorter than before, because its VAD (Silero v6.2, with new model resets) finds the end of speech later. Compare runs made with the same version.
+- With no reasoning effort set, the caller sends the lowest effort that Pipecat lists for the model. `gpt-5`, `gpt-5-mini` and `gpt-5-nano` change from `none` to `minimal`; o-series models and `gpt-6-astra` change from the model's default to `low`. The default caller model does not change.
+
 ## v0.1.1 (2026-10-22)
 
 ### Feat
