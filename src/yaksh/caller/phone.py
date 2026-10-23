@@ -59,6 +59,7 @@ from yaksh.caller.plivo_server import (
     StreamRegistry,
 )
 from yaksh.caller.transcript import TranscriptBuilder, WireTap
+from yaksh.caller.turn_models import TurnModels
 from yaksh.config import Settings
 from yaksh.domain.conversations import (
     CallObserver,
@@ -670,7 +671,8 @@ async def handshake(socket: WebSocket) -> tuple[str, str, str]:
 
 class PhoneCaller:
     """Dials the agent and talks over the stream Plivo opens. A stream that dies without a close
-    frame ends with the conversation's duration limit."""
+    frame ends with the conversation's duration limit. All its calls hear the agent with the turn
+    models that it loads when it is made."""
 
     def __init__(
         self,
@@ -687,6 +689,7 @@ class PhoneCaller:
         self._registry = registry
         self._plivo_api = plivo_api
         self._receiver = Receiver()
+        self._turn_models = TurnModels()
 
     async def run(
         self, request: CallRequest, observer: CallObserver, stop: asyncio.Event
@@ -873,6 +876,7 @@ class PhoneCaller:
             before_output=[checkpoints],
             after_output=[marks, WireTap(transcript, settled)],
             state=state,
+            turn_models=self._turn_models,
             observers=[AudioTap(transport.input(), transport.output(), live)],
         )
 
