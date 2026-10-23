@@ -10,8 +10,6 @@ from typing import Any, Protocol
 
 from pipecat.adapters.schemas.function_schema import FunctionSchema
 from pipecat.adapters.schemas.tools_schema import ToolsSchema
-from pipecat.audio.turn.smart_turn.local_smart_turn_v3 import LocalSmartTurnAnalyzerV3
-from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.audio.vad.vad_analyzer import VADParams
 from pipecat.frames.frames import (
     ErrorFrame,
@@ -47,6 +45,7 @@ from yaksh.caller.transcript import (
     GeneratedTap,
     TranscriptBuilder,
 )
+from yaksh.caller.turn_models import TurnModels
 from yaksh.caller.usage import UsageMeter
 from yaksh.diagnostics import describe_exception
 from yaksh.domain.conversations import (
@@ -306,6 +305,7 @@ class Persona:
         transport_output: FrameProcessor,
         after_output: Sequence[FrameProcessor],
         state: CallState,
+        turn_models: TurnModels,
         before_output: Sequence[FrameProcessor] = (),
         observers: Sequence[BaseObserver] = (),
     ) -> None:
@@ -350,16 +350,14 @@ class Persona:
                 # not make the persona ask it to repeat.
                 empty_user_turn=None,
                 user_turn_strategies=UserTurnStrategies(
-                    stop=[
-                        TurnAnalyzerUserTurnStopStrategy(turn_analyzer=LocalSmartTurnAnalyzerV3())
-                    ]
+                    stop=[TurnAnalyzerUserTurnStopStrategy(turn_analyzer=turn_models.end_of_turn())]
                 ),
             ),
         )
         pipeline = Pipeline(
             [
                 transport_input,
-                VADProcessor(vad_analyzer=SileroVADAnalyzer(sample_rate=SAMPLE_RATE, params=VAD)),
+                VADProcessor(vad_analyzer=turn_models.vad(sample_rate=SAMPLE_RATE, params=VAD)),
                 self.stt,
                 aggregators.user(),
                 AgentTurnTap(transcript),
