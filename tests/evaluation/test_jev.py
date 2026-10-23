@@ -3,8 +3,8 @@ from typing import Any
 
 from httpx import AsyncClient
 from pipecat.classifiers.base_classifier import ClassifierError
-from pipecat.classifiers.jev.classifier import JevClassifier
-from pipecat.classifiers.jev.client import JevClient, JevUsage
+from pipecat.classifiers.typesafe.jev.classifier import JevClassifier
+from pipecat.classifiers.typesafe.jev.client import JevClient, JevUsage
 from sqlalchemy import select
 
 from tests.conftest import (
@@ -37,7 +37,9 @@ class StubJevClient(JevClient):
         self.broken = broken
         self.questions: list[dict[str, Any]] = []
 
-    async def ask(self, state: Any, questions: Any) -> tuple[dict[str, dict[str, Any]], JevUsage]:
+    async def ask(
+        self, state: Any, questions: Any, assets: Any = None
+    ) -> tuple[dict[str, dict[str, Any]], JevUsage]:
         self.questions.append(dict(questions))
         if self.broken is not None:
             raise self.broken

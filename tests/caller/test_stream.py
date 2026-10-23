@@ -55,8 +55,8 @@ async def test_checkpoints_follow_the_audio_and_their_reports_close_the_reply() 
         TTSAudioRawFrame(LOUD * 3, SAMPLE_RATE, 1),
     )
     hello, there = (
-        TTSTextFrame("Hello", aggregated_by="word"),
-        TTSTextFrame("there", aggregated_by="word"),
+        TTSTextFrame("Hello", text_type="word"),
+        TTSTextFrame("there", text_type="word"),
     )
 
     downstream, _ = await run_test(

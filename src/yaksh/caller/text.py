@@ -11,7 +11,7 @@ from typing import Any
 import openai
 from openai import AsyncOpenAI
 from openai.types.responses import EasyInputMessageParam, FunctionToolParam, Response
-from pipecat.services.openai.responses.llm import _model_supports_reasoning, _rejects_effort_none
+from pipecat.services.openai.responses.llm import _THINKING_DEFAULTS, _model_name
 
 from yaksh.caller.audio import Clock
 from yaksh.caller.pipeline import END_CALL, IDLE_NUDGES, SILENT_END, CallState, Silence
@@ -57,13 +57,10 @@ END_CALL_TOOL = FunctionToolParam(
 
 def reasoning(model: str, effort: str | None) -> dict[str, Any]:
     """The phone caller's rule, from Pipecat's service, so both callers ask the model the same
-    way: the configured effort, or none for a reasoning model that takes it, for the fastest
-    reply."""
-    if effort:
-        return {"reasoning": {"effort": effort}}
-    if _model_supports_reasoning(model) and not _rejects_effort_none(model):
-        return {"reasoning": {"effort": "none"}}
-    return {}
+    way: the configured effort, or the lowest effort that Pipecat lists for the model, for the
+    fastest reply. A model that Pipecat does not list gets no effort."""
+    effort = effort or _THINKING_DEFAULTS.get(_model_name(model))
+    return {"reasoning": {"effort": effort}} if effort else {}
 
 
 @dataclass(frozen=True)

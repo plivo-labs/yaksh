@@ -9,7 +9,7 @@ import aiohttp
 import openai
 from openai import AsyncOpenAI
 from pipecat.classifiers.base_classifier import ChoiceQuestion
-from pipecat.classifiers.jev.classifier import JevClassifier
+from pipecat.classifiers.typesafe.jev.classifier import JevClassifier
 
 from yaksh.diagnostics import describe_exception
 from yaksh.domain.errors import UnavailableError
