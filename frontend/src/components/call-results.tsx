@@ -6,7 +6,12 @@ import { Spinner } from "@/components/ui/spinner";
 import { Explained, OutcomeIcon, VerdictPill } from "@/components/verdict-ui";
 import { percent } from "@/lib/format";
 import { useConversationEvaluation } from "@/lib/queries";
-import { checkedValues, type HeardValueResult, type SavedValueResult } from "@/lib/record-checks";
+import {
+  checkedValues,
+  passedChecks,
+  type HeardValueResult,
+  type SavedValueResult,
+} from "@/lib/record-checks";
 import {
   DECIDED_BY_TEXT,
   ERROR_TEXT,
@@ -458,8 +463,7 @@ function Answer({ item, onTurn }: { item: EvaluationItem; onTurn?: OnTurn }) {
       {answer.reasoning}
     </p>
   );
-  // An answer that failed the code checks can have any shape: show only its reasoning.
-  if (item.machine_outcome === "error") return reasoning || null;
+  if (!passedChecks(item)) return reasoning || null;
   const parts: ReactNode[] = [];
   const evidence = answer.evidence as Quote[] | undefined;
   if (evidence?.length) parts.push(<Quotes key="evidence" quotes={evidence} onTurn={onTurn} />);

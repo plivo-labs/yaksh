@@ -17,10 +17,14 @@ export type HeardValueResult = {
   reasoning: string;
 };
 
-/** The values of a record check's answer. None for an answer that failed the code checks:
- * Yaksh keeps that answer as the judge gave it, so any field can be missing. */
+/** Yaksh keeps an answer that failed the code checks as the judge gave it, so any field can be
+ * missing. Its error reason stays when the caller check or a label changes the outcome. */
+export function passedChecks(item: EvaluationItem): boolean {
+  return item.error_reason === null;
+}
+
 export function checkedValues<T>(item: EvaluationItem | undefined): T[] | null {
-  if (!item || item.machine_outcome === "error") return null;
+  if (!item || !passedChecks(item)) return null;
   const values = item.answer?.values;
   return Array.isArray(values) ? (values as T[]) : null;
 }
