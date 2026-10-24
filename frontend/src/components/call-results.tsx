@@ -453,13 +453,18 @@ function Callout({ tone, children }: { tone: "warn" | "danger"; children: ReactN
 function Answer({ item, onTurn }: { item: EvaluationItem; onTurn?: OnTurn }) {
   const itemKey = item.item_key;
   const answer = item.answer ?? {};
+  const reasoning = typeof answer.reasoning === "string" && answer.reasoning && (
+    <p key="reasoning" className="text-xs-400 whitespace-pre-wrap text-muted-foreground">
+      {answer.reasoning}
+    </p>
+  );
+  // An answer that failed the code checks can have any shape: show only its reasoning.
+  if (item.machine_outcome === "error") return reasoning || null;
   const parts: ReactNode[] = [];
-  const evidence = answer.evidence;
-  if (Array.isArray(evidence) && evidence.length) {
-    parts.push(<Quotes key="evidence" quotes={evidence as Quote[]} onTurn={onTurn} />);
-  }
-  const recorded = answer.record_evidence;
-  if (Array.isArray(recorded) && recorded.length) {
+  const evidence = answer.evidence as Quote[] | undefined;
+  if (evidence?.length) parts.push(<Quotes key="evidence" quotes={evidence} onTurn={onTurn} />);
+  const recorded = answer.record_evidence as { line: number; quote: string }[] | undefined;
+  if (recorded?.length) {
     parts.push(
       <ul key="record-evidence" className="grid gap-1">
         {recorded.map((quote, index) => (
@@ -564,14 +569,7 @@ function Answer({ item, onTurn }: { item: EvaluationItem; onTurn?: OnTurn }) {
       </p>,
     );
   }
-  const reasoning = typeof answer.reasoning === "string" ? answer.reasoning : null;
-  if (reasoning) {
-    parts.push(
-      <p key="reasoning" className="text-xs-400 whitespace-pre-wrap text-muted-foreground">
-        {reasoning}
-      </p>,
-    );
-  }
+  if (reasoning) parts.push(reasoning);
   return <div className="grid gap-2">{parts}</div>;
 }
 
