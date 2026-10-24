@@ -260,12 +260,15 @@ async def test_a_pass_that_rests_on_an_absence_is_asked_about_the_turns_it_left_
 async def test_an_empty_quote_or_a_misshapen_answer_is_invalid_evidence_not_a_crash() -> None:
     empty = answer("fail", evidence=[{"turn": 3, "quote": " "}])
     misshapen = {"verdict": "pass"}
+    extra = answer("pass", notes=[None])
 
     first = await criterion(Scripted(empty, empty))
     second = await criterion(Scripted(misshapen, misshapen))
+    third = await criterion(Scripted(extra, extra))
 
     assert (first.outcome, first.error_reason) == (Outcome.ERROR, "invalid_evidence")
     assert (second.outcome, second.error_reason) == (Outcome.ERROR, "invalid_evidence")
+    assert (third.outcome, third.error_reason) == (Outcome.ERROR, "invalid_evidence")
 
 
 def test_a_group_of_errors_is_described_by_the_errors_in_it() -> None:

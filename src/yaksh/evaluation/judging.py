@@ -210,6 +210,12 @@ def mismatches(schema: dict[str, Any], value: Any, path: str = "the answer") -> 
         return [f"{path} must be one of {', '.join(schema['enum'])}."]
     if kind == "object":
         problems = [f"{path} has no {key}." for key in schema["required"] if key not in value]
+        if schema.get("additionalProperties") is False:
+            problems += [
+                f"{path} has {key}, which is not in the schema."
+                for key in value
+                if key not in schema["properties"]
+            ]
         for key, inner in schema["properties"].items():
             if key in value:
                 problems += mismatches(inner, value[key], f"{path}.{key}")
