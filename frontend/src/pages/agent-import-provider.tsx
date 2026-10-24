@@ -641,6 +641,8 @@ function AgentChoice({
         agent_speaks_first: draft.agent_speaks_first,
         outbound,
         endpoint: draft.endpoint ?? EMPTY_DRAFT.endpoint,
+        record: draft.record_source !== null,
+        record_source: draft.record_source ?? EMPTY_DRAFT.record_source,
       },
       { source: words.source(chosen.name), kind },
       briefDraftId,
@@ -882,6 +884,13 @@ function Fills({
         <Fact term="Text">
           <span className="font-mono" title={draft.endpoint.url}>
             {draft.endpoint.url}
+          </span>
+        </Fact>
+      )}
+      {draft.record_source && (
+        <Fact term="Agent record">
+          <span className="font-mono" title={draft.record_source.url}>
+            {draft.record_source.url}
           </span>
         </Fact>
       )}

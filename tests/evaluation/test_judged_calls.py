@@ -105,6 +105,7 @@ class Judge:
             return ModelAnswer(data=data, model="judge-1", input_tokens=900, output_tokens=60)
         data = {
             "evidence": [{"turn": 3, "quote": "next Thursday at 4 pm"}],
+            "record_evidence": [],
             "absence": False,
             "absence_turns": None,
             "reasoning": "Turn 3 states the new time.",

@@ -13,6 +13,7 @@ from sqlalchemy import Row, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from yaksh.db.models import (
+    AgentRecordRow,
     Conversation,
     Evaluation,
     EvaluationItem,
@@ -22,9 +23,11 @@ from yaksh.db.models import (
     Scenario,
     ScenarioVersion,
 )
+from yaksh.domain.agent_records import RecordState
 from yaksh.domain.answering import Answering, plays_scenario
 from yaksh.domain.conversations import ConversationStatus, EndReason
 from yaksh.domain.evaluations import (
+    AgentRecordCounts,
     CallerFidelity,
     CallVerdict,
     CriterionCounts,
@@ -38,10 +41,12 @@ from yaksh.domain.evaluations import (
     UnsureKind,
 )
 from yaksh.evaluation import numbers
+from yaksh.evaluation.record_checks import HEARD_KEY, SAVED_DATA_KEY
 from yaksh.evaluation.verdicts import CRITERION, RULE
 
-DECIDED = (CRITERION, RULE)
-"""The keys of the items a verdict counts: the criteria and the agent rules."""
+DECIDED = (CRITERION, RULE, SAVED_DATA_KEY)
+"""The keys of the items a verdict counts: the criteria, the agent rules and the saved data
+check."""
 FINISHED = frozenset({EvaluationState.DONE, EvaluationState.FAILED})
 
 
@@ -196,6 +201,38 @@ async def run_verdicts(
         errors=sum(item.machine_outcome is Outcome.ERROR for item in decided),
         callers=caller_fidelity(played_judged, items),
         judge_versions=await versions_used(session, items),
+        agent_record=await record_counts(session, in_order(judged), items),
+    )
+
+
+async def record_counts(
+    session: AsyncSession, judged: Sequence[Row[Any]], items: Sequence[Row[Any]]
+) -> AgentRecordCounts | None:
+    records = (
+        await session.execute(
+            select(
+                AgentRecordRow.conversation_id, AgentRecordRow.state, AgentRecordRow.provider
+            ).where(AgentRecordRow.conversation_id.in_([row.conversation_id for row in judged]))
+        )
+    ).all()
+    if not records:
+        return None
+    state_of = {record.conversation_id: record.state for record in records}
+    checks: dict[str, Counter[str]] = {SAVED_DATA_KEY: Counter(), HEARD_KEY: Counter()}
+    for item in items:
+        if item.item_key in checks:
+            checks[item.item_key][outcome_name(item)] += 1
+    return AgentRecordCounts(
+        provider=Counter(record.provider for record in records).most_common(1)[0][0],
+        calls=len(records),
+        found=sum(record.state is RecordState.FOUND for record in records),
+        missing=[
+            row.conversation_id
+            for row in judged
+            if state_of.get(row.conversation_id) is RecordState.MISSING
+        ],
+        saved_data=dict(checks[SAVED_DATA_KEY]),
+        heard=dict(checks[HEARD_KEY]),
     )
 
 

@@ -4,7 +4,7 @@ time under a lease, written back only by the evaluator that holds the latest cla
 import uuid
 from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass, field
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import Any
 
 from sqlalchemy import ColumnElement, and_, func, or_, select, update
@@ -210,6 +210,25 @@ async def stored_judge_versions(
     found = {judge: version_id for judge, version_id in rows}
     await session.commit()
     return found
+
+
+async def defer(
+    session: AsyncSession, evaluation_id: uuid.UUID, claim_seq: int, until: datetime
+) -> None:
+    """Queue the evaluation again for `until`, while an input it needs is still being written.
+    A wait is not a failed attempt, so the claim gives back the attempt it counted."""
+    await session.execute(
+        update(Evaluation)
+        .where(held(evaluation_id, claim_seq))
+        .values(
+            state=EvaluationState.QUEUED,
+            claimed_by=None,
+            lease_expires_at=None,
+            not_before=until,
+            attempts=Evaluation.attempts - 1,
+        )
+    )
+    await session.commit()
 
 
 async def fail(

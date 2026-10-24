@@ -13,6 +13,8 @@ from yaksh.api.errors import CLIENT_ERRORS, UNAVAILABLE, json_errors
 from yaksh.api.files import StoredFileResponse
 from yaksh.api.pagination import Page, PageDep
 from yaksh.api.schemas.conversations import (
+    AgentRecordRead,
+    AgentRecordStatus,
     ConversationEvaluation,
     ConversationRead,
     ConversationSummary,
@@ -31,8 +33,9 @@ from yaksh.domain.conversations import (
     Role,
     Transcript,
 )
+from yaksh.domain.errors import NotFoundError
 from yaksh.domain.latency import Latency, place
-from yaksh.evaluation import results
+from yaksh.evaluation import agent_records, results
 from yaksh.simulation import conversations
 from yaksh.simulation.listen import live_audio
 
@@ -121,6 +124,7 @@ async def detail(session: AsyncSession, conversation: Conversation) -> Conversat
     found = await results.evaluated(session, [conversation.id])
     latency = found[conversation.id].latency if conversation.id in found else None
     base = await summary(session, conversation, found)
+    record = await agent_records.record_view(session, conversation)
     return ConversationRead(
         **base.model_dump(),
         instructions=conversation.instructions,
@@ -134,6 +138,9 @@ async def detail(session: AsyncSession, conversation: Conversation) -> Conversat
         wire_events=transcript.wire_events,
         validity=transcript.validity,
         retried_as=await conversations.retried_as(session, conversation),
+        agent_record=None
+        if record is None
+        else AgentRecordStatus(status=record.status, reason=record.reason),
     )
 
 
@@ -192,6 +199,16 @@ async def get_evaluation(conversation_id: uuid.UUID, session: SessionDep) -> Con
         ),
         items=[ItemRead.model_validate(item) for item in items],
     )
+
+
+@router.get("/{conversation_id}/agent-record")
+async def get_agent_record(conversation_id: uuid.UUID, session: SessionDep) -> AgentRecordRead:
+    """The agent's own record of the call; 404 when the call has none to read."""
+    conversation = await conversations.get_conversation(session, conversation_id)
+    view = await agent_records.record_view(session, conversation)
+    if view is None:
+        raise NotFoundError("this call has no agent record to read")
+    return AgentRecordRead.of(view)
 
 
 @router.get("/{conversation_id}/recording", response_class=StreamingResponse, responses=UNAVAILABLE)

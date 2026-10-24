@@ -7,6 +7,7 @@ import {
   toOutbound,
   toOutboundDraft,
 } from "@/lib/outbound";
+import { EMPTY_RECORD_SOURCE } from "@/lib/record-providers";
 import type {
   Agent,
   AgentInput,
@@ -14,6 +15,7 @@ import type {
   AgentSummary,
   Direction,
   Endpoint,
+  RecordSource,
 } from "@/lib/types";
 
 /** The API's limits for the brief, which every agent has. */
@@ -35,6 +37,9 @@ export interface Draft {
   agent_number: string;
   outbound: OutboundDraft;
   endpoint: Endpoint;
+  /** Yaksh reads the agent's own record after each phone test. */
+  record: boolean;
+  record_source: RecordSource;
   agent_speaks_first: boolean;
   languages: AgentLanguage[];
   brief: string;
@@ -50,6 +55,8 @@ export const EMPTY_DRAFT: Draft = {
   agent_number: "",
   outbound: EMPTY_OUTBOUND,
   endpoint: EMPTY_ENDPOINT,
+  record: false,
+  record_source: EMPTY_RECORD_SOURCE,
   agent_speaks_first: true,
   languages: ["en-US"],
   brief: "",
@@ -66,6 +73,8 @@ export function toDraft(agent: Agent): Draft {
     agent_number: agent.agent_number ?? "",
     outbound: agent.outbound ? toOutboundDraft(agent.outbound) : EMPTY_OUTBOUND,
     endpoint: agent.endpoint ?? EMPTY_ENDPOINT,
+    record: agent.record_source !== null,
+    record_source: agent.record_source ?? EMPTY_RECORD_SOURCE,
     agent_speaks_first: agent.agent_speaks_first,
     languages: agent.languages,
     brief: agent.brief,
@@ -93,6 +102,10 @@ export function toInput(draft: Draft): AgentInput {
     agent_number: phone && !outbound ? normalizeNumber(draft.agent_number) : null,
     outbound: phone && outbound ? toOutbound(draft.outbound) : null,
     endpoint: text ? toEndpoint(draft.endpoint) : null,
+    record_source:
+      phone && draft.record
+        ? { provider: draft.record_source.provider, ...toEndpoint(draft.record_source) }
+        : null,
     agent_speaks_first: draft.agent_speaks_first,
     languages: draft.languages,
     brief: draft.brief.trim(),

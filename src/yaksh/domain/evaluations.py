@@ -10,6 +10,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict
 
 from yaksh.domain.answering import AnsweredBy
+from yaksh.domain.record_sources import RecordProvider
 from yaksh.domain.scenarios import Category
 from yaksh.domain.surroundings import Surroundings
 
@@ -281,6 +282,21 @@ class CallerFidelity(BaseModel):
     possible: int
 
 
+class AgentRecordCounts(BaseModel):
+    """The agent's own record over a run's judged phone calls that read one."""
+
+    provider: RecordProvider
+    calls: int
+    """Judged calls whose record Yaksh read or gave up on."""
+    found: int
+    missing: list[uuid.UUID]
+    """The calls with no record, in the run's order."""
+    saved_data: dict[str, int]
+    """The saved data check by outcome after labels."""
+    heard: dict[str, int]
+    """The heard check by outcome after labels; it reports only."""
+
+
 class JudgeVersionUsed(BaseModel):
     judge: str
     model: str
@@ -330,6 +346,8 @@ class RunVerdicts(BaseModel):
     """The criteria and agent rules that no judge could decide."""
     callers: list[CallerFidelity]
     judge_versions: list[JudgeVersionUsed]
+    agent_record: AgentRecordCounts | None
+    """None when no judged call read an agent record."""
 
 
 class RunMetrics(BaseModel):

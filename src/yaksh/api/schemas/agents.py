@@ -7,6 +7,7 @@ from pydantic import BaseModel, ConfigDict, computed_field
 from yaksh.db.models import Agent, Document
 from yaksh.domain.agents import AgentConfig, AgentSource, Direction, Transport, transports_of
 from yaksh.domain.languages import AgentLanguage
+from yaksh.domain.record_sources import RecordSource
 from yaksh.domain.rules import AgentRules
 from yaksh.domain.triggers import Endpoint, OutboundConfig
 
@@ -24,6 +25,7 @@ class AgentSummary(BaseModel):
     agent_number: str | None
     outbound: OutboundConfig | None
     endpoint: Endpoint | None
+    record_source: RecordSource | None
     agent_speaks_first: bool
     languages: list[AgentLanguage]
     brief: str

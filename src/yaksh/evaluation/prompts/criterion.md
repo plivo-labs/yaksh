@@ -7,12 +7,13 @@ Verdicts:
 - fail: the transcript shows that the agent did not do it, or did the opposite.
 - not_applicable: the criterion asks something only in a situation that did not come up in this call.
 - unsure, with a kind:
-  - hidden_action: the answer needs a tool call or a stored record that the transcript does not show, such as a booking saved or an email sent.
+  - hidden_action: the answer needs a tool call or a stored record that neither the transcript nor the agent record shows, such as a booking saved or an email sent.
   - not_confirmed_played: the only evidence is in caller turns marked "audio not confirmed played" or "not played".
   - unclear: the transcript does not give a clear answer.
 
 Rules:
 - Quote your evidence word for word from the transcript, with the turn number. Quote the shortest part that shows the point.
+- When the view has an AGENT RECORD, it is the agent's own record of the values it saved and the tools it called. Use it for what the transcript cannot show. Quote its lines word for word in record_evidence, with the line number of R1, R2 and so on; else give an empty record_evidence. A saved value must match what the caller said in the transcript.
 - When the verdict depends on something that never happened, set absence to true and give absence_turns: the first and last turn you checked.
 - Judge the result, not the cause. Do not guess why the agent did something, and do not say that it misheard.
 - The transcript note says how the agent's lines were captured. Judge what was said, not the spelling or the written form of numbers.

@@ -1,0 +1,48 @@
+---
+title: Agent record
+description: Read the agent's own record of each phone test, what it heard, the values it saved and the tools it called, and check it.
+---
+
+The transcript shows what the caller heard. The agent's provider keeps its own record of the call: what the agent's speech-to-text heard, the values the agent saved and the tools it called. With an agent record, Yaksh reads that record after each phone test, shows it on the call, and gives it to the judges.
+
+## What Yaksh does with it
+
+- The call page gets an **Agent record** tab: the values the agent saved, and the whole call as the agent recorded it, its own words and what its speech-to-text heard, with its tool calls in place. Each line links to its turn in Yaksh's transcript.
+- The judges read a new AGENT RECORD section in the evidence view: the saved values and the tool calls, numbered R1, R2 and so on. A criterion such as "The agent saves the appointment for `{{Date}}`" gets a pass or a fail. Without a record, it ends "unsure" with the kind "hidden action".
+- **Data the agent saved** checks each saved value against what the caller said. A value that the call clearly contradicts fails the check, but a caller turn that Yaksh did not confirm as played cannot fail it alone, and the check counts in the call's verdict with agent rules, as a deciding agent rule does. The scenario verdict and the pass rate do not change. An empty value, or one the call does not show, is not checkable.
+- **What the agent heard** compares each value that Yaksh's caller said, such as a name, a number or a date, with what the agent's speech-to-text heard. It skips a caller line that Yaksh did not confirm as played. It only reports.
+- The run's verdicts show how many calls had a record and the results of the two checks.
+
+The two checks run when the persona talked on the call. Text tests have no agent record.
+
+## Set it up
+
+On the agent's **Settings**, choose **Edit** and turn on **Read the agent's record after each phone test**. Give:
+
+- **Provider**: where the agent runs.
+- **URL**: the agent's address in the provider's API.
+- **Headers**: the credential, as `{{secrets.NAME}}`. Add the secret on the **Trigger secrets** tab of Settings.
+
+### Plivo CX
+
+- URL: `https://api.plivo.com/v1/Account/<Auth ID>/AgentFlow/<agent ID>/`, the agent's `resource_uri` in the Plivo API.
+- Header: `Authorization` with `Basic ` and the base64 of `<Auth ID>:<Auth token>`, from a secret. The Plivo agent API takes the credentials of a main account only.
+- The Plivo CX import fills both.
+
+## How Yaksh finds the call
+
+- **The agent calls Yaksh**: the provider's response to the trigger names the run it started. For Plivo CX, it is `api_id`. Yaksh keeps the trigger's response for this.
+- **Yaksh calls the agent**: Yaksh reads the agent's runs that started during the call, the closest first, and keeps the one that came from the number Yaksh called from.
+
+## When the record is ready
+
+Yaksh reads the record before it judges the call. A provider writes some of its record after the call ends: Plivo CX can add a line after the run ends, so Yaksh takes a Plivo CX run as final 90 seconds after its last line. Until then, the evaluation waits and asks again every 15 seconds, for up to 5 minutes after the call. The wait does not use one of the evaluation's attempts.
+
+After 5 minutes, Yaksh keeps what it has, with a note that the record can be incomplete. With no record at all, the tab says why, such as refused credentials or no run from the number, and the call is judged without one. Yaksh reads a call's record once.
+
+## Limits
+
+- Plivo CX logs a saved value when the agent's AI node extracts it during the call. A flow that leaves the AI node for another node before the call ends can log no values.
+- The Plivo agent API allows 60 requests a minute for each Auth ID, and your other use of the API shares it. Each call takes about one list request and one or two run requests.
+- **Yaksh calls the agent**: Yaksh reads the 10 runs closest to the call. If more runs of the agent start during one test call, and the call's run is not in those 10, the record is missing. More than 200 runs during one test call cannot be matched.
+- A provider answer in a shape that Yaksh does not read makes the record missing, with the reason. The call is judged without a record.

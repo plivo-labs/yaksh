@@ -60,6 +60,16 @@ The hostname of a quick tunnel changes each time that the tunnel starts. After e
 
 `docker/compose.yaml` uses the released image. `docker/compose.dev.yaml` builds the image from your code.
 
+## Add a provider of agent records
+
+An [agent record](/docs/agent-record) is read by one reader for each provider. Only the reader and the provider's entry in two tables know the provider:
+
+1. Add the provider to `RecordProvider` in `src/yaksh/domain/record_sources.py`, and its entry to `RECORD_PROVIDERS`: label, default URL, the path of one agent's URL, and whether its record holds the live transcript.
+2. Write the reader in `src/yaksh/integrations/`: `find()` gets the record source, its filled headers and the call, and returns `Found`, `Pending` or `Missing` with an `AgentRecord`.
+3. Add the reader to `record_readers()` in `src/yaksh/worker/evaluator.py`.
+4. Add the provider to `frontend/src/lib/record-providers.ts`: label, URL placeholder and header placeholder.
+5. Add a migration that adds the value to the `record_provider` type.
+
 ## Release
 
 A release is a version tag on `main`. Refer to [Versions and upgrades](/docs/versions) for what each version number means.

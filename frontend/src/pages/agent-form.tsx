@@ -25,6 +25,13 @@ import {
   FieldSet,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Spinner } from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
@@ -42,7 +49,8 @@ import {
 import { useDeleteAgent, useSaveAgent } from "@/lib/queries";
 import { cn } from "@/lib/utils";
 import { endpointProblems, isPhoneNumber } from "@/lib/outbound";
-import type { Agent, Direction } from "@/lib/types";
+import { RECORD_PROVIDERS } from "@/lib/record-providers";
+import type { Agent, Direction, RecordProvider, RecordSource } from "@/lib/types";
 import { ConfigField } from "@/pages/agent-config-field";
 import { OutboundFields, Pairs } from "@/pages/agent-outbound-fields";
 
@@ -275,6 +283,90 @@ function PhoneFields({ form }: { form: AgentDraft }) {
   );
 }
 
+const PROVIDER_ITEMS = Object.entries(RECORD_PROVIDERS).map(([value, { label }]) => ({
+  value: value as RecordProvider,
+  label,
+}));
+
+/** Where Yaksh reads the agent's own record after each phone test; only a phone connection
+ * has one. */
+export function RecordFields({ form }: { form: AgentDraft }) {
+  const { draft, set, submitted, swap } = form;
+  if (!draft.phone) return null;
+  const source = draft.record_source;
+  const provider = RECORD_PROVIDERS[source.provider];
+  const problems = submitted && draft.record ? endpointProblems(source) : {};
+  const update = (next: Partial<RecordSource>) => set("record_source", { ...source, ...next });
+  return (
+    <FieldSet className={swap}>
+      <FieldLegend variant="label">Agent record</FieldLegend>
+      <Field orientation="horizontal" className="rounded-md border bg-muted/40 px-3.5 py-3">
+        <FieldContent>
+          <FieldLabel htmlFor="record">Read the agent's record after each phone test</FieldLabel>
+          <FieldDescription>
+            What it heard, the data it saved and the tools it called.
+          </FieldDescription>
+        </FieldContent>
+        <Switch
+          id="record"
+          checked={draft.record}
+          onCheckedChange={(checked) => set("record", checked)}
+        />
+      </Field>
+      {draft.record && (
+        <>
+          <Field>
+            <FieldLabel htmlFor="record_provider">Provider</FieldLabel>
+            <Select
+              items={PROVIDER_ITEMS}
+              value={source.provider}
+              onValueChange={(next) => next && update({ provider: next })}
+            >
+              <SelectTrigger id="record_provider" className="w-56">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {PROVIDER_ITEMS.map((item) => (
+                  <SelectItem key={item.value} value={item.value}>
+                    {item.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="record_url">URL</FieldLabel>
+            <Input
+              id="record_url"
+              required
+              placeholder={provider.urlPlaceholder}
+              className="font-mono text-xs-400"
+              aria-invalid={Boolean(problems.url)}
+              aria-describedby={problems.url ? "record_url-error" : undefined}
+              value={source.url}
+              onChange={(e) => update({ url: e.target.value })}
+            />
+            <FieldDescription>The agent's address in the {provider.label} API.</FieldDescription>
+            {problems.url && <FieldError id="record_url-error">{problems.url}</FieldError>}
+          </Field>
+          <Field>
+            <FieldLabel>Headers</FieldLabel>
+            <Pairs
+              pairs={source.headers}
+              noun="Header"
+              namePlaceholder="Authorization"
+              valuePlaceholder={provider.headerPlaceholder}
+              onChange={(headers) => update({ headers })}
+            />
+            <FieldDescription>Put the credential in a secret in Settings.</FieldDescription>
+            {problems.headers && <FieldError>{problems.headers}</FieldError>}
+          </Field>
+        </>
+      )}
+    </FieldSet>
+  );
+}
+
 /** The agent's own ID, for finding it through the API. */
 export function AgentIdField({ form }: { form: AgentDraft }) {
   const { draft, set } = form;
@@ -461,6 +553,7 @@ function AgentForm({
           <ReachChoice form={form} />
           <ReachFields form={form} />
           <CallOptionsFields form={form} />
+          <RecordFields form={form} />
         </FieldGroup>
       </FieldSet>
 

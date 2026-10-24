@@ -11,7 +11,12 @@ func (a *app) conversationCmd() *cobra.Command {
 		Use:   "conversation",
 		Short: "Conversations: the calls of runs",
 	}
-	conversation.AddCommand(a.conversationViewCmd(), a.conversationEvaluationCmd(), a.conversationListCmd())
+	conversation.AddCommand(
+		a.conversationViewCmd(),
+		a.conversationEvaluationCmd(),
+		a.conversationRecordCmd(),
+		a.conversationListCmd(),
+	)
 	return conversation
 }
 
@@ -53,6 +58,29 @@ func (a *app) conversationEvaluationCmd() *cobra.Command {
 				return err
 			}
 			body, err := api.Body(c.GetEvaluationApiV1ConversationsConversationIdEvaluationGet(cmd.Context(), id))
+			if err != nil {
+				return err
+			}
+			return printJSON(cmd.OutOrStdout(), body)
+		},
+	}
+}
+
+func (a *app) conversationRecordCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "record <id>",
+		Short: "Show the agent's own record of a call: the values it saved, what it heard and said, and its tool calls",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			id, err := parseID("conversation", args[0])
+			if err != nil {
+				return err
+			}
+			c, err := a.client()
+			if err != nil {
+				return err
+			}
+			body, err := api.Body(c.GetAgentRecordApiV1ConversationsConversationIdAgentRecordGet(cmd.Context(), id))
 			if err != nil {
 				return err
 			}

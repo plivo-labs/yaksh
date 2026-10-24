@@ -883,6 +883,42 @@ func (e Provider) Valid() bool {
 	}
 }
 
+// Defines values for RecordProvider.
+const (
+	RecordProviderPlivoCx RecordProvider = "plivo_cx"
+)
+
+// Valid indicates whether the value is a known member of the RecordProvider enum.
+func (e RecordProvider) Valid() bool {
+	switch e {
+	case RecordProviderPlivoCx:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for RecordStatus.
+const (
+	RecordStatusFound   RecordStatus = "found"
+	RecordStatusMissing RecordStatus = "missing"
+	RecordStatusWaiting RecordStatus = "waiting"
+)
+
+// Valid indicates whether the value is a known member of the RecordStatus enum.
+func (e RecordStatus) Valid() bool {
+	switch e {
+	case RecordStatusFound:
+		return true
+	case RecordStatusMissing:
+		return true
+	case RecordStatusWaiting:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for Role.
 const (
 	RoleAgent  Role = "agent"
@@ -1311,6 +1347,7 @@ type AgentConfig struct {
 	KnowledgeBase    *[]KnowledgeBaseEntry     `json:"knowledge_base,omitempty"`
 	Languages        *[]AgentLanguage          `json:"languages,omitempty"`
 	Outbound         *OutboundConfig           `json:"outbound,omitempty"`
+	RecordSource     *RecordSource             `json:"record_source,omitempty"`
 	Rules            *[]AgentConfig_Rules_Item `json:"rules,omitempty"`
 }
 
@@ -1332,6 +1369,7 @@ type AgentCreate struct {
 	Languages        *[]AgentLanguage          `json:"languages,omitempty"`
 	Name             string                    `json:"name"`
 	Outbound         *OutboundConfig           `json:"outbound,omitempty"`
+	RecordSource     *RecordSource             `json:"record_source,omitempty"`
 	Rules            *[]AgentCreate_Rules_Item `json:"rules,omitempty"`
 
 	// Source Where an agent came from: made in Yaksh, or imported from a file or a provider.
@@ -1381,6 +1419,7 @@ type AgentRead struct {
 	Languages        []AgentLanguage         `json:"languages"`
 	Name             string                  `json:"name"`
 	Outbound         *OutboundConfig         `json:"outbound"`
+	RecordSource     *RecordSource           `json:"record_source"`
 	Rules            []AgentRead_Rules_Item  `json:"rules"`
 
 	// Source Where an agent came from: made in Yaksh, or imported from a file or a provider.
@@ -1394,6 +1433,41 @@ type AgentRead struct {
 // AgentRead_Rules_Item defines model for AgentRead.rules.Item.
 type AgentRead_Rules_Item struct {
 	union json.RawMessage
+}
+
+// AgentRecordCounts The agent's own record over a run's judged phone calls that read one.
+type AgentRecordCounts struct {
+	Calls     int                  `json:"calls"`
+	Found     int                  `json:"found"`
+	Heard     map[string]int       `json:"heard"`
+	Missing   []openapi_types.UUID `json:"missing"`
+	Provider  RecordProvider       `json:"provider"`
+	SavedData map[string]int       `json:"saved_data"`
+}
+
+// AgentRecordRead The agent's own record of the call: its lines, each speaker's in order and paired with
+// Yaksh's turns, the values it saved and its tool calls.
+type AgentRecordRead struct {
+	ExternalId     *string        `json:"external_id"`
+	FetchedAt      *time.Time     `json:"fetched_at"`
+	Provider       RecordProvider `json:"provider"`
+	ProviderLabel  string         `json:"provider_label"`
+	ProviderStatus *string        `json:"provider_status"`
+	Reason         *string        `json:"reason"`
+	Saved          []SavedValue   `json:"saved"`
+
+	// Status Where a call's agent record is, as the console shows it.
+	Status RecordStatus     `json:"status"`
+	Tools  []RecordToolRead `json:"tools"`
+	Turns  []RecordTurnRead `json:"turns"`
+}
+
+// AgentRecordStatus defines model for AgentRecordStatus.
+type AgentRecordStatus struct {
+	Reason *string `json:"reason"`
+
+	// Status Where a call's agent record is, as the console shows it.
+	Status RecordStatus `json:"status"`
 }
 
 // AgentSource Where an agent came from: made in Yaksh, or imported from a file or a provider.
@@ -1414,6 +1488,7 @@ type AgentSummary struct {
 	Languages        []AgentLanguage     `json:"languages"`
 	Name             string              `json:"name"`
 	Outbound         *OutboundConfig     `json:"outbound"`
+	RecordSource     *RecordSource       `json:"record_source"`
 
 	// Source Where an agent came from: made in Yaksh, or imported from a file or a provider.
 	Source AgentSource `json:"source"`
@@ -1436,6 +1511,7 @@ type AgentUpdate struct {
 	Languages        *[]AgentLanguage          `json:"languages,omitempty"`
 	Name             *string                   `json:"name,omitempty"`
 	Outbound         *OutboundConfig           `json:"outbound,omitempty"`
+	RecordSource     *RecordSource             `json:"record_source,omitempty"`
 	Rules            *[]AgentUpdate_Rules_Item `json:"rules,omitempty"`
 }
 
@@ -1574,6 +1650,7 @@ type ConversationRead struct {
 	AgentCallerId  *string            `json:"agent_caller_id"`
 	AgentId        openapi_types.UUID `json:"agent_id"`
 	AgentName      string             `json:"agent_name"`
+	AgentRecord    *AgentRecordStatus `json:"agent_record"`
 	AgentVersion   int                `json:"agent_version"`
 	AgentVersionId openapi_types.UUID `json:"agent_version_id"`
 	AnsweredBy     AnsweredBy         `json:"answered_by"`
@@ -2492,6 +2569,7 @@ type ProviderDraft struct {
 	Languages        []AgentLanguage    `json:"languages"`
 	Name             *string            `json:"name"`
 	NumberNote       *string            `json:"number_note,omitempty"`
+	RecordSource     *RecordSource      `json:"record_source,omitempty"`
 	StartRequest     *StartRequestDraft `json:"start_request"`
 }
 
@@ -2525,6 +2603,38 @@ type QueuedReview struct {
 	Items          int                `json:"items"`
 	Labeled        int                `json:"labeled"`
 	ScenarioName   string             `json:"scenario_name"`
+}
+
+// RecordProvider defines model for RecordProvider.
+type RecordProvider string
+
+// RecordSource The agent's address in its provider's API, with the headers that read it.
+type RecordSource struct {
+	Headers  *[]Header      `json:"headers,omitempty"`
+	Provider RecordProvider `json:"provider"`
+	Url      string         `json:"url"`
+}
+
+// RecordStatus Where a call's agent record is, as the console shows it.
+type RecordStatus string
+
+// RecordToolRead defines model for RecordToolRead.
+type RecordToolRead struct {
+	Arguments string     `json:"arguments"`
+	At        *time.Time `json:"at,omitempty"`
+	AtMs      *int       `json:"at_ms"`
+	Failed    *bool      `json:"failed,omitempty"`
+	Name      string     `json:"name"`
+	Output    *string    `json:"output,omitempty"`
+}
+
+// RecordTurnRead defines model for RecordTurnRead.
+type RecordTurnRead struct {
+	At   *time.Time `json:"at,omitempty"`
+	AtMs *int       `json:"at_ms"`
+	Role Role       `json:"role"`
+	Text string     `json:"text"`
+	Turn *int       `json:"turn"`
 }
 
 // Reply The agent's answer to one caller reply, or to the start of the call.
@@ -2760,6 +2870,7 @@ type RunSummary struct {
 // RunVerdicts The run's verdict numbers over its judged calls: completed calls that no one stopped,
 // whose evaluation gave a verdict or failed.
 type RunVerdicts struct {
+	AgentRecord       *AgentRecordCounts    `json:"agent_record"`
 	Best              *float32              `json:"best"`
 	Callers           []CallerFidelity      `json:"callers"`
 	Coverage          *float32              `json:"coverage"`
@@ -2779,6 +2890,12 @@ type RunVerdicts struct {
 	Scenarios         []ScenarioVerdicts    `json:"scenarios"`
 	Unplayed          []UnplayedCallVerdict `json:"unplayed"`
 	Worst             *float32              `json:"worst"`
+}
+
+// SavedValue defines model for SavedValue.
+type SavedValue struct {
+	Name  string `json:"name"`
+	Value string `json:"value"`
 }
 
 // ScenarioConfig What a scenario version pins. The instructions and the facts go to the caller. The
@@ -4367,6 +4484,13 @@ type ClientInterface interface {
 	// Corresponds with GET /api/v1/conversations/{conversation_id} (the `GetConversationApiV1ConversationsConversationIdGet` operationId).
 	GetConversationApiV1ConversationsConversationIdGet(ctx context.Context, conversationId openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// GetAgentRecordApiV1ConversationsConversationIdAgentRecordGet Get Agent Record
+	//
+	// The agent's own record of the call; 404 when the call has none to read.
+	//
+	// Corresponds with GET /api/v1/conversations/{conversation_id}/agent-record (the `GetAgentRecordApiV1ConversationsConversationIdAgentRecordGet` operationId).
+	GetAgentRecordApiV1ConversationsConversationIdAgentRecordGet(ctx context.Context, conversationId openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// EndConversationApiV1ConversationsConversationIdEndPost End Conversation
 	//
 	// Corresponds with POST /api/v1/conversations/{conversation_id}/end (the `EndConversationApiV1ConversationsConversationIdEndPost` operationId).
@@ -5924,6 +6048,23 @@ func (c *Client) ListConversationsApiV1ConversationsGet(ctx context.Context, par
 // Corresponds with GET /api/v1/conversations/{conversation_id} (the `GetConversationApiV1ConversationsConversationIdGet` operationId).
 func (c *Client) GetConversationApiV1ConversationsConversationIdGet(ctx context.Context, conversationId openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetConversationApiV1ConversationsConversationIdGetRequest(c.Server, conversationId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetAgentRecordApiV1ConversationsConversationIdAgentRecordGet Get Agent Record
+//
+// The agent's own record of the call; 404 when the call has none to read.
+//
+// Corresponds with GET /api/v1/conversations/{conversation_id}/agent-record (the `GetAgentRecordApiV1ConversationsConversationIdAgentRecordGet` operationId).
+func (c *Client) GetAgentRecordApiV1ConversationsConversationIdAgentRecordGet(ctx context.Context, conversationId openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetAgentRecordApiV1ConversationsConversationIdAgentRecordGetRequest(c.Server, conversationId)
 	if err != nil {
 		return nil, err
 	}
@@ -9082,6 +9223,40 @@ func NewGetConversationApiV1ConversationsConversationIdGetRequest(server string,
 	}
 
 	operationPath := fmt.Sprintf("/api/v1/conversations/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetAgentRecordApiV1ConversationsConversationIdAgentRecordGetRequest constructs an http.Request for the GetAgentRecordApiV1ConversationsConversationIdAgentRecordGet method
+func NewGetAgentRecordApiV1ConversationsConversationIdAgentRecordGetRequest(server string, conversationId openapi_types.UUID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "conversation_id", conversationId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/conversations/%s/agent-record", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -12518,6 +12693,15 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with GET /api/v1/conversations/{conversation_id} (the `GetConversationApiV1ConversationsConversationIdGet` operationId).
 	GetConversationApiV1ConversationsConversationIdGetWithResponse(ctx context.Context, conversationId openapi_types.UUID, reqEditors ...RequestEditorFn) (*GetConversationApiV1ConversationsConversationIdGetResponse, error)
 
+	// GetAgentRecordApiV1ConversationsConversationIdAgentRecordGetWithResponse Get Agent Record
+	//
+	// The agent's own record of the call; 404 when the call has none to read.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/conversations/{conversation_id}/agent-record (the `GetAgentRecordApiV1ConversationsConversationIdAgentRecordGet` operationId).
+	GetAgentRecordApiV1ConversationsConversationIdAgentRecordGetWithResponse(ctx context.Context, conversationId openapi_types.UUID, reqEditors ...RequestEditorFn) (*GetAgentRecordApiV1ConversationsConversationIdAgentRecordGetResponse, error)
+
 	// EndConversationApiV1ConversationsConversationIdEndPostWithResponse End Conversation
 	//
 	// Returns a wrapper object for the known response body format(s).
@@ -14774,6 +14958,54 @@ func (r GetConversationApiV1ConversationsConversationIdGetResponse) StatusCode()
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r GetConversationApiV1ConversationsConversationIdGetResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetAgentRecordApiV1ConversationsConversationIdAgentRecordGetResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *AgentRecordRead
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetAgentRecordApiV1ConversationsConversationIdAgentRecordGetResponse) GetJSON200() *AgentRecordRead {
+	return r.JSON200
+}
+
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r GetAgentRecordApiV1ConversationsConversationIdAgentRecordGetResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
+}
+
+// GetBody returns the raw response body bytes
+func (r GetAgentRecordApiV1ConversationsConversationIdAgentRecordGetResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetAgentRecordApiV1ConversationsConversationIdAgentRecordGetResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetAgentRecordApiV1ConversationsConversationIdAgentRecordGetResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetAgentRecordApiV1ConversationsConversationIdAgentRecordGetResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -19056,6 +19288,21 @@ func (c *ClientWithResponses) GetConversationApiV1ConversationsConversationIdGet
 	return ParseGetConversationApiV1ConversationsConversationIdGetResponse(rsp)
 }
 
+// GetAgentRecordApiV1ConversationsConversationIdAgentRecordGetWithResponse Get Agent Record
+//
+// The agent's own record of the call; 404 when the call has none to read.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/conversations/{conversation_id}/agent-record (the `GetAgentRecordApiV1ConversationsConversationIdAgentRecordGet` operationId).
+func (c *ClientWithResponses) GetAgentRecordApiV1ConversationsConversationIdAgentRecordGetWithResponse(ctx context.Context, conversationId openapi_types.UUID, reqEditors ...RequestEditorFn) (*GetAgentRecordApiV1ConversationsConversationIdAgentRecordGetResponse, error) {
+	rsp, err := c.GetAgentRecordApiV1ConversationsConversationIdAgentRecordGet(ctx, conversationId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetAgentRecordApiV1ConversationsConversationIdAgentRecordGetResponse(rsp)
+}
+
 // EndConversationApiV1ConversationsConversationIdEndPostWithResponse End Conversation
 //
 // Returns a wrapper object for the known response body format(s).
@@ -21456,6 +21703,39 @@ func ParseGetConversationApiV1ConversationsConversationIdGetResponse(rsp *http.R
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest ConversationRead
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetAgentRecordApiV1ConversationsConversationIdAgentRecordGetResponse parses an HTTP response from a GetAgentRecordApiV1ConversationsConversationIdAgentRecordGetWithResponse call
+func ParseGetAgentRecordApiV1ConversationsConversationIdAgentRecordGetResponse(rsp *http.Response) (*GetAgentRecordApiV1ConversationsConversationIdAgentRecordGetResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetAgentRecordApiV1ConversationsConversationIdAgentRecordGetResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest AgentRecordRead
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}

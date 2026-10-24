@@ -27,6 +27,7 @@ from yaksh.domain.errors import (
     ValidationError,
 )
 from yaksh.domain.languages import AgentLanguage
+from yaksh.domain.record_sources import RECORD_PROVIDERS, RecordProvider, RecordSource
 from yaksh.domain.triggers import Endpoint, Header, TriggerMethod
 from yaksh.simulation.agent_import import pruned, text
 from yaksh.simulation.curl_import import FILL, NUMBER, NUMBER_NAME, check, scenario_body
@@ -85,6 +86,7 @@ async def import_flow(api: PlivoCxAccountApi, flow_id: uuid.UUID) -> ProviderDra
         agent_numbers=[],
         start_request=None,
         endpoint=text_endpoint(api, flow_id),
+        record_source=record_source(api, flow_id),
     )
     if "call" in triggers:
         try:
@@ -163,6 +165,17 @@ def text_endpoint(api: PlivoCxAccountApi, flow_id: uuid.UUID) -> Endpoint:
     """The flow's text-test URL: its run URL plus /text-test, always with Basic auth."""
     return Endpoint(
         url=f"{RUNNER}/v1/account/{api.auth_id}/flow/{flow_id}/text-test",
+        headers=[Header(name="Authorization", value=basic_auth(api))],
+    )
+
+
+def record_source(api: PlivoCxAccountApi, flow_id: uuid.UUID) -> RecordSource:
+    """The flow's address in the Plivo API, where Yaksh reads the run of each phone test, with
+    the Basic auth of the text endpoint."""
+    api_url = RECORD_PROVIDERS[RecordProvider.PLIVO_CX].default_url
+    return RecordSource(
+        provider=RecordProvider.PLIVO_CX,
+        url=f"{api_url}/v1/Account/{api.auth_id}/AgentFlow/{flow_id}/",
         headers=[Header(name="Authorization", value=basic_auth(api))],
     )
 

@@ -5,6 +5,7 @@ setting, the agent's configuration and its documents. A change to the text is a 
 from dataclasses import dataclass, field
 from datetime import date
 
+from yaksh.domain.agent_records import AgentRecord, RecordTool, StoredRecord
 from yaksh.domain.agents import Direction, Transport
 from yaksh.domain.answering import (
     SCREENER_LABELS,
@@ -23,9 +24,10 @@ from yaksh.domain.conversations import (
     WireEvent,
     WireEventKind,
 )
+from yaksh.domain.record_sources import RECORD_PROVIDERS
 from yaksh.domain.scenarios import Fact
 
-EVIDENCE_VIEW_VERSION = 4
+EVIDENCE_VIEW_VERSION = 5
 
 TRANSCRIPTION_NOTE = {
     Transport.PHONE: (
@@ -84,45 +86,79 @@ class CallView:
     answering: Answering | None = None
     """The voicemail and call screener of Yaksh's caller, when one of them answered."""
     events: list[WireEvent] = field(default_factory=list)
+    record: StoredRecord | None = None
+    """The agent's own record of the call; None when the agent has no record source or the
+    test ran over text."""
 
 
 def render(view: CallView) -> str:
     """The view without its item: what one request about every item of a call can share."""
-    return "\n\n".join(
-        [
-            "\n".join(
-                [
-                    "AGENT",
-                    f"Brief: {view.brief}",
-                    f"Agent data sent with this call: {facts(view.agent_data)}.",
-                ]
-            ),
-            "\n".join(
-                [
-                    "CALLER",
-                    f"Instructions: {view.instructions}",
-                    f"Known facts: {facts(view.known_facts)}.",
-                    f"Facts the caller does not know: {', '.join(view.unknown_facts) or 'none'}.",
-                ]
-            ),
-            "\n".join(
-                [
-                    "DATE",
-                    f"Today is {view.today:%A}, {view.today.day} {view.today:%B %Y}. "
-                    f"Time zone: {view.time_zone}.",
-                ]
-            ),
-            "\n".join(["CALL FACTS", who_called(view), *answered(view), how_it_ended(view)]),
-            "\n".join(
-                [
-                    "TRANSCRIPT",
-                    TRANSCRIPTION_NOTE[view.transport],
-                    *([MACHINE_NOTE] if view.answered_by is not AnsweredBy.CALLER else []),
-                    *transcript(view.turns, view.events),
-                ]
-            ),
-        ]
-    )
+    sections = [
+        "\n".join(
+            [
+                "AGENT",
+                f"Brief: {view.brief}",
+                f"Agent data sent with this call: {facts(view.agent_data)}.",
+            ]
+        ),
+        "\n".join(
+            [
+                "CALLER",
+                f"Instructions: {view.instructions}",
+                f"Known facts: {facts(view.known_facts)}.",
+                f"Facts the caller does not know: {', '.join(view.unknown_facts) or 'none'}.",
+            ]
+        ),
+        "\n".join(
+            [
+                "DATE",
+                f"Today is {view.today:%A}, {view.today.day} {view.today:%B %Y}. "
+                f"Time zone: {view.time_zone}.",
+            ]
+        ),
+        "\n".join(["CALL FACTS", who_called(view), *answered(view), how_it_ended(view)]),
+        "\n".join(
+            [
+                "TRANSCRIPT",
+                TRANSCRIPTION_NOTE[view.transport],
+                *([MACHINE_NOTE] if view.answered_by is not AnsweredBy.CALLER else []),
+                *transcript(view.turns, view.events),
+            ]
+        ),
+    ]
+    if view.record is not None:
+        sections.append("\n".join(agent_record(view.record)))
+    return "\n\n".join(sections)
+
+
+def record_lines(record: AgentRecord) -> list[str]:
+    """The record's lines a judge can quote, numbered from 1 in the view: the values the agent
+    saved, then its tool calls. What the agent heard is left out: it repeats the transcript."""
+    return [f"Saved: {value.name} = {value.value}" for value in record.saved] + [
+        record_tool_line(tool) for tool in record.tools
+    ]
+
+
+def record_tool_line(tool: RecordTool) -> str:
+    output = "no output reported" if tool.output is None else f"output {tool.output}"
+    failed = ", and it failed" if tool.failed else ""
+    return f"Tool call: {tool.name} {tool.arguments}, {output}{failed}"
+
+
+def agent_record(stored: StoredRecord) -> list[str]:
+    record = stored.record
+    if record is None:
+        return ["AGENT RECORD", "Yaksh could not read the agent's own record of this call."]
+    label = RECORD_PROVIDERS[record.provider].label
+    lines = [
+        "AGENT RECORD",
+        f"The agent's own record of this call, from {label}: the values it saved and the "
+        "tools it called. Quote a line by its number.",
+    ]
+    if stored.reason:
+        lines.append(f"The record can be incomplete: it was {stored.reason}.")
+    numbered = [f"[R{number}] {line}" for number, line in enumerate(record_lines(record), 1)]
+    return lines + (numbered or ["The agent saved no values and called no tools."])
 
 
 def with_item(view: str, item: str) -> str:

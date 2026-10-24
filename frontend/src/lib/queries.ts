@@ -15,6 +15,7 @@ import {
   ACTIVE_STATUSES,
   type Agent,
   type AgentDraft,
+  type AgentRecord,
   type AgentInput,
   type AgentRule,
   type AgentSource,
@@ -88,6 +89,8 @@ export const keys = {
   conversation: (id: string) => ["conversations", "one", id] as const,
   conversationEvaluation: (id: string, evaluation: EvaluationState | null) =>
     ["conversations", "evaluation", id, evaluation ?? "none"] as const,
+  agentRecord: (id: string, status: string) =>
+    ["conversations", "agent-record", id, status] as const,
   personas: ["personas"] as const,
   persona: (id: string) => ["personas", id] as const,
   personaScenarios: (id: string) => ["personas", id, "scenarios"] as const,
@@ -709,6 +712,15 @@ export function useConversationEvaluation(id: string, evaluation: EvaluationStat
     queryFn: ({ signal }) =>
       api<ConversationEvaluation>(`/conversations/${id}/evaluation`, { signal }),
     enabled: evaluation === "done" || evaluation === "failed",
+  });
+}
+
+/** The agent's own record of a call; its key follows the record's status, so a record that
+ * arrives is read again. */
+export function useAgentRecord(id: string, status: string) {
+  return useQuery({
+    queryKey: keys.agentRecord(id, status),
+    queryFn: ({ signal }) => api<AgentRecord>(`/conversations/${id}/agent-record`, { signal }),
   });
 }
 

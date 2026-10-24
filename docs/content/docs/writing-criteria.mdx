@@ -11,8 +11,8 @@ Yaksh tests the agent from the outside, through a phone line. The judge reads on
 
 | The judge sees | The judge does not see |
 | --- | --- |
-| What Yaksh's caller said, and whether its audio is confirmed as played | What the agent's speech recognition heard |
-| Yaksh's transcript of the agent's audio | Tool calls, tool results and saved records |
+| What Yaksh's caller said, and whether its audio is confirmed as played | What the agent's speech recognition heard, without an agent record |
+| Yaksh's transcript of the agent's audio | Tool calls, tool results and saved records, without an agent record |
 | Who hung up, the end reason and the call length | Transfers, other than what the caller heard |
 | The scenario: its instructions and the facts the caller knows, and for an agent that places the call, the data sent to it | The prompt the agent really ran |
 | Today's date and the time zone of the test | Tone, pronunciation and pace: the judge reads text |
@@ -23,7 +23,7 @@ Yaksh tests the agent from the outside, through a phone line. The judge reads on
 2. Write one check per criterion. Two checks in one criterion give one verdict for both.
 3. Give exact values when they matter: "$95", not "the right price". When the value is a fact the caller knows, write the fact's name in double braces, as in "The agent reads back the move to `{{Moving to}}`". Each call fills it in from its data set, so the criterion stays right in every data set.
 4. Write a condition when the check does not apply to every call: "If the caller asks about the price, the agent says...". A call where the condition does not come up is not applicable, not a fail.
-5. Do not check a saved record. A criterion that needs a tool call or a backend state ends "unsure" with the kind "hidden action". It counts as not applicable and never passes on a guess.
+5. Check a saved value or a tool call only when the agent has an [agent record](/docs/agent-record). Without one, a criterion that needs a tool call or a backend state ends "unsure" with the kind "hidden action". It counts as not applicable and never passes on a guess.
 6. Do not name a cause that the call cannot show, such as "the agent misheard".
 7. Use an agent rule for a check that applies to every call of the agent, and a phrase rule for an exact phrase. A phrase rule is checked in code: it is cheaper and exact.
 
@@ -33,7 +33,7 @@ Yaksh tests the agent from the outside, through a phone line. The judge reads on
 | --- | --- | --- |
 | After the date of birth matches the record, the agent books. | The match happens inside the agent. | The agent asks for the date of birth before it books. |
 | The agent sounds friendly. | Tone is audio; the judge reads text. | The agent thanks the caller before the call ends. |
-| The appointment is saved in the clinic's calendar. | Needs a saved record: unsure, hidden action. | The agent tells the caller the date and time of the booking. |
+| The appointment is saved in the clinic's calendar. | Needs a saved record: unsure, hidden action, unless the agent has an agent record. | The agent tells the caller the date and time of the booking; with an agent record, also: The agent saves the appointment for `{{Date}}`. |
 | The agent transfers the caller to billing. | The judge sees what the caller heard, not a transfer event. | The agent says it will transfer the call to billing, and then a different voice answers. |
 | The agent does not invent prices. | Too general to judge on one call. | Upload the price list for the hallucination judge, or write the value: If the caller asks about the price, the agent says that a new patient cleaning costs $95. |
 | The agent misheard the caller's name. | Names a cause the call cannot show. | The agent reads the caller's last name back as Lee. |

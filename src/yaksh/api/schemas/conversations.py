@@ -4,6 +4,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
+from yaksh.domain.agent_records import RecordStatus, RecordTool, RecordTurn, SavedValue
 from yaksh.domain.agents import Direction, Transport
 from yaksh.domain.answering import AnsweredBy, Answering
 from yaksh.domain.conversations import (
@@ -25,8 +26,10 @@ from yaksh.domain.evaluations import (
 )
 from yaksh.domain.languages import Language
 from yaksh.domain.latency import Latency, Reply
+from yaksh.domain.record_sources import RECORD_PROVIDERS, RecordProvider
 from yaksh.domain.scenarios import PlayedScenario
 from yaksh.domain.surroundings import Layer, NoiseSound, SoundPlan, SpeakerKind, Surroundings
+from yaksh.evaluation.agent_records import RecordView
 from yaksh.simulation.surroundings import clip_by_file
 
 
@@ -148,6 +151,61 @@ class SoundRead(BaseModel):
         return [cls.of(layer) for layer in SoundPlan.model_validate(saved).layers]
 
 
+class AgentRecordStatus(BaseModel):
+    status: RecordStatus
+    reason: str | None
+    """Why there is no record; or, for a found one, why it can be incomplete."""
+
+
+class RecordTurnRead(RecordTurn):
+    at_ms: int | None
+    """On the call's clock, as the transcript's turns."""
+    turn: int | None
+    """The Yaksh turn the line belongs to, counted from 1; None when it pairs with none."""
+
+
+class RecordToolRead(RecordTool):
+    at_ms: int | None
+
+
+class AgentRecordRead(AgentRecordStatus):
+    """The agent's own record of the call: its lines, each speaker's in order and paired with
+    Yaksh's turns, the values it saved and its tool calls."""
+
+    provider: RecordProvider
+    provider_label: str
+    external_id: str | None
+    provider_status: str | None
+    """The provider's own word for the state of the call."""
+    fetched_at: datetime | None
+    saved: list[SavedValue]
+    turns: list[RecordTurnRead]
+    tools: list[RecordToolRead]
+
+    @classmethod
+    def of(cls, view: RecordView) -> AgentRecordRead:
+        row = view.row
+        record = row.record if row is not None else None
+        return cls(
+            status=view.status,
+            reason=view.reason,
+            provider=view.source.provider,
+            provider_label=RECORD_PROVIDERS[view.source.provider].label,
+            external_id=row.external_id if row is not None else None,
+            provider_status=record.get("status") if record else None,
+            fetched_at=row.fetched_at if row is not None else None,
+            saved=[SavedValue.model_validate(value) for value in (record or {}).get("saved", [])],
+            turns=[
+                RecordTurnRead(**paired.turn.model_dump(), at_ms=paired.at_ms, turn=paired.number)
+                for paired in view.turns
+            ],
+            tools=[
+                RecordToolRead(**placed.tool.model_dump(), at_ms=placed.at_ms)
+                for placed in view.tools
+            ],
+        )
+
+
 class ConversationRead(ConversationSummary):
     instructions: str
     answering: Answering | None
@@ -163,6 +221,9 @@ class ConversationRead(ConversationSummary):
     wire_events: list[WireEvent]
     validity: Validity | None
     retried_as: uuid.UUID | None
+    agent_record: AgentRecordStatus | None
+    """None when the call has no agent record to read: its agent has no record source, or the
+    call is not a judged phone test."""
 
 
 class ItemRead(BaseModel):

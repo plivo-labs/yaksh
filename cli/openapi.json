@@ -1523,6 +1523,55 @@
         }
       }
     },
+    "/api/v1/conversations/{conversation_id}/agent-record": {
+      "get": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Get Agent Record",
+        "description": "The agent's own record of the call; 404 when the call has none to read.",
+        "operationId": "get_agent_record_api_v1_conversations__conversation_id__agent_record_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Conversation Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentRecordRead"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "The request failed. The error tells why.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/conversations/{conversation_id}/recording": {
       "get": {
         "tags": [
@@ -5804,6 +5853,16 @@
               }
             ]
           },
+          "record_source": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RecordSource"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "agent_speaks_first": {
             "type": "boolean",
             "title": "Agent Speaks First",
@@ -5910,6 +5969,16 @@
             "anyOf": [
               {
                 "$ref": "#/components/schemas/Endpoint"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "record_source": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RecordSource"
               },
               {
                 "type": "null"
@@ -6168,6 +6237,16 @@
               }
             ]
           },
+          "record_source": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RecordSource"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "agent_speaks_first": {
             "type": "boolean",
             "title": "Agent Speaks First"
@@ -6269,6 +6348,7 @@
           "agent_number",
           "outbound",
           "endpoint",
+          "record_source",
           "agent_speaks_first",
           "languages",
           "brief",
@@ -6282,6 +6362,173 @@
           "transports"
         ],
         "title": "AgentRead"
+      },
+      "AgentRecordCounts": {
+        "properties": {
+          "provider": {
+            "$ref": "#/components/schemas/RecordProvider"
+          },
+          "calls": {
+            "type": "integer",
+            "title": "Calls"
+          },
+          "found": {
+            "type": "integer",
+            "title": "Found"
+          },
+          "missing": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Missing"
+          },
+          "saved_data": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Saved Data"
+          },
+          "heard": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Heard"
+          }
+        },
+        "type": "object",
+        "required": [
+          "provider",
+          "calls",
+          "found",
+          "missing",
+          "saved_data",
+          "heard"
+        ],
+        "title": "AgentRecordCounts",
+        "description": "The agent's own record over a run's judged phone calls that read one."
+      },
+      "AgentRecordRead": {
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/RecordStatus"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "provider": {
+            "$ref": "#/components/schemas/RecordProvider"
+          },
+          "provider_label": {
+            "type": "string",
+            "title": "Provider Label"
+          },
+          "external_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "External Id"
+          },
+          "provider_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider Status"
+          },
+          "fetched_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fetched At"
+          },
+          "saved": {
+            "items": {
+              "$ref": "#/components/schemas/SavedValue"
+            },
+            "type": "array",
+            "title": "Saved"
+          },
+          "turns": {
+            "items": {
+              "$ref": "#/components/schemas/RecordTurnRead"
+            },
+            "type": "array",
+            "title": "Turns"
+          },
+          "tools": {
+            "items": {
+              "$ref": "#/components/schemas/RecordToolRead"
+            },
+            "type": "array",
+            "title": "Tools"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "reason",
+          "provider",
+          "provider_label",
+          "external_id",
+          "provider_status",
+          "fetched_at",
+          "saved",
+          "turns",
+          "tools"
+        ],
+        "title": "AgentRecordRead",
+        "description": "The agent's own record of the call: its lines, each speaker's in order and paired with\nYaksh's turns, the values it saved and its tool calls."
+      },
+      "AgentRecordStatus": {
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/RecordStatus"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "reason"
+        ],
+        "title": "AgentRecordStatus"
       },
       "AgentSource": {
         "type": "string",
@@ -6355,6 +6602,16 @@
               }
             ]
           },
+          "record_source": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RecordSource"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "agent_speaks_first": {
             "type": "boolean",
             "title": "Agent Speaks First"
@@ -6416,6 +6673,7 @@
           "agent_number",
           "outbound",
           "endpoint",
+          "record_source",
           "agent_speaks_first",
           "languages",
           "brief",
@@ -6489,6 +6747,16 @@
             "anyOf": [
               {
                 "$ref": "#/components/schemas/Endpoint"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "record_source": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RecordSource"
               },
               {
                 "type": "null"
@@ -7426,6 +7694,16 @@
               }
             ],
             "title": "Retried As"
+          },
+          "agent_record": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentRecordStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -7480,7 +7758,8 @@
           "replies",
           "wire_events",
           "validity",
-          "retried_as"
+          "retried_as",
+          "agent_record"
         ],
         "title": "ConversationRead"
       },
@@ -11186,6 +11465,16 @@
               }
             ]
           },
+          "record_source": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RecordSource"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "agent_speaks_first": {
             "type": "boolean",
             "title": "Agent Speaks First",
@@ -11342,6 +11631,164 @@
           "labeled"
         ],
         "title": "QueuedReview"
+      },
+      "RecordProvider": {
+        "type": "string",
+        "enum": [
+          "plivo_cx"
+        ],
+        "title": "RecordProvider"
+      },
+      "RecordSource": {
+        "properties": {
+          "url": {
+            "type": "string",
+            "maxLength": 2083,
+            "minLength": 1,
+            "format": "uri",
+            "title": "Url"
+          },
+          "headers": {
+            "items": {
+              "$ref": "#/components/schemas/Header"
+            },
+            "type": "array",
+            "maxItems": 30,
+            "title": "Headers"
+          },
+          "provider": {
+            "$ref": "#/components/schemas/RecordProvider"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "url",
+          "provider"
+        ],
+        "title": "RecordSource",
+        "description": "The agent's address in its provider's API, with the headers that read it."
+      },
+      "RecordStatus": {
+        "type": "string",
+        "enum": [
+          "waiting",
+          "found",
+          "missing"
+        ],
+        "title": "RecordStatus",
+        "description": "Where a call's agent record is, as the console shows it."
+      },
+      "RecordToolRead": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "arguments": {
+            "type": "string",
+            "title": "Arguments"
+          },
+          "output": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Output"
+          },
+          "failed": {
+            "type": "boolean",
+            "title": "Failed",
+            "default": false
+          },
+          "at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "At"
+          },
+          "at_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "At Ms"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "arguments",
+          "at_ms"
+        ],
+        "title": "RecordToolRead"
+      },
+      "RecordTurnRead": {
+        "properties": {
+          "role": {
+            "$ref": "#/components/schemas/Role"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "At"
+          },
+          "at_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "At Ms"
+          },
+          "turn": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turn"
+          }
+        },
+        "type": "object",
+        "required": [
+          "role",
+          "text",
+          "at_ms",
+          "turn"
+        ],
+        "title": "RecordTurnRead"
       },
       "Reply": {
         "properties": {
@@ -12694,6 +13141,16 @@
             },
             "type": "array",
             "title": "Judge Versions"
+          },
+          "agent_record": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentRecordCounts"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -12716,10 +13173,29 @@
           "decided_by",
           "errors",
           "callers",
-          "judge_versions"
+          "judge_versions",
+          "agent_record"
         ],
         "title": "RunVerdicts",
         "description": "The run's verdict numbers over its judged calls: completed calls that no one stopped,\nwhose evaluation gave a verdict or failed."
+      },
+      "SavedValue": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "value": {
+            "type": "string",
+            "title": "Value"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "value"
+        ],
+        "title": "SavedValue"
       },
       "ScenarioConfig": {
         "properties": {

@@ -13,6 +13,10 @@ class Timings:
     """A worker not seen for this long has stopped, and its conversations are reaped."""
     evaluator_poll_s: float = 2.0
     evaluator_lease_s: float = 60
+    record_poll_s: float = 15.0
+    """How often an evaluation asks again for an agent record that is not final."""
+    record_wait_s: float = 300.0
+    """How long after a call its agent record can take to be final."""
     end_timeout_s: float = 5.0
     """How long a stopping call, server or database pool gets to end on its own."""
 

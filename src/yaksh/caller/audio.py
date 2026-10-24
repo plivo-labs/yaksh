@@ -6,6 +6,7 @@ import time
 import wave
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 
 import audioop
@@ -36,6 +37,8 @@ MACHINE = "yaksh.machine"
 class Clock:
     def __init__(self) -> None:
         self._started = time.monotonic()
+        self.started_at = datetime.now(UTC)
+        """The wall time when the clock read 0."""
 
     def ms(self) -> int:
         return int((time.monotonic() - self._started) * 1000)

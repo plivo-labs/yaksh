@@ -11,7 +11,7 @@ from yaksh.domain.rules import LlmRule
 from yaksh.evaluation.evidence import with_item
 from yaksh.evaluation.judging import Answered, Check, ItemResult, JudgeSpec, ask, prompt
 from yaksh.evaluation.limit import Slots
-from yaksh.evaluation.quotes import absence_problems, quote_problems
+from yaksh.evaluation.quotes import absence_problems, quote_problems, record_quote_problems
 from yaksh.evaluation.verdicts import RULE
 
 NULLABLE_TURNS = {
@@ -25,6 +25,15 @@ NULLABLE_TURNS = {
         },
     ]
 }
+RECORD_EVIDENCE = {
+    "type": "array",
+    "items": {
+        "type": "object",
+        "properties": {"line": {"type": "integer"}, "quote": {"type": "string"}},
+        "required": ["line", "quote"],
+        "additionalProperties": False,
+    },
+}
 ANSWER_PROPERTIES: dict[str, Any] = {
     "evidence": {
         "type": "array",
@@ -35,6 +44,7 @@ ANSWER_PROPERTIES: dict[str, Any] = {
             "additionalProperties": False,
         },
     },
+    "record_evidence": RECORD_EVIDENCE,
     "absence": {"type": "boolean"},
     "absence_turns": NULLABLE_TURNS,
     "reasoning": {"type": "string"},
@@ -60,12 +70,14 @@ AGENT_RULE = JudgeSpec(
 )
 
 
-def answer_problems(turns: Sequence[Turn]) -> Check:
+def answer_problems(turns: Sequence[Turn], record_lines: Sequence[str]) -> Check:
     def check(answer: dict[str, Any]) -> tuple[list[str], list[str]]:
         hard = quote_problems(answer["evidence"], turns, tools=True)
+        hard += record_quote_problems(answer["record_evidence"], record_lines)
+        quoted = answer["evidence"] or answer["record_evidence"]
         if answer["verdict"] == "unsure" and answer["kind"] is None:
             hard.append("An unsure verdict needs a kind.")
-        if answer["verdict"] == "fail" and not answer["evidence"] and not answer["absence"]:
+        if answer["verdict"] == "fail" and not quoted and not answer["absence"]:
             hard.append("A fail needs quotes, or an absence claim with absence_turns.")
         absent_hard, soft = absence_problems(answer, len(turns))
         return hard + absent_hard, soft
@@ -106,6 +118,7 @@ async def judge_criterion(
     number: int,
     criterion: str,
     *,
+    record_lines: Sequence[str],
     slots: Slots,
     retry_later: bool,
 ) -> ItemResult:
@@ -113,7 +126,7 @@ async def judge_criterion(
         model,
         CRITERION,
         with_item(view, f"Criterion: {criterion}"),
-        answer_problems(turns),
+        answer_problems(turns, record_lines),
         slots=slots,
         retry_later=retry_later,
     )
@@ -138,6 +151,7 @@ async def judge_rule(
     turns: Sequence[Turn],
     rule: LlmRule,
     *,
+    record_lines: Sequence[str],
     slots: Slots,
     retry_later: bool,
 ) -> ItemResult:
@@ -145,7 +159,7 @@ async def judge_rule(
         model,
         AGENT_RULE,
         with_item(view, rule_text(rule)),
-        answer_problems(turns),
+        answer_problems(turns, record_lines),
         slots=slots,
         retry_later=retry_later,
     )

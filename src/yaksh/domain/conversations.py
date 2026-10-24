@@ -346,6 +346,11 @@ class CallOutcome(BaseModel):
     caller_voice: bytes | None = Field(default=None, repr=False)
     """Each caller reply's own audio, back to back, as a mono WAV."""
     call_uuid: str | None = None
+    trigger_response: str | None = None
+    """The body of the outbound agent's trigger response, secrets masked: where a provider
+    names the call it started."""
+    clock_started_at: datetime | None = None
+    """A phone call that connected: the wall time when the call's clock read 0."""
 
 
 def audio_key(conversation_id: uuid.UUID, file_name: str) -> str:

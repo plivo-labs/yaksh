@@ -24,6 +24,7 @@ from sqlalchemy.dialects.postgresql import ARRAY, JSONB, UUID
 from sqlalchemy.orm import Mapped, MappedColumn, mapped_column
 
 from yaksh.db.base import Base
+from yaksh.domain.agent_records import RecordState
 from yaksh.domain.agents import AgentSource, Direction, Transport
 from yaksh.domain.answering import AnsweredBy
 from yaksh.domain.conversations import Channel, ConversationStatus, EndReason
@@ -40,6 +41,7 @@ from yaksh.domain.evaluations import (
 )
 from yaksh.domain.generation import GenerationMode, GenerationStatus
 from yaksh.domain.languages import AgentLanguage, Language
+from yaksh.domain.record_sources import RecordProvider
 from yaksh.domain.scenarios import Category
 from yaksh.domain.voices import VoiceGender, VoiceProvider
 
@@ -63,6 +65,7 @@ class Agent(Base):
     agent_number: Mapped[str | None] = mapped_column(Text)
     outbound: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     endpoint: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    record_source: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     agent_speaks_first: Mapped[bool] = mapped_column(Boolean, default=True)
     languages: Mapped[list[AgentLanguage]] = mapped_column(
         ARRAY(pg_enum(AgentLanguage, "agent_language"))
@@ -189,6 +192,11 @@ class Conversation(Base):
     """Outbound only: the time until which a call from the agent is accepted."""
     agent_caller_id: Mapped[str | None] = mapped_column(Text)
     """Outbound only: the number the agent called from."""
+    trigger_response: Mapped[str | None] = mapped_column(Text)
+    """Outbound only: the body of the trigger's response, secrets masked."""
+    clock_started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    """A phone call that connected: the wall time when the call's clock read 0. The turns and
+    wire events count from it; started_at is earlier, when a worker claimed the call."""
     max_duration_s: Mapped[int] = mapped_column(Integer)
     max_turns: Mapped[int] = mapped_column(Integer)
     surroundings: Mapped[dict[str, Any]] = mapped_column(JSONB)
@@ -278,6 +286,23 @@ class RefusedCall(Base):
     conversation_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("conversations.id"))
     """The conversation that held the number, when one did."""
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class AgentRecordRow(Base):
+    """The agent's own record of a phone test, read from its provider once, before the call is
+    judged; or why there is none."""
+
+    __tablename__ = "agent_records"
+
+    conversation_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("conversations.id"), primary_key=True
+    )
+    state: Mapped[RecordState] = mapped_column(pg_enum(RecordState, "record_state"))
+    provider: Mapped[RecordProvider] = mapped_column(pg_enum(RecordProvider, "record_provider"))
+    external_id: Mapped[str | None] = mapped_column(Text)
+    record: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    reason: Mapped[str | None] = mapped_column(Text)
+    fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 class Evaluation(Base):

@@ -7,6 +7,12 @@ import { Explained, OutcomeIcon, VerdictPill } from "@/components/verdict-ui";
 import { percent } from "@/lib/format";
 import { useConversationEvaluation } from "@/lib/queries";
 import {
+  checkedValues,
+  passedChecks,
+  type HeardValueResult,
+  type SavedValueResult,
+} from "@/lib/record-checks";
+import {
   DECIDED_BY_TEXT,
   ERROR_TEXT,
   type EvaluationItem,
@@ -26,6 +32,7 @@ export type OnTurn = (turn: number) => void;
 const GROUPS: { title: string; matches: (key: string) => boolean }[] = [
   { title: "Criteria", matches: (key) => key.startsWith("criterion-") },
   { title: "Agent rules", matches: (key) => key.startsWith("rule-") },
+  { title: "Agent record", matches: (key) => key === "saved_data" || key === "heard" },
   {
     title: "Reports",
     matches: (key) => key === "instructions" || key === "hallucination" || key === "caller_check",
@@ -79,9 +86,7 @@ export function CallResults({
     );
   }
   const counted = data.items.filter(
-    (item) =>
-      item.item_key.startsWith("criterion-") ||
-      (item.item_key.startsWith("rule-") && item.role === "deciding"),
+    (item) => item.item_key.startsWith("criterion-") || item.role === "deciding",
   );
   return (
     <div className="grid gap-5">
@@ -194,7 +199,7 @@ const VERDICT_KINDS = {
   },
   conversation: {
     label: "With agent rules",
-    hint: "The scenario's criteria plus the agent rules set to count in the conversation's verdict. Rules that only report do not change it.",
+    hint: "The scenario's criteria, the agent rules set to count in the conversation's verdict, and the check of the data the agent saved. Rules and checks that only report do not change it.",
   },
 } as const;
 
@@ -272,6 +277,25 @@ function summary(item: EvaluationItem): string {
     return found === 0
       ? "Nothing the agent said contradicts the documents"
       : `${found} ${found === 1 ? "statement contradicts" : "statements contradict"} the documents`;
+  }
+  const saved = item.item_key === "saved_data" ? checkedValues<SavedValueResult>(item) : null;
+  if (saved) {
+    const count = (result: string) => saved.filter((value) => value.result === result).length;
+    return [
+      count("matches") && `${count("matches")} match`,
+      count("contradicts") && `${count("contradicts")} do not match`,
+      count("not_checkable") && `${count("not_checkable")} not checkable`,
+    ]
+      .filter(Boolean)
+      .join(", ");
+  }
+  const heard = item.item_key === "heard" ? checkedValues<HeardValueResult>(item) : null;
+  if (heard) {
+    const wrong = heard.filter((value) => value.result !== "same").length;
+    if (heard.length === 0) return "No values to compare · reports only";
+    return wrong === 0
+      ? "Every value heard as said · reports only"
+      : `${wrong} of ${heard.length} values misheard · reports only`;
   }
   if (item.item_key === "caller_check" && typeof answer.blame_risk === "string") {
     return BLAME_TEXT[answer.blame_risk] ?? answer.blame_risk;
@@ -396,8 +420,9 @@ function ItemDetails({
   const facts = [
     `Decided by ${decidedBy(item).toLowerCase().replace("jev", "Jev")}`,
     item.role === "deciding" &&
-      item.item_key.startsWith("rule-") &&
+      !item.item_key.startsWith("criterion-") &&
       "counts in the conversation's verdict",
+    item.item_key === "heard" && "reports only, does not change a verdict",
     outcome === "unsure" && kind && UNSURE_TEXT[kind],
     !machineOnly &&
       outcome !== item.machine_outcome &&
@@ -409,7 +434,7 @@ function ItemDetails({
       {item.error_reason && (
         <Callout tone="danger">{ERROR_TEXT[item.error_reason] ?? item.error_reason}</Callout>
       )}
-      {item.answer && <Answer itemKey={item.item_key} answer={item.answer} onTurn={onTurn} />}
+      {item.answer && <Answer item={item} onTurn={onTurn} />}
       <p className="text-xs-400 text-muted-foreground">{facts.join(" · ")}</p>
     </div>
   );
@@ -430,18 +455,43 @@ function Callout({ tone, children }: { tone: "warn" | "danger"; children: ReactN
 
 /** The judge's answer: quotes that take you to their turn, and its reasoning. Each judge has
  * its own answer shape. */
-function Answer({
-  itemKey,
-  answer,
-  onTurn,
-}: {
-  itemKey: string;
-  answer: Record<string, unknown>;
-  onTurn?: OnTurn;
-}) {
+function Answer({ item, onTurn }: { item: EvaluationItem; onTurn?: OnTurn }) {
+  const itemKey = item.item_key;
+  const answer = item.answer ?? {};
+  const reasoning = typeof answer.reasoning === "string" && answer.reasoning && (
+    <p key="reasoning" className="text-xs-400 whitespace-pre-wrap text-muted-foreground">
+      {answer.reasoning}
+    </p>
+  );
+  if (!passedChecks(item)) return reasoning || null;
   const parts: ReactNode[] = [];
   const evidence = answer.evidence as Quote[] | undefined;
   if (evidence?.length) parts.push(<Quotes key="evidence" quotes={evidence} onTurn={onTurn} />);
+  const recorded = answer.record_evidence as { line: number; quote: string }[] | undefined;
+  if (recorded?.length) {
+    parts.push(
+      <ul key="record-evidence" className="grid gap-1">
+        {recorded.map((quote, index) => (
+          <li key={index} className="flex items-start gap-2 text-xs-400">
+            <span className="shrink-0 rounded-sm bg-muted px-1.5 font-mono text-xs-400 text-muted-foreground">
+              Record
+            </span>
+            <q className="min-w-0 font-mono wrap-anywhere">{quote.quote}</q>
+          </li>
+        ))}
+      </ul>,
+    );
+  }
+  if (itemKey === "saved_data") {
+    for (const value of checkedValues<SavedValueResult>(item) ?? []) {
+      parts.push(<SavedValueRow key={`saved-${value.name}`} value={value} onTurn={onTurn} />);
+    }
+  }
+  if (itemKey === "heard") {
+    for (const value of checkedValues<HeardValueResult>(item) ?? []) {
+      parts.push(<HeardRow key={`heard-${value.value}`} value={value} onTurn={onTurn} />);
+    }
+  }
   const absence = answer.absence_turns as { first: number; last: number } | null | undefined;
   if (answer.absence && absence) {
     parts.push(
@@ -523,15 +573,67 @@ function Answer({
       </p>,
     );
   }
-  const reasoning = typeof answer.reasoning === "string" ? answer.reasoning : null;
-  if (reasoning) {
-    parts.push(
-      <p key="reasoning" className="text-xs-400 whitespace-pre-wrap text-muted-foreground">
-        {reasoning}
-      </p>,
-    );
-  }
+  if (reasoning) parts.push(reasoning);
   return <div className="grid gap-2">{parts}</div>;
+}
+
+const SAVED_OUTCOME: Record<SavedValueResult["result"], Outcome> = {
+  matches: "pass",
+  contradicts: "fail",
+  not_checkable: "not_applicable",
+};
+
+const SAVED_TEXT: Record<SavedValueResult["result"], string> = {
+  matches: "Matches",
+  contradicts: "Does not match",
+  not_checkable: "Not checkable",
+};
+
+function SavedValueRow({ value, onTurn }: { value: SavedValueResult; onTurn?: OnTurn }) {
+  return (
+    <div className="grid gap-1.5 rounded-md border px-2.5 py-2">
+      <span className="flex flex-wrap items-center gap-1.5 text-xs-500">
+        <OutcomeIcon outcome={SAVED_OUTCOME[value.result]} className="size-3.5" decorative />
+        <span className="font-mono">{value.name}</span>
+        <span className="font-normal text-muted-foreground">{SAVED_TEXT[value.result]}</span>
+      </span>
+      {value.evidence.length > 0 && <Quotes quotes={value.evidence} onTurn={onTurn} />}
+      {value.reasoning && <p className="text-xs-400 text-muted-foreground">{value.reasoning}</p>}
+    </div>
+  );
+}
+
+function HeardRow({ value, onTurn }: { value: HeardValueResult; onTurn?: OnTurn }) {
+  return (
+    <div className="grid gap-1.5 rounded-md border px-2.5 py-2 text-xs-400">
+      <span className="flex items-center gap-1.5 text-xs-500">
+        <OutcomeIcon
+          outcome={value.result === "same" ? "pass" : "fail"}
+          className="size-3.5"
+          decorative
+        />
+        {value.value}
+        <span className="font-normal text-muted-foreground">
+          {value.result === "same"
+            ? "Heard as said"
+            : value.result === "different"
+              ? "Misheard"
+              : "Not heard"}
+        </span>
+      </span>
+      <span className="grid grid-cols-[3.5rem_minmax(0,1fr)] items-start gap-x-2 gap-y-1">
+        <span className="text-muted-foreground">Said</span>
+        <span className="flex items-start gap-2">
+          <TurnChip turn={value.said.turn} onTurn={onTurn} />
+          <q className="min-w-0 wrap-anywhere">{value.said.quote}</q>
+        </span>
+        <span className="text-muted-foreground">Heard</span>
+        <span className="min-w-0 wrap-anywhere">
+          {value.heard ? <q>{value.heard.quote}</q> : "Nothing"}
+        </span>
+      </span>
+    </div>
+  );
 }
 
 function Quotes({ quotes, onTurn }: { quotes: Quote[]; onTurn?: OnTurn }) {

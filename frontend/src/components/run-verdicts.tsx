@@ -9,6 +9,7 @@ import { Explained, Meter, OutcomeCounts, OutcomeIcon, Stat } from "@/components
 import { ANSWERS } from "@/lib/answering";
 import { counted, percent } from "@/lib/format";
 import { useJudgeAgreement, useRunMetrics } from "@/lib/queries";
+import { RECORD_PROVIDERS } from "@/lib/record-providers";
 import { ROLE_TEXT } from "@/lib/rules";
 import {
   CATEGORY_LABELS,
@@ -54,6 +55,7 @@ export function RunVerdictsPanel({
           {scored && <ScenarioList verdicts={verdicts} />}
           {verdicts.unplayed.length > 0 && <UnplayedList calls={verdicts.unplayed} />}
           {verdicts.rules.length > 0 && <RuleList rules={verdicts.rules} agentId={agentId} />}
+          {verdicts.agent_record && <AgentRecordList record={verdicts.agent_record} />}
           <HowJudged verdicts={verdicts} agreement={agreement.data} />
         </>
       ) : (
@@ -453,6 +455,64 @@ function CriterionRow({ criterion }: { criterion: Criterion }) {
 }
 
 /** The agent's rules over the run's judged calls. */
+function AgentRecordList({ record }: { record: NonNullable<RunVerdicts["agent_record"]> }) {
+  const checks = [
+    {
+      name: "Data the agent saved",
+      role: "Counts in the conversation's verdict",
+      counts: record.saved_data,
+    },
+    { name: "What the agent heard", role: "Reports only", counts: record.heard },
+  ];
+  return (
+    <section aria-label="Agent record" className="border-t">
+      <div className="flex flex-wrap items-baseline justify-between gap-3 px-5 pt-4 pb-2">
+        <h3 className="text-s-500">Agent record</h3>
+        <span className="text-xs-400 text-muted-foreground">
+          Found for {record.found} of {counted(record.calls, "conversation", "conversations")}, from{" "}
+          {RECORD_PROVIDERS[record.provider].label}
+        </span>
+      </div>
+      <ul className="divide-y border-t">
+        {checks.map((check) => (
+          <li
+            key={check.name}
+            className="grid grid-cols-[minmax(0,1fr)_6rem_3rem] items-center gap-x-3 px-5 py-2.5"
+          >
+            <span className="grid min-w-0 gap-0.5">
+              <span className="truncate text-s-500">{check.name}</span>
+              <span className="text-xs-400 text-muted-foreground">{check.role}</span>
+            </span>
+            <OutcomeCounts counts={check.counts} label={check.name} />
+          </li>
+        ))}
+        {record.missing.length > 0 && (
+          <li className="flex flex-wrap items-center gap-x-3 gap-y-1 px-5 py-2.5">
+            <span className="grid min-w-0 flex-1 gap-0.5">
+              <span className="text-s-500">No record</span>
+              <span className="text-xs-400 text-muted-foreground">
+                The checks did not run on{" "}
+                {counted(record.missing.length, "conversation", "conversations")}.
+              </span>
+            </span>
+            <span className="flex flex-wrap gap-2 text-xs-500">
+              {record.missing.map((id, index) => (
+                <Link
+                  key={id}
+                  to={`/conversations/${id}`}
+                  className="underline underline-offset-4 hover:text-foreground"
+                >
+                  Open {index + 1}
+                </Link>
+              ))}
+            </span>
+          </li>
+        )}
+      </ul>
+    </section>
+  );
+}
+
 function RuleList({ rules, agentId }: { rules: RunVerdicts["rules"]; agentId: string }) {
   return (
     <section aria-label="Agent rules" className="border-t">

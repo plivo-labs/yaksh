@@ -21,6 +21,7 @@ from yaksh.domain.triggers import SEND_TIMEOUT_S, RenderedTrigger, TriggerMethod
 
 TIMEOUT = aiohttp.ClientTimeout(total=SEND_TIMEOUT_S, sock_connect=5)
 EXCERPT_CHARS = 500
+BODY_CHARS = 16 * 1024
 READ_LIMIT = 64 * 1024
 
 
@@ -40,6 +41,8 @@ class TriggerOutcome:
     result: TriggerResult
     detail: str
     """The status and the start of the response body, secrets masked; or what went wrong."""
+    body: str | None = None
+    """The response body, secrets masked, up to BODY_CHARS; None when it was not read."""
 
 
 EMBEDS_IPV4 = (
@@ -168,8 +171,10 @@ async def send_trigger(
         if status is None:
             return TriggerOutcome(TriggerResult.UNKNOWN, failure)
         return TriggerOutcome(result_of(status), f"HTTP {status}, body not read: {failure}")
-    detail = f"HTTP {status}: {mask(text, request.secrets)[:EXCERPT_CHARS]}"
-    return TriggerOutcome(result_of(status), detail)
+    body = mask(text.replace("\x00", ""), request.secrets)
+    return TriggerOutcome(
+        result_of(status), f"HTTP {status}: {body[:EXCERPT_CHARS]}", body[:BODY_CHARS]
+    )
 
 
 def guarded_session(

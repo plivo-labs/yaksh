@@ -20,6 +20,7 @@ import { usePageParam } from "@/hooks/use-page-param";
 import { copyText } from "@/lib/clipboard";
 import { phone, reach, textSize, when } from "@/lib/format";
 import { RUNS_PAGE, useAgent, useLastCall, useRuns } from "@/lib/queries";
+import { RECORD_PROVIDERS } from "@/lib/record-providers";
 import { CONVERSATION_TONE } from "@/lib/status";
 import {
   ACTIVE_STATUSES,
@@ -301,6 +302,13 @@ function Settings({ agent, edit }: { agent: Agent; edit: ReactNode }) {
             <span className="break-all">{endpoint.url}</span>
           </Fact>
         )}
+        {agent.record_source && (
+          <Fact label="Agent record" wrap className="col-span-full">
+            <span className="break-all">
+              {RECORD_PROVIDERS[agent.record_source.provider].label}, {agent.record_source.url}
+            </span>
+          </Fact>
+        )}
         <Fact label="Source">{SOURCE_NAMES[agent.source]}</Fact>
         <Fact label="External id" wrap>
           {agent.external_id ?? none}
@@ -322,6 +330,13 @@ function Settings({ agent, edit }: { agent: Agent; edit: ReactNode }) {
             {agent.agent_speaks_first ? "Agent speaks first" : "Caller speaks first"}
           </Fact>
           {outbound && <OutboundFacts outbound={outbound} />}
+          {agent.record_source && (
+            <Fact label="Record headers" wrap>
+              {agent.record_source.headers.length > 0
+                ? agent.record_source.headers.map((header) => header.name).join(", ")
+                : none}
+            </Fact>
+          )}
           {endpoint && (
             <Fact label="Text headers" wrap>
               {endpoint.headers.length > 0

@@ -17,6 +17,7 @@ from pydantic import (
 from yaksh.domain.documents import DocumentName
 from yaksh.domain.languages import AgentLanguage
 from yaksh.domain.numbers import E164
+from yaksh.domain.record_sources import RecordSource
 from yaksh.domain.rules import AgentRules
 from yaksh.domain.triggers import Endpoint, OutboundConfig, placeholders
 
@@ -132,6 +133,8 @@ class AgentConfig(BaseModel):
     """The phone connection of an outbound agent."""
     endpoint: Endpoint | None = None
     """Where Yaksh sends each turn: the text connection."""
+    record_source: RecordSource | None = None
+    """Where Yaksh reads the agent's own record of each phone test."""
     agent_speaks_first: bool = True
     languages: AgentLanguages = [AgentLanguage.EN_US]
     brief: Brief
@@ -202,6 +205,7 @@ class AgentUpdate(BaseModel):
     agent_number: E164 | None = None
     outbound: OutboundConfig | None = None
     endpoint: Endpoint | None = None
+    record_source: RecordSource | None = None
     agent_speaks_first: bool | None = None
     languages: AgentLanguages | None = None
     brief: Brief | None = None
