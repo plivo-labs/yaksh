@@ -1,5 +1,8 @@
 """A run's verdict numbers, read from its judged calls: the completed calls that no one
-stopped, among the run's counted conversations, whose evaluation gave a verdict or failed."""
+stopped, among the run's counted conversations, whose evaluation gave a verdict or failed.
+The scenario numbers count only the calls where the persona talked; a call that only its
+voicemail or call screener answered counts for the agent rules alone, and its verdict with agent
+rules is listed apart."""
 
 import uuid
 from collections import Counter, defaultdict
@@ -15,9 +18,11 @@ from yaksh.db.models import (
     EvaluationItem,
     JudgeVersion,
     Persona,
+    PersonaVersion,
     Scenario,
     ScenarioVersion,
 )
+from yaksh.domain.answering import Answering, plays_scenario
 from yaksh.domain.conversations import ConversationStatus, EndReason
 from yaksh.domain.evaluations import (
     CallerFidelity,
@@ -29,6 +34,7 @@ from yaksh.domain.evaluations import (
     RuleCounts,
     RunVerdicts,
     ScenarioVerdicts,
+    UnplayedCallVerdict,
     UnsureKind,
 )
 from yaksh.evaluation import numbers
@@ -52,7 +58,9 @@ async def run_verdicts(
                 Conversation.scenario_id,
                 Conversation.persona_id,
                 Conversation.data_set_id,
+                Conversation.answered_by,
                 Conversation.repeat,
+                PersonaVersion.config["answering"].label("answering"),
                 ScenarioVersion.config["criteria"].label("criteria"),
                 Scenario.name,
                 Scenario.category,
@@ -60,23 +68,31 @@ async def run_verdicts(
                 Evaluation.id.label("evaluation_id"),
                 Evaluation.state,
                 Evaluation.effective_scenario_verdict.label("verdict"),
+                Evaluation.effective_conversation_verdict.label("with_rules"),
             )
             .join(Scenario, Scenario.id == Conversation.scenario_id)
             .join(ScenarioVersion, ScenarioVersion.id == Conversation.scenario_version_id)
             .join(Persona, Persona.id == Conversation.persona_id)
+            .join(PersonaVersion, PersonaVersion.id == Conversation.persona_version_id)
             .outerjoin(Evaluation, Evaluation.conversation_id == Conversation.id)
             .where(
                 Conversation.id.in_(set(conversation_ids)),
                 Conversation.status == ConversationStatus.COMPLETED,
                 Conversation.end_reason.is_distinct_from(EndReason.USER_REQUEST),
             )
-            .order_by(Conversation.repeat, Conversation.created_at)
+            .order_by(Conversation.repeat, Conversation.created_at, Conversation.id)
         )
     ).all()
     finished = [row for row in rows if row.state in FINISHED]
     judged = [
         row for row in finished if row.state is EvaluationState.FAILED or row.verdict is not None
     ]
+    played_ids = {
+        row.conversation_id
+        for row in rows
+        if plays_scenario(row.answered_by, Answering.model_validate(row.answering or {}))
+    }
+    played_judged = [row for row in judged if row.conversation_id in played_ids]
     items = (
         await session.execute(
             select(
@@ -95,8 +111,12 @@ async def run_verdicts(
         )
     ).all()
     position = {scenario: index for index, scenario in enumerate(scenario_order)}
+
+    def in_order(found: Sequence[Row[Any]]) -> list[Row[Any]]:
+        return sorted(found, key=lambda row: position.get(row.scenario_id, len(position)))
+
     grouped: dict[uuid.UUID, list[Row[Any]]] = defaultdict(list)
-    for row in sorted(judged, key=lambda row: position.get(row.scenario_id, len(position))):
+    for row in in_order(played_judged):
         grouped[row.scenario_id].append(row)
     scenarios, results = [], []
     for calls in grouped.values():
@@ -123,13 +143,15 @@ async def run_verdicts(
         results.append(result)
     worst_best = numbers.worst_and_best(results)
     interval = numbers.suite_interval(results, seed)
-    # Repeats compare only when the same persona called with the same data set: each scenario,
-    # persona and data set is one group for pass^2 and for the scenarios that both passed and
-    # failed.
-    pairs: dict[tuple[uuid.UUID, uuid.UUID, uuid.UUID], list[Row[Any]]] = defaultdict(list)
+    # Repeats compare only when the same persona called with the same data set and the same
+    # answer: each scenario, persona, data set and answer is one group for pass^2 and for the
+    # scenarios that both passed and failed.
+    pairs: dict[tuple[uuid.UUID, uuid.UUID, uuid.UUID, str], list[Row[Any]]] = defaultdict(list)
     for calls in grouped.values():
         for call in calls:
-            pairs[(call.scenario_id, call.persona_id, call.data_set_id)].append(call)
+            pairs[(call.scenario_id, call.persona_id, call.data_set_id, call.answered_by)].append(
+                call
+            )
     pair_results = [
         numbers.ScenarioResults([call.verdict for call in calls]) for calls in pairs.values()
     ]
@@ -147,10 +169,24 @@ async def run_verdicts(
         pass_hat_2=pass_hat,
         pass_hat_2_scenarios=pass_hat_scenarios,
         scenarios=scenarios,
+        unplayed=[
+            UnplayedCallVerdict(
+                conversation_id=row.conversation_id,
+                scenario_id=row.scenario_id,
+                scenario=row.name,
+                repeat=row.repeat,
+                persona_id=row.persona_id,
+                persona=row.persona,
+                answered_by=row.answered_by,
+                verdict=row.with_rules,
+            )
+            for row in in_order(judged)
+            if row.conversation_id not in played_ids
+        ],
         inconsistent=list(
             dict.fromkeys(list(pairs)[index][0] for index in numbers.inconsistent(pair_results))
         ),
-        criteria=criterion_counts(list(grouped), judged, items),
+        criteria=criterion_counts(list(grouped), played_judged, items),
         rules=rule_counts(items),
         decided_by=dict(
             Counter(
@@ -158,7 +194,7 @@ async def run_verdicts(
             )
         ),
         errors=sum(item.machine_outcome is Outcome.ERROR for item in decided),
-        callers=caller_fidelity(judged, items),
+        callers=caller_fidelity(played_judged, items),
         judge_versions=await versions_used(session, items),
     )
 

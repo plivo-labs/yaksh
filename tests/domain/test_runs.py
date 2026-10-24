@@ -19,6 +19,8 @@ FAILED = {
     EndReason.NO_CALL: OutcomeGroup.DID_NOT_CONNECT,
     EndReason.TURN_LIMIT: OutcomeGroup.ERROR,
     EndReason.START_REFUSED: OutcomeGroup.DID_NOT_CONNECT,
+    EndReason.VOICEMAIL_ENDED: OutcomeGroup.ERROR,
+    EndReason.SCREENER_ENDED: OutcomeGroup.ERROR,
 }
 """A failed conversation's group by end reason. Every end reason is listed, so a new one fails
 the test below until it is given a group."""

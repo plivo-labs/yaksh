@@ -10,21 +10,24 @@ import {
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { ruleProblems } from "@/lib/rules";
+import { SCOPE_TEXT, ruleProblems } from "@/lib/rules";
 import type { AgentRule, LlmRule, PhraseRule } from "@/lib/types";
 
 /** One rule's fields. The kind is chosen when the rule is added and does not change.
  * `multilingual` is an agent that serves more than one language, where a phrase must match in
- * each of them. */
+ * each of them. Only an `outbound` agent's calls can be answered by a voicemail or a call
+ * screener, so only its rules choose the answers they check. */
 export function RuleFields({
   rule,
   submitted,
   multilingual,
+  outbound,
   onChange,
 }: {
   rule: AgentRule;
   submitted: boolean;
   multilingual: boolean;
+  outbound: boolean;
   onChange: (rule: AgentRule) => void;
 }) {
   const problems = submitted ? ruleProblems(rule) : {};
@@ -48,6 +51,23 @@ export function RuleFields({
           multilingual={multilingual}
           onChange={onChange}
         />
+      )}
+      {outbound && (
+        <div className="grid gap-1.5">
+          <Segmented
+            label="Answered by"
+            value={rule.answered_by}
+            options={(["caller", "voicemail", "screener", "any"] as const).map((value) => ({
+              value,
+              label: value === "any" ? "Any" : SCOPE_TEXT[value],
+            }))}
+            onChange={(answered_by) => onChange({ ...rule, answered_by })}
+          />
+          <p className="text-xs-400 text-muted-foreground">
+            The rule checks only the calls with this answer. A screened call also counts for what
+            answers after the screener.
+          </p>
+        </div>
       )}
       <Field orientation="horizontal" className="rounded-md border bg-muted/40 px-3.5 py-3">
         <FieldContent>

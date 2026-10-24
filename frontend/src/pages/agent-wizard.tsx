@@ -297,6 +297,7 @@ export function AgentWizardPage() {
               edit={ruleEdit}
               locked={saving}
               multilingual={servedLanguages(form.draft.languages).size > 1}
+              outbound={form.draft.direction === "outbound"}
               onEdit={(edit) => {
                 setRuleDraft(null);
                 setParam("rule", edit === null ? null : String(edit.index ?? edit.rule.kind));

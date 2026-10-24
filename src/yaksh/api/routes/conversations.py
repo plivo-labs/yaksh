@@ -22,6 +22,7 @@ from yaksh.api.schemas.conversations import (
     TurnRead,
 )
 from yaksh.db.models import Conversation
+from yaksh.domain.answering import AnsweredBy
 from yaksh.domain.conversations import (
     ACTIVE_STATUSES,
     LIVE_STATUSES,
@@ -123,6 +124,9 @@ async def detail(session: AsyncSession, conversation: Conversation) -> Conversat
     return ConversationRead(
         **base.model_dump(),
         instructions=conversation.instructions,
+        answering=None
+        if conversation.answered_by is AnsweredBy.CALLER
+        else await conversations.persona_answering(session, conversation),
         sounds=SoundRead.all_of(conversation.sound_plan),
         scenario=await conversations.played_scenario(session, conversation),
         transcript=turns_with_replies(transcript, latency),
@@ -147,6 +151,7 @@ async def list_conversations(
     latest_attempts: Annotated[
         bool, Query(description="true leaves out the attempts that a retry replaced")
     ] = False,
+    answered_by: AnsweredBy | None = None,
     q: Annotated[str | None, Query(max_length=200)] = None,
     sort: Annotated[str, Query(pattern=SORT_PATTERN)] = "-created_at",
 ) -> Page[ConversationSummary]:
@@ -159,6 +164,7 @@ async def list_conversations(
         status=status,
         groups=group or (),
         latest_attempts=latest_attempts,
+        answered_by=answered_by,
         search=q,
         sort=sort,
     )

@@ -7,6 +7,14 @@ export const ROLE_TEXT: Record<AgentRule["role"], string> = {
   reporting: "Reports only",
 };
 
+/** Which calls a rule checks, by who answered them. */
+export const SCOPE_TEXT: Record<AgentRule["answered_by"], string> = {
+  caller: "The caller",
+  voicemail: "Voicemail",
+  screener: "Call screener",
+  any: "Any answer",
+};
+
 export const NEW_LLM: LlmRule = {
   kind: "llm",
   key: "",
@@ -17,6 +25,7 @@ export const NEW_LLM: LlmRule = {
   fail_when: "",
   not_a_failure: null,
   role: "reporting",
+  answered_by: "caller",
 };
 
 export const NEW_PHRASE: PhraseRule = {
@@ -28,6 +37,7 @@ export const NEW_PHRASE: PhraseRule = {
   value: "",
   where: "any_agent_turn",
   role: "reporting",
+  answered_by: "caller",
 };
 
 /** The rules with `rule` added (`index` null) or put in place of the one at `index`. */
@@ -86,12 +96,12 @@ export const KIND: Record<AgentRule["kind"], { label: string; note: string; edit
   llm: {
     label: "LLM rule",
     note: "The judge model decides it on every judged conversation, beside the scenario's criteria.",
-    edit: "A change to its name, its text or the conversations it is judged on starts its results again.",
+    edit: "A change to its name, its text, the conversations it is judged on or the answers it checks starts its results again.",
   },
   phrase: {
     label: "phrase rule",
     note: "Code looks for it in the agent's lines on every judged conversation.",
-    edit: "A change to what it looks for, or where, starts its results again; a new name does not.",
+    edit: "A change to what it looks for, where, or the answers it checks starts its results again; a new name does not.",
   },
 };
 
@@ -99,6 +109,12 @@ const PHRASE_VERB = {
   phrase: { required: "Must say", forbidden: "Must not say" },
   regex: { required: "Must match", forbidden: "Must not match" },
 } as const;
+
+/** What a rule checks, in one line, and for an outbound agent the answers it checks. */
+export function ruleLine(rule: AgentRule, outbound: boolean): string {
+  const scope = outbound ? ` · ${SCOPE_TEXT[rule.answered_by]}` : "";
+  return `${summary(rule)}${scope} · ${ROLE_TEXT[rule.role]}`;
+}
 
 /** What a rule checks, in one line. */
 export function summary(rule: AgentRule): string {

@@ -267,6 +267,7 @@ func TestErrorsSayTheNextStep(t *testing.T) {
 		{"server message", against(missing), []string{"agent", "view", agentID}, "404 Not Found: agent not found"},
 		{"server down", map[string]string{"YAKSH_URL": stopped.URL}, []string{"agent", "list"}, "cannot reach " + stopped.URL},
 		{"bad agent ID", against(missing), []string{"agent", "view", "support-line"}, `"support-line" is not an agent ID: find it with "yaksh agent list"`},
+		{"bad answer", against(missing), []string{"run", "start", "--agent", agentID, "--all", "--answer", "machine"}, `"machine" is not an answer: use caller, voicemail or screener`},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -284,7 +285,7 @@ func TestRunStartSendsOnlyTheFieldsThatWereSet(t *testing.T) {
 	})
 	code, stdout, stderr := run(t, context.Background(), against(f), "",
 		"run", "start", "--agent", agentID, "--scenario", scenA+","+scenB, "--repeats", "2",
-		"--transport", "text", "--idempotency-key", "ci-41")
+		"--transport", "phone", "--answer", "caller,voicemail", "--idempotency-key", "ci-41")
 
 	if code != 0 || !strings.Contains(stdout, `"status": "queued"`) || stderr != "next: yaksh run wait "+runID+"\n" {
 		t.Fatalf("code = %d, stdout = %q, stderr = %q", code, stdout, stderr)
@@ -294,7 +295,7 @@ func TestRunStartSendsOnlyTheFieldsThatWereSet(t *testing.T) {
 	if err := json.Unmarshal(req.body, &body); err != nil {
 		t.Fatal(err)
 	}
-	want := fmt.Sprintf(`{"agent_id":"%s","repeats":2,"scenarios":[{"scenario_id":"%s"},{"scenario_id":"%s"}],"transport":"text"}`, agentID, scenA, scenB)
+	want := fmt.Sprintf(`{"agent_id":"%s","repeats":2,"scenarios":[{"answered_by":["caller","voicemail"],"scenario_id":"%s"},{"answered_by":["caller","voicemail"],"scenario_id":"%s"}],"transport":"phone"}`, agentID, scenA, scenB)
 	if got, _ := json.Marshal(body); string(got) != want {
 		t.Fatalf("body = %s, want %s", got, want)
 	}
@@ -384,6 +385,21 @@ func TestRunWaitWaitsForTheJudgesAndFailsUnlessTheyPassEveryCall(t *testing.T) {
 		"next: yaksh run metrics " + runID + "\n"
 	if code != 1 || !strings.HasSuffix(stderr, want) || len(f.requests("GET", "/api/v1/runs/"+runID+"/metrics")) != 2 {
 		t.Fatalf("code = %d, stderr = %q; want 1, two reads of the metrics and %q", code, stderr, want)
+	}
+}
+
+func TestRunWaitFailsWhenTheRulesFailACallThatNoCallerTalkedOn(t *testing.T) {
+	voicemail := fmt.Sprintf(`{"verdicts":{"pending":0,"errors":0,"scenarios":[{"scenario_id":"%s","calls":[{"conversation_id":"%s","repeat":1,"verdict":"pass"}]}],"unplayed":[{"conversation_id":"%s","scenario_id":"%s","repeat":1,"answered_by":"voicemail","verdict":"fail"}]}}`,
+		scenA, convID, convID, scenA)
+	f := newFakeAPI(t, map[string]http.HandlerFunc{
+		"GET /api/v1/runs/{id}":         reply(200, runJSON("done", `"completed":2`)),
+		"GET /api/v1/runs/{id}/metrics": reply(200, voicemail),
+	})
+	code, _, stderr := run(t, context.Background(), against(f), "", "run", "wait", runID)
+
+	want := "failed: run " + runID + " done: 2 of 2 calls completed; judges: 1 pass, 1 fail\n"
+	if code != 1 || !strings.Contains(stderr, want) {
+		t.Fatalf("code = %d, stderr = %q; want 1 and %q", code, stderr, want)
 	}
 }
 

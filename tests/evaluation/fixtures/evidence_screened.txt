@@ -1,0 +1,31 @@
+AGENT
+Brief: Calls patients to confirm their cleaning appointments for Maple Dental.
+Agent data sent with this call: none.
+
+CALLER
+Instructions: Book a cleaning for next Tuesday afternoon as a new patient.
+Known facts: full name = Jordan Lee; date of birth = 14 March 1990; phone number = 555 0142.
+Facts the caller does not know: insurance member ID.
+
+DATE
+Today is Thursday, 1 October 2026. Time zone: America/New_York.
+
+CALL FACTS
+The agent called Yaksh's number +15550177 from +15550200.
+Answered by: the call screener of Yaksh's caller (iPhone call screening).
+After the screener, Yaksh's caller picked up.
+The agent hung up (Plivo hangup source: Caller). End reason: agent_hangup. Call length: 45.3 s.
+
+TRANSCRIPT
+The agent's lines are Yaksh's speech-to-text of the agent's audio. Judge what was said, not the spelling: "for" can mean "four", and "to" can mean "two".
+A line marked recorded is played by the phone of Yaksh's caller, its voicemail or its call screener: a fixed recording that cannot hear or answer the agent.
+[1] Call screener (recorded): Hi. If you record your name and reason for calling...
+[2] Agent: This is Ava from Maple Dental, about your cleaning.
+[3] Call screener (recorded): Thanks. Please stay on the line.
+(The call screener puts the agent on hold for 20 s.)
+(Yaksh's caller picks up.)
+[4] Caller: Hello
+[5] Agent: Hi Jordan, can you still make Tuesday at two thirty?
+
+ITEM
+Criterion: The agent asks to confirm the appointment.

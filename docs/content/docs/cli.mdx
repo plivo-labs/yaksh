@@ -57,11 +57,17 @@ You can also set two variables and not use `yaksh auth login`, for example in CI
 yaksh run start --agent <agent id> --all --wait
 ```
 
-This command starts a run of all scenarios of the agent, waits until the run stops, and then waits for the verdicts of the judges. With `--wait`, the command exits with 0 only if all conversations of the run completed and the judges passed all calls. For a conversation that has retries, only the last retry counts. The judges decide each call by its scenario verdict after the labels of persons, as for the pass rate of the run. A call that did not connect, a call that the judges failed or did not score, and a failed evaluation give exit 1. If no `--timeout` is set, the wait for the judges stops after 10 minutes. If the judges are off, exit 0 does not tell you that the agent did its tasks correctly. If you stop the command with Ctrl-C while the run continues, the CLI cancels the run. `yaksh agent list` shows the IDs of the agents.
+This command starts a run of all scenarios of the agent, waits until the run stops, and then waits for the verdicts of the judges. With `--wait`, the command exits with 0 only if all conversations of the run completed and the judges passed all calls. For a conversation that has retries, only the last retry counts. The judges decide each call by its scenario verdict after the labels of persons, as for the pass rate of the run. A call that did not connect, a call that the judges failed or did not score, and a failed evaluation give exit 1. A call where no caller talked, because the persona's voicemail or call screener answered, has no scenario verdict: its deciding agent rules decide it. If no `--timeout` is set, the wait for the judges stops after 10 minutes. If the judges are off, exit 0 does not tell you that the agent did its tasks correctly. If you stop the command with Ctrl-C while the run continues, the CLI cancels the run. `yaksh agent list` shows the IDs of the agents.
+
+To do a test of how an outbound agent handles a voicemail or a call screener, add `--answer`. Each answer is a different conversation of each scenario:
+
+```sh
+yaksh run start --agent <agent id> --all --answer voicemail --answer screener --wait
+```
 
 If the judges failed a call, these commands show why:
 
-- `yaksh run metrics <run id>` shows the pass rate, the coverage, the calls of each scenario with their verdicts, and the counts of each criterion. A call with a null verdict is a call whose evaluation failed.
+- `yaksh run metrics <run id>` shows the pass rate, the coverage, the calls of each scenario with their verdicts, and the counts of each criterion. A call with a null verdict is a call whose evaluation failed. `unplayed` lists the calls where no caller talked, with their verdicts from the agent rules.
 - `yaksh conversation evaluation <conversation id>` shows the verdicts of one call, and each criterion and rule with the quotes and the reasoning of its judge.
 - `yaksh conversation view <conversation id>` shows the transcript of the call.
 

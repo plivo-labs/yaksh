@@ -44,7 +44,7 @@ func (a *app) runCmd() *cobra.Command {
 
 type runStartFlags struct {
 	agent                                                                    string
-	scenarios                                                                []string
+	scenarios, answers                                                       []string
 	all, wait                                                                bool
 	repeats, maxDurationS, maxTurns, maxParallel, startIntervalS, maxRetries int
 	name, idempotencyKey, transport                                          string
@@ -66,6 +66,7 @@ func (a *app) runStartCmd() *cobra.Command {
 	fl.StringVar(&f.transport, "transport", "", "phone or text; needed when the agent has both")
 	fl.StringSliceVar(&f.scenarios, "scenario", nil, "a scenario's ID; repeat the flag or separate IDs with commas")
 	fl.BoolVar(&f.all, "all", false, "every scenario of the agent")
+	fl.StringSliceVar(&f.answers, "answer", nil, "who answers the calls of each scenario: caller, voicemail or screener; repeat the flag or separate them with commas, and each one is its own call; voicemail and screener need a phone run of an outbound agent")
 	fl.IntVar(&f.repeats, "repeats", 0, "how many times each scenario runs")
 	fl.IntVar(&f.maxDurationS, "max-duration-s", 0, "the time limit of each call, in seconds")
 	fl.IntVar(&f.maxTurns, "max-turns", 0, "how many agent turns the caller answers")
@@ -96,6 +97,14 @@ func (a *app) startRun(cmd *cobra.Command, f runStartFlags) error {
 		}
 		scenarioIDs = append(scenarioIDs, id)
 	}
+	var answers []api.AnsweredBy
+	for _, s := range f.answers {
+		answer := api.AnsweredBy(s)
+		if !answer.Valid() {
+			return fmt.Errorf("%q is not an answer: use caller, voicemail or screener", s)
+		}
+		answers = append(answers, answer)
+	}
 	c, err := a.client()
 	if err != nil {
 		return err
@@ -108,7 +117,7 @@ func (a *app) startRun(cmd *cobra.Command, f runStartFlags) error {
 	body := api.RunCreate{
 		AgentId:        agentID,
 		Transport:      changed(cmd, "transport", api.Transport(f.transport)),
-		Scenarios:      ownPersonas(scenarioIDs),
+		Scenarios:      ownPersonas(scenarioIDs, answers),
 		Repeats:        changed(cmd, "repeats", f.repeats),
 		MaxDurationS:   changed(cmd, "max-duration-s", f.maxDurationS),
 		MaxTurns:       changed(cmd, "max-turns", f.maxTurns),
@@ -416,11 +425,15 @@ func (a *app) runCancelCmd() *cobra.Command {
 	}
 }
 
-// ownPersonas runs each scenario with its own persona.
-func ownPersonas(ids []uuid.UUID) []api.RunScenario {
+// ownPersonas runs each scenario with its own persona, once for each answer; no answers is the
+// caller.
+func ownPersonas(ids []uuid.UUID, answers []api.AnsweredBy) []api.RunScenario {
 	scenarios := make([]api.RunScenario, len(ids))
 	for i, id := range ids {
 		scenarios[i] = api.RunScenario{ScenarioId: id}
+		if len(answers) > 0 {
+			scenarios[i].AnsweredBy = &answers
+		}
 	}
 	return scenarios
 }

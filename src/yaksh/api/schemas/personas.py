@@ -4,6 +4,7 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict
 
 from yaksh.db.models import Persona
+from yaksh.domain.answering import Answering
 from yaksh.domain.languages import Language
 from yaksh.domain.personas import PersonaConfig
 from yaksh.domain.surroundings import Surroundings
@@ -21,6 +22,7 @@ class PersonaRead(BaseModel):
     voice_gender: VoiceGender | None
     surroundings: Surroundings
     sample_line: str | None
+    answering: Answering
     current_version: int
     forked_from_id: uuid.UUID | None
     created_at: datetime

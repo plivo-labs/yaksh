@@ -23,7 +23,7 @@ The TypeSafe key, on the **Providers** tab, is optional. It makes judging cheape
 
 ## What each judge reads
 
-All judges read the same evidence view of the call: the agent's brief, the data sent to an agent that places the call, the caller's instructions and the facts it knows and does not have, today's date and time zone, the numbers, who hung up and why, the call length, and the numbered transcript. A caller turn whose audio is not confirmed as played, or that the agent spoke over, is marked. The view never holds the caller's own reason for ending the call, the noise setting or Yaksh's prompts.
+All judges read the same evidence view of the call: the agent's brief, the data sent to an agent that places the call, the caller's instructions and the facts it knows and does not have, today's date and time zone, the numbers, who hung up and why, the call length, and the numbered transcript. A caller turn whose audio is not confirmed as played, or that the agent spoke over, is marked. When the persona's voicemail or call screener answered, the view says so, and its recorded lines, the tone and the hold are marked as recorded, not said by a person. The view never holds the caller's own reason for ending the call, the noise setting or Yaksh's prompts.
 
 | Judge | Reads, beside the evidence view | Requests per call | Answers |
 | --- | --- | --- | --- |
@@ -33,6 +33,8 @@ All judges read the same evidence view of the call: the agent's brief, the data 
 | Instruction adherence | The agent's `config` | One, when the agent has a config | The goal, the steps and the limits of the instructions: each kept or not, with a quote from the call and from the config |
 | Hallucination | The agent's knowledge-base documents | One, when the agent has documents | Each agent statement that a document contradicts, with both quotes |
 | Caller check | The persona, the criteria and facts that code found; the instructions and facts come from the view | One | Where Yaksh's caller broke its test, which criteria that changed, and the risk that it changed a result |
+
+An agent rule checks only the calls of its **Answered by** value: the caller, the voicemail, the call screener, or any call. A call where no caller talked has no criteria and no caller check. Refer to [Voicemail and call screening](/docs/voicemail-and-call-screening).
 
 Code checks each quote against its turn, and an answer that fails the checks is asked again once. A second failure makes the item an error, `invalid_evidence`. Instruction adherence, hallucination and the caller check only report: they do not change the scenario verdict, but a caller check can block a criterion that Yaksh's caller likely broke, or that the test's turn or time limit cut off.
 

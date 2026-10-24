@@ -19,6 +19,7 @@ from pydantic import (
 )
 
 from yaksh.domain.agents import Transport
+from yaksh.domain.answering import AnsweredBy
 from yaksh.domain.conversations import EndReason, OutcomeGroup
 
 RunName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=80)]
@@ -35,15 +36,20 @@ class RunScenario(BaseModel):
     """In the order their conversations start."""
     data_set_ids: list[uuid.UUID] | None = Field(default=None, min_length=1)
     """In the order each persona plays them."""
+    answered_by: list[AnsweredBy] = Field(default=[AnsweredBy.CALLER], min_length=1)
+    """Who answers: each one is a call of its own for each persona and data set, in this
+    order. A voicemail or a call screener answers only a phone call of an outbound agent."""
 
-    @field_validator("persona_ids", "data_set_ids")
+    @field_validator("persona_ids", "data_set_ids", "answered_by")
     @classmethod
-    def each_once(cls, ids: list[uuid.UUID] | None, info: ValidationInfo) -> list[uuid.UUID] | None:
-        repeated = [item for item, n in Counter(ids or []).items() if n > 1]
+    def each_once[T](cls, items: list[T] | None, info: ValidationInfo) -> list[T] | None:
+        repeated = [item for item, n in Counter(items or []).items() if n > 1]
         if repeated:
-            kind = "persona" if info.field_name == "persona_ids" else "data set"
+            kind = {"persona_ids": "persona", "data_set_ids": "data set"}.get(
+                info.field_name or "", "answer"
+            )
             raise ValueError(f"{kind} {repeated[0]} is listed more than once")
-        return ids
+        return items
 
 
 class RunCreate(BaseModel):
@@ -138,6 +144,8 @@ class RunProgress(BaseModel):
     cancelled_at: datetime | None
     counts: dict[OutcomeGroup, int]
     end_reasons: dict[EndReason, int]
+    answered_by: dict[AnsweredBy, int]
+    """Who answered the counted conversations."""
     retries: int
     """How many retries the run made."""
     median_talk_ms: int | None

@@ -1,4 +1,5 @@
 import asyncio
+import uuid
 from typing import Any
 
 import pytest
@@ -17,7 +18,15 @@ from tests.conftest import (
     start_run,
 )
 from yaksh.config import Settings
-from yaksh.db.models import Evaluation, EvaluationItem, JudgeCall, JudgeVersion, MetricValue
+from yaksh.db.models import (
+    Conversation,
+    Evaluation,
+    EvaluationItem,
+    JudgeCall,
+    JudgeVersion,
+    MetricValue,
+)
+from yaksh.domain.answering import AnsweredBy
 from yaksh.domain.conversations import (
     CallOutcome,
     EndReason,
@@ -329,3 +338,80 @@ async def test_a_busy_judge_puts_the_evaluation_off_and_its_last_attempt_keeps_t
         ("caller_check", Outcome.ERROR, "judge_unavailable"),
     }
     assert MetricKey.USAGE in metric_keys
+
+
+async def test_a_call_that_the_voicemail_answered_is_judged_only_by_the_rules_that_check_it(
+    client: AsyncClient, db: Db, settings: Settings
+) -> None:
+    callback = {
+        "kind": "llm",
+        "key": "callback",
+        "name": "Leaves a call-back number",
+        "applies_when": "the agent leaves a message",
+        "pass_when": "the message gives a number",
+        "fail_when": "the message gives no number",
+        "role": "deciding",
+        "answered_by": "voicemail",
+    }
+    brand = {"kind": "phrase", "key": "brand", "name": "Names itself", "expects": "required",
+             "value": "this is Ava", "answered_by": "any"}  # fmt: skip
+    agent = await create_agent_id(client, name="Clinic", rules=[*RULES, callback, brand])
+    scenario = await create_scenario(client, agent, criteria=["The agent reads the new time back."])
+    run = (await start_run(client, agent, [scenario["id"]], repeats=2)).json()
+    person, voicemail = str(await claim(db)), str(await claim(db))
+    async with db.begin() as session:
+        await session.execute(
+            update(Conversation)
+            .where(Conversation.id == uuid.UUID(voicemail))
+            .values(answered_by=AnsweredBy.VOICEMAIL)
+        )
+    for conversation in (person, voicemail):
+        ended = CallOutcome(connected=True, end_reason=EndReason.AGENT_HANGUP)
+        await finish(db, conversation, ended, transcript=CALL)
+    stop = asyncio.Event()
+    evaluator = asyncio.create_task(make_evaluator(db, settings, Judge()).run(stop))
+
+    async def evaluations() -> list[Evaluation]:
+        async with db() as session:
+            return list(await session.scalars(select(Evaluation)))
+
+    try:
+        done = await eventually(
+            evaluations, lambda found: all(e.state is EvaluationState.DONE for e in found)
+        )
+    finally:
+        stop.set()
+        await evaluator
+    by_call = {str(e.conversation_id): e for e in done}
+    async with db() as session:
+        keys = [
+            (str(item.evaluation_id), item.item_key)
+            for item in await session.scalars(select(EvaluationItem).order_by(EvaluationItem.id))
+        ]
+    verdicts = (await client.get(f"/api/v1/runs/{run['id']}/metrics")).json()["verdicts"]
+
+    def items_of(conversation: str) -> list[str]:
+        return [key for evaluation, key in keys if evaluation == str(by_call[conversation].id)]
+
+    assert items_of(voicemail) == ["rule-callback", "rule-brand"]
+    assert items_of(person) == [
+        "criterion-1",
+        "rule-no-promises",
+        "rule-greets",
+        "rule-brand",
+        "caller_check",
+    ]
+    machine = by_call[voicemail]
+    assert (machine.scenario_verdict, machine.conversation_verdict) == (
+        Verdict.NOT_SCORED,
+        Verdict.FAIL,
+    )
+    assert [call["conversation_id"] for s in verdicts["scenarios"] for call in s["calls"]] == [
+        person
+    ]
+    assert [
+        (call["conversation_id"], call["answered_by"], call["verdict"])
+        for call in verdicts["unplayed"]
+    ] == [(voicemail, "voicemail", "fail")]
+    assert (verdicts["pending"], verdicts["not_judged"], verdicts["coverage"]) == (0, 0, 1.0)
+    assert {rule["key"]: rule["counts"] for rule in verdicts["rules"]}["callback"] == {"fail": 1}

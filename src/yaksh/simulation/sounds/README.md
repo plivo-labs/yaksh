@@ -48,6 +48,20 @@ The files are 30 s long (240,000 samples), except `crowd.wav`. Crowd is very eve
 
 `scripts/make_speaker_clips.py` builds every clip from `speakers.yaml` (2026-10-07): ElevenLabs `eleven_v3` speaks each line on its own, the lines are joined with the pauses, a light room effect is added (ffmpeg `highpass=f=100,lowpass=f=3600,aecho=0.9:0.9:30:0.12`), the speech level is set to -20 dBFS, and the peaks are limited to -3 dBFS. The script writes the length and the line start times back to `speakers.yaml`.
 
+## Voicemail and call screener lines
+
+`answering.yaml` lists the lines that the persona's voicemail or call screener plays, each with the voice of its phone system, and `answering/` holds one file for each line, plus `tone.wav`. `simulation/answering.py` puts them in a call's plan, and `tests/simulation/test_answering.py` checks the rules below.
+
+### Rules
+
+- WAV, 16-bit PCM, mono, 8000 Hz, a whole number of 20 ms chunks, as the noise loops.
+- Active speech at -20 dBFS, the caller's speech level, with peaks at or below -3 dBFS.
+- The tone is a 440 Hz sine, 1 s long, with a -6 dBFS peak and a 10 ms fade at each end.
+
+### How the files were made
+
+`scripts/make_answering_clips.py` builds every file from `answering.yaml` (2026-10-23): ElevenLabs `eleven_flash_v2_5` speaks each line at 8 kHz with stability 0.8, as the voice previews do, and the speech level is set to -20 dBFS. The script writes the tone without ElevenLabs. Lines that no real phone was recorded for are estimates.
+
 ## Terms
 
 The sounds were generated with ElevenLabs, so the ElevenLabs terms of service apply to them.

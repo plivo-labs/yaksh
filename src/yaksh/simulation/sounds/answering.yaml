@@ -1,0 +1,67 @@
+# Voicemail and call screener lines: 8 kHz 16-bit mono WAV, active speech at -20 dBFS.
+# scripts/make_answering_clips.py speaks each line into answering/<id>.wav and writes
+# answering/tone.wav. Lines that no real phone was recorded for are estimates.
+voices:
+  iphone: SAz9YHcvj6GT2YYXdXww
+  carrier: MF3mGyEYCl7XYWbV9V6O
+  google: 21m00Tcm4TlvDq8ikWAM
+  samsung: EXAVITQu4vr4xnSDxMaL
+  truecaller: ecp3DWciuUyW7BYM7II1
+lines:
+  - id: iphone_greeting
+    voice: iphone
+    text: "Your call has been forwarded to voicemail. The person you're trying to reach is not available. At the tone, please record your message."
+  - id: pixel_greeting
+    voice: google
+    text: "The person you're calling isn't available right now. Please leave a message after the tone."
+  - id: carrier_greeting
+    voice: carrier
+    text: "The person you are calling is not available. Please leave your message after the tone."
+  - id: mailbox_full
+    voice: carrier
+    text: "The mailbox of the person you are calling is full. Please try again later. Goodbye."
+  - id: iphone_screen_prompt
+    voice: iphone
+    text: "Hi. If you record your name and reason for calling, I'll see if this person is available."
+  - id: iphone_screen_ack
+    voice: iphone
+    text: "Thanks. Please stay on the line."
+  - id: iphone_screen_reply
+    voice: iphone
+    text: "They can't take your call right now. Please try again later."
+  - id: pixel_assist_prompt
+    voice: google
+    text: "Hi, I'm Call Assist by Google, recording this call for the person you're trying to reach. Can I ask what you're calling about?"
+  - id: pixel_assist_follow_up
+    voice: google
+    text: "Thanks. Do you need to get a hold of them urgently?"
+  - id: google_2018_prompt
+    voice: google
+    text: "Hi, the person you're calling is using a screening service from Google, and will get a copy of this conversation. Go ahead and say your name and why you're calling."
+  - id: google_2018_follow_up
+    voice: google
+    text: "Do you need to get a hold of them urgently?"
+  - id: google_ack
+    voice: google
+    text: "Thanks. Please stay on the line."
+  - id: google_reply
+    voice: google
+    text: "They can't talk right now, but they'll give you a call later. Thanks, and goodbye."
+  - id: samsung_prompt
+    voice: samsung
+    text: "Hi, the person you're calling is using a call assistant. Please say your name and why you're calling."
+  - id: samsung_ack
+    voice: samsung
+    text: "Thanks. Please hold."
+  - id: samsung_reply
+    voice: samsung
+    text: "They can't answer right now. Please call again later."
+  - id: truecaller_prompt
+    voice: truecaller
+    text: "Hi, I'm the assistant for this number. Who's calling, and what is it about?"
+  - id: truecaller_ack
+    voice: truecaller
+    text: "Thank you. Please hold, I'm checking if they're available."
+  - id: truecaller_reply
+    voice: truecaller
+    text: "They're busy right now. Please call again later."

@@ -28,7 +28,17 @@ from pipecat.processors.aggregators.llm_context import LLMContext
 from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
 
 from yaksh.caller.audio import OFFSET, PLAYOUT, Clock, Playout
+from yaksh.domain.answering import MachineLine
 from yaksh.domain.conversations import CallObserver, Provenance, Role, Turn
+
+
+@dataclass(frozen=True)
+class Queued:
+    """Text that a reply about to be spoken carries: generated, fixed, or a machine's line."""
+
+    text: str
+    scripted: bool = False
+    machine: MachineLine | None = None
 
 
 @dataclass
@@ -104,13 +114,25 @@ class TranscriptBuilder:
         self._voice_started: int | None = None
         self._voice_stopped: int | None = None
         self._generating: list[str] | None = None
-        self._generated: deque[tuple[str, bool]] = deque()
+        self._generated: deque[Queued] = deque()
         self._reply: Reply | None = None
         self._closed: Playout | None = None
         self.agent_speaking = False
         self.agent_spoke = False
+        self.agent_turns = 0
+        """How many agent turns have ended."""
+        self.agent_voice = False
+        """The voice detector hears the agent now."""
+        self.agent_voice_ended_ms: int | None = None
+        """When the voice detector last heard the agent stop."""
         self._generated_words = False
         self._called_after_words: dict[str, bool] = {}
+
+    @property
+    def caller_quiet(self) -> bool:
+        """No caller reply is being generated, waits to be spoken, or has audio that Plivo has
+        not reported played."""
+        return self._generating is None and not self._generated and self._reply is None
 
     @property
     def quiet(self) -> bool:
@@ -134,6 +156,7 @@ class TranscriptBuilder:
         self._agent_stopped = self._clock.ms()
 
     def agent_voice_started(self, start_secs: float) -> None:
+        self.agent_voice = True
         if self._voice_stopped is not None and not self.agent_speaking:
             self._voice_started = self._voice_stopped = None
             self._agent_started = self._agent_stopped = None
@@ -141,10 +164,12 @@ class TranscriptBuilder:
             self._voice_started = self._clock.ms() - round(start_secs * 1000)
 
     def agent_voice_stopped(self, stop_secs: float) -> None:
-        self._voice_stopped = self._clock.ms() - round(stop_secs * 1000)
+        self.agent_voice = False
+        self._voice_stopped = self.agent_voice_ended_ms = self._clock.ms() - round(stop_secs * 1000)
 
     def agent_said(self, text: str) -> None:
         self.agent_spoke = True
+        self.agent_turns += 1
         now = self._clock.ms()
         started = self._voice_started if self._voice_started is not None else self._agent_started
         stopped = self._voice_stopped if self._voice_stopped is not None else self._agent_stopped
@@ -160,7 +185,11 @@ class TranscriptBuilder:
 
     def scripted(self, text: str) -> None:
         """Fixed text about to be spoken for the caller; it takes the place of a generation."""
-        self._generated.append((text, True))
+        self._generated.append(Queued(text, scripted=True))
+
+    def machine(self, text: str, line: MachineLine) -> None:
+        """A recorded line of the persona's phone about to play."""
+        self._generated.append(Queued(text, machine=line))
 
     def generation_started(self) -> None:
         self._generating = []
@@ -184,7 +213,7 @@ class TranscriptBuilder:
             return
         text = "".join(self._generating).strip()
         if text:
-            self._generated.append((text, False))
+            self._generated.append(Queued(text))
         self._generating = None
 
     def caller_started(self, playout: Playout | None) -> None:
@@ -228,8 +257,7 @@ class TranscriptBuilder:
             self._close(cut=False)
         now = self._clock.ms()
         while self._generated:
-            text, scripted = self._generated.popleft()
-            self._caller_turn(text, now, now, Provenance.UNCONFIRMED, scripted)
+            self._caller_turn(self._generated.popleft(), None, now, now, Provenance.UNCONFIRMED)
 
     def caller_interrupted(self) -> None:
         self.generation_ended()
@@ -244,34 +272,35 @@ class TranscriptBuilder:
         if reply.playout is not None:
             self._closed = reply.playout
         now = self._clock.ms()
-        generated, scripted = self._generated.popleft() if self._generated else (None, False)
+        queued = self._generated.popleft() if self._generated else Queued("")
         heard = reply.heard()
         text = ("" if reply.self_spaced else " ").join(heard).strip()
         if text:
-            self._caller_turn(text, reply.started_ms, now, Provenance.TRANSMITTED, scripted)
+            self._caller_turn(queued, text, reply.started_ms, now, Provenance.TRANSMITTED)
         if cut or len(heard) < len(reply.words) or not text:
-            rest = remainder(generated, text) if generated else None
+            rest = remainder(queued.text, text) if queued.text else None
             if rest is None:
                 rest = " ".join(word for word, _, _ in reply.words[len(heard) :]).strip()
             if rest:
                 provenance = Provenance.CUT if cut else Provenance.UNCONFIRMED
-                self._caller_turn(rest, now, now, provenance, scripted)
+                self._caller_turn(queued, rest, now, now, provenance)
         if cut:
             while self._generated:
-                waiting, waiting_scripted = self._generated.popleft()
-                self._caller_turn(waiting, now, now, Provenance.CUT, waiting_scripted)
+                self._caller_turn(self._generated.popleft(), None, now, now, Provenance.CUT)
 
     def _caller_turn(
-        self, text: str, started: int, ended: int, provenance: Provenance, scripted: bool
+        self, queued: Queued, text: str | None, started: int, ended: int, provenance: Provenance
     ) -> None:
+        """text is the part of the queued text that the turn holds; None holds all of it."""
         self._observer.turn(
             Turn(
                 role=Role.CALLER,
-                text=text,
+                text=queued.text if text is None else text,
                 started_at_ms=started,
                 ended_at_ms=ended,
                 provenance=provenance,
-                scripted=scripted,
+                scripted=queued.scripted,
+                machine=queued.machine,
             )
         )
 

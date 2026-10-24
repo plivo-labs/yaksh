@@ -42,6 +42,7 @@ from pipecat.turns.user_turn_strategies import UserTurnStrategies
 from pipecat.workers.runner import WorkerRunner
 
 from yaksh.caller.audio import SAMPLE_RATE, Clock
+from yaksh.caller.machines import MachineGate, SoundPlayer
 from yaksh.caller.speech_to_text import deepgram_language
 from yaksh.caller.transcript import (
     AgentTurnTap,
@@ -178,10 +179,14 @@ class Silence:
 
 
 def watch_silence(
-    user: LLMUserAggregator, state: CallState, nudge: Callable[[], Awaitable[None]]
+    user: LLMUserAggregator,
+    state: CallState,
+    nudge: Callable[[], Awaitable[None]],
+    listening: Callable[[], bool] = lambda: True,
 ) -> None:
     """A quiet agent gets a nudge; silence through every nudge ends the call. A call that is
-    ending gets no nudge."""
+    ending gets no nudge, and neither does one that a machine answers while it is not
+    `listening`: the machine decides what silence does."""
     silence = Silence(IDLE_NUDGES)
 
     @user.event_handler("on_user_turn_started")
@@ -190,7 +195,7 @@ def watch_silence(
 
     @user.event_handler("on_user_turn_idle")
     async def on_idle(_aggregator: Any) -> None:
-        if state.end_reason is not None:
+        if state.end_reason is not None or not listening():
             return
         if silence.give_up():
             state.end(EndReason.AGENT_SILENT)
@@ -357,6 +362,9 @@ class Persona:
                 ),
             ),
         )
+        self.gate = MachineGate() if request.answering else None
+        """Closed while the persona's voicemail or call screener answers."""
+        self.player = SoundPlayer() if request.answering else None
         pipeline = Pipeline(
             [
                 transport_input,
@@ -364,10 +372,12 @@ class Persona:
                 self.stt,
                 aggregators.user(),
                 AgentTurnTap(transcript),
+                *([self.gate] if self.gate else []),
                 TurnLimit(request.max_turns, self.ending.goodbye),
                 self.llm,
                 GeneratedTap(transcript),
                 self.tts,
+                *([self.player] if self.player else []),
                 *before_output,
                 transport_output,
                 *after_output,
@@ -398,7 +408,7 @@ class Persona:
         async def nudge() -> None:
             await self.say(request.nudge)
 
-        watch_silence(aggregators.user(), state, nudge)
+        watch_silence(aggregators.user(), state, nudge, self.listening)
 
         @self.worker.event_handler("on_pipeline_error")
         async def on_error(_worker: Any, frame: ErrorFrame) -> None:
@@ -411,6 +421,10 @@ class Persona:
         @self.worker.event_handler("on_setup_timeout")
         async def on_setup_timeout(_worker: Any) -> None:
             state.blame("the pipeline could not be set up: a provider did not connect")
+
+    def listening(self) -> bool:
+        """The persona is on the line: no machine of its phone is answering."""
+        return self.gate is None or not self.gate.closed
 
     async def speak_first(self) -> None:
         await self.say(self._first_words)

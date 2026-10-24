@@ -1,10 +1,11 @@
-import { Check, Shuffle, XIcon } from "lucide-react";
-import { type SubmitEvent, useState } from "react";
+import { Check, ChevronDown, Shuffle, XIcon } from "lucide-react";
+import { Fragment, type SubmitEvent, useState } from "react";
 import { Link, useNavigate } from "react-router";
 
 import { PersonaChips } from "@/components/persona-chips";
 import { ScenarioAdder } from "@/components/scenario-adder";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -25,11 +26,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { ANSWERS, DEFAULT_ANSWERING, withoutVerdict } from "@/lib/answering";
 import { counted, when } from "@/lib/format";
 import { revealErrors } from "@/lib/forms";
 import { mixPersonas } from "@/lib/mix";
 import { randomKey } from "@/lib/random-key";
 import {
+  useAgent,
   useDefaults,
   usePersonas,
   usePhoneNumbers,
@@ -40,6 +44,7 @@ import {
 import {
   AGENT_LANGUAGES,
   type AgentSummary,
+  type AnsweredBy,
   type Language,
   LANGUAGE_NAMES,
   type RunSummary,
@@ -61,6 +66,24 @@ function dataSetsToPlay(scenario: Scenario, wanted?: string[]): string[] {
   return kept.length > 0 ? kept : ids;
 }
 
+/** The answers of `wanted` in menu order, or the caller when there are none. */
+function answersToPlay(wanted?: AnsweredBy[]): AnsweredBy[] {
+  const kept = ANSWERS.map((answer) => answer.value).filter((answer) => wanted?.includes(answer));
+  return kept.length > 0 ? kept : ["caller"];
+}
+
+/** "The caller, voicemail": the first answer as its label, the others in lower case. */
+function answersText(answers: AnsweredBy[]): string {
+  return ANSWERS.filter((answer) => answers.includes(answer.value))
+    .map((answer, index) => (index === 0 ? answer.label : answer.label.toLowerCase()))
+    .join(", ");
+}
+
+const MACHINE_CALLS: Record<Exclude<AnsweredBy, "caller">, string> = {
+  voicemail: "voicemail calls",
+  screener: "screener calls",
+};
+
 const MIX_SIZES = ["2", "3", "4", "5"].map((value) => ({ value, label: value }));
 
 /** A whole number from an input, null when it is empty, NaN when it is not a whole number. */
@@ -79,18 +102,21 @@ interface Row {
   personaIds: string[];
   /** The data sets each persona plays: all of them at first. */
   dataSetIds: string[];
+  /** Who answers each call: the caller at first. Phone runs of an outbound agent only. */
+  answers: AnsweredBy[];
 }
 
 /** Starts a run of the scenarios, in the order given, or of every scenario of the agent when
- * `scenarioIds` is absent. Each scenario runs once for each persona on its card and each data
- * set checked on it: its own persona and every data set at first, or the ones in `personasOf`
- * and `dataSetsOf` for "Run again". `earlier` fills the other fields, and scenarios, personas
- * or data sets deleted since are left out. */
+ * `scenarioIds` is absent. Each scenario runs once for each persona on its card, each data set
+ * and each answer checked on it: its own persona, every data set and the caller at first, or the
+ * ones in `personasOf`, `dataSetsOf` and `answersOf` for "Run again". `earlier` fills the other
+ * fields, and scenarios, personas or data sets deleted since are left out. */
 export function RunDialog({
   agent,
   scenarioIds,
   personasOf,
   dataSetsOf,
+  answersOf,
   earlier,
   onClosed,
 }: {
@@ -98,6 +124,7 @@ export function RunDialog({
   scenarioIds?: string[];
   personasOf?: Record<string, string[]>;
   dataSetsOf?: Record<string, string[]>;
+  answersOf?: Record<string, AnsweredBy[]>;
   earlier?: RunSummary;
   onClosed: () => void;
 }) {
@@ -135,6 +162,7 @@ export function RunDialog({
     error: loadError,
   } = useRunScenarios(agent.id, scenarioIds);
   const everyScenario = useScenarios(agent.id);
+  const rules = useAgent(agent.id).data?.rules;
   const personas = usePersonas();
   const defaults = useDefaults();
   const numbers = usePhoneNumbers();
@@ -154,12 +182,23 @@ export function RunDialog({
           scenario,
           personaIds: kept.length ? kept : [scenario.persona_id],
           dataSetIds: dataSetsToPlay(scenario, dataSetsOf?.[scenario.id]),
+          answers: answersToPlay(answersOf?.[scenario.id]),
         };
       }),
     );
   }
+  // Voicemail and call screening answer the calls that Yaksh receives from an outbound agent.
+  const phone = transport === "phone";
+  const outbound = agent.direction === "outbound";
+  const answering = phone && outbound;
   const scenarios = (rows ?? []).map((row) => row.scenario);
   const cards = Object.fromEntries((rows ?? []).map((row) => [row.scenario.id, row.personaIds]));
+  const answered = Object.fromEntries(
+    (rows ?? []).map((row): [string, AnsweredBy[]] => [
+      row.scenario.id,
+      answering ? row.answers : ["caller"],
+    ]),
+  );
   const changed = (rows ?? []).some(
     (row) => row.personaIds.length !== 1 || row.personaIds[0] !== row.scenario.persona_id,
   );
@@ -174,6 +213,10 @@ export function RunDialog({
       ),
     );
   const played = Object.fromEntries((rows ?? []).map((row) => [row.scenario.id, row.dataSetIds]));
+  const setAnswers = (scenarioId: string, answers: AnsweredBy[]) =>
+    setRows((current) =>
+      (current ?? []).map((row) => (row.scenario.id === scenarioId ? { ...row, answers } : row)),
+    );
   const setCard = (scenarioId: string, ids: string[]) =>
     update((row) => (row.scenario.id === scenarioId ? ids : row.personaIds));
   const removeScenario = (scenarioId: string) =>
@@ -181,7 +224,12 @@ export function RunDialog({
   const addScenario = (scenario: Scenario) =>
     setRows((current) => [
       ...(current ?? []),
-      { scenario, personaIds: [scenario.persona_id], dataSetIds: dataSetsToPlay(scenario) },
+      {
+        scenario,
+        personaIds: [scenario.persona_id],
+        dataSetIds: dataSetsToPlay(scenario),
+        answers: answersToPlay(),
+      },
     ]);
   const mix = () => {
     const mixed = mixPersonas(
@@ -229,7 +277,11 @@ export function RunDialog({
     repeatsOk &&
     limitsOk;
   const different = scenarios.reduce(
-    (sum, scenario) => sum + (cards[scenario.id]?.length ?? 0) * (played[scenario.id]?.length ?? 0),
+    (sum, scenario) =>
+      sum +
+      (cards[scenario.id]?.length ?? 0) *
+        (played[scenario.id]?.length ?? 0) *
+        (answered[scenario.id]?.length ?? 0),
     0,
   );
   const total = different * (repeatsOk ? repeatCount : 0);
@@ -247,8 +299,6 @@ export function RunDialog({
         : `${repeatCount} times`;
 
   // Text tests use no phone number, so phone readiness never blocks them.
-  const phone = transport === "phone";
-  const outbound = agent.direction === "outbound";
   const blocked =
     phone && numbers.data
       ? outbound
@@ -278,6 +328,7 @@ export function RunDialog({
           scenario_id: scenario.id,
           persona_ids: cards[scenario.id],
           data_set_ids: scenario.data_sets.length > 1 ? played[scenario.id] : null,
+          answered_by: answered[scenario.id],
         })),
         repeats: repeatCount,
         // Untouched fields go as null, for the defaults they show: a resent request then stays
@@ -470,7 +521,16 @@ export function RunDialog({
                     .map((id) => byId.get(id))
                     .filter((persona) => persona && !served.has(persona.language));
                   const sets = played[scenario.id] ?? [];
-                  const calls = ids.length * sets.length * (repeatsOk ? repeatCount : 0);
+                  const answers = answered[scenario.id] ?? [];
+                  const calls =
+                    ids.length * sets.length * answers.length * (repeatsOk ? repeatCount : 0);
+                  const settings = ids.map((id) => byId.get(id)?.answering ?? DEFAULT_ANSWERING);
+                  const unjudged = rules
+                    ? answers.filter(
+                        (answer): answer is keyof typeof MACHINE_CALLS =>
+                          answer !== "caller" && withoutVerdict(answer, rules, settings),
+                      )
+                    : [];
                   return (
                     <div
                       key={scenario.id}
@@ -479,6 +539,12 @@ export function RunDialog({
                       <div className="flex items-start justify-between gap-4">
                         <span className="text-s-500">{scenario.name}</span>
                         <span className="flex shrink-0 items-center gap-2">
+                          {answering && (
+                            <AnswersMenu
+                              value={answers}
+                              onValueChange={(next) => setAnswers(scenario.id, next)}
+                            />
+                          )}
                           <span className="text-xs-400 text-muted-foreground tabular-nums">
                             {counted(calls, one, many)}
                           </span>
@@ -517,6 +583,13 @@ export function RunDialog({
                               agent does not serve.
                             </p>
                           ),
+                      )}
+                      {unjudged.length > 0 && (
+                        <p className="text-xs-400 text-status-warning-text">
+                          No rule decides{" "}
+                          {unjudged.map((answer) => MACHINE_CALLS[answer]).join(" or ")}, so they
+                          get no verdict.
+                        </p>
                       )}
                     </div>
                   );
@@ -730,6 +803,83 @@ export function RunDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+/** Who answers the scenario's calls, as a menu of checkboxes. The last checked answer is locked,
+ * because each scenario needs at least one. */
+function AnswersMenu({
+  value,
+  onValueChange,
+}: {
+  value: AnsweredBy[];
+  onValueChange: (answers: AnsweredBy[]) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const text = answersText(value);
+  const toggle = (answer: AnsweredBy) =>
+    onValueChange(
+      value.includes(answer)
+        ? value.filter((item) => item !== answer)
+        : answersToPlay([...value, answer]),
+    );
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger
+        render={
+          <button
+            type="button"
+            aria-label={`Answered by: ${text}`}
+            className="-my-0.5 flex h-6 items-center gap-1 rounded-sm bg-muted pr-1.5 pl-2 text-xs-500 hover:bg-hv1"
+          />
+        }
+      >
+        {text}
+        <ChevronDown className={`size-3 transition-transform ${open ? "rotate-180" : ""}`} />
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-72 gap-0 p-1">
+        <span className="px-2.5 pt-2 pb-1 text-xs-400 text-muted-foreground">Answered by</span>
+        {ANSWERS.map((answer) => {
+          const on = value.includes(answer.value);
+          const locked = on && value.length === 1;
+          const row = (
+            <label
+              className={`flex items-start gap-2.5 rounded-sm px-2.5 py-2 ${locked ? "cursor-not-allowed" : "cursor-pointer hover:bg-hv1"}`}
+            >
+              <Checkbox
+                className="mt-0.5"
+                checked={on}
+                disabled={locked}
+                onCheckedChange={() => toggle(answer.value)}
+              />
+              <span className="grid">
+                <span className="text-s-500">{answer.label}</span>
+                <span className="text-xs-400 text-muted-foreground">{answer.description}</span>
+              </span>
+            </label>
+          );
+          return locked ? (
+            <Tooltip key={answer.value}>
+              <TooltipTrigger
+                render={
+                  <div
+                    tabIndex={0}
+                    className="rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+                  />
+                }
+              >
+                {row}
+              </TooltipTrigger>
+              <TooltipContent side="left">
+                A scenario needs at least one. Check another one first.
+              </TooltipContent>
+            </Tooltip>
+          ) : (
+            <Fragment key={answer.value}>{row}</Fragment>
+          );
+        })}
+      </PopoverContent>
+    </Popover>
   );
 }
 

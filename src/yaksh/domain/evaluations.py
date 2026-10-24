@@ -9,6 +9,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
+from yaksh.domain.answering import AnsweredBy
 from yaksh.domain.scenarios import Category
 from yaksh.domain.surroundings import Surroundings
 
@@ -208,6 +209,23 @@ class CallVerdict(BaseModel):
     """The scenario verdict after labels; None when the evaluation failed."""
 
 
+class UnplayedCallVerdict(BaseModel):
+    """A judged call that the persona never talked on: its voicemail or call screener answered,
+    and the persona did not pick up. The scenario's criteria do not apply, so the agent rules
+    decide it."""
+
+    conversation_id: uuid.UUID
+    scenario_id: uuid.UUID
+    scenario: str
+    """The scenario's name."""
+    repeat: int
+    persona_id: uuid.UUID
+    persona: str
+    answered_by: AnsweredBy
+    verdict: Verdict | None
+    """The verdict with agent rules after labels; None when the evaluation failed."""
+
+
 class ScenarioVerdicts(BaseModel):
     scenario_id: uuid.UUID
     name: str
@@ -297,6 +315,9 @@ class RunVerdicts(BaseModel):
     """How many scenario and persona pairs pass_hat_2 covers."""
     scenarios: list[ScenarioVerdicts]
     """In the run's order."""
+    unplayed: list[UnplayedCallVerdict]
+    """The judged calls that no caller talked on, in the run's order. They are not in the
+    scenario numbers above."""
     inconsistent: list[uuid.UUID]
     """Scenarios that both passed and failed across repeats of one persona. No cause is named:
     repeats mix the agent, the caller and the line."""

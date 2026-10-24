@@ -47,5 +47,7 @@ The outcome group comes from the status and the end reason. If you stopped a con
 | `error` | An error occurred in Yaksh or on the phone line. The failure reason gives the cause. |
 | `worker_stopped` | The worker stopped during the call. The result of the call is not known. |
 | `lease_lost` | The worker lost its claim on the conversation. The result of the call is not known. |
+| `voicemail_ended` | The persona's voicemail stopped the call: after 5 seconds of silence, at its time limit, or because the mailbox is full. The caller reason tells which. |
+| `screener_ended` | The persona's call screener stopped the call: it sent a reply, it declined the call, or the agent did not answer it. The caller reason tells which. |
 
 For the causes of a failed call, refer to [Troubleshooting](/docs/troubleshooting).

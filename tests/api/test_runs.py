@@ -118,8 +118,18 @@ async def test_a_run_starts_each_repeat_of_every_scenario_in_order_with_its_pers
     }
     detail = (await client.get(f"/api/v1/runs/{run['id']}")).json()
     assert detail["scenarios"] == [
-        {"scenario_id": second["id"], "persona_ids": [hurried], "data_set_ids": [only(second)]},
-        {"scenario_id": first["id"], "persona_ids": [calm], "data_set_ids": [only(first)]},
+        {
+            "scenario_id": second["id"],
+            "persona_ids": [hurried],
+            "data_set_ids": [only(second)],
+            "answered_by": ["caller"],
+        },
+        {
+            "scenario_id": first["id"],
+            "persona_ids": [calm],
+            "data_set_ids": [only(first)],
+            "answered_by": ["caller"],
+        },
     ]
     assert detail["median_talk_ms"] is None
 
@@ -156,8 +166,18 @@ async def test_a_scenario_runs_once_for_each_persona_asked_for_and_the_run_lists
     ]
     detail = (await client.get(f"/api/v1/runs/{run['id']}")).json()
     assert detail["scenarios"] == [
-        {"scenario_id": first["id"], "persona_ids": [calm, hindi], "data_set_ids": [only(first)]},
-        {"scenario_id": second["id"], "persona_ids": [own], "data_set_ids": [only(second)]},
+        {
+            "scenario_id": first["id"],
+            "persona_ids": [calm, hindi],
+            "data_set_ids": [only(first)],
+            "answered_by": ["caller"],
+        },
+        {
+            "scenario_id": second["id"],
+            "persona_ids": [own],
+            "data_set_ids": [only(second)],
+            "answered_by": ["caller"],
+        },
     ]
     assert run["languages"] == detail["languages"] == ["en", "hi"]
     again = await start_run(client, agent, detail["scenarios"], repeats=3)
@@ -806,3 +826,27 @@ async def test_each_persona_plays_each_data_set_with_its_values_filled_in(
     assert run["scenarios"][0]["data_set_ids"] == [denver["id"]]
     assert removed.status_code == 422 and "no data set" in removed.text
     assert austin["id"] != denver["id"]
+
+
+async def test_only_a_phone_run_of_an_outbound_agent_is_answered_by_a_machine(
+    client: AsyncClient,
+) -> None:
+    agent = await create_agent_id(client)
+    scenario = await create_scenario(client, agent)
+
+    def asked(answers: list[str]) -> list[str | dict[str, Any]]:
+        return [{"scenario_id": scenario["id"], "answered_by": answers}]
+
+    voicemail = await start_run(client, agent, asked(["caller", "voicemail"]))
+    twice = await start_run(client, agent, asked(["caller", "caller"]))
+    nobody = await start_run(client, agent, asked([]))
+    caller = await start_run(client, agent, asked(["caller"]))
+
+    assert voicemail.status_code == 422
+    assert voicemail.json()["error"]["message"] == (
+        'the scenario "Reschedule a cleaning": voicemail and call screening need a phone run of '
+        "an outbound agent"
+    )
+    assert twice.status_code == 422 and "caller is listed more than once" in twice.text
+    assert nobody.status_code == 422
+    assert caller.status_code == 202, caller.text

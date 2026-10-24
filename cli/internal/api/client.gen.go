@@ -19,6 +19,30 @@ import (
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
+// Defines values for AfterScreening.
+const (
+	AfterScreeningDeclines  AfterScreening = "declines"
+	AfterScreeningPicksUp   AfterScreening = "picks_up"
+	AfterScreeningReply     AfterScreening = "reply"
+	AfterScreeningVoicemail AfterScreening = "voicemail"
+)
+
+// Valid indicates whether the value is a known member of the AfterScreening enum.
+func (e AfterScreening) Valid() bool {
+	switch e {
+	case AfterScreeningDeclines:
+		return true
+	case AfterScreeningPicksUp:
+		return true
+	case AfterScreeningReply:
+		return true
+	case AfterScreeningVoicemail:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for AgentLanguage.
 const (
 	AgentLanguageBn   AgentLanguage = "bn"
@@ -91,6 +115,27 @@ func (e AgentSource) Valid() bool {
 	case AgentSourceRetell:
 		return true
 	case AgentSourceVapi:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for AnsweredBy.
+const (
+	AnsweredByCaller    AnsweredBy = "caller"
+	AnsweredByScreener  AnsweredBy = "screener"
+	AnsweredByVoicemail AnsweredBy = "voicemail"
+)
+
+// Valid indicates whether the value is a known member of the AnsweredBy enum.
+func (e AnsweredBy) Valid() bool {
+	switch e {
+	case AnsweredByCaller:
+		return true
+	case AnsweredByScreener:
+		return true
+	case AnsweredByVoicemail:
 		return true
 	default:
 		return false
@@ -231,20 +276,22 @@ func (e ElevenLabsRegion) Valid() bool {
 
 // Defines values for EndReason.
 const (
-	EndReasonAgentHangup   EndReason = "agent_hangup"
-	EndReasonAgentSilent   EndReason = "agent_silent"
-	EndReasonCallerHangup  EndReason = "caller_hangup"
-	EndReasonDurationLimit EndReason = "duration_limit"
-	EndReasonError         EndReason = "error"
-	EndReasonLeaseLost     EndReason = "lease_lost"
-	EndReasonNoAnswer      EndReason = "no_answer"
-	EndReasonNoCall        EndReason = "no_call"
-	EndReasonStartRefused  EndReason = "start_refused"
-	EndReasonStreamEnded   EndReason = "stream_ended"
-	EndReasonTriggerFailed EndReason = "trigger_failed"
-	EndReasonTurnLimit     EndReason = "turn_limit"
-	EndReasonUserRequest   EndReason = "user_request"
-	EndReasonWorkerStopped EndReason = "worker_stopped"
+	EndReasonAgentHangup    EndReason = "agent_hangup"
+	EndReasonAgentSilent    EndReason = "agent_silent"
+	EndReasonCallerHangup   EndReason = "caller_hangup"
+	EndReasonDurationLimit  EndReason = "duration_limit"
+	EndReasonError          EndReason = "error"
+	EndReasonLeaseLost      EndReason = "lease_lost"
+	EndReasonNoAnswer       EndReason = "no_answer"
+	EndReasonNoCall         EndReason = "no_call"
+	EndReasonScreenerEnded  EndReason = "screener_ended"
+	EndReasonStartRefused   EndReason = "start_refused"
+	EndReasonStreamEnded    EndReason = "stream_ended"
+	EndReasonTriggerFailed  EndReason = "trigger_failed"
+	EndReasonTurnLimit      EndReason = "turn_limit"
+	EndReasonUserRequest    EndReason = "user_request"
+	EndReasonVoicemailEnded EndReason = "voicemail_ended"
+	EndReasonWorkerStopped  EndReason = "worker_stopped"
 )
 
 // Valid indicates whether the value is a known member of the EndReason enum.
@@ -266,6 +313,8 @@ func (e EndReason) Valid() bool {
 		return true
 	case EndReasonNoCall:
 		return true
+	case EndReasonScreenerEnded:
+		return true
 	case EndReasonStartRefused:
 		return true
 	case EndReasonStreamEnded:
@@ -275,6 +324,8 @@ func (e EndReason) Valid() bool {
 	case EndReasonTurnLimit:
 		return true
 	case EndReasonUserRequest:
+		return true
+	case EndReasonVoicemailEnded:
 		return true
 	case EndReasonWorkerStopped:
 		return true
@@ -535,6 +586,33 @@ const (
 func (e LlmRuleKind) Valid() bool {
 	switch e {
 	case LlmRuleKindLlm:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for MachineLine.
+const (
+	MachineLineGreeting    MachineLine = "greeting"
+	MachineLineMailboxFull MachineLine = "mailbox_full"
+	MachineLineReply       MachineLine = "reply"
+	MachineLineScreener    MachineLine = "screener"
+	MachineLineTone        MachineLine = "tone"
+)
+
+// Valid indicates whether the value is a known member of the MachineLine enum.
+func (e MachineLine) Valid() bool {
+	switch e {
+	case MachineLineGreeting:
+		return true
+	case MachineLineMailboxFull:
+		return true
+	case MachineLineReply:
+		return true
+	case MachineLineScreener:
+		return true
+	case MachineLineTone:
 		return true
 	default:
 		return false
@@ -841,6 +919,30 @@ func (e RuleGate) Valid() bool {
 	}
 }
 
+// Defines values for RuleScope.
+const (
+	RuleScopeAny       RuleScope = "any"
+	RuleScopeCaller    RuleScope = "caller"
+	RuleScopeScreener  RuleScope = "screener"
+	RuleScopeVoicemail RuleScope = "voicemail"
+)
+
+// Valid indicates whether the value is a known member of the RuleScope enum.
+func (e RuleScope) Valid() bool {
+	switch e {
+	case RuleScopeAny:
+		return true
+	case RuleScopeCaller:
+		return true
+	case RuleScopeScreener:
+		return true
+	case RuleScopeVoicemail:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for RunStatus.
 const (
 	RunStatusCancelled  RunStatus = "cancelled"
@@ -862,6 +964,33 @@ func (e RunStatus) Valid() bool {
 	case RunStatusQueued:
 		return true
 	case RunStatusRunning:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for Screener.
+const (
+	ScreenerGoogle2018      Screener = "google_2018"
+	ScreenerIphone          Screener = "iphone"
+	ScreenerPixelCallAssist Screener = "pixel_call_assist"
+	ScreenerSamsung         Screener = "samsung"
+	ScreenerTruecaller      Screener = "truecaller"
+)
+
+// Valid indicates whether the value is a known member of the Screener enum.
+func (e Screener) Valid() bool {
+	switch e {
+	case ScreenerGoogle2018:
+		return true
+	case ScreenerIphone:
+		return true
+	case ScreenerPixelCallAssist:
+		return true
+	case ScreenerSamsung:
+		return true
+	case ScreenerTruecaller:
 		return true
 	default:
 		return false
@@ -1054,6 +1183,33 @@ func (e VoiceProvider) Valid() bool {
 	}
 }
 
+// Defines values for Voicemail.
+const (
+	VoicemailCarrier       Voicemail = "carrier"
+	VoicemailCarrierNoTone Voicemail = "carrier_no_tone"
+	VoicemailIphone        Voicemail = "iphone"
+	VoicemailMailboxFull   Voicemail = "mailbox_full"
+	VoicemailPixel         Voicemail = "pixel"
+)
+
+// Valid indicates whether the value is a known member of the Voicemail enum.
+func (e Voicemail) Valid() bool {
+	switch e {
+	case VoicemailCarrier:
+		return true
+	case VoicemailCarrierNoTone:
+		return true
+	case VoicemailIphone:
+		return true
+	case VoicemailMailboxFull:
+		return true
+	case VoicemailPixel:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for WaitingReason.
 const (
 	MaxParallel    WaitingReason = "max_parallel"
@@ -1082,10 +1238,13 @@ const (
 	WireEventKindCallerAudioEnd   WireEventKind = "caller_audio_end"
 	WireEventKindCallerAudioStart WireEventKind = "caller_audio_start"
 	WireEventKindCallerError      WireEventKind = "caller_error"
+	WireEventKindCallerSound      WireEventKind = "caller_sound"
 	WireEventKindClearAudio       WireEventKind = "clear_audio"
 	WireEventKindConnectStarted   WireEventKind = "connect_started"
 	WireEventKindConnected        WireEventKind = "connected"
 	WireEventKindEndCall          WireEventKind = "end_call"
+	WireEventKindHandover         WireEventKind = "handover"
+	WireEventKindHoldStarted      WireEventKind = "hold_started"
 	WireEventKindRinging          WireEventKind = "ringing"
 	WireEventKindSilenceGreeting  WireEventKind = "silence_greeting"
 	WireEventKindStop             WireEventKind = "stop"
@@ -1107,6 +1266,8 @@ func (e WireEventKind) Valid() bool {
 		return true
 	case WireEventKindCallerError:
 		return true
+	case WireEventKindCallerSound:
+		return true
 	case WireEventKindClearAudio:
 		return true
 	case WireEventKindConnectStarted:
@@ -1114,6 +1275,10 @@ func (e WireEventKind) Valid() bool {
 	case WireEventKindConnected:
 		return true
 	case WireEventKindEndCall:
+		return true
+	case WireEventKindHandover:
+		return true
+	case WireEventKindHoldStarted:
 		return true
 	case WireEventKindRinging:
 		return true
@@ -1131,6 +1296,9 @@ func (e WireEventKind) Valid() bool {
 		return false
 	}
 }
+
+// AfterScreening What the persona does once its screener has heard the agent.
+type AfterScreening string
 
 // AgentConfig defines model for AgentConfig.
 type AgentConfig struct {
@@ -1285,6 +1453,18 @@ type AgentVersionRead struct {
 	Version   int                `json:"version"`
 }
 
+// AnsweredBy defines model for AnsweredBy.
+type AnsweredBy string
+
+// Answering The persona's phone, for the calls that a run sends to its voicemail or call screener.
+type Answering struct {
+	// AfterScreening What the persona does once its screener has heard the agent.
+	AfterScreening *AfterScreening `json:"after_screening,omitempty"`
+	Greeting       *string         `json:"greeting,omitempty"`
+	Screener       *Screener       `json:"screener,omitempty"`
+	Voicemail      *Voicemail      `json:"voicemail,omitempty"`
+}
+
 // ApplicationChoice defines model for ApplicationChoice.
 type ApplicationChoice struct {
 	ApplicationId string `json:"application_id"`
@@ -1396,6 +1576,8 @@ type ConversationRead struct {
 	AgentName      string             `json:"agent_name"`
 	AgentVersion   int                `json:"agent_version"`
 	AgentVersionId openapi_types.UUID `json:"agent_version_id"`
+	AnsweredBy     AnsweredBy         `json:"answered_by"`
+	Answering      *Answering         `json:"answering"`
 	Attempt        int                `json:"attempt"`
 	CallUuid       *string            `json:"call_uuid"`
 	CallerNumber   *string            `json:"caller_number"`
@@ -1460,6 +1642,7 @@ type ConversationSummary struct {
 	AgentName      string             `json:"agent_name"`
 	AgentVersion   int                `json:"agent_version"`
 	AgentVersionId openapi_types.UUID `json:"agent_version_id"`
+	AnsweredBy     AnsweredBy         `json:"answered_by"`
 	Attempt        int                `json:"attempt"`
 	CallUuid       *string            `json:"call_uuid"`
 	CallerNumber   *string            `json:"caller_number"`
@@ -1902,8 +2085,11 @@ type Llm struct {
 
 // LlmRule defines model for LlmRule.
 type LlmRule struct {
-	AppliesWhen string `json:"applies_when"`
-	FailWhen    string `json:"fail_when"`
+	// AnsweredBy Which calls a rule checks, by who answered. A call that a screener passed on counts for
+	// the screener and for who answered after it.
+	AnsweredBy  *RuleScope `json:"answered_by,omitempty"`
+	AppliesWhen string     `json:"applies_when"`
+	FailWhen    string     `json:"fail_when"`
 
 	// Gate When an LLM rule can apply, decided in code before any model call.
 	Gate        *RuleGate    `json:"gate,omitempty"`
@@ -1917,6 +2103,9 @@ type LlmRule struct {
 
 // LlmRuleKind defines model for LlmRule.Kind.
 type LlmRuleKind string
+
+// MachineLine Machine audio on the call. A spoken line is a caller turn; the tone is not.
+type MachineLine string
 
 // Metric One metric's value and the flags it raised.
 type Metric struct {
@@ -2043,6 +2232,9 @@ type Pair struct {
 
 // PersonaConfig What a persona version pins: the settings plus the voice gender from the voices list.
 type PersonaConfig struct {
+	// Answering The persona's phone, for the calls that a run sends to its voicemail or call screener.
+	Answering *Answering `json:"answering,omitempty"`
+
 	// Language A language a caller speaks.
 	Language   *Language `json:"language,omitempty"`
 	Prompt     string    `json:"prompt"`
@@ -2059,6 +2251,8 @@ type PersonaConfig struct {
 
 // PersonaCreate defines model for PersonaCreate.
 type PersonaCreate struct {
+	// Answering The persona's phone, for the calls that a run sends to its voicemail or call screener.
+	Answering    *Answering          `json:"answering,omitempty"`
 	ForkedFromId *openapi_types.UUID `json:"forked_from_id,omitempty"`
 
 	// Language A language a caller speaks.
@@ -2097,6 +2291,8 @@ type PersonaIdea struct {
 
 // PersonaRead defines model for PersonaRead.
 type PersonaRead struct {
+	// Answering The persona's phone, for the calls that a run sends to its voicemail or call screener.
+	Answering      Answering           `json:"answering"`
 	BuiltinKey     *string             `json:"builtin_key"`
 	CreatedAt      time.Time           `json:"created_at"`
 	CurrentVersion int                 `json:"current_version"`
@@ -2129,6 +2325,7 @@ type PersonaScenario struct {
 
 // PersonaUpdate defines model for PersonaUpdate.
 type PersonaUpdate struct {
+	Answering    *Answering     `json:"answering,omitempty"`
 	Language     *Language      `json:"language,omitempty"`
 	Name         *string        `json:"name,omitempty"`
 	Prompt       *string        `json:"prompt,omitempty"`
@@ -2197,14 +2394,17 @@ type PhraseMatch string
 
 // PhraseRule defines model for PhraseRule.
 type PhraseRule struct {
-	Expects PhraseExpectation `json:"expects"`
-	Key     string            `json:"key"`
-	Kind    *PhraseRuleKind   `json:"kind,omitempty"`
-	Match   *PhraseMatch      `json:"match,omitempty"`
-	Name    string            `json:"name"`
-	Role    *ItemRole         `json:"role,omitempty"`
-	Value   string            `json:"value"`
-	Where   *PhraseWhere      `json:"where,omitempty"`
+	// AnsweredBy Which calls a rule checks, by who answered. A call that a screener passed on counts for
+	// the screener and for who answered after it.
+	AnsweredBy *RuleScope        `json:"answered_by,omitempty"`
+	Expects    PhraseExpectation `json:"expects"`
+	Key        string            `json:"key"`
+	Kind       *PhraseRuleKind   `json:"kind,omitempty"`
+	Match      *PhraseMatch      `json:"match,omitempty"`
+	Name       string            `json:"name"`
+	Role       *ItemRole         `json:"role,omitempty"`
+	Value      string            `json:"value"`
+	Where      *PhraseWhere      `json:"where,omitempty"`
 }
 
 // PhraseRuleKind defines model for PhraseRule.Kind.
@@ -2415,6 +2615,10 @@ type RuleResults struct {
 	Key      string         `json:"key"`
 }
 
+// RuleScope Which calls a rule checks, by who answered. A call that a screener passed on counts for
+// the screener and for who answered after it.
+type RuleScope string
+
 // RunCreate Limits that an operator sets, such as the most repeats, are checked where the settings
 // are known.
 type RunCreate struct {
@@ -2480,6 +2684,7 @@ type RunRead struct {
 	AgentName      string             `json:"agent_name"`
 	AgentVersion   int                `json:"agent_version"`
 	AgentVersionId openapi_types.UUID `json:"agent_version_id"`
+	AnsweredBy     map[string]int     `json:"answered_by"`
 	CancelledAt    *time.Time         `json:"cancelled_at"`
 	Counts         map[string]int     `json:"counts"`
 	CreatedAt      time.Time          `json:"created_at"`
@@ -2510,6 +2715,7 @@ type RunRead struct {
 // RunScenario A scenario of a run, the personas that call it and the data sets they play. No personas
 // is the scenario's own persona; no data sets is every data set of its current version.
 type RunScenario struct {
+	AnsweredBy *[]AnsweredBy         `json:"answered_by,omitempty"`
 	DataSetIds *[]openapi_types.UUID `json:"data_set_ids,omitempty"`
 	PersonaIds *[]openapi_types.UUID `json:"persona_ids,omitempty"`
 	ScenarioId openapi_types.UUID    `json:"scenario_id"`
@@ -2524,6 +2730,7 @@ type RunSummary struct {
 	AgentName      string             `json:"agent_name"`
 	AgentVersion   int                `json:"agent_version"`
 	AgentVersionId openapi_types.UUID `json:"agent_version_id"`
+	AnsweredBy     map[string]int     `json:"answered_by"`
 	CancelledAt    *time.Time         `json:"cancelled_at"`
 	Counts         map[string]int     `json:"counts"`
 	CreatedAt      time.Time          `json:"created_at"`
@@ -2553,24 +2760,25 @@ type RunSummary struct {
 // RunVerdicts The run's verdict numbers over its judged calls: completed calls that no one stopped,
 // whose evaluation gave a verdict or failed.
 type RunVerdicts struct {
-	Best              *float32             `json:"best"`
-	Callers           []CallerFidelity     `json:"callers"`
-	Coverage          *float32             `json:"coverage"`
-	Criteria          []CriterionCounts    `json:"criteria"`
-	DecidedBy         map[string]int       `json:"decided_by"`
-	Errors            int                  `json:"errors"`
-	Inconsistent      []openapi_types.UUID `json:"inconsistent"`
-	IntervalHigh      *float32             `json:"interval_high"`
-	IntervalLow       *float32             `json:"interval_low"`
-	JudgeVersions     []JudgeVersionUsed   `json:"judge_versions"`
-	NotJudged         int                  `json:"not_judged"`
-	PassHat2          *float32             `json:"pass_hat_2"`
-	PassHat2Scenarios int                  `json:"pass_hat_2_scenarios"`
-	PassRate          *float32             `json:"pass_rate"`
-	Pending           int                  `json:"pending"`
-	Rules             []RuleCounts         `json:"rules"`
-	Scenarios         []ScenarioVerdicts   `json:"scenarios"`
-	Worst             *float32             `json:"worst"`
+	Best              *float32              `json:"best"`
+	Callers           []CallerFidelity      `json:"callers"`
+	Coverage          *float32              `json:"coverage"`
+	Criteria          []CriterionCounts     `json:"criteria"`
+	DecidedBy         map[string]int        `json:"decided_by"`
+	Errors            int                   `json:"errors"`
+	Inconsistent      []openapi_types.UUID  `json:"inconsistent"`
+	IntervalHigh      *float32              `json:"interval_high"`
+	IntervalLow       *float32              `json:"interval_low"`
+	JudgeVersions     []JudgeVersionUsed    `json:"judge_versions"`
+	NotJudged         int                   `json:"not_judged"`
+	PassHat2          *float32              `json:"pass_hat_2"`
+	PassHat2Scenarios int                   `json:"pass_hat_2_scenarios"`
+	PassRate          *float32              `json:"pass_rate"`
+	Pending           int                   `json:"pending"`
+	Rules             []RuleCounts          `json:"rules"`
+	Scenarios         []ScenarioVerdicts    `json:"scenarios"`
+	Unplayed          []UnplayedCallVerdict `json:"unplayed"`
+	Worst             *float32              `json:"worst"`
 }
 
 // ScenarioConfig What a scenario version pins. The instructions and the facts go to the caller. The
@@ -2679,6 +2887,9 @@ type ScenarioVersionRead struct {
 	ScenarioId openapi_types.UUID `json:"scenario_id"`
 	Version    int                `json:"version"`
 }
+
+// Screener defines model for Screener.
+type Screener string
 
 // SecretName defines model for SecretName.
 type SecretName string
@@ -2848,15 +3059,30 @@ type TriggerMethod string
 
 // TurnRead defines model for TurnRead.
 type TurnRead struct {
-	EndedAtMs   int         `json:"ended_at_ms"`
-	Provenance  *Provenance `json:"provenance,omitempty"`
-	ResponseMs  *int        `json:"response_ms,omitempty"`
-	Role        Role        `json:"role"`
-	Scripted    *bool       `json:"scripted,omitempty"`
-	StartedAtMs int         `json:"started_at_ms"`
-	TalkedOver  *bool       `json:"talked_over,omitempty"`
-	Text        string      `json:"text"`
-	Tools       *[]ToolItem `json:"tools,omitempty"`
+	EndedAtMs   int          `json:"ended_at_ms"`
+	Machine     *MachineLine `json:"machine,omitempty"`
+	Provenance  *Provenance  `json:"provenance,omitempty"`
+	ResponseMs  *int         `json:"response_ms,omitempty"`
+	Role        Role         `json:"role"`
+	Scripted    *bool        `json:"scripted,omitempty"`
+	StartedAtMs int          `json:"started_at_ms"`
+	TalkedOver  *bool        `json:"talked_over,omitempty"`
+	Text        string       `json:"text"`
+	Tools       *[]ToolItem  `json:"tools,omitempty"`
+}
+
+// UnplayedCallVerdict A judged call that the persona never talked on: its voicemail or call screener answered,
+// and the persona did not pick up. The scenario's criteria do not apply, so the agent rules
+// decide it.
+type UnplayedCallVerdict struct {
+	AnsweredBy     AnsweredBy         `json:"answered_by"`
+	ConversationId openapi_types.UUID `json:"conversation_id"`
+	Persona        string             `json:"persona"`
+	PersonaId      openapi_types.UUID `json:"persona_id"`
+	Repeat         int                `json:"repeat"`
+	Scenario       string             `json:"scenario"`
+	ScenarioId     openapi_types.UUID `json:"scenario_id"`
+	Verdict        *Verdict           `json:"verdict"`
 }
 
 // UnsureKind defines model for UnsureKind.
@@ -2972,6 +3198,9 @@ type VoiceUpdate struct {
 	Name      *string     `json:"name,omitempty"`
 }
 
+// Voicemail defines model for Voicemail.
+type Voicemail string
+
 // WaitingReason Why queued conversations of a run have not started. Only the run's own limits are
 // named; anything else is a worker or a number.
 type WaitingReason string
@@ -3032,11 +3261,12 @@ type ListConversationsApiV1ConversationsGetParams struct {
 	Group *[]OutcomeGroup `form:"group,omitempty" json:"group,omitempty"`
 
 	// LatestAttempts true leaves out the attempts that a retry replaced
-	LatestAttempts *bool   `form:"latest_attempts,omitempty" json:"latest_attempts,omitempty"`
-	Q              *string `form:"q,omitempty" json:"q,omitempty"`
-	Sort           *string `form:"sort,omitempty" json:"sort,omitempty"`
-	Page           *int    `form:"page,omitempty" json:"page,omitempty"`
-	PageSize       *int    `form:"page_size,omitempty" json:"page_size,omitempty"`
+	LatestAttempts *bool       `form:"latest_attempts,omitempty" json:"latest_attempts,omitempty"`
+	AnsweredBy     *AnsweredBy `form:"answered_by,omitempty" json:"answered_by,omitempty"`
+	Q              *string     `form:"q,omitempty" json:"q,omitempty"`
+	Sort           *string     `form:"sort,omitempty" json:"sort,omitempty"`
+	Page           *int        `form:"page,omitempty" json:"page,omitempty"`
+	PageSize       *int        `form:"page_size,omitempty" json:"page_size,omitempty"`
 }
 
 // ListPersonasApiV1PersonasGetParams defines parameters for ListPersonasApiV1PersonasGet.
@@ -8752,6 +8982,18 @@ func NewListConversationsApiV1ConversationsGetRequest(server string, params *Lis
 		if params.LatestAttempts != nil {
 
 			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "latest_attempts", *params.LatestAttempts, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "boolean", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.AnsweredBy != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "answered_by", *params.AnsweredBy, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "", Format: ""}); err != nil {
 				return nil, err
 			} else {
 				for _, qp := range strings.Split(queryFrag, "&") {

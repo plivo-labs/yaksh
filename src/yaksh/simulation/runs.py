@@ -16,6 +16,7 @@ from sqlalchemy.orm import aliased
 from yaksh.config import Settings
 from yaksh.db.models import Agent, Conversation, Persona, Run, Scenario, ScenarioVersion
 from yaksh.domain.agents import Transport
+from yaksh.domain.answering import AnsweredBy
 from yaksh.domain.conversations import (
     ACTIVE_STATUSES,
     LIVE_STATUSES,
@@ -36,7 +37,7 @@ from yaksh.domain.runs import (
 )
 from yaksh.domain.scenarios import ScenarioConfig
 from yaksh.domain.settings import AppSettings, CallerModel, Limits
-from yaksh.domain.surroundings import Surroundings
+from yaksh.domain.surroundings import SoundPlan, Surroundings
 from yaksh.simulation.agents import get_agent
 from yaksh.simulation.starts import Inputs, snapshot
 from yaksh.simulation.surroundings import sound_plan
@@ -134,8 +135,9 @@ async def create_run(
     request_key: str | None,
     check_caller: CallerCheck | None = None,
 ) -> Run:
-    """Start a conversation for each repeat of each scenario, persona and data set, all of them
-    or none, in the order repeat, then scenario, then persona, then data set. A repeated
+    """Start a conversation for each repeat of each scenario, persona, data set and answer, all
+    of them or none, in the order repeat, then scenario, then persona, then data set, then answer.
+    A call that a machine answers plays no surroundings: a recording has none behind it. A repeated
     request with the same idempotency key returns the run it started, whatever changed since.
     The key is looked up first, and again once the agent's lock is held, so a request that
     waited for another one with its key returns that run; a request for another agent collides
@@ -191,11 +193,15 @@ async def create_run(
                 **asdict(item),
                 "max_duration_s": run.max_duration_s,
                 "max_turns": run.max_turns,
-                "sound_plan": sound_plan(
-                    Surroundings.model_validate(item.surroundings),
-                    item.language,
-                    key=f"{item.scenario_version_id}/{item.persona_version_id}/{n}",
-                    duration_s=run.max_duration_s,
+                "sound_plan": (
+                    sound_plan(
+                        Surroundings.model_validate(item.surroundings),
+                        item.language,
+                        key=f"{item.scenario_version_id}/{item.persona_version_id}/{n}",
+                        duration_s=run.max_duration_s,
+                    )
+                    if item.answered_by is AnsweredBy.CALLER
+                    else SoundPlan()
                 ).model_dump(mode="json"),
                 "run_id": run.id,
                 "repeat": n,
@@ -362,6 +368,7 @@ async def retry(session: AsyncSession, run: Run, ended: Sequence[Row[Any]]) -> N
                 "scenario_id",
                 "persona_id",
                 "data_set_id",
+                "answered_by",
                 "attempt",
             ]
         )
@@ -424,6 +431,7 @@ async def progress(session: AsyncSession, runs: Sequence[Run]) -> dict[uuid.UUID
             run_waiting().label("waiting"),
             Conversation.status,
             Conversation.end_reason,
+            Conversation.answered_by,
             func.count().filter(latest).label("latest"),
             func.count().filter(Conversation.attempt > 1).label("retries"),
             func.array_agg(Conversation.talk_ms)
@@ -434,7 +442,7 @@ async def progress(session: AsyncSession, runs: Sequence[Run]) -> dict[uuid.UUID
         )
         .join(Run, Run.id == Conversation.run_id)
         .where(Run.id.in_([run.id for run in runs]))
-        .group_by(Run.id, Conversation.status, Conversation.end_reason)
+        .group_by(Run.id, Conversation.status, Conversation.end_reason, Conversation.answered_by)
     )
     by_run: dict[uuid.UUID, list[Row[Any]]] = defaultdict(list)
     for row in rows:
@@ -461,14 +469,17 @@ async def caller_languages(
 
 
 def counted(rows: list[Row[Any]]) -> RunProgress:
-    """One run's progress from its rows grouped by status and end reason."""
+    """One run's progress from its rows grouped by status, end reason and answer."""
     counts = dict.fromkeys(OutcomeGroup, 0)
     end_reasons: dict[EndReason, int] = {}
+    answered_by: dict[AnsweredBy, int] = {}
     talk_ms: list[int] = []
     for row in rows:
         counts[outcome_group(row.status, row.end_reason)] += row.latest
         if row.end_reason is not None and row.latest:
             end_reasons[row.end_reason] = end_reasons.get(row.end_reason, 0) + row.latest
+        if row.latest:
+            answered_by[row.answered_by] = answered_by.get(row.answered_by, 0) + row.latest
         talk_ms += row.talk_ms or []
     active = any(row.latest and row.status in ACTIVE_STATUSES for row in rows)
     started = [row.started_at for row in rows if row.started_at is not None]
@@ -480,6 +491,7 @@ def counted(rows: list[Row[Any]]) -> RunProgress:
         cancelled_at=cancelled_at,
         counts=counts,
         end_reasons=end_reasons,
+        answered_by=answered_by,
         retries=sum(row.retries for row in rows),
         median_talk_ms=round(statistics.median(talk_ms)) if talk_ms else None,
         waiting_reason=waiting_reason(
@@ -510,19 +522,31 @@ async def counted_conversations(
 
 
 async def run_scenarios(session: AsyncSession, run: Run) -> list[RunScenario]:
-    """The run's scenarios with the personas that call them and the data sets they play, in
-    the order the conversations of each repeat start."""
+    """The run's scenarios with the personas that call them, the data sets they play and who
+    answers, in the order the conversations of each repeat start."""
     rows = await session.execute(
-        select(Conversation.scenario_id, Conversation.persona_id, Conversation.data_set_id)
+        select(
+            Conversation.scenario_id,
+            Conversation.persona_id,
+            Conversation.data_set_id,
+            Conversation.answered_by,
+        )
         .where(Conversation.run_id == run.id, Conversation.repeat == 1, Conversation.attempt == 1)
         .order_by(Conversation.created_at, Conversation.id)
     )
     personas: dict[uuid.UUID, dict[uuid.UUID, None]] = {}
     data_sets: dict[uuid.UUID, dict[uuid.UUID, None]] = {}
-    for scenario_id, persona_id, data_set_id in rows.tuples():
+    answers: dict[uuid.UUID, dict[AnsweredBy, None]] = {}
+    for scenario_id, persona_id, data_set_id, answered_by in rows.tuples():
         personas.setdefault(scenario_id, {})[persona_id] = None
         data_sets.setdefault(scenario_id, {})[data_set_id] = None
+        answers.setdefault(scenario_id, {})[answered_by] = None
     return [
-        RunScenario(scenario_id=s, persona_ids=list(p), data_set_ids=list(data_sets[s]))
+        RunScenario(
+            scenario_id=s,
+            persona_ids=list(p),
+            data_set_ids=list(data_sets[s]),
+            answered_by=list(answers[s]),
+        )
         for s, p in personas.items()
     ]

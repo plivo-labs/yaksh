@@ -5,6 +5,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict
 
 from yaksh.domain.agents import Direction, Transport
+from yaksh.domain.answering import AnsweredBy, Answering
 from yaksh.domain.conversations import (
     Channel,
     ConversationStatus,
@@ -73,6 +74,7 @@ class ConversationSummary(BaseModel):
     scenario_name: str
     data_set_id: uuid.UUID
     data_set_name: str
+    answered_by: AnsweredBy
     scenario_data_sets: int
     """How many data sets the pinned scenario version holds; the data set's name tells a call
     apart only when it holds more than one."""
@@ -148,6 +150,9 @@ class SoundRead(BaseModel):
 
 class ConversationRead(ConversationSummary):
     instructions: str
+    answering: Answering | None
+    """The persona's voicemail and call screener, as its pinned version set them; None when the
+    persona answered."""
     sounds: list[SoundRead]
     """What the call played behind the caller, as planned before it started; sounds planned
     after the call ended were not heard."""

@@ -24,6 +24,7 @@ Calls cost money and minutes. Run the fewest scenarios that test the change, and
 2. **See what failed.** `yaksh run metrics <run-id>`, in `verdicts`:
    - `pass_rate`: the mean over scenarios of passes over scored calls. `coverage`: scored calls over judged calls; below 0.95, read the `worst` to `best` range.
    - `scenarios`: each scenario with its calls, their conversation IDs and verdicts. A verdict is `pass`, `fail`, `not_scored` (the judges could not decide), or null (the evaluation failed).
+   - `unplayed`: the calls that no caller talked on, because the persona's voicemail or call screener answered. Their verdict comes from the agent's deciding rules (see "Voicemail and call screening").
    - `criteria`: each scenario criterion with its outcome counts. `inconsistent`: scenarios whose repeats disagree. `errors`: the number of criteria and agent rules that no judge could decide.
 3. **See why a call failed.** `yaksh conversation evaluation <conversation-id>`:
    - `effective_scenario_verdict` decides the call: it comes from the scenario's criteria, after people's labels. `effective_conversation_verdict` also counts the agent's deciding rules.
@@ -62,6 +63,15 @@ The agent's response time is the wait from the end of the caller's speech to the
 - `error`: a problem on Yaksh's side or on the phone line, not in the agent.
 
 The judges check only completed calls that no one stopped.
+
+## Voicemail and call screening
+
+On a phone run of an outbound agent, the persona's voicemail or call screener can answer instead of the persona. `yaksh run start --answer caller --answer voicemail` runs each scenario once for each answer: `caller`, `voicemail` or `screener`. The persona's settings choose the voicemail type, the screener type and what the persona does after screening.
+
+- A call where the persona never talks has no scenario verdict: the criteria do not apply. Only the agent rules that check that answer (their `answered_by`: `voicemail`, `screener` or `any`) judge it, and its verdict is in `unplayed`. With no deciding rule for that answer, the call is `not_scored`, and `--wait` exits 1.
+- A call where the persona picks up after its screener is judged on the criteria, as a normal call.
+- `answered_by` on a conversation says who answered. In the transcript, a turn with `machine` set is a recorded line of the persona's phone, not the persona. `wire_events` show the tone (`caller_sound`), the hold (`hold_started`) and the pickup (`handover`).
+- `end_reason` `voicemail_ended`: the voicemail stopped recording after 5 s of silence or at its time limit, or the mailbox was full. `screener_ended`: the screener sent a reply, declined the call, or got no answer from the agent. `caller_reason` says which.
 
 ## No test numbers
 
