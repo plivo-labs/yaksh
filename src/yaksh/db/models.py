@@ -25,6 +25,7 @@ from sqlalchemy.orm import Mapped, MappedColumn, mapped_column
 
 from yaksh.db.base import Base
 from yaksh.domain.agents import AgentSource, Direction, Transport
+from yaksh.domain.answering import AnsweredBy
 from yaksh.domain.conversations import Channel, ConversationStatus, EndReason
 from yaksh.domain.evaluations import (
     DecidedBy,
@@ -172,6 +173,10 @@ class Conversation(Base):
     """The data set of the scenario version that the conversation plays."""
     data_set_name: Mapped[str] = mapped_column(Text)
     """The data set's name in that version, which never changes."""
+    answered_by: Mapped[AnsweredBy] = mapped_column(
+        pg_enum(AnsweredBy, "answered_by"), default=AnsweredBy.CALLER, server_default="caller"
+    )
+    """Who answers the call: the persona, or its phone's voicemail or call screener."""
     language: Mapped[Language] = mapped_column(pg_enum(Language, "language"))
     instructions: Mapped[str] = mapped_column(Text)
     nudge: Mapped[str] = mapped_column(Text)
@@ -228,7 +233,16 @@ class Conversation(Base):
             ["agent_version_id", "agent_id"], ["agent_versions.id", "agent_versions.agent_id"]
         ),
         ForeignKeyConstraint(["run_id", "agent_id"], ["runs.id", "runs.agent_id"]),
-        UniqueConstraint("run_id", "repeat", "scenario_id", "persona_id", "data_set_id", "attempt"),
+        UniqueConstraint(
+            "run_id",
+            "repeat",
+            "scenario_id",
+            "persona_id",
+            "data_set_id",
+            "answered_by",
+            "attempt",
+            name="uq_conversations_attempt",
+        ),
         CheckConstraint(
             "attempt >= 1 AND (retry_of IS NULL) = (attempt = 1)",
             name="retry_is_later_attempt",
@@ -449,6 +463,10 @@ class Persona(Base):
     voice_gender: Mapped[VoiceGender | None] = mapped_column(pg_enum(VoiceGender, "voice_gender"))
     surroundings: Mapped[dict[str, Any]] = mapped_column(JSONB)
     sample_line: Mapped[str | None] = mapped_column(Text)
+    answering: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, default=dict, server_default=text("'{}'::jsonb")
+    )
+    """The persona's `Answering`: its voicemail and call screener."""
     current_version: Mapped[int] = mapped_column(Integer, default=1)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(

@@ -22,7 +22,9 @@ export type EndReason =
   | "trigger_failed"
   | "no_call"
   | "turn_limit"
-  | "start_refused";
+  | "start_refused"
+  | "voicemail_ended"
+  | "screener_ended";
 
 export const END_REASON_LABELS: Record<EndReason, string> = {
   user_request: "Stopped on request",
@@ -39,7 +41,31 @@ export const END_REASON_LABELS: Record<EndReason, string> = {
   no_call: "Agent did not call",
   turn_limit: "Turn limit reached",
   start_refused: "Agent refused to start",
+  voicemail_ended: "Voicemail hung up",
+  screener_ended: "Screener hung up",
 };
+
+/** Who answers an outbound test call: the persona, or its phone's voicemail or call screener. */
+export type AnsweredBy = "caller" | "voicemail" | "screener";
+export type VoicemailKind = "iphone" | "pixel" | "carrier" | "carrier_no_tone" | "mailbox_full";
+export type ScreenerKind =
+  | "iphone"
+  | "pixel_call_assist"
+  | "google_2018"
+  | "samsung"
+  | "truecaller";
+export type AfterScreening = "picks_up" | "voicemail" | "reply" | "declines";
+/** Machine audio on a call: a spoken line is a caller turn, the tone is not. */
+export type MachineLine = "greeting" | "tone" | "mailbox_full" | "screener" | "reply";
+
+/** The persona's phone, for the calls that a run sends to its voicemail or call screener. */
+export interface Answering {
+  voicemail: VoicemailKind;
+  /** Said in the persona's voice before the tone; null plays the voicemail's standard greeting. */
+  greeting: string | null;
+  screener: ScreenerKind;
+  after_screening: AfterScreening;
+}
 
 type Role = "agent" | "caller";
 export type Language = "en" | "hi" | "bn" | "gu" | "kn" | "mr" | "ta" | "te" | "es";
@@ -71,7 +97,10 @@ type WireEventKind =
   | "stop"
   | "caller_error"
   | "trigger_sent"
-  | "waiting_for_call";
+  | "waiting_for_call"
+  | "caller_sound"
+  | "hold_started"
+  | "handover";
 
 /** What each wire event means, from where Yaksh records it. */
 export const WIRE_EVENT_HELP: Record<WireEventKind, string> = {
@@ -93,6 +122,10 @@ export const WIRE_EVENT_HELP: Record<WireEventKind, string> = {
   stop: "Plivo stopped the audio stream.",
   caller_error:
     "Plivo could not play the caller's audio or reported an error, or a speech or model service of the caller failed.",
+  caller_sound: "The persona's voicemail played its tone.",
+  hold_started:
+    "The persona's call screener put the agent on hold. The text below gives the hold in ms.",
+  handover: "The persona picked up after its call screener.",
 };
 
 export const ACTIVE_STATUSES: ConversationStatus[] = ["queued", "running", "ending"];
@@ -372,6 +405,8 @@ export interface LlmRule {
   fail_when: string;
   not_a_failure: string | null;
   role: "deciding" | "reporting";
+  /** Which calls the rule checks, by who answered; "any" checks every call. */
+  answered_by: AnsweredBy | "any";
 }
 
 /** A phrase or pattern that code looks for in the agent's lines. */
@@ -384,6 +419,8 @@ export interface PhraseRule {
   value: string;
   where: "first_agent_turn" | "any_agent_turn";
   role: "deciding" | "reporting";
+  /** Which calls the rule checks, by who answered; "any" checks every call. */
+  answered_by: AnsweredBy | "any";
 }
 
 export type AgentRule = LlmRule | PhraseRule;
@@ -650,6 +687,7 @@ export interface PersonaInput {
   surroundings: Surroundings;
   /** What the persona's previews say; null says its language's sample sentence. */
   sample_line: string | null;
+  answering: Answering;
 }
 
 /** A live scenario that uses a persona. */
@@ -681,6 +719,7 @@ export interface Persona {
   voice_gender: VoiceGender | null;
   surroundings: Surroundings;
   sample_line: string | null;
+  answering: Answering;
   current_version: number;
   /** The persona this one was forked from. */
   forked_from_id: string | null;
@@ -789,6 +828,8 @@ export interface Turn {
   ended_at_ms: number;
   provenance: Provenance | null;
   scripted: boolean;
+  /** A recorded line of the persona's voicemail or call screener, not the persona. */
+  machine: MachineLine | null;
   /** The text agent's tool calls in this turn; empty on a phone call. */
   tools: ToolItem[];
   /** On an agent turn that starts a reply: how long the agent made the caller wait. Turns that
@@ -841,6 +882,7 @@ export interface ConversationSummary {
   data_set_id: string;
   /** The data set's name in the scenario version the conversation played. */
   data_set_name: string;
+  answered_by: AnsweredBy;
   /** How many data sets that scenario version holds; the name matters only with more than one. */
   scenario_data_sets: number;
   language: Language;
@@ -876,6 +918,9 @@ export interface ConversationSummary {
 
 export interface Conversation extends ConversationSummary {
   instructions: string;
+  /** The persona's voicemail and call screener, as its pinned version set them; null when the
+   * persona answered. */
+  answering: Answering | null;
   /** What the call played behind the caller, as planned before it started. */
   sounds: PlayedSound[];
   scenario: PlayedScenario;
@@ -929,6 +974,8 @@ export interface RunSummary {
   /** The latest attempt of each repeat of each scenario, by outcome group. */
   counts: Record<OutcomeGroup, number>;
   end_reasons: Partial<Record<EndReason, number>>;
+  /** Who answered the latest attempts. */
+  answered_by: Partial<Record<AnsweredBy, number>>;
   /** How many retries the run made. */
   retries: number;
   median_talk_ms: number | null;
@@ -941,12 +988,14 @@ export interface RunSummary {
   cancelled_at: string | null;
 }
 
-/** A scenario of a run, the personas that call it and the data sets they play. No personas is
- * the scenario's own persona; no data sets is every data set. */
+/** A scenario of a run, the personas that call it, the data sets they play and who answers. No
+ * personas is the scenario's own persona; no data sets is every data set; no answers is the
+ * caller. */
 export interface RunScenario {
   scenario_id: string;
   persona_ids?: string[] | null;
   data_set_ids?: string[] | null;
+  answered_by?: AnsweredBy[];
 }
 
 export interface Run extends RunSummary {
@@ -1189,6 +1238,20 @@ export interface RunVerdicts {
     }[];
     passes: number;
     scored: number;
+  }[];
+  /** The judged conversations that no caller talked on, because the persona's voicemail or
+   * call screener answered, in the run's order. The agent rules decide them, so they are not
+   * in the scenario numbers. */
+  unplayed: {
+    conversation_id: string;
+    scenario_id: string;
+    scenario: string;
+    repeat: number;
+    persona_id: string;
+    persona: string;
+    answered_by: AnsweredBy;
+    /** The verdict with agent rules; null when the evaluation failed. */
+    verdict: Verdict | null;
   }[];
   inconsistent: string[];
   criteria: {

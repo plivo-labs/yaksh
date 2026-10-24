@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from yaksh.config import Settings
 from yaksh.db.models import Agent, AgentVersion, Persona, PersonaVersion, Scenario, ScenarioVersion
 from yaksh.domain.agents import Direction, Transport
+from yaksh.domain.answering import AnsweredBy
 from yaksh.domain.errors import NotFoundError, ValidationError
 from yaksh.domain.languages import Language
 from yaksh.domain.runs import RunScenario
@@ -43,6 +44,7 @@ class Inputs:
     scenario_version_id: uuid.UUID
     data_set_id: uuid.UUID
     data_set_name: str
+    answered_by: AnsweredBy
     language: Language
     instructions: str
     nudge: str
@@ -63,9 +65,10 @@ async def snapshot(
 ) -> list[Inputs]:
     """Check that conversations of the agent's scenarios can start now, and read what they pin,
     once for all of them: the current agent, scenario and persona versions, and today. Each
-    scenario runs with the personas asked for, or its own persona, and each persona plays the
-    data sets asked for, or every data set. The inputs are in the order asked: scenario, then
-    persona, then data set. The caller holds the agent's lock.
+    scenario runs with the personas asked for, or its own persona, each persona plays the data
+    sets asked for, or every data set, and each of those calls is answered by each answer asked
+    for. The inputs are in the order asked: scenario, then persona, then data set, then answer.
+    The caller holds the agent's lock.
     A refusal about a scenario names it."""
     current = agent_config_of(agent)
     transport = chosen_transport(current.transports, asked)
@@ -82,14 +85,22 @@ async def snapshot(
         raise ValidationError(f"phone calls are off: {problem}")
     scenario_ids = [item.scenario_id for item in wanted]
     scenarios = await scenarios_to_start(session, agent, scenario_ids)
+    machines = transport is Transport.PHONE and agent.direction is Direction.OUTBOUND
+    for scenario, item in zip(scenarios, wanted, strict=True):
+        if not machines and item.answered_by != [AnsweredBy.CALLER]:
+            raise ValidationError(
+                f'the scenario "{scenario.name}": voicemail and call screening need a phone run '
+                "of an outbound agent"
+            )
     plays = [
-        (scenario, persona_id, data_set)
+        (scenario, persona_id, data_set, answer)
         for scenario, item in zip(scenarios, wanted, strict=True)
         for persona_id in item.persona_ids or [scenario.persona_id]
         for data_set in data_sets_to_play(scenario, item.data_set_ids)
+        for answer in item.answered_by
     ]
     personas = await live_personas(
-        session, sorted({persona_id for _, persona_id, _ in plays}), share_lock=True
+        session, sorted({persona_id for _, persona_id, _, _ in plays}), share_lock=True
     )
     agent_version_id = (
         await session.execute(
@@ -133,7 +144,7 @@ async def snapshot(
         else None
     )
     inputs = []
-    for scenario, persona_id, data_set in plays:
+    for scenario, persona_id, data_set, answer in plays:
         persona = personas[persona_id]
         config = persona_config_of(persona)
         wants = scenario_config_of(scenario)
@@ -152,6 +163,7 @@ async def snapshot(
                 scenario_version_id=scenario_versions[scenario.id],
                 data_set_id=data_set.id,
                 data_set_name=data_set.name,
+                answered_by=answer,
                 language=config.language,
                 instructions=caller_instructions(
                     config,

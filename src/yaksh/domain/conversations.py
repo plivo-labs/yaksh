@@ -7,6 +7,7 @@ from typing import Protocol
 from pydantic import BaseModel, ConfigDict, Field
 
 from yaksh.domain.agents import AgentConfig, Transport
+from yaksh.domain.answering import AnsweredBy, AnsweringPlan, MachineLine
 from yaksh.domain.languages import Language
 from yaksh.domain.latency import AgentMedia, CallerReplyWindow, LoopLag
 from yaksh.domain.scenarios import Fact
@@ -53,6 +54,11 @@ class EndReason(StrEnum):
     """The caller answered its most agent turns, said goodbye and hung up."""
     START_REFUSED = "start_refused"
     """A text agent refused the first request with a 4xx: its URL or headers are wrong."""
+    VOICEMAIL_ENDED = "voicemail_ended"
+    """The persona's voicemail stopped recording, or its mailbox was full, and hung up."""
+    SCREENER_ENDED = "screener_ended"
+    """The persona's call screener hung up: it sent a reply, the persona declined, or the
+    agent did not answer it."""
 
 
 ACTIVE_STATUSES = frozenset(
@@ -139,6 +145,13 @@ class WireEventKind(StrEnum):
     TRIGGER_SENT = "trigger_sent"
     """Yaksh sent the outbound agent's trigger; the detail holds the result."""
     WAITING_FOR_CALL = "waiting_for_call"
+    CALLER_SOUND = "caller_sound"
+    """A sound of the persona's phone, such as the voicemail's tone; the detail names it and
+    its length."""
+    HOLD_STARTED = "hold_started"
+    """The call screener put the agent on hold; the detail is the hold in ms."""
+    HANDOVER = "handover"
+    """The persona picked up after its call screener."""
 
 
 class ToolItem(BaseModel):
@@ -162,6 +175,8 @@ class Turn(BaseModel):
     provenance: Provenance | None = None
     scripted: bool = False
     """Fixed text Yaksh spoke for the caller, such as the idle nudge, not model output."""
+    machine: MachineLine | None = None
+    """A recorded line of the persona's voicemail or call screener, not the persona."""
     tools: list[ToolItem] = Field(default_factory=list)
     """The text agent's tool calls in this turn, in its order."""
 
@@ -301,6 +316,10 @@ class CallRequest(BaseModel):
     caller: CallerModel
     """The caller's model: the scenario's, else the settings'."""
     scenario_model: bool = False
+    answered_by: AnsweredBy = AnsweredBy.CALLER
+    answering: AnsweringPlan | None = None
+    """What the persona's phone plays before or in place of the persona; None when the persona
+    answers."""
 
 
 class CallOutcome(BaseModel):

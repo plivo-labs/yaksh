@@ -6,6 +6,7 @@ import { Panel, PanelHeader } from "@/components/panel";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Explained, Meter, OutcomeCounts, OutcomeIcon, Stat } from "@/components/verdict-ui";
+import { ANSWERS } from "@/lib/answering";
 import { counted, percent } from "@/lib/format";
 import { useJudgeAgreement, useRunMetrics } from "@/lib/queries";
 import { ROLE_TEXT } from "@/lib/rules";
@@ -41,15 +42,17 @@ export function RunVerdictsPanel({
   const agreement = useJudgeAgreement();
   if (!metrics.data) return null;
   const verdicts = metrics.data.verdicts;
-  const judged = verdicts.scenarios.length > 0;
+  const scored = verdicts.scenarios.length > 0;
+  const judged = scored || verdicts.unplayed.length > 0;
   if (!judged && verdicts.pending === 0 && verdicts.not_judged === 0) return null;
   return (
     <Panel className="overflow-hidden">
       <PanelHeader title="Verdicts" action={<Progress verdicts={verdicts} />} />
       {judged ? (
         <>
-          <Scorecard verdicts={verdicts} />
-          <ScenarioList verdicts={verdicts} />
+          {scored && <Scorecard verdicts={verdicts} />}
+          {scored && <ScenarioList verdicts={verdicts} />}
+          {verdicts.unplayed.length > 0 && <UnplayedList calls={verdicts.unplayed} />}
           {verdicts.rules.length > 0 && <RuleList rules={verdicts.rules} agentId={agentId} />}
           <HowJudged verdicts={verdicts} agreement={agreement.data} />
         </>
@@ -385,6 +388,54 @@ function ScenarioRow({
         </div>
       )}
     </li>
+  );
+}
+
+/** The conversations that no caller talked on. Only the agent rules decide them. */
+function UnplayedList({ calls }: { calls: RunVerdicts["unplayed"] }) {
+  return (
+    <section aria-label="No caller talked" className="border-t">
+      <div className="grid gap-0.5 px-5 pt-4 pb-2">
+        <h3 className="text-s-500">No caller talked</h3>
+        <p className="text-xs-400 text-muted-foreground">
+          A voicemail or a call screener answered, and the persona did not pick up. The agent rules
+          decide these conversations.
+        </p>
+      </div>
+      <ul className="divide-y border-t">
+        {calls.map((call) => {
+          const said = call.verdict === null ? "the evaluation failed" : CHIP_TEXT[call.verdict];
+          const answer = ANSWERS.find((item) => item.value === call.answered_by)?.label;
+          return (
+            <li key={call.conversation_id}>
+              <Link
+                to={`/conversations/${call.conversation_id}`}
+                aria-label={`${call.scenario}, ${answer}, ${call.persona}, repeat ${call.repeat}: ${said}. Open the conversation.`}
+                className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-6 px-5 py-2.5 outline-none transition-colors duration-150 hover:bg-hv1 focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-inset"
+              >
+                <span className="grid min-w-0 gap-0.5">
+                  <span className="truncate text-s-500">{call.scenario}</span>
+                  <span className="truncate text-xs-400 text-muted-foreground">
+                    {answer}, {call.persona}, repeat {call.repeat}
+                  </span>
+                </span>
+                <span
+                  className={cn(
+                    "grid size-6 place-items-center rounded-md",
+                    call.verdict === null ? "bg-muted text-muted-foreground" : CHIP[call.verdict],
+                  )}
+                >
+                  <OutcomeIcon
+                    outcome={call.verdict === null ? "error" : CHIP_OUTCOME[call.verdict]}
+                    className="size-3.5 text-current"
+                  />
+                </span>
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
   );
 }
 

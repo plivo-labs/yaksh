@@ -9,6 +9,7 @@ from functools import partial
 
 from yaksh.db.models import Conversation
 from yaksh.domain.agents import AgentConfig, Direction, Transport
+from yaksh.domain.answering import AnsweredBy, Answering, plays_scenario, reaches
 from yaksh.domain.conversations import (
     CallerSettings,
     CallerUsage,
@@ -22,7 +23,7 @@ from yaksh.domain.evaluations import DecidedBy, ItemRole, Metric, MetricKey, Out
 from yaksh.domain.files import FileStore
 from yaksh.domain.language_models import JsonModel
 from yaksh.domain.latency import Latency, Span, waits
-from yaksh.domain.rules import LlmRule, PhraseRule
+from yaksh.domain.rules import LlmRule, PhraseRule, in_scope
 from yaksh.domain.scenarios import PlayedScenario
 from yaksh.evaluation import metrics, speech
 from yaksh.evaluation.caller_check import CALLER_CHECK, applied, check_caller
@@ -72,6 +73,7 @@ async def evaluate(
     agent: AgentConfig,
     scenario: PlayedScenario,
     persona: str | None,
+    answering: Answering,
     documents: Sequence[Document],
     judging: Judging | None,
     *,
@@ -83,23 +85,28 @@ async def evaluate(
     the failure is the item's error instead. Items come in order: criteria by number, rules as
     the agent lists them, instruction adherence when the agent has its instructions,
     hallucination when it has knowledge-base documents, and last the caller check, whose
-    findings can block criteria."""
+    findings can block criteria. A call that the persona's voicemail or call screener answered
+    gets only the rules that check what it reached; one where the persona never talked gets no
+    criteria and no caller check, so its scenario verdict is not scored."""
     transcript = Transcript.model_validate(conversation.transcript or {})
     found = await measure_call(conversation, store, agent.agent_speaks_first)
     if not judged(conversation):
         return Evaluated(metrics=found)
     turns = transcript.turns
+    reached = reaches(conversation.answered_by, answering)
+    agent_rules = [rule for rule in agent.rules if in_scope(rule, reached)]
     if judging is None:
-        phrases = [phrase_item(rule, turns) for rule in agent.rules if isinstance(rule, PhraseRule)]
+        phrases = [phrase_item(rule, turns) for rule in agent_rules if isinstance(rule, PhraseRule)]
         return Evaluated(metrics=found, items=phrases)
-    view = render(call_view(conversation, agent, scenario, transcript))
+    view = render(call_view(conversation, agent, scenario, transcript, answering))
+    criteria_text = scenario.criteria if plays_scenario(conversation.answered_by, answering) else []
     open_rules = [
-        rule for rule in agent.rules if isinstance(rule, LlmRule) and gate_open(rule, transcript)
+        rule for rule in agent_rules if isinstance(rule, LlmRule) and gate_open(rule, transcript)
     ]
     first = (
         await judging.jev.ask(
             view,
-            {f"criterion-{n}": text for n, text in enumerate(scenario.criteria, 1)}
+            {f"criterion-{n}": text for n, text in enumerate(criteria_text, 1)}
             | {f"{RULE}{rule.key}": rule_text(rule) for rule in open_rules},
         )
         if judging.jev is not None
@@ -148,20 +155,24 @@ async def evaluate(
                     ),
                 )
             )
-            for number, criterion in enumerate(scenario.criteria, 1)
+            for number, criterion in enumerate(criteria_text, 1)
         ]
-        caller = group.create_task(
-            check_caller(
-                judging.model,
-                view,
-                transcript,
-                persona,
-                scenario.criteria,
-                conversation.end_reason,
-                conversation.language,
-                slots=judging.slots,
-                retry_later=retry_later,
+        caller = (
+            group.create_task(
+                check_caller(
+                    judging.model,
+                    view,
+                    transcript,
+                    persona,
+                    criteria_text,
+                    conversation.end_reason,
+                    conversation.language,
+                    slots=judging.slots,
+                    retry_later=retry_later,
+                )
             )
+            if criteria_text
+            else None
         )
         rules = [
             group.create_task(
@@ -182,7 +193,7 @@ async def evaluate(
             )
             if rule in open_rules
             else rule
-            for rule in agent.rules
+            for rule in agent_rules
         ]
         sources = []
         if agent.config:
@@ -212,12 +223,16 @@ async def evaluate(
                     )
                 )
             )
-    checked = caller.result()
+    checked = caller.result() if caller is not None else None
     items = (
-        applied([task.result() for task in criteria], checked, conversation.end_reason)
+        (
+            applied([task.result() for task in criteria], checked, conversation.end_reason)
+            if checked is not None
+            else []
+        )
         + [rule_item(rule, turns) for rule in rules]
         + [task.result() for task in sources]
-        + [checked]
+        + ([checked] if checked is not None else [])
     )
     return Evaluated(
         metrics=found,
@@ -260,7 +275,11 @@ def outcomes(
 
 
 def call_view(
-    conversation: Conversation, agent: AgentConfig, scenario: PlayedScenario, transcript: Transcript
+    conversation: Conversation,
+    agent: AgentConfig,
+    scenario: PlayedScenario,
+    transcript: Transcript,
+    answering: Answering,
 ) -> CallView:
     line = parsed(LineFacts, conversation.line_facts)
     return CallView(
@@ -282,6 +301,9 @@ def call_view(
         end_reason=conversation.end_reason,
         talk_ms=conversation.talk_ms,
         turns=list(transcript.turns),
+        answered_by=conversation.answered_by,
+        answering=None if conversation.answered_by is AnsweredBy.CALLER else answering,
+        events=list(transcript.wire_events),
     )
 
 
@@ -291,7 +313,9 @@ async def measure_call(
     """The metrics of a saved call. A call that never connected has only its usage. One that
     failed before it was saved in full, or has no recording or caller replies, has no speech
     metrics: a missing value, never a zero. agent_speaks_first is the pinned agent's setting:
-    without it, Yaksh's caller opens the call."""
+    without it, Yaksh's caller opens the call. The persona's voicemail or call screener is not
+    a reply that waits for the agent, so its lines, and the call's start when it answers, have
+    no response time."""
     transcript = Transcript.model_validate(conversation.transcript or {})
     found = {
         MetricKey.USAGE: metrics.usage(
@@ -325,7 +349,7 @@ async def measure_call(
         heard.end_ms,
         goodbye_from_ms=goodbye,
         gaps=gaps,
-        agent_opens=agent_speaks_first,
+        agent_opens=agent_speaks_first and conversation.answered_by is AnsweredBy.CALLER,
     )
     found[MetricKey.SPEECH] = Metric(value=heard.speech.model_dump(mode="json"))
     found[MetricKey.RESPONSE_TIME] = Metric(value=Latency.answered(paired).model_dump(mode="json"))
@@ -368,6 +392,5 @@ async def hear(
         voice, voice_rate = await asyncio.to_thread(speech.read_mono, caller_voice)
         if voice_rate != rate:
             raise ValueError(f"the caller voice is at {voice_rate} Hz, the recording at {rate} Hz")
-    return await speech.measure(
-        agent, voice, rate, transcript.recording_start_ms, transcript.caller_replies
-    )
+    replies = [reply for reply in transcript.caller_replies if reply.machine is None]
+    return await speech.measure(agent, voice, rate, transcript.recording_start_ms, replies)

@@ -38,15 +38,29 @@ func RunVerdicts(ctx context.Context, c *api.Client, id uuid.UUID, opts Options)
 		func(v Verdicts) string { return fmt.Sprintf("judging: %d calls pending", v.Metrics.Verdicts.Pending) })
 }
 
-// Passed reports whether the judges passed every judged call, by its scenario verdict after
-// people's labels. A call they did not score, or whose evaluation failed, proves nothing, so it
-// does not pass. With the judges off, no call is judged.
-func (v Verdicts) Passed() bool {
+// verdicts lists the verdict of each judged call after people's labels: the scenario verdict of
+// a call where the persona talked, and the verdict with agent rules of a call that only its
+// voicemail or call screener answered.
+func (v Verdicts) verdicts() []*api.Verdict {
+	var found []*api.Verdict
 	for _, scenario := range v.Metrics.Verdicts.Scenarios {
 		for _, call := range scenario.Calls {
-			if call.Verdict == nil || *call.Verdict != api.VerdictPass {
-				return false
-			}
+			found = append(found, call.Verdict)
+		}
+	}
+	for _, call := range v.Metrics.Verdicts.Unplayed {
+		found = append(found, call.Verdict)
+	}
+	return found
+}
+
+// Passed reports whether the judges passed every judged call. A call they did not score, or
+// whose evaluation failed, proves nothing, so it does not pass. With the judges off, no call is
+// judged.
+func (v Verdicts) Passed() bool {
+	for _, verdict := range v.verdicts() {
+		if verdict == nil || *verdict != api.VerdictPass {
+			return false
 		}
 	}
 	return true
@@ -56,10 +70,8 @@ func (v Verdicts) Passed() bool {
 // judges are off. It is empty when no call was evaluated.
 func (v Verdicts) Summary() string {
 	counts := map[string]int{}
-	for _, scenario := range v.Metrics.Verdicts.Scenarios {
-		for _, call := range scenario.Calls {
-			counts[verdictName(call.Verdict)]++
-		}
+	for _, verdict := range v.verdicts() {
+		counts[verdictName(verdict)]++
 	}
 	var parts []string
 	for _, name := range []string{"pass", "fail", "not scored", "evaluation failed"} {

@@ -264,7 +264,10 @@ async def persona_draft(
 async def test_a_persona_fork_in_another_language_gets_a_voice_that_speaks_it(
     client: AsyncClient, generation_model: FakeJsonModel
 ) -> None:
-    original = await create_persona(client, name="Rushed caller", sample_line="Hi there.")
+    phone = {"voicemail": "carrier", "greeting": "Hi, it's Rachel.", "screener": "truecaller"}
+    original = await create_persona(
+        client, name="Rushed caller", sample_line="Hi there.", answering=phone
+    )
 
     events = await persona_draft(
         client, generation_model, original["id"], language="hi", voice_gender="female"
@@ -277,6 +280,7 @@ async def test_a_persona_fork_in_another_language_gets_a_voice_that_speaks_it(
         original["id"],
     )
     assert draft["sample_line"] is None
+    assert draft["answering"] == {**original["answering"], "greeting": None}
 
 
 async def test_a_persona_fork_changes_only_what_the_change_names(
@@ -288,7 +292,11 @@ async def test_a_persona_fork_changes_only_what_the_change_names(
         "speaker": {"kind": "tv", "db": -9, "start_s": 3},
     }
     original = await create_persona(
-        client, name="Rushed caller", prompt="You are impatient.", surroundings=surroundings
+        client,
+        name="Rushed caller",
+        prompt="You are impatient.",
+        surroundings=surroundings,
+        answering={"voicemail": "pixel", "greeting": "Leave a message."},
     )
 
     louder = await persona_draft(client, generation_model, original["id"], noise_level="loud")
@@ -300,6 +308,7 @@ async def test_a_persona_fork_changes_only_what_the_change_names(
     louder_sounds = [{**sound, "db": -4} for sound in own["sounds"]]
     assert loud["surroundings"] == {**own, "sounds": louder_sounds}
     assert (loud["prompt"], loud["voice"]) == ("You are impatient.", original["voice"])
+    assert loud["answering"] == original["answering"]
     assert quiet["surroundings"] == {**own, "speaker": None}
     assert loud["name"] == "Rushed caller (changed)"
 

@@ -30,6 +30,7 @@ from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
 from pipecat.serializers.base_serializer import FrameSerializer
 from pipecat.transports.websocket.fastapi import FastAPIWebsocketParams, FastAPIWebsocketTransport
 
+from yaksh.caller.answering import AnsweringScript, own_greeting
 from yaksh.caller.audio import (
     GAP_BYTES,
     LOUD_PEAK,
@@ -706,6 +707,7 @@ class PhoneCaller:
             return unreached(EndReason.ERROR, str(error))
         api = self._plivo_api(*credentials)
         hang_up = partial(self._hang_up, api)
+        own = own_greeting(request, keys)
         clock = Clock()
         observer.wire_event(WireEvent(kind=WireEventKind.CONNECT_STARTED, at_ms=clock.ms()))
         entry = self._registry.expect(request.conversation_id)
@@ -726,10 +728,15 @@ class PhoneCaller:
                 return dialed
             line = Line(dialed.call_uuid, entry.callbacks, hang_up)
             try:
-                return await self._talk(request, keys, observer, stop, clock, dialed, line, live)
+                return await self._talk(
+                    request, keys, observer, stop, clock, dialed, line, live, own
+                )
             finally:
                 await line.hang_up()
         finally:
+            if own is not None:
+                own.cancel()
+                await asyncio.gather(own, return_exceptions=True)
             await live.close()
             self._registry.forget(request.conversation_id)
             if trigger is not None:
@@ -777,12 +784,14 @@ class PhoneCaller:
         dialed: Connected,
         line: Line,
         live: LiveAudio,
+        own: asyncio.Future[bytes] | None,
     ) -> CallOutcome:
+        """own is the persona's own voicemail greeting, being spoken."""
         connected_ms = clock.ms()
         observer.wire_event(WireEvent(kind=WireEventKind.CONNECTED, at_ms=connected_ms))
         lag = LagSampler(clock.ms)
         try:
-            spoken = await self._converse(request, keys, observer, stop, clock, dialed, live)
+            spoken = await self._converse(request, keys, observer, stop, clock, dialed, live, own)
         finally:
             loop_lag = lag.stop()
         ended_ms = clock.ms()
@@ -831,8 +840,11 @@ class PhoneCaller:
         clock: Clock,
         dialed: Connected,
         live: LiveAudio,
+        own: asyncio.Future[bytes] | None,
     ) -> Spoken:
-        """Build the caller around the stream and hold the conversation until it ends."""
+        """Build the caller around the stream and hold the conversation until it ends. When the
+        persona's voicemail or call screener answers, it starts at connect in place of the
+        persona."""
         log.info(
             "stream %s for conversation %s, call %s, %s",
             dialed.stream_id,
@@ -880,9 +892,17 @@ class PhoneCaller:
             observers=[AudioTap(transport.input(), transport.output(), live)],
         )
 
+        machine: asyncio.Task[None] | None = None
+
         @transport.event_handler("on_client_connected")
         async def on_connected(_transport: Any, _socket: Any) -> None:
-            if not request.agent.agent_speaks_first:
+            nonlocal machine
+            if request.answering is not None:
+                script = AnsweringScript(
+                    request.answering, persona, state, transcript, observer, clock, own
+                )
+                machine = asyncio.create_task(script.run())
+            elif not request.agent.agent_speaks_first:
                 await persona.speak_first()
 
         @transport.event_handler("on_client_disconnected")
@@ -890,7 +910,7 @@ class PhoneCaller:
             disconnected.set()
 
         greeting = None
-        if request.agent.agent_speaks_first:
+        if request.agent.agent_speaks_first and request.answering is None:
             greeting = asyncio.create_task(persona.greet_if_silent())
         try:
             await converse(
@@ -904,8 +924,10 @@ class PhoneCaller:
                 },
             )
         finally:
-            if greeting is not None:
-                greeting.cancel()
+            for task in (greeting, machine):
+                if task is not None:
+                    task.cancel()
+                    await asyncio.gather(task, return_exceptions=True)
         return Spoken(state, persona, recording, marks, serializer)
 
     @staticmethod

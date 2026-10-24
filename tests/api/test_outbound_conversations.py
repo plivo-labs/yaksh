@@ -15,9 +15,11 @@ from tests.conftest import (
     FakeCaller,
     claim,
     create_agent,
+    create_persona,
     create_scenario,
     data_sets,
     expire_leases,
+    finish,
     make_settings,
     make_worker,
     reap,
@@ -29,6 +31,8 @@ from tests.conftest import (
 from yaksh.config import Settings
 from yaksh.db.models import Conversation, PhoneNumber, RunningWorker
 from yaksh.db.session import create_engine, create_sessionmaker
+from yaksh.domain.answering import AnsweredBy, MachineLine
+from yaksh.domain.conversations import CallOutcome, EndReason
 from yaksh.simulation import conversations
 from yaksh.simulation.workers import report_worker
 from yaksh.timings import TIMINGS
@@ -248,3 +252,94 @@ async def test_an_outbound_retry_runs_as_outbound(
     assert inbound_only is None and retried is not None
     detail = (await client.get(f"/api/v1/conversations/{retried}")).json()
     assert (detail["direction"], detail["attempt"]) == ("outbound", 2)
+
+
+async def test_a_run_calls_each_persona_and_data_set_once_for_each_answer(
+    client: AsyncClient, settings: Settings
+) -> None:
+    await report(settings)
+    await link_number(settings)
+    agent = await create_agent(client, **OUTBOUND_AGENT)
+    noisy = await create_persona(client, name="Noisy caller", surroundings={"auto": {"db": -10}})
+    scenario = await create_scenario(
+        client, agent["id"], persona_id=noisy["id"], data_sets=WITH_DATA
+    )
+    answers = ["caller", "voicemail", "screener"]
+
+    started = await start_run(
+        client, agent["id"], [{"scenario_id": scenario["id"], "answered_by": answers}]
+    )
+    run_id = started.json()["id"]
+    queued = await run_conversations(client, run_id)
+    detail = (await client.get(f"/api/v1/runs/{run_id}")).json()
+    voicemails = await run_conversations(client, run_id, answered_by="voicemail")
+    caller, voicemail = [
+        (await client.get(f"/api/v1/conversations/{queued[n]['id']}")).json() for n in (0, 1)
+    ]
+
+    assert started.status_code == 202, started.text
+    assert [c["answered_by"] for c in queued] == answers
+    assert detail["scenarios"][0]["answered_by"] == answers
+    assert detail["answered_by"] == {"caller": 1, "voicemail": 1, "screener": 1}
+    assert [c["id"] for c in voicemails] == [queued[1]["id"]]
+    assert caller["answering"] is None and caller["sounds"] != []
+    assert voicemail["answering"] == noisy["answering"]
+    assert voicemail["sounds"] == [], "a recording has no surroundings behind it"
+
+
+async def test_preparing_a_call_that_a_machine_answers_plans_what_the_phone_plays(
+    client: AsyncClient, settings: Settings, db: Db
+) -> None:
+    await report(settings)
+    await link_number(settings)
+    agent = await create_agent(client, **OUTBOUND_AGENT)
+    phone = {"voicemail": "carrier", "greeting": "Hi, it's Rachel.", "after_screening": "voicemail"}
+    persona = await create_persona(client, name="Busy caller", answering=phone)
+    scenario = await create_scenario(
+        client, agent["id"], persona_id=persona["id"], data_sets=WITH_DATA
+    )
+    await start_run(
+        client, agent["id"], [{"scenario_id": scenario["id"], "answered_by": ["screener"]}]
+    )
+    claimed = await claim(db, receiving_app_id=APP_ID)
+    assert claimed is not None
+
+    async with db() as session:
+        conversation = await session.get_one(Conversation, uuid.UUID(claimed))
+        request = await conversations.prepare_call(
+            session, APP_SETTINGS, conversation, APP_ID, APP_ID
+        )
+
+    plan = request.answering
+    assert request.answered_by is AnsweredBy.SCREENER
+    assert plan is not None and plan.screener is not None and plan.voicemail is not None
+    assert plan.screener.label == "iPhone call screening"
+    assert plan.screener.prompt.line is MachineLine.SCREENER
+    assert Path(plan.screener.prompt.file).is_file()
+    assert (plan.voicemail.greeting, plan.voicemail.own_greeting) == (None, "Hi, it's Rachel.")
+    assert plan.voicemail.tone is not None
+
+
+async def test_a_retry_keeps_who_answers(client: AsyncClient, settings: Settings, db: Db) -> None:
+    await report(settings)
+    await link_number(settings)
+    agent = await create_agent(client, **OUTBOUND_AGENT)
+    scenario = await create_scenario(client, agent["id"], data_sets=WITH_DATA)
+    started = await start_run(
+        client,
+        agent["id"],
+        [{"scenario_id": scenario["id"], "answered_by": ["voicemail"]}],
+        max_retries=1,
+    )
+    claimed = await claim(db, receiving_app_id=APP_ID)
+    assert claimed is not None
+
+    await finish(
+        db, claimed, CallOutcome(connected=False, end_reason=EndReason.ERROR, caller_error="x")
+    )
+    attempts = await run_conversations(client, started.json()["id"])
+
+    assert [(c["attempt"], c["answered_by"]) for c in attempts] == [
+        (1, "voicemail"),
+        (2, "voicemail"),
+    ]

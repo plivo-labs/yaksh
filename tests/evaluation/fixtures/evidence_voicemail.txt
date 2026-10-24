@@ -1,0 +1,26 @@
+AGENT
+Brief: Calls patients to confirm their cleaning appointments for Maple Dental.
+Agent data sent with this call: none.
+
+CALLER
+Instructions: Book a cleaning for next Tuesday afternoon as a new patient.
+Known facts: full name = Jordan Lee; date of birth = 14 March 1990; phone number = 555 0142.
+Facts the caller does not know: insurance member ID.
+
+DATE
+Today is Thursday, 1 October 2026. Time zone: America/New_York.
+
+CALL FACTS
+The agent called Yaksh's number +15550177 from +15550200.
+Answered by: the voicemail of Yaksh's caller (Carrier voicemail, its own greeting).
+The voicemail of Yaksh's caller stopped recording and hung up (Plivo hangup source: Callee). End reason: voicemail_ended. Call length: 45.3 s.
+
+TRANSCRIPT
+The agent's lines are Yaksh's speech-to-text of the agent's audio. Judge what was said, not the spelling: "for" can mean "four", and "to" can mean "two".
+A line marked recorded is played by the phone of Yaksh's caller, its voicemail or its call screener: a fixed recording that cannot hear or answer the agent.
+[1] Voicemail (recorded): Hi, you've reached Jordan. Leave a message.
+(Voicemail: tone, 1 s.)
+[2] Agent: Hi Jordan, this is Ava from Maple Dental. Please call us back.
+
+ITEM
+Criterion: The agent leaves a call-back number.

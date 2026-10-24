@@ -17,6 +17,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ANSWERS } from "@/lib/answering";
 import { playedDataSet } from "@/lib/data-sets";
 import { copyText } from "@/lib/clipboard";
 import { duration, surroundingsLabel, when } from "@/lib/format";
@@ -185,6 +186,11 @@ function ConversationRow({
           </Link>
           {conversation.attempt > 1 && (
             <Badge className="shrink-0">Attempt {conversation.attempt}</Badge>
+          )}
+          {conversation.answered_by !== "caller" && (
+            <Badge className="shrink-0">
+              {ANSWERS.find((answer) => answer.value === conversation.answered_by)?.label}
+            </Badge>
           )}
           {surroundingsLabel(conversation.surroundings) && (
             <Badge className="shrink-0">{surroundingsLabel(conversation.surroundings)}</Badge>

@@ -42,10 +42,13 @@ export function CallResults({
   conversationId,
   evaluation,
   onTurn,
+  notPlayed = null,
 }: {
   conversationId: string;
   evaluation: EvaluationState | null;
   onTurn?: OnTurn;
+  /** Why the scenario's criteria were not judged: no caller talked on the call. */
+  notPlayed?: string | null;
 }) {
   const found = useConversationEvaluation(conversationId, evaluation);
   if (evaluation === null) {
@@ -108,6 +111,12 @@ export function CallResults({
               Label this conversation
             </Link>
           </div>
+        </section>
+      )}
+      {notPlayed && data.scenario_verdict !== null && (
+        <section aria-label="Criteria" className="grid gap-2">
+          <h3 className="text-label text-muted-foreground">Criteria</h3>
+          <Note>Not judged. {notPlayed}</Note>
         </section>
       )}
       {GROUPS.map(({ title, matches }) => {

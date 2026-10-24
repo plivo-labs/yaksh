@@ -47,6 +47,16 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
+import {
+  type CallMoment,
+  answeredText,
+  callMoments,
+  machineBand,
+  machineSpeaker,
+  playsScenario,
+  soundMs,
+  voicemailFacts,
+} from "@/lib/answering";
 import { playedDataSet } from "@/lib/data-sets";
 import { copyText } from "@/lib/clipboard";
 import {
@@ -168,7 +178,7 @@ function ConversationView({ id }: { id: string }) {
         {data.failure_reason && (
           <p className="text-s-400 text-status-danger">{data.failure_reason}</p>
         )}
-        {data.caller_reason && (
+        {data.caller_reason && data.answered_by === "caller" && (
           <p className="text-s-400 text-muted-foreground">
             Why the caller hung up: {data.caller_reason}
           </p>
@@ -210,6 +220,11 @@ function ConversationView({ id }: { id: string }) {
                     conversationId={data.id}
                     evaluation={data.evaluation}
                     onTurn={showTurn}
+                    notPlayed={
+                      playsScenario(data.answered_by, data.answering)
+                        ? null
+                        : `${data.answered_by === "voicemail" ? "A voicemail" : "A call screener"} answered, so no caller talked.`
+                    }
                   />
                 </TabsContent>
                 <TabsContent value="metrics">
@@ -272,6 +287,11 @@ function ConversationFacts({ conversation }: { conversation: Conversation }) {
   const finished = !ACTIVE_STATUSES.includes(conversation.status);
   const [initial] = useState(conversation.status);
   const arrived = conversation.status === initial ? undefined : APPEAR;
+  const answered = conversation.answered_by !== "caller";
+  const persona = playsScenario(conversation.answered_by, conversation.answering);
+  const voicemail = answered
+    ? voicemailFacts(conversation.transcript, conversation.wire_events)
+    : null;
   return (
     <dl className="flex flex-wrap gap-x-10 gap-y-3">
       {conversation.started_at && (
@@ -284,28 +304,53 @@ function ConversationFacts({ conversation }: { conversation: Conversation }) {
           <span className="tabular-nums">{duration(conversation.talk_ms)}</span>
         </Fact>
       )}
+      {answered && (
+        <Fact label="Answered by">
+          {answeredText(
+            conversation.answered_by,
+            conversation.answering,
+            conversation.transcript,
+            conversation.wire_events,
+          )}
+        </Fact>
+      )}
       {conversation.end_reason && (
         <Fact className={arrived} label="End">
           {END_REASON_LABELS[conversation.end_reason]}
         </Fact>
       )}
-      {latency?.p90_ms != null && (
+      {voicemail && finished && (
+        <>
+          <Fact className={arrived} label="Talked over the greeting">
+            {voicemail.talkedOver ? "Yes" : "No"}
+          </Fact>
+          <Fact className={arrived} label="Message">
+            <span className="tabular-nums">{duration(voicemail.messageMs)}</span>
+          </Fact>
+        </>
+      )}
+      {!persona && finished && conversation.talk_ms !== null && (
+        <Fact className={arrived} label="Response time">
+          No caller turns
+        </Fact>
+      )}
+      {persona && latency?.p90_ms != null && (
         <Fact className={arrived} label="Response p90">
           <ResponseTime ms={latency.p90_ms} />
         </Fact>
       )}
-      {latency?.p50_ms != null && (
+      {persona && latency?.p50_ms != null && (
         <Fact className={arrived} label="Response p50">
           <ResponseTime ms={latency.p50_ms} />
         </Fact>
       )}
-      {latency && (
+      {persona && latency && (
         <Fact className={arrived} label="Replies">
           <span className="tabular-nums">{latency.replies}</span>
           {latency.talked_over > 0 && `, ${latency.talked_over} talked over`}
         </Fact>
       )}
-      {latency === null && finished && conversation.talk_ms !== null && (
+      {persona && latency === null && finished && conversation.talk_ms !== null && (
         <Fact className={arrived} label="Response time">
           {measuring[conversation.evaluation ?? "none"]}
         </Fact>
@@ -392,6 +437,59 @@ function replyMark(reply: Reply, connectedMs: number): Mark {
   };
 }
 
+const MACHINE_FILL: Record<string, { fill: string; text: string }> = {
+  line: { fill: "bg-status-neutral/15", text: "text-muted-foreground" },
+  tone: { fill: "bg-status-progress/15", text: "text-status-progress" },
+  hold: { fill: "bg-status-warning/15", text: "text-status-warning-text" },
+};
+
+/** The persona's phone on the waveform: each recorded line, the voicemail's tone and the
+ * screener's hold. */
+function machineMarks(conversation: Conversation, connectedMs: number): Mark[] {
+  const at = (ms: number) => Math.max(0, ms - connectedMs) / 1000;
+  const end = conversation.talk_ms === null ? Infinity : conversation.talk_ms / 1000;
+  const lines = conversation.transcript.flatMap((turn): Mark[] =>
+    turn.machine
+      ? [
+          {
+            from: at(turn.started_at_ms),
+            to: at(turn.ended_at_ms),
+            label: machineBand(turn.machine),
+            title: `Recorded line of the ${machineSpeaker(turn.machine).toLowerCase()}`,
+            ...MACHINE_FILL.line,
+          },
+        ]
+      : [],
+  );
+  const sounds = conversation.wire_events.flatMap((event): Mark[] => {
+    if (event.kind === "caller_sound") {
+      return [
+        {
+          from: at(event.at_ms),
+          to: at(event.at_ms + soundMs(event)),
+          label: "Tone",
+          title: "The voicemail's tone",
+          ...MACHINE_FILL.tone,
+        },
+      ];
+    }
+    if (event.kind === "hold_started") {
+      const hold = Number(event.detail ?? 0) / 1000;
+      return [
+        {
+          from: at(event.at_ms),
+          to: Math.min(at(event.at_ms) + hold, end),
+          label: "Hold",
+          title: `The call screener held the agent for ${Math.round(hold)} s`,
+          ...MACHINE_FILL.hold,
+        },
+      ];
+    }
+    return [];
+  });
+  return [...lines, ...sounds];
+}
+
 /** A turn to bring into view, by index. Each ask is a new object, so asking for the same turn
  * again scrolls to it again. */
 export interface ShownTurn {
@@ -436,7 +534,10 @@ function AudioCard({
         marks={
           connectedMs === undefined
             ? []
-            : conversation.replies.map((reply) => replyMark(reply, connectedMs))
+            : [
+                ...machineMarks(conversation, connectedMs),
+                ...conversation.replies.map((reply) => replyMark(reply, connectedMs)),
+              ]
         }
       />
     );
@@ -486,6 +587,7 @@ export function CallPane({
       )}
       <Transcript
         turns={conversation.transcript}
+        moments={connectedMs === undefined ? [] : callMoments(conversation, connectedMs)}
         active={ACTIVE_STATUSES.includes(conversation.status)}
         waiting={waitingText(conversation)}
         connectedMs={connectedMs ?? 0}
@@ -761,6 +863,7 @@ function ShowTurn({ shown }: { shown: ShownTurn | null }) {
 
 function Transcript({
   turns,
+  moments,
   active,
   waiting,
   connectedMs,
@@ -769,6 +872,8 @@ function Transcript({
   onPlay,
 }: {
   turns: Turn[];
+  /** Lines between the turns, by time. */
+  moments: CallMoment[];
   active: boolean;
   waiting: string;
   /** Turn times count from the dial; they show from the connect, as the recording does. */
@@ -812,7 +917,17 @@ function Transcript({
               <ShowTurn shown={shown} />
               <MessageScrollerViewport className="pr-4">
                 <MessageScrollerContent className="gap-4">
-                  {turns.map((turn, index) => {
+                  {timeline(turns, moments).map((line) => {
+                    if (line.kind === "moment") {
+                      return (
+                        <MomentRow
+                          key={`${line.moment.at_ms}-${line.moment.text}`}
+                          moment={line.moment}
+                          connectedMs={connectedMs}
+                        />
+                      );
+                    }
+                    const { turn, index } = line;
                     const at = Math.max(0, turn.started_at_ms - connectedMs);
                     return (
                       <MessageScrollerItem
@@ -823,7 +938,15 @@ function Transcript({
                         <Message align={turn.role === "caller" ? "end" : "start"}>
                           <MessageContent>
                             <MessageHeader className="gap-2 tabular-nums">
-                              <span>{turn.role === "agent" ? "Agent" : "Caller"}</span>
+                              <span
+                                className={turn.machine ? "font-medium text-secondary" : undefined}
+                              >
+                                {turn.machine
+                                  ? machineSpeaker(turn.machine)
+                                  : turn.role === "agent"
+                                    ? "Agent"
+                                    : "Caller"}
+                              </span>
                               <span>{clock(at)}</span>
                               {typeof turn.response_ms === "number" && (
                                 <ResponseTime ms={turn.response_ms} />
@@ -844,7 +967,7 @@ function Transcript({
                                 <Copy className="size-3.5" />
                               </button>
                             </MessageHeader>
-                            <Bubble variant={turn.role}>
+                            <Bubble variant={turn.machine ? "outline" : turn.role}>
                               <BubbleContent
                                 render={
                                   onPlay && (
@@ -861,6 +984,7 @@ function Transcript({
                                   index === shown?.index && "ring-2 ring-status-progress/70",
                                   turn.provenance === "cut" && "line-through opacity-60",
                                   turn.provenance === "unconfirmed" && "opacity-60",
+                                  turn.machine && "border-dashed text-muted-foreground",
                                 )}
                               >
                                 {turn.text}
@@ -886,6 +1010,37 @@ function Transcript({
         )}
       </CardContent>
     </Card>
+  );
+}
+
+type TranscriptLine =
+  | { kind: "turn"; turn: Turn; index: number }
+  | { kind: "moment"; moment: CallMoment };
+
+/** The turns in transcript order, which the judges' turn numbers follow, with each moment
+ * before the first of them that starts at or after it. A turn keeps its index, which the
+ * recording and the quotes use. */
+function timeline(turns: Turn[], moments: CallMoment[]): TranscriptLine[] {
+  const sorted = [...moments].sort((a, b) => a.at_ms - b.at_ms);
+  const lines: TranscriptLine[] = [];
+  let next = 0;
+  turns.forEach((turn, index) => {
+    for (; next < sorted.length && sorted[next].at_ms <= turn.started_at_ms; next++) {
+      lines.push({ kind: "moment", moment: sorted[next] });
+    }
+    lines.push({ kind: "turn", turn, index });
+  });
+  return [...lines, ...sorted.slice(next).map((moment) => ({ kind: "moment" as const, moment }))];
+}
+
+function MomentRow({ moment, connectedMs }: { moment: CallMoment; connectedMs: number }) {
+  return (
+    <div
+      role="separator"
+      className="flex items-center gap-3 text-xs-400 text-muted-foreground tabular-nums before:h-px before:flex-1 before:bg-border after:h-px after:flex-1 after:bg-border"
+    >
+      {moment.text} · {clock(Math.max(0, moment.at_ms - connectedMs))}
+    </div>
   );
 }
 

@@ -13,6 +13,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from yaksh.db.models import Agent, Persona, PersonaVersion, Scenario, Voice
+from yaksh.domain.answering import Answering
 from yaksh.domain.errors import ConflictError, NotFoundError, ValidationError
 from yaksh.domain.names import fork_name
 from yaksh.domain.personas import PersonaConfig, PersonaCreate, PersonaSettings, PersonaUpdate
@@ -36,6 +37,7 @@ def config_of(persona: Persona) -> PersonaConfig:
         voice_gender=persona.voice_gender,
         surroundings=Surroundings.model_validate(persona.surroundings),
         sample_line=persona.sample_line,
+        answering=Answering.model_validate(persona.answering),
     )
 
 
@@ -50,6 +52,7 @@ def config_columns(config: PersonaConfig) -> dict[str, Any]:
         "voice_gender": config.voice_gender,
         "surroundings": config.surroundings.model_dump(mode="json"),
         "sample_line": config.sample_line,
+        "answering": config.answering.model_dump(mode="json"),
     }
 
 

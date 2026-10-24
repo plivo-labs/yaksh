@@ -259,3 +259,39 @@ async def test_a_sample_line_is_kept_and_cleared_like_any_setting(client: AsyncC
     assert cleared.json()["sample_line"] is None
     assert cleared.json()["current_version"] == 3
     assert too_long.status_code == 422
+
+
+async def test_a_persona_keeps_its_voicemail_and_screener_and_a_change_makes_a_version(
+    client: AsyncClient,
+) -> None:
+    plain = await create_persona(client)
+    phone = {
+        "voicemail": "carrier",
+        "greeting": "  Hi, it's Rachel. Leave a message. ",
+        "screener": "truecaller",
+        "after_screening": "reply",
+    }
+    persona = await create_persona(client, name="Screened caller", answering=phone)
+    url = f"/api/v1/personas/{persona['id']}"
+
+    changed = await client.patch(url, json={"answering": {"voicemail": "mailbox_full"}})
+    cleared = await client.patch(url, json={"answering": None})
+    long = await client.patch(url, json={"answering": {"greeting": "x" * 201}})
+    fork = await client.post(f"{url}/fork")
+    versions = (await client.get(f"{url}/versions")).json()["items"]
+
+    assert plain["answering"] == {
+        "voicemail": "iphone",
+        "greeting": None,
+        "screener": "iphone",
+        "after_screening": "picks_up",
+    }
+    assert persona["answering"] == {**phone, "greeting": "Hi, it's Rachel. Leave a message."}
+    assert changed.json()["answering"] == {**plain["answering"], "voicemail": "mailbox_full"}
+    assert changed.json()["current_version"] == 2
+    assert cleared.status_code == 422 and cleared.json()["error"]["message"] == (
+        "answering: answering cannot be null"
+    )
+    assert long.status_code == 422
+    assert fork.json()["answering"] == changed.json()["answering"]
+    assert [v["config"]["answering"]["voicemail"] for v in versions] == ["mailbox_full", "carrier"]

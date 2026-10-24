@@ -2,14 +2,30 @@
 leaves out what must not sway a judge: the caller's own reason for ending the call, the noise
 setting, the agent's configuration and its documents. A change to the text is a new version."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date
 
 from yaksh.domain.agents import Direction, Transport
-from yaksh.domain.conversations import EndReason, Provenance, Role, ToolItem, Turn
+from yaksh.domain.answering import (
+    SCREENER_LABELS,
+    VOICEMAIL_LABELS,
+    AnsweredBy,
+    Answering,
+    MachineLine,
+    Voicemail,
+)
+from yaksh.domain.conversations import (
+    EndReason,
+    Provenance,
+    Role,
+    ToolItem,
+    Turn,
+    WireEvent,
+    WireEventKind,
+)
 from yaksh.domain.scenarios import Fact
 
-EVIDENCE_VIEW_VERSION = 3
+EVIDENCE_VIEW_VERSION = 4
 
 TRANSCRIPTION_NOTE = {
     Transport.PHONE: (
@@ -29,7 +45,19 @@ ENDED_BY = {
     EndReason.CALLER_HANGUP: "Yaksh's caller hung up",
     EndReason.TURN_LIMIT: "Yaksh's caller hung up at the test's turn limit",
     EndReason.DURATION_LIMIT: "Yaksh ended the call at the test's time limit",
+    EndReason.VOICEMAIL_ENDED: "The voicemail of Yaksh's caller stopped recording and hung up",
+    EndReason.SCREENER_ENDED: "The call screener of Yaksh's caller hung up",
 }
+RECORDED = {
+    MachineLine.GREETING: "Voicemail",
+    MachineLine.MAILBOX_FULL: "Voicemail",
+    MachineLine.SCREENER: "Call screener",
+    MachineLine.REPLY: "Call screener",
+}
+MACHINE_NOTE = (
+    "A line marked recorded is played by the phone of Yaksh's caller, its voicemail or its call "
+    "screener: a fixed recording that cannot hear or answer the agent."
+)
 
 
 @dataclass(frozen=True)
@@ -52,6 +80,10 @@ class CallView:
     end_reason: EndReason | None
     talk_ms: int | None
     turns: list[Turn]
+    answered_by: AnsweredBy = AnsweredBy.CALLER
+    answering: Answering | None = None
+    """The voicemail and call screener of Yaksh's caller, when one of them answered."""
+    events: list[WireEvent] = field(default_factory=list)
 
 
 def render(view: CallView) -> str:
@@ -80,8 +112,15 @@ def render(view: CallView) -> str:
                     f"Time zone: {view.time_zone}.",
                 ]
             ),
-            "\n".join(["CALL FACTS", who_called(view), how_it_ended(view)]),
-            "\n".join(["TRANSCRIPT", TRANSCRIPTION_NOTE[view.transport], *transcript(view.turns)]),
+            "\n".join(["CALL FACTS", who_called(view), *answered(view), how_it_ended(view)]),
+            "\n".join(
+                [
+                    "TRANSCRIPT",
+                    TRANSCRIPTION_NOTE[view.transport],
+                    *([MACHINE_NOTE] if view.answered_by is not AnsweredBy.CALLER else []),
+                    *transcript(view.turns, view.events),
+                ]
+            ),
         ]
     )
 
@@ -110,6 +149,27 @@ def who_called(view: CallView) -> str:
     )
 
 
+def answered(view: CallView) -> list[str]:
+    """Who answered for Yaksh's caller, when its voicemail or call screener did."""
+    answering = view.answering
+    if view.answered_by is AnsweredBy.CALLER or answering is None:
+        return []
+    voicemail = VOICEMAIL_LABELS[answering.voicemail]
+    if answering.voicemail is not Voicemail.MAILBOX_FULL:
+        greeting = "its own greeting" if answering.greeting else "its standard greeting"
+        voicemail = f"{voicemail}, {greeting}"
+    if view.answered_by is AnsweredBy.VOICEMAIL:
+        return [f"Answered by: the voicemail of Yaksh's caller ({voicemail})."]
+    lines = [
+        f"Answered by: the call screener of Yaksh's caller ({SCREENER_LABELS[answering.screener]})."
+    ]
+    if any(event.kind is WireEventKind.HANDOVER for event in view.events):
+        lines.append("After the screener, Yaksh's caller picked up.")
+    elif any(turn.machine is MachineLine.GREETING for turn in view.turns):
+        lines.append(f"After the screener, the voicemail of Yaksh's caller answered ({voicemail}).")
+    return lines
+
+
 def how_it_ended(view: CallView) -> str:
     ended = ENDED_BY.get(view.end_reason, "The call ended") if view.end_reason else "The call ended"
     source = f" (Plivo hangup source: {view.hangup_source})" if view.hangup_source else ""
@@ -118,10 +178,34 @@ def how_it_ended(view: CallView) -> str:
     return f"{ended}{source}. End reason: {reason}. Call length: {length}."
 
 
-def transcript(turns: list[Turn]) -> list[str]:
-    return [
-        f"[{number}] {speaker(turn)}: {turn_evidence(turn)}" for number, turn in enumerate(turns, 1)
-    ]
+def transcript(turns: list[Turn], events: list[WireEvent]) -> list[str]:
+    """The numbered turns, with what the phone of Yaksh's caller did between them on lines
+    that have no number, so a criterion's turn numbers stay the turns' own."""
+    marks = sorted(
+        (event for event in events if event.kind in BETWEEN_TURNS), key=lambda event: event.at_ms
+    )
+    lines = []
+    for number, turn in enumerate(turns, 1):
+        while marks and marks[0].at_ms <= turn.started_at_ms:
+            lines.append(mark_line(marks.pop(0)))
+        lines.append(f"[{number}] {speaker(turn)}: {turn_evidence(turn)}")
+    return lines + [mark_line(event) for event in marks]
+
+
+BETWEEN_TURNS = frozenset(
+    {WireEventKind.CALLER_SOUND, WireEventKind.HOLD_STARTED, WireEventKind.HANDOVER}
+)
+
+
+def mark_line(event: WireEvent) -> str:
+    match event.kind:
+        case WireEventKind.CALLER_SOUND:
+            return f"(Voicemail: {event.detail or 'a tone'}.)"
+        case WireEventKind.HOLD_STARTED:
+            seconds = f" for {int(event.detail) / 1000:g} s" if event.detail else ""
+            return f"(The call screener puts the agent on hold{seconds}.)"
+        case _:
+            return "(Yaksh's caller picks up.)"
 
 
 def tool_line(tool: ToolItem) -> str:
@@ -137,13 +221,15 @@ def turn_evidence(turn: Turn) -> str:
 def speaker(turn: Turn) -> str:
     if turn.role is Role.AGENT:
         return "Agent"
+    name = "Caller" if turn.machine is None else RECORDED[turn.machine]
     marks = [
         mark
         for mark, applies in (
+            ("recorded", turn.machine is not None),
             ("Yaksh's fixed line", turn.scripted),
             ("audio not confirmed played", turn.provenance is Provenance.UNCONFIRMED),
             ("not played: the agent spoke over it", turn.provenance is Provenance.CUT),
         )
         if applies
     ]
-    return f"Caller ({'; '.join(marks)})" if marks else "Caller"
+    return f"{name} ({'; '.join(marks)})" if marks else name

@@ -10,10 +10,9 @@ import {
   MAX_RULES,
   NEW_LLM,
   NEW_PHRASE,
-  ROLE_TEXT,
+  ruleLine,
   ruleProblems,
   withRule,
-  summary,
 } from "@/lib/rules";
 import type { AgentRule } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -36,6 +35,7 @@ export function DraftRules({
   onRuleChange,
   locked,
   multilingual,
+  outbound,
 }: {
   rules: AgentRule[];
   onChange: (rules: AgentRule[]) => void;
@@ -46,6 +46,8 @@ export function DraftRules({
   locked: boolean;
   /** The agent serves more than one language. */
   multilingual: boolean;
+  /** The agent calls out, so its calls can reach a voicemail or a call screener. */
+  outbound: boolean;
 }) {
   const full = locked || edit !== null || rules.length >= MAX_RULES;
   const finish = (next: AgentRule[]) => {
@@ -85,6 +87,7 @@ export function DraftRules({
           rule={edit.rule}
           locked={locked}
           multilingual={multilingual}
+          outbound={outbound}
           title={
             edit.index === null
               ? `New ${KIND[edit.rule.kind].label}`
@@ -122,7 +125,7 @@ export function DraftRules({
                   {rule.name}
                 </span>
                 <span className="truncate text-xs-400 text-muted-foreground">
-                  {summary(rule)} · {ROLE_TEXT[rule.role]}
+                  {ruleLine(rule, outbound)}
                 </span>
               </button>
             </li>
@@ -137,6 +140,7 @@ function RuleForm({
   rule,
   locked,
   multilingual,
+  outbound,
   title,
   onChange,
   onSave,
@@ -146,6 +150,7 @@ function RuleForm({
   rule: AgentRule;
   locked: boolean;
   multilingual: boolean;
+  outbound: boolean;
   title: string;
   onChange: (rule: AgentRule) => void;
   onSave: (rule: AgentRule) => void;
@@ -178,6 +183,7 @@ function RuleForm({
           rule={rule}
           submitted={submitted}
           multilingual={multilingual}
+          outbound={outbound}
           onChange={onChange}
         />
         <div className="flex flex-wrap items-center justify-end gap-2">

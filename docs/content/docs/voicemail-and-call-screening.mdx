@@ -1,0 +1,50 @@
+---
+title: Voicemail and call screening
+description: Do tests of how an outbound agent handles a voicemail or a call screener.
+---
+
+An outbound agent calls people. Often a voicemail or a call screener answers, not the person. Yaksh can answer a test call in the same way: with the voicemail or the call screener of the persona.
+
+These answers apply only to phone runs of an [outbound agent](/docs/outbound-agents). A text run or a run of an inbound agent that asks for them is refused.
+
+## Settings of a persona
+
+The **Voicemail and screening** card of a persona has these settings. A change makes a new version of the persona.
+
+| Setting | Values |
+| --- | --- |
+| Voicemail | **iPhone voicemail** (the default), **Pixel voicemail**, **Carrier voicemail**, **Carrier voicemail, no tone**, **Mailbox full**. |
+| Greeting | Optional, 1 to 200 characters. The persona says it in its own voice. Without it, the voicemail plays its standard greeting. **Mailbox full** has no greeting. |
+| Call screener | **iPhone call screening** (the default), **Pixel Call Assist**, **Google Call Screen (2018)**, **Samsung call screening**, **Truecaller Assistant**. |
+| After screening | **Picks up** (the default), **Sends it to voicemail**, **Sends a reply**, **Declines**. |
+
+**Hear the voicemail** plays the greeting and the tone as a call plays them. The standard greetings and the screener lines are recorded in English.
+
+## Who answers
+
+In the run dialog, each scenario has an **Answered by** menu: **The caller**, **Voicemail** and **Call screener**. Each checked answer is a different conversation. A scenario needs at least one answer. The default is **The caller**.
+
+In the API, give `answered_by` in each item of `scenarios`, for example `["caller", "voicemail"]`. In the CLI, use `--answer`. Refer to [Runs](/docs/runs).
+
+## What the call does
+
+**Voicemail.** The voicemail plays its greeting, then a tone of 1 second, then it records. It stops the call after 5 seconds of silence from the agent, or after 120 seconds. **Carrier voicemail, no tone** starts to record after the greeting. **Mailbox full** plays one line and stops the call.
+
+**Call screener.** The screener asks who is calling and why. Some screeners ask one more question. After each question, it waits for the agent to answer. Then it puts the agent on hold. After the hold, the persona's **After screening** setting applies:
+
+- **Picks up**: the persona says the first words of the scenario, or "Hello", and then talks to the agent as the scenario tells it.
+- **Sends it to voicemail**: the voicemail of the persona answers, as above.
+- **Sends a reply**: the screener says a short reply and stops the call.
+- **Declines**: the screener stops the call.
+
+If the agent does not answer a screener question, the screener stops the call. The persona does not speak while its voicemail or screener plays.
+
+## Results
+
+A call where no caller talked has no scenario verdict: the scenario's criteria do not apply, and the call shows **Not scored**. The agent rules that check that answer judge the call. Each agent rule has **Answered by**: **The caller** (the default), **Voicemail**, **Call screener** or **Any**. A call that a screener sent to the persona or to the voicemail is also checked by the rules for that answer.
+
+The run dialog shows a warning when no deciding rule checks the voicemail or screener calls of a scenario: these calls then get no verdict.
+
+The conversation page shows who answered. For a voicemail, it also shows if the agent talked over the greeting, and the length of the agent's message after the tone. The transcript shows the recorded lines of the voicemail and the screener, the tone, the hold and the pickup. These calls have no response time until the persona talks.
+
+Two end reasons apply only to these calls: `voicemail_ended` and `screener_ended`. Refer to [Results](/docs/results#end-reasons).

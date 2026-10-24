@@ -12,6 +12,7 @@ These are never findings:
 - Other words with the same meaning as a line in its instructions.
 - A goodbye, such as "Bye". Words do not end a call; only a hang-up does, and the CALL FACTS say who hung up.
 - A line marked "Yaksh's fixed line": Yaksh says it, not the caller.
+- A line from "Voicemail (recorded)" or "Call screener (recorded)": the phone of Yaksh's caller plays it, not the caller. Do not check it.
 
 A criterion that starts with "If the caller says ..." or "After the caller ..." applies when the caller said it, at any point in the call. The caller's timing does not change what the agent had to do next.
 

@@ -15,6 +15,7 @@ from pydantic import (
     model_validator,
 )
 
+from yaksh.domain.answering import AnsweredBy
 from yaksh.domain.evaluations import ItemRole
 
 RuleKey = Annotated[str, StringConstraints(pattern=r"^[a-z0-9][a-z0-9_-]{0,62}$")]
@@ -31,6 +32,16 @@ class RuleGate(StrEnum):
     AGENT_SPOKE = "agent_spoke"
 
 
+class RuleScope(StrEnum):
+    """Which calls a rule checks, by who answered. A call that a screener passed on counts for
+    the screener and for who answered after it."""
+
+    CALLER = "caller"
+    VOICEMAIL = "voicemail"
+    SCREENER = "screener"
+    ANY = "any"
+
+
 class LlmRule(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -43,6 +54,7 @@ class LlmRule(BaseModel):
     fail_when: RuleText
     not_a_failure: RuleText | None = None
     role: ItemRole = ItemRole.REPORTING
+    answered_by: RuleScope = RuleScope.CALLER
 
 
 class PhraseExpectation(StrEnum):
@@ -80,6 +92,7 @@ class PhraseRule(BaseModel):
     value: Annotated[str, StringConstraints(min_length=1, max_length=MAX_PATTERN_CHARS)]
     where: PhraseWhere = PhraseWhere.ANY_AGENT_TURN
     role: ItemRole = ItemRole.REPORTING
+    answered_by: RuleScope = RuleScope.CALLER
 
     @model_validator(mode="after")
     def value_can_match(self) -> PhraseRule:
@@ -93,6 +106,11 @@ class PhraseRule(BaseModel):
 
 
 AgentRule = Annotated[LlmRule | PhraseRule, Field(discriminator="kind")]
+
+
+def in_scope(rule: LlmRule | PhraseRule, reached: frozenset[AnsweredBy]) -> bool:
+    """Whether the rule checks a call that reached these answers."""
+    return rule.answered_by is RuleScope.ANY or AnsweredBy(rule.answered_by.value) in reached
 
 
 def distinct_keys(rules: list[AgentRule]) -> list[AgentRule]:

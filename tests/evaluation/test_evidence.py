@@ -1,9 +1,19 @@
 from dataclasses import replace
 from datetime import date
 from pathlib import Path
+from typing import Any
 
 from yaksh.domain.agents import Direction, Transport
-from yaksh.domain.conversations import EndReason, Provenance, Role, ToolItem, Turn
+from yaksh.domain.answering import AfterScreening, AnsweredBy, Answering, MachineLine, Voicemail
+from yaksh.domain.conversations import (
+    EndReason,
+    Provenance,
+    Role,
+    ToolItem,
+    Turn,
+    WireEvent,
+    WireEventKind,
+)
 from yaksh.domain.scenarios import Fact
 from yaksh.evaluation.evidence import CallView, render, with_item
 from yaksh.evaluation.quotes import quote_problems
@@ -140,3 +150,77 @@ def test_a_judge_sees_and_can_quote_the_tools_of_a_text_turn() -> None:
     assert quote_problems([{"turn": 1, "quote": call}], turns, tools=True) == []
     assert quote_problems([{"turn": 2, "quote": "save_feedback"}], turns, tools=True) != []
     assert quote_problems([{"turn": 1, "quote": call}], turns) != []
+
+
+def outbound_call(*lines: tuple[Role, str, MachineLine | None], **fields: Any) -> CallView:
+    outbound: dict[str, Any] = {
+        "brief": "Calls patients to confirm their cleaning appointments for Maple Dental.",
+        "direction": Direction.OUTBOUND,
+        "agent_number": None,
+        "agent_caller_id": "+15550200",
+        "hangup_source": "Caller",
+        "turns": [
+            Turn(
+                role=role,
+                text=text,
+                started_at_ms=index * 4000,
+                ended_at_ms=index * 4000 + 3000,
+                machine=machine,
+            )
+            for index, (role, text, machine) in enumerate(lines)
+        ],
+    }
+    return replace(MAPLE_DENTAL, **{**outbound, **fields})
+
+
+def test_the_evidence_marks_the_voicemails_recording_and_its_tone() -> None:
+    view = outbound_call(
+        (Role.CALLER, "Hi, you've reached Jordan. Leave a message.", MachineLine.GREETING),
+        (Role.AGENT, "Hi Jordan, this is Ava from Maple Dental. Please call us back.", None),
+        answered_by=AnsweredBy.VOICEMAIL,
+        answering=Answering(voicemail=Voicemail.CARRIER, greeting="Hi, you've reached Jordan."),
+        events=[WireEvent(kind=WireEventKind.CALLER_SOUND, at_ms=3500, detail="tone, 1 s")],
+        end_reason=EndReason.VOICEMAIL_ENDED,
+        hangup_source="Callee",
+    )
+
+    rendered = with_item(render(view), "Criterion: The agent leaves a call-back number.")
+
+    assert rendered + "\n" == (FIXTURES / "evidence_voicemail.txt").read_text()
+
+
+def test_a_recorded_line_that_did_not_play_in_full_says_so() -> None:
+    view = outbound_call(
+        (Role.CALLER, "Hi, you've reached Jordan. Leave a message.", MachineLine.GREETING),
+        answered_by=AnsweredBy.VOICEMAIL,
+        answering=Answering(),
+    )
+    greeting = view.turns[0].model_copy(update={"provenance": Provenance.UNCONFIRMED})
+
+    rendered = render(replace(view, turns=[greeting]))
+
+    assert "[1] Voicemail (recorded; audio not confirmed played): Hi, you've reached" in rendered
+
+
+def test_the_evidence_tells_when_the_caller_picked_up_after_its_screener() -> None:
+    view = outbound_call(
+        (
+            Role.CALLER,
+            "Hi. If you record your name and reason for calling...",
+            MachineLine.SCREENER,
+        ),
+        (Role.AGENT, "This is Ava from Maple Dental, about your cleaning.", None),
+        (Role.CALLER, "Thanks. Please stay on the line.", MachineLine.SCREENER),
+        (Role.CALLER, "Hello", None),
+        (Role.AGENT, "Hi Jordan, can you still make Tuesday at two thirty?", None),
+        answered_by=AnsweredBy.SCREENER,
+        answering=Answering(after_screening=AfterScreening.PICKS_UP),
+        events=[
+            WireEvent(kind=WireEventKind.HOLD_STARTED, at_ms=11_000, detail="20000"),
+            WireEvent(kind=WireEventKind.HANDOVER, at_ms=11_500),
+        ],
+    )
+
+    rendered = with_item(render(view), "Criterion: The agent asks to confirm the appointment.")
+
+    assert rendered + "\n" == (FIXTURES / "evidence_screened.txt").read_text()

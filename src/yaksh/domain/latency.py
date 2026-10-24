@@ -5,6 +5,8 @@ from collections.abc import Sequence
 
 from pydantic import BaseModel, ConfigDict
 
+from yaksh.domain.answering import MachineLine
+
 VAD_CONFIDENCE = 0.5
 VAD_START_S = 0.1
 VAD_STOP_S = 0.6
@@ -56,6 +58,9 @@ class CallerReplyWindow(BaseModel):
     first end_ms - start_ms of it."""
     audio_start_ms: int
     audio_ms: int
+    machine: MachineLine | None = None
+    """Audio of the persona's voicemail or call screener: not a reply that waits for the
+    agent."""
 
 
 class LoopLag(BaseModel):

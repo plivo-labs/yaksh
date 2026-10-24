@@ -10,6 +10,7 @@ from pydantic import (
     field_validator,
 )
 
+from yaksh.domain.answering import Answering
 from yaksh.domain.languages import Language
 from yaksh.domain.surroundings import Surroundings
 from yaksh.domain.voices import SampleLine, VoiceGender, VoiceSettings
@@ -28,6 +29,7 @@ class PersonaSettings(BaseModel):
     surroundings: Surroundings = Surroundings()
     sample_line: SampleLine | None = None
     """What the persona's previews say; None says its language's sample sentence."""
+    answering: Answering = Answering()
 
 
 class PersonaConfig(PersonaSettings):
@@ -77,8 +79,9 @@ class PersonaUpdate(BaseModel):
     surroundings: Surroundings | None = None
     sample_line: SampleLine | None = None
     """None clears it."""
+    answering: Answering | None = None
 
-    @field_validator("name", "prompt", "language", "voice", "surroundings")
+    @field_validator("name", "prompt", "language", "voice", "surroundings", "answering")
     @classmethod
     def cannot_be_cleared(cls, value: Any, info: ValidationInfo) -> Any:
         if value is None:

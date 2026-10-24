@@ -430,6 +430,9 @@ def persona_forks(
                 voice=source.voice(language, gender, speed, asked=bool(data.get("voice_gender"))),
                 surroundings=surroundings,
                 sample_line=own.sample_line if language is own.language else None,
+                answering=own.answering
+                if language is own.language
+                else own.answering.model_copy(update={"greeting": None}),
                 forked_from_id=source.id,
             )
         except (KeyError, ValueError) as error:

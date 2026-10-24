@@ -105,9 +105,9 @@ def judging_inputs(settings: AppSettings) -> tuple[object, ...]:
     )
 
 
-async def persona_prompt(session: AsyncSession, conversation: Conversation) -> str:
+async def persona_config(session: AsyncSession, conversation: Conversation) -> PersonaConfig:
     version = await session.get_one(PersonaVersion, conversation.persona_version_id)
-    return PersonaConfig.model_validate(version.config).prompt
+    return PersonaConfig.model_validate(version.config)
 
 
 async def knowledge_base(session: AsyncSession, agent: AgentConfig) -> list[Document]:
@@ -265,14 +265,15 @@ class Evaluator:
                 )
                 agent_config = AgentConfig.model_validate(agent.config)
                 judged = judging is not None and call.judged(conversation)
-                persona = await persona_prompt(session, conversation) if judged else None
+                persona = await persona_config(session, conversation)
                 documents = await knowledge_base(session, agent_config) if judged else []
             evaluated = await call.evaluate(
                 conversation,
                 self._store,
                 agent_config,
                 scenario,
-                persona,
+                persona.prompt if judged else None,
+                persona.answering,
                 documents,
                 judging,
                 retry_later=evaluation.attempts < evaluations.MAX_ATTEMPTS,

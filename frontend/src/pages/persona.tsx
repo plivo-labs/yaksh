@@ -33,6 +33,8 @@ import { Slider } from "@/components/ui/slider";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { useVoicePreview } from "@/hooks/use-voice-preview";
+import { useVoicemailPreview } from "@/hooks/use-voicemail-preview";
+import { AFTER_SCREENING, DEFAULT_ANSWERING, SCREENERS, VOICEMAILS } from "@/lib/answering";
 import { surroundingsLabel } from "@/lib/format";
 import { APPEAR } from "@/lib/motion";
 import { revealErrors } from "@/lib/forms";
@@ -45,6 +47,7 @@ import {
   useVoices,
 } from "@/lib/queries";
 import {
+  type Answering,
   LANGUAGE_ITEMS,
   LANGUAGE_NAMES,
   type Language,
@@ -66,6 +69,7 @@ interface Draft {
   stability: number;
   surroundings: Surroundings;
   sample_line: string;
+  answering: Answering;
 }
 
 const EMPTY: Draft = {
@@ -77,6 +81,7 @@ const EMPTY: Draft = {
   stability: 0.5,
   surroundings: QUIET,
   sample_line: "",
+  answering: DEFAULT_ANSWERING,
 };
 
 const VOICE = "voice";
@@ -91,6 +96,7 @@ function toDraft(persona: Persona): Draft {
     stability: persona.voice.stability,
     surroundings: persona.surroundings,
     sample_line: persona.sample_line ?? "",
+    answering: persona.answering,
   };
 }
 
@@ -107,7 +113,52 @@ function toInput(draft: Draft): PersonaInput {
     },
     surroundings: draft.surroundings,
     sample_line: draft.sample_line.trim() || null,
+    answering: { ...draft.answering, greeting: draft.answering.greeting?.trim() || null },
   };
+}
+
+/** A choice of a few options, each with a line on what it does. */
+function ChoiceField<T extends string>({
+  id,
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  value: T;
+  options: { value: T; label: string; description: string }[];
+  onChange: (value: T) => void;
+}) {
+  const chosen = options.find((option) => option.value === value);
+  return (
+    <Field>
+      <FieldLabel htmlFor={id}>{label}</FieldLabel>
+      <Select
+        items={options.map((option) => ({ value: option.value, label: option.label }))}
+        value={value}
+        onValueChange={(next) => next && onChange(next as T)}
+      >
+        <SelectTrigger id={id} className="w-full">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectGroup>
+            {options.map((option) => (
+              <SelectItem key={option.value} value={option.value}>
+                <span className="grid">
+                  <span>{option.label}</span>
+                  <span className="text-xs-400 text-muted-foreground">{option.description}</span>
+                </span>
+              </SelectItem>
+            ))}
+          </SelectGroup>
+        </SelectContent>
+      </Select>
+      {chosen && <FieldDescription>{chosen.description}</FieldDescription>}
+    </Field>
+  );
 }
 
 function voiceLabel(voice: Voice): string {
@@ -202,6 +253,7 @@ function PersonaEditor({
   const remove = useDeletePersona();
   const scenarios = usePersonaScenarios(id);
   const preview = useVoicePreview();
+  const voicemail = useVoicemailPreview();
   const [initial, setInitial] = useState<Draft>(() => (persona ? toDraft(persona) : EMPTY));
   const [draft, setDraft] = useState<Draft>(() => (generated ? fromGenerated(generated) : initial));
   const [pickVoice, setPickVoice] = useState(Boolean(generated));
@@ -495,6 +547,82 @@ function PersonaEditor({
                     </FieldDescription>
                   </SliderField>
                 </div>
+              </FieldGroup>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Voicemail and screening</CardTitle>
+              <CardDescription>
+                What answers when a run sends a call to voicemail or a call screener.
+              </CardDescription>
+              <CardAction>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={!hasVoice && Boolean(draft.answering.greeting?.trim())}
+                  aria-busy={voicemail.isLoading}
+                  onClick={() => voicemail.toggle(input.answering, input.voice, input.language)}
+                >
+                  {voicemail.isLoading ? <Spinner /> : voicemail.isPlaying ? <Square /> : <Play />}
+                  {voicemail.isPlaying ? "Stop" : "Hear the voicemail"}
+                </Button>
+              </CardAction>
+            </CardHeader>
+            <CardContent>
+              <FieldGroup>
+                <div className="grid gap-6 sm:grid-cols-2">
+                  <ChoiceField
+                    id="voicemail"
+                    label="Voicemail"
+                    value={draft.answering.voicemail}
+                    options={VOICEMAILS}
+                    onChange={(value) => set("answering", { ...draft.answering, voicemail: value })}
+                  />
+                  <ChoiceField
+                    id="screener"
+                    label="Call screener"
+                    value={draft.answering.screener}
+                    options={SCREENERS}
+                    onChange={(value) => set("answering", { ...draft.answering, screener: value })}
+                  />
+                </div>
+                {draft.answering.voicemail === "mailbox_full" ? (
+                  <p className="text-s-400 text-muted-foreground">
+                    A full mailbox plays no greeting and records nothing. It says that the mailbox
+                    is full, then hangs up.
+                  </p>
+                ) : (
+                  <Field>
+                    <FieldLabel htmlFor="greeting">Greeting</FieldLabel>
+                    <Textarea
+                      id="greeting"
+                      rows={2}
+                      maxLength={200}
+                      value={draft.answering.greeting ?? ""}
+                      placeholder="Hi, you've reached Rachel. Leave your name and number and I'll call you back."
+                      onChange={(event) =>
+                        set("answering", { ...draft.answering, greeting: event.target.value })
+                      }
+                    />
+                    <FieldDescription>
+                      Played in this persona's voice, before the tone. Empty plays the voicemail's
+                      standard greeting.
+                    </FieldDescription>
+                  </Field>
+                )}
+                <ChoiceField
+                  id="after-screening"
+                  label="After screening"
+                  value={draft.answering.after_screening}
+                  options={AFTER_SCREENING}
+                  onChange={(value) =>
+                    set("answering", { ...draft.answering, after_screening: value })
+                  }
+                />
+                {voicemail.error && <FieldError>{voicemail.error}</FieldError>}
               </FieldGroup>
             </CardContent>
           </Card>

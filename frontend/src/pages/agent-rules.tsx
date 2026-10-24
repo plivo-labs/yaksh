@@ -22,15 +22,7 @@ import { useCloseGuard } from "@/hooks/use-close-guard";
 import { when } from "@/lib/format";
 import { revealErrors } from "@/lib/forms";
 import { useRuleResults, useSaveRules } from "@/lib/queries";
-import {
-  KIND,
-  MAX_RULES,
-  NEW_LLM,
-  NEW_PHRASE,
-  ROLE_TEXT,
-  ruleProblems,
-  summary,
-} from "@/lib/rules";
+import { KIND, MAX_RULES, NEW_LLM, NEW_PHRASE, ruleProblems, ruleLine } from "@/lib/rules";
 import { type Agent, type AgentRule, type RuleResults, servedLanguages } from "@/lib/types";
 import { RuleFields } from "@/pages/agent-rules-field";
 
@@ -102,6 +94,7 @@ export function AgentRules({ agent }: { agent: Agent }) {
               <RuleRow
                 key={rule.key}
                 rule={rule}
+                outbound={agent.direction === "outbound"}
                 results={results}
                 onEdit={() => setEditing(rule)}
               />
@@ -114,6 +107,7 @@ export function AgentRules({ agent }: { agent: Agent }) {
           key={editing.key || editing.kind}
           agentId={agent.id}
           multilingual={servedLanguages(agent.languages).size > 1}
+          outbound={agent.direction === "outbound"}
           rule={editing}
           onClosed={() => setEditing(null)}
         />
@@ -126,10 +120,12 @@ type ResultsQuery = ReturnType<typeof useRuleResults>;
 
 function RuleRow({
   rule,
+  outbound,
   results,
   onEdit,
 }: {
   rule: AgentRule;
+  outbound: boolean;
   results: ResultsQuery;
   onEdit: () => void;
 }) {
@@ -145,7 +141,7 @@ function RuleRow({
           {rule.name}
         </span>
         <span className="truncate text-xs-400 text-muted-foreground">
-          {summary(rule)} · {ROLE_TEXT[rule.role]}
+          {ruleLine(rule, outbound)}
         </span>
       </button>
       <Results query={results} result={result} name={rule.name} />
@@ -196,11 +192,13 @@ function Results({
 function RuleDialog({
   agentId,
   multilingual,
+  outbound,
   rule,
   onClosed,
 }: {
   agentId: string;
   multilingual: boolean;
+  outbound: boolean;
   rule: AgentRule;
   onClosed: () => void;
 }) {
@@ -256,6 +254,7 @@ function RuleDialog({
             rule={draft}
             submitted={submitted}
             multilingual={multilingual}
+            outbound={outbound}
             onChange={(next) => {
               save.reset();
               setDraft(next);

@@ -23,6 +23,7 @@ from yaksh.db.models import (
     ScenarioVersion,
 )
 from yaksh.domain.agents import AgentConfig, Direction, Transport
+from yaksh.domain.answering import AnsweredBy, Answering
 from yaksh.domain.conversations import (
     ACTIVE_STATUSES,
     LIVE_STATUSES,
@@ -46,6 +47,7 @@ from yaksh.domain.settings import AppSettings
 from yaksh.domain.surroundings import SoundPlan
 from yaksh.domain.triggers import SEND_TIMEOUT_S
 from yaksh.evaluation import evaluations, results
+from yaksh.simulation.answering import answering_plan
 from yaksh.simulation.files import OpenedFile, open_file
 from yaksh.simulation.languages import LANGUAGES
 from yaksh.simulation.numbers import free_numbers, lease_number, release_numbers
@@ -123,6 +125,7 @@ async def list_conversations(
     status: ConversationStatus | None = None,
     groups: Sequence[OutcomeGroup] = (),
     latest_attempts: bool = False,
+    answered_by: AnsweredBy | None = None,
     search: str | None = None,
     sort: str = "-created_at",
 ) -> tuple[list[Conversation], int]:
@@ -155,6 +158,8 @@ async def list_conversations(
         query = query.where(or_(*(in_group(group) for group in groups)))
     if latest_attempts:
         query = query.where(latest_attempt())
+    if answered_by is not None:
+        query = query.where(Conversation.answered_by == answered_by)
     total = await session.scalar(select(func.count()).select_from(query.subquery()))
     key = SORT_KEYS[sort.removeprefix("-")]
     order = key.desc() if sort.startswith("-") else key.asc()
@@ -211,6 +216,12 @@ async def pinned_personas(
         .where(PersonaVersion.id.in_(set(version_ids)))
     )
     return {row.id: (row.version, row.name) for row in rows}
+
+
+async def persona_answering(session: AsyncSession, conversation: Conversation) -> Answering:
+    """The voicemail and call screener of the pinned persona version."""
+    version = await session.get_one(PersonaVersion, conversation.persona_version_id)
+    return PersonaConfig.model_validate(version.config).answering
 
 
 def transcript_of(conversation: Conversation) -> Transcript:
@@ -363,6 +374,7 @@ async def call_request(
     agent: AgentConfig,
 ) -> CallRequest:
     persona_version = await session.get_one(PersonaVersion, conversation.persona_version_id)
+    persona = PersonaConfig.model_validate(persona_version.config)
     scenario = await played_scenario(session, conversation)
     return CallRequest(
         conversation_id=conversation.id,
@@ -372,7 +384,7 @@ async def call_request(
         first_words=scenario.first_words or LANGUAGES[conversation.language].first_words,
         nudge=conversation.nudge,
         caller_language=conversation.language,
-        voice=PersonaConfig.model_validate(persona_version.config).voice,
+        voice=persona.voice,
         sound_plan=with_full_paths(SoundPlan.model_validate(conversation.sound_plan)),
         caller_number=number,
         max_duration_s=conversation.max_duration_s,
@@ -383,6 +395,8 @@ async def call_request(
         app_settings=app,
         caller=scenario.caller or app.caller,
         scenario_model=scenario.caller is not None,
+        answered_by=conversation.answered_by,
+        answering=answering_plan(conversation.answered_by, persona.answering),
     )
 
 

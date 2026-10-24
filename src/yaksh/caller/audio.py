@@ -19,6 +19,7 @@ from pipecat.frames.frames import (
     TTSTextFrame,
 )
 
+from yaksh.domain.answering import MachineLine
 from yaksh.domain.latency import AgentMedia, CallerReplyWindow, Span
 from yaksh.domain.surroundings import Layer, SoundPlan
 
@@ -28,6 +29,8 @@ LOUD_PEAK = 500
 GAP_BYTES = SAMPLE_RATE * 2 // 5
 PLAYOUT = "yaksh.playout"
 OFFSET = "yaksh.offset"
+MACHINE = "yaksh.machine"
+"""On a TTSStartedFrame: the machine line the reply plays."""
 
 
 class Clock:
@@ -53,6 +56,8 @@ class Playout:
         self._sent = 0
         self._origin: int | None = None
         self._words = 0
+        self.machine: MachineLine | None = None
+        """The machine line the reply plays; None for the persona's own words."""
 
     @property
     def arrived(self) -> int:
@@ -94,6 +99,7 @@ class Stamper:
     def stamp(self, frame: Frame, now_ns: int) -> None:
         if isinstance(frame, TTSStartedFrame):
             self.arriving = frame.metadata[PLAYOUT] = Playout()
+            self.arriving.machine = frame.metadata.get(MACHINE)
         elif isinstance(frame, TTSAudioRawFrame) and self.arriving is not None:
             self.arriving.received(frame.audio, now_ns)
         elif isinstance(frame, TTSTextFrame) and self.arriving is not None:
@@ -145,6 +151,7 @@ def caller_voice(
                 finished=reply.finished,
                 audio_start_ms=bytes_ms(len(voice)),
                 audio_ms=bytes_ms(len(own)),
+                machine=reply.playout.machine if reply.playout else None,
             )
         )
         voice += own

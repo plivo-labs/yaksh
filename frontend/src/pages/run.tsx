@@ -26,6 +26,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { useFilterParams } from "@/hooks/use-filter-params";
+import { ANSWERS } from "@/lib/answering";
 import { usePageParam } from "@/hooks/use-page-param";
 import { duration, runFinished, runTitle, runTotal, when } from "@/lib/format";
 import {
@@ -155,6 +156,7 @@ function Overview({ run }: { run: Run }) {
           )}
         </div>
         <GroupFilter run={run} />
+        <AnswerFilter run={run} />
         {endReasons.length > 0 && (
           <div className="flex flex-wrap items-center gap-1.5 text-xs-400">
             <span className="mr-1 text-muted-foreground">How conversations ended</span>
@@ -252,6 +254,9 @@ function RunActions({ run }: { run: Run }) {
           dataSetsOf={Object.fromEntries(
             run.scenarios.map((item) => [item.scenario_id, item.data_set_ids ?? []]),
           )}
+          answersOf={Object.fromEntries(
+            run.scenarios.map((item) => [item.scenario_id, item.answered_by ?? []]),
+          )}
           earlier={run}
           onClosed={() => setAgain(false)}
         />
@@ -286,9 +291,43 @@ function GroupFilter({ run }: { run: Run }) {
   );
 }
 
+/** Shown when a voicemail or call screener answered any call of the run. */
+function AnswerFilter({ run }: { run: Run }) {
+  const [params, update] = useFilterParams();
+  const chosen = params.get("answered_by");
+  const answers = ANSWERS.filter((answer) => run.answered_by[answer.value]);
+  if (answers.every((answer) => answer.value === "caller")) return null;
+  return (
+    <div
+      className="flex flex-wrap items-center gap-2"
+      role="group"
+      aria-label="Show conversations by who answered"
+    >
+      <span className="mr-1 text-xs-400 text-muted-foreground">Who answered</span>
+      {answers.map((answer) => (
+        <Button
+          key={answer.value}
+          type="button"
+          variant={chosen === answer.value ? "tertiary" : "ghost"}
+          size="sm"
+          aria-pressed={chosen === answer.value}
+          onClick={() => update({ answered_by: chosen === answer.value ? null : answer.value })}
+          className="tabular-nums"
+        >
+          {answer.label}
+          <span className={chosen === answer.value ? undefined : "text-muted-foreground"}>
+            {run.answered_by[answer.value]}
+          </span>
+        </Button>
+      ))}
+    </div>
+  );
+}
+
 function Conversations({ run }: { run: Run }) {
   const [params, update] = useFilterParams();
   const group = params.get("group");
+  const answeredBy = params.get("answered_by");
   const sort = params.get("sort") ?? "created_at";
   const sortBy = (next: string) => update({ sort: next });
   const conversations = useConversations(
@@ -297,17 +336,22 @@ function Conversations({ run }: { run: Run }) {
       latest_attempts: "true",
       sort,
       ...(group ? { group } : {}),
+      ...(answeredBy ? { answered_by: answeredBy } : {}),
     },
     usePageParam(),
     { live: ACTIVE_RUN_STATUSES.includes(run.status) },
   );
-  const groupLabel = OUTCOME_GROUPS.find((item) => item.value === group)?.label;
+  const shown = [
+    OUTCOME_GROUPS.find((item) => item.value === group)?.label,
+    ANSWERS.find((item) => item.value === answeredBy)?.label,
+  ]
+    .filter(Boolean)
+    .map((label) => label?.toLowerCase())
+    .join(", ");
 
   return (
     <Panel className="overflow-hidden">
-      <PanelHeader
-        title={groupLabel ? `Conversations: ${groupLabel.toLowerCase()}` : "Conversations"}
-      />
+      <PanelHeader title={shown ? `Conversations: ${shown}` : "Conversations"} />
       <p className="border-b px-5 py-2.5 text-xs-400 text-muted-foreground">
         The latest attempt of each repeat of each scenario. Open a retry to see the attempt before
         it.
