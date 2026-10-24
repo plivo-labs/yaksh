@@ -5,6 +5,7 @@ import { useDefaultLayout } from "react-resizable-panels";
 import { Link, useParams, useSearchParams } from "react-router";
 
 import { ToolCalls } from "@/components/tool-calls";
+import { AgentRecordPanel } from "@/components/agent-record";
 import { CallMetricsCard } from "@/components/call-metrics";
 import { CallResults } from "@/components/call-results";
 import { CallSounds } from "@/components/call-sounds";
@@ -201,13 +202,14 @@ function ConversationView({ id }: { id: string }) {
           />
         </ResizablePanel>
         <ResizableHandle withHandle />
-        <ResizablePanel id="details" defaultSize={420} minSize={300} maxSize="80%">
+        <ResizablePanel id="details" defaultSize={500} minSize={300} maxSize="80%">
           <Tabs
             defaultValue={data.evaluation ? "results" : "scenario"}
             className="h-full min-h-0 gap-3 pl-3"
           >
             <TabsList variant="line" className="shrink-0 overflow-x-auto overflow-y-hidden">
               <TabsTrigger value="results">Results</TabsTrigger>
+              {data.agent_record && <TabsTrigger value="record">Agent record</TabsTrigger>}
               <TabsTrigger value="metrics">Metrics</TabsTrigger>
               <TabsTrigger value="scenario">Scenario</TabsTrigger>
               <TabsTrigger value="caller">Caller</TabsTrigger>
@@ -227,6 +229,17 @@ function ConversationView({ id }: { id: string }) {
                     }
                   />
                 </TabsContent>
+                {data.agent_record && (
+                  <TabsContent value="record">
+                    <AgentRecordPanel
+                      conversationId={data.id}
+                      status={data.agent_record}
+                      evaluation={data.evaluation}
+                      connectedMs={connectedMs}
+                      onTurn={showTurn}
+                    />
+                  </TabsContent>
+                )}
                 <TabsContent value="metrics">
                   <CallMetricsCard conversationId={data.id} evaluation={data.evaluation} />
                 </TabsContent>

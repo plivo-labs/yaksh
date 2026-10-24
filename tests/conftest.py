@@ -1,7 +1,7 @@
 import asyncio
 import uuid
 from array import array
-from collections.abc import AsyncGenerator, AsyncIterator, Awaitable, Callable, Iterator
+from collections.abc import AsyncGenerator, AsyncIterator, Awaitable, Callable, Iterator, Mapping
 from datetime import timedelta
 from pathlib import Path
 from typing import Any
@@ -23,6 +23,7 @@ from yaksh.db.migrate import upgrade_to_head
 from yaksh.db.models import Conversation, Voice
 from yaksh.db.session import create_engine, create_sessionmaker
 from yaksh.domain.agent_import import ElevenLabsRegion, VapiRegion
+from yaksh.domain.agent_records import RecordReader
 from yaksh.domain.agents import Transport
 from yaksh.domain.conversations import (
     Admission,
@@ -45,6 +46,7 @@ from yaksh.domain.files import FileStore
 from yaksh.domain.language_models import ModelAnswer, ModelCallError
 from yaksh.domain.languages import Language
 from yaksh.domain.numbers import AccountNumber, PlivoApplication
+from yaksh.domain.record_sources import RecordProvider
 from yaksh.domain.settings import AppSettings, Phone, SecretName, Secrets
 from yaksh.domain.voices import ProviderVoice, VoiceGender, VoiceProvider, VoiceSettings
 from yaksh.evaluation import evaluations
@@ -624,6 +626,8 @@ def make_evaluator(
     sources_model: Any = None,
     jev: Any = None,
     store: FileStore | None = None,
+    readers: Mapping[RecordProvider, RecordReader] | None = None,
+    timings: Timings | None = None,
 ) -> Evaluator:
     """An evaluator that judges with these clients, whatever the stored settings say."""
     return Evaluator(
@@ -632,6 +636,8 @@ def make_evaluator(
         SettingsSource(sessionmaker, Cipher(ENCRYPTION_KEY)),
         store or FakeFileStore(),
         clients=lambda _settings: JudgeClients(model, sources_model, jev),
+        timings=timings or Timings(),
+        readers=readers,
     )
 
 
@@ -997,7 +1003,8 @@ async def client(
         await connection.execute(
             text(
                 "TRUNCATE phone_numbers, refused_calls, labels, labelers, judge_calls,"
-                " evaluation_items, judge_versions, metric_values, evaluations, conversations,"
+                " evaluation_items, judge_versions, metric_values, evaluations, agent_records,"
+                " conversations,"
                 " runs, agent_versions, agents, persona_versions, personas, voices,"
                 " scenario_versions, scenarios, workers, documents, scenario_generations"
             )

@@ -637,6 +637,8 @@ async def finalize(
                 caller_voice_key=audio.caller_voice_key,
                 call_uuid=outcome.call_uuid,
                 agent_caller_id=Conversation.agent_caller_id if outcome.call_uuid else None,
+                trigger_response=outcome.trigger_response,
+                clock_started_at=outcome.clock_started_at,
                 claimed_by=None,
                 lease_expires_at=None,
             )

@@ -31,6 +31,26 @@ def quote_problems(
     return problems
 
 
+def record_quote_problems(evidence: Sequence[dict[str, Any]], lines: Sequence[str]) -> list[str]:
+    """Quotes from the agent record: each one is in the record line it names."""
+    problems = []
+    for quote in evidence:
+        line, words = quote["line"], quote["quote"]
+        if not canonical(words):
+            problems.append(f"The quote for record line R{line} is empty. Quote the words.")
+        elif not 1 <= line <= len(lines):
+            have = f"lines R1 to R{len(lines)}" if lines else "no lines"
+            problems.append(
+                f'The quote "{words}" names record line R{line}; the record has {have}.'
+            )
+        elif not contains(lines[line - 1], words):
+            problems.append(
+                f'The quote "{words}" is not in record line R{line}. '
+                f"Quote the words as R{line} has them."
+            )
+    return problems
+
+
 def absence_problems(answer: dict[str, Any], turn_count: int) -> tuple[list[str], list[str]]:
     """Problems with a claim that something never happened: hard ones always need a new answer;
     a soft one, a claim whose turns stop before the end of the call, gets one question, because

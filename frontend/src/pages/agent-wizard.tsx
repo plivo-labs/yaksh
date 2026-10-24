@@ -35,6 +35,7 @@ import {
   NameField,
   ReachChoice,
   ReachFields,
+  RecordFields,
 } from "@/pages/agent-form";
 import { KnowledgeBasePanel } from "@/pages/agent-knowledge-base";
 import { DraftRules, type RuleEdit } from "@/pages/agent-wizard-rules";
@@ -77,7 +78,7 @@ export function AgentWizardPage() {
   const { needs } = form;
   const stepProblems = [
     needs.name || needs.brief || needs.config,
-    needs.direction || needs.connection || needs.reach || needs.languages,
+    needs.direction || needs.connection || needs.reach || needs.languages || needs.record,
     false,
     false,
   ];
@@ -246,6 +247,7 @@ export function AgentWizardPage() {
                 <ReachChoice form={form} />
                 <ReachFields form={form} />
                 <CallOptionsFields form={form} />
+                <RecordFields form={form} />
               </FieldGroup>
             </Panel>
             <StepFooter>

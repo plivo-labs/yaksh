@@ -624,6 +624,15 @@ class Receiver:
             await asyncio.gather(stopped, report, return_exceptions=True)
 
 
+def delivered_body(trigger: asyncio.Future[TriggerOutcome] | None) -> str | None:
+    """The response body of a trigger that was delivered. The call can come before the
+    response, and the response can still be on its way when the call ends."""
+    if trigger is None or not trigger.done() or trigger.cancelled() or trigger.exception():
+        return None
+    outcome = trigger.result()
+    return outcome.body if outcome.result is TriggerResult.DELIVERED else None
+
+
 def ended_early_incoming(report: Mapping[str, str], call_uuid: str | None) -> CallOutcome:
     reason, error = ended_by(report, CALLING_SIDE)
     if reason is EndReason.AGENT_HANGUP:
@@ -728,11 +737,17 @@ class PhoneCaller:
                 return dialed
             line = Line(dialed.call_uuid, entry.callbacks, hang_up)
             try:
-                return await self._talk(
+                outcome = await self._talk(
                     request, keys, observer, stop, clock, dialed, line, live, own
                 )
             finally:
                 await line.hang_up()
+            return outcome.model_copy(
+                update={
+                    "trigger_response": delivered_body(trigger),
+                    "clock_started_at": clock.started_at,
+                }
+            )
         finally:
             if own is not None:
                 own.cancel()

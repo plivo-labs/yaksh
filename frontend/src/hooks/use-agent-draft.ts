@@ -28,6 +28,8 @@ export function useAgentDraft(baseline: Draft, start: Draft = baseline) {
       draft.direction !== null &&
       ((draft.phone && phoneProblem) ||
         (draft.text && Object.keys(endpointProblems(draft.endpoint)).length > 0)),
+    record:
+      draft.phone && draft.record && Object.keys(endpointProblems(draft.record_source)).length > 0,
     languages: draft.languages.length === 0,
     brief: briefLength(draft.brief) < MIN_BRIEF_CHARS,
     config: draft.config.length > MAX_CONFIG_CHARS,

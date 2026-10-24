@@ -344,6 +344,14 @@ export interface Endpoint {
   headers: Header[];
 }
 
+export type RecordProvider = "plivo_cx";
+
+/** The agent's address in its provider's API, where Yaksh reads its own record of each phone
+ * test. */
+export interface RecordSource extends Endpoint {
+  provider: RecordProvider;
+}
+
 export interface OutboundSettings {
   trigger: Trigger;
   calling_numbers: string[];
@@ -359,6 +367,7 @@ export interface AgentSummary {
   agent_number: string | null;
   outbound: OutboundSettings | null;
   endpoint: Endpoint | null;
+  record_source: RecordSource | null;
   /** The ways a run can reach the agent, phone first. */
   transports: Transport[];
   agent_speaks_first: boolean;
@@ -564,6 +573,7 @@ export interface ProviderDraft {
   start_request: StartRequestDraft | null;
   /** The agent's text endpoint, when the provider serves Yaksh's text contract. */
   endpoint: Endpoint | null;
+  record_source: RecordSource | null;
   agent_speaks_first: boolean;
   /** Why an agent that answers calls has no number: none reaches it, or the lookup failed. */
   number_note: string | null;
@@ -576,6 +586,7 @@ export interface AgentInput {
   agent_number: string | null;
   outbound: OutboundSettings | null;
   endpoint: Endpoint | null;
+  record_source: RecordSource | null;
   agent_speaks_first: boolean;
   languages: AgentLanguage[];
   brief: string;
@@ -930,6 +941,52 @@ export interface Conversation extends ConversationSummary {
   validity: Validity | null;
   /** The retry that replaced this conversation. */
   retried_as: string | null;
+  /** Null when the call has no agent record to read. */
+  agent_record: AgentRecordStatus | null;
+}
+
+export type RecordStatus = "waiting" | "found" | "missing";
+
+export interface AgentRecordStatus {
+  status: RecordStatus;
+  /** Why there is no record; or, for a found one, why it can be incomplete. */
+  reason: string | null;
+}
+
+export interface SavedValue {
+  name: string;
+  value: string;
+}
+
+/** One line of the call as the agent recorded it: its own words, or what its speech-to-text
+ * heard. */
+export interface RecordTurn {
+  role: Role;
+  text: string;
+  /** On the call's clock, as the transcript's turns. */
+  at_ms: number | null;
+  /** The transcript turn it belongs to, counted from 1. */
+  turn: number | null;
+}
+
+export interface RecordTool {
+  name: string;
+  arguments: string;
+  output: string | null;
+  failed: boolean;
+  at_ms: number | null;
+}
+
+export interface AgentRecord extends AgentRecordStatus {
+  provider: RecordProvider;
+  provider_label: string;
+  external_id: string | null;
+  /** The provider's own word for the state of the call. */
+  provider_status: string | null;
+  fetched_at: string | null;
+  saved: SavedValue[];
+  turns: RecordTurn[];
+  tools: RecordTool[];
 }
 
 export interface RunInput {
@@ -1274,6 +1331,16 @@ export interface RunVerdicts {
   errors: number;
   callers: { persona: string; calls: number; likely: number; possible: number }[];
   judge_versions: { judge: string; model: string; version: string; items: number }[];
+  /** Null when no judged call read an agent record. */
+  agent_record: {
+    provider: RecordProvider;
+    calls: number;
+    found: number;
+    /** The calls with no record, in the run's order. */
+    missing: string[];
+    saved_data: Record<string, number>;
+    heard: Record<string, number>;
+  } | null;
 }
 
 export interface RunMetrics {
@@ -1388,6 +1455,8 @@ export const JUDGE_TEXT: Record<string, string> = {
   instructions: "Instruction adherence",
   hallucination: "Hallucination",
   caller_check: "Caller check",
+  saved_data: "Saved data",
+  heard: "Heard",
   jev: "Jev",
 };
 

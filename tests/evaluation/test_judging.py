@@ -36,6 +36,7 @@ TURNS = [
 def answer(verdict: str = "pass", **fields: Any) -> dict[str, Any]:
     return {
         "evidence": [{"turn": 3, "quote": "ninety five dollars"}],
+        "record_evidence": [],
         "absence": False,
         "absence_turns": None,
         "reasoning": "It said the price.",
@@ -48,7 +49,14 @@ async def criterion(
     model: Scripted, retry_later: bool = True, text: str = "Says the price."
 ) -> Any:
     return await judge_criterion(
-        model, "VIEW", TURNS, 1, text, slots=asyncio.Semaphore(4), retry_later=retry_later
+        model,
+        "VIEW",
+        TURNS,
+        1,
+        text,
+        record_lines=[],
+        slots=asyncio.Semaphore(4),
+        retry_later=retry_later,
     )
 
 
@@ -153,6 +161,7 @@ async def test_an_agent_rule_that_does_not_apply_is_not_applicable_whatever_it_s
         "VIEW",
         TURNS,
         rule,
+        record_lines=[],
         slots=asyncio.Semaphore(1),
         retry_later=True,
     )

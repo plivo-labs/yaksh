@@ -8,6 +8,7 @@ from dataclasses import dataclass, replace
 from functools import partial
 
 from yaksh.db.models import Conversation
+from yaksh.domain.agent_records import StoredRecord
 from yaksh.domain.agents import AgentConfig, Direction, Transport
 from yaksh.domain.answering import AnsweredBy, Answering, plays_scenario, reaches
 from yaksh.domain.conversations import (
@@ -23,16 +24,18 @@ from yaksh.domain.evaluations import DecidedBy, ItemRole, Metric, MetricKey, Out
 from yaksh.domain.files import FileStore
 from yaksh.domain.language_models import JsonModel
 from yaksh.domain.latency import Latency, Span, waits
+from yaksh.domain.record_sources import RECORD_PROVIDERS
 from yaksh.domain.rules import LlmRule, PhraseRule, in_scope
 from yaksh.domain.scenarios import PlayedScenario
 from yaksh.evaluation import metrics, speech
 from yaksh.evaluation.caller_check import CALLER_CHECK, applied, check_caller
 from yaksh.evaluation.criteria import AGENT_RULE, CRITERION, judge_criterion, judge_rule, rule_text
 from yaksh.evaluation.evaluations import Evaluated
-from yaksh.evaluation.evidence import CallView, render
+from yaksh.evaluation.evidence import CallView, record_lines, render
 from yaksh.evaluation.jev import JEV, Jev
 from yaksh.evaluation.judging import ItemResult
 from yaksh.evaluation.limit import Slots
+from yaksh.evaluation.record_checks import HEARD, SAVED_DATA, judge_heard, judge_saved_data
 from yaksh.evaluation.rules import gate_open, gated, phrase_item
 from yaksh.evaluation.sources import (
     HALLUCINATION,
@@ -63,7 +66,7 @@ class Judging:
 
 SOURCE_JUDGES = (INSTRUCTIONS, HALLUCINATION)
 """The judges that read the agent's whole instructions or documents, with the sources model."""
-JUDGES = (CRITERION, AGENT_RULE, CALLER_CHECK, *SOURCE_JUDGES)
+JUDGES = (CRITERION, AGENT_RULE, CALLER_CHECK, *SOURCE_JUDGES, SAVED_DATA, HEARD)
 """Every judge an evaluation can name; the evaluator stores a version of each at start."""
 
 
@@ -78,16 +81,18 @@ async def evaluate(
     judging: Judging | None,
     *,
     retry_later: bool,
+    record: StoredRecord | None = None,
 ) -> Evaluated:
     """Code metrics for every call. A call that completed and that no one stopped also gets its
     agent's phrase rules and, with a judge model, its judges and verdicts; any other call none.
     retry_later lets a temporary judge failure put the evaluation off; on its last attempt,
     the failure is the item's error instead. Items come in order: criteria by number, rules as
     the agent lists them, instruction adherence when the agent has its instructions,
-    hallucination when it has knowledge-base documents, and last the caller check, whose
-    findings can block criteria. A call that the persona's voicemail or call screener answered
-    gets only the rules that check what it reached; one where the persona never talked gets no
-    criteria and no caller check, so its scenario verdict is not scored."""
+    hallucination when it has knowledge-base documents, the checks of the agent's own record
+    when there is one, and last the caller check, whose findings can block criteria. A call that
+    the persona's voicemail or call screener answered gets only the rules that check what it
+    reached; one where the persona never talked gets no criteria, no record checks and no
+    caller check, so its scenario verdict is not scored."""
     transcript = Transcript.model_validate(conversation.transcript or {})
     found = await measure_call(conversation, store, agent.agent_speaks_first)
     if not judged(conversation):
@@ -98,8 +103,11 @@ async def evaluate(
     if judging is None:
         phrases = [phrase_item(rule, turns) for rule in agent_rules if isinstance(rule, PhraseRule)]
         return Evaluated(metrics=found, items=phrases)
-    view = render(call_view(conversation, agent, scenario, transcript, answering))
-    criteria_text = scenario.criteria if plays_scenario(conversation.answered_by, answering) else []
+    view = render(call_view(conversation, agent, scenario, transcript, answering, record))
+    played = plays_scenario(conversation.answered_by, answering)
+    criteria_text = scenario.criteria if played else []
+    kept = record.record if record is not None else None
+    lines = record_lines(kept) if kept is not None else []
     open_rules = [
         rule for rule in agent_rules if isinstance(rule, LlmRule) and gate_open(rule, transcript)
     ]
@@ -150,6 +158,7 @@ async def evaluate(
                         turns,
                         number,
                         criterion,
+                        record_lines=lines,
                         slots=judging.slots,
                         retry_later=retry_later,
                     ),
@@ -186,6 +195,7 @@ async def evaluate(
                         view,
                         turns,
                         rule,
+                        record_lines=lines,
                         slots=judging.slots,
                         retry_later=retry_later,
                     ),
@@ -223,6 +233,34 @@ async def evaluate(
                     )
                 )
             )
+        record_items = []
+        if kept is not None and played and kept.saved:
+            record_items.append(
+                group.create_task(
+                    judge_saved_data(
+                        judging.model,
+                        view,
+                        turns,
+                        kept,
+                        slots=judging.slots,
+                        retry_later=retry_later,
+                    )
+                )
+            )
+        heard = RECORD_PROVIDERS[kept.provider].live_transcript if kept is not None else False
+        if kept is not None and played and heard:
+            record_items.append(
+                group.create_task(
+                    judge_heard(
+                        judging.model,
+                        view,
+                        turns,
+                        kept,
+                        slots=judging.slots,
+                        retry_later=retry_later,
+                    )
+                )
+            )
     checked = caller.result() if caller is not None else None
     items = (
         (
@@ -232,6 +270,7 @@ async def evaluate(
         )
         + [rule_item(rule, turns) for rule in rules]
         + [task.result() for task in sources]
+        + [task.result() for task in record_items]
         + ([checked] if checked is not None else [])
     )
     return Evaluated(
@@ -280,6 +319,7 @@ def call_view(
     scenario: PlayedScenario,
     transcript: Transcript,
     answering: Answering,
+    record: StoredRecord | None = None,
 ) -> CallView:
     line = parsed(LineFacts, conversation.line_facts)
     return CallView(
@@ -304,6 +344,7 @@ def call_view(
         answered_by=conversation.answered_by,
         answering=None if conversation.answered_by is AnsweredBy.CALLER else answering,
         events=list(transcript.wire_events),
+        record=record,
     )
 
 

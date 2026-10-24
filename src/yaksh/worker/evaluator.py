@@ -7,8 +7,9 @@ import logging
 import os
 import socket
 import uuid
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
+from datetime import UTC, datetime
 
 from pipecat.classifiers.typesafe.jev.classifier import JevClassifier
 from sqlalchemy import select
@@ -24,18 +25,21 @@ from yaksh.db.models import (
 )
 from yaksh.db.models import Document as DocumentRow
 from yaksh.diagnostics import describe_exception
+from yaksh.domain.agent_records import RecordReader, StoredRecord
 from yaksh.domain.agents import AgentConfig
 from yaksh.domain.files import FileStore
 from yaksh.domain.language_models import JsonModel
 from yaksh.domain.personas import PersonaConfig
+from yaksh.domain.record_sources import RecordProvider
 from yaksh.domain.scenarios import ScenarioConfig
 from yaksh.domain.settings import AppSettings, EvaluationLimits, reveal
-from yaksh.evaluation import call, evaluations, labels
+from yaksh.evaluation import agent_records, call, evaluations, labels
 from yaksh.evaluation.call import JUDGES, SOURCE_JUDGES, Judging
 from yaksh.evaluation.jev import JEV, JEV_MODEL, Jev
 from yaksh.evaluation.limit import Limit
 from yaksh.evaluation.sources import Document
 from yaksh.integrations.openai_models import OpenAIJsonModel
+from yaksh.integrations.plivo_cx_runs import PlivoCxRuns
 from yaksh.settings.store import SettingsSource
 from yaksh.timings import TIMINGS, Timings
 
@@ -105,6 +109,11 @@ def judging_inputs(settings: AppSettings) -> tuple[object, ...]:
     )
 
 
+def record_readers(settings: Settings) -> dict[RecordProvider, RecordReader]:
+    """The reader of each provider's agent records."""
+    return {RecordProvider.PLIVO_CX: PlivoCxRuns(allow_private=settings.allow_private_hosts)}
+
+
 async def persona_config(session: AsyncSession, conversation: Conversation) -> PersonaConfig:
     version = await session.get_one(PersonaVersion, conversation.persona_version_id)
     return PersonaConfig.model_validate(version.config)
@@ -136,9 +145,11 @@ class Evaluator:
         store: FileStore,
         clients: Callable[[AppSettings], JudgeClients] = judge_clients,
         timings: Timings = TIMINGS,
+        readers: Mapping[RecordProvider, RecordReader] | None = None,
     ) -> None:
         """clients builds the judge clients for a version of the stored settings."""
         self._sessionmaker = sessionmaker
+        self._readers = readers if readers is not None else record_readers(settings)
         self._settings = settings
         self._timings = timings
         self._source = source
@@ -267,6 +278,16 @@ class Evaluator:
                 judged = judging is not None and call.judged(conversation)
                 persona = await persona_config(session, conversation)
                 documents = await knowledge_base(session, agent_config) if judged else []
+            try:
+                record = await self._record(conversation, agent_config, app)
+            except agent_records.NotReady as wait:
+                if held.is_set():
+                    async with self._sessionmaker() as session:
+                        await evaluations.defer(
+                            session, evaluation.id, evaluation.claim_seq, wait.until
+                        )
+                log.info("evaluation %s waits for the agent record: %s", evaluation.id, wait)
+                return
             evaluated = await call.evaluate(
                 conversation,
                 self._store,
@@ -277,6 +298,7 @@ class Evaluator:
                 documents,
                 judging,
                 retry_later=evaluation.attempts < evaluations.MAX_ATTEMPTS,
+                record=record,
             )
             if not held.is_set():
                 return
@@ -297,6 +319,25 @@ class Evaluator:
             heartbeat.cancel()
             with contextlib.suppress(asyncio.CancelledError):
                 await heartbeat
+
+    async def _record(
+        self, conversation: Conversation, agent: AgentConfig, app: AppSettings
+    ) -> StoredRecord | None:
+        """The agent's own record of the call, when it has a record source; raises NotReady
+        while the provider is still writing it."""
+        source = agent.record_source
+        if source is None or not agent_records.applies(conversation, agent):
+            return None
+        return await agent_records.resolve(
+            self._sessionmaker,
+            conversation,
+            source,
+            self._readers,
+            app.secrets,
+            now=datetime.now(UTC),
+            wait_s=self._timings.record_wait_s,
+            poll_s=self._timings.record_poll_s,
+        )
 
     async def _fail(self, evaluation: Evaluation, failure: str) -> None:
         try:

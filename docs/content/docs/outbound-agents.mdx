@@ -15,6 +15,8 @@ The worker reads the numbers of the account again every 5 minutes by default, an
 
 ## Trigger
 
+Yaksh keeps the body of the trigger's response with the call, secrets masked. With an [agent record](/docs/agent-record), it names the run that placed the call.
+
 The trigger URL must use `https` and a public address. Yaksh saves an `http` URL, but each test then stops with the end reason `trigger_failed`. For an agent on your own network, set `YAKSH_ALLOW_PRIVATE_HOSTS`.
 
 The dial window (`dial_window_s`) is the time that Yaksh waits for the call of the agent: 10 to 600 seconds. The default is 120. The wait starts when Yaksh gets a number for the conversation. Yaksh adds 15 seconds for the trigger request. If no call comes during this time, the conversation stops with the end reason `no_call`. If you give calling numbers (`calling_numbers`), Yaksh accepts a call only from these numbers.
