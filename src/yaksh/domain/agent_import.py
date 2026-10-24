@@ -106,7 +106,6 @@ class ProviderDraft(BaseModel):
     endpoint: Endpoint | None = None
     """The agent's text endpoint, when the provider serves Yaksh's text contract."""
     record_source: RecordSource | None = None
-    """Where Yaksh reads the agent's own record of each phone test, when Yaksh can."""
     agent_speaks_first: bool = True
     number_note: str | None = None
     """Why an agent that answers calls has no number: none reaches it, or the lookup failed.

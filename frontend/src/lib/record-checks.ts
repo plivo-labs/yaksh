@@ -2,7 +2,6 @@ import type { EvaluationItem } from "@/lib/types";
 
 type TurnQuote = { turn: number; quote: string };
 
-/** One saved value as the saved data check found it. */
 export type SavedValueResult = {
   name: string;
   result: "matches" | "contradicts" | "not_checkable";
@@ -10,7 +9,6 @@ export type SavedValueResult = {
   reasoning: string;
 };
 
-/** One value the caller said, and what the agent's speech-to-text heard. */
 export type HeardValueResult = {
   value: string;
   said: TurnQuote;

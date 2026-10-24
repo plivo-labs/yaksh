@@ -455,7 +455,6 @@ function CriterionRow({ criterion }: { criterion: Criterion }) {
 }
 
 /** The agent's rules over the run's judged calls. */
-/** The agent's own record over the run: how many calls had one, and its two checks. */
 function AgentRecordList({ record }: { record: NonNullable<RunVerdicts["agent_record"]> }) {
   const checks = [
     {

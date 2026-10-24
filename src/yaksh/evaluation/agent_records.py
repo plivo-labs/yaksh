@@ -1,11 +1,3 @@
-"""The agent's own record of a phone test: read once from its provider before the call is
-judged, kept with the call, and paired with Yaksh's turns.
-
-A record that its provider is still writing puts the evaluation off without using one of its
-attempts. A record that is not final when the wait ends is kept as it is, with the reason; with
-no record at all, the call is judged without one.
-"""
-
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -52,7 +44,6 @@ class NotReady(Exception):
 
 
 def connected_at(conversation: Conversation) -> datetime | None:
-    """When the call's audio started: its connected event on the call's clock."""
     transcript = Transcript.model_validate(conversation.transcript or {})
     event = next(
         (event for event in transcript.wire_events if event.kind is WireEventKind.CONNECTED), None
@@ -63,7 +54,6 @@ def connected_at(conversation: Conversation) -> datetime | None:
 
 
 def applies(conversation: Conversation, agent: AgentConfig) -> bool:
-    """A judged phone test that connected, of an agent with a record source."""
     return (
         agent.record_source is not None
         and conversation.transport is Transport.PHONE
@@ -177,7 +167,6 @@ def final(lookup: Lookup, wait_s: float) -> StoredRecord:
 
 
 def call_clock_ms(conversation: Conversation, at: datetime | None) -> int | None:
-    """A record time on the call's clock."""
     if at is None or conversation.clock_started_at is None:
         return None
     return round((at - conversation.clock_started_at).total_seconds() * 1000)
@@ -215,8 +204,6 @@ class PlacedTool:
 
 @dataclass(frozen=True)
 class RecordView:
-    """A call's agent record as the console shows it, its lines placed on the call's clock."""
-
     status: RecordStatus
     source: RecordSource
     reason: str | None

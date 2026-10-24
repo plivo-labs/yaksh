@@ -454,10 +454,12 @@ function Answer({ item, onTurn }: { item: EvaluationItem; onTurn?: OnTurn }) {
   const itemKey = item.item_key;
   const answer = item.answer ?? {};
   const parts: ReactNode[] = [];
-  const evidence = answer.evidence as Quote[] | undefined;
-  if (evidence?.length) parts.push(<Quotes key="evidence" quotes={evidence} onTurn={onTurn} />);
-  const recorded = answer.record_evidence as { line: number; quote: string }[] | undefined;
-  if (recorded?.length) {
+  const evidence = answer.evidence;
+  if (Array.isArray(evidence) && evidence.length) {
+    parts.push(<Quotes key="evidence" quotes={evidence as Quote[]} onTurn={onTurn} />);
+  }
+  const recorded = answer.record_evidence;
+  if (Array.isArray(recorded) && recorded.length) {
     parts.push(
       <ul key="record-evidence" className="grid gap-1">
         {recorded.map((quote, index) => (
@@ -585,7 +587,6 @@ const SAVED_TEXT: Record<SavedValueResult["result"], string> = {
   not_checkable: "Not checkable",
 };
 
-/** One saved value as the saved data check found it. */
 function SavedValueRow({ value, onTurn }: { value: SavedValueResult; onTurn?: OnTurn }) {
   return (
     <div className="grid gap-1.5 rounded-md border px-2.5 py-2">
@@ -600,7 +601,6 @@ function SavedValueRow({ value, onTurn }: { value: SavedValueResult; onTurn?: On
   );
 }
 
-/** One value the caller said, and what the agent's speech-to-text heard. */
 function HeardRow({ value, onTurn }: { value: HeardValueResult; onTurn?: OnTurn }) {
   return (
     <div className="grid gap-1.5 rounded-md border px-2.5 py-2 text-xs-400">

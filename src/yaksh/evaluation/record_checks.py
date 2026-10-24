@@ -1,7 +1,3 @@
-"""The checks of the agent's own record, one judge call each: the values the agent saved
-against what the caller said, which can fail the call; and what the agent's speech-to-text
-heard against what Yaksh's caller said, which only reports."""
-
 from collections import Counter
 from collections.abc import Callable, Sequence
 from typing import Any

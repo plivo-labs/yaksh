@@ -17,8 +17,6 @@ import type {
 } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-/** The agent's own record of the call: the values it saved, and the whole call as it recorded
- * it, with its tool calls in place. The checks of the record mark what they found. */
 export function AgentRecordPanel({
   conversationId,
   status,
@@ -338,7 +336,6 @@ function RecordLine({
   );
 }
 
-/** The text with the misheard words marked, when they are in it. */
 function highlighted(text: string, wrong: string | null): ReactNode {
   const at = wrong ? text.toLowerCase().indexOf(wrong.toLowerCase()) : -1;
   if (wrong === null || at < 0) return text;

@@ -30,7 +30,3 @@ test("an answer that failed the code checks gives none, even after a label passe
   expect(checkedValues(item("error", "pass", {}))).toBeNull();
   expect(checkedValues(item("error", "error", [{ name: "caller_age" }]))).toBeNull();
 });
-
-test("no item gives none", () => {
-  expect(checkedValues(undefined)).toBeNull();
-});

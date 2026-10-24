@@ -259,7 +259,9 @@ def finished(detail: dict[str, Any]) -> Found | Pending:
 def logs_of(detail: dict[str, Any]) -> list[dict[str, Any]]:
     """The run's log entries. A log in another shape raises TypeError, which find() makes a
     missing record: an empty log would read as a call where the agent heard nothing."""
-    logs = detail.get("logs") or []
+    logs = detail.get("logs")
+    if logs is None:
+        return []
     if not isinstance(logs, list) or not all(isinstance(entry, dict) for entry in logs):
         raise TypeError("the run's logs are not a list of objects")
     return logs
@@ -279,10 +281,9 @@ def start_call(detail: dict[str, Any]) -> dict[str, Any]:
 
 
 def parse_run(detail: dict[str, Any], now: datetime) -> AgentRecord:
-    """The run as an agent record: each line spoken or heard, the values the agent saved and
-    its tool calls. A value saved under the same name by two nodes keeps its node in the
-    name, as Plivo CX's own hang-up callback names it. The record is final when Plivo CX ended
-    the run and its log has settled."""
+    """A value saved under the same name by two nodes keeps its node in the name, as Plivo
+    CX's own hang-up callback names it. The record is final when Plivo CX ended the run and its
+    log has settled."""
     logs = logs_of(detail)
     nodes = {
         str(entry.get("node_uuid")): str(entry.get("current_node") or "")

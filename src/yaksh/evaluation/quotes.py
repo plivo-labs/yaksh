@@ -32,7 +32,6 @@ def quote_problems(
 
 
 def record_quote_problems(evidence: Sequence[dict[str, Any]], lines: Sequence[str]) -> list[str]:
-    """Quotes from the agent record: each one is in the record line it names."""
     problems = []
     for quote in evidence:
         line, words = quote["line"], quote["quote"]

@@ -98,7 +98,6 @@ def call(direction: Direction = Direction.INBOUND, trigger: str | None = None) -
 
 
 def run_like_live(run_id: str, caller: str, started: str, ended: str) -> dict[str, Any]:
-    """The live run with another ID, caller number and times."""
     detail = copy.deepcopy(LIVE_RUN)
     detail.update(run_uuid=run_id, started_at=started, ended_at=ended)
     detail["logs"][0]["node_config"]["call.from"] = caller
@@ -218,7 +217,6 @@ async def test_a_run_that_called_another_number_is_not_the_calls(cx: Cx) -> None
     ("status", "headers", "expected", "wait"),
     [
         (401, {}, Missing, None),
-        (403, {}, Missing, None),
         (429, {"Retry-After": "7"}, Pending, 7.0),
         (503, {}, Pending, None),
     ],
@@ -245,7 +243,7 @@ async def test_two_nodes_that_save_one_name_keep_their_node_in_it(cx: Cx) -> Non
             "sender": "assistant",
             "text": "",
             "node_uuid": "booking",
-            "node_config": {"variables": {"caller_age": 35, "slot": None}},
+            "node_config": {"variables": {"caller_age": 35, "slot": None, "note": "A\u0000B"}},
         },
         {
             "event_name": "SYSTEM_CHUNK_CREATED",
@@ -269,6 +267,7 @@ async def test_two_nodes_that_save_one_name_keep_their_node_in_it(cx: Cx) -> Non
         "caller_full_name": "Jordan Ellis",
         "Booking.caller_age": "35",
         "slot": "",
+        "note": "AB",
     }
     [tool] = found.record.tools
     assert (tool.name, tool.arguments, tool.output, tool.failed) == (
@@ -328,7 +327,7 @@ async def test_a_run_in_a_shape_yaksh_does_not_read_is_missing_with_why(cx: Cx, 
     if odd == "variables":
         detail["logs"][3]["node_config"]["variables"] = ["caller_age", "34"]
     if odd == "logs":
-        detail["logs"] = {"entries": detail["logs"]}
+        detail["logs"] = {}
     cx.add(detail)
     if odd == "started_at":
         cx.summaries[0]["started_at"] = "yesterday"

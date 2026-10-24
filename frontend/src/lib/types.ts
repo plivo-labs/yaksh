@@ -958,8 +958,6 @@ export interface SavedValue {
   value: string;
 }
 
-/** One line of the call as the agent recorded it: its own words, or what its speech-to-text
- * heard. */
 export interface RecordTurn {
   role: Role;
   text: string;

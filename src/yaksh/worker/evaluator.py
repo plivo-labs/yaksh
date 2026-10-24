@@ -110,7 +110,6 @@ def judging_inputs(settings: AppSettings) -> tuple[object, ...]:
 
 
 def record_readers(settings: Settings) -> dict[RecordProvider, RecordReader]:
-    """The reader of each provider's agent records."""
     return {RecordProvider.PLIVO_CX: PlivoCxRuns(allow_private=settings.allow_private_hosts)}
 
 

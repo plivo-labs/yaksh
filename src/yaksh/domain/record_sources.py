@@ -1,5 +1,3 @@
-"""Where Yaksh reads an agent's own record of each phone test, and what each provider gives."""
-
 import re
 from dataclasses import dataclass
 from enum import StrEnum
@@ -21,7 +19,6 @@ class ProviderSpec:
     default_url: str
     """The provider's API: where the import and the console start an agent's URL."""
     agent_path: re.Pattern[str]
-    """The path of one agent's URL in the provider's API."""
     url_hint: str
     live_transcript: bool
     """The record's caller turns are the agent's speech-to-text during the call, so they show

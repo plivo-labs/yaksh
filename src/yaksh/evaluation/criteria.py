@@ -34,7 +34,6 @@ RECORD_EVIDENCE = {
         "additionalProperties": False,
     },
 }
-"""Quotes from the agent record, with their R line numbers."""
 ANSWER_PROPERTIES: dict[str, Any] = {
     "evidence": {
         "type": "array",

@@ -67,7 +67,6 @@ SOURCE = {
     "headers": [{"name": "Authorization", "value": "{{secrets.CX_AUTH}}"}],
 }
 YAKSH_NUMBER = "+15550100000"
-"""The number the worker leased for the call."""
 CLOCK_LAG = timedelta(seconds=7)
 """How long after the claim the call's clock starts: the worker prepares the call first."""
 FAST = Timings(evaluator_poll_s=0.05, record_poll_s=0.05, record_wait_s=30)
