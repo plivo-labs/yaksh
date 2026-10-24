@@ -1,3 +1,14 @@
+## v0.2.0 (2026-10-24)
+
+### Feat
+
+- **runs**: test voicemail and call screening on outbound phone runs (#10)
+
+### Changed
+
+- Run verdicts: `pending` and `not_judged` count all calls of the run, also the calls in the new `unplayed` list, where no caller talked.
+- The API applies database migration 0002 when it starts.
+
 ## v0.1.2 (2026-10-23)
 
 ### Perf
