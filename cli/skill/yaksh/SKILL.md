@@ -81,6 +81,10 @@ Yaksh calls only from its test numbers, and receives calls only on them. When a 
 - A test number with `state` `in_use` or `resting` is not free. Wait for the other tests to end, or ask the user for more test numbers.
 - Do not run `yaksh numbers use` without the user's approval. The user chooses the test numbers on the Numbers page of the console.
 
+## Suites in CI
+
+A suite is a saved list of agents, each with its scenarios and run settings. `yaksh suite list` lists the suites. `yaksh suite run <suite-id> --wait --timeout <limit>` starts one run for each agent, waits for the calls and the judges, and exits 0 only when the suite run passed. Each run gets a result against the suite's required pass rate: `passed`, `failed`, `not_decided` (the calls that were not scored can change the result) or `cancelled`. A call that did not complete counts as not scored. When the suite run did not pass, the `next:` line names the run that decided the result: `yaksh run metrics` (read it as in step 2 of the loop), or `yaksh conversation list ... --group error,did_not_connect` when its calls did not complete (see "Calls that did not complete"). `yaksh suite wait <suite-run-id>` waits again.
+
 ## Rules
 
 - Never print the API token, and never write it to a file.

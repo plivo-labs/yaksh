@@ -147,7 +147,7 @@ async def run_verdicts(
         )
         results.append(result)
     worst_best = numbers.worst_and_best(results)
-    interval = numbers.suite_interval(results, seed)
+    interval = numbers.pass_rate_interval(results, seed)
     # Repeats compare only when the same persona called with the same data set and the same
     # answer: each scenario, persona, data set and answer is one group for pass^2 and for the
     # scenarios that both passed and failed.

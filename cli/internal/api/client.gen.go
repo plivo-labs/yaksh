@@ -979,6 +979,36 @@ func (e RuleScope) Valid() bool {
 	}
 }
 
+// Defines values for RunResult.
+const (
+	RunResultCancelled  RunResult = "cancelled"
+	RunResultFailed     RunResult = "failed"
+	RunResultJudging    RunResult = "judging"
+	RunResultNotDecided RunResult = "not_decided"
+	RunResultPassed     RunResult = "passed"
+	RunResultRunning    RunResult = "running"
+)
+
+// Valid indicates whether the value is a known member of the RunResult enum.
+func (e RunResult) Valid() bool {
+	switch e {
+	case RunResultCancelled:
+		return true
+	case RunResultFailed:
+		return true
+	case RunResultJudging:
+		return true
+	case RunResultNotDecided:
+		return true
+	case RunResultPassed:
+		return true
+	case RunResultRunning:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for RunStatus.
 const (
 	RunStatusCancelled  RunStatus = "cancelled"
@@ -1529,6 +1559,12 @@ type AgentVersionRead struct {
 	Version   int                `json:"version"`
 }
 
+// AllScenarios Every live scenario of the agent at each start, each with its own persona and all its
+// data sets, answered by each of these answers.
+type AllScenarios struct {
+	AnsweredBy *[]AnsweredBy `json:"answered_by,omitempty"`
+}
+
 // AnsweredBy defines model for AnsweredBy.
 type AnsweredBy string
 
@@ -1938,6 +1974,23 @@ type ForkRequest struct {
 	Instruction string `json:"instruction"`
 }
 
+// GateNumbers What a suite reads from one run to give it a result. Each counted call is in one group:
+// pending, or by its verdict among the calls where the caller talked, or by its verdict with
+// agent rules among the calls where no caller talked.
+type GateNumbers struct {
+	Best              *float32 `json:"best"`
+	Coverage          *float32 `json:"coverage"`
+	Failed            int      `json:"failed"`
+	NotScored         int      `json:"not_scored"`
+	PassRate          *float32 `json:"pass_rate"`
+	Passed            int      `json:"passed"`
+	Pending           int      `json:"pending"`
+	UnplayedFailed    int      `json:"unplayed_failed"`
+	UnplayedNotScored int      `json:"unplayed_not_scored"`
+	UnplayedPassed    int      `json:"unplayed_passed"`
+	Worst             *float32 `json:"worst"`
+}
+
 // GenerateScenarios defines model for GenerateScenarios.
 type GenerateScenarios struct {
 	Count        *int                  `json:"count,omitempty"`
@@ -2145,13 +2198,15 @@ type Layer struct {
 
 // Limits defines model for Limits.
 type Limits struct {
-	DefaultMaxDurationS  *int `json:"default_max_duration_s,omitempty"`
-	DefaultMaxTurns      *int `json:"default_max_turns,omitempty"`
-	MaxRunConversations  *int `json:"max_run_conversations,omitempty"`
-	MaxRunRepeats        *int `json:"max_run_repeats,omitempty"`
-	MaxRunRetries        *int `json:"max_run_retries,omitempty"`
-	MaxRunStartIntervalS *int `json:"max_run_start_interval_s,omitempty"`
-	MaxScenarioDataSets  *int `json:"max_scenario_data_sets,omitempty"`
+	DefaultMaxDurationS      *int `json:"default_max_duration_s,omitempty"`
+	DefaultMaxTurns          *int `json:"default_max_turns,omitempty"`
+	MaxRunConversations      *int `json:"max_run_conversations,omitempty"`
+	MaxRunRepeats            *int `json:"max_run_repeats,omitempty"`
+	MaxRunRetries            *int `json:"max_run_retries,omitempty"`
+	MaxRunStartIntervalS     *int `json:"max_run_start_interval_s,omitempty"`
+	MaxScenarioDataSets      *int `json:"max_scenario_data_sets,omitempty"`
+	MaxSuiteEntries          *int `json:"max_suite_entries,omitempty"`
+	MaxSuiteRunConversations *int `json:"max_suite_run_conversations,omitempty"`
 }
 
 // Llm Any API with OpenAI's Responses endpoint. The caller, scenario writing and the judges
@@ -2291,6 +2346,22 @@ type PageScenarioVersionRead struct {
 	Page     int                   `json:"page"`
 	PageSize int                   `json:"page_size"`
 	Total    int                   `json:"total"`
+}
+
+// PageSuiteRunSummary defines model for Page_SuiteRunSummary_.
+type PageSuiteRunSummary struct {
+	Items    []SuiteRunSummary `json:"items"`
+	Page     int               `json:"page"`
+	PageSize int               `json:"page_size"`
+	Total    int               `json:"total"`
+}
+
+// PageSuiteSummary defines model for Page_SuiteSummary_.
+type PageSuiteSummary struct {
+	Items    []SuiteSummary `json:"items"`
+	Page     int            `json:"page"`
+	PageSize int            `json:"page_size"`
+	Total    int            `json:"total"`
 }
 
 // PageVoiceRead defines model for Page_VoiceRead_.
@@ -2729,8 +2800,7 @@ type RuleResults struct {
 // the screener and for who answered after it.
 type RuleScope string
 
-// RunCreate Limits that an operator sets, such as the most repeats, are checked where the settings
-// are known.
+// RunCreate defines model for RunCreate.
 type RunCreate struct {
 	AgentId        openapi_types.UUID `json:"agent_id"`
 	MaxDurationS   *int               `json:"max_duration_s,omitempty"`
@@ -2755,6 +2825,14 @@ type RunMetrics struct {
 	// Verdicts The run's verdict numbers over its judged calls: completed calls that no one stopped,
 	// whose evaluation gave a verdict or failed.
 	Verdicts RunVerdicts `json:"verdicts"`
+}
+
+// RunNames The names of what a run played, for a client that shows or copies the run. A scenario or
+// persona deleted since keeps its name; a data set keeps the name it had at the start.
+type RunNames struct {
+	DataSets  map[string]map[string]string `json:"data_sets"`
+	Personas  map[string]string            `json:"personas"`
+	Scenarios map[string]string            `json:"scenarios"`
 }
 
 // RunNumbers What the evaluations found over some of a run's conversations.
@@ -2808,19 +2886,27 @@ type RunRead struct {
 	MaxTurns       int                `json:"max_turns"`
 	MedianTalkMs   *int               `json:"median_talk_ms"`
 	Name           *string            `json:"name"`
-	Repeats        int                `json:"repeats"`
-	ResponseP50Ms  *int               `json:"response_p50_ms"`
-	ResponseP90Ms  *int               `json:"response_p90_ms"`
-	Retries        int                `json:"retries"`
-	Scenarios      []RunScenario      `json:"scenarios"`
-	StartIntervalS *int               `json:"start_interval_s"`
-	StartedAt      *time.Time         `json:"started_at"`
-	Status         RunStatus          `json:"status"`
+
+	// Names The names of what a run played, for a client that shows or copies the run. A scenario or
+	// persona deleted since keeps its name; a data set keeps the name it had at the start.
+	Names          RunNames      `json:"names"`
+	Repeats        int           `json:"repeats"`
+	ResponseP50Ms  *int          `json:"response_p50_ms"`
+	ResponseP90Ms  *int          `json:"response_p90_ms"`
+	Retries        int           `json:"retries"`
+	Scenarios      []RunScenario `json:"scenarios"`
+	StartIntervalS *int          `json:"start_interval_s"`
+	StartedAt      *time.Time    `json:"started_at"`
+	Status         RunStatus     `json:"status"`
+	SuiteRun       *SuiteRunLink `json:"suite_run"`
 
 	// Transport How Yaksh reaches an agent.
 	Transport     Transport      `json:"transport"`
 	WaitingReason *WaitingReason `json:"waiting_reason"`
 }
+
+// RunResult defines model for RunResult.
+type RunResult string
 
 // RunScenario A scenario of a run, the personas that call it and the data sets they play. No personas
 // is the scenario's own persona; no data sets is every data set of its current version.
@@ -2861,6 +2947,7 @@ type RunSummary struct {
 	StartIntervalS *int               `json:"start_interval_s"`
 	StartedAt      *time.Time         `json:"started_at"`
 	Status         RunStatus          `json:"status"`
+	SuiteRun       *SuiteRunLink      `json:"suite_run"`
 
 	// Transport How Yaksh reaches an agent.
 	Transport     Transport      `json:"transport"`
@@ -3126,6 +3213,147 @@ type StartRequestDraft struct {
 	NumberField *string                 `json:"number_field"`
 	Query       []Pair                  `json:"query"`
 	Url         string                  `json:"url"`
+}
+
+// SuiteCreate A new suite has no entries; the suite page adds them.
+type SuiteCreate struct {
+	Name                string `json:"name"`
+	RequiredPassPercent *int   `json:"required_pass_percent,omitempty"`
+}
+
+// SuiteEntry One run of a suite run: an agent over one connection, its scenarios and settings.
+type SuiteEntry struct {
+	AgentId        openapi_types.UUID   `json:"agent_id"`
+	MaxDurationS   *int                 `json:"max_duration_s,omitempty"`
+	MaxParallel    *int                 `json:"max_parallel,omitempty"`
+	MaxRetries     *int                 `json:"max_retries,omitempty"`
+	MaxTurns       *int                 `json:"max_turns,omitempty"`
+	Repeats        *int                 `json:"repeats,omitempty"`
+	Scenarios      SuiteEntry_Scenarios `json:"scenarios"`
+	StartIntervalS *int                 `json:"start_interval_s,omitempty"`
+
+	// Transport How Yaksh reaches an agent.
+	Transport Transport `json:"transport"`
+}
+
+// SuiteEntryScenarios0 defines model for SuiteEntry.Scenarios.0.
+type SuiteEntryScenarios0 = []RunScenario
+
+// SuiteEntry_Scenarios defines model for SuiteEntry.Scenarios.
+type SuiteEntry_Scenarios struct {
+	union json.RawMessage
+}
+
+// SuiteEntryRead defines model for SuiteEntryRead.
+type SuiteEntryRead struct {
+	AgentId        openapi_types.UUID       `json:"agent_id"`
+	AgentName      string                   `json:"agent_name"`
+	Calls          int                      `json:"calls"`
+	MaxDurationS   *int                     `json:"max_duration_s,omitempty"`
+	MaxParallel    *int                     `json:"max_parallel,omitempty"`
+	MaxRetries     *int                     `json:"max_retries,omitempty"`
+	MaxTurns       *int                     `json:"max_turns,omitempty"`
+	Position       int                      `json:"position"`
+	Problems       []string                 `json:"problems"`
+	Repeats        *int                     `json:"repeats,omitempty"`
+	ScenarioCount  int                      `json:"scenario_count"`
+	Scenarios      SuiteEntryRead_Scenarios `json:"scenarios"`
+	StartIntervalS *int                     `json:"start_interval_s,omitempty"`
+
+	// Transport How Yaksh reaches an agent.
+	Transport Transport `json:"transport"`
+}
+
+// SuiteEntryReadScenarios0 defines model for SuiteEntryRead.Scenarios.0.
+type SuiteEntryReadScenarios0 = []RunScenario
+
+// SuiteEntryRead_Scenarios defines model for SuiteEntryRead.Scenarios.
+type SuiteEntryRead_Scenarios struct {
+	union json.RawMessage
+}
+
+// SuiteRead defines model for SuiteRead.
+type SuiteRead struct {
+	AgentNames          []string           `json:"agent_names"`
+	Calls               int                `json:"calls"`
+	CreatedAt           time.Time          `json:"created_at"`
+	Entries             []SuiteEntryRead   `json:"entries"`
+	Id                  openapi_types.UUID `json:"id"`
+	LastRun             *SuiteRunSummary   `json:"last_run"`
+	Name                string             `json:"name"`
+	RequiredPassPercent int                `json:"required_pass_percent"`
+	Revision            int                `json:"revision"`
+	UpdatedAt           time.Time          `json:"updated_at"`
+}
+
+// SuiteRunLink The suite run that started a run.
+type SuiteRunLink struct {
+	Id        openapi_types.UUID `json:"id"`
+	Position  int                `json:"position"`
+	SuiteId   openapi_types.UUID `json:"suite_id"`
+	SuiteName string             `json:"suite_name"`
+}
+
+// SuiteRunPart One run of a suite run, with its result against the suite run's pass rate.
+type SuiteRunPart struct {
+	// Numbers What a suite reads from one run to give it a result. Each counted call is in one group:
+	// pending, or by its verdict among the calls where the caller talked, or by its verdict with
+	// agent rules among the calls where no caller talked.
+	Numbers GateNumbers `json:"numbers"`
+	Result  RunResult   `json:"result"`
+	Run     RunSummary  `json:"run"`
+}
+
+// SuiteRunRead defines model for SuiteRunRead.
+type SuiteRunRead struct {
+	CancelledAt         *time.Time         `json:"cancelled_at"`
+	ConversationCount   int                `json:"conversation_count"`
+	CreatedAt           time.Time          `json:"created_at"`
+	EndedAt             *time.Time         `json:"ended_at"`
+	Id                  openapi_types.UUID `json:"id"`
+	PassedRunCount      int                `json:"passed_run_count"`
+	RequiredPassPercent int                `json:"required_pass_percent"`
+	Result              RunResult          `json:"result"`
+	RunCount            int                `json:"run_count"`
+	Runs                []SuiteRunPart     `json:"runs"`
+	SuiteId             openapi_types.UUID `json:"suite_id"`
+	SuiteName           string             `json:"suite_name"`
+}
+
+// SuiteRunSummary defines model for SuiteRunSummary.
+type SuiteRunSummary struct {
+	CancelledAt         *time.Time         `json:"cancelled_at"`
+	ConversationCount   int                `json:"conversation_count"`
+	CreatedAt           time.Time          `json:"created_at"`
+	EndedAt             *time.Time         `json:"ended_at"`
+	Id                  openapi_types.UUID `json:"id"`
+	PassedRunCount      int                `json:"passed_run_count"`
+	RequiredPassPercent int                `json:"required_pass_percent"`
+	Result              RunResult          `json:"result"`
+	RunCount            int                `json:"run_count"`
+	SuiteId             openapi_types.UUID `json:"suite_id"`
+	SuiteName           string             `json:"suite_name"`
+}
+
+// SuiteSummary defines model for SuiteSummary.
+type SuiteSummary struct {
+	AgentNames          []string           `json:"agent_names"`
+	Calls               int                `json:"calls"`
+	CreatedAt           time.Time          `json:"created_at"`
+	Id                  openapi_types.UUID `json:"id"`
+	LastRun             *SuiteRunSummary   `json:"last_run"`
+	Name                string             `json:"name"`
+	RequiredPassPercent int                `json:"required_pass_percent"`
+	Revision            int                `json:"revision"`
+	UpdatedAt           time.Time          `json:"updated_at"`
+}
+
+// SuiteUpdate A partial change. The entries, when given, replace the suite's entries as a whole.
+type SuiteUpdate struct {
+	Entries             *[]SuiteEntry `json:"entries,omitempty"`
+	Name                *string       `json:"name,omitempty"`
+	RequiredPassPercent *int          `json:"required_pass_percent,omitempty"`
+	Revision            int           `json:"revision"`
 }
 
 // Surroundings What the agent hears behind the caller. No sounds and no auto noise is a quiet room.
@@ -3410,6 +3638,7 @@ type ListRunsApiV1RunsGetParams struct {
 	Status        *RunStatus          `form:"status,omitempty" json:"status,omitempty"`
 	CreatedFrom   *time.Time          `form:"created_from,omitempty" json:"created_from,omitempty"`
 	CreatedBefore *time.Time          `form:"created_before,omitempty" json:"created_before,omitempty"`
+	SuiteId       *openapi_types.UUID `form:"suite_id,omitempty" json:"suite_id,omitempty"`
 	Page          *int                `form:"page,omitempty" json:"page,omitempty"`
 	PageSize      *int                `form:"page_size,omitempty" json:"page_size,omitempty"`
 }
@@ -3426,6 +3655,23 @@ type ForkScenarioApiV1ScenariosScenarioIdForkPostJSONBody = ScenarioFork
 type ListVersionsApiV1ScenariosScenarioIdVersionsGetParams struct {
 	Page     *int `form:"page,omitempty" json:"page,omitempty"`
 	PageSize *int `form:"page_size,omitempty" json:"page_size,omitempty"`
+}
+
+// ListSuitesApiV1SuitesGetParams defines parameters for ListSuitesApiV1SuitesGet.
+type ListSuitesApiV1SuitesGetParams struct {
+	Page     *int `form:"page,omitempty" json:"page,omitempty"`
+	PageSize *int `form:"page_size,omitempty" json:"page_size,omitempty"`
+}
+
+// ListSuiteRunsApiV1SuitesSuiteIdRunsGetParams defines parameters for ListSuiteRunsApiV1SuitesSuiteIdRunsGet.
+type ListSuiteRunsApiV1SuitesSuiteIdRunsGetParams struct {
+	Page     *int `form:"page,omitempty" json:"page,omitempty"`
+	PageSize *int `form:"page_size,omitempty" json:"page_size,omitempty"`
+}
+
+// StartSuiteApiV1SuitesSuiteIdRunsPostParams defines parameters for StartSuiteApiV1SuitesSuiteIdRunsPost.
+type StartSuiteApiV1SuitesSuiteIdRunsPostParams struct {
+	IdempotencyKey *string `json:"idempotency-key,omitempty"`
 }
 
 // ListVoicesApiV1VoicesGetParams defines parameters for ListVoicesApiV1VoicesGet.
@@ -3551,6 +3797,12 @@ type PutValuesApiV1SettingsValuesPutJSONRequestBody = SettingsValues
 
 // PreviewPlanApiV1SoundsPlanPostJSONRequestBody defines body for PreviewPlanApiV1SoundsPlanPost for application/json ContentType.
 type PreviewPlanApiV1SoundsPlanPostJSONRequestBody = PlanPreview
+
+// CreateSuiteApiV1SuitesPostJSONRequestBody defines body for CreateSuiteApiV1SuitesPost for application/json ContentType.
+type CreateSuiteApiV1SuitesPostJSONRequestBody = SuiteCreate
+
+// UpdateSuiteApiV1SuitesSuiteIdPatchJSONRequestBody defines body for UpdateSuiteApiV1SuitesSuiteIdPatch for application/json ContentType.
+type UpdateSuiteApiV1SuitesSuiteIdPatchJSONRequestBody = SuiteUpdate
 
 // CreateVoiceApiV1VoicesPostJSONRequestBody defines body for CreateVoiceApiV1VoicesPost for application/json ContentType.
 type CreateVoiceApiV1VoicesPostJSONRequestBody = VoiceCreate
@@ -4023,6 +4275,130 @@ func (t FieldError_Loc_Item) MarshalJSON() ([]byte, error) {
 }
 
 func (t *FieldError_Loc_Item) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsSuiteEntryScenarios0 returns the union data inside the SuiteEntry_Scenarios as a SuiteEntryScenarios0
+func (t SuiteEntry_Scenarios) AsSuiteEntryScenarios0() (SuiteEntryScenarios0, error) {
+	var body SuiteEntryScenarios0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSuiteEntryScenarios0 overwrites any union data inside the SuiteEntry_Scenarios as the provided SuiteEntryScenarios0
+func (t *SuiteEntry_Scenarios) FromSuiteEntryScenarios0(v SuiteEntryScenarios0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSuiteEntryScenarios0 performs a merge with any union data inside the SuiteEntry_Scenarios, using the provided SuiteEntryScenarios0
+func (t *SuiteEntry_Scenarios) MergeSuiteEntryScenarios0(v SuiteEntryScenarios0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsAllScenarios returns the union data inside the SuiteEntry_Scenarios as a AllScenarios
+func (t SuiteEntry_Scenarios) AsAllScenarios() (AllScenarios, error) {
+	var body AllScenarios
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromAllScenarios overwrites any union data inside the SuiteEntry_Scenarios as the provided AllScenarios
+func (t *SuiteEntry_Scenarios) FromAllScenarios(v AllScenarios) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeAllScenarios performs a merge with any union data inside the SuiteEntry_Scenarios, using the provided AllScenarios
+func (t *SuiteEntry_Scenarios) MergeAllScenarios(v AllScenarios) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t SuiteEntry_Scenarios) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *SuiteEntry_Scenarios) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsSuiteEntryReadScenarios0 returns the union data inside the SuiteEntryRead_Scenarios as a SuiteEntryReadScenarios0
+func (t SuiteEntryRead_Scenarios) AsSuiteEntryReadScenarios0() (SuiteEntryReadScenarios0, error) {
+	var body SuiteEntryReadScenarios0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSuiteEntryReadScenarios0 overwrites any union data inside the SuiteEntryRead_Scenarios as the provided SuiteEntryReadScenarios0
+func (t *SuiteEntryRead_Scenarios) FromSuiteEntryReadScenarios0(v SuiteEntryReadScenarios0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSuiteEntryReadScenarios0 performs a merge with any union data inside the SuiteEntryRead_Scenarios, using the provided SuiteEntryReadScenarios0
+func (t *SuiteEntryRead_Scenarios) MergeSuiteEntryReadScenarios0(v SuiteEntryReadScenarios0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsAllScenarios returns the union data inside the SuiteEntryRead_Scenarios as a AllScenarios
+func (t SuiteEntryRead_Scenarios) AsAllScenarios() (AllScenarios, error) {
+	var body AllScenarios
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromAllScenarios overwrites any union data inside the SuiteEntryRead_Scenarios as the provided AllScenarios
+func (t *SuiteEntryRead_Scenarios) FromAllScenarios(v AllScenarios) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeAllScenarios performs a merge with any union data inside the SuiteEntryRead_Scenarios, using the provided AllScenarios
+func (t *SuiteEntryRead_Scenarios) MergeAllScenarios(v AllScenarios) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t SuiteEntryRead_Scenarios) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *SuiteEntryRead_Scenarios) UnmarshalJSON(b []byte) error {
 	err := t.union.UnmarshalJSON(b)
 	return err
 }
@@ -5154,6 +5530,72 @@ type ClientInterface interface {
 	//
 	// Corresponds with GET /api/v1/sounds/{file} (the `SoundFileApiV1SoundsFileGet` operationId).
 	SoundFileApiV1SoundsFileGet(ctx context.Context, file string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetSuiteRunApiV1SuiteRunsSuiteRunIdGet Get Suite Run
+	//
+	// Corresponds with GET /api/v1/suite-runs/{suite_run_id} (the `GetSuiteRunApiV1SuiteRunsSuiteRunIdGet` operationId).
+	GetSuiteRunApiV1SuiteRunsSuiteRunIdGet(ctx context.Context, suiteRunId openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CancelSuiteRunApiV1SuiteRunsSuiteRunIdCancelPost Cancel Suite Run
+	//
+	// Corresponds with POST /api/v1/suite-runs/{suite_run_id}/cancel (the `CancelSuiteRunApiV1SuiteRunsSuiteRunIdCancelPost` operationId).
+	CancelSuiteRunApiV1SuiteRunsSuiteRunIdCancelPost(ctx context.Context, suiteRunId openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListSuitesApiV1SuitesGet List Suites
+	//
+	// Corresponds with GET /api/v1/suites (the `ListSuitesApiV1SuitesGet` operationId).
+	ListSuitesApiV1SuitesGet(ctx context.Context, params *ListSuitesApiV1SuitesGetParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateSuiteApiV1SuitesPostWithBody Create Suite
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /api/v1/suites (the `CreateSuiteApiV1SuitesPost` operationId).
+	CreateSuiteApiV1SuitesPostWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateSuiteApiV1SuitesPost Create Suite
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /api/v1/suites (the `CreateSuiteApiV1SuitesPost` operationId).
+	CreateSuiteApiV1SuitesPost(ctx context.Context, body CreateSuiteApiV1SuitesPostJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeleteSuiteApiV1SuitesSuiteIdDelete Delete Suite
+	//
+	// Corresponds with DELETE /api/v1/suites/{suite_id} (the `DeleteSuiteApiV1SuitesSuiteIdDelete` operationId).
+	DeleteSuiteApiV1SuitesSuiteIdDelete(ctx context.Context, suiteId openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetSuiteApiV1SuitesSuiteIdGet Get Suite
+	//
+	// Corresponds with GET /api/v1/suites/{suite_id} (the `GetSuiteApiV1SuitesSuiteIdGet` operationId).
+	GetSuiteApiV1SuitesSuiteIdGet(ctx context.Context, suiteId openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateSuiteApiV1SuitesSuiteIdPatchWithBody Update Suite
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PATCH /api/v1/suites/{suite_id} (the `UpdateSuiteApiV1SuitesSuiteIdPatch` operationId).
+	UpdateSuiteApiV1SuitesSuiteIdPatchWithBody(ctx context.Context, suiteId openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateSuiteApiV1SuitesSuiteIdPatch Update Suite
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PATCH /api/v1/suites/{suite_id} (the `UpdateSuiteApiV1SuitesSuiteIdPatch` operationId).
+	UpdateSuiteApiV1SuitesSuiteIdPatch(ctx context.Context, suiteId openapi_types.UUID, body UpdateSuiteApiV1SuitesSuiteIdPatchJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListSuiteRunsApiV1SuitesSuiteIdRunsGet List Suite Runs
+	//
+	// Corresponds with GET /api/v1/suites/{suite_id}/runs (the `ListSuiteRunsApiV1SuitesSuiteIdRunsGet` operationId).
+	ListSuiteRunsApiV1SuitesSuiteIdRunsGet(ctx context.Context, suiteId openapi_types.UUID, params *ListSuiteRunsApiV1SuitesSuiteIdRunsGetParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// StartSuiteApiV1SuitesSuiteIdRunsPost Start Suite
+	//
+	// Starts one run for each entry, all of them or none. A refusal names each entry and its
+	// problem.
+	//
+	// Corresponds with POST /api/v1/suites/{suite_id}/runs (the `StartSuiteApiV1SuitesSuiteIdRunsPost` operationId).
+	StartSuiteApiV1SuitesSuiteIdRunsPost(ctx context.Context, suiteId openapi_types.UUID, params *StartSuiteApiV1SuitesSuiteIdRunsPostParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListVoicesApiV1VoicesGet List Voices
 	//
@@ -7609,6 +8051,182 @@ func (c *Client) PreviewPlanApiV1SoundsPlanPost(ctx context.Context, body Previe
 // Corresponds with GET /api/v1/sounds/{file} (the `SoundFileApiV1SoundsFileGet` operationId).
 func (c *Client) SoundFileApiV1SoundsFileGet(ctx context.Context, file string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewSoundFileApiV1SoundsFileGetRequest(c.Server, file)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetSuiteRunApiV1SuiteRunsSuiteRunIdGet Get Suite Run
+//
+// Corresponds with GET /api/v1/suite-runs/{suite_run_id} (the `GetSuiteRunApiV1SuiteRunsSuiteRunIdGet` operationId).
+func (c *Client) GetSuiteRunApiV1SuiteRunsSuiteRunIdGet(ctx context.Context, suiteRunId openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetSuiteRunApiV1SuiteRunsSuiteRunIdGetRequest(c.Server, suiteRunId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CancelSuiteRunApiV1SuiteRunsSuiteRunIdCancelPost Cancel Suite Run
+//
+// Corresponds with POST /api/v1/suite-runs/{suite_run_id}/cancel (the `CancelSuiteRunApiV1SuiteRunsSuiteRunIdCancelPost` operationId).
+func (c *Client) CancelSuiteRunApiV1SuiteRunsSuiteRunIdCancelPost(ctx context.Context, suiteRunId openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCancelSuiteRunApiV1SuiteRunsSuiteRunIdCancelPostRequest(c.Server, suiteRunId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListSuitesApiV1SuitesGet List Suites
+//
+// Corresponds with GET /api/v1/suites (the `ListSuitesApiV1SuitesGet` operationId).
+func (c *Client) ListSuitesApiV1SuitesGet(ctx context.Context, params *ListSuitesApiV1SuitesGetParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListSuitesApiV1SuitesGetRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreateSuiteApiV1SuitesPostWithBody Create Suite
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /api/v1/suites (the `CreateSuiteApiV1SuitesPost` operationId).
+func (c *Client) CreateSuiteApiV1SuitesPostWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateSuiteApiV1SuitesPostRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreateSuiteApiV1SuitesPost Create Suite
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /api/v1/suites (the `CreateSuiteApiV1SuitesPost` operationId).
+func (c *Client) CreateSuiteApiV1SuitesPost(ctx context.Context, body CreateSuiteApiV1SuitesPostJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateSuiteApiV1SuitesPostRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DeleteSuiteApiV1SuitesSuiteIdDelete Delete Suite
+//
+// Corresponds with DELETE /api/v1/suites/{suite_id} (the `DeleteSuiteApiV1SuitesSuiteIdDelete` operationId).
+func (c *Client) DeleteSuiteApiV1SuitesSuiteIdDelete(ctx context.Context, suiteId openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteSuiteApiV1SuitesSuiteIdDeleteRequest(c.Server, suiteId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetSuiteApiV1SuitesSuiteIdGet Get Suite
+//
+// Corresponds with GET /api/v1/suites/{suite_id} (the `GetSuiteApiV1SuitesSuiteIdGet` operationId).
+func (c *Client) GetSuiteApiV1SuitesSuiteIdGet(ctx context.Context, suiteId openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetSuiteApiV1SuitesSuiteIdGetRequest(c.Server, suiteId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// UpdateSuiteApiV1SuitesSuiteIdPatchWithBody Update Suite
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PATCH /api/v1/suites/{suite_id} (the `UpdateSuiteApiV1SuitesSuiteIdPatch` operationId).
+func (c *Client) UpdateSuiteApiV1SuitesSuiteIdPatchWithBody(ctx context.Context, suiteId openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateSuiteApiV1SuitesSuiteIdPatchRequestWithBody(c.Server, suiteId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// UpdateSuiteApiV1SuitesSuiteIdPatch Update Suite
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PATCH /api/v1/suites/{suite_id} (the `UpdateSuiteApiV1SuitesSuiteIdPatch` operationId).
+func (c *Client) UpdateSuiteApiV1SuitesSuiteIdPatch(ctx context.Context, suiteId openapi_types.UUID, body UpdateSuiteApiV1SuitesSuiteIdPatchJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateSuiteApiV1SuitesSuiteIdPatchRequest(c.Server, suiteId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListSuiteRunsApiV1SuitesSuiteIdRunsGet List Suite Runs
+//
+// Corresponds with GET /api/v1/suites/{suite_id}/runs (the `ListSuiteRunsApiV1SuitesSuiteIdRunsGet` operationId).
+func (c *Client) ListSuiteRunsApiV1SuitesSuiteIdRunsGet(ctx context.Context, suiteId openapi_types.UUID, params *ListSuiteRunsApiV1SuitesSuiteIdRunsGetParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListSuiteRunsApiV1SuitesSuiteIdRunsGetRequest(c.Server, suiteId, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// StartSuiteApiV1SuitesSuiteIdRunsPost Start Suite
+//
+// Starts one run for each entry, all of them or none. A refusal names each entry and its
+// problem.
+//
+// Corresponds with POST /api/v1/suites/{suite_id}/runs (the `StartSuiteApiV1SuitesSuiteIdRunsPost` operationId).
+func (c *Client) StartSuiteApiV1SuitesSuiteIdRunsPost(ctx context.Context, suiteId openapi_types.UUID, params *StartSuiteApiV1SuitesSuiteIdRunsPostParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewStartSuiteApiV1SuitesSuiteIdRunsPostRequest(c.Server, suiteId, params)
 	if err != nil {
 		return nil, err
 	}
@@ -10814,6 +11432,18 @@ func NewListRunsApiV1RunsGetRequest(server string, params *ListRunsApiV1RunsGetP
 
 		}
 
+		if params.SuiteId != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "suite_id", *params.SuiteId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
 		if params.Page != nil {
 
 			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "page", *params.Page, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
@@ -11940,6 +12570,417 @@ func NewSoundFileApiV1SoundsFileGetRequest(server string, file string) (*http.Re
 	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
 	if err != nil {
 		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetSuiteRunApiV1SuiteRunsSuiteRunIdGetRequest constructs an http.Request for the GetSuiteRunApiV1SuiteRunsSuiteRunIdGet method
+func NewGetSuiteRunApiV1SuiteRunsSuiteRunIdGetRequest(server string, suiteRunId openapi_types.UUID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "suite_run_id", suiteRunId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/suite-runs/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewCancelSuiteRunApiV1SuiteRunsSuiteRunIdCancelPostRequest constructs an http.Request for the CancelSuiteRunApiV1SuiteRunsSuiteRunIdCancelPost method
+func NewCancelSuiteRunApiV1SuiteRunsSuiteRunIdCancelPostRequest(server string, suiteRunId openapi_types.UUID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "suite_run_id", suiteRunId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/suite-runs/%s/cancel", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewListSuitesApiV1SuitesGetRequest constructs an http.Request for the ListSuitesApiV1SuitesGet method
+func NewListSuitesApiV1SuitesGetRequest(server string, params *ListSuitesApiV1SuitesGetParams) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/suites")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Page != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "page", *params.Page, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.PageSize != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "page_size", *params.PageSize, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewCreateSuiteApiV1SuitesPostRequest calls the generic CreateSuiteApiV1SuitesPost builder with application/json body
+func NewCreateSuiteApiV1SuitesPostRequest(server string, body CreateSuiteApiV1SuitesPostJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreateSuiteApiV1SuitesPostRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewCreateSuiteApiV1SuitesPostRequestWithBody constructs an http.Request for the CreateSuiteApiV1SuitesPost method, with any body, and a specified content type
+func NewCreateSuiteApiV1SuitesPostRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/suites")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewDeleteSuiteApiV1SuitesSuiteIdDeleteRequest constructs an http.Request for the DeleteSuiteApiV1SuitesSuiteIdDelete method
+func NewDeleteSuiteApiV1SuitesSuiteIdDeleteRequest(server string, suiteId openapi_types.UUID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "suite_id", suiteId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/suites/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetSuiteApiV1SuitesSuiteIdGetRequest constructs an http.Request for the GetSuiteApiV1SuitesSuiteIdGet method
+func NewGetSuiteApiV1SuitesSuiteIdGetRequest(server string, suiteId openapi_types.UUID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "suite_id", suiteId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/suites/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewUpdateSuiteApiV1SuitesSuiteIdPatchRequest calls the generic UpdateSuiteApiV1SuitesSuiteIdPatch builder with application/json body
+func NewUpdateSuiteApiV1SuitesSuiteIdPatchRequest(server string, suiteId openapi_types.UUID, body UpdateSuiteApiV1SuitesSuiteIdPatchJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUpdateSuiteApiV1SuitesSuiteIdPatchRequestWithBody(server, suiteId, "application/json", bodyReader)
+}
+
+// NewUpdateSuiteApiV1SuitesSuiteIdPatchRequestWithBody constructs an http.Request for the UpdateSuiteApiV1SuitesSuiteIdPatch method, with any body, and a specified content type
+func NewUpdateSuiteApiV1SuitesSuiteIdPatchRequestWithBody(server string, suiteId openapi_types.UUID, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "suite_id", suiteId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/suites/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPatch, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewListSuiteRunsApiV1SuitesSuiteIdRunsGetRequest constructs an http.Request for the ListSuiteRunsApiV1SuitesSuiteIdRunsGet method
+func NewListSuiteRunsApiV1SuitesSuiteIdRunsGetRequest(server string, suiteId openapi_types.UUID, params *ListSuiteRunsApiV1SuitesSuiteIdRunsGetParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "suite_id", suiteId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/suites/%s/runs", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Page != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "page", *params.Page, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.PageSize != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "page_size", *params.PageSize, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewStartSuiteApiV1SuitesSuiteIdRunsPostRequest constructs an http.Request for the StartSuiteApiV1SuitesSuiteIdRunsPost method
+func NewStartSuiteApiV1SuitesSuiteIdRunsPostRequest(server string, suiteId openapi_types.UUID, params *StartSuiteApiV1SuitesSuiteIdRunsPostParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "suite_id", suiteId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/suites/%s/runs", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+
+		if params.IdempotencyKey != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "idempotency-key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "", Format: ""})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("idempotency-key", headerParam0)
+		}
+
 	}
 
 	return req, nil
@@ -13463,6 +14504,86 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with GET /api/v1/sounds/{file} (the `SoundFileApiV1SoundsFileGet` operationId).
 	SoundFileApiV1SoundsFileGetWithResponse(ctx context.Context, file string, reqEditors ...RequestEditorFn) (*SoundFileApiV1SoundsFileGetResponse, error)
+
+	// GetSuiteRunApiV1SuiteRunsSuiteRunIdGetWithResponse Get Suite Run
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/suite-runs/{suite_run_id} (the `GetSuiteRunApiV1SuiteRunsSuiteRunIdGet` operationId).
+	GetSuiteRunApiV1SuiteRunsSuiteRunIdGetWithResponse(ctx context.Context, suiteRunId openapi_types.UUID, reqEditors ...RequestEditorFn) (*GetSuiteRunApiV1SuiteRunsSuiteRunIdGetResponse, error)
+
+	// CancelSuiteRunApiV1SuiteRunsSuiteRunIdCancelPostWithResponse Cancel Suite Run
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/suite-runs/{suite_run_id}/cancel (the `CancelSuiteRunApiV1SuiteRunsSuiteRunIdCancelPost` operationId).
+	CancelSuiteRunApiV1SuiteRunsSuiteRunIdCancelPostWithResponse(ctx context.Context, suiteRunId openapi_types.UUID, reqEditors ...RequestEditorFn) (*CancelSuiteRunApiV1SuiteRunsSuiteRunIdCancelPostResponse, error)
+
+	// ListSuitesApiV1SuitesGetWithResponse List Suites
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/suites (the `ListSuitesApiV1SuitesGet` operationId).
+	ListSuitesApiV1SuitesGetWithResponse(ctx context.Context, params *ListSuitesApiV1SuitesGetParams, reqEditors ...RequestEditorFn) (*ListSuitesApiV1SuitesGetResponse, error)
+
+	// CreateSuiteApiV1SuitesPostWithBodyWithResponse Create Suite
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/suites (the `CreateSuiteApiV1SuitesPost` operationId).
+	CreateSuiteApiV1SuitesPostWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateSuiteApiV1SuitesPostResponse, error)
+
+	// CreateSuiteApiV1SuitesPostWithResponse Create Suite
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/suites (the `CreateSuiteApiV1SuitesPost` operationId).
+	CreateSuiteApiV1SuitesPostWithResponse(ctx context.Context, body CreateSuiteApiV1SuitesPostJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateSuiteApiV1SuitesPostResponse, error)
+
+	// DeleteSuiteApiV1SuitesSuiteIdDeleteWithResponse Delete Suite
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with DELETE /api/v1/suites/{suite_id} (the `DeleteSuiteApiV1SuitesSuiteIdDelete` operationId).
+	DeleteSuiteApiV1SuitesSuiteIdDeleteWithResponse(ctx context.Context, suiteId openapi_types.UUID, reqEditors ...RequestEditorFn) (*DeleteSuiteApiV1SuitesSuiteIdDeleteResponse, error)
+
+	// GetSuiteApiV1SuitesSuiteIdGetWithResponse Get Suite
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/suites/{suite_id} (the `GetSuiteApiV1SuitesSuiteIdGet` operationId).
+	GetSuiteApiV1SuitesSuiteIdGetWithResponse(ctx context.Context, suiteId openapi_types.UUID, reqEditors ...RequestEditorFn) (*GetSuiteApiV1SuitesSuiteIdGetResponse, error)
+
+	// UpdateSuiteApiV1SuitesSuiteIdPatchWithBodyWithResponse Update Suite
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PATCH /api/v1/suites/{suite_id} (the `UpdateSuiteApiV1SuitesSuiteIdPatch` operationId).
+	UpdateSuiteApiV1SuitesSuiteIdPatchWithBodyWithResponse(ctx context.Context, suiteId openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateSuiteApiV1SuitesSuiteIdPatchResponse, error)
+
+	// UpdateSuiteApiV1SuitesSuiteIdPatchWithResponse Update Suite
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PATCH /api/v1/suites/{suite_id} (the `UpdateSuiteApiV1SuitesSuiteIdPatch` operationId).
+	UpdateSuiteApiV1SuitesSuiteIdPatchWithResponse(ctx context.Context, suiteId openapi_types.UUID, body UpdateSuiteApiV1SuitesSuiteIdPatchJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateSuiteApiV1SuitesSuiteIdPatchResponse, error)
+
+	// ListSuiteRunsApiV1SuitesSuiteIdRunsGetWithResponse List Suite Runs
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/suites/{suite_id}/runs (the `ListSuiteRunsApiV1SuitesSuiteIdRunsGet` operationId).
+	ListSuiteRunsApiV1SuitesSuiteIdRunsGetWithResponse(ctx context.Context, suiteId openapi_types.UUID, params *ListSuiteRunsApiV1SuitesSuiteIdRunsGetParams, reqEditors ...RequestEditorFn) (*ListSuiteRunsApiV1SuitesSuiteIdRunsGetResponse, error)
+
+	// StartSuiteApiV1SuitesSuiteIdRunsPostWithResponse Start Suite
+	//
+	// Starts one run for each entry, all of them or none. A refusal names each entry and its
+	// problem.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/suites/{suite_id}/runs (the `StartSuiteApiV1SuitesSuiteIdRunsPost` operationId).
+	StartSuiteApiV1SuitesSuiteIdRunsPostWithResponse(ctx context.Context, suiteId openapi_types.UUID, params *StartSuiteApiV1SuitesSuiteIdRunsPostParams, reqEditors ...RequestEditorFn) (*StartSuiteApiV1SuitesSuiteIdRunsPostResponse, error)
 
 	// ListVoicesApiV1VoicesGetWithResponse List Voices
 	//
@@ -18310,6 +19431,438 @@ func (r SoundFileApiV1SoundsFileGetResponse) ContentType() string {
 	return ""
 }
 
+type GetSuiteRunApiV1SuiteRunsSuiteRunIdGetResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *SuiteRunRead
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetSuiteRunApiV1SuiteRunsSuiteRunIdGetResponse) GetJSON200() *SuiteRunRead {
+	return r.JSON200
+}
+
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r GetSuiteRunApiV1SuiteRunsSuiteRunIdGetResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
+}
+
+// GetBody returns the raw response body bytes
+func (r GetSuiteRunApiV1SuiteRunsSuiteRunIdGetResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetSuiteRunApiV1SuiteRunsSuiteRunIdGetResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetSuiteRunApiV1SuiteRunsSuiteRunIdGetResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetSuiteRunApiV1SuiteRunsSuiteRunIdGetResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type CancelSuiteRunApiV1SuiteRunsSuiteRunIdCancelPostResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *SuiteRunRead
+	// JSON202 the response for an HTTP 202 `application/json` response
+	JSON202 *SuiteRunRead
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r CancelSuiteRunApiV1SuiteRunsSuiteRunIdCancelPostResponse) GetJSON200() *SuiteRunRead {
+	return r.JSON200
+}
+
+// GetJSON202 returns the response for an HTTP 202 `application/json` response
+func (r CancelSuiteRunApiV1SuiteRunsSuiteRunIdCancelPostResponse) GetJSON202() *SuiteRunRead {
+	return r.JSON202
+}
+
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r CancelSuiteRunApiV1SuiteRunsSuiteRunIdCancelPostResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
+}
+
+// GetBody returns the raw response body bytes
+func (r CancelSuiteRunApiV1SuiteRunsSuiteRunIdCancelPostResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r CancelSuiteRunApiV1SuiteRunsSuiteRunIdCancelPostResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CancelSuiteRunApiV1SuiteRunsSuiteRunIdCancelPostResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r CancelSuiteRunApiV1SuiteRunsSuiteRunIdCancelPostResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type ListSuitesApiV1SuitesGetResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *PageSuiteSummary
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListSuitesApiV1SuitesGetResponse) GetJSON200() *PageSuiteSummary {
+	return r.JSON200
+}
+
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r ListSuitesApiV1SuitesGetResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
+}
+
+// GetBody returns the raw response body bytes
+func (r ListSuitesApiV1SuitesGetResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListSuitesApiV1SuitesGetResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListSuitesApiV1SuitesGetResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListSuitesApiV1SuitesGetResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type CreateSuiteApiV1SuitesPostResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON201 the response for an HTTP 201 `application/json` response
+	JSON201 *SuiteRead
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
+}
+
+// GetJSON201 returns the response for an HTTP 201 `application/json` response
+func (r CreateSuiteApiV1SuitesPostResponse) GetJSON201() *SuiteRead {
+	return r.JSON201
+}
+
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r CreateSuiteApiV1SuitesPostResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
+}
+
+// GetBody returns the raw response body bytes
+func (r CreateSuiteApiV1SuitesPostResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r CreateSuiteApiV1SuitesPostResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CreateSuiteApiV1SuitesPostResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r CreateSuiteApiV1SuitesPostResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type DeleteSuiteApiV1SuitesSuiteIdDeleteResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
+}
+
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r DeleteSuiteApiV1SuitesSuiteIdDeleteResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
+}
+
+// GetBody returns the raw response body bytes
+func (r DeleteSuiteApiV1SuitesSuiteIdDeleteResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r DeleteSuiteApiV1SuitesSuiteIdDeleteResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeleteSuiteApiV1SuitesSuiteIdDeleteResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r DeleteSuiteApiV1SuitesSuiteIdDeleteResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetSuiteApiV1SuitesSuiteIdGetResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *SuiteRead
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetSuiteApiV1SuitesSuiteIdGetResponse) GetJSON200() *SuiteRead {
+	return r.JSON200
+}
+
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r GetSuiteApiV1SuitesSuiteIdGetResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
+}
+
+// GetBody returns the raw response body bytes
+func (r GetSuiteApiV1SuitesSuiteIdGetResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetSuiteApiV1SuitesSuiteIdGetResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetSuiteApiV1SuitesSuiteIdGetResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetSuiteApiV1SuitesSuiteIdGetResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type UpdateSuiteApiV1SuitesSuiteIdPatchResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *SuiteRead
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r UpdateSuiteApiV1SuitesSuiteIdPatchResponse) GetJSON200() *SuiteRead {
+	return r.JSON200
+}
+
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r UpdateSuiteApiV1SuitesSuiteIdPatchResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
+}
+
+// GetBody returns the raw response body bytes
+func (r UpdateSuiteApiV1SuitesSuiteIdPatchResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r UpdateSuiteApiV1SuitesSuiteIdPatchResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UpdateSuiteApiV1SuitesSuiteIdPatchResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r UpdateSuiteApiV1SuitesSuiteIdPatchResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type ListSuiteRunsApiV1SuitesSuiteIdRunsGetResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *PageSuiteRunSummary
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListSuiteRunsApiV1SuitesSuiteIdRunsGetResponse) GetJSON200() *PageSuiteRunSummary {
+	return r.JSON200
+}
+
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r ListSuiteRunsApiV1SuitesSuiteIdRunsGetResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
+}
+
+// GetBody returns the raw response body bytes
+func (r ListSuiteRunsApiV1SuitesSuiteIdRunsGetResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListSuiteRunsApiV1SuitesSuiteIdRunsGetResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListSuiteRunsApiV1SuitesSuiteIdRunsGetResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListSuiteRunsApiV1SuitesSuiteIdRunsGetResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type StartSuiteApiV1SuitesSuiteIdRunsPostResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON202 the response for an HTTP 202 `application/json` response
+	JSON202 *SuiteRunRead
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
+}
+
+// GetJSON202 returns the response for an HTTP 202 `application/json` response
+func (r StartSuiteApiV1SuitesSuiteIdRunsPostResponse) GetJSON202() *SuiteRunRead {
+	return r.JSON202
+}
+
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r StartSuiteApiV1SuitesSuiteIdRunsPostResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
+}
+
+// GetBody returns the raw response body bytes
+func (r StartSuiteApiV1SuitesSuiteIdRunsPostResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r StartSuiteApiV1SuitesSuiteIdRunsPostResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r StartSuiteApiV1SuitesSuiteIdRunsPostResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r StartSuiteApiV1SuitesSuiteIdRunsPostResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type ListVoicesApiV1VoicesGetResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -20591,6 +22144,152 @@ func (c *ClientWithResponses) SoundFileApiV1SoundsFileGetWithResponse(ctx contex
 		return nil, err
 	}
 	return ParseSoundFileApiV1SoundsFileGetResponse(rsp)
+}
+
+// GetSuiteRunApiV1SuiteRunsSuiteRunIdGetWithResponse Get Suite Run
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/suite-runs/{suite_run_id} (the `GetSuiteRunApiV1SuiteRunsSuiteRunIdGet` operationId).
+func (c *ClientWithResponses) GetSuiteRunApiV1SuiteRunsSuiteRunIdGetWithResponse(ctx context.Context, suiteRunId openapi_types.UUID, reqEditors ...RequestEditorFn) (*GetSuiteRunApiV1SuiteRunsSuiteRunIdGetResponse, error) {
+	rsp, err := c.GetSuiteRunApiV1SuiteRunsSuiteRunIdGet(ctx, suiteRunId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetSuiteRunApiV1SuiteRunsSuiteRunIdGetResponse(rsp)
+}
+
+// CancelSuiteRunApiV1SuiteRunsSuiteRunIdCancelPostWithResponse Cancel Suite Run
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/suite-runs/{suite_run_id}/cancel (the `CancelSuiteRunApiV1SuiteRunsSuiteRunIdCancelPost` operationId).
+func (c *ClientWithResponses) CancelSuiteRunApiV1SuiteRunsSuiteRunIdCancelPostWithResponse(ctx context.Context, suiteRunId openapi_types.UUID, reqEditors ...RequestEditorFn) (*CancelSuiteRunApiV1SuiteRunsSuiteRunIdCancelPostResponse, error) {
+	rsp, err := c.CancelSuiteRunApiV1SuiteRunsSuiteRunIdCancelPost(ctx, suiteRunId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCancelSuiteRunApiV1SuiteRunsSuiteRunIdCancelPostResponse(rsp)
+}
+
+// ListSuitesApiV1SuitesGetWithResponse List Suites
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/suites (the `ListSuitesApiV1SuitesGet` operationId).
+func (c *ClientWithResponses) ListSuitesApiV1SuitesGetWithResponse(ctx context.Context, params *ListSuitesApiV1SuitesGetParams, reqEditors ...RequestEditorFn) (*ListSuitesApiV1SuitesGetResponse, error) {
+	rsp, err := c.ListSuitesApiV1SuitesGet(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListSuitesApiV1SuitesGetResponse(rsp)
+}
+
+// CreateSuiteApiV1SuitesPostWithBodyWithResponse Create Suite
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/suites (the `CreateSuiteApiV1SuitesPost` operationId).
+func (c *ClientWithResponses) CreateSuiteApiV1SuitesPostWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateSuiteApiV1SuitesPostResponse, error) {
+	rsp, err := c.CreateSuiteApiV1SuitesPostWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateSuiteApiV1SuitesPostResponse(rsp)
+}
+
+// CreateSuiteApiV1SuitesPostWithResponse Create Suite
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/suites (the `CreateSuiteApiV1SuitesPost` operationId).
+func (c *ClientWithResponses) CreateSuiteApiV1SuitesPostWithResponse(ctx context.Context, body CreateSuiteApiV1SuitesPostJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateSuiteApiV1SuitesPostResponse, error) {
+	rsp, err := c.CreateSuiteApiV1SuitesPost(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateSuiteApiV1SuitesPostResponse(rsp)
+}
+
+// DeleteSuiteApiV1SuitesSuiteIdDeleteWithResponse Delete Suite
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /api/v1/suites/{suite_id} (the `DeleteSuiteApiV1SuitesSuiteIdDelete` operationId).
+func (c *ClientWithResponses) DeleteSuiteApiV1SuitesSuiteIdDeleteWithResponse(ctx context.Context, suiteId openapi_types.UUID, reqEditors ...RequestEditorFn) (*DeleteSuiteApiV1SuitesSuiteIdDeleteResponse, error) {
+	rsp, err := c.DeleteSuiteApiV1SuitesSuiteIdDelete(ctx, suiteId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeleteSuiteApiV1SuitesSuiteIdDeleteResponse(rsp)
+}
+
+// GetSuiteApiV1SuitesSuiteIdGetWithResponse Get Suite
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/suites/{suite_id} (the `GetSuiteApiV1SuitesSuiteIdGet` operationId).
+func (c *ClientWithResponses) GetSuiteApiV1SuitesSuiteIdGetWithResponse(ctx context.Context, suiteId openapi_types.UUID, reqEditors ...RequestEditorFn) (*GetSuiteApiV1SuitesSuiteIdGetResponse, error) {
+	rsp, err := c.GetSuiteApiV1SuitesSuiteIdGet(ctx, suiteId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetSuiteApiV1SuitesSuiteIdGetResponse(rsp)
+}
+
+// UpdateSuiteApiV1SuitesSuiteIdPatchWithBodyWithResponse Update Suite
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PATCH /api/v1/suites/{suite_id} (the `UpdateSuiteApiV1SuitesSuiteIdPatch` operationId).
+func (c *ClientWithResponses) UpdateSuiteApiV1SuitesSuiteIdPatchWithBodyWithResponse(ctx context.Context, suiteId openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateSuiteApiV1SuitesSuiteIdPatchResponse, error) {
+	rsp, err := c.UpdateSuiteApiV1SuitesSuiteIdPatchWithBody(ctx, suiteId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateSuiteApiV1SuitesSuiteIdPatchResponse(rsp)
+}
+
+// UpdateSuiteApiV1SuitesSuiteIdPatchWithResponse Update Suite
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PATCH /api/v1/suites/{suite_id} (the `UpdateSuiteApiV1SuitesSuiteIdPatch` operationId).
+func (c *ClientWithResponses) UpdateSuiteApiV1SuitesSuiteIdPatchWithResponse(ctx context.Context, suiteId openapi_types.UUID, body UpdateSuiteApiV1SuitesSuiteIdPatchJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateSuiteApiV1SuitesSuiteIdPatchResponse, error) {
+	rsp, err := c.UpdateSuiteApiV1SuitesSuiteIdPatch(ctx, suiteId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateSuiteApiV1SuitesSuiteIdPatchResponse(rsp)
+}
+
+// ListSuiteRunsApiV1SuitesSuiteIdRunsGetWithResponse List Suite Runs
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/suites/{suite_id}/runs (the `ListSuiteRunsApiV1SuitesSuiteIdRunsGet` operationId).
+func (c *ClientWithResponses) ListSuiteRunsApiV1SuitesSuiteIdRunsGetWithResponse(ctx context.Context, suiteId openapi_types.UUID, params *ListSuiteRunsApiV1SuitesSuiteIdRunsGetParams, reqEditors ...RequestEditorFn) (*ListSuiteRunsApiV1SuitesSuiteIdRunsGetResponse, error) {
+	rsp, err := c.ListSuiteRunsApiV1SuitesSuiteIdRunsGet(ctx, suiteId, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListSuiteRunsApiV1SuitesSuiteIdRunsGetResponse(rsp)
+}
+
+// StartSuiteApiV1SuitesSuiteIdRunsPostWithResponse Start Suite
+//
+// Starts one run for each entry, all of them or none. A refusal names each entry and its
+// problem.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/suites/{suite_id}/runs (the `StartSuiteApiV1SuitesSuiteIdRunsPost` operationId).
+func (c *ClientWithResponses) StartSuiteApiV1SuitesSuiteIdRunsPostWithResponse(ctx context.Context, suiteId openapi_types.UUID, params *StartSuiteApiV1SuitesSuiteIdRunsPostParams, reqEditors ...RequestEditorFn) (*StartSuiteApiV1SuitesSuiteIdRunsPostResponse, error) {
+	rsp, err := c.StartSuiteApiV1SuitesSuiteIdRunsPost(ctx, suiteId, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseStartSuiteApiV1SuitesSuiteIdRunsPostResponse(rsp)
 }
 
 // ListVoicesApiV1VoicesGetWithResponse List Voices
@@ -24025,6 +25724,306 @@ func ParseSoundFileApiV1SoundsFileGetResponse(rsp *http.Response) (*SoundFileApi
 	}
 
 	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetSuiteRunApiV1SuiteRunsSuiteRunIdGetResponse parses an HTTP response from a GetSuiteRunApiV1SuiteRunsSuiteRunIdGetWithResponse call
+func ParseGetSuiteRunApiV1SuiteRunsSuiteRunIdGetResponse(rsp *http.Response) (*GetSuiteRunApiV1SuiteRunsSuiteRunIdGetResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetSuiteRunApiV1SuiteRunsSuiteRunIdGetResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest SuiteRunRead
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseCancelSuiteRunApiV1SuiteRunsSuiteRunIdCancelPostResponse parses an HTTP response from a CancelSuiteRunApiV1SuiteRunsSuiteRunIdCancelPostWithResponse call
+func ParseCancelSuiteRunApiV1SuiteRunsSuiteRunIdCancelPostResponse(rsp *http.Response) (*CancelSuiteRunApiV1SuiteRunsSuiteRunIdCancelPostResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CancelSuiteRunApiV1SuiteRunsSuiteRunIdCancelPostResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest SuiteRunRead
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 202:
+		var dest SuiteRunRead
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON202 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListSuitesApiV1SuitesGetResponse parses an HTTP response from a ListSuitesApiV1SuitesGetWithResponse call
+func ParseListSuitesApiV1SuitesGetResponse(rsp *http.Response) (*ListSuitesApiV1SuitesGetResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListSuitesApiV1SuitesGetResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest PageSuiteSummary
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseCreateSuiteApiV1SuitesPostResponse parses an HTTP response from a CreateSuiteApiV1SuitesPostWithResponse call
+func ParseCreateSuiteApiV1SuitesPostResponse(rsp *http.Response) (*CreateSuiteApiV1SuitesPostResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CreateSuiteApiV1SuitesPostResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest SuiteRead
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseDeleteSuiteApiV1SuitesSuiteIdDeleteResponse parses an HTTP response from a DeleteSuiteApiV1SuitesSuiteIdDeleteWithResponse call
+func ParseDeleteSuiteApiV1SuitesSuiteIdDeleteResponse(rsp *http.Response) (*DeleteSuiteApiV1SuitesSuiteIdDeleteResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeleteSuiteApiV1SuitesSuiteIdDeleteResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case rsp.StatusCode == 204:
+		break // No content-type
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetSuiteApiV1SuitesSuiteIdGetResponse parses an HTTP response from a GetSuiteApiV1SuitesSuiteIdGetWithResponse call
+func ParseGetSuiteApiV1SuitesSuiteIdGetResponse(rsp *http.Response) (*GetSuiteApiV1SuitesSuiteIdGetResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetSuiteApiV1SuitesSuiteIdGetResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest SuiteRead
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseUpdateSuiteApiV1SuitesSuiteIdPatchResponse parses an HTTP response from a UpdateSuiteApiV1SuitesSuiteIdPatchWithResponse call
+func ParseUpdateSuiteApiV1SuitesSuiteIdPatchResponse(rsp *http.Response) (*UpdateSuiteApiV1SuitesSuiteIdPatchResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UpdateSuiteApiV1SuitesSuiteIdPatchResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest SuiteRead
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListSuiteRunsApiV1SuitesSuiteIdRunsGetResponse parses an HTTP response from a ListSuiteRunsApiV1SuitesSuiteIdRunsGetWithResponse call
+func ParseListSuiteRunsApiV1SuitesSuiteIdRunsGetResponse(rsp *http.Response) (*ListSuiteRunsApiV1SuitesSuiteIdRunsGetResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListSuiteRunsApiV1SuitesSuiteIdRunsGetResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest PageSuiteRunSummary
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseStartSuiteApiV1SuitesSuiteIdRunsPostResponse parses an HTTP response from a StartSuiteApiV1SuitesSuiteIdRunsPostWithResponse call
+func ParseStartSuiteApiV1SuitesSuiteIdRunsPostResponse(rsp *http.Response) (*StartSuiteApiV1SuitesSuiteIdRunsPostResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &StartSuiteApiV1SuitesSuiteIdRunsPostResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 202:
+		var dest SuiteRunRead
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON202 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
 		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {

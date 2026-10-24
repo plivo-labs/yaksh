@@ -132,6 +132,15 @@ function RunRow({ run, grid, showAgent }: { run: RunSummary; grid: string; showA
           {runTitle(run)}
         </Link>
         <span className="flex min-w-0 items-center gap-1.5 text-s-400 text-muted-foreground">
+          {run.suite_run && (
+            <Link
+              to={`/suite-runs/${run.suite_run.id}`}
+              title="The suite run that started this run"
+              className="relative z-10 shrink-0 text-brand-text outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring/50"
+            >
+              {run.suite_run.suite_name}
+            </Link>
+          )}
           {run.transport === "text" && <Badge>Text</Badge>}
           <span className="truncate">{outcomes(run)}</span>
         </span>

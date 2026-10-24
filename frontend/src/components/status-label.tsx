@@ -2,8 +2,8 @@ import type { ReactNode } from "react";
 
 import { Settle } from "@/components/settle";
 import { upperFirst, words } from "@/lib/format";
-import { CONVERSATION_TONE, RUN_TONE, type Tone } from "@/lib/status";
-import type { ConversationStatus, RunStatus } from "@/lib/types";
+import { CONVERSATION_TONE, RESULT_TONE, RUN_TONE, type Tone } from "@/lib/status";
+import type { ConversationStatus, RunResult, RunStatus } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 const COLOR: Record<Tone, string> = {
@@ -74,6 +74,17 @@ export function ConversationStatusLabel({ status }: { status: ConversationStatus
     <Settle value={status}>
       <StatusLabel tone={CONVERSATION_TONE[status]} live={status === "running"}>
         {upperFirst(words(status))}
+      </StatusLabel>
+    </Settle>
+  );
+}
+
+/** The result of a run against a suite's pass rate, or of a suite run. */
+export function ResultLabel({ result }: { result: RunResult }) {
+  return (
+    <Settle value={result}>
+      <StatusLabel tone={RESULT_TONE[result]} live={result === "running"}>
+        {upperFirst(words(result))}
       </StatusLabel>
     </Settle>
   );

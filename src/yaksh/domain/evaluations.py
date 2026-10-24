@@ -306,6 +306,32 @@ class JudgeVersionUsed(BaseModel):
     """The run's items this version judged."""
 
 
+FULL_COVERAGE = 0.95
+"""From this share of scored calls, the pass rate decides; below it, the worst-to-best range
+does."""
+
+
+class GateNumbers(BaseModel):
+    """What a suite reads from one run to give it a result. Each counted call is in one group:
+    pending, or by its verdict among the calls where the caller talked, or by its verdict with
+    agent rules among the calls where no caller talked."""
+
+    pending: int
+    """Calls that the judges score, whose evaluation is not finished."""
+    passed: int
+    failed: int
+    not_scored: int
+    """Calls where the caller talked and no verdict was given: a verdict of not scored, a failed
+    evaluation, a call that did not complete, or a call that a user stopped."""
+    pass_rate: float | None
+    coverage: float | None
+    worst: float | None
+    best: float | None
+    unplayed_passed: int
+    unplayed_failed: int
+    unplayed_not_scored: int
+
+
 class RunVerdicts(BaseModel):
     """The run's verdict numbers over its judged calls: completed calls that no one stopped,
     whose evaluation gave a verdict or failed."""
@@ -323,7 +349,8 @@ class RunVerdicts(BaseModel):
     best: float | None
     interval_low: float | None
     interval_high: float | None
-    """The "this suite" 95% interval; none below five scenarios."""
+    """The 95% interval of the pass rate over the run's scenarios; none below five
+    scenarios."""
     pass_hat_2: float | None
     """The chance that two repeats of a scenario with the same persona both pass, over the
     scenario and persona pairs with two scored calls."""

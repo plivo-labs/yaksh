@@ -17,7 +17,7 @@ from yaksh.domain.runs import RunCreate, RunStatus
 from yaksh.domain.settings import AppSettings, CallerModel
 from yaksh.evaluation import results
 from yaksh.integrations import provider_checks
-from yaksh.simulation import conversations, runs
+from yaksh.simulation import conversations, runs, suites
 
 router = APIRouter(prefix="/runs", tags=["runs"], dependencies=[Depends(require_token)])
 
@@ -29,6 +29,7 @@ async def summaries(session: AsyncSession, rows: list[Run]) -> list[RunSummary]:
     counted = await runs.counted_conversations(session, [row.id for row in rows])
     found = await results.evaluated(session, (c for ids in counted.values() for c in ids))
     measured = {key: done.latency for key, done in found.items() if done.latency}
+    links = await suites.suite_links(session, rows)
     return [
         RunSummary.of(
             row,
@@ -36,6 +37,7 @@ async def summaries(session: AsyncSession, rows: list[Run]) -> list[RunSummary]:
             progress[row.id],
             pooled([measured[c] for c in counted.get(row.id, []) if c in measured]),
             languages.get(row.id, []),
+            links.get(row.id),
         )
         for row in rows
     ]
@@ -43,7 +45,11 @@ async def summaries(session: AsyncSession, rows: list[Run]) -> list[RunSummary]:
 
 async def detail(session: AsyncSession, run: Run) -> RunRead:
     base = (await summaries(session, [run]))[0]
-    return RunRead(**base.model_dump(), scenarios=await runs.run_scenarios(session, run))
+    return RunRead(
+        **base.model_dump(),
+        scenarios=await runs.run_scenarios(session, run),
+        names=await runs.run_names(session, run),
+    )
 
 
 def caller_check(app: AppSettings) -> runs.CallerCheck | None:
@@ -86,6 +92,7 @@ async def list_runs(
     status: RunStatus | None = None,
     created_from: AwareDatetime | None = None,
     created_before: AwareDatetime | None = None,
+    suite_id: uuid.UUID | None = None,
 ) -> Page[RunSummary]:
     """`created_from` includes its time and `created_before` excludes its time, so ranges
     next to each other do not overlap. Both need a time zone."""
@@ -98,6 +105,7 @@ async def list_runs(
         status=status,
         created_from=created_from,
         created_before=created_before,
+        suite_id=suite_id,
     )
     return Page.of(await summaries(session, rows), total, page)
 

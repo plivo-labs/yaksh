@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from yaksh.config import Settings
 from yaksh.db.models import Agent, AgentVersion, Persona, PersonaVersion, Scenario, ScenarioVersion
-from yaksh.domain.agents import Direction, Transport
+from yaksh.domain.agents import Direction, Transport, machines_answer
 from yaksh.domain.answering import AnsweredBy
 from yaksh.domain.errors import NotFoundError, ValidationError
 from yaksh.domain.languages import Language
@@ -85,7 +85,7 @@ async def snapshot(
         raise ValidationError(f"phone calls are off: {problem}")
     scenario_ids = [item.scenario_id for item in wanted]
     scenarios = await scenarios_to_start(session, agent, scenario_ids)
-    machines = transport is Transport.PHONE and agent.direction is Direction.OUTBOUND
+    machines = machines_answer(transport, agent.direction)
     for scenario, item in zip(scenarios, wanted, strict=True):
         if not machines and item.answered_by != [AnsweredBy.CALLER]:
             raise ValidationError(
@@ -218,8 +218,10 @@ async def scenarios_to_start(
     found = {row.id: row for row in rows}
     for scenario_id in scenario_ids:
         scenario = found.get(scenario_id)
-        if scenario is None or scenario.deleted_at is not None:
+        if scenario is None:
             raise NotFoundError(f"scenario {scenario_id} not found")
+        if scenario.deleted_at is not None:
+            raise NotFoundError(f'the scenario "{scenario.name}" was deleted')
         if scenario.agent_id != agent.id:
             raise ValidationError(f'the scenario "{scenario.name}" belongs to another agent')
     return [found[scenario_id] for scenario_id in scenario_ids]

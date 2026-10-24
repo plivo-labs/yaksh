@@ -93,6 +93,12 @@ NOT_CONNECTED = frozenset(
 ends with agent_hangup only when the agent hung up before the audio started."""
 
 
+def judges_score(status: ConversationStatus, end_reason: EndReason | None) -> bool:
+    """The judges score a call that completed and that no user ended; another ended call gets
+    only its metrics."""
+    return status is ConversationStatus.COMPLETED and end_reason is not EndReason.USER_REQUEST
+
+
 def outcome_group(status: ConversationStatus, end_reason: EndReason | None) -> OutcomeGroup:
     if status is ConversationStatus.CANCELLED or end_reason is EndReason.USER_REQUEST:
         return OutcomeGroup.CANCELLED

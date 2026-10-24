@@ -46,6 +46,11 @@ class Transport(StrEnum):
     """Over HTTP, one request a turn, with no audio: docs/content/docs/text-tests.mdx."""
 
 
+def machines_answer(transport: Transport, direction: Direction) -> bool:
+    """A voicemail or a call screener can answer only a phone call of an outbound agent."""
+    return transport is Transport.PHONE and direction is Direction.OUTBOUND
+
+
 TEXT_TURN_TIMEOUT_S = 60.0
 """How long Yaksh waits for a text agent's reply to one turn."""
 MIN_BRIEF_CHARS = 20

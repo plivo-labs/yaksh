@@ -1,0 +1,121 @@
+---
+title: Suites
+description: Start runs of several agents with one action, and get one result for all of them.
+---
+
+A suite is a saved list of agents to test together. For each agent, the suite keeps one connection, the scenarios and the run settings. Each item of this list is an entry. When you run a suite, Yaksh starts one run for each entry. These runs make one suite run. The suite run gets one result: `passed`, `failed`, `not_decided` or `cancelled`.
+
+Use a suite after a change that can affect more than one agent, for example a change to a shared prompt or tool. Use a suite in CI to stop a release when an agent does not pass.
+
+## Make a suite
+
+1. On the **Suites** page, click **New suite**.
+2. Enter a name and the required pass rate. The default rate is 80%.
+3. Click **Create suite**. The suite page opens.
+4. Click **Add agent**, and select the agent.
+5. Select the connection and the scenarios. Set the repeats and the limits as for a run.
+6. Click **Add to suite**.
+
+Do steps 4 to 6 for each agent. You can add the same agent more than one time, for example one time for each connection.
+
+For the scenarios of an entry, select one of these:
+
+- **All scenarios**: each start plays all scenarios that the agent has at that time. Each scenario uses its own persona and all of its data sets. Scenarios that you add to the agent later are also played. On a phone entry of an outbound agent, **Answered by** sets the answers for all scenarios.
+- **Choose**: select the scenarios, and the personas, data sets and answers of each one. Each scenario starts with its own persona. The suite keeps the personas that you select. If you change the persona of a scenario later, the suite does not change.
+
+To change an entry, click the menu at the end of its row, then click **Edit** or **Remove from the suite**. To change the name or the required pass rate, click **Edit** at the top of the suite page. A new rate applies to the next suite runs. A suite run keeps the rate that it started with.
+
+## Copy a run into a suite
+
+You can make an entry from a run that you did before:
+
+- In the **Add agent** dialog, select the run in **Copy a run**.
+- On the page of the run, click **Add to suite**, and select the suite. Click **New suite** to make a new suite for the run.
+
+The entry gets the agent, the connection, the scenarios, the personas, the data sets, the answers, the repeats and the limits of the run. It does not get the results of the run. If a scenario, a persona or a data set of the run was deleted, the dialog tells you, and the entry does not get it. If the agent no longer has the connection of the run, choose a different connection. If the voicemail and screener answers no longer apply, the dialog tells you, and the entry keeps only the caller.
+
+## Run a suite
+
+On the suite page, click **Run suite**. With the CLI, use `yaksh suite run <suite id> --wait`. Refer to [Suites in CI](#suites-in-ci).
+
+Yaksh starts all runs of the suite run, or none of them. Each run uses the newest version of its agent, scenarios and personas, and has the name of the suite. Yaksh does not start the suite run if an entry has a problem. The suite page shows each problem on its entry:
+
+- The agent, a scenario or a persona of the entry was deleted.
+- A chosen data set of a scenario was deleted.
+- The agent no longer has the connection of the entry.
+- An entry with **All scenarios** is for an agent that has no scenarios.
+- An entry has the voicemail or screener answer, and it is not a phone entry of an outbound agent.
+
+Each run must also keep the [limits of a run](/docs/configuration#settings). The suite run must keep the limits of a suite on the **Limits** tab of Settings: the number of entries (**Agents**, default 100) and the number of conversations of all its runs together (**Conversations**, default 20000). Retries do not count.
+
+Two suite runs of the same suite can be in progress at the same time. You cannot delete a suite while one of its suite runs has calls in progress. You can delete it while the judges are at work.
+
+To cancel a suite run, click **Cancel suite run** on its page. Yaksh cancels all of its runs. If you cancel only one run on the run page, that run gets the result `cancelled`. The suite run then also gets `cancelled`, unless a run failed.
+
+## Result of a run
+
+Each run gets a result from its calls and the required pass rate of the suite run. For a conversation that has retries, only the last retry counts. The judges decide each call by its scenario verdict after the labels of persons.
+
+- A call where the caller talked passes, fails, or is not scored. A call that did not complete, a call that you stopped and a call that the judges did not score are not scored. Thus, a run cannot pass because many of its calls did not get a verdict.
+- A call where no caller talked, because the voicemail or the call screener answered, has no scenario verdict. Its agent rules decide it. If one of these calls does not pass, the run fails. Refer to [Voicemail and call screening](/docs/voicemail-and-call-screening).
+
+The pass rate of a scenario is its passed calls divided by its scored calls. The pass rate of a run is the mean of the pass rates of its scenarios. The coverage is the scored calls divided by all calls where the caller talked.
+
+Yaksh uses the first rule that applies:
+
+1. While the run has calls in progress, the result is `running`.
+2. While the judges have not completed a call that they score, the result is `judging`.
+3. If the run was cancelled, the result is `cancelled`.
+4. If a call where no caller talked did not pass, the result is `failed`.
+5. If no caller talked in any call, the result is `passed`.
+6. If the coverage is 95% or more, the pass rate decides. If the pass rate is the same as or more than the required rate, the result is `passed`. If not, the result is `failed`.
+7. If the coverage is less than 95%, Yaksh calculates the pass rate two times. The first time, all calls that are not scored fail. The second time, they all pass. If the first rate is the same as or more than the required rate, the result is `passed`. If the second rate is less than the required rate, the result is `failed`. If not, the result is `not_decided`: the calls that are not scored can change the result. The suite run page shows these two rates as a range.
+
+For example, the required rate is 80%, and one scenario has 10 calls: 7 passed, 1 failed and 2 not scored. The first rate is 7 / 10 = 70%. The second rate is 9 / 10 = 90%. The result is `not_decided`. If 9 calls passed and 1 call was not scored, the first rate is 90%, and the result is `passed`.
+
+## Result of a suite run
+
+The suite run gets the first of these results that one of its runs has: `running`, `judging`, `failed`, `cancelled`, `not_decided`. If all runs passed, the suite run passed. A failure comes before a cancel, because a failure tells you about an agent.
+
+## Suites in CI
+
+```sh
+yaksh suite run <suite id> --wait --timeout 1h
+```
+
+This command starts the suite run and waits until all of its runs stop. Then it waits for the judges, and writes the suite run as JSON. It exits with 0 only if the suite run passed. If the suite run did not pass, the last lines start with `failed:` and `next:`. The `next:` line is for the first run that has the result of the suite run. If calls of that run did not connect or stopped with an error, it gives `yaksh conversation list` for those calls. If not, it gives `yaksh run metrics`. The suite page shows this command with the ID of the suite.
+
+- `--timeout` stops the wait. The suite run continues. Without `--timeout`, the wait for the judges stops after 10 minutes.
+- `--idempotency-key` makes a repeated request safe. The same key for the same suite returns the first suite run. The same key for a different suite gets an error.
+- If you stop the command with Ctrl-C while the calls continue, the CLI cancels the suite run.
+- `yaksh suite wait <suite run id>` waits again. Stopping it does not cancel the suite run.
+- `yaksh suite cancel <suite run id>` cancels the suite run, and waits until its calls stop.
+- `yaksh suite list` shows the suites, with the result of the last suite run of each one.
+
+## API
+
+- `POST /api/v1/suites` makes a suite: `name` and `required_pass_percent` (1 to 100, default 80).
+- `PATCH /api/v1/suites/<suite id>` changes a suite. Send the `revision` that you read. If another change came first, the request gets an error, and you must read the suite again. `entries` replaces all entries of the suite.
+- `POST /api/v1/suites/<suite id>/runs` starts a suite run. It accepts an `Idempotency-Key` header.
+- `GET /api/v1/suite-runs/<suite run id>` shows the result of the suite run and of each run.
+- `POST /api/v1/suite-runs/<suite run id>/cancel` cancels all runs of the suite run.
+- `GET /api/v1/runs?suite_id=<suite id>` lists the runs of the suite. On the **Runs** page, select the suite in the suite filter.
+
+An entry has the fields of a run request, but not `name`. `transport` is necessary. `scenarios` is a list of scenarios as for a run, or `{"answered_by": ["caller"]}` for all scenarios:
+
+```json
+{
+  "revision": 1,
+  "entries": [
+    {"agent_id": "<agent id 1>", "transport": "phone", "scenarios": {"answered_by": ["caller"]}},
+    {
+      "agent_id": "<agent id 2>",
+      "transport": "text",
+      "scenarios": [{"scenario_id": "<scenario id>", "persona_ids": ["<persona id>"]}],
+      "repeats": 2
+    }
+  ]
+}
+```
+
+A save refuses an ID that does not exist, a scenario of a different agent, and more entries than the maximum. A suite that has more entries than a lowered maximum can keep them, but it cannot get more. A save accepts an entry whose agent, scenario or persona was deleted, so that you can repair the other entries first. Each entry in `GET /api/v1/suites/<suite id>` has its `problems`.

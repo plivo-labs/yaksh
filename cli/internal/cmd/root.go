@@ -65,7 +65,7 @@ func (a *app) execute(ctx context.Context, args []string, stdin io.Reader, stdou
 	}
 	root.AddCommand(
 		a.authCmd(), a.versionCmd(), a.guideCmd(),
-		a.agentCmd(), a.scenarioCmd(), a.personaCmd(), a.runCmd(), a.conversationCmd(),
+		a.agentCmd(), a.scenarioCmd(), a.personaCmd(), a.runCmd(), a.suiteCmd(), a.conversationCmd(),
 		a.settingsCmd(), a.numbersCmd(),
 	)
 	root.SetArgs(args)

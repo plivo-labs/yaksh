@@ -3770,6 +3770,23 @@
             }
           },
           {
+            "name": "suite_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Suite Id"
+            }
+          },
+          {
             "name": "page",
             "in": "query",
             "required": false,
@@ -5454,6 +5471,496 @@
         }
       }
     },
+    "/api/v1/suites": {
+      "post": {
+        "tags": [
+          "suites"
+        ],
+        "summary": "Create Suite",
+        "operationId": "create_suite_api_v1_suites_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SuiteCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuiteRead"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "The request failed. The error tells why.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "suites"
+        ],
+        "summary": "List Suites",
+        "operationId": "list_suites_api_v1_suites_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1,
+              "title": "Page"
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Page Size"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_SuiteSummary_"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "The request failed. The error tells why.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/suites/{suite_id}": {
+      "get": {
+        "tags": [
+          "suites"
+        ],
+        "summary": "Get Suite",
+        "operationId": "get_suite_api_v1_suites__suite_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "suite_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Suite Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuiteRead"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "The request failed. The error tells why.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "suites"
+        ],
+        "summary": "Update Suite",
+        "operationId": "update_suite_api_v1_suites__suite_id__patch",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "suite_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Suite Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SuiteUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuiteRead"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "The request failed. The error tells why.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "suites"
+        ],
+        "summary": "Delete Suite",
+        "operationId": "delete_suite_api_v1_suites__suite_id__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "suite_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Suite Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "4XX": {
+            "description": "The request failed. The error tells why.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/suites/{suite_id}/runs": {
+      "post": {
+        "tags": [
+          "suites"
+        ],
+        "summary": "Start Suite",
+        "description": "Starts one run for each entry, all of them or none. A refusal names each entry and its\nproblem.",
+        "operationId": "start_suite_api_v1_suites__suite_id__runs_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "suite_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Suite Id"
+            }
+          },
+          {
+            "name": "idempotency-key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuiteRunRead"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "The request failed. The error tells why.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "suites"
+        ],
+        "summary": "List Suite Runs",
+        "operationId": "list_suite_runs_api_v1_suites__suite_id__runs_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "suite_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Suite Id"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1,
+              "title": "Page"
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Page Size"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_SuiteRunSummary_"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "The request failed. The error tells why.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/suite-runs/{suite_run_id}": {
+      "get": {
+        "tags": [
+          "suites"
+        ],
+        "summary": "Get Suite Run",
+        "operationId": "get_suite_run_api_v1_suite_runs__suite_run_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "suite_run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Suite Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuiteRunRead"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "The request failed. The error tells why.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/suite-runs/{suite_run_id}/cancel": {
+      "post": {
+        "tags": [
+          "suites"
+        ],
+        "summary": "Cancel Suite Run",
+        "operationId": "cancel_suite_run_api_v1_suite_runs__suite_run_id__cancel_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "suite_run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Suite Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuiteRunRead"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "The request failed. The error tells why.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "The suite run is cancelled, and some of its calls are still stopping.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuiteRunRead"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/voices": {
       "get": {
         "tags": [
@@ -6897,6 +7404,25 @@
           "created_at"
         ],
         "title": "AgentVersionRead"
+      },
+      "AllScenarios": {
+        "properties": {
+          "answered_by": {
+            "items": {
+              "$ref": "#/components/schemas/AnsweredBy"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Answered By",
+            "default": [
+              "caller"
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "AllScenarios",
+        "description": "Every live scenario of the agent at each start, each with its own persona and all its\ndata sets, answered by each of these answers."
       },
       "AnsweredBy": {
         "type": "string",
@@ -8795,6 +9321,98 @@
         "title": "ForkRequest",
         "description": "What the forks of a scenario or a persona change, and how many to write."
       },
+      "GateNumbers": {
+        "properties": {
+          "pending": {
+            "type": "integer",
+            "title": "Pending"
+          },
+          "passed": {
+            "type": "integer",
+            "title": "Passed"
+          },
+          "failed": {
+            "type": "integer",
+            "title": "Failed"
+          },
+          "not_scored": {
+            "type": "integer",
+            "title": "Not Scored"
+          },
+          "pass_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pass Rate"
+          },
+          "coverage": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Coverage"
+          },
+          "worst": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Worst"
+          },
+          "best": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Best"
+          },
+          "unplayed_passed": {
+            "type": "integer",
+            "title": "Unplayed Passed"
+          },
+          "unplayed_failed": {
+            "type": "integer",
+            "title": "Unplayed Failed"
+          },
+          "unplayed_not_scored": {
+            "type": "integer",
+            "title": "Unplayed Not Scored"
+          }
+        },
+        "type": "object",
+        "required": [
+          "pending",
+          "passed",
+          "failed",
+          "not_scored",
+          "pass_rate",
+          "coverage",
+          "worst",
+          "best",
+          "unplayed_passed",
+          "unplayed_failed",
+          "unplayed_not_scored"
+        ],
+        "title": "GateNumbers",
+        "description": "What a suite reads from one run to give it a result. Each counted call is in one group:\npending, or by its verdict among the calls where the caller talked, or by its verdict with\nagent rules among the calls where no caller talked."
+      },
       "GenerateScenarios": {
         "properties": {
           "mode": {
@@ -9755,6 +10373,20 @@
             "minimum": 1.0,
             "title": "Max Scenario Data Sets",
             "default": 10
+          },
+          "max_suite_entries": {
+            "type": "integer",
+            "maximum": 1000.0,
+            "minimum": 1.0,
+            "title": "Max Suite Entries",
+            "default": 100
+          },
+          "max_suite_run_conversations": {
+            "type": "integer",
+            "maximum": 1000000.0,
+            "minimum": 1.0,
+            "title": "Max Suite Run Conversations",
+            "default": 20000
           }
         },
         "additionalProperties": false,
@@ -10270,6 +10902,68 @@
           "page_size"
         ],
         "title": "Page[ScenarioVersionRead]"
+      },
+      "Page_SuiteRunSummary_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SuiteRunSummary"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "page": {
+            "type": "integer",
+            "title": "Page"
+          },
+          "page_size": {
+            "type": "integer",
+            "title": "Page Size"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "page",
+          "page_size"
+        ],
+        "title": "Page[SuiteRunSummary]"
+      },
+      "Page_SuiteSummary_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SuiteSummary"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "page": {
+            "type": "integer",
+            "title": "Page"
+          },
+          "page_size": {
+            "type": "integer",
+            "title": "Page Size"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "page",
+          "page_size"
+        ],
+        "title": "Page[SuiteSummary]"
       },
       "Page_VoiceRead_": {
         "properties": {
@@ -12201,29 +12895,6 @@
       },
       "RunCreate": {
         "properties": {
-          "agent_id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Agent Id"
-          },
-          "transport": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Transport"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "scenarios": {
-            "items": {
-              "$ref": "#/components/schemas/RunScenario"
-            },
-            "type": "array",
-            "minItems": 1,
-            "title": "Scenarios"
-          },
           "repeats": {
             "type": "integer",
             "minimum": 1.0,
@@ -12292,6 +12963,29 @@
             ],
             "title": "Max Retries"
           },
+          "agent_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Agent Id"
+          },
+          "transport": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Transport"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "scenarios": {
+            "items": {
+              "$ref": "#/components/schemas/RunScenario"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Scenarios"
+          },
           "name": {
             "anyOf": [
               {
@@ -12312,8 +13006,7 @@
           "agent_id",
           "scenarios"
         ],
-        "title": "RunCreate",
-        "description": "Limits that an operator sets, such as the most repeats, are checked where the settings\nare known."
+        "title": "RunCreate"
       },
       "RunMetrics": {
         "properties": {
@@ -12346,6 +13039,54 @@
           "verdicts"
         ],
         "title": "RunMetrics"
+      },
+      "RunNames": {
+        "properties": {
+          "scenarios": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "propertyNames": {
+              "format": "uuid"
+            },
+            "type": "object",
+            "title": "Scenarios"
+          },
+          "personas": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "propertyNames": {
+              "format": "uuid"
+            },
+            "type": "object",
+            "title": "Personas"
+          },
+          "data_sets": {
+            "additionalProperties": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "propertyNames": {
+                "format": "uuid"
+              },
+              "type": "object"
+            },
+            "propertyNames": {
+              "format": "uuid"
+            },
+            "type": "object",
+            "title": "Data Sets"
+          }
+        },
+        "type": "object",
+        "required": [
+          "scenarios",
+          "personas",
+          "data_sets"
+        ],
+        "title": "RunNames",
+        "description": "The names of what a run played, for a client that shows or copies the run. A scenario or\npersona deleted since keeps its name; a data set keeps the name it had at the start."
       },
       "RunNumbers": {
         "properties": {
@@ -12638,12 +13379,25 @@
             "type": "array",
             "title": "Languages"
           },
+          "suite_run": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SuiteRunLink"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "scenarios": {
             "items": {
               "$ref": "#/components/schemas/RunScenario"
             },
             "type": "array",
             "title": "Scenarios"
+          },
+          "names": {
+            "$ref": "#/components/schemas/RunNames"
           }
         },
         "type": "object",
@@ -12675,9 +13429,23 @@
           "response_p50_ms",
           "response_p90_ms",
           "languages",
-          "scenarios"
+          "suite_run",
+          "scenarios",
+          "names"
         ],
         "title": "RunRead"
+      },
+      "RunResult": {
+        "type": "string",
+        "enum": [
+          "running",
+          "judging",
+          "passed",
+          "failed",
+          "not_decided",
+          "cancelled"
+        ],
+        "title": "RunResult"
       },
       "RunScenario": {
         "properties": {
@@ -12953,6 +13721,16 @@
             },
             "type": "array",
             "title": "Languages"
+          },
+          "suite_run": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SuiteRunLink"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -12983,7 +13761,8 @@
           "created_at",
           "response_p50_ms",
           "response_p90_ms",
-          "languages"
+          "languages",
+          "suite_run"
         ],
         "title": "RunSummary"
       },
@@ -14048,7 +14827,9 @@
               "max_run_repeats": 10,
               "max_run_retries": 3,
               "max_run_start_interval_s": 600,
-              "max_scenario_data_sets": 10
+              "max_scenario_data_sets": 10,
+              "max_suite_entries": 100,
+              "max_suite_run_conversations": 20000
             }
           }
         },
@@ -14324,6 +15105,680 @@
         ],
         "title": "StartRequestDraft",
         "description": "A start request read from a cURL command, for the person to check. `number_field` names\nthe body field or query parameter that now holds `{{yaksh.number}}`, if one looked like the\nnumber to call."
+      },
+      "SuiteCreate": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "required_pass_percent": {
+            "type": "integer",
+            "maximum": 100.0,
+            "minimum": 1.0,
+            "title": "Required Pass Percent",
+            "default": 80
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "SuiteCreate",
+        "description": "A new suite has no entries; the suite page adds them."
+      },
+      "SuiteEntry": {
+        "properties": {
+          "repeats": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Repeats",
+            "default": 1
+          },
+          "max_duration_s": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 1800.0,
+                "minimum": 10.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Duration S"
+          },
+          "max_turns": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 100.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Turns"
+          },
+          "max_parallel": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Parallel"
+          },
+          "start_interval_s": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Interval S"
+          },
+          "max_retries": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Retries"
+          },
+          "agent_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Agent Id"
+          },
+          "transport": {
+            "$ref": "#/components/schemas/Transport"
+          },
+          "scenarios": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/RunScenario"
+                },
+                "type": "array",
+                "minItems": 1
+              },
+              {
+                "$ref": "#/components/schemas/AllScenarios"
+              }
+            ],
+            "title": "Scenarios"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "agent_id",
+          "transport",
+          "scenarios"
+        ],
+        "title": "SuiteEntry",
+        "description": "One run of a suite run: an agent over one connection, its scenarios and settings."
+      },
+      "SuiteEntryRead": {
+        "properties": {
+          "repeats": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Repeats",
+            "default": 1
+          },
+          "max_duration_s": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 1800.0,
+                "minimum": 10.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Duration S"
+          },
+          "max_turns": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 100.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Turns"
+          },
+          "max_parallel": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Parallel"
+          },
+          "start_interval_s": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Interval S"
+          },
+          "max_retries": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Retries"
+          },
+          "agent_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Agent Id"
+          },
+          "transport": {
+            "$ref": "#/components/schemas/Transport"
+          },
+          "scenarios": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/RunScenario"
+                },
+                "type": "array",
+                "minItems": 1
+              },
+              {
+                "$ref": "#/components/schemas/AllScenarios"
+              }
+            ],
+            "title": "Scenarios"
+          },
+          "position": {
+            "type": "integer",
+            "title": "Position"
+          },
+          "agent_name": {
+            "type": "string",
+            "title": "Agent Name"
+          },
+          "scenario_count": {
+            "type": "integer",
+            "title": "Scenario Count"
+          },
+          "calls": {
+            "type": "integer",
+            "title": "Calls"
+          },
+          "problems": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Problems"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "agent_id",
+          "transport",
+          "scenarios",
+          "position",
+          "agent_name",
+          "scenario_count",
+          "calls",
+          "problems"
+        ],
+        "title": "SuiteEntryRead"
+      },
+      "SuiteRead": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "required_pass_percent": {
+            "type": "integer",
+            "title": "Required Pass Percent"
+          },
+          "revision": {
+            "type": "integer",
+            "title": "Revision"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "agent_names": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Agent Names"
+          },
+          "calls": {
+            "type": "integer",
+            "title": "Calls"
+          },
+          "last_run": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SuiteRunSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/SuiteEntryRead"
+            },
+            "type": "array",
+            "title": "Entries"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "required_pass_percent",
+          "revision",
+          "created_at",
+          "updated_at",
+          "agent_names",
+          "calls",
+          "last_run",
+          "entries"
+        ],
+        "title": "SuiteRead"
+      },
+      "SuiteRunLink": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "suite_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Suite Id"
+          },
+          "suite_name": {
+            "type": "string",
+            "title": "Suite Name"
+          },
+          "position": {
+            "type": "integer",
+            "title": "Position"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "suite_id",
+          "suite_name",
+          "position"
+        ],
+        "title": "SuiteRunLink",
+        "description": "The suite run that started a run."
+      },
+      "SuiteRunPart": {
+        "properties": {
+          "run": {
+            "$ref": "#/components/schemas/RunSummary"
+          },
+          "result": {
+            "$ref": "#/components/schemas/RunResult"
+          },
+          "numbers": {
+            "$ref": "#/components/schemas/GateNumbers"
+          }
+        },
+        "type": "object",
+        "required": [
+          "run",
+          "result",
+          "numbers"
+        ],
+        "title": "SuiteRunPart",
+        "description": "One run of a suite run, with its result against the suite run's pass rate."
+      },
+      "SuiteRunRead": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "suite_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Suite Id"
+          },
+          "suite_name": {
+            "type": "string",
+            "title": "Suite Name"
+          },
+          "required_pass_percent": {
+            "type": "integer",
+            "title": "Required Pass Percent"
+          },
+          "result": {
+            "$ref": "#/components/schemas/RunResult"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "ended_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ended At"
+          },
+          "cancelled_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cancelled At"
+          },
+          "run_count": {
+            "type": "integer",
+            "title": "Run Count"
+          },
+          "passed_run_count": {
+            "type": "integer",
+            "title": "Passed Run Count"
+          },
+          "conversation_count": {
+            "type": "integer",
+            "title": "Conversation Count"
+          },
+          "runs": {
+            "items": {
+              "$ref": "#/components/schemas/SuiteRunPart"
+            },
+            "type": "array",
+            "title": "Runs"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "suite_id",
+          "suite_name",
+          "required_pass_percent",
+          "result",
+          "created_at",
+          "ended_at",
+          "cancelled_at",
+          "run_count",
+          "passed_run_count",
+          "conversation_count",
+          "runs"
+        ],
+        "title": "SuiteRunRead"
+      },
+      "SuiteRunSummary": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "suite_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Suite Id"
+          },
+          "suite_name": {
+            "type": "string",
+            "title": "Suite Name"
+          },
+          "required_pass_percent": {
+            "type": "integer",
+            "title": "Required Pass Percent"
+          },
+          "result": {
+            "$ref": "#/components/schemas/RunResult"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "ended_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ended At"
+          },
+          "cancelled_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cancelled At"
+          },
+          "run_count": {
+            "type": "integer",
+            "title": "Run Count"
+          },
+          "passed_run_count": {
+            "type": "integer",
+            "title": "Passed Run Count"
+          },
+          "conversation_count": {
+            "type": "integer",
+            "title": "Conversation Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "suite_id",
+          "suite_name",
+          "required_pass_percent",
+          "result",
+          "created_at",
+          "ended_at",
+          "cancelled_at",
+          "run_count",
+          "passed_run_count",
+          "conversation_count"
+        ],
+        "title": "SuiteRunSummary"
+      },
+      "SuiteSummary": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "required_pass_percent": {
+            "type": "integer",
+            "title": "Required Pass Percent"
+          },
+          "revision": {
+            "type": "integer",
+            "title": "Revision"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "agent_names": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Agent Names"
+          },
+          "calls": {
+            "type": "integer",
+            "title": "Calls"
+          },
+          "last_run": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SuiteRunSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "required_pass_percent",
+          "revision",
+          "created_at",
+          "updated_at",
+          "agent_names",
+          "calls",
+          "last_run"
+        ],
+        "title": "SuiteSummary"
+      },
+      "SuiteUpdate": {
+        "properties": {
+          "revision": {
+            "type": "integer",
+            "title": "Revision"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 80,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "required_pass_percent": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 100.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Required Pass Percent"
+          },
+          "entries": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/SuiteEntry"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entries"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "revision"
+        ],
+        "title": "SuiteUpdate",
+        "description": "A partial change. The entries, when given, replace the suite's entries as a whole."
       },
       "Surroundings": {
         "properties": {
