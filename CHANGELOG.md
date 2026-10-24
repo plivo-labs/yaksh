@@ -1,3 +1,16 @@
+## v0.3.0 (2026-10-24)
+
+### Feat
+
+- **agents**: read the agent's own record of a phone test and check it (#11)
+
+### Changed
+
+- The API applies database migration 0003 when it starts. It adds `agents.record_source`, `conversations.trigger_response`, `conversations.clock_started_at` and the `agent_records` table.
+- A judge answer with a field that its schema does not allow is asked again, and then counts as invalid evidence. A model in strict mode never sends such an answer.
+- The results view shows only the reasoning of a judge answer that failed the code checks, under the error.
+- The conversation's details panel opens at 500 px, so that its six tabs fit.
+
 ## v0.2.0 (2026-10-24)
 
 ### Feat
