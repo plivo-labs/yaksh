@@ -992,7 +992,7 @@ export function useScenarioCount(agentId: string) {
 }
 
 export interface Recording {
-  src: string;
+  blob: Blob;
   duration: number;
   /** Peak level of each 10 ms of the call for each channel, 0 to 1 against the loudest moment. */
   lanes: Float32Array[];
@@ -1000,9 +1000,7 @@ export interface Recording {
 
 const BUCKET_S = 0.01;
 
-/** Loads a recording with the API token and measures its waveform. The object URL lives as
- * long as the page. */
-// ponytail: object URLs are not revoked; revoke on cache removal if pages stay open for hours.
+/** Loads a recording with the API token and measures its waveform. */
 export function useRecording(url: string | null) {
   return useQuery({
     queryKey: ["recording", url],
@@ -1024,7 +1022,7 @@ export function useRecording(url: string | null) {
       for (const lane of lanes) {
         for (let i = 0; i < lane.length; i++) lane[i] /= loudest;
       }
-      return { src: URL.createObjectURL(blob), duration: decoded.duration, lanes };
+      return { blob, duration: decoded.duration, lanes };
     },
   });
 }

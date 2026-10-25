@@ -21,12 +21,25 @@ export function SearchInput({
 }) {
   const [typed, setTyped] = useState(value);
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  /** The last search this box sent. The address reports it back later, after newer typing. */
+  const sent = useRef(value);
+  // A search set elsewhere, such as by the sidebar link, replaces the typed text and the search
+  // still waiting.
+  useEffect(() => {
+    if (value === sent.current) return;
+    sent.current = value;
+    clearTimeout(timer.current);
+    setTyped(value);
+  }, [value]);
   // A search still waiting when the page closes would change the next page's address.
   useEffect(() => () => clearTimeout(timer.current), []);
   const type = (text: string) => {
     setTyped(text);
     clearTimeout(timer.current);
-    timer.current = setTimeout(() => onSearch(text.trim()), SEARCH_DELAY_MS);
+    timer.current = setTimeout(() => {
+      sent.current = text.trim();
+      onSearch(sent.current);
+    }, SEARCH_DELAY_MS);
   };
   return (
     <div className={`relative ${className ?? ""}`}>
