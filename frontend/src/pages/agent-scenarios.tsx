@@ -7,6 +7,7 @@ import { toast } from "sonner";
 
 import { DeleteConfirm, DeleteDialog } from "@/components/confirm-dialogs";
 import { CopyId } from "@/components/copy-id";
+import { FilterSelect } from "@/components/filter-select";
 import { ForkedFrom } from "@/components/forked-from";
 import { Panel } from "@/components/panel";
 import { SearchInput } from "@/components/search-input";
@@ -19,14 +20,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { type GenerationProgress, useGeneration } from "@/hooks/use-generation";
@@ -320,27 +313,16 @@ export function AgentScenarios({ agent }: { agent: Agent }) {
                   ))}
                 </ToggleGroup>
                 {batches.length > 0 && (
-                  <Select
+                  <FilterSelect
+                    label="Show scenarios from"
                     items={batchItems}
                     value={shownBatch ?? ALL}
-                    onValueChange={(value) => {
+                    onChange={(value) => {
                       setBatch(value === ALL ? null : value);
                       setPicked(new Set());
                     }}
-                  >
-                    <SelectTrigger aria-label="Show scenarios from" size="sm" className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectGroup>
-                        {batchItems.map((item) => (
-                          <SelectItem key={item.value} value={item.value}>
-                            {item.label}
-                          </SelectItem>
-                        ))}
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
+                    className="w-full"
+                  />
                 )}
               </div>
               <div className="flex min-h-12 flex-wrap items-center gap-x-3 gap-y-2 border-b px-4 py-2">

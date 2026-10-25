@@ -1,11 +1,4 @@
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { FilterSelect } from "@/components/filter-select";
 import { cn } from "@/lib/utils";
 import type { Transport } from "@/lib/types";
 
@@ -27,25 +20,14 @@ export function TransportFilter({
   className?: string;
 }) {
   return (
-    <Select
+    <FilterSelect
+      label="Filter by connection"
       items={ITEMS}
       value={transport ?? ANY}
-      onValueChange={(value) =>
+      onChange={(value) =>
         onTransportChange(value === "phone" || value === "text" ? value : undefined)
       }
-    >
-      <SelectTrigger size="sm" className={cn("w-36", className)} aria-label="Filter by connection">
-        <SelectValue />
-      </SelectTrigger>
-      <SelectContent>
-        <SelectGroup>
-          {ITEMS.map((item) => (
-            <SelectItem key={item.value} value={item.value}>
-              {item.label}
-            </SelectItem>
-          ))}
-        </SelectGroup>
-      </SelectContent>
-    </Select>
+      className={cn("w-36", className)}
+    />
   );
 }

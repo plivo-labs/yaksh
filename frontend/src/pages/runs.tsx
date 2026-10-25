@@ -1,15 +1,8 @@
 import { DateFilter } from "@/components/date-filter";
+import { FilterSelect } from "@/components/filter-select";
 import { Pager } from "@/components/pager";
 import { RunList } from "@/components/run-list";
 import { TransportFilter } from "@/components/transport-filter";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { createdBetween, useDatesParam } from "@/hooks/use-dates-param";
 import { useFilterParams } from "@/hooks/use-filter-params";
 import { usePageParam } from "@/hooks/use-page-param";
@@ -70,74 +63,29 @@ export function RunsPage() {
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <Select
+        <FilterSelect
+          label="Filter by agent"
           items={agentItems}
           value={agentId}
-          onValueChange={(value) => setParam("agent_id", value ?? ANY)}
-        >
-          <SelectTrigger
-            size="sm"
-            className="min-w-0 flex-1 sm:w-48 sm:flex-none"
-            aria-label="Filter by agent"
-          >
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectGroup>
-              {agentItems.map((item) => (
-                <SelectItem key={item.value} value={item.value}>
-                  {item.label}
-                </SelectItem>
-              ))}
-            </SelectGroup>
-          </SelectContent>
-        </Select>
+          onChange={(value) => setParam("agent_id", value)}
+          className="min-w-0 flex-1 sm:w-48 sm:flex-none"
+        />
         {(suites.data?.length ?? 0) > 0 && (
-          <Select
+          <FilterSelect
+            label="Filter by suite"
             items={suiteItems}
             value={suiteId}
-            onValueChange={(value) => setParam("suite_id", value ?? ANY)}
-          >
-            <SelectTrigger
-              size="sm"
-              className="min-w-0 flex-1 sm:w-44 sm:flex-none"
-              aria-label="Filter by suite"
-            >
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectGroup>
-                {suiteItems.map((item) => (
-                  <SelectItem key={item.value} value={item.value}>
-                    {item.label}
-                  </SelectItem>
-                ))}
-              </SelectGroup>
-            </SelectContent>
-          </Select>
+            onChange={(value) => setParam("suite_id", value)}
+            className="min-w-0 flex-1 sm:w-44 sm:flex-none"
+          />
         )}
-        <Select
+        <FilterSelect
+          label="Filter by status"
           items={statusItems}
           value={status}
-          onValueChange={(value) => setParam("status", value ?? ANY)}
-        >
-          <SelectTrigger
-            size="sm"
-            className="min-w-0 flex-1 sm:w-40 sm:flex-none"
-            aria-label="Filter by status"
-          >
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectGroup>
-              {statusItems.map((item) => (
-                <SelectItem key={item.value} value={item.value}>
-                  {item.label}
-                </SelectItem>
-              ))}
-            </SelectGroup>
-          </SelectContent>
-        </Select>
+          onChange={(value) => setParam("status", value)}
+          className="min-w-0 flex-1 sm:w-40 sm:flex-none"
+        />
         <TransportFilter
           transport={transport}
           onTransportChange={setTransport}

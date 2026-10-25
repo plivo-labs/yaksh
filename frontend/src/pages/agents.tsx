@@ -5,6 +5,7 @@ import { Link, useNavigate } from "react-router";
 import { toast } from "sonner";
 
 import { DeleteDialog } from "@/components/confirm-dialogs";
+import { FilterSelect } from "@/components/filter-select";
 import { Pager } from "@/components/pager";
 import { SearchInput } from "@/components/search-input";
 import { SortHeader } from "@/components/sort-header";
@@ -26,14 +27,6 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useFilterParams } from "@/hooks/use-filter-params";
 import { usePageParam } from "@/hooks/use-page-param";
@@ -194,24 +187,13 @@ function SourceFilter({
     ...sources.map((source) => ({ value: source, label: SOURCE_NAMES[source] })),
   ];
   return (
-    <Select
+    <FilterSelect
+      label="Filter by source"
       items={items}
       value={value ?? ANY}
-      onValueChange={(next) => onChange(sources.find((source) => source === next))}
-    >
-      <SelectTrigger size="sm" className="w-40" aria-label="Filter by source">
-        <SelectValue />
-      </SelectTrigger>
-      <SelectContent>
-        <SelectGroup>
-          {items.map((item) => (
-            <SelectItem key={item.value} value={item.value}>
-              {item.label}
-            </SelectItem>
-          ))}
-        </SelectGroup>
-      </SelectContent>
-    </Select>
+      onChange={(next) => onChange(sources.find((source) => source === next))}
+      className="w-40"
+    />
   );
 }
 

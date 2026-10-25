@@ -32,6 +32,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Skeleton } from "@/components/ui/skeleton";
 import { Slider } from "@/components/ui/slider";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { useObjectUrl } from "@/hooks/use-object-url";
 import { copyText } from "@/lib/clipboard";
 import type { LiveView } from "@/lib/listen";
 import { clock, stamp } from "@/lib/format";
@@ -259,7 +260,8 @@ function Player({
   onTime?: (seconds: number) => void;
   marks: Mark[];
 }) {
-  const { src, duration, lanes } = recording;
+  const { duration, lanes } = recording;
+  const src = useObjectUrl(recording.blob);
   const stereo = lanes.length > 1;
   const maxZoom = 2 ** Math.max(0, Math.floor(Math.log2(lanes[0].length / BARS)));
   const contentPx = RULER_PX + lanes.length * LANE_PX + (lanes.length - 1) * GAP_PX;
