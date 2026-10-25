@@ -23,8 +23,8 @@ CHECK_TIMEOUT_S = 15.0
 
 def caller_effort(model: str, configured: str | None) -> str | None:
     """The effort the caller sends: the configured one, else low for a model that Pipecat lists,
-    or the model's lowest effort when that is above low. A model that Pipecat does not list, such
-    as an Azure deployment with its own name, gets none: a model without reasoning refuses any."""
+    or the model's lowest effort when that is above low. A model that Pipecat does not list gets
+    none: a model without reasoning refuses any."""
     if configured:
         return configured
     lowest = _THINKING_DEFAULTS.get(_model_name(model))
