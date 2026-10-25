@@ -1,3 +1,11 @@
+## v0.5.0 (2026-10-25)
+
+### Fix
+
+- **caller**: stop the caller from ending calls before its instructions are done (#13)
+  - The caller ends a call only when its instructions name the point or are done, and the agent's latest turn shows that point. Most calls now end when the agent ends them.
+  - With no reasoning effort set, the caller uses `low`, or the model's lowest effort when that is higher. A model that Yaksh does not know gets no effort. To get the earlier behavior, set the caller's effort on Settings.
+
 ## v0.4.0 (2026-10-25)
 
 ### Feat
