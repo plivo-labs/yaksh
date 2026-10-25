@@ -1,3 +1,12 @@
+## v0.4.0 (2026-10-25)
+
+### Feat
+
+- **suites**: run several agents together and get one result (#12)
+  - A suite is a saved list of agents, each with its connection (phone or text), scenarios and run settings. "Run suite" starts one run for each agent, and the suite run passes only when every run passes at the suite's required pass rate.
+  - `yaksh suite run <id> --wait` waits for the result and exits 0 only on a pass, for use in CI.
+  - In the console: a Suites page, a suite run page with live progress, and "Add to suite" on a run page.
+
 ## v0.3.0 (2026-10-24)
 
 ### Feat
