@@ -52,7 +52,9 @@ async def test_a_run_is_refused_when_the_provider_refuses_a_scenario_caller_mode
     gone = await create_scenario(
         client, agent_id, name="Late booking", caller={"model": "gone-model"}
     )
-    fine = await create_scenario(client, agent_id, name="Menu question", caller=ASTRA)
+    fine = await create_scenario(
+        client, agent_id, name="Menu question", caller={"model": "gpt-6-luna"}
+    )
 
     response = await client.post(
         "/api/v1/runs",
@@ -68,6 +70,7 @@ async def test_a_run_is_refused_when_the_provider_refuses_a_scenario_caller_mode
     assert '"Late booking"' in message and "gone-model" in message
     assert "Menu question" not in message
     assert runs == []
+    assert sorted(asked) == [("gone-model", None), ("gpt-6-luna", "low")], "the effort sent"
 
 
 async def test_a_repeated_request_returns_its_run_without_checking_again(

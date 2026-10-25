@@ -63,6 +63,7 @@ from yaksh.domain.conversations import (
 from yaksh.domain.latency import VAD_CONFIDENCE, VAD_START_S, VAD_STOP_S
 from yaksh.domain.settings import AppSettings, CallerModel
 from yaksh.integrations import elevenlabs
+from yaksh.integrations.openai_models import caller_effort
 
 log = logging.getLogger(__name__)
 
@@ -81,9 +82,10 @@ IDLE_NUDGES = 2
 END_CALL = FunctionSchema(
     name="end_call",
     description=(
-        "End the call. Call it only when the agent's latest turn shows that it has done what "
-        "your instructions ask for, or shows the point where they tell you to end; never in a "
-        "normal turn."
+        "End the call. Use it only in a reply that is nothing but a short goodbye, and only when "
+        "the agent's latest turn shows that your instructions are done, or shows the point where "
+        "they tell you to end. Never use it in a reply that greets, answers a question, gives a "
+        "value, agrees or asks something: then the call goes on."
     ),
     properties={
         "reason": {
@@ -124,10 +126,9 @@ def caller_keys(settings: AppSettings) -> CallerKeys:
 def llm_service(
     settings: AppSettings, caller: CallerModel, keys: CallerKeys, instructions: str
 ) -> OpenAIResponsesHttpLLMService:
-    """The persona's model over the Responses API. With no effort configured, Pipecat sends the
-    lowest effort that it lists for the model, for the fastest first word; a model it does not
-    list gets no effort. A reply calls at most one tool, so it can end the call only once."""
-    effort = caller.reasoning_effort
+    """The persona's model over the Responses API, at `caller_effort`. A reply calls at most one
+    tool, so it can end the call only once."""
+    effort = caller_effort(caller.model, caller.reasoning_effort)
     return OpenAIResponsesHttpLLMService(
         api_key=keys.llm,
         base_url=settings.llm.base_url,
@@ -322,7 +323,7 @@ class Persona:
         hearing = deepgram_language(request.agent.languages, request.caller_language)
         self.settings = CallerSettings(
             llm_model=request.caller.model,
-            reasoning_effort=request.caller.reasoning_effort,
+            reasoning_effort=caller_effort(request.caller.model, request.caller.reasoning_effort),
             scenario_model=request.scenario_model,
             stt_model=settings.deepgram.model,
             stt_language=hearing,

@@ -100,14 +100,27 @@ async def test_a_call_that_is_ending_gets_no_nudge() -> None:
 @pytest.mark.parametrize(
     ("model", "effort", "reasoning"),
     [
-        ("gpt-6-luna", None, {"effort": "none"}),
+        ("gpt-6-luna", None, {"effort": "low"}),
+        ("gpt-5", None, {"effort": "low"}),
         ("o3", None, {"effort": "low"}),
+        ("gpt-5.2-pro", None, {"effort": "medium"}),
+        ("gpt-5-pro", None, {"effort": "high"}),
+        ("gpt-6-luna-2026-01-01", None, {"effort": "low"}),
         ("gpt-4.1", None, None),
-        ("gpt-6-luna", "low", {"effort": "low"}),
+        ("gpt-6-luna", "none", {"effort": "none"}),
     ],
-    ids=["reasoning model", "model without effort none", "gpt-4.x", "configured effort"],
+    ids=[
+        "lowest none",
+        "lowest minimal",
+        "lowest low",
+        "lowest medium",
+        "lowest high",
+        "dated snapshot",
+        "gpt-4.x",
+        "configured effort",
+    ],
 )
-async def test_the_persona_asks_the_responses_api_for_the_lowest_effort_unless_configured(
+async def test_the_persona_asks_for_low_effort_or_the_models_lowest_unless_configured(
     provider: tuple[str, FakeProvider],
     model: str,
     effort: str | None,

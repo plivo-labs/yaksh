@@ -245,8 +245,7 @@ function Form({
                 model={draft.caller.model}
                 value={draft.caller.reasoning_effort}
                 onValueChange={(effort) => change("caller", "reasoning_effort", effort)}
-                unset="none"
-                hidden={["none"]}
+                unset="default"
               />
             </SettingRow>
           </Panel>

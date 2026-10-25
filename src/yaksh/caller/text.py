@@ -11,10 +11,15 @@ from typing import Any
 import openai
 from openai import AsyncOpenAI
 from openai.types.responses import EasyInputMessageParam, FunctionToolParam, Response
-from pipecat.services.openai.responses.llm import _THINKING_DEFAULTS, _model_name
 
 from yaksh.caller.audio import Clock
-from yaksh.caller.pipeline import END_CALL, IDLE_NUDGES, SILENT_END, CallState, Silence
+from yaksh.caller.pipeline import (
+    END_CALL,
+    IDLE_NUDGES,
+    SILENT_END,
+    CallState,
+    Silence,
+)
 from yaksh.config import Settings
 from yaksh.diagnostics import describe_exception
 from yaksh.domain.conversations import (
@@ -30,7 +35,7 @@ from yaksh.domain.conversations import (
     WireEventKind,
 )
 from yaksh.domain.triggers import Filler, RenderError
-from yaksh.integrations.openai_models import failure
+from yaksh.integrations.openai_models import caller_effort, failure
 from yaksh.integrations.text_agent import AgentReply, TextAgent, TextAgentError
 from yaksh.timings import TIMINGS
 
@@ -56,10 +61,8 @@ END_CALL_TOOL = FunctionToolParam(
 
 
 def reasoning(model: str, effort: str | None) -> dict[str, Any]:
-    """The phone caller's rule, from Pipecat's service, so both callers ask the model the same
-    way: the configured effort, or the lowest effort that Pipecat lists for the model, for the
-    fastest reply. A model that Pipecat does not list gets no effort."""
-    effort = effort or _THINKING_DEFAULTS.get(_model_name(model))
+    """The phone caller's effort, so both callers ask the model the same way."""
+    effort = caller_effort(model, effort)
     return {"reasoning": {"effort": effort}} if effort else {}
 
 
@@ -195,7 +198,9 @@ class TextConversation:
             talk_ms=ended_ms - self._connected_ms if self._connected_ms is not None else None,
             caller_settings=CallerSettings(
                 llm_model=self._request.caller.model,
-                reasoning_effort=self._request.caller.reasoning_effort,
+                reasoning_effort=caller_effort(
+                    self._request.caller.model, self._request.caller.reasoning_effort
+                ),
                 scenario_model=self._request.scenario_model,
             ),
             caller_usage=CallerUsage.model_validate(self._usage),

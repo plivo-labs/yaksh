@@ -9,6 +9,7 @@ from typing import Any
 import openai
 from openai import AsyncOpenAI, omit
 from openai.types.responses import Response
+from pipecat.services.openai.responses.llm import _THINKING_DEFAULTS, _model_name
 
 from yaksh.domain.language_models import ModelAnswer, ModelCallError
 
@@ -18,6 +19,18 @@ RETRIES = 1
 """One retry: someone is waiting for the answer in the console."""
 CHECK_TIMEOUT_S = 15.0
 """For one try of the reasoning check, which takes about a second even at the highest effort."""
+
+
+def caller_effort(model: str, configured: str | None) -> str | None:
+    """The effort the caller sends: the configured one, else low for a model that Pipecat lists,
+    or the model's lowest effort when that is above low. A model that Pipecat does not list gets
+    none: a model without reasoning refuses any."""
+    if configured:
+        return configured
+    lowest = _THINKING_DEFAULTS.get(_model_name(model))
+    if lowest is None:
+        return None
+    return "low" if lowest in ("none", "minimal") else lowest
 
 
 class OpenAIJsonModel:
