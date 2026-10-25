@@ -21,7 +21,6 @@ from tests.conftest import (
     receive_outbound_calls,
     report_receiving_worker,
     run_conversations,
-    save_settings,
     wait_for_lock_waiters,
 )
 from yaksh.config import Settings
@@ -179,11 +178,6 @@ async def test_a_start_names_every_broken_entry_and_starts_nothing(
         fixed.json(),
         [entry(kept, [{"scenario_id": spare["id"], "persona_ids": [str(uuid.uuid4())]}])],
     )
-    await save_entries(
-        client, fixed.json(), [entry(kept, [{"scenario_id": spare["id"]}], repeats=3)]
-    )
-    await save_settings(db, {"limits": {"max_suite_run_conversations": 2}})
-    too_many = await start_suite(client, suite["id"])
 
     assert broken.status_code == 422
     assert broken.json()["error"]["message"] == (
@@ -198,8 +192,6 @@ async def test_a_start_names_every_broken_entry_and_starts_nothing(
     assert fixed.status_code == 200, "a broken entry does not stop the fix of another one"
     assert still.json()["error"]["message"] == "entry 2, Dropped (phone): the agent was deleted"
     assert unknown.status_code == 422 and "entry 1: persona" in unknown.text
-    assert too_many.status_code == 422
-    assert "at most 2 conversations; its entries make 3" in too_many.text
     assert (await rows(db, SuiteRun), await rows(db, Run), await rows(db, Conversation)) == (
         0,
         0,

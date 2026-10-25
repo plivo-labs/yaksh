@@ -2198,15 +2198,13 @@ type Layer struct {
 
 // Limits defines model for Limits.
 type Limits struct {
-	DefaultMaxDurationS      *int `json:"default_max_duration_s,omitempty"`
-	DefaultMaxTurns          *int `json:"default_max_turns,omitempty"`
-	MaxRunConversations      *int `json:"max_run_conversations,omitempty"`
-	MaxRunRepeats            *int `json:"max_run_repeats,omitempty"`
-	MaxRunRetries            *int `json:"max_run_retries,omitempty"`
-	MaxRunStartIntervalS     *int `json:"max_run_start_interval_s,omitempty"`
-	MaxScenarioDataSets      *int `json:"max_scenario_data_sets,omitempty"`
-	MaxSuiteEntries          *int `json:"max_suite_entries,omitempty"`
-	MaxSuiteRunConversations *int `json:"max_suite_run_conversations,omitempty"`
+	DefaultMaxDurationS  *int `json:"default_max_duration_s,omitempty"`
+	DefaultMaxTurns      *int `json:"default_max_turns,omitempty"`
+	MaxRunConversations  *int `json:"max_run_conversations,omitempty"`
+	MaxRunRepeats        *int `json:"max_run_repeats,omitempty"`
+	MaxRunRetries        *int `json:"max_run_retries,omitempty"`
+	MaxRunStartIntervalS *int `json:"max_run_start_interval_s,omitempty"`
+	MaxScenarioDataSets  *int `json:"max_scenario_data_sets,omitempty"`
 }
 
 // Llm Any API with OpenAI's Responses endpoint. The caller, scenario writing and the judges
@@ -2827,14 +2825,6 @@ type RunMetrics struct {
 	Verdicts RunVerdicts `json:"verdicts"`
 }
 
-// RunNames The names of what a run played, for a client that shows or copies the run. A scenario or
-// persona deleted since keeps its name; a data set keeps the name it had at the start.
-type RunNames struct {
-	DataSets  map[string]map[string]string `json:"data_sets"`
-	Personas  map[string]string            `json:"personas"`
-	Scenarios map[string]string            `json:"scenarios"`
-}
-
 // RunNumbers What the evaluations found over some of a run's conversations.
 type RunNumbers struct {
 	// Connected How many of a total, with the 95% Wilson interval of the rate: few calls give a wide
@@ -2886,19 +2876,15 @@ type RunRead struct {
 	MaxTurns       int                `json:"max_turns"`
 	MedianTalkMs   *int               `json:"median_talk_ms"`
 	Name           *string            `json:"name"`
-
-	// Names The names of what a run played, for a client that shows or copies the run. A scenario or
-	// persona deleted since keeps its name; a data set keeps the name it had at the start.
-	Names          RunNames      `json:"names"`
-	Repeats        int           `json:"repeats"`
-	ResponseP50Ms  *int          `json:"response_p50_ms"`
-	ResponseP90Ms  *int          `json:"response_p90_ms"`
-	Retries        int           `json:"retries"`
-	Scenarios      []RunScenario `json:"scenarios"`
-	StartIntervalS *int          `json:"start_interval_s"`
-	StartedAt      *time.Time    `json:"started_at"`
-	Status         RunStatus     `json:"status"`
-	SuiteRun       *SuiteRunLink `json:"suite_run"`
+	Repeats        int                `json:"repeats"`
+	ResponseP50Ms  *int               `json:"response_p50_ms"`
+	ResponseP90Ms  *int               `json:"response_p90_ms"`
+	Retries        int                `json:"retries"`
+	Scenarios      []RunScenario      `json:"scenarios"`
+	StartIntervalS *int               `json:"start_interval_s"`
+	StartedAt      *time.Time         `json:"started_at"`
+	Status         RunStatus          `json:"status"`
+	SuiteRun       *SuiteRunLink      `json:"suite_run"`
 
 	// Transport How Yaksh reaches an agent.
 	Transport     Transport      `json:"transport"`

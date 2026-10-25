@@ -172,10 +172,8 @@ async def get_suite(suite_id: uuid.UUID, session: SessionDep) -> SuiteRead:
 
 
 @router.patch("/{suite_id}")
-async def update_suite(
-    suite_id: uuid.UUID, update: SuiteUpdate, session: SessionDep, app: AppSettingsDep
-) -> SuiteRead:
-    suite = await suites.update_suite(session, suite_id, update, app.limits)
+async def update_suite(suite_id: uuid.UUID, update: SuiteUpdate, session: SessionDep) -> SuiteRead:
+    suite = await suites.update_suite(session, suite_id, update)
     return await suite_read(session, suite)
 
 

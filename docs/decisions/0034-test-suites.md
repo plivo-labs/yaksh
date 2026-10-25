@@ -31,7 +31,7 @@ Status: accepted
 
 ## Cost
 
-- Migration 0003: `suites`, `suite_entries`, `suite_entry_scenarios`, `suite_entry_scenario_personas`, `suite_runs`, and `runs.suite_run_id` with `runs.suite_position`.
+- Migration 0004: `suites`, `suite_entries`, `suite_entry_scenarios`, `suite_entry_scenario_personas`, `suite_runs`, and `runs.suite_run_id` with `runs.suite_position`.
 - A start locks the suite, then the agents, scenarios and personas of all its entries in that order, before any snapshot. A save locks the suite and key-shares the rows that its entries point to in the same order.
 - The suite's pass rate can be lower than the one the run page shows for the same run, when calls did not complete or a user stopped them.
 

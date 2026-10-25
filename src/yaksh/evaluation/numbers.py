@@ -1,6 +1,6 @@
 """A run's verdict numbers: the pass rate as a mean over scenarios, so a scenario with more calls
 does not count more; coverage and the worst-to-best range when some calls were not scored; the
-interval of the pass rate from the scenarios' own results; and pass^k, the chance that k repeats of
+"this suite" interval from the scenarios' own results; and pass^k, the chance that k repeats of
 a scenario all pass."""
 
 import functools
@@ -59,9 +59,7 @@ def worst_and_best(scenarios: Sequence[ScenarioResults]) -> tuple[float, float] 
     return sum(worst) / len(worst), sum(best) / len(best)
 
 
-def pass_rate_interval(
-    scenarios: Sequence[ScenarioResults], seed: int
-) -> tuple[float, float] | None:
+def suite_interval(scenarios: Sequence[ScenarioResults], seed: int) -> tuple[float, float] | None:
     """The 95% interval of the pass rate, from random draws of each scenario's rate (Jeffreys:
     beta(passes + 1/2, fails + 1/2)). The seed, the run's, makes the same run always give the
     same interval. None below five scenarios: too few to say."""

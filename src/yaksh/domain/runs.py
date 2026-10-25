@@ -104,16 +104,6 @@ class RunCreate(RunSettings):
         return hashlib.sha256(body.encode()).hexdigest()
 
 
-class RunNames(BaseModel):
-    """The names of what a run played, for a client that shows or copies the run. A scenario or
-    persona deleted since keeps its name; a data set keeps the name it had at the start."""
-
-    scenarios: dict[uuid.UUID, str]
-    personas: dict[uuid.UUID, str]
-    data_sets: dict[uuid.UUID, dict[uuid.UUID, str]]
-    """By scenario: a data set's id is unique only within its scenario."""
-
-
 class RunStatus(StrEnum):
     QUEUED = "queued"
     """Conversations wait, and none has started."""

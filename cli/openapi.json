@@ -10373,20 +10373,6 @@
             "minimum": 1.0,
             "title": "Max Scenario Data Sets",
             "default": 10
-          },
-          "max_suite_entries": {
-            "type": "integer",
-            "maximum": 1000.0,
-            "minimum": 1.0,
-            "title": "Max Suite Entries",
-            "default": 100
-          },
-          "max_suite_run_conversations": {
-            "type": "integer",
-            "maximum": 1000000.0,
-            "minimum": 1.0,
-            "title": "Max Suite Run Conversations",
-            "default": 20000
           }
         },
         "additionalProperties": false,
@@ -13040,54 +13026,6 @@
         ],
         "title": "RunMetrics"
       },
-      "RunNames": {
-        "properties": {
-          "scenarios": {
-            "additionalProperties": {
-              "type": "string"
-            },
-            "propertyNames": {
-              "format": "uuid"
-            },
-            "type": "object",
-            "title": "Scenarios"
-          },
-          "personas": {
-            "additionalProperties": {
-              "type": "string"
-            },
-            "propertyNames": {
-              "format": "uuid"
-            },
-            "type": "object",
-            "title": "Personas"
-          },
-          "data_sets": {
-            "additionalProperties": {
-              "additionalProperties": {
-                "type": "string"
-              },
-              "propertyNames": {
-                "format": "uuid"
-              },
-              "type": "object"
-            },
-            "propertyNames": {
-              "format": "uuid"
-            },
-            "type": "object",
-            "title": "Data Sets"
-          }
-        },
-        "type": "object",
-        "required": [
-          "scenarios",
-          "personas",
-          "data_sets"
-        ],
-        "title": "RunNames",
-        "description": "The names of what a run played, for a client that shows or copies the run. A scenario or\npersona deleted since keeps its name; a data set keeps the name it had at the start."
-      },
       "RunNumbers": {
         "properties": {
           "conversations": {
@@ -13395,9 +13333,6 @@
             },
             "type": "array",
             "title": "Scenarios"
-          },
-          "names": {
-            "$ref": "#/components/schemas/RunNames"
           }
         },
         "type": "object",
@@ -13430,8 +13365,7 @@
           "response_p90_ms",
           "languages",
           "suite_run",
-          "scenarios",
-          "names"
+          "scenarios"
         ],
         "title": "RunRead"
       },
@@ -14827,9 +14761,7 @@
               "max_run_repeats": 10,
               "max_run_retries": 3,
               "max_run_start_interval_s": 600,
-              "max_scenario_data_sets": 10,
-              "max_suite_entries": 100,
-              "max_suite_run_conversations": 20000
+              "max_scenario_data_sets": 10
             }
           }
         },
@@ -15763,7 +15695,8 @@
                 "items": {
                   "$ref": "#/components/schemas/SuiteEntry"
                 },
-                "type": "array"
+                "type": "array",
+                "maxItems": 100
               },
               {
                 "type": "null"

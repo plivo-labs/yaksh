@@ -5,7 +5,7 @@ from yaksh.db.models import Run
 from yaksh.domain.agents import Transport
 from yaksh.domain.languages import Language
 from yaksh.domain.latency import Latency
-from yaksh.domain.runs import RunNames, RunProgress, RunScenario
+from yaksh.domain.runs import RunProgress, RunScenario
 from yaksh.domain.suites import SuiteRunLink
 
 
@@ -72,4 +72,3 @@ class RunRead(RunSummary):
     scenarios: list[RunScenario]
     """With the personas that call them, in the order the conversations of each repeat
     start. A client can send them back to start the same run again."""
-    names: RunNames

@@ -30,7 +30,7 @@ from yaksh.domain.answering import AnsweredBy
 from yaksh.domain.conversations import ACTIVE_STATUSES
 from yaksh.domain.errors import ConflictError, NotFoundError, ValidationError
 from yaksh.domain.runs import RunScenario
-from yaksh.domain.settings import AppSettings, Limits
+from yaksh.domain.settings import AppSettings
 from yaksh.domain.suites import AllScenarios, SuiteCreate, SuiteEntry, SuiteRunLink, SuiteUpdate
 from yaksh.simulation.agents import config_of as agent_config_of
 from yaksh.simulation.runs import (
@@ -94,15 +94,13 @@ async def list_suites(session: AsyncSession, *, offset: int, limit: int) -> tupl
     return list(rows), total or 0
 
 
-async def update_suite(
-    session: AsyncSession, suite_id: uuid.UUID, update: SuiteUpdate, limits: Limits
-) -> Suite:
+async def update_suite(session: AsyncSession, suite_id: uuid.UUID, update: SuiteUpdate) -> Suite:
     """A save of an older read is refused, so two editors cannot drop each other's changes."""
     suite = await get_suite(session, suite_id, lock=True)
     if update.revision != suite.revision:
         raise ConflictError("the suite changed since it was read: read it again")
     if update.entries is not None:
-        await replace_entries(session, suite, update.entries, limits)
+        await replace_entries(session, suite, update.entries)
     if update.name is not None:
         suite.name = update.name
     if update.required_pass_percent is not None:
@@ -115,16 +113,13 @@ async def update_suite(
 
 
 async def replace_entries(
-    session: AsyncSession, suite: Suite, entries: Sequence[SuiteEntry], limits: Limits
+    session: AsyncSession, suite: Suite, entries: Sequence[SuiteEntry]
 ) -> None:
-    """Refuses only what is wrong in the request itself: an id that does not exist, a scenario
-    of another agent, or more entries than the limit. What can also go wrong later, such as a
+    """Refuses only what is wrong in the request itself: an id that does not exist, or a
+    scenario of another agent. What can also go wrong later, such as a
     deleted scenario, is kept and shown as a problem of its entry, so broken entries can be
     fixed one at a time. The rows that the entries point to are key-shared first, in the lock
     order, before the inserts take the same locks in an order of their own."""
-    held = await session.scalar(select(func.count()).where(SuiteEntryRow.suite_id == suite.id))
-    if len(entries) > max(limits.max_suite_entries, held or 0):
-        raise ValidationError(f"a suite holds at most {limits.max_suite_entries} entries")
     chosen = [item for entry in entries for item in chosen_scenarios(entry)]
     agents = await key_shared(session, Agent, {entry.agent_id for entry in entries})
     scenarios = await key_shared(session, Scenario, {item.scenario_id for item in chosen})
@@ -476,14 +471,6 @@ async def start_suite(
             problems.append(f"{label}: {error}")
             continue
         prepared.append((label, run))
-    total = sum(run.count for _, run in prepared)
-    if total > app.limits.max_suite_run_conversations:
-        problems.append(
-            f"a suite run starts at most {app.limits.max_suite_run_conversations} "
-            f"conversations; its entries make {total}"
-        )
-    if len(entries) > app.limits.max_suite_entries:
-        problems.append(f"a suite holds at most {app.limits.max_suite_entries} entries")
     if check_caller is not None and prepared:
         refused = await unserved_callers(
             session, check_caller, [item for _, run in prepared for item in run.inputs]

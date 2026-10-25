@@ -48,7 +48,6 @@ async def detail(session: AsyncSession, run: Run) -> RunRead:
     return RunRead(
         **base.model_dump(),
         scenarios=await runs.run_scenarios(session, run),
-        names=await runs.run_names(session, run),
     )
 
 

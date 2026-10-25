@@ -37,7 +37,6 @@ from yaksh.domain.errors import ConflictError, NotFoundError, ValidationError
 from yaksh.domain.languages import Language
 from yaksh.domain.runs import (
     RunCreate,
-    RunNames,
     RunProgress,
     RunScenario,
     RunStatus,
@@ -634,26 +633,3 @@ async def run_scenarios(session: AsyncSession, run: Run) -> list[RunScenario]:
         )
         for s, p in personas.items()
     ]
-
-
-async def run_names(session: AsyncSession, run: Run) -> RunNames:
-    rows = await session.execute(
-        select(
-            Conversation.scenario_id,
-            Scenario.name,
-            Conversation.persona_id,
-            Persona.name,
-            Conversation.data_set_id,
-            Conversation.data_set_name,
-        )
-        .join(Scenario, Scenario.id == Conversation.scenario_id)
-        .join(Persona, Persona.id == Conversation.persona_id)
-        .where(Conversation.run_id == run.id, Conversation.repeat == 1, Conversation.attempt == 1)
-        .distinct()
-    )
-    names = RunNames(scenarios={}, personas={}, data_sets={})
-    for scenario, scenario_name, persona, persona_name, data_set, data_set_name in rows.tuples():
-        names.scenarios[scenario] = scenario_name
-        names.personas[persona] = persona_name
-        names.data_sets.setdefault(scenario, {})[data_set] = data_set_name
-    return names

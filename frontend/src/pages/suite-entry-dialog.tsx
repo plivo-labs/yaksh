@@ -17,7 +17,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
+import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import {
   Select,
   SelectContent,
@@ -28,17 +28,9 @@ import {
 } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 import { DEFAULT_ANSWERING } from "@/lib/answering";
-import { counted, runTitle, runTotal } from "@/lib/format";
+import { counted, runTitle } from "@/lib/format";
 import { revealErrors } from "@/lib/forms";
-import {
-  useAgent,
-  useAgents,
-  usePersonas,
-  useRun,
-  useRuns,
-  useSaveSuite,
-  useScenarios,
-} from "@/lib/queries";
+import { useAgent, useAgents, usePersonas, useSaveSuite, useScenarios } from "@/lib/queries";
 import { useRunSetup } from "@/lib/run-setup";
 import {
   asEntry,
@@ -59,10 +51,8 @@ import {
   servedLanguages,
 } from "@/lib/types";
 
-const NONE = "none";
-
-/** Adds an agent to a suite, or edits one of its entries. A new entry can start as a copy of a
- * run: of the agent's newest runs, or of `copyRun`, which the run page passes. */
+/** Adds an agent to a suite, or edits one of its entries. With `copyRun`, which the run page
+ * passes, the new entry starts as a copy of that run. */
 export function SuiteEntryDialog({
   suite,
   entry,
@@ -81,22 +71,11 @@ export function SuiteEntryDialog({
   // gets a 409 and is never overwritten.
   const [base] = useState(suite);
   const [agentId, setAgentId] = useState(entry?.agent_id ?? copyRun?.agent_id ?? "");
-  const [runId, setRunId] = useState(copyRun?.id ?? NONE);
   const agents = useAgents();
-  const runs = useRuns({ agentId: agentId || undefined }, 1);
-  const copied = useRun(runId === NONE ? undefined : runId);
   const agent = agents.data?.find((item) => item.id === agentId);
   const save = useSaveSuite(suite.id);
 
   const agentItems = (agents.data ?? []).map((item) => ({ value: item.id, label: item.name }));
-  const runItems = [
-    { value: NONE, label: "None" },
-    ...(agentId ? (runs.data?.items ?? []) : []).map((run) => ({
-      value: run.id,
-      label: `${runTitle(run)} · ${counted(runTotal(run), "call", "calls")}`,
-    })),
-  ];
-  const waitingForCopy = runId !== NONE && copied.data?.id !== runId;
   const stale = suite.revision !== base.revision && !save.isSuccess;
 
   return (
@@ -108,20 +87,20 @@ export function SuiteEntryDialog({
       <DialogContent className="flex h-[min(760px,90vh)] flex-col gap-0 p-0 sm:max-w-5xl">
         <DialogHeader className="border-b px-6 py-5">
           <DialogTitle>{entry ? "Edit agent" : "Add an agent"}</DialogTitle>
-          <DialogDescription>{suite.name}</DialogDescription>
+          <DialogDescription>
+            {copyRun
+              ? `${suite.name}. A copy of ${runTitle(copyRun)}; the suite does not use its results.`
+              : suite.name}
+          </DialogDescription>
         </DialogHeader>
-        {!entry && (
-          <div className="grid gap-4 border-b px-6 py-4 sm:grid-cols-2">
-            <Field>
+        {!entry && !copyRun && (
+          <div className="border-b px-6 py-4">
+            <Field className="max-w-md">
               <FieldLabel htmlFor="entry-agent">Agent</FieldLabel>
               <Select
                 items={agentItems}
                 value={agentId || null}
-                onValueChange={(value) => {
-                  if (!value) return;
-                  setAgentId(value);
-                  setRunId(NONE);
-                }}
+                onValueChange={(value) => value && setAgentId(value)}
               >
                 <SelectTrigger id="entry-agent" className="w-full">
                   <SelectValue placeholder="Choose an agent" />
@@ -137,51 +116,22 @@ export function SuiteEntryDialog({
                 </SelectContent>
               </Select>
             </Field>
-            <Field>
-              <FieldLabel htmlFor="entry-copy">Copy a run</FieldLabel>
-              <Select
-                items={runItems}
-                value={runId}
-                disabled={!agentId}
-                onValueChange={(value) => value && setRunId(value)}
-              >
-                <SelectTrigger id="entry-copy" className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    {runItems.map((item) => (
-                      <SelectItem key={item.value} value={item.value}>
-                        {item.label}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-              <FieldDescription>
-                {runId === NONE
-                  ? "Fills the form from a run of this agent."
-                  : "The form is a copy of this run. The suite does not use the results of the run."}
-              </FieldDescription>
-            </Field>
           </div>
         )}
-        {agent === undefined || waitingForCopy ? (
+        {agent === undefined ? (
           <p className="px-6 py-5 text-s-400 text-muted-foreground">
             {agents.isError
               ? `Could not load the agents: ${agents.error.message}`
-              : copied.isError
-                ? `Could not load the run: ${copied.error.message}`
-                : agentId || waitingForCopy
-                  ? "Loading"
-                  : "Choose the agent to test."}
+              : agentId
+                ? "Loading"
+                : "Choose the agent to test."}
           </p>
         ) : (
           <EntryForm
-            key={`${agent.id}|${runId}`}
+            key={agent.id}
             agent={agent}
             entry={entry}
-            copied={runId === NONE ? undefined : copied.data}
+            copied={copyRun}
             pending={save.isPending}
             stale={stale}
             error={stale ? SUITE_CHANGED : save.error?.message}
@@ -255,7 +205,7 @@ function EntryForm({
       : entry && Array.isArray(entry.scenarios)
         ? entry.scenarios
         : [];
-    const cards = cardsFrom(items, live, known, copied?.names);
+    const cards = cardsFrom(items, live, known);
     setup.setRows(cards.rows);
     if (copied) setLost(cards.lost);
   }

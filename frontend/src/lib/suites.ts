@@ -1,10 +1,10 @@
+import { counted } from "@/lib/format";
 import type { Row, SetupStart } from "@/lib/run-setup";
 import type {
   AgentSummary,
   AnsweredBy,
   Persona,
   Run,
-  RunNames,
   RunScenario,
   Scenario,
   SuiteEntry,
@@ -12,37 +12,31 @@ import type {
 } from "@/lib/types";
 
 /** The cards of saved or copied scenarios. A scenario, persona or data set that is gone is left
- * out, and with `names`, the run's names, each one is named in `lost`. A scenario that lost its
- * last persona or data set keeps an empty list: the form marks it, and the user fixes it. An
- * empty list never becomes null, which means the scenario's own persona or all data sets. */
+ * out, and `lost` counts each kind, such as "1 scenario". A scenario that lost its last persona or
+ * data set keeps an empty list: the form marks it, and the user fixes it. An empty list never
+ * becomes null, which means the scenario's own persona or all data sets. */
 export function cardsFrom(
   items: RunScenario[],
   scenarios: Scenario[],
   personas: Persona[],
-  names?: RunNames,
 ): { rows: Row[]; lost: string[] } {
   const live = new Map(scenarios.map((scenario) => [scenario.id, scenario]));
   const known = new Set(personas.map((persona) => persona.id));
   const rows: Row[] = [];
-  const lost = new Set<string>();
+  let goneScenarios = 0;
+  let goneDataSets = 0;
+  const gonePersonas = new Set<string>();
   for (const item of items) {
     const scenario = live.get(item.scenario_id);
-    const scenarioName = names?.scenarios[item.scenario_id] ?? scenario?.name ?? "";
     if (!scenario) {
-      lost.add(`the scenario "${scenarioName}"`);
+      goneScenarios += 1;
       continue;
     }
     const personaIds = item.persona_ids ?? [scenario.persona_id];
-    for (const id of personaIds.filter((id) => !known.has(id))) {
-      lost.add(`the persona "${names?.personas[id] ?? ""}"`);
-    }
+    for (const id of personaIds.filter((id) => !known.has(id))) gonePersonas.add(id);
     const dataSets = scenario.data_sets.map((dataSet) => dataSet.id ?? "");
     const wanted = item.data_set_ids ?? dataSets;
-    for (const id of wanted.filter((id) => !dataSets.includes(id))) {
-      lost.add(
-        `the data set "${names?.data_sets[item.scenario_id]?.[id] ?? ""}" of "${scenarioName}"`,
-      );
-    }
+    goneDataSets += wanted.filter((id) => !dataSets.includes(id)).length;
     rows.push({
       scenario,
       personaIds: personaIds.filter((id) => known.has(id)),
@@ -50,7 +44,12 @@ export function cardsFrom(
       answers: item.answered_by ?? ["caller"],
     });
   }
-  return { rows, lost: [...lost] };
+  const lost = [
+    goneScenarios > 0 && counted(goneScenarios, "scenario", "scenarios"),
+    gonePersonas.size > 0 && counted(gonePersonas.size, "persona", "personas"),
+    goneDataSets > 0 && counted(goneDataSets, "data set", "data sets"),
+  ].filter((part): part is string => Boolean(part));
+  return { rows, lost };
 }
 
 /** A copy of a run's settings. A run stores its time limit, turn limit and retries with the

@@ -27,10 +27,7 @@ To change an entry, click the menu at the end of its row, then click **Edit** or
 
 ## Copy a run into a suite
 
-You can make an entry from a run that you did before:
-
-- In the **Add agent** dialog, select the run in **Copy a run**.
-- On the page of the run, click **Add to suite**, and select the suite. Click **New suite** to make a new suite for the run.
+To make an entry from a run that you did before, open the page of the run and click **Add to suite**. Then select the suite, or click **New suite** to make a new suite for the run.
 
 The entry gets the agent, the connection, the scenarios, the personas, the data sets, the answers, the repeats and the limits of the run. It does not get the results of the run. If a scenario, a persona or a data set of the run was deleted, the dialog tells you, and the entry does not get it. If the agent no longer has the connection of the run, choose a different connection. If the voicemail and screener answers no longer apply, the dialog tells you, and the entry keeps only the caller.
 
@@ -46,7 +43,7 @@ Yaksh starts all runs of the suite run, or none of them. Each run uses the newes
 - An entry with **All scenarios** is for an agent that has no scenarios.
 - An entry has the voicemail or screener answer, and it is not a phone entry of an outbound agent.
 
-Each run must also keep the [limits of a run](/docs/configuration#settings). The suite run must keep the limits of a suite on the **Limits** tab of Settings: the number of entries (**Agents**, default 100) and the number of conversations of all its runs together (**Conversations**, default 20000). Retries do not count.
+Each run must also keep the [limits of a run](/docs/configuration#settings). A suite has at most 100 entries.
 
 Two suite runs of the same suite can be in progress at the same time. You cannot delete a suite while one of its suite runs has calls in progress. You can delete it while the judges are at work.
 
@@ -89,7 +86,6 @@ This command starts the suite run and waits until all of its runs stop. Then it 
 - `--idempotency-key` makes a repeated request safe. The same key for the same suite returns the first suite run. The same key for a different suite gets an error.
 - If you stop the command with Ctrl-C while the calls continue, the CLI cancels the suite run.
 - `yaksh suite wait <suite run id>` waits again. Stopping it does not cancel the suite run.
-- `yaksh suite cancel <suite run id>` cancels the suite run, and waits until its calls stop.
 - `yaksh suite list` shows the suites, with the result of the last suite run of each one.
 
 ## API
@@ -118,4 +114,4 @@ An entry has the fields of a run request, but not `name`. `transport` is necessa
 }
 ```
 
-A save refuses an ID that does not exist, a scenario of a different agent, and more entries than the maximum. A suite that has more entries than a lowered maximum can keep them, but it cannot get more. A save accepts an entry whose agent, scenario or persona was deleted, so that you can repair the other entries first. Each entry in `GET /api/v1/suites/<suite id>` has its `problems`.
+A save refuses an ID that does not exist, a scenario of a different agent, and more than 100 entries. A save accepts an entry whose agent, scenario or persona was deleted, so that you can repair the other entries first. Each entry in `GET /api/v1/suites/<suite id>` has its `problems`.

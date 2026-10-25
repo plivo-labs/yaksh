@@ -24,6 +24,8 @@ from yaksh.domain.runs import (
 SuiteName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=80)]
 PassPercent = Annotated[int, Field(ge=1, le=100)]
 """A whole percent, as the console shows it."""
+MAX_ENTRIES = 100
+"""Each run has its own most conversations, so this also bounds a suite run."""
 MARGIN = 1e-9
 """A pass rate is a float mean; a rate equal to the required percent passes."""
 
@@ -81,7 +83,7 @@ class SuiteUpdate(BaseModel):
     drop each other's changes."""
     name: SuiteName | None = None
     required_pass_percent: PassPercent | None = None
-    entries: list[SuiteEntry] | None = None
+    entries: Annotated[list[SuiteEntry], Field(max_length=MAX_ENTRIES)] | None = None
 
 
 class RunResult(StrEnum):

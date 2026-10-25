@@ -18,7 +18,7 @@ func (a *app) suiteCmd() *cobra.Command {
 		Use:   "suite",
 		Short: "Suites: saved lists of runs that start together and get one result, for CI",
 	}
-	suite.AddCommand(a.suiteListCmd(), a.suiteRunCmd(), a.suiteWaitCmd(), a.suiteCancelCmd())
+	suite.AddCommand(a.suiteListCmd(), a.suiteRunCmd(), a.suiteWaitCmd())
 	return suite
 }
 
@@ -200,45 +200,8 @@ func cancelSuiteAfterStop(ctx context.Context, c *api.Client, id uuid.UUID) erro
 	defer cancel()
 	if _, err := api.Body(c.CancelSuiteRunApiV1SuiteRunsSuiteRunIdCancelPost(ctx, id)); err != nil {
 		return &nextStep{fmt.Sprintf("stopped, but could not cancel suite run %s: %v", id, err),
-			"yaksh suite cancel " + id.String()}
+			"cancel it on its page in the console"}
 	}
 	return &nextStep{fmt.Sprintf("stopped: suite run %s is cancelled, and its calls on the line are ending", id),
 		"yaksh suite wait " + id.String()}
-}
-
-func (a *app) suiteCancelCmd() *cobra.Command {
-	return &cobra.Command{
-		Use:   "cancel <suite-run-id>",
-		Short: "Cancel every run of a suite run and wait until their calls on the line have ended",
-		Args:  cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			id, err := parseID("suite run", args[0])
-			if err != nil {
-				return err
-			}
-			c, err := a.client()
-			if err != nil {
-				return err
-			}
-			if _, err := api.Body(c.CancelSuiteRunApiV1SuiteRunsSuiteRunIdCancelPost(cmd.Context(), id)); err != nil {
-				return err
-			}
-			stderr := cmd.ErrOrStderr()
-			again := "yaksh suite cancel " + id.String()
-			r, err := wait.Suite(cmd.Context(), c, id, wait.Options{
-				Interval: a.pollInterval, Progress: stderr, Live: isTerminal(stderr),
-			}, wait.SuiteResult.Stopped)
-			switch {
-			case errors.Is(err, context.Canceled):
-				return &nextStep{"stopped waiting; the cancel was sent", again}
-			case err != nil:
-				return &nextStep{fmt.Sprintf("could not read suite run %s (%s); the cancel was sent", id, describe(err)), again}
-			}
-			if err := printJSON(cmd.OutOrStdout(), r.Body); err != nil {
-				return err
-			}
-			fmt.Fprintln(stderr, r.Summary())
-			return nil
-		},
-	}
 }

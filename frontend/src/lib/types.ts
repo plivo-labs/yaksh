@@ -1057,15 +1057,6 @@ export interface RunScenario {
 
 export interface Run extends RunSummary {
   scenarios: RunScenario[];
-  names: RunNames;
-}
-
-/** The names of what a run played. A scenario or persona deleted since keeps its name; a data
- * set keeps the name it had at the start, by scenario. */
-export interface RunNames {
-  scenarios: Record<string, string>;
-  personas: Record<string, string>;
-  data_sets: Record<string, Record<string, string>>;
 }
 
 export interface SuiteRunLink {
@@ -1710,8 +1701,6 @@ export interface SettingsValues {
     max_run_retries: number;
     max_run_start_interval_s: number;
     max_scenario_data_sets: number;
-    max_suite_entries: number;
-    max_suite_run_conversations: number;
   };
 }
 

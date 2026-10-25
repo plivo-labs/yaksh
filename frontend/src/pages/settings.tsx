@@ -552,27 +552,6 @@ function Form({
               onValueChange={(value) => change("limits", "max_scenario_data_sets", value)}
             />
           </Panel>
-          <Panel>
-            <PanelHeader title="Maximums for a suite" />
-            <NumberRow
-              id="max-suite-entries"
-              label="Agents"
-              help="Entries of one suite. A suite over a lowered maximum can drop entries, not add them."
-              min={1}
-              max={1000}
-              value={draft.limits.max_suite_entries}
-              onValueChange={(value) => change("limits", "max_suite_entries", value)}
-            />
-            <NumberRow
-              id="max-suite-conversations"
-              label="Conversations"
-              help="All runs of one suite run together. Retries do not count. A start checks it."
-              min={1}
-              max={1000000}
-              value={draft.limits.max_suite_run_conversations}
-              onValueChange={(value) => change("limits", "max_suite_run_conversations", value)}
-            />
-          </Panel>
         </TabsContent>
       </Tabs>
       <p className="text-xs-400 text-muted-foreground">

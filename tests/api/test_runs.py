@@ -131,14 +131,6 @@ async def test_a_run_starts_each_repeat_of_every_scenario_in_order_with_its_pers
             "answered_by": ["caller"],
         },
     ]
-    assert detail["names"] == {
-        "scenarios": {second["id"]: "Cancel a cleaning", first["id"]: "Reschedule a cleaning"},
-        "personas": {hurried: "Hurried caller", calm: "Calm caller"},
-        "data_sets": {
-            second["id"]: {only(second): "Data set 1"},
-            first["id"]: {only(first): "Data set 1"},
-        },
-    }
     assert detail["median_talk_ms"] is None
 
 
