@@ -13,37 +13,47 @@ function isMuted(listen: Listen, index: number, count: number): boolean {
 
 /** A live call as it plays: the same lanes as the recording, filling from the left, with the
  * played part darker. */
-export function LiveWaveform({ view }: { view: LiveView }) {
+export function LiveWaveform({ view, compact = false }: { view: LiveView; compact?: boolean }) {
   const { lanes, span, played } = view;
   const fraction = played / span;
   return (
-    <div className="grid gap-3">
-      <div className="grid grid-cols-[3rem_minmax(0,1fr)] gap-x-2">
-        <div className="grid content-start gap-2 pt-5 text-xs-400 text-muted-foreground">
-          {LANES.map((lane) => (
-            <span key={lane} className="flex h-10 items-center">
-              {lane}
-            </span>
-          ))}
-        </div>
-        <div
-          role="img"
-          aria-label={`Live audio of the call, ${clock(played * 1000)} heard`}
-          className="relative"
-          style={{ height: waveformHeight(lanes.length) }}
-        >
-          <Tile
-            index={0}
-            zoom={1}
-            lanes={lanes}
-            duration={span}
-            listen="both"
-            played={fraction * 100}
-          />
-          <Playhead fraction={fraction} />
-        </div>
+    <div className="grid grid-cols-[3rem_minmax(0,1fr)] gap-x-2">
+      <LaneNames count={lanes.length} compact={compact} />
+      <div
+        role="img"
+        aria-label={`Live audio of the call, ${clock(played * 1000)} heard`}
+        className="relative"
+        style={{ height: waveformHeight(lanes.length, compact) }}
+      >
+        <Tile
+          index={0}
+          zoom={1}
+          lanes={lanes}
+          duration={span}
+          listen="both"
+          played={fraction * 100}
+          compact={compact}
+        />
+        <Playhead fraction={fraction} />
       </div>
-      <p className="text-p-400 text-muted-foreground tabular-nums">Live, {clock(played * 1000)}</p>
+    </div>
+  );
+}
+
+/** The name of each lane, beside the waveform. */
+export function LaneNames({ count, compact }: { count: number; compact: boolean }) {
+  return (
+    <div
+      className={cn(
+        "grid content-start text-muted-foreground",
+        compact ? "gap-1 text-xxs-400" : "gap-2 pt-5 text-xs-400",
+      )}
+    >
+      {Array.from({ length: count }, (_, index) => (
+        <span key={index} className={cn("flex items-center", compact ? "h-4" : "h-10")}>
+          {count > 1 ? LANES[index] : "Call"}
+        </span>
+      ))}
     </div>
   );
 }
@@ -59,8 +69,9 @@ export function Playhead({ fraction }: { fraction: number }) {
   );
 }
 
-/** One view-width slice of the timeline: its ruler and every lane. Only the slices around the
- * view are mounted, so a long call at a deep zoom stays light. */
+/** One view-width slice of the timeline: its ruler and every lane, or in the small player the
+ * lanes only. Only the slices around the view are mounted, so a long call at a deep zoom stays
+ * light. */
 export const Tile = memo(function Tile({
   index,
   zoom,
@@ -68,6 +79,7 @@ export const Tile = memo(function Tile({
   duration,
   listen,
   played,
+  compact,
 }: {
   index: number;
   zoom: number;
@@ -75,6 +87,7 @@ export const Tile = memo(function Tile({
   duration: number;
   listen: Listen;
   played: number;
+  compact: boolean;
 }) {
   const peaks = useMemo(
     () =>
@@ -98,21 +111,23 @@ export const Tile = memo(function Tile({
       className="absolute inset-y-0"
       style={{ left: `${(index / zoom) * 100}%`, width: `${100 / zoom}%` }}
     >
-      <div className="relative h-5">
-        {ticks.map((tick) => (
-          <span
-            key={tick}
-            className="absolute top-0 h-full border-l pl-1 text-xxs-400 leading-4 text-muted-foreground tabular-nums"
-            style={{ left: `${((tick - index * span) / span) * 100}%` }}
-          >
-            {stamp(tick)}
-          </span>
-        ))}
-      </div>
+      {!compact && (
+        <div className="relative h-5">
+          {ticks.map((tick) => (
+            <span
+              key={tick}
+              className="absolute top-0 h-full border-l pl-1 text-xxs-400 leading-4 text-muted-foreground tabular-nums"
+              style={{ left: `${((tick - index * span) / span) * 100}%` }}
+            >
+              {stamp(tick)}
+            </span>
+          ))}
+        </div>
+      )}
       <div className="relative">
-        <Lanes peaks={peaks} listen={listen} className="opacity-30" />
+        <Lanes peaks={peaks} listen={listen} compact={compact} className="opacity-30" />
         <div className="absolute inset-0" style={{ clipPath: `inset(0 ${100 - played}% 0 0)` }}>
-          <Lanes peaks={peaks} listen={listen} />
+          <Lanes peaks={peaks} listen={listen} compact={compact} />
         </div>
       </div>
     </div>
@@ -130,20 +145,19 @@ function bars(lane: number[]): string {
     .join("");
 }
 
-export const Lanes = memo(function Lanes({
+const Lanes = memo(function Lanes({
   peaks,
   listen,
+  compact,
   className,
-  lane: laneHeight = "h-10",
 }: {
   peaks: number[][];
   listen: Listen;
+  compact: boolean;
   className?: string;
-  /** The height class of each lane. */
-  lane?: string;
 }) {
   return (
-    <div className={cn("grid gap-2", className)}>
+    <div className={cn("grid", compact ? "gap-1" : "gap-2", className)}>
       {peaks.map((lane, index) => (
         <svg
           key={index}
@@ -152,7 +166,7 @@ export const Lanes = memo(function Lanes({
           aria-hidden
           className={cn(
             "w-full fill-current transition-opacity duration-150",
-            laneHeight,
+            compact ? "h-4" : "h-10",
             index === 0 ? "text-foreground" : "text-chart-1",
             isMuted(listen, index, peaks.length) && "opacity-30",
           )}
