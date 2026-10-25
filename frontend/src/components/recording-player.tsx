@@ -12,19 +12,18 @@ import {
 } from "lucide-react";
 import {
   type KeyboardEvent,
-  memo,
   type PointerEvent,
   type ReactElement,
   type ReactNode,
   type Ref,
   useCallback,
+  useEffect,
   useImperativeHandle,
   useLayoutEffect,
-  useMemo,
   useRef,
   useState,
 } from "react";
-import { flushSync } from "react-dom";
+import { createPortal, flushSync } from "react-dom";
 
 import { Segmented } from "@/components/segmented";
 import { Button } from "@/components/ui/button";
@@ -32,29 +31,21 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Skeleton } from "@/components/ui/skeleton";
 import { Slider } from "@/components/ui/slider";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { LaneNames, Playhead, Tile } from "@/components/waveform";
 import { useObjectUrl } from "@/hooks/use-object-url";
 import { copyText } from "@/lib/clipboard";
-import type { LiveView } from "@/lib/listen";
-import { clock, stamp } from "@/lib/format";
+import { clock } from "@/lib/format";
 import { type Recording, useRecording } from "@/lib/queries";
 import { cn } from "@/lib/utils";
+import { BARS, LANES, type Listen, RULER_PX, waveformHeight } from "@/lib/waveform";
 
 const RATES = [0.75, 1, 1.25, 1.5, 2, 3];
 const STEP_S = 5;
-const LANES = ["Agent", "Caller"] as const;
-/** Bars across one view width of waveform, at every zoom. */
-const BARS = 480;
-const TICK_STEPS_S = [1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 900, 1800];
-/** Heights of the ruler, each lane and the gap between lanes; they match h-5, h-10 and gap-2. */
-const RULER_PX = 20;
-const LANE_PX = 40;
-const GAP_PX = 8;
 /** Room under the waveform for a scrollbar, so the controls stay put when one appears. */
 const SCROLLBAR_PX = 14;
 /** Wheel or pinch travel, in pixels, for one zoom step. */
 const WHEEL_STEP = 60;
 
-type Listen = "both" | "agent" | "caller";
 type Output = "mono" | "stereo";
 
 const PREFERENCES_KEY = "yaksh.player";
@@ -122,64 +113,6 @@ function build(element: HTMLAudioElement, channelCount: number): Graph {
   return { context, channels, merger, volume };
 }
 
-function isMuted(listen: Listen, index: number, count: number): boolean {
-  return count > 1 && listen !== "both" && LANES[index].toLowerCase() !== listen;
-}
-
-/** The peak of each of BARS equal slices of a lane between two 10 ms buckets. */
-function slice(lane: Float32Array, from: number, to: number): number[] {
-  const per = (to - from) / BARS;
-  return Array.from({ length: BARS }, (_, bar) => {
-    const start = Math.floor(from + bar * per);
-    const end = Math.max(start + 1, Math.floor(from + (bar + 1) * per));
-    let peak = 0;
-    for (let i = start; i < Math.min(end, lane.length); i++) peak = Math.max(peak, lane[i]);
-    return peak;
-  });
-}
-
-/** A live call as it plays: the same lanes as the recording, filling from the left, with the
- * played part darker. */
-export function LiveWaveform({ view }: { view: LiveView }) {
-  const { lanes, span, played } = view;
-  const contentPx = RULER_PX + lanes.length * LANE_PX + (lanes.length - 1) * GAP_PX;
-  const fraction = played / span;
-  return (
-    <div className="grid gap-3">
-      <div className="grid grid-cols-[3rem_minmax(0,1fr)] gap-x-2">
-        <div className="grid content-start gap-2 pt-5 text-xs-400 text-muted-foreground">
-          {LANES.map((lane) => (
-            <span key={lane} className="flex h-10 items-center">
-              {lane}
-            </span>
-          ))}
-        </div>
-        <div
-          role="img"
-          aria-label={`Live audio of the call, ${clock(played * 1000)} heard`}
-          className="relative"
-          style={{ height: contentPx }}
-        >
-          <Tile
-            index={0}
-            zoom={1}
-            lanes={lanes}
-            duration={span}
-            listen="both"
-            played={fraction * 100}
-          />
-          <span
-            aria-hidden
-            className="pointer-events-none absolute inset-y-0 w-px bg-foreground/70"
-            style={{ left: `${fraction * 100}%` }}
-          />
-        </div>
-      </div>
-      <p className="text-p-400 text-muted-foreground tabular-nums">Live, {clock(played * 1000)}</p>
-    </div>
-  );
-}
-
 /** What a page can ask of a loaded recording. */
 export interface PlayerHandle {
   /** Plays from that second of the recording. */
@@ -215,6 +148,8 @@ export function RecordingPlayer({
   ref,
   onTime,
   marks = [],
+  compact = false,
+  trailing,
 }: {
   url: string | null;
   name: string;
@@ -223,6 +158,11 @@ export function RecordingPlayer({
   /** Hears where playback is, a few times a second and on each seek. */
   onTime?: (seconds: number) => void;
   marks?: Mark[];
+  /** Short lanes with no ruler, so the page keeps more room for the transcript. The playback
+   * goes on when this changes. */
+  compact?: boolean;
+  /** A control at the end of the control row, such as the page's Expand. */
+  trailing?: ReactNode;
 }) {
   const recording = useRecording(url);
   if (url === null) {
@@ -231,7 +171,7 @@ export function RecordingPlayer({
   if (recording.isError) {
     return <p className="text-p-400 text-destructive">The recording did not load.</p>;
   }
-  if (recording.isPending) return <Skeleton className="h-40 w-full" />;
+  if (recording.isPending) return <Skeleton className={cn("w-full", compact ? "h-18" : "h-40")} />;
   return (
     <Player
       key={url}
@@ -241,6 +181,8 @@ export function RecordingPlayer({
       ref={ref}
       onTime={onTime}
       marks={marks}
+      compact={compact}
+      trailing={trailing}
     />
   );
 }
@@ -252,6 +194,8 @@ function Player({
   ref,
   onTime,
   marks,
+  compact,
+  trailing,
 }: {
   recording: Recording;
   name: string;
@@ -259,15 +203,18 @@ function Player({
   ref?: Ref<PlayerHandle>;
   onTime?: (seconds: number) => void;
   marks: Mark[];
+  compact: boolean;
+  trailing?: ReactNode;
 }) {
   const { duration, lanes } = recording;
   const src = useObjectUrl(recording.blob);
   const stereo = lanes.length > 1;
   const maxZoom = 2 ** Math.max(0, Math.floor(Math.log2(lanes[0].length / BARS)));
-  const contentPx = RULER_PX + lanes.length * LANE_PX + (lanes.length - 1) * GAP_PX;
+  const contentPx = waveformHeight(lanes.length, compact);
 
   const audio = useRef<HTMLAudioElement | null>(null);
   const graph = useRef<Graph | null>(null);
+  const [menu, setMenu] = useState<"volume" | "playback" | null>(null);
   const viewport = useRef<HTMLDivElement | null>(null);
   const frame = useRef(0);
   const scrub = useRef<{ resume: boolean } | null>(null);
@@ -281,9 +228,30 @@ function Player({
   const [listen, setListen] = useState<Listen>("both");
   const [output, setOutput] = useState<Output>(initial.output);
   const [volume, setVolume] = useState(initial.volume);
-  const [hover, setHover] = useState<{ fraction: number; mark?: Mark } | null>(null);
-  const [shift, setShift] = useState(0);
-  const hint = useRef<HTMLSpanElement | null>(null);
+  /** Where the pointer is on the timeline, and where the hover time goes on the screen: at the
+   * pointer, along the top of the view, which spans `left` to `right`. */
+  const [hover, setHover] = useState<Hover | null>(null);
+  const hovering = hover !== null;
+  // The hover time has a fixed place on the screen and the time under the pointer: a scroll that
+  // moves the waveform, its own included, or a new window size makes both wrong, so it hides.
+  useEffect(() => {
+    const view = viewport.current;
+    if (!hovering || !view) return;
+    const hide = (event: Event) => {
+      if (
+        event.type === "resize" ||
+        (event.target instanceof Node && event.target.contains(view))
+      ) {
+        setHover(null);
+      }
+    };
+    window.addEventListener("scroll", hide, { capture: true, passive: true });
+    window.addEventListener("resize", hide);
+    return () => {
+      window.removeEventListener("scroll", hide, { capture: true });
+      window.removeEventListener("resize", hide);
+    };
+  }, [hovering]);
   const [zoom, setZoom] = useState(1);
   const [first, setFirst] = useState(0);
 
@@ -413,15 +381,21 @@ function Player({
       (best, mark) => (best && distance(best) <= distance(mark) ? best : mark),
       undefined,
     );
-    setHover({
-      fraction,
-      mark: nearest && distance(nearest) <= MARK_REACH_PX ? nearest : undefined,
-    });
+    const view = viewport.current;
+    const box = view?.getBoundingClientRect();
+    if (box) {
+      setHover({
+        fraction,
+        mark: nearest && distance(nearest) <= MARK_REACH_PX ? nearest : undefined,
+        x: Math.min(Math.max(event.clientX, box.left), box.right),
+        top: box.top,
+        left: box.left,
+        right: box.right,
+      });
+    }
     if (!scrub.current) return;
     seek(fraction * duration);
     // Dragging past either edge of a zoomed view scrolls it along.
-    const view = viewport.current;
-    const box = view?.getBoundingClientRect();
     if (view && box && event.clientX > box.right) view.scrollLeft += event.clientX - box.right;
     else if (view && box && event.clientX < box.left) view.scrollLeft -= box.left - event.clientX;
   };
@@ -436,7 +410,9 @@ function Player({
   const key = (event: KeyboardEvent<HTMLDivElement>) => {
     const actions: Record<string, () => void> = {
       ArrowRight: () => seek(time + STEP_S, true),
+      ArrowUp: () => seek(time + STEP_S, true),
       ArrowLeft: () => seek(time - STEP_S, true),
+      ArrowDown: () => seek(time - STEP_S, true),
       Home: () => seek(0, true),
       End: () => seek(duration, true),
       " ": toggle,
@@ -475,17 +451,6 @@ function Player({
     void copyText(link.toString(), `Link to ${clock(Math.floor(time) * 1000)} copied`);
   };
 
-  // The hover time sits centred on the pointer, and moves inward where an edge of the view
-  // would cut it off.
-  useLayoutEffect(() => {
-    const view = viewport.current;
-    const label = hint.current;
-    if (!hover || !view || !label) return;
-    const x = hover.fraction * view.scrollWidth - view.scrollLeft;
-    const width = label.offsetWidth;
-    setShift(Math.max(-x, Math.min(-width / 2, view.clientWidth - x - width)));
-  }, [hover]);
-
   const fraction = duration > 0 ? time / duration : 0;
   const tiles: number[] = [];
   for (let index = Math.max(0, first - 1); index <= Math.min(zoom - 1, first + 2); index++) {
@@ -493,7 +458,12 @@ function Player({
   }
 
   return (
-    <div className="grid gap-3 transition-opacity duration-200 ease-out starting:opacity-0">
+    <div
+      className={cn(
+        "grid grid-cols-1 transition-opacity duration-200 ease-out starting:opacity-0",
+        compact ? "gap-1.5" : "gap-3",
+      )}
+    >
       <audio
         ref={attachAudio}
         src={src}
@@ -515,21 +485,20 @@ function Player({
         onTimeUpdate={(event) => onTime?.(event.currentTarget.currentTime)}
       />
       <div className="grid grid-cols-[3rem_minmax(0,1fr)] gap-x-2">
-        <div className="grid content-start gap-2 pt-5 text-xs-400 text-muted-foreground">
-          {lanes.map((_, index) => (
-            <span key={index} className="flex h-10 items-center">
-              {stereo ? LANES[index] : "Call"}
-            </span>
-          ))}
-        </div>
+        <LaneNames count={lanes.length} compact={compact} />
         <div
           ref={attachViewport}
           tabIndex={-1}
           onScroll={(event) =>
             setFirst(Math.floor(event.currentTarget.scrollLeft / event.currentTarget.clientWidth))
           }
-          className="overflow-x-auto overflow-y-hidden [scrollbar-width:thin]"
-          style={{ height: contentPx + SCROLLBAR_PX }}
+          className={cn(
+            "overflow-x-auto overflow-y-hidden",
+            // The small player has no room for a scrollbar: a zoomed view follows the playback,
+            // and a sideways scroll or a drag past an edge moves it.
+            compact ? "[scrollbar-width:none]" : "[scrollbar-width:thin]",
+          )}
+          style={{ height: contentPx + (compact ? 0 : SCROLLBAR_PX) }}
         >
           <div
             role="slider"
@@ -557,59 +526,30 @@ function Player({
                 duration={duration}
                 listen={listen}
                 played={Math.min(Math.max(fraction * zoom - index, 0), 1) * 100}
+                compact={compact}
               />
             ))}
             {marks.map((mark) => (
-              <span
+              <MarkBand
                 key={`${mark.from}-${mark.to}`}
-                aria-hidden
-                className="pointer-events-none absolute inset-y-0"
-                style={{
-                  left: `${(mark.from / duration) * 100}%`,
-                  width: `${(Math.max(mark.to - mark.from, 0) / duration) * 100}%`,
-                }}
-              >
-                <span
-                  className={cn("absolute inset-x-0 bottom-0", mark.fill)}
-                  style={{ top: RULER_PX }}
-                />
-                <span
-                  className={cn(
-                    "absolute top-0.5 left-1/2 rounded-sm bg-card px-0.5 text-xxs-600 whitespace-nowrap tabular-nums",
-                    mark.text,
-                  )}
-                  style={{ translate: inside((mark.from + mark.to) / 2 / duration) }}
-                >
-                  {mark.label}
-                </span>
-              </span>
+                mark={mark}
+                duration={duration}
+                compact={compact}
+              />
             ))}
             {hover && (
               <span
                 aria-hidden
-                className="pointer-events-none absolute inset-y-0"
+                className="pointer-events-none absolute inset-y-0 w-px bg-foreground/25"
                 style={{ left: `${hover.fraction * 100}%` }}
-              >
-                <span className="absolute inset-y-0 left-0 w-px bg-foreground/25" />
-                <span
-                  ref={hint}
-                  className="absolute top-0 left-0 z-10 rounded-sm bg-popover px-1.5 py-0.5 text-xxs-600 whitespace-nowrap tabular-nums shadow-1 ring-1 ring-border"
-                  style={{ translate: `${shift}px` }}
-                >
-                  {clock(hover.fraction * duration * 1000)}
-                  {hover.mark && ` · ${hover.mark.title}`}
-                </span>
-              </span>
+              />
             )}
-            <span
-              aria-hidden
-              className="pointer-events-none absolute inset-y-0 w-px bg-foreground/70"
-              style={{ left: `${fraction * 100}%` }}
-            />
+            <Playhead fraction={fraction} />
           </div>
         </div>
       </div>
-      <div className="flex items-center gap-1">
+      {hover && <HoverTime hover={hover} duration={duration} compact={compact} />}
+      <div className="flex flex-wrap items-center gap-1">
         <Button size="icon-sm" aria-label={playing ? "Pause" : "Play"} onClick={toggle}>
           {playing ? <Pause /> : <Play />}
         </Button>
@@ -617,7 +557,7 @@ function Player({
           {clock(time * 1000)}
           <span className="text-muted-foreground"> / {clock(duration * 1000)}</span>
         </span>
-        <div className="ml-auto flex items-center gap-1">
+        <div className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-1">
           {maxZoom > 1 && (
             <>
               <Hint
@@ -667,7 +607,10 @@ function Player({
               <Divider />
             </>
           )}
-          <Popover>
+          <Popover
+            open={menu === "volume"}
+            onOpenChange={(open) => setMenu(open ? "volume" : null)}
+          >
             <Hint
               label="Volume"
               shortcut="M"
@@ -735,7 +678,10 @@ function Player({
           >
             <Download />
           </Hint>
-          <Popover>
+          <Popover
+            open={menu === "playback"}
+            onOpenChange={(open) => setMenu(open ? "playback" : null)}
+          >
             <PopoverTrigger
               render={<Button variant="ghost" size="sm" aria-label="Playback settings" />}
             >
@@ -774,100 +720,95 @@ function Player({
               />
             </PopoverContent>
           </Popover>
+          {trailing && (
+            <>
+              <Divider />
+              {trailing}
+            </>
+          )}
         </div>
       </div>
     </div>
   );
 }
 
-/** One view-width slice of the timeline: its ruler and every lane. Only the slices around the
- * view are mounted, so a long call at a deep zoom stays light. */
-const Tile = memo(function Tile({
-  index,
-  zoom,
-  lanes,
-  duration,
-  listen,
-  played,
-}: {
-  index: number;
-  zoom: number;
-  lanes: Float32Array[];
-  duration: number;
-  listen: Listen;
-  played: number;
-}) {
-  const peaks = useMemo(
-    () =>
-      lanes.map((lane) =>
-        slice(lane, (index * lane.length) / zoom, ((index + 1) * lane.length) / zoom),
-      ),
-    [lanes, index, zoom],
-  );
-  const span = duration / zoom;
-  const step =
-    TICK_STEPS_S.find((candidate) => candidate >= span / 8) ??
-    TICK_STEPS_S[TICK_STEPS_S.length - 1];
-  // A tick too close to the end of the call has no room for its label.
-  const last = Math.min((index + 1) * span, duration - span * 0.04);
-  const ticks: number[] = [];
-  for (let tick = Math.ceil((index * span) / step) * step; tick < last; tick += step) {
-    ticks.push(tick);
-  }
+/** A mark on the waveform: its band, and in the full player its label on the ruler. */
+function MarkBand({ mark, duration, compact }: { mark: Mark; duration: number; compact: boolean }) {
   return (
-    <div
-      className="absolute inset-y-0"
-      style={{ left: `${(index / zoom) * 100}%`, width: `${100 / zoom}%` }}
+    <span
+      aria-hidden
+      className="pointer-events-none absolute inset-y-0"
+      style={{
+        left: `${(mark.from / duration) * 100}%`,
+        width: `${(Math.max(mark.to - mark.from, 0) / duration) * 100}%`,
+      }}
     >
-      <div className="relative h-5">
-        {ticks.map((tick) => (
-          <span
-            key={tick}
-            className="absolute top-0 h-full border-l pl-1 text-xxs-400 leading-4 text-muted-foreground tabular-nums"
-            style={{ left: `${((tick - index * span) / span) * 100}%` }}
-          >
-            {stamp(tick)}
-          </span>
-        ))}
-      </div>
-      <div className="relative">
-        <Lanes peaks={peaks} listen={listen} className="opacity-30" />
-        <div className="absolute inset-0" style={{ clipPath: `inset(0 ${100 - played}% 0 0)` }}>
-          <Lanes peaks={peaks} listen={listen} />
-        </div>
-      </div>
-    </div>
-  );
-});
-
-const Lanes = memo(function Lanes({
-  peaks,
-  listen,
-  className = "",
-}: {
-  peaks: number[][];
-  listen: Listen;
-  className?: string;
-}) {
-  return (
-    <div className={`grid gap-2 ${className}`}>
-      {peaks.map((lane, index) => (
-        <svg
-          key={index}
-          viewBox={`0 0 ${lane.length} 2`}
-          preserveAspectRatio="none"
-          aria-hidden
-          className={`h-10 w-full fill-current transition-opacity duration-150 ${index === 0 ? "text-foreground" : "text-chart-1"} ${isMuted(listen, index, peaks.length) ? "opacity-30" : ""}`}
+      <span
+        className={cn("absolute inset-x-0 bottom-0", mark.fill)}
+        style={{ top: compact ? 0 : RULER_PX }}
+      />
+      {!compact && (
+        <span
+          className={cn(
+            "absolute top-0.5 left-1/2 rounded-sm bg-card px-0.5 text-xxs-600 whitespace-nowrap tabular-nums",
+            mark.text,
+          )}
+          style={{ translate: inside((mark.from + mark.to) / 2 / duration) }}
         >
-          {lane.map((peak, bar) => {
-            const height = Math.max(peak, 0.02);
-            return <rect key={bar} x={bar + 0.15} width={0.7} y={1 - height} height={height * 2} />;
-          })}
-        </svg>
-      ))}
-    </div>
+          {mark.label}
+        </span>
+      )}
+    </span>
   );
-});
+}
+
+/** Where the pointer is on the timeline, and the top of the view and its two ends on the screen. */
+interface Hover {
+  fraction: number;
+  mark?: Mark;
+  x: number;
+  top: number;
+  left: number;
+  right: number;
+}
+
+/** The time under the pointer, and the mark there. It is drawn over the page, so a panel's edge
+ * does not cut it off: centred on the pointer along the top of the view and moved inward where
+ * an end of the view would cut it off. The small player has no ruler to cover, so there the time
+ * sits above the lanes. */
+function HoverTime({
+  hover,
+  duration,
+  compact,
+}: {
+  hover: Hover;
+  duration: number;
+  compact: boolean;
+}) {
+  const label = useRef<HTMLSpanElement | null>(null);
+  const [shift, setShift] = useState(0);
+  useLayoutEffect(() => {
+    const width = label.current?.offsetWidth;
+    if (width === undefined) return;
+    setShift(Math.max(hover.left - hover.x, Math.min(-width / 2, hover.right - hover.x - width)));
+  }, [hover]);
+  return createPortal(
+    <span
+      ref={label}
+      aria-hidden
+      className="pointer-events-none fixed z-40 rounded-sm bg-popover px-1.5 py-0.5 text-xxs-600 whitespace-nowrap tabular-nums shadow-1 ring-1 ring-border"
+      style={{
+        left: hover.x + shift,
+        top: hover.top,
+        translate: compact ? "0 calc(-100% - 6px)" : undefined,
+      }}
+    >
+      {clock(hover.fraction * duration * 1000)}
+      {hover.mark && ` · ${hover.mark.title}`}
+    </span>,
+    document.body,
+  );
+}
 
 function Hint({
   label,

@@ -1,6 +1,16 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { Copy } from "lucide-react";
-import { Fragment, type RefObject, useEffect, useRef, useState } from "react";
+import {
+  Fragment,
+  memo,
+  type RefObject,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useDefaultLayout } from "react-resizable-panels";
 import { Link, useParams, useSearchParams } from "react-router";
 
@@ -12,12 +22,7 @@ import { CallSounds } from "@/components/call-sounds";
 import { EndCallDialog } from "@/components/confirm-dialogs";
 import { CopyId } from "@/components/copy-id";
 import { Fact } from "@/components/panel";
-import {
-  LiveWaveform,
-  type Mark,
-  type PlayerHandle,
-  RecordingPlayer,
-} from "@/components/recording-player";
+import type { PlayerHandle } from "@/components/recording-player";
 import { ResponseTime } from "@/components/response-time";
 import { ConversationStatusLabel } from "@/components/status-label";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -48,32 +53,19 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
+import { AudioCard } from "@/components/audio-card";
 import {
   type CallMoment,
   answeredText,
   callMoments,
-  machineBand,
   machineSpeaker,
   playsScenario,
-  soundMs,
   voicemailFacts,
 } from "@/lib/answering";
 import { playedDataSet } from "@/lib/data-sets";
 import { copyText } from "@/lib/clipboard";
-import {
-  BAND_TEXT,
-  BAND_WASH,
-  clock,
-  duration,
-  surroundingsLabel,
-  phone,
-  responseBand,
-  seconds,
-  when,
-  words,
-} from "@/lib/format";
+import { clock, duration, surroundingsLabel, phone, when, words } from "@/lib/format";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { useLiveListen } from "@/hooks/use-live-listen";
 import { useStoredBoolean } from "@/hooks/use-stored-boolean";
 import { APPEAR, REVEAL, RISE } from "@/lib/motion";
 import { keys, useAgent, useConversation } from "@/lib/queries";
@@ -84,12 +76,10 @@ import { cn } from "@/lib/utils";
 import {
   END_REASON_LABELS,
   ACTIVE_STATUSES,
-  LIVE_STATUSES,
   type Conversation,
   type EvaluationState,
   type Fact as ScenarioFact,
   LANGUAGE_NAMES,
-  type Reply,
   type PlayedScenario,
   type Turn,
   WIRE_EVENT_HELP,
@@ -161,18 +151,21 @@ function ConversationView({ id }: { id: string }) {
               >
                 {agent.data?.name ?? data.agent_name}
               </Link>
-              , {data.persona_name}
+              , version {data.agent_version}, {data.persona_name}
               {playedDataSet(data) && ` · ${playedDataSet(data)}`}
             </p>
           </div>
-          <div className="flex items-center gap-4">
-            <ConversationStatusLabel status={data.status} />
-            {active && (
-              <Button variant="outline" size="sm" onClick={() => setEnding(true)}>
-                End
-              </Button>
-            )}
-            <EndCallDialog conversation={data} open={ending} onOpenChange={setEnding} />
+          <div className="grid justify-items-end gap-1">
+            <div className="flex items-center gap-4">
+              <ConversationStatusLabel status={data.status} />
+              {active && (
+                <Button variant="outline" size="sm" onClick={() => setEnding(true)}>
+                  End
+                </Button>
+              )}
+              <EndCallDialog conversation={data} open={ending} onOpenChange={setEnding} />
+            </div>
+            <ConversationIds conversation={data} />
           </div>
         </div>
         <ConversationFacts key={data.id} conversation={data} />
@@ -306,7 +299,7 @@ function ConversationFacts({ conversation }: { conversation: Conversation }) {
     ? voicemailFacts(conversation.transcript, conversation.wire_events)
     : null;
   return (
-    <dl className="flex flex-wrap gap-x-10 gap-y-3">
+    <dl className="flex flex-wrap gap-x-8 gap-y-3">
       {conversation.started_at && (
         <Fact className={arrived} label="Started">
           <span className="tabular-nums">{when(conversation.started_at)}</span>
@@ -347,14 +340,13 @@ function ConversationFacts({ conversation }: { conversation: Conversation }) {
           No caller turns
         </Fact>
       )}
-      {persona && latency?.p90_ms != null && (
-        <Fact className={arrived} label="Response p90">
-          <ResponseTime ms={latency.p90_ms} />
-        </Fact>
-      )}
-      {persona && latency?.p50_ms != null && (
-        <Fact className={arrived} label="Response p50">
-          <ResponseTime ms={latency.p50_ms} />
+      {persona && latency && (latency.p50_ms != null || latency.p90_ms != null) && (
+        <Fact className={arrived} label="Response p50 / p90">
+          <span className="flex items-center gap-1.5">
+            {latency.p50_ms != null ? <ResponseTime ms={latency.p50_ms} /> : "–"}
+            <span className="text-muted-foreground">/</span>
+            {latency.p90_ms != null ? <ResponseTime ms={latency.p90_ms} /> : "–"}
+          </span>
         </Fact>
       )}
       {persona && latency && (
@@ -369,50 +361,57 @@ function ConversationFacts({ conversation }: { conversation: Conversation }) {
         </Fact>
       )}
       <Fact className={arrived} label="Run">
-        <Link to={`/runs/${conversation.run_id}`} className="underline-offset-4 hover:underline">
-          Repeat {conversation.repeat}
-        </Link>
+        <span className="flex gap-3">
+          <Link to={`/runs/${conversation.run_id}`} className="underline-offset-4 hover:underline">
+            Repeat {conversation.repeat}
+          </Link>
+          {(conversation.retry_of || conversation.retried_as) && (
+            <span className="tabular-nums">Attempt {conversation.attempt}</span>
+          )}
+          {conversation.retry_of && (
+            <Link
+              to={`/conversations/${conversation.retry_of}`}
+              className="underline-offset-4 hover:underline"
+            >
+              Previous attempt
+            </Link>
+          )}
+          {conversation.retried_as && (
+            <Link
+              to={`/conversations/${conversation.retried_as}`}
+              className="underline-offset-4 hover:underline"
+            >
+              Next attempt
+            </Link>
+          )}
+        </span>
       </Fact>
-      {(conversation.retry_of || conversation.retried_as) && (
-        <Fact className={arrived} label="Attempt">
-          <span className="flex gap-3">
-            <span className="tabular-nums">{conversation.attempt}</span>
-            {conversation.retry_of && (
-              <Link
-                to={`/conversations/${conversation.retry_of}`}
-                className="underline-offset-4 hover:underline"
-              >
-                Previous attempt
-              </Link>
-            )}
-            {conversation.retried_as && (
-              <Link
-                to={`/conversations/${conversation.retried_as}`}
-                className="underline-offset-4 hover:underline"
-              >
-                Next attempt
-              </Link>
-            )}
-          </span>
-        </Fact>
-      )}
-      <Fact className={arrived} label="Agent version">
-        <span className="tabular-nums">{conversation.agent_version}</span>
-      </Fact>
-      <Fact label="Conversation id">
-        <CopyId id={conversation.id} label="conversation id" />
-      </Fact>
-      {conversation.call_uuid && (
-        <Fact label="Plivo call">
-          <CopyId id={conversation.call_uuid} label="Plivo call id" />
-        </Fact>
-      )}
-      {agentSession(conversation) && (
-        <Fact label="Agent session">
-          <CopyId id={agentSession(conversation) ?? ""} label="agent session id" />
-        </Fact>
-      )}
     </dl>
+  );
+}
+
+/** The ids to copy for the API, the CLI or a Plivo log search, in one quiet line. */
+function ConversationIds({ conversation }: { conversation: Conversation }) {
+  const session = agentSession(conversation);
+  return (
+    <div className="flex flex-wrap items-center justify-end gap-x-4 gap-y-1 text-xs-400 text-muted-foreground">
+      <span className="flex items-center gap-1.5">
+        Conversation
+        <CopyId id={conversation.id} label="conversation id" />
+      </span>
+      {conversation.call_uuid && (
+        <span className="flex items-center gap-1.5">
+          Plivo call
+          <CopyId id={conversation.call_uuid} label="Plivo call id" />
+        </span>
+      )}
+      {session && (
+        <span className="flex items-center gap-1.5">
+          Agent session
+          <CopyId id={session} label="agent session id" />
+        </span>
+      )}
+    </div>
   );
 }
 
@@ -424,152 +423,10 @@ const measuring: Record<EvaluationState | "none", string> = {
   none: "Not measured",
 };
 
-/** One reply as a band on the waveform: the wait in its colour, or the overlap of a talk-over. */
-function replyMark(reply: Reply, connectedMs: number): Mark {
-  const from = (Math.min(reply.start_ms, reply.speech_ms) - connectedMs) / 1000;
-  const to = (Math.max(reply.start_ms, reply.speech_ms) - connectedMs) / 1000;
-  if (reply.speech_ms < reply.start_ms) {
-    return {
-      from,
-      to,
-      label: "talked over",
-      title: `Agent started ${seconds(reply.start_ms - reply.speech_ms)} before the caller finished`,
-      fill: "bg-foreground/10",
-      text: "text-muted-foreground",
-    };
-  }
-  const wait = reply.speech_ms - reply.start_ms;
-  const band = responseBand(wait);
-  return {
-    from,
-    to,
-    label: seconds(wait),
-    title: `Agent answered after ${seconds(wait)}`,
-    fill: BAND_WASH[band],
-    text: BAND_TEXT[band],
-  };
-}
-
-const MACHINE_FILL: Record<string, { fill: string; text: string }> = {
-  line: { fill: "bg-status-neutral/15", text: "text-muted-foreground" },
-  tone: { fill: "bg-status-progress/15", text: "text-status-progress" },
-  hold: { fill: "bg-status-warning/15", text: "text-status-warning-text" },
-};
-
-/** The persona's phone on the waveform: each recorded line, the voicemail's tone and the
- * screener's hold. */
-function machineMarks(conversation: Conversation, connectedMs: number): Mark[] {
-  const at = (ms: number) => Math.max(0, ms - connectedMs) / 1000;
-  const end = conversation.talk_ms === null ? Infinity : conversation.talk_ms / 1000;
-  const lines = conversation.transcript.flatMap((turn): Mark[] =>
-    turn.machine
-      ? [
-          {
-            from: at(turn.started_at_ms),
-            to: at(turn.ended_at_ms),
-            label: machineBand(turn.machine),
-            title: `Recorded line of the ${machineSpeaker(turn.machine).toLowerCase()}`,
-            ...MACHINE_FILL.line,
-          },
-        ]
-      : [],
-  );
-  const sounds = conversation.wire_events.flatMap((event): Mark[] => {
-    if (event.kind === "caller_sound") {
-      return [
-        {
-          from: at(event.at_ms),
-          to: at(event.at_ms + soundMs(event)),
-          label: "Tone",
-          title: "The voicemail's tone",
-          ...MACHINE_FILL.tone,
-        },
-      ];
-    }
-    if (event.kind === "hold_started") {
-      const hold = Number(event.detail ?? 0) / 1000;
-      return [
-        {
-          from: at(event.at_ms),
-          to: Math.min(at(event.at_ms) + hold, end),
-          label: "Hold",
-          title: `The call screener held the agent for ${Math.round(hold)} s`,
-          ...MACHINE_FILL.hold,
-        },
-      ];
-    }
-    return [];
-  });
-  return [...lines, ...sounds];
-}
-
 /** A turn to bring into view, by index. Each ask is a new object, so asking for the same turn
  * again scrolls to it again. */
 export interface ShownTurn {
   index: number;
-}
-
-/** The call's audio: while the call is live, a Listen button that plays it and draws it as it
- * plays; after the call, the recording. It holds the listening, so only this card redraws as
- * the audio plays. */
-function AudioCard({
-  conversation,
-  player,
-  start,
-  onTime,
-}: {
-  conversation: Conversation;
-  player: RefObject<PlayerHandle | null>;
-  start: number;
-  onTime: (seconds: number) => void;
-}) {
-  const live = useLiveListen(conversation.id);
-  const isLive = LIVE_STATUSES.includes(conversation.status);
-  const connectedMs = connectedAt(conversation);
-  let content;
-  if (live.view) content = <LiveWaveform view={live.view} />;
-  else if (live.listening) {
-    content = <p className="text-p-400 text-muted-foreground">Waiting for the call's audio.</p>;
-  } else if (isLive) {
-    content = (
-      <p className="text-p-400 text-muted-foreground">
-        Listen plays the call while it runs. The recording comes when the call ends.
-      </p>
-    );
-  } else {
-    content = (
-      <RecordingPlayer
-        ref={player}
-        url={conversation.recording_url}
-        name={`yaksh-${conversation.id}`}
-        start={start}
-        onTime={onTime}
-        marks={
-          connectedMs === undefined
-            ? []
-            : [
-                ...machineMarks(conversation, connectedMs),
-                ...conversation.replies.map((reply) => replyMark(reply, connectedMs)),
-              ]
-        }
-      />
-    );
-  }
-  return (
-    <Card className="shrink-0">
-      <CardHeader className="border-b">
-        <CardTitle>Audio</CardTitle>
-        {(isLive || live.listening) && (
-          <CardAction>
-            <Button variant="outline" size="sm" onClick={live.toggle}>
-              {live.listening ? "Stop listening" : "Listen"}
-            </Button>
-          </CardAction>
-        )}
-      </CardHeader>
-      <CardContent>{content}</CardContent>
-    </Card>
-  );
 }
 
 /** The recording and the transcript. Keyed by the conversation, so the turn that was playing
@@ -586,8 +443,41 @@ export function CallPane({
   shown?: ShownTurn | null;
 }) {
   const [heard, setHeard] = useState<number | null>(null);
+  const [expanded, setExpanded] = useState(false);
+  const transcript = useRef<HTMLDivElement | null>(null);
+  const slide = useRef<Animation | null>(null);
+  /** Where the transcript was drawn when the player's size was asked to change. */
+  const slideFrom = useRef<number | null>(null);
   const connectedMs = connectedAt(conversation);
   const overText = conversation.transport === "text";
+  const toggle = useCallback(() => {
+    slideFrom.current = transcript.current?.getBoundingClientRect().top ?? null;
+    setExpanded((value) => !value);
+  }, []);
+  // The new size moves the transcript at once; it slides there from where it was drawn, also
+  // when a slide is still running.
+  useLayoutEffect(() => {
+    const card = transcript.current;
+    const from = slideFrom.current;
+    slideFrom.current = null;
+    if (!card || from === null) return;
+    slide.current?.cancel();
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    slide.current = card.animate(
+      [
+        { transform: `translateY(${from - card.getBoundingClientRect().top}px)` },
+        { transform: "translateY(0)" },
+      ],
+      // Chrome can start the slide a moment after this frame; "backwards" holds its first
+      // position until then, so no frame shows the transcript at its end place too early.
+      { duration: 240, easing: "cubic-bezier(0.2, 0, 0, 1)", fill: "backwards" },
+    );
+  }, [expanded]);
+  const play = useCallback((seconds: number) => player.current?.playFrom(seconds), [player]);
+  const moments = useMemo(
+    () => (connectedMs === undefined ? [] : callMoments(conversation, connectedMs)),
+    [conversation, connectedMs],
+  );
   return (
     <div className="flex h-full flex-col gap-6 p-px pr-3">
       {!overText && (
@@ -596,21 +486,20 @@ export function CallPane({
           player={player}
           start={start}
           onTime={(seconds) => setHeard(turnAt(conversation.transcript, connectedMs ?? 0, seconds))}
+          expanded={expanded}
+          onToggle={toggle}
         />
       )}
       <Transcript
+        cardRef={transcript}
         turns={conversation.transcript}
-        moments={connectedMs === undefined ? [] : callMoments(conversation, connectedMs)}
+        moments={moments}
         active={ACTIVE_STATUSES.includes(conversation.status)}
         waiting={waitingText(conversation)}
         connectedMs={connectedMs ?? 0}
         heard={heard}
         shown={shown}
-        onPlay={
-          conversation.recording_url && connectedMs !== undefined
-            ? (seconds) => player.current?.playFrom(seconds)
-            : undefined
-        }
+        onPlay={conversation.recording_url && connectedMs !== undefined ? play : undefined}
       />
     </div>
   );
@@ -874,7 +763,7 @@ function ShowTurn({ shown }: { shown: ShownTurn | null }) {
   return null;
 }
 
-function Transcript({
+const Transcript = memo(function Transcript({
   turns,
   moments,
   active,
@@ -883,6 +772,7 @@ function Transcript({
   heard,
   shown,
   onPlay,
+  cardRef,
 }: {
   turns: Turn[];
   /** Lines between the turns, by time. */
@@ -897,13 +787,15 @@ function Transcript({
   shown: ShownTurn | null;
   /** Plays the recording from that second; absent while there is no recording. */
   onPlay?: (seconds: number) => void;
+  /** The card, which slides when the player above it changes size. */
+  cardRef: RefObject<HTMLDivElement | null>;
 }) {
   const [follow, setFollow] = useStoredBoolean("yaksh.transcript.follow", true);
   /** A live call opens at its newest turn, a finished one at its first. Kept from the first
    * render, so a call that ends while it is open does not jump back to the start. */
   const [openedLive] = useState(active);
   return (
-    <Card className="min-h-0">
+    <Card ref={cardRef} className="relative z-10 min-h-0">
       <CardHeader className="shrink-0 border-b">
         <CardTitle>Transcript</CardTitle>
         {onPlay && (
@@ -1024,7 +916,7 @@ function Transcript({
       </CardContent>
     </Card>
   );
-}
+});
 
 type TranscriptLine =
   | { kind: "turn"; turn: Turn; index: number }
