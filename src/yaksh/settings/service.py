@@ -20,6 +20,7 @@ from yaksh.domain.settings import (
 )
 from yaksh.evaluation.jev import JEV_MODEL
 from yaksh.integrations import provider_checks as checks
+from yaksh.integrations.openai_models import caller_effort
 from yaksh.integrations.provider_checks import ProviderCheckError
 from yaksh.settings.store import DEFAULTS, changed_values
 from yaksh.simulation.voices import builtin_voices
@@ -53,7 +54,10 @@ async def test_provider(settings: AppSettings, provider: Provider) -> str:
         case Provider.LLM:
             key = required(secrets.llm_api_key, "the LLM provider key")
             await checks.check_llm(
-                settings.llm.base_url, key, settings.caller.model, settings.caller.reasoning_effort
+                settings.llm.base_url,
+                key,
+                settings.caller.model,
+                caller_effort(settings.caller.model, settings.caller.reasoning_effort),
             )
             return f"{settings.caller.model} answered a test request."
         case Provider.DEEPGRAM:

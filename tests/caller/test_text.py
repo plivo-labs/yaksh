@@ -69,10 +69,12 @@ class FakeModel:
     def __init__(self, *replies: tuple[str, str | None]) -> None:
         self._replies = list(replies)
         self.inputs: list[list[Any]] = []
+        self.efforts: list[Any] = []
         self.responses = SimpleNamespace(create=self._create)
 
     async def _create(self, **request: Any) -> Any:
         self.inputs.append(list(request["input"]))
+        self.efforts.append(request.get("extra_body", {}).get("reasoning"))
         words, ended = self._replies.pop(0)
         output = (
             []
@@ -201,6 +203,8 @@ async def test_a_caller_who_speaks_first_sends_its_first_words_and_the_agent_end
     assert observer.turns[0].scripted
     assert outcome.end_reason is EndReason.AGENT_HANGUP
     assert agent.closes == []
+    assert model.efforts == [{"effort": "low"}], "the phone caller's effort"
+    assert outcome.caller_settings and outcome.caller_settings.reasoning_effort == "low"
 
 
 async def test_a_refused_start_is_not_tried_again_and_a_missing_session_id_is_an_error(

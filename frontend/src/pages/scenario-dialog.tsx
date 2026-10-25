@@ -561,7 +561,7 @@ function CallerModelField({
           <span className="text-s-400 text-muted-foreground">
             {!value && "Default"}
             {shown &&
-              `${value ? "" : ": "}${shown.model}, ${shown.reasoning_effort ?? "no"} reasoning effort`}
+              `${value ? "" : ": "}${shown.model}, ${shown.reasoning_effort ?? "default"} reasoning effort`}
             {!shown && settings.isError && " (the settings did not load)"}
           </span>
         </div>
@@ -615,8 +615,7 @@ function CallerModelField({
             model={model}
             value={value ? value.reasoning_effort : (fallback?.reasoning_effort ?? null)}
             onValueChange={(effort) => onChange({ model, reasoning_effort: effort })}
-            unset="none"
-            hidden={["none"]}
+            unset="default"
           />
         </Field>
       </div>

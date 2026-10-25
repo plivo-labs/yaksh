@@ -245,8 +245,8 @@ class CallerSettings(BaseModel):
 
     llm_model: str
     reasoning_effort: str | None
-    """The effort configured for the caller's model; None leaves it to Pipecat, which asks a
-    reasoning model that accepts it for none."""
+    """The effort the caller sent, None for none. Older records hold the configured effort
+    instead, where None meant the lowest effort that Pipecat lists for the model."""
     scenario_model: bool = False
     """The scenario chose the model and effort, not the settings."""
     stt_model: str | None = None

@@ -20,14 +20,12 @@ export function EffortSelect({
   value,
   onValueChange,
   unset,
-  hidden = [],
 }: {
   id: string;
   model: string;
   value: string | null;
   onValueChange: (effort: string | null) => void;
   unset: string;
-  hidden?: string[];
 }) {
   const efforts = useModelEfforts(model);
   if (efforts.isPending) {
@@ -62,9 +60,7 @@ export function EffortSelect({
   }
   const items = [
     { value: UNSET, label: unset },
-    ...taken
-      .filter((effort) => !hidden.includes(effort))
-      .map((effort) => ({ value: effort, label: effort })),
+    ...taken.map((effort) => ({ value: effort, label: effort })),
   ];
   const refused = value !== null && !taken.includes(value);
   return (

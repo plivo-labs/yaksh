@@ -17,6 +17,7 @@ from yaksh.domain.runs import RunCreate, RunStatus
 from yaksh.domain.settings import AppSettings, CallerModel
 from yaksh.evaluation import results
 from yaksh.integrations import provider_checks
+from yaksh.integrations.openai_models import caller_effort
 from yaksh.simulation import conversations, runs, suites
 
 router = APIRouter(prefix="/runs", tags=["runs"], dependencies=[Depends(require_token)])
@@ -61,7 +62,10 @@ def caller_check(app: AppSettings) -> runs.CallerCheck | None:
     async def check(caller: CallerModel) -> str | None:
         try:
             await provider_checks.check_llm(
-                app.llm.base_url, key.get_secret_value(), caller.model, caller.reasoning_effort
+                app.llm.base_url,
+                key.get_secret_value(),
+                caller.model,
+                caller_effort(caller.model, caller.reasoning_effort),
             )
         except provider_checks.ProviderCheckError as error:
             return str(error)
