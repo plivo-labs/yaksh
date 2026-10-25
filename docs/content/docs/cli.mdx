@@ -3,7 +3,7 @@ title: CLI
 description: The yaksh CLI is a command-line client for coding agents, CI and persons.
 ---
 
-`yaksh` is a command-line client for the Yaksh API. Coding agents, CI and persons use the same commands. The `agent`, `scenario`, `persona`, `run` and `conversation` commands write the JSON of the server to stdout. With `--wait`, `yaksh run start` waits for the calls and then for the judges. Then it writes the run.
+`yaksh` is a command-line client for the Yaksh API. Coding agents, CI and persons use the same commands. The `agent`, `scenario`, `persona`, `run`, `suite` and `conversation` commands write the JSON of the server to stdout. With `--wait`, `yaksh run start` waits for the calls and then for the judges. Then it writes the run.
 
 `yaksh auth status` and `yaksh version` write JSON that the CLI makes. `yaksh guide` writes Markdown. `yaksh auth login` and `yaksh auth logout` do not write to stdout. Each command writes progress, hints and errors to stderr. Each command exits with 0 if it has no error, and with 1 if it has an error. If a test ran and did not pass, the last lines start with `failed:` and `next:`. If the command itself went wrong, the line starts with `error:`.
 
@@ -84,6 +84,14 @@ Yaksh takes the name, the agent ID and the languages from the file, and keeps th
 `yaksh guide` shows how a coding agent uses the CLI to do tests of a voice agent. The same text is the skill in `cli/skill/yaksh/SKILL.md`. To add the skill for all your projects, use `npx skills add plivo-labs/yaksh -g`. Without `-g`, the skill goes only into the project in the current folder.
 
 `yaksh --help` and `yaksh <command> --help` show all commands and flags.
+
+## Run a suite
+
+```sh
+yaksh suite run <suite id> --wait
+```
+
+This command starts one run for each agent of the suite, waits for the calls and for the judges, and writes the suite run. It exits with 0 only if the suite run passed. `yaksh suite list` shows the IDs of the suites. Refer to [Suites in CI](/docs/suites#suites-in-ci).
 
 ## Phone numbers
 

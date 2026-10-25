@@ -249,13 +249,17 @@ func (a *app) waitForRun(cmd *cobra.Command, c *api.Client, id uuid.UUID, timeou
 	}
 	switch {
 	case !r.Passed():
-		return &failure{nextStep{summary, fmt.Sprintf(
-			"yaksh conversation list --run %s --latest-attempts --group error,did_not_connect", id)}}
+		return &failure{nextStep{summary, notCompleted(id.String())}}
 	case !v.Passed():
 		return &failure{nextStep{summary, "yaksh run metrics " + id.String()}}
 	}
 	fmt.Fprintln(stderr, summary)
 	return nil
+}
+
+// notCompleted is the command that lists a run's calls that did not complete.
+func notCompleted(runID string) string {
+	return "yaksh conversation list --run " + runID + " --latest-attempts --group error,did_not_connect"
 }
 
 // cancelAfterStop cancels a run whose wait Ctrl-C or SIGTERM stopped, so that no paid calls go

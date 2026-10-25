@@ -1041,6 +1041,8 @@ export interface RunSummary {
   ended_at: string | null;
   created_at: string;
   cancelled_at: string | null;
+  /** The suite run that started the run; null for a run started on its own. */
+  suite_run: SuiteRunLink | null;
 }
 
 /** A scenario of a run, the personas that call it, the data sets they play and who answers. No
@@ -1056,6 +1058,113 @@ export interface RunScenario {
 export interface Run extends RunSummary {
   scenarios: RunScenario[];
 }
+
+export interface SuiteRunLink {
+  id: string;
+  suite_id: string;
+  suite_name: string;
+  position: number;
+}
+
+export type RunResult = "running" | "judging" | "passed" | "failed" | "not_decided" | "cancelled";
+
+/** What a suite reads from one run to give it a result. */
+export interface GateNumbers {
+  /** Calls that the judges score, whose evaluation is not finished. */
+  pending: number;
+  passed: number;
+  failed: number;
+  /** Calls where the caller talked and no verdict was given. */
+  not_scored: number;
+  pass_rate: number | null;
+  coverage: number | null;
+  worst: number | null;
+  best: number | null;
+  /** Calls where no caller talked, by their verdict with the agent rules. */
+  unplayed_passed: number;
+  unplayed_failed: number;
+  unplayed_not_scored: number;
+}
+
+/** Every live scenario of the agent at each start, each answered by these answers. */
+export interface AllScenarios {
+  answered_by: AnsweredBy[];
+}
+
+/** One run of a suite run: an agent over one connection, its scenarios and settings. */
+export interface SuiteEntry {
+  agent_id: string;
+  transport: Transport;
+  scenarios: RunScenario[] | AllScenarios;
+  repeats: number;
+  max_duration_s: number | null;
+  max_turns: number | null;
+  max_parallel: number | null;
+  start_interval_s: number | null;
+  max_retries: number | null;
+}
+
+export interface SuiteEntryRead extends SuiteEntry {
+  position: number;
+  agent_name: string;
+  scenario_count: number;
+  /** The conversations each suite run starts for the entry. */
+  calls: number;
+  /** Why a start would refuse the entry now. A save keeps them. */
+  problems: string[];
+}
+
+export interface SuiteRunSummary {
+  id: string;
+  suite_id: string;
+  suite_name: string;
+  required_pass_percent: number;
+  result: RunResult;
+  created_at: string;
+  ended_at: string | null;
+  cancelled_at: string | null;
+  run_count: number;
+  passed_run_count: number;
+  conversation_count: number;
+}
+
+export interface SuiteSummary {
+  id: string;
+  name: string;
+  required_pass_percent: number;
+  /** Send it back with a change: a change of an older read is refused. */
+  revision: number;
+  created_at: string;
+  updated_at: string;
+  agent_names: string[];
+  calls: number;
+  last_run: SuiteRunSummary | null;
+}
+
+export interface Suite extends SuiteSummary {
+  entries: SuiteEntryRead[];
+}
+
+export interface SuiteUpdate {
+  revision: number;
+  name?: string;
+  required_pass_percent?: number;
+  /** Replace the suite's entries as a whole. */
+  entries?: SuiteEntry[];
+}
+
+export interface SuiteRunPart {
+  run: RunSummary;
+  result: RunResult;
+  numbers: GateNumbers;
+}
+
+export interface SuiteRun extends SuiteRunSummary {
+  /** In entry order. */
+  runs: SuiteRunPart[];
+}
+
+export const FINAL_RESULTS: RunResult[] = ["passed", "failed", "not_decided", "cancelled"];
 
 export type GenerationMode = "agent" | "knowledge_base";
 export type GenerationStatus = "running" | "done" | "failed" | "stopped";

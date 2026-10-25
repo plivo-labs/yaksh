@@ -6,6 +6,7 @@ from yaksh.domain.agents import Transport
 from yaksh.domain.languages import Language
 from yaksh.domain.latency import Latency
 from yaksh.domain.runs import RunProgress, RunScenario
+from yaksh.domain.suites import SuiteRunLink
 
 
 class RunSummary(RunProgress):
@@ -28,6 +29,8 @@ class RunSummary(RunProgress):
     """Nearest rank over every measured reply of the latest attempts, pooled."""
     languages: list[Language]
     """The languages the run's callers speak."""
+    suite_run: SuiteRunLink | None
+    """The suite run that started the run; None for a run started on its own."""
 
     @classmethod
     def of(
@@ -37,6 +40,7 @@ class RunSummary(RunProgress):
         progress: RunProgress,
         response: Latency,
         languages: list[Language],
+        suite_run: SuiteRunLink | None,
     ) -> RunSummary:
         """The run's own columns and its pinned agent; status and cancelled_at come only from
         the progress, read in one statement."""
@@ -59,6 +63,7 @@ class RunSummary(RunProgress):
             response_p50_ms=response.p50_ms,
             response_p90_ms=response.p90_ms,
             languages=languages,
+            suite_run=suite_run,
             **progress.model_dump(),
         )
 
@@ -66,4 +71,4 @@ class RunSummary(RunProgress):
 class RunRead(RunSummary):
     scenarios: list[RunScenario]
     """With the personas that call them, in the order the conversations of each repeat
-    start."""
+    start. A client can send them back to start the same run again."""

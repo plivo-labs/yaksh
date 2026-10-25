@@ -14,11 +14,10 @@ from yaksh.domain.answering import AnsweredBy, Answering, plays_scenario, reache
 from yaksh.domain.conversations import (
     CallerSettings,
     CallerUsage,
-    ConversationStatus,
-    EndReason,
     LineFacts,
     Transcript,
     Turn,
+    judges_score,
 )
 from yaksh.domain.evaluations import DecidedBy, ItemRole, Metric, MetricKey, Outcome, UnsureKind
 from yaksh.domain.files import FileStore
@@ -295,10 +294,7 @@ def rule_item(
 
 
 def judged(conversation: Conversation) -> bool:
-    return (
-        conversation.status is ConversationStatus.COMPLETED
-        and conversation.end_reason is not EndReason.USER_REQUEST
-    )
+    return judges_score(conversation.status, conversation.end_reason)
 
 
 def outcomes(

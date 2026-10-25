@@ -10,8 +10,15 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 import { Skeleton } from "@/components/ui/skeleton";
-import { runTitle } from "@/lib/format";
-import { useAgent, useConversation, usePersona, useRun } from "@/lib/queries";
+import { runTitle, when } from "@/lib/format";
+import {
+  useAgent,
+  useConversation,
+  usePersona,
+  useRun,
+  useSuite,
+  useSuiteRun,
+} from "@/lib/queries";
 
 /** One step of the trail. The last step is the current page; a step before it links to `to`. A
  * name that is still loading is undefined. */
@@ -91,6 +98,31 @@ export const ProviderImportCrumbs = () => (
 export function AgentCrumbs() {
   const agent = useAgent(useParams().id);
   return <Trail steps={[AGENTS, { label: agent.data?.name }]} />;
+}
+
+const SUITES = { label: "Suites", to: "/suites" };
+
+export const SuitesCrumbs = () => <Trail steps={[{ label: "Suites" }]} />;
+
+export function SuiteCrumbs() {
+  const suite = useSuite(useParams().id);
+  return <Trail steps={[SUITES, { label: suite.data?.name }]} />;
+}
+
+export function SuiteRunCrumbs() {
+  const suiteRun = useSuiteRun(useParams().id);
+  return (
+    <Trail
+      steps={[
+        SUITES,
+        {
+          label: suiteRun.data?.suite_name,
+          to: suiteRun.data && `/suites/${suiteRun.data.suite_id}`,
+        },
+        { label: suiteRun.data && when(suiteRun.data.created_at) },
+      ]}
+    />
+  );
 }
 
 export function RunCrumbs() {

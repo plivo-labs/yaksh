@@ -1,6 +1,6 @@
-import { Play, Square } from "lucide-react";
-import { type ReactNode, useState } from "react";
-import { Link, useParams } from "react-router";
+import { ChevronDown, Layers, Play, Plus, Square } from "lucide-react";
+import { type ReactNode, useEffect, useState } from "react";
+import { Link, useNavigate, useParams } from "react-router";
 import { toast } from "sonner";
 
 import { ConversationList } from "@/components/conversation-list";
@@ -23,6 +23,15 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { useFilterParams } from "@/hooks/use-filter-params";
@@ -32,9 +41,11 @@ import { duration, runFinished, runTitle, runTotal, when } from "@/lib/format";
 import {
   CONVERSATIONS_PAGE,
   useAgent,
+  useAllSuites,
   useCancelRun,
   useConversations,
   useRun,
+  useSuite,
 } from "@/lib/queries";
 import {
   ACTIVE_RUN_STATUSES,
@@ -46,6 +57,8 @@ import {
   WAITING_REASON_TEXT,
 } from "@/lib/types";
 import { RunDialog } from "@/pages/run-dialog";
+import { SuiteEntryDialog } from "@/pages/suite-entry-dialog";
+import { NewSuiteDialog } from "@/pages/suites";
 
 export function RunPage() {
   const { id = "" } = useParams();
@@ -117,6 +130,18 @@ function Overview({ run }: { run: Run }) {
           {run.waiting_reason && (
             <p className="text-s-400 text-muted-foreground">
               Waiting: {WAITING_REASON_TEXT[run.waiting_reason]}
+            </p>
+          )}
+          {run.suite_run && (
+            <p className="flex items-center gap-1.5 text-s-400 text-muted-foreground">
+              <Layers className="size-3.5" />
+              Part of a suite run of{" "}
+              <Link
+                to={`/suite-runs/${run.suite_run.id}`}
+                className="text-brand-text underline-offset-4 hover:underline"
+              >
+                {run.suite_run.suite_name}
+              </Link>
             </p>
           )}
         </div>
@@ -239,6 +264,7 @@ function RunActions({ run }: { run: Run }) {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+        <AddToSuite run={run} disabled={!agent.data} />
         <Button variant="outline" size="sm" disabled={!agent.data} onClick={() => setAgain(true)}>
           <Play />
           Run again
@@ -263,6 +289,74 @@ function RunActions({ run }: { run: Run }) {
       )}
     </div>
   );
+}
+
+/** Copies the run's settings into a suite, as a new agent of it: one of the suites, or a new
+ * one. The suite does not use the run's results. */
+function AddToSuite({ run, disabled }: { run: Run; disabled: boolean }) {
+  const suites = useAllSuites();
+  const [suiteId, setSuiteId] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
+  return (
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger render={<Button variant="outline" size="sm" disabled={disabled} />}>
+          <Layers />
+          Add to suite
+          <ChevronDown />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-64">
+          <DropdownMenuGroup>
+            <DropdownMenuLabel>Copy this run into a suite</DropdownMenuLabel>
+            {(suites.data ?? []).map((suite) => (
+              <DropdownMenuItem key={suite.id} onClick={() => setSuiteId(suite.id)}>
+                {suite.name}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuGroup>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={() => setCreating(true)}>
+            <Plus />
+            New suite
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      {creating && (
+        <NewSuiteDialog
+          onCreated={(suite) => setSuiteId(suite.id)}
+          onClosed={() => setCreating(false)}
+        />
+      )}
+      {suiteId && <CopyToSuite suiteId={suiteId} run={run} onClosed={() => setSuiteId(null)} />}
+    </>
+  );
+}
+
+function CopyToSuite({
+  suiteId,
+  run,
+  onClosed,
+}: {
+  suiteId: string;
+  run: Run;
+  onClosed: () => void;
+}) {
+  const suite = useSuite(suiteId);
+  const navigate = useNavigate();
+  const failed = suite.error?.message;
+  useEffect(() => {
+    if (failed === undefined) return;
+    toast.error("Could not load the suite", { description: failed });
+    onClosed();
+  }, [failed, onClosed]);
+  return suite.data ? (
+    <SuiteEntryDialog
+      suite={suite.data}
+      copyRun={run}
+      onSaved={() => navigate(`/suites/${suiteId}`)}
+      onClosed={onClosed}
+    />
+  ) : null;
 }
 
 function GroupFilter({ run }: { run: Run }) {

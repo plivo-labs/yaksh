@@ -131,6 +131,8 @@ class Limits(Section):
     max_run_retries: int = Field(default=3, ge=0, le=100)
     max_run_start_interval_s: int = Field(default=600, ge=1, le=86_400)
     max_scenario_data_sets: int = Field(default=10, ge=1, le=MAX_DATA_SETS)
+    """Conversations one suite run starts, over all its runs. Retries are not counted. The
+    default is 100 entries of the default run limit."""
 
     @property
     def default_max_retries(self) -> int:

@@ -14,6 +14,7 @@ from sqlalchemy import (
     ForeignKeyConstraint,
     Index,
     Integer,
+    SmallInteger,
     Text,
     UniqueConstraint,
     func,
@@ -143,15 +144,160 @@ class Run(Base):
     """A hash of the validated request, so the key with another request is refused."""
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     cancelled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    suite_run_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("suite_runs.id"))
+    """The suite run that started the run; None for a run started on its own."""
+    suite_position: Mapped[int | None] = mapped_column(Integer)
+    """The position of the suite entry the run was started from."""
 
     __table_args__ = (
         ForeignKeyConstraint(
             ["agent_version_id", "agent_id"], ["agent_versions.id", "agent_versions.agent_id"]
         ),
         UniqueConstraint("id", "agent_id"),
+        UniqueConstraint("suite_run_id", "suite_position", name="uq_runs_suite_position"),
         CheckConstraint("(request_key IS NULL) = (request_hash IS NULL)", name="request_together"),
+        CheckConstraint(
+            "(suite_run_id IS NULL) = (suite_position IS NULL)", name="suite_position_together"
+        ),
+        CheckConstraint("suite_position >= 1", name="suite_position_from_1"),
         Index("ix_runs_agent_created", "agent_id", text("created_at DESC")),
         Index("ix_runs_agent_transport_created", "agent_id", "transport", text("created_at DESC")),
+    )
+
+
+class Suite(Base):
+    """A saved list of runs that start together (docs/decisions/0034)."""
+
+    __tablename__ = "suites"
+
+    id: Mapped[uuid.UUID] = uuid_primary_key()
+    name: Mapped[str] = mapped_column(Text)
+    required_pass_percent: Mapped[int] = mapped_column(SmallInteger)
+    revision: Mapped[int] = mapped_column(Integer, default=1, server_default=text("1"))
+    """Goes up by one at each save, so a save of an older read is refused."""
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.statement_timestamp()
+    )
+    """A save waits for the suite's lock, so it writes the time of the statement."""
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    __table_args__ = (
+        Index(
+            "ix_suites_name_live",
+            func.lower(text("name")),
+            unique=True,
+            postgresql_where=text("deleted_at IS NULL"),
+        ),
+        CheckConstraint(
+            "required_pass_percent BETWEEN 1 AND 100", name="required_pass_percent_range"
+        ),
+    )
+
+
+class SuiteEntry(Base):
+    """One run of each suite run. Its scenarios are rows of suite_entry_scenarios, or every live
+    scenario of the agent at each start when all_scenarios_answered_by holds their answers."""
+
+    __tablename__ = "suite_entries"
+
+    id: Mapped[uuid.UUID] = uuid_primary_key()
+    suite_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("suites.id", ondelete="CASCADE"))
+    position: Mapped[int] = mapped_column(Integer)
+    agent_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("agents.id"))
+    transport: Mapped[Transport] = mapped_column(pg_enum(Transport, "agent_transport"))
+    all_scenarios_answered_by: Mapped[list[AnsweredBy] | None] = mapped_column(
+        ARRAY(pg_enum(AnsweredBy, "answered_by"))
+    )
+    repeats: Mapped[int] = mapped_column(Integer)
+    max_duration_s: Mapped[int | None] = mapped_column(Integer)
+    max_turns: Mapped[int | None] = mapped_column(Integer)
+    max_parallel: Mapped[int | None] = mapped_column(Integer)
+    start_interval_s: Mapped[int | None] = mapped_column(Integer)
+    max_retries: Mapped[int | None] = mapped_column(Integer)
+
+    __table_args__ = (
+        UniqueConstraint("suite_id", "position"),
+        UniqueConstraint("id", "agent_id"),
+        CheckConstraint("position >= 1", name="position_from_1"),
+        CheckConstraint(
+            "all_scenarios_answered_by IS NULL OR cardinality(all_scenarios_answered_by) > 0",
+            name="all_scenarios_answers_not_empty",
+        ),
+    )
+
+
+class SuiteEntryScenario(Base):
+    __tablename__ = "suite_entry_scenarios"
+
+    id: Mapped[uuid.UUID] = uuid_primary_key()
+    entry_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
+    agent_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
+    """The entry's agent, so both foreign keys hold a scenario of that agent."""
+    scenario_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
+    position: Mapped[int] = mapped_column(Integer)
+    data_set_ids: Mapped[list[uuid.UUID] | None] = mapped_column(ARRAY(UUID(as_uuid=True)))
+    """In order; None is every data set of the scenario at each start."""
+    answered_by: Mapped[list[AnsweredBy]] = mapped_column(ARRAY(pg_enum(AnsweredBy, "answered_by")))
+
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["entry_id", "agent_id"],
+            ["suite_entries.id", "suite_entries.agent_id"],
+            ondelete="CASCADE",
+        ),
+        ForeignKeyConstraint(["scenario_id", "agent_id"], ["scenarios.id", "scenarios.agent_id"]),
+        UniqueConstraint("entry_id", "position"),
+        UniqueConstraint("entry_id", "scenario_id"),
+        CheckConstraint("position >= 1", name="position_from_1"),
+        CheckConstraint(
+            "cardinality(answered_by) > 0 AND "
+            "(data_set_ids IS NULL OR cardinality(data_set_ids) > 0)",
+            name="lists_not_empty",
+        ),
+    )
+
+
+class SuiteEntryScenarioPersona(Base):
+    __tablename__ = "suite_entry_scenario_personas"
+
+    entry_scenario_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey(
+            "suite_entry_scenarios.id",
+            ondelete="CASCADE",
+            name="fk_suite_entry_scenario_personas_entry_scenario",
+        ),
+        primary_key=True,
+    )
+    position: Mapped[int] = mapped_column(Integer, primary_key=True)
+    persona_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("personas.id"))
+
+    __table_args__ = (
+        UniqueConstraint("entry_scenario_id", "persona_id"),
+        CheckConstraint("position >= 1", name="position_from_1"),
+    )
+
+
+class SuiteRun(Base):
+    """One start of a suite: a run for each of its entries."""
+
+    __tablename__ = "suite_runs"
+
+    id: Mapped[uuid.UUID] = uuid_primary_key()
+    suite_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("suites.id"))
+    required_pass_percent: Mapped[int] = mapped_column(SmallInteger)
+    """The suite's value at start, so a later edit does not change the result."""
+    request_key: Mapped[str | None] = mapped_column(Text, unique=True)
+    """The client's idempotency key. The request is only the suite id, so the same key returns
+    this suite run for the same suite and is refused for another suite."""
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    cancelled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    __table_args__ = (
+        CheckConstraint(
+            "required_pass_percent BETWEEN 1 AND 100", name="required_pass_percent_range"
+        ),
+        Index("ix_suite_runs_suite_created", "suite_id", text("created_at DESC")),
     )
 
 

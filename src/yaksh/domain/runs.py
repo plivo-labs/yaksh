@@ -10,6 +10,7 @@ from enum import StrEnum
 from typing import Annotated
 
 from pydantic import (
+    AfterValidator,
     BaseModel,
     ConfigDict,
     Field,
@@ -23,6 +24,13 @@ from yaksh.domain.answering import AnsweredBy
 from yaksh.domain.conversations import EndReason, OutcomeGroup
 
 RunName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=80)]
+
+
+def listed_once[T](items: list[T] | None, kind: str) -> list[T] | None:
+    repeated = [item for item, n in Counter(items or []).items() if n > 1]
+    if repeated:
+        raise ValueError(f"{kind} {repeated[0]} is listed more than once")
+    return items
 
 
 class RunScenario(BaseModel):
@@ -43,26 +51,31 @@ class RunScenario(BaseModel):
     @field_validator("persona_ids", "data_set_ids", "answered_by")
     @classmethod
     def each_once[T](cls, items: list[T] | None, info: ValidationInfo) -> list[T] | None:
-        repeated = [item for item, n in Counter(items or []).items() if n > 1]
-        if repeated:
-            kind = {"persona_ids": "persona", "data_set_ids": "data set"}.get(
-                info.field_name or "", "answer"
-            )
-            raise ValueError(f"{kind} {repeated[0]} is listed more than once")
-        return items
+        kind = {"persona_ids": "persona", "data_set_ids": "data set"}.get(
+            info.field_name or "", "answer"
+        )
+        return listed_once(items, kind)
 
 
-class RunCreate(BaseModel):
-    """Limits that an operator sets, such as the most repeats, are checked where the settings
-    are known."""
+def each_scenario_once(scenarios: list[RunScenario]) -> list[RunScenario]:
+    ids = [scenario.scenario_id for scenario in scenarios]
+    repeated = [scenario_id for scenario_id, n in Counter(ids).items() if n > 1]
+    if repeated:
+        raise ValueError(f"scenario {repeated[0]} is listed more than once")
+    return scenarios
+
+
+ScenarioList = Annotated[list[RunScenario], Field(min_length=1), AfterValidator(each_scenario_once)]
+"""In the order the conversations of each repeat start."""
+
+
+class RunSettings(BaseModel):
+    """What a run does with its scenarios, apart from which scenarios: a suite entry keeps the
+    same settings. Limits that an operator sets, such as the most repeats, are checked where the
+    settings are known."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    agent_id: uuid.UUID
-    transport: Transport | None = None
-    """How the conversations reach the agent; None takes the agent's only connection."""
-    scenarios: list[RunScenario] = Field(min_length=1)
-    """In the order the conversations of each repeat start."""
     repeats: int = Field(default=1, ge=1)
     max_duration_s: int | None = Field(default=None, ge=10, le=1800)
     """None takes the operator's default."""
@@ -74,16 +87,14 @@ class RunCreate(BaseModel):
     max_retries: int | None = Field(default=None, ge=0)
     """How many times a conversation that ends with an error is tried again; None takes 1, or
     the operator's limit when that is lower."""
-    name: RunName | None = None
 
-    @field_validator("scenarios")
-    @classmethod
-    def each_scenario_once(cls, scenarios: list[RunScenario]) -> list[RunScenario]:
-        ids = [scenario.scenario_id for scenario in scenarios]
-        repeated = [scenario_id for scenario_id, n in Counter(ids).items() if n > 1]
-        if repeated:
-            raise ValueError(f"scenario {repeated[0]} is listed more than once")
-        return scenarios
+
+class RunCreate(RunSettings):
+    agent_id: uuid.UUID
+    transport: Transport | None = None
+    """How the conversations reach the agent; None takes the agent's only connection."""
+    scenarios: ScenarioList
+    name: RunName | None = None
 
     def request_hash(self) -> str:
         """The same for the same request, so a repeated request can be told from another request

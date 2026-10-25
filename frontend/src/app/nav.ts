@@ -1,4 +1,4 @@
-import { AudioLines, Bot, Hash, ListChecks, PhoneCall, UserRound } from "lucide-react";
+import { AudioLines, Bot, Hash, Layers, ListChecks, PhoneCall, UserRound } from "lucide-react";
 
 export const NAV_GROUPS: {
   label: string;
@@ -8,6 +8,7 @@ export const NAV_GROUPS: {
     label: "Test",
     links: [
       { to: "/agents", label: "Agents", icon: Bot },
+      { to: "/suites", label: "Suites", icon: Layers },
       { to: "/runs", label: "Runs", icon: ListChecks },
       { to: "/conversations", label: "Conversations", icon: PhoneCall },
     ],

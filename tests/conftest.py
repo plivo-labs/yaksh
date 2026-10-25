@@ -11,7 +11,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from httpx import ASGITransport, AsyncClient, Response
 from pydantic import SecretStr
-from sqlalchemy import ColumnElement, func, text, update
+from sqlalchemy import ColumnElement, func, insert, text, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from testcontainers.community.postgres import PostgresContainer
 
@@ -20,7 +20,7 @@ from yaksh.caller.audio import Clock
 from yaksh.caller.plivo_server import PlivoServer
 from yaksh.config import Settings
 from yaksh.db.migrate import upgrade_to_head
-from yaksh.db.models import Conversation, Voice
+from yaksh.db.models import Conversation, PhoneNumber, Voice
 from yaksh.db.session import create_engine, create_sessionmaker
 from yaksh.domain.agent_import import ElevenLabsRegion, VapiRegion
 from yaksh.domain.agent_records import RecordReader
@@ -60,6 +60,7 @@ from yaksh.settings import store
 from yaksh.settings.cipher import Cipher
 from yaksh.settings.store import SettingsSource
 from yaksh.simulation import conversations, numbers
+from yaksh.simulation.workers import report_worker
 from yaksh.timings import Timings
 from yaksh.worker.evaluator import Evaluator, JudgeClients
 from yaksh.worker.phone_account import PhoneAccount
@@ -390,6 +391,50 @@ async def wait_for(
         return (await client.get(f"/api/v1/conversations/{conversation_id}")).json()
 
     return await eventually(conversation, lambda found: found["status"] in statuses, timeout)
+
+
+RECEIVING_APP_ID = "31216907353261579"
+RECEIVING_NUMBER = "+15716535187"
+AGENT_DATA = [{"name": "Customer name", "value": "Priya Raman"}]
+WITH_AGENT_DATA = data_sets(agent_data=AGENT_DATA)
+"""The data set of a scenario of OUTBOUND_AGENT: its trigger names the customer."""
+
+
+async def receive_outbound_calls(db: Db) -> None:
+    """The receiving application is RECEIVING_APP_ID: RECEIVING_NUMBER, once linked, is the only
+    test number."""
+    await save_settings(db, values={"phone": {"application_id": RECEIVING_APP_ID}})
+
+
+async def link_receiving_number(settings: Settings, **columns: Any) -> None:
+    engine = create_engine(settings.database_url.encoded_string())
+    async with engine.begin() as connection:
+        await connection.execute(
+            insert(PhoneNumber).values(
+                number=RECEIVING_NUMBER, application_id=RECEIVING_APP_ID, **columns
+            )
+        )
+    await engine.dispose()
+
+
+async def report_receiving_worker(
+    settings: Settings,
+    worker_id: str = "w1",
+    *,
+    receiving_app_id: str | None = RECEIVING_APP_ID,
+    outbound_problem: str | None = None,
+) -> None:
+    """Report a worker as one that receives the outbound calls, as a running worker does."""
+    engine = create_engine(settings.database_url.encoded_string())
+    async with create_sessionmaker(engine)() as session:
+        await report_worker(
+            session,
+            worker_id,
+            receiving_app_id=receiving_app_id,
+            outbound_problem=outbound_problem,
+            lease_s=FAST.worker_lease_s,
+        )
+    await engine.dispose()
 
 
 async def wait_for_lock_waiters(db: Db, count: int, timeout: float = 5.0) -> None:
@@ -1004,9 +1049,10 @@ async def client(
             text(
                 "TRUNCATE phone_numbers, refused_calls, labels, labelers, judge_calls,"
                 " evaluation_items, judge_versions, metric_values, evaluations, agent_records,"
-                " conversations,"
-                " runs, agent_versions, agents, persona_versions, personas, voices,"
-                " scenario_versions, scenarios, workers, documents, scenario_generations"
+                " conversations, runs, suite_runs, suite_entry_scenario_personas,"
+                " suite_entry_scenarios, suite_entries, suites, agent_versions, agents,"
+                " persona_versions, personas, voices, scenario_versions, scenarios, workers,"
+                " documents, scenario_generations"
             )
         )
         await connection.execute(

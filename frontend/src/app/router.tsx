@@ -15,6 +15,9 @@ import {
   RunCrumbs,
   RunsCrumbs,
   SettingsCrumbs,
+  SuiteCrumbs,
+  SuiteRunCrumbs,
+  SuitesCrumbs,
   VoicesCrumbs,
 } from "@/app/crumbs";
 import { RouteError } from "@/app/route-error";
@@ -35,6 +38,9 @@ import { ReviewPage, ReviewQueuePage, ReviewShell } from "@/pages/review";
 import { RunPage } from "@/pages/run";
 import { RunsPage } from "@/pages/runs";
 import { SettingsPage } from "@/pages/settings";
+import { SuitePage } from "@/pages/suite";
+import { SuiteRunPage } from "@/pages/suite-run";
+import { SuitesPage } from "@/pages/suites";
 import { VoicesPage } from "@/pages/voices";
 
 export const router = createBrowserRouter([
@@ -81,6 +87,9 @@ export const router = createBrowserRouter([
       },
       { path: "agents/:id", element: <AgentPage />, handle: { crumbs: AgentCrumbs } },
       { path: "numbers", element: <NumbersPage />, handle: { crumbs: NumbersCrumbs } },
+      { path: "suites", element: <SuitesPage />, handle: { crumbs: SuitesCrumbs } },
+      { path: "suites/:id", element: <SuitePage />, handle: { crumbs: SuiteCrumbs } },
+      { path: "suite-runs/:id", element: <SuiteRunPage />, handle: { crumbs: SuiteRunCrumbs } },
       { path: "runs", element: <RunsPage />, handle: { crumbs: RunsCrumbs } },
       { path: "runs/:id", element: <RunPage />, handle: { crumbs: RunCrumbs } },
       { path: "settings", element: <SettingsPage />, handle: { crumbs: SettingsCrumbs } },

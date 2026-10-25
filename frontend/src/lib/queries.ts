@@ -57,6 +57,7 @@ import {
   type RetellAgentPage,
   type ReviewConversation,
   type RuleResults,
+  FINAL_RESULTS,
   type Run,
   type RunInput,
   type RunMetrics,
@@ -71,6 +72,11 @@ import {
   type SettingsValues,
   type SoundPlan,
   type StartRequestDraft,
+  type Suite,
+  type SuiteRun,
+  type SuiteRunSummary,
+  type SuiteSummary,
+  type SuiteUpdate,
   type Surroundings,
   type VapiAccount,
   type VapiAssistantPage,
@@ -113,8 +119,13 @@ export const keys = {
       filters.createdFrom ?? "",
       filters.createdBefore ?? "",
       filters.lastHours ?? 0,
+      filters.suiteId ?? "any",
     ] as const,
   run: (id: string) => ["runs", "one", id] as const,
+  suites: (page: number) => ["suites", "list", page] as const,
+  suite: (id: string) => ["suites", "one", id] as const,
+  suiteRuns: (id: string, page: number) => ["suites", "runs", id, page] as const,
+  suiteRun: (id: string) => ["suite-runs", id] as const,
   runMetrics: (id: string) => ["runs", "metrics", id] as const,
   document: (id: string) => ["documents", id] as const,
   reviewQueue: ["review", "queue"] as const,
@@ -746,6 +757,7 @@ export interface RunFilters {
   createdBefore?: string;
   /** The runs of the hours up to each fetch. Each refetch moves the window, the query key stays. */
   lastHours?: number;
+  suiteId?: string;
 }
 
 export function useRuns(filters: RunFilters, page: number) {
@@ -755,6 +767,7 @@ export function useRuns(filters: RunFilters, page: number) {
   if (filters.status) search.set("status", filters.status);
   if (filters.createdFrom) search.set("created_from", filters.createdFrom);
   if (filters.createdBefore) search.set("created_before", filters.createdBefore);
+  if (filters.suiteId) search.set("suite_id", filters.suiteId);
   return useQuery({
     queryKey: [...keys.runs(filters), page],
     queryFn: ({ signal }) => {
@@ -829,6 +842,129 @@ export function useCancelRun(id: string) {
     mutationFn: () => api<Run>(`/runs/${id}/cancel`, { method: "POST" }),
     onSuccess: (run) => {
       client.setQueryData(keys.run(id), run);
+      void client.invalidateQueries({ queryKey: ["runs"] });
+      void client.invalidateQueries({ queryKey: ["conversations"] });
+    },
+  });
+}
+
+export const SUITES_PAGE = 25;
+
+const final = (result: SuiteRunSummary["result"] | undefined) =>
+  result === undefined || FINAL_RESULTS.includes(result);
+
+export function useSuites(page: number) {
+  const search = new URLSearchParams({ page: String(page), page_size: String(SUITES_PAGE) });
+  return useQuery({
+    queryKey: keys.suites(page),
+    queryFn: ({ signal }) => api<Page<SuiteSummary>>(`/suites?${search}`, { signal }),
+    placeholderData: keepPreviousData,
+    refetchInterval: (query) =>
+      query.state.data?.items.some((suite) => !final(suite.last_run?.result)) ? 3_000 : 15_000,
+  });
+}
+
+/** Every suite, for a menu that adds a run to one of them. */
+export function useAllSuites() {
+  return useQuery({ queryKey: ["suites", "all"], queryFn: () => all<SuiteSummary>("/suites") });
+}
+
+export function useSuite(id: string | undefined) {
+  return useQuery({
+    queryKey: keys.suite(id ?? ""),
+    queryFn: ({ signal }) => api<Suite>(`/suites/${id}`, { signal }),
+    enabled: Boolean(id),
+    refetchInterval: (query) => (final(query.state.data?.last_run?.result) ? 15_000 : 3_000),
+  });
+}
+
+export function useCreateSuite() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { name: string; required_pass_percent: number }) =>
+      api<Suite>("/suites", { method: "POST", json: input }),
+    onSuccess: (suite) => {
+      client.setQueryData(keys.suite(suite.id), suite);
+      void client.invalidateQueries({ queryKey: ["suites"] });
+    },
+  });
+}
+
+/** A save sends the revision that the client read. A 409 means the suite changed since, so the
+ * suite is read again. */
+export function useSaveSuite(id: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (input: SuiteUpdate) =>
+      api<Suite>(`/suites/${id}`, { method: "PATCH", json: input }),
+    onSuccess: (suite) => {
+      client.setQueryData(keys.suite(id), suite);
+      void client.invalidateQueries({ queryKey: ["suites", "list"] });
+      void client.invalidateQueries({ queryKey: ["suites", "all"] });
+    },
+    onError: (error) => {
+      if (error instanceof ApiError && error.status === 409) {
+        void client.invalidateQueries({ queryKey: keys.suite(id) });
+      }
+    },
+  });
+}
+
+export function useDeleteSuite(id: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: () => api<void>(`/suites/${id}`, { method: "DELETE" }),
+    onSuccess: () => void client.invalidateQueries({ queryKey: ["suites"] }),
+  });
+}
+
+/** The key makes a repeated request, such as a double click, return the suite run it started. */
+export function useStartSuite(id: string, requestKey: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      api<SuiteRun>(`/suites/${id}/runs`, {
+        method: "POST",
+        headers: { "Idempotency-Key": requestKey },
+      }),
+    onSuccess: (suiteRun) => {
+      client.setQueryData(keys.suiteRun(suiteRun.id), suiteRun);
+      void client.invalidateQueries({ queryKey: ["suites"] });
+      void client.invalidateQueries({ queryKey: ["runs"] });
+      void client.invalidateQueries({ queryKey: ["conversations"] });
+    },
+  });
+}
+
+export function useSuiteRuns(id: string, page: number) {
+  const search = new URLSearchParams({ page: String(page), page_size: String(SUITES_PAGE) });
+  return useQuery({
+    queryKey: keys.suiteRuns(id, page),
+    queryFn: ({ signal }) => api<Page<SuiteRunSummary>>(`/suites/${id}/runs?${search}`, { signal }),
+    placeholderData: keepPreviousData,
+    refetchInterval: (query) =>
+      query.state.data?.items.some((suiteRun) => !final(suiteRun.result)) ? 3_000 : 15_000,
+  });
+}
+
+/** A suite run. It refreshes until its result is final: after the calls end, the judges can
+ * still be at work. */
+export function useSuiteRun(id: string | undefined) {
+  return useQuery({
+    queryKey: keys.suiteRun(id ?? ""),
+    queryFn: ({ signal }) => api<SuiteRun>(`/suite-runs/${id}`, { signal }),
+    enabled: Boolean(id),
+    refetchInterval: (query) => (final(query.state.data?.result) ? false : 3_000),
+  });
+}
+
+export function useCancelSuiteRun(id: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: () => api<SuiteRun>(`/suite-runs/${id}/cancel`, { method: "POST" }),
+    onSuccess: (suiteRun) => {
+      client.setQueryData(keys.suiteRun(id), suiteRun);
+      void client.invalidateQueries({ queryKey: ["suites"] });
       void client.invalidateQueries({ queryKey: ["runs"] });
       void client.invalidateQueries({ queryKey: ["conversations"] });
     },

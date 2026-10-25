@@ -792,3 +792,57 @@ func TestNumbersStopShowsWhyTheServerRefused(t *testing.T) {
 		t.Fatalf("code = %d, stdout = %q, stderr = %q", code, stdout, stderr)
 	}
 }
+
+const suiteID = "5e1f0000-0000-4000-8000-00000000000c"
+
+// suiteRunJSON is a suite run of one run, which has the suite run's result.
+func suiteRunJSON(result string, passed int) string {
+	return fmt.Sprintf(`{"id":"%s","suite_id":"%s","suite_name":"Release check","result":"%s","created_at":"2026-10-24T10:00:00Z","run_count":1,"passed_run_count":%d,"runs":[{"result":"%s","run":{"id":"%s"}}]}`,
+		runID, suiteID, result, passed, result, runID)
+}
+
+func TestSuiteRunWaitExitsWithZeroOnlyWhenTheSuiteRunPassed(t *testing.T) {
+	const otherRunID = "7c1e2a0b-0000-4000-8000-000000000003"
+	// The second run decides the result; a call of it did not connect, which only its
+	// conversations show.
+	notConnected := fmt.Sprintf(`{"id":"%s","suite_id":"%s","suite_name":"Release check","result":"failed","created_at":"2026-10-24T10:00:00Z","run_count":2,"passed_run_count":0,"runs":[`+
+		`{"result":"not_decided","run":{"id":"%s","counts":{"completed":1}}},`+
+		`{"result":"failed","run":{"id":"%s","counts":{"completed":2,"did_not_connect":1}}}]}`,
+		runID, suiteID, runID, otherRunID)
+	for _, tc := range []struct {
+		result string
+		final  string
+		code   int
+		tail   string
+	}{
+		{"passed", suiteRunJSON("passed", 1), 0, "suite run " + runID + " of Release check passed: 1 of 1 runs passed\n"},
+		{"not_decided", suiteRunJSON("not_decided", 0), 1, "failed: suite run " + runID + " of Release check not decided: 0 of 1 runs passed\n" +
+			"next: yaksh run metrics " + runID + "\n"},
+		{"failed", notConnected, 1, "failed: suite run " + runID + " of Release check failed: 0 of 2 runs passed\n" +
+			"next: yaksh conversation list --run " + otherRunID + " --latest-attempts --group error,did_not_connect\n"},
+	} {
+		t.Run(tc.result, func(t *testing.T) {
+			f := newFakeAPI(t, map[string]http.HandlerFunc{
+				"POST /api/v1/suites/{id}/runs": reply(202, suiteRunJSON("running", 0)),
+				"GET /api/v1/suite-runs/{id}":   replies(suiteRunJSON("running", 0), suiteRunJSON("judging", 0), tc.final),
+			})
+			code, stdout, stderr := run(t, context.Background(), against(f), "", "suite", "run", suiteID, "--wait")
+
+			// The wait reads past "judging": the result is final only once the judges are done.
+			if code != tc.code || !strings.HasSuffix(stderr, tc.tail) || !strings.Contains(stdout, `"result": "`+tc.result+`"`) {
+				t.Fatalf("code = %d, stdout = %q, stderr = %q; want %d and %q", code, stdout, stderr, tc.code, tc.tail)
+			}
+		})
+	}
+}
+
+func TestSuiteWaitPrintsTheSuiteRunWhenTheJudgesTakeTooLong(t *testing.T) {
+	f := newFakeAPI(t, map[string]http.HandlerFunc{
+		"GET /api/v1/suite-runs/{id}": reply(200, suiteRunJSON("judging", 0)),
+	})
+	code, stdout, stderr := run(t, context.Background(), against(f), "", "suite", "wait", runID, "--timeout", "50ms")
+
+	if code != 1 || !strings.Contains(stdout, `"result": "judging"`) || !strings.Contains(stderr, "the judges were not done") {
+		t.Fatalf("code = %d, stdout = %q, stderr = %q", code, stdout, stderr)
+	}
+}

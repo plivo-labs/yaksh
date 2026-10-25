@@ -9,6 +9,7 @@
     "voicemail-and-call-screening",
     "text-tests",
     "runs",
+    "suites",
     "results",
     "judges",
     "agent-record",

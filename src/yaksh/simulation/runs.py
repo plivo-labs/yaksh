@@ -2,8 +2,8 @@ import asyncio
 import statistics
 import uuid
 from collections import defaultdict
-from collections.abc import Awaitable, Callable, Sequence
-from dataclasses import asdict, fields
+from collections.abc import Awaitable, Callable, Iterable, Sequence
+from dataclasses import asdict, dataclass, fields
 from datetime import datetime
 from typing import Any
 
@@ -14,7 +14,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
 from yaksh.config import Settings
-from yaksh.db.models import Agent, Conversation, Persona, Run, Scenario, ScenarioVersion
+from yaksh.db.models import (
+    Agent,
+    Conversation,
+    Persona,
+    Run,
+    Scenario,
+    ScenarioVersion,
+    SuiteRun,
+)
 from yaksh.domain.agents import Transport
 from yaksh.domain.answering import AnsweredBy
 from yaksh.domain.conversations import (
@@ -94,22 +102,37 @@ CallerCheck = Callable[[CallerModel], Awaitable[str | None]]
 CALLER_CHECKS_AT_ONCE = 4
 
 
-async def refuse_unserved_callers(
+@dataclass(frozen=True)
+class RefusedCaller:
+    """A caller model that the provider refused, and the pinned scenario versions that choose
+    it, with their scenarios' names."""
+
+    chosen_by: dict[uuid.UUID, str]
+    reason: str
+
+    def message(self, versions: Iterable[uuid.UUID] | None = None) -> str:
+        """Names the scenarios among these versions, or all of them."""
+        wanted = set(self.chosen_by if versions is None else versions)
+        names = [name for version, name in self.chosen_by.items() if version in wanted]
+        quoted = ", ".join(f'"{name}"' for name in names)
+        return f"{quoted}: the LLM provider refused its caller model: {self.reason}"
+
+
+async def unserved_callers(
     session: AsyncSession, check: CallerCheck, inputs: Sequence[Inputs]
-) -> None:
-    """Refuses the run when the provider refuses a caller model that a pinned scenario version
-    chooses, naming those scenarios."""
-    chosen: dict[CallerModel, list[str]] = defaultdict(list)
+) -> list[RefusedCaller]:
+    """Asks the provider once for each caller model that a pinned scenario version chooses."""
+    chosen: dict[CallerModel, dict[uuid.UUID, str]] = defaultdict(dict)
     rows = await session.execute(
-        select(Scenario.name, ScenarioVersion.config)
+        select(ScenarioVersion.id, Scenario.name, ScenarioVersion.config)
         .join(Scenario, Scenario.id == ScenarioVersion.scenario_id)
         .where(ScenarioVersion.id.in_({item.scenario_version_id for item in inputs}))
         .order_by(Scenario.name)
     )
-    for name, config in rows.tuples():
+    for version_id, name, config in rows.tuples():
         caller = ScenarioConfig.model_validate(config).caller
         if caller is not None:
-            chosen[caller].append(name)
+            chosen[caller][version_id] = name
     slots = asyncio.Semaphore(CALLER_CHECKS_AT_ONCE)
 
     async def bounded(caller: CallerModel) -> str | None:
@@ -117,14 +140,51 @@ async def refuse_unserved_callers(
             return await check(caller)
 
     reasons = await asyncio.gather(*(bounded(caller) for caller in chosen))
-    refused = [
-        f"{', '.join(f'"{name}"' for name in names)}: the LLM provider refused its caller "
-        f"model: {reason}"
-        for names, reason in zip(chosen.values(), reasons, strict=True)
+    return [
+        RefusedCaller(chosen_by, reason)
+        for chosen_by, reason in zip(chosen.values(), reasons, strict=True)
         if reason is not None
     ]
+
+
+async def refuse_unserved_callers(
+    session: AsyncSession, check: CallerCheck, inputs: Sequence[Inputs]
+) -> None:
+    """Refuses the run when the provider refuses a caller model that a pinned scenario version
+    chooses, naming those scenarios."""
+    refused = await unserved_callers(session, check, inputs)
     if refused:
-        raise ValidationError("; ".join(refused))
+        raise ValidationError("; ".join(caller.message() for caller in refused))
+
+
+@dataclass(frozen=True)
+class PreparedRun:
+    """A run that passed its checks, with the request's defaults filled in and what each of its
+    conversations pins; nothing is saved yet."""
+
+    command: RunCreate
+    inputs: list[Inputs]
+
+    @property
+    def count(self) -> int:
+        return len(self.inputs) * self.command.repeats
+
+
+async def prepare_run(
+    session: AsyncSession, settings: Settings, app: AppSettings, agent: Agent, command: RunCreate
+) -> PreparedRun:
+    """The checks of a run and the snapshot of its conversations. The caller holds the agent's
+    lock."""
+    command = with_defaults(app.limits, command)
+    check_limits(app.limits, command)
+    inputs = await snapshot(session, settings, app, agent, command.scenarios, command.transport)
+    prepared = PreparedRun(command, inputs)
+    if prepared.count > app.limits.max_run_conversations:
+        raise ValidationError(
+            f"a run starts at most {app.limits.max_run_conversations} conversations;"
+            f" {len(inputs)} different calls and {command.repeats} repeats make {prepared.count}"
+        )
+    return prepared
 
 
 async def create_run(
@@ -146,24 +206,40 @@ async def create_run(
     earlier = await earlier_run(session, request_key, request_hash)
     if earlier is not None:
         return earlier
-    command = with_defaults(app.limits, command)
-    check_limits(app.limits, command)
     agent = await get_agent(session, command.agent_id, lock=True)
     earlier = await earlier_run(session, request_key, request_hash)
     if earlier is not None:
         await session.commit()
         return earlier
-    inputs = await snapshot(session, settings, app, agent, command.scenarios, command.transport)
-    count = len(inputs) * command.repeats
-    if count > app.limits.max_run_conversations:
-        raise ValidationError(
-            f"a run starts at most {app.limits.max_run_conversations} conversations;"
-            f" {len(inputs)} different calls and {command.repeats} repeats make {count}"
-        )
+    prepared = await prepare_run(session, settings, app, agent, command)
     if check_caller is not None:
-        await refuse_unserved_callers(session, check_caller, inputs)
+        await refuse_unserved_callers(session, check_caller, prepared.inputs)
+    try:
+        run = await add_run(session, prepared, request_key=request_key, request_hash=request_hash)
+    except IntegrityError as error:
+        await session.rollback()
+        if REQUEST_KEY_INDEX not in str(error.orig):
+            raise
+        earlier = await earlier_run(session, request_key, request_hash)
+        assert earlier is not None
+        return earlier
+    await session.commit()
+    return run
+
+
+async def add_run(
+    session: AsyncSession,
+    prepared: PreparedRun,
+    *,
+    request_key: str | None = None,
+    request_hash: str | None = None,
+    suite_run_id: uuid.UUID | None = None,
+    suite_position: int | None = None,
+) -> Run:
+    """Insert a prepared run and its conversations, without a commit."""
+    command, inputs = prepared.command, prepared.inputs
     run = Run(
-        agent_id=agent.id,
+        agent_id=command.agent_id,
         agent_version_id=inputs[0].agent_version_id,
         transport=inputs[0].transport,
         name=command.name,
@@ -175,17 +251,11 @@ async def create_run(
         max_retries=command.max_retries,
         request_key=request_key,
         request_hash=request_hash,
+        suite_run_id=suite_run_id,
+        suite_position=suite_position,
     )
     session.add(run)
-    try:
-        await session.flush()
-    except IntegrityError as error:
-        await session.rollback()
-        if REQUEST_KEY_INDEX not in str(error.orig):
-            raise
-        earlier = await earlier_run(session, request_key, request_hash)
-        assert earlier is not None
-        return earlier
+    await session.flush()
     await session.execute(
         insert(Conversation),
         [
@@ -210,7 +280,6 @@ async def create_run(
             for item in inputs
         ],
     )
-    await session.commit()
     return run
 
 
@@ -230,6 +299,15 @@ async def cancel_run(session: AsyncSession, run_id: uuid.UUID) -> Run:
     """Cancel the run's queued conversations and ask the workers to end its live calls, in one
     transaction under the run's lock. A run with no active conversation stays as it is."""
     run = await get_run(session, run_id, lock=True)
+    await cancel_conversations(session, run)
+    await session.commit()
+    await session.refresh(run)
+    return run
+
+
+async def cancel_conversations(session: AsyncSession, run: Run) -> bool:
+    """The steps of `cancel_run`, without a commit; True when the run had an active
+    conversation. The caller holds the run's lock."""
     of_run = Conversation.run_id == run.id
     active = await session.scalar(
         select(Conversation.id).where(of_run, Conversation.status.in_(ACTIVE_STATUSES)).limit(1)
@@ -253,9 +331,7 @@ async def cancel_run(session: AsyncSession, run_id: uuid.UUID) -> Run:
                 ended_at=func.statement_timestamp(),
             )
         )
-    await session.commit()
-    await session.refresh(run)
-    return run
+    return active is not None
 
 
 async def get_run(session: AsyncSession, run_id: uuid.UUID, *, lock: bool = False) -> Run:
@@ -402,10 +478,15 @@ async def list_runs(
     status: RunStatus | None = None,
     created_from: datetime | None = None,
     created_before: datetime | None = None,
+    suite_id: uuid.UUID | None = None,
 ) -> tuple[list[Run], int]:
     query = select(Run)
     if agent_id is not None:
         query = query.where(Run.agent_id == agent_id)
+    if suite_id is not None:
+        query = query.where(
+            Run.suite_run_id.in_(select(SuiteRun.id).where(SuiteRun.suite_id == suite_id))
+        )
     if transport is not None:
         query = query.where(Run.transport == transport)
     if status is not None:
@@ -503,18 +584,20 @@ def counted(rows: list[Row[Any]]) -> RunProgress:
 
 
 async def counted_conversations(
-    session: AsyncSession, run_ids: Sequence[uuid.UUID]
+    session: AsyncSession, run_ids: Sequence[uuid.UUID], *, stopped: bool = False
 ) -> dict[uuid.UUID, list[uuid.UUID]]:
     """The conversations of each run that its numbers count: the latest attempt of each
-    repeat, unless it was cancelled."""
-    rows = await session.execute(
-        select(Conversation.run_id, Conversation.id).where(
-            Conversation.run_id.in_(run_ids),
-            latest_attempt(),
+    repeat, unless it was cancelled or a user ended it. With `stopped`, those count too: a
+    suite counts them as not scored."""
+    query = select(Conversation.run_id, Conversation.id).where(
+        Conversation.run_id.in_(run_ids), latest_attempt()
+    )
+    if not stopped:
+        query = query.where(
             Conversation.status != ConversationStatus.CANCELLED,
             Conversation.end_reason.is_distinct_from(EndReason.USER_REQUEST),
         )
-    )
+    rows = await session.execute(query)
     found: dict[uuid.UUID, list[uuid.UUID]] = defaultdict(list)
     for run_id, conversation_id in rows:
         found[run_id].append(conversation_id)

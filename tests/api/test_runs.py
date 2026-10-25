@@ -229,7 +229,8 @@ async def test_one_bad_scenario_refuses_the_whole_run_and_is_named(client: Async
     missing = await start_run(client, agent, [kept["id"], unknown])
     crossed = await start_run(client, agent, [kept["id"], foreign["id"]])
 
-    assert gone.status_code == 404 and deleted["id"] in gone.json()["error"]["message"]
+    assert gone.status_code == 404
+    assert gone.json()["error"]["message"] == 'the scenario "Deleted one" was deleted'
     assert missing.status_code == 404 and unknown in missing.json()["error"]["message"]
     assert crossed.status_code == 422
     assert crossed.json()["error"]["message"] == (
