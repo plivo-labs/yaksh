@@ -1,6 +1,17 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { Copy } from "lucide-react";
-import { Fragment, type RefObject, useEffect, useRef, useState } from "react";
+import { ChevronDown, Copy } from "lucide-react";
+import {
+  Fragment,
+  memo,
+  type RefObject,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { flushSync } from "react-dom";
 import { useDefaultLayout } from "react-resizable-panels";
 import { Link, useParams, useSearchParams } from "react-router";
 
@@ -12,12 +23,7 @@ import { CallSounds } from "@/components/call-sounds";
 import { EndCallDialog } from "@/components/confirm-dialogs";
 import { CopyId } from "@/components/copy-id";
 import { Fact } from "@/components/panel";
-import {
-  LiveWaveform,
-  type Mark,
-  type PlayerHandle,
-  RecordingPlayer,
-} from "@/components/recording-player";
+import { type Mark, type PlayerHandle, RecordingPlayer } from "@/components/recording-player";
 import { ResponseTime } from "@/components/response-time";
 import { ConversationStatusLabel } from "@/components/status-label";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -48,6 +54,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
+import { LiveWaveform } from "@/components/waveform";
 import {
   type CallMoment,
   answeredText,
@@ -59,6 +66,7 @@ import {
   voicemailFacts,
 } from "@/lib/answering";
 import { playedDataSet } from "@/lib/data-sets";
+import { START, type ScrollEvent, scrolled } from "@/lib/scroll-owner";
 import { copyText } from "@/lib/clipboard";
 import {
   BAND_TEXT,
@@ -73,7 +81,7 @@ import {
   words,
 } from "@/lib/format";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { useLiveListen } from "@/hooks/use-live-listen";
+import { type LiveListen, useLiveListen } from "@/hooks/use-live-listen";
 import { useStoredBoolean } from "@/hooks/use-stored-boolean";
 import { APPEAR, REVEAL, RISE } from "@/lib/motion";
 import { keys, useAgent, useConversation } from "@/lib/queries";
@@ -161,18 +169,21 @@ function ConversationView({ id }: { id: string }) {
               >
                 {agent.data?.name ?? data.agent_name}
               </Link>
-              , {data.persona_name}
+              , version {data.agent_version}, {data.persona_name}
               {playedDataSet(data) && ` · ${playedDataSet(data)}`}
             </p>
           </div>
-          <div className="flex items-center gap-4">
-            <ConversationStatusLabel status={data.status} />
-            {active && (
-              <Button variant="outline" size="sm" onClick={() => setEnding(true)}>
-                End
-              </Button>
-            )}
-            <EndCallDialog conversation={data} open={ending} onOpenChange={setEnding} />
+          <div className="grid justify-items-end gap-1">
+            <div className="flex items-center gap-4">
+              <ConversationStatusLabel status={data.status} />
+              {active && (
+                <Button variant="outline" size="sm" onClick={() => setEnding(true)}>
+                  End
+                </Button>
+              )}
+              <EndCallDialog conversation={data} open={ending} onOpenChange={setEnding} />
+            </div>
+            <ConversationIds conversation={data} />
           </div>
         </div>
         <ConversationFacts key={data.id} conversation={data} />
@@ -306,7 +317,7 @@ function ConversationFacts({ conversation }: { conversation: Conversation }) {
     ? voicemailFacts(conversation.transcript, conversation.wire_events)
     : null;
   return (
-    <dl className="flex flex-wrap gap-x-10 gap-y-3">
+    <dl className="flex flex-wrap gap-x-8 gap-y-3">
       {conversation.started_at && (
         <Fact className={arrived} label="Started">
           <span className="tabular-nums">{when(conversation.started_at)}</span>
@@ -347,14 +358,13 @@ function ConversationFacts({ conversation }: { conversation: Conversation }) {
           No caller turns
         </Fact>
       )}
-      {persona && latency?.p90_ms != null && (
-        <Fact className={arrived} label="Response p90">
-          <ResponseTime ms={latency.p90_ms} />
-        </Fact>
-      )}
-      {persona && latency?.p50_ms != null && (
-        <Fact className={arrived} label="Response p50">
-          <ResponseTime ms={latency.p50_ms} />
+      {persona && latency && (latency.p50_ms != null || latency.p90_ms != null) && (
+        <Fact className={arrived} label="Response p50 / p90">
+          <span className="flex items-center gap-1.5">
+            {latency.p50_ms != null ? <ResponseTime ms={latency.p50_ms} /> : "–"}
+            <span className="text-muted-foreground">/</span>
+            {latency.p90_ms != null ? <ResponseTime ms={latency.p90_ms} /> : "–"}
+          </span>
         </Fact>
       )}
       {persona && latency && (
@@ -369,50 +379,57 @@ function ConversationFacts({ conversation }: { conversation: Conversation }) {
         </Fact>
       )}
       <Fact className={arrived} label="Run">
-        <Link to={`/runs/${conversation.run_id}`} className="underline-offset-4 hover:underline">
-          Repeat {conversation.repeat}
-        </Link>
+        <span className="flex gap-3">
+          <Link to={`/runs/${conversation.run_id}`} className="underline-offset-4 hover:underline">
+            Repeat {conversation.repeat}
+          </Link>
+          {(conversation.retry_of || conversation.retried_as) && (
+            <span className="tabular-nums">Attempt {conversation.attempt}</span>
+          )}
+          {conversation.retry_of && (
+            <Link
+              to={`/conversations/${conversation.retry_of}`}
+              className="underline-offset-4 hover:underline"
+            >
+              Previous attempt
+            </Link>
+          )}
+          {conversation.retried_as && (
+            <Link
+              to={`/conversations/${conversation.retried_as}`}
+              className="underline-offset-4 hover:underline"
+            >
+              Next attempt
+            </Link>
+          )}
+        </span>
       </Fact>
-      {(conversation.retry_of || conversation.retried_as) && (
-        <Fact className={arrived} label="Attempt">
-          <span className="flex gap-3">
-            <span className="tabular-nums">{conversation.attempt}</span>
-            {conversation.retry_of && (
-              <Link
-                to={`/conversations/${conversation.retry_of}`}
-                className="underline-offset-4 hover:underline"
-              >
-                Previous attempt
-              </Link>
-            )}
-            {conversation.retried_as && (
-              <Link
-                to={`/conversations/${conversation.retried_as}`}
-                className="underline-offset-4 hover:underline"
-              >
-                Next attempt
-              </Link>
-            )}
-          </span>
-        </Fact>
-      )}
-      <Fact className={arrived} label="Agent version">
-        <span className="tabular-nums">{conversation.agent_version}</span>
-      </Fact>
-      <Fact label="Conversation id">
-        <CopyId id={conversation.id} label="conversation id" />
-      </Fact>
-      {conversation.call_uuid && (
-        <Fact label="Plivo call">
-          <CopyId id={conversation.call_uuid} label="Plivo call id" />
-        </Fact>
-      )}
-      {agentSession(conversation) && (
-        <Fact label="Agent session">
-          <CopyId id={agentSession(conversation) ?? ""} label="agent session id" />
-        </Fact>
-      )}
     </dl>
+  );
+}
+
+/** The ids to copy for the API, the CLI or a Plivo log search, in one quiet line. */
+function ConversationIds({ conversation }: { conversation: Conversation }) {
+  const session = agentSession(conversation);
+  return (
+    <div className="flex flex-wrap items-center justify-end gap-x-4 gap-y-1 text-xs-400 text-muted-foreground">
+      <span className="flex items-center gap-1.5">
+        Conversation
+        <CopyId id={conversation.id} label="conversation id" />
+      </span>
+      {conversation.call_uuid && (
+        <span className="flex items-center gap-1.5">
+          Plivo call
+          <CopyId id={conversation.call_uuid} label="Plivo call id" />
+        </span>
+      )}
+      {session && (
+        <span className="flex items-center gap-1.5">
+          Agent session
+          <CopyId id={session} label="agent session id" />
+        </span>
+      )}
+    </div>
   );
 }
 
@@ -449,6 +466,12 @@ function replyMark(reply: Reply, connectedMs: number): Mark {
     text: BAND_TEXT[band],
   };
 }
+
+const STRIP_PX = 64;
+/** A window shorter than this opens with the one-row player, and only Expand grows it. */
+const SHORT_WINDOW_PX = 760;
+const UP_KEYS = new Set(["ArrowUp", "PageUp", "Home"]);
+const SCROLL_KEYS = new Set([...UP_KEYS, "ArrowDown", "PageDown", "End", " "]);
 
 const MACHINE_FILL: Record<string, { fill: string; text: string }> = {
   line: { fill: "bg-status-neutral/15", text: "text-muted-foreground" },
@@ -510,20 +533,37 @@ export interface ShownTurn {
 }
 
 /** The call's audio: while the call is live, a Listen button that plays it and draws it as it
- * plays; after the call, the recording. It holds the listening, so only this card redraws as
- * the audio plays. */
+ * plays; after the call, the recording. */
 function AudioCard({
   conversation,
   player,
   start,
   onTime,
+  compact,
+  onExpand,
+  fullRef,
+  live,
 }: {
   conversation: Conversation;
   player: RefObject<PlayerHandle | null>;
   start: number;
   onTime: (seconds: number) => void;
+  /** Only the recording's one-row player shows. */
+  compact: boolean;
+  onExpand: () => void;
+  /** The full card, which keeps its size while the one-row player shows. */
+  fullRef: RefObject<HTMLDivElement | null>;
+  live: LiveListen;
 }) {
-  const live = useLiveListen(conversation.id);
+  const [strip, setStrip] = useState<HTMLDivElement | null>(null);
+  const frame = useRef<HTMLDivElement | null>(null);
+  // When the player has no control to take the focus from the box being hidden, such as from
+  // Expand, the box that shows takes it. Runs after the player's own move.
+  useLayoutEffect(() => {
+    const hidden = compact ? fullRef.current : frame.current;
+    const shown = compact ? frame.current : fullRef.current;
+    if (hidden?.contains(document.activeElement)) shown?.focus({ preventScroll: true });
+  }, [compact, fullRef]);
   const isLive = LIVE_STATUSES.includes(conversation.status);
   const connectedMs = connectedAt(conversation);
   let content;
@@ -552,11 +592,23 @@ function AudioCard({
                 ...conversation.replies.map((reply) => replyMark(reply, connectedMs)),
               ]
         }
+        strip={strip}
+        compact={compact}
       />
     );
   }
-  return (
-    <Card className="shrink-0">
+  const card = (
+    <Card
+      ref={fullRef}
+      tabIndex={-1}
+      className={cn(
+        "outline-none duration-150 ease-out motion-reduce:transition-none",
+        compact
+          ? "invisible absolute inset-x-0 top-0 opacity-0 transition-[opacity,visibility]"
+          : "transition-opacity",
+      )}
+      inert={compact}
+    >
       <CardHeader className="border-b">
         <CardTitle>Audio</CardTitle>
         {(isLive || live.listening) && (
@@ -569,6 +621,29 @@ function AudioCard({
       </CardHeader>
       <CardContent>{content}</CardContent>
     </Card>
+  );
+  // The full card and the one-row player cross-fade in place; only the full card leaves the
+  // layout, so the column changes size once and the transcript can slide into the space.
+  return (
+    <div className="relative shrink-0" style={compact ? { height: STRIP_PX } : undefined}>
+      {card}
+      <div
+        ref={frame}
+        tabIndex={-1}
+        className={cn(
+          "absolute inset-x-0 top-0 flex items-center gap-3 rounded-lg border bg-card px-3 outline-none duration-200 ease-out motion-reduce:transition-none",
+          compact ? "transition-opacity" : "invisible opacity-0 transition-[opacity,visibility]",
+        )}
+        style={{ height: STRIP_PX }}
+        inert={!compact}
+      >
+        <div ref={setStrip} className="flex h-full min-w-0 flex-1 items-center gap-3" />
+        <Button variant="outline" size="sm" onClick={onExpand}>
+          <ChevronDown />
+          Expand
+        </Button>
+      </div>
+    </div>
   );
 }
 
@@ -586,8 +661,93 @@ export function CallPane({
   shown?: ShownTurn | null;
 }) {
   const [heard, setHeard] = useState<number | null>(null);
+  const live = useLiveListen(conversation.id);
+  const [small, setSmall] = useState(() => window.innerHeight < SHORT_WINDOW_PX);
+  /** The size asked for last; a resize that a scroll queued checks it, not the render it saw. */
+  const size = useRef(small);
+  const transcript = useRef<HTMLDivElement | null>(null);
+  const view = useRef<HTMLDivElement | null>(null);
+  const audio = useRef<HTMLDivElement | null>(null);
+  const slide = useRef<Animation | null>(null);
   const connectedMs = connectedAt(conversation);
   const overText = conversation.transport === "text";
+  const shrinks =
+    !overText &&
+    conversation.recording_url !== null &&
+    !LIVE_STATUSES.includes(conversation.status) &&
+    !live.listening;
+  const compact = shrinks && small;
+  /** Changes the player's size, and slides the transcript from where it was to its new place:
+   * the layout changes once, so each frame of the slide only moves it. The distance comes from
+   * the full card, which keeps its size in both states, read before the change: reading the
+   * layout after it would force the browser to lay out the page inside this event. */
+  /** Returns whether the size changed. */
+  const resize = useCallback(
+    (next: boolean) => {
+      if (!shrinks || next === size.current) return false;
+      size.current = next;
+      const card = transcript.current;
+      const full = audio.current?.offsetHeight;
+      // A slide that is still running goes on from where it is drawn now.
+      const from =
+        card && slide.current?.playState === "running"
+          ? new DOMMatrixReadOnly(getComputedStyle(card).transform).m42
+          : 0;
+      slide.current?.cancel();
+      flushSync(() => setSmall(next));
+      if (!card || full === undefined) return true;
+      if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return true;
+      const shift = (next ? full - STRIP_PX : STRIP_PX - full) + from;
+      slide.current = card.animate(
+        [{ transform: `translateY(${shift}px)` }, { transform: "translateY(0)" }],
+        // Chrome can start the slide a moment after this frame; "backwards" holds its first
+        // position until then, so no frame shows the transcript at its end place too early.
+        { duration: 240, easing: "cubic-bezier(0.2, 0, 0, 1)", fill: "backwards" },
+      );
+      return true;
+    },
+    [shrinks],
+  );
+  const owner = useRef(START);
+  const shrinking = useRef<ReturnType<typeof setTimeout>>(undefined);
+  // A shrink that waits does not run after the page closes or the player stops shrinking.
+  useEffect(() => () => clearTimeout(shrinking.current), [resize]);
+  /** The shrink runs in a task of its own, so the layout that reading the transcript's place
+   * forces is not inside a frame. */
+  const shrink = useCallback(() => {
+    const top = resize(true) ? view.current?.scrollTop : undefined;
+    if (top !== undefined) owner.current = scrolled(owner.current, { kind: "resized", top })[0];
+  }, [resize]);
+  const feed = useCallback(
+    (event: ScrollEvent) => {
+      const [next, change] = scrolled(owner.current, event);
+      owner.current = next;
+      if (change === null) return;
+      clearTimeout(shrinking.current);
+      // Chrome sends scroll events inside the frame it is drawing; the shrink waits for the next
+      // task, so that frame is not delayed by it.
+      if (change === "shrink") {
+        if (!size.current) shrinking.current = setTimeout(shrink);
+      } else if (window.innerHeight >= SHORT_WINDOW_PX) resize(false);
+    },
+    [resize, shrink],
+  );
+  // A new window size can make the browser move the transcript to fit.
+  useEffect(() => {
+    const reset = () => feed({ kind: "code" });
+    window.addEventListener("resize", reset);
+    return () => window.removeEventListener("resize", reset);
+  }, [feed]);
+  const expand = useCallback(() => {
+    clearTimeout(shrinking.current);
+    feed({ kind: "expanded" });
+    resize(false);
+  }, [feed, resize]);
+  const play = useCallback((seconds: number) => player.current?.playFrom(seconds), [player]);
+  const moments = useMemo(
+    () => (connectedMs === undefined ? [] : callMoments(conversation, connectedMs)),
+    [conversation, connectedMs],
+  );
   return (
     <div className="flex h-full flex-col gap-6 p-px pr-3">
       {!overText && (
@@ -596,21 +756,24 @@ export function CallPane({
           player={player}
           start={start}
           onTime={(seconds) => setHeard(turnAt(conversation.transcript, connectedMs ?? 0, seconds))}
+          compact={compact}
+          onExpand={expand}
+          fullRef={audio}
+          live={live}
         />
       )}
       <Transcript
+        cardRef={transcript}
+        viewRef={view}
+        onScrollEvent={feed}
         turns={conversation.transcript}
-        moments={connectedMs === undefined ? [] : callMoments(conversation, connectedMs)}
+        moments={moments}
         active={ACTIVE_STATUSES.includes(conversation.status)}
         waiting={waitingText(conversation)}
         connectedMs={connectedMs ?? 0}
         heard={heard}
         shown={shown}
-        onPlay={
-          conversation.recording_url && connectedMs !== undefined
-            ? (seconds) => player.current?.playFrom(seconds)
-            : undefined
-        }
+        onPlay={conversation.recording_url && connectedMs !== undefined ? play : undefined}
       />
     </div>
   );
@@ -853,28 +1016,30 @@ function turnAt(turns: Turn[], connectedMs: number, seconds: number): number | n
 }
 
 /** Keeps the turn the recording plays in view. */
-function FollowAudio({ index }: { index: number | null }) {
+function FollowAudio({ index, onScroll }: { index: number | null; onScroll: () => void }) {
   const { scrollToMessage } = useMessageScroller();
   useEffect(() => {
     if (index === null) return;
     const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    onScroll();
     scrollToMessage(String(index), { align: "center", behavior: still ? "auto" : "smooth" });
-  }, [index, scrollToMessage]);
+  }, [index, scrollToMessage, onScroll]);
   return null;
 }
 
 /** Brings the turn a quote asked for into view. */
-function ShowTurn({ shown }: { shown: ShownTurn | null }) {
+function ShowTurn({ shown, onScroll }: { shown: ShownTurn | null; onScroll: () => void }) {
   const { scrollToMessage } = useMessageScroller();
   useEffect(() => {
     if (shown === null) return;
     const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    onScroll();
     scrollToMessage(String(shown.index), { align: "center", behavior: still ? "auto" : "smooth" });
-  }, [shown, scrollToMessage]);
+  }, [shown, scrollToMessage, onScroll]);
   return null;
 }
 
-function Transcript({
+const Transcript = memo(function Transcript({
   turns,
   moments,
   active,
@@ -883,6 +1048,9 @@ function Transcript({
   heard,
   shown,
   onPlay,
+  cardRef,
+  viewRef,
+  onScrollEvent,
 }: {
   turns: Turn[];
   /** Lines between the turns, by time. */
@@ -897,13 +1065,22 @@ function Transcript({
   shown: ShownTurn | null;
   /** Plays the recording from that second; absent while there is no recording. */
   onPlay?: (seconds: number) => void;
+  cardRef: RefObject<HTMLDivElement | null>;
+  viewRef: RefObject<HTMLDivElement | null>;
+  /** What happens in the scroll area, for the player's size. */
+  onScrollEvent: (event: ScrollEvent) => void;
 }) {
   const [follow, setFollow] = useStoredBoolean("yaksh.transcript.follow", true);
   /** A live call opens at its newest turn, a finished one at its first. Kept from the first
    * render, so a call that ends while it is open does not jump back to the start. */
   const [openedLive] = useState(active);
+  const touchY = useRef<number | null>(null);
+  /** Ends the press that owns the scroll, while one lasts. */
+  const pressing = useRef<AbortController | null>(null);
+  useEffect(() => () => pressing.current?.abort(), []);
+  const pageScrolls = useCallback(() => onScrollEvent({ kind: "code" }), [onScrollEvent]);
   return (
-    <Card className="min-h-0">
+    <Card ref={cardRef} className="relative z-10 min-h-0">
       <CardHeader className="shrink-0 border-b">
         <CardTitle>Transcript</CardTitle>
         {onPlay && (
@@ -926,9 +1103,75 @@ function Transcript({
             defaultScrollPosition={openedLive ? "end" : "start"}
           >
             <MessageScroller>
-              {onPlay && <FollowAudio index={follow ? heard : null} />}
-              <ShowTurn shown={shown} />
-              <MessageScrollerViewport className="pr-4">
+              {onPlay && <FollowAudio index={follow ? heard : null} onScroll={pageScrolls} />}
+              <ShowTurn shown={shown} onScroll={pageScrolls} />
+              <MessageScrollerViewport
+                ref={viewRef}
+                className="pr-4"
+                onWheel={(event) =>
+                  onScrollEvent({
+                    kind: "gesture",
+                    at: event.timeStamp,
+                    up: event.deltaY < 0,
+                    top: event.currentTarget.scrollTop,
+                  })
+                }
+                onKeyDown={(event) => {
+                  // A scroll key on a turn's button scrolls the transcript too; Space presses it.
+                  const press = event.key === " " && event.target !== event.currentTarget;
+                  if (!SCROLL_KEYS.has(event.key) || press) return;
+                  onScrollEvent({
+                    kind: "gesture",
+                    at: event.timeStamp,
+                    up: UP_KEYS.has(event.key) || (event.key === " " && event.shiftKey),
+                    top: event.currentTarget.scrollTop,
+                  });
+                }}
+                onTouchStart={(event) => {
+                  touchY.current = event.touches[0]?.clientY ?? null;
+                }}
+                onTouchMove={(event) => {
+                  const y = event.touches[0]?.clientY;
+                  if (y === undefined) return;
+                  const up = touchY.current !== null && y > touchY.current;
+                  touchY.current = y;
+                  onScrollEvent({
+                    kind: "gesture",
+                    at: event.timeStamp,
+                    up,
+                    top: event.currentTarget.scrollTop,
+                  });
+                }}
+                onFocus={(event) => {
+                  // Focus that moves to a turn, such as by Tab, scrolls the turn into view.
+                  if (event.target !== event.currentTarget) onScrollEvent({ kind: "code" });
+                }}
+                onPointerDown={(event) => {
+                  // Only a press on the scroll area itself, such as on its scrollbar, owns the
+                  // scroll: a press on a turn can scroll the turn into view.
+                  if (event.target !== event.currentTarget) {
+                    onScrollEvent({ kind: "code" });
+                    return;
+                  }
+                  pressing.current?.abort();
+                  const done = new AbortController();
+                  pressing.current = done;
+                  const release = () => {
+                    done.abort();
+                    onScrollEvent({ kind: "press", down: false });
+                  };
+                  onScrollEvent({ kind: "press", down: true });
+                  window.addEventListener("pointerup", release, { signal: done.signal });
+                  window.addEventListener("pointercancel", release, { signal: done.signal });
+                }}
+                onScroll={(event) =>
+                  onScrollEvent({
+                    kind: "scroll",
+                    at: event.timeStamp,
+                    top: event.currentTarget.scrollTop,
+                  })
+                }
+              >
                 <MessageScrollerContent className="gap-4">
                   {timeline(turns, moments).map((line) => {
                     if (line.kind === "moment") {
@@ -1017,14 +1260,14 @@ function Transcript({
                   )}
                 </MessageScrollerContent>
               </MessageScrollerViewport>
-              <MessageScrollerButton />
+              <MessageScrollerButton onClick={pageScrolls} />
             </MessageScroller>
           </MessageScrollerProvider>
         )}
       </CardContent>
     </Card>
   );
-}
+});
 
 type TranscriptLine =
   | { kind: "turn"; turn: Turn; index: number }

@@ -3,7 +3,7 @@ import { toast } from "sonner";
 
 import { listen, type LiveView } from "@/lib/listen";
 
-interface LiveListen {
+export interface LiveListen {
   listening: boolean;
   /** What has played so far, once the first sound plays. */
   view: LiveView | null;

@@ -166,7 +166,13 @@ export function ReviewPage() {
       </div>
       <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[minmax(0,1fr)_400px]">
         <div className="min-h-0">
-          <CallPane conversation={conversation} player={player} start={0} shown={shown} />
+          <CallPane
+            key={conversation.id}
+            conversation={conversation}
+            player={player}
+            start={0}
+            shown={shown}
+          />
         </div>
         <ScrollArea className="min-h-0">
           <div className="flex flex-col gap-6 p-px pr-4">

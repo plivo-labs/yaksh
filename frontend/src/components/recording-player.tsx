@@ -12,7 +12,6 @@ import {
 } from "lucide-react";
 import {
   type KeyboardEvent,
-  memo,
   type PointerEvent,
   type ReactElement,
   type ReactNode,
@@ -24,7 +23,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { flushSync } from "react-dom";
+import { createPortal, flushSync } from "react-dom";
 
 import { Segmented } from "@/components/segmented";
 import { Button } from "@/components/ui/button";
@@ -32,29 +31,21 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Skeleton } from "@/components/ui/skeleton";
 import { Slider } from "@/components/ui/slider";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Lanes, Playhead, Tile } from "@/components/waveform";
 import { useObjectUrl } from "@/hooks/use-object-url";
 import { copyText } from "@/lib/clipboard";
-import type { LiveView } from "@/lib/listen";
-import { clock, stamp } from "@/lib/format";
+import { clock } from "@/lib/format";
 import { type Recording, useRecording } from "@/lib/queries";
 import { cn } from "@/lib/utils";
+import { BARS, LANES, type Listen, RULER_PX, slice, waveformHeight } from "@/lib/waveform";
 
 const RATES = [0.75, 1, 1.25, 1.5, 2, 3];
 const STEP_S = 5;
-const LANES = ["Agent", "Caller"] as const;
-/** Bars across one view width of waveform, at every zoom. */
-const BARS = 480;
-const TICK_STEPS_S = [1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 900, 1800];
-/** Heights of the ruler, each lane and the gap between lanes; they match h-5, h-10 and gap-2. */
-const RULER_PX = 20;
-const LANE_PX = 40;
-const GAP_PX = 8;
 /** Room under the waveform for a scrollbar, so the controls stay put when one appears. */
 const SCROLLBAR_PX = 14;
 /** Wheel or pinch travel, in pixels, for one zoom step. */
 const WHEEL_STEP = 60;
 
-type Listen = "both" | "agent" | "caller";
 type Output = "mono" | "stereo";
 
 const PREFERENCES_KEY = "yaksh.player";
@@ -122,64 +113,6 @@ function build(element: HTMLAudioElement, channelCount: number): Graph {
   return { context, channels, merger, volume };
 }
 
-function isMuted(listen: Listen, index: number, count: number): boolean {
-  return count > 1 && listen !== "both" && LANES[index].toLowerCase() !== listen;
-}
-
-/** The peak of each of BARS equal slices of a lane between two 10 ms buckets. */
-function slice(lane: Float32Array, from: number, to: number): number[] {
-  const per = (to - from) / BARS;
-  return Array.from({ length: BARS }, (_, bar) => {
-    const start = Math.floor(from + bar * per);
-    const end = Math.max(start + 1, Math.floor(from + (bar + 1) * per));
-    let peak = 0;
-    for (let i = start; i < Math.min(end, lane.length); i++) peak = Math.max(peak, lane[i]);
-    return peak;
-  });
-}
-
-/** A live call as it plays: the same lanes as the recording, filling from the left, with the
- * played part darker. */
-export function LiveWaveform({ view }: { view: LiveView }) {
-  const { lanes, span, played } = view;
-  const contentPx = RULER_PX + lanes.length * LANE_PX + (lanes.length - 1) * GAP_PX;
-  const fraction = played / span;
-  return (
-    <div className="grid gap-3">
-      <div className="grid grid-cols-[3rem_minmax(0,1fr)] gap-x-2">
-        <div className="grid content-start gap-2 pt-5 text-xs-400 text-muted-foreground">
-          {LANES.map((lane) => (
-            <span key={lane} className="flex h-10 items-center">
-              {lane}
-            </span>
-          ))}
-        </div>
-        <div
-          role="img"
-          aria-label={`Live audio of the call, ${clock(played * 1000)} heard`}
-          className="relative"
-          style={{ height: contentPx }}
-        >
-          <Tile
-            index={0}
-            zoom={1}
-            lanes={lanes}
-            duration={span}
-            listen="both"
-            played={fraction * 100}
-          />
-          <span
-            aria-hidden
-            className="pointer-events-none absolute inset-y-0 w-px bg-foreground/70"
-            style={{ left: `${fraction * 100}%` }}
-          />
-        </div>
-      </div>
-      <p className="text-p-400 text-muted-foreground tabular-nums">Live, {clock(played * 1000)}</p>
-    </div>
-  );
-}
-
 /** What a page can ask of a loaded recording. */
 export interface PlayerHandle {
   /** Plays from that second of the recording. */
@@ -199,6 +132,14 @@ export interface Mark {
   text: string;
 }
 
+/** A mark's place along the timeline. */
+function place(mark: Mark, duration: number) {
+  return {
+    left: `${(mark.from / duration) * 100}%`,
+    width: `${(Math.max(mark.to - mark.from, 0) / duration) * 100}%`,
+  };
+}
+
 /** How near a band, in pixels, the pointer counts as on it: a short wait is a narrow band. */
 const MARK_REACH_PX = 4;
 
@@ -215,6 +156,8 @@ export function RecordingPlayer({
   ref,
   onTime,
   marks = [],
+  strip = null,
+  compact = false,
 }: {
   url: string | null;
   name: string;
@@ -223,15 +166,32 @@ export function RecordingPlayer({
   /** Hears where playback is, a few times a second and on each seek. */
   onTime?: (seconds: number) => void;
   marks?: Mark[];
+  /** Where to draw the one-row player as well: the same playback, so a page can show either
+   * size without stopping it. */
+  strip?: HTMLElement | null;
+  /** Only the strip shows: the full player's menus close, and focus moves to the strip. */
+  compact?: boolean;
 }) {
   const recording = useRecording(url);
   if (url === null) {
     return <p className="text-p-400 text-muted-foreground">Available once the call has ended.</p>;
   }
   if (recording.isError) {
-    return <p className="text-p-400 text-destructive">The recording did not load.</p>;
+    return (
+      <>
+        <p className="text-p-400 text-destructive">The recording did not load.</p>
+        {strip && createPortal(<StripNote>The recording did not load.</StripNote>, strip)}
+      </>
+    );
   }
-  if (recording.isPending) return <Skeleton className="h-40 w-full" />;
+  if (recording.isPending) {
+    return (
+      <>
+        <Skeleton className="h-40 w-full" />
+        {strip && createPortal(<StripNote>Loading the recording</StripNote>, strip)}
+      </>
+    );
+  }
   return (
     <Player
       key={url}
@@ -241,8 +201,14 @@ export function RecordingPlayer({
       ref={ref}
       onTime={onTime}
       marks={marks}
+      strip={strip}
+      compact={compact}
     />
   );
+}
+
+function StripNote({ children }: { children: ReactNode }) {
+  return <span className="truncate text-p-400 text-muted-foreground">{children}</span>;
 }
 
 function Player({
@@ -252,6 +218,8 @@ function Player({
   ref,
   onTime,
   marks,
+  strip,
+  compact,
 }: {
   recording: Recording;
   name: string;
@@ -259,15 +227,31 @@ function Player({
   ref?: Ref<PlayerHandle>;
   onTime?: (seconds: number) => void;
   marks: Mark[];
+  strip: HTMLElement | null;
+  compact: boolean;
 }) {
   const { duration, lanes } = recording;
   const src = useObjectUrl(recording.blob);
+  const overview = useMemo(() => lanes.map((lane) => slice(lane, 0, lane.length)), [lanes]);
   const stereo = lanes.length > 1;
   const maxZoom = 2 ** Math.max(0, Math.floor(Math.log2(lanes[0].length / BARS)));
-  const contentPx = RULER_PX + lanes.length * LANE_PX + (lanes.length - 1) * GAP_PX;
+  const contentPx = waveformHeight(lanes.length);
 
   const audio = useRef<HTMLAudioElement | null>(null);
   const graph = useRef<Graph | null>(null);
+  const full = useRef<HTMLDivElement | null>(null);
+  const fullPlay = useRef<HTMLButtonElement | null>(null);
+  const stripPlay = useRef<HTMLButtonElement | null>(null);
+  const fullSeek = useRef<HTMLDivElement | null>(null);
+  const stripSeek = useRef<HTMLDivElement | null>(null);
+  const [menu, setMenu] = useState<"volume" | "playback" | null>(null);
+  // A size change closes the full player's menus: they open in a layer of their own, which the
+  // hidden box's inert does not reach.
+  const [sized, setSized] = useState(compact);
+  if (sized !== compact) {
+    setSized(compact);
+    setMenu(null);
+  }
   const viewport = useRef<HTMLDivElement | null>(null);
   const frame = useRef(0);
   const scrub = useRef<{ resume: boolean } | null>(null);
@@ -425,6 +409,9 @@ function Player({
     if (view && box && event.clientX > box.right) view.scrollLeft += event.clientX - box.right;
     else if (view && box && event.clientX < box.left) view.scrollLeft -= box.left - event.clientX;
   };
+  const drag = (event: PointerEvent<HTMLDivElement>) => {
+    if (scrub.current) seek(at(event) * duration);
+  };
   const release = () => {
     if (scrub.current?.resume) void play();
     scrub.current = null;
@@ -436,7 +423,9 @@ function Player({
   const key = (event: KeyboardEvent<HTMLDivElement>) => {
     const actions: Record<string, () => void> = {
       ArrowRight: () => seek(time + STEP_S, true),
+      ArrowUp: () => seek(time + STEP_S, true),
       ArrowLeft: () => seek(time - STEP_S, true),
+      ArrowDown: () => seek(time - STEP_S, true),
       Home: () => seek(0, true),
       End: () => seek(duration, true),
       " ": toggle,
@@ -486,6 +475,31 @@ function Player({
     setShift(Math.max(-x, Math.min(-width / 2, view.clientWidth - x - width)));
   }, [hover]);
 
+  // The box being hidden turns inert, which would drop the focus; it moves to the same control
+  // in the box that shows: a slider to the other slider, so the arrow keys go on seeking, and
+  // any other control to Play. Runs before the browser's own focus fixup.
+  useLayoutEffect(() => {
+    const hidden = compact ? full.current : strip;
+    const focused = document.activeElement;
+    if (!hidden?.contains(focused)) return;
+    const onSlider = focused === fullSeek.current || focused === stripSeek.current;
+    const [seekTo, playTo] = compact ? [stripSeek, stripPlay] : [fullSeek, fullPlay];
+    (onSlider ? seekTo : playTo).current?.focus({ preventScroll: true });
+  }, [compact, strip]);
+
+  const seekArea = {
+    role: "slider",
+    tabIndex: 0,
+    "aria-label": "Position in the recording",
+    "aria-valuemin": 0,
+    "aria-valuemax": Math.round(duration),
+    "aria-valuenow": Math.round(time),
+    "aria-valuetext": `${clock(time * 1000)} of ${clock(duration * 1000)}`,
+    onPointerDown: press,
+    onPointerUp: release,
+    onPointerCancel: release,
+    onKeyDown: key,
+  } as const;
   const fraction = duration > 0 ? time / duration : 0;
   const tiles: number[] = [];
   for (let index = Math.max(0, first - 1); index <= Math.min(zoom - 1, first + 2); index++) {
@@ -493,7 +507,10 @@ function Player({
   }
 
   return (
-    <div className="grid gap-3 transition-opacity duration-200 ease-out starting:opacity-0">
+    <div
+      ref={full}
+      className="grid gap-3 transition-opacity duration-200 ease-out starting:opacity-0"
+    >
       <audio
         ref={attachAudio}
         src={src}
@@ -532,19 +549,10 @@ function Player({
           style={{ height: contentPx + SCROLLBAR_PX }}
         >
           <div
-            role="slider"
-            tabIndex={0}
-            aria-label="Position in the recording"
-            aria-valuemin={0}
-            aria-valuemax={Math.round(duration)}
-            aria-valuenow={Math.round(time)}
-            aria-valuetext={`${clock(time * 1000)} of ${clock(duration * 1000)}`}
-            onPointerDown={press}
+            {...seekArea}
+            ref={fullSeek}
             onPointerMove={move}
-            onPointerUp={release}
-            onPointerCancel={release}
             onPointerLeave={() => setHover(null)}
-            onKeyDown={key}
             className="@container relative cursor-pointer touch-none rounded-sm outline-none select-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-inset"
             style={{ width: `${zoom * 100}%`, height: contentPx }}
           >
@@ -564,10 +572,7 @@ function Player({
                 key={`${mark.from}-${mark.to}`}
                 aria-hidden
                 className="pointer-events-none absolute inset-y-0"
-                style={{
-                  left: `${(mark.from / duration) * 100}%`,
-                  width: `${(Math.max(mark.to - mark.from, 0) / duration) * 100}%`,
-                }}
+                style={place(mark, duration)}
               >
                 <span
                   className={cn("absolute inset-x-0 bottom-0", mark.fill)}
@@ -601,16 +606,17 @@ function Player({
                 </span>
               </span>
             )}
-            <span
-              aria-hidden
-              className="pointer-events-none absolute inset-y-0 w-px bg-foreground/70"
-              style={{ left: `${fraction * 100}%` }}
-            />
+            <Playhead fraction={fraction} />
           </div>
         </div>
       </div>
       <div className="flex items-center gap-1">
-        <Button size="icon-sm" aria-label={playing ? "Pause" : "Play"} onClick={toggle}>
+        <Button
+          ref={fullPlay}
+          size="icon-sm"
+          aria-label={playing ? "Pause" : "Play"}
+          onClick={toggle}
+        >
           {playing ? <Pause /> : <Play />}
         </Button>
         <span className="ml-2 text-p-400 tabular-nums">
@@ -667,7 +673,10 @@ function Player({
               <Divider />
             </>
           )}
-          <Popover>
+          <Popover
+            open={menu === "volume"}
+            onOpenChange={(open) => setMenu(open ? "volume" : null)}
+          >
             <Hint
               label="Volume"
               shortcut="M"
@@ -679,7 +688,7 @@ function Player({
             >
               <VolumeIcon volume={volume} />
             </Hint>
-            <PopoverContent align="end" className="w-64">
+            <PopoverContent align="end" className="w-64" finalFocus={compact ? stripPlay : true}>
               <div className="grid gap-1.5">
                 <span className="text-xs-400 text-muted-foreground">Volume</span>
                 <div className="flex items-center gap-2">
@@ -735,14 +744,17 @@ function Player({
           >
             <Download />
           </Hint>
-          <Popover>
+          <Popover
+            open={menu === "playback"}
+            onOpenChange={(open) => setMenu(open ? "playback" : null)}
+          >
             <PopoverTrigger
               render={<Button variant="ghost" size="sm" aria-label="Playback settings" />}
             >
               <Settings2 />
               <span className="tabular-nums">{rate}×</span>
             </PopoverTrigger>
-            <PopoverContent align="end" className="w-auto">
+            <PopoverContent align="end" className="w-auto" finalFocus={compact ? stripPlay : true}>
               {stereo && (
                 <div className="flex gap-6">
                   <Segmented
@@ -776,98 +788,50 @@ function Player({
           </Popover>
         </div>
       </div>
+      {strip &&
+        createPortal(
+          <>
+            <Button
+              ref={stripPlay}
+              size="icon-sm"
+              aria-label={playing ? "Pause" : "Play"}
+              onClick={toggle}
+            >
+              {playing ? <Pause /> : <Play />}
+            </Button>
+            <span className="shrink-0 text-p-400 tabular-nums">
+              {clock(time * 1000)}
+              <span className="text-muted-foreground"> / {clock(duration * 1000)}</span>
+            </span>
+            <div
+              {...seekArea}
+              ref={stripSeek}
+              onPointerMove={drag}
+              className="relative grid h-9 min-w-0 flex-1 cursor-pointer touch-none content-center rounded-sm outline-none select-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-inset"
+            >
+              {marks.map((mark) => (
+                <span
+                  key={`${mark.from}-${mark.to}`}
+                  aria-hidden
+                  className={cn("pointer-events-none absolute inset-y-0", mark.fill)}
+                  style={place(mark, duration)}
+                />
+              ))}
+              <Lanes peaks={overview} listen={listen} className="gap-1 opacity-30" lane="h-4" />
+              <div
+                className="absolute inset-0 grid content-center"
+                style={{ clipPath: `inset(0 ${100 - fraction * 100}% 0 0)` }}
+              >
+                <Lanes peaks={overview} listen={listen} className="gap-1" lane="h-4" />
+              </div>
+              <Playhead fraction={fraction} />
+            </div>
+          </>,
+          strip,
+        )}
     </div>
   );
 }
-
-/** One view-width slice of the timeline: its ruler and every lane. Only the slices around the
- * view are mounted, so a long call at a deep zoom stays light. */
-const Tile = memo(function Tile({
-  index,
-  zoom,
-  lanes,
-  duration,
-  listen,
-  played,
-}: {
-  index: number;
-  zoom: number;
-  lanes: Float32Array[];
-  duration: number;
-  listen: Listen;
-  played: number;
-}) {
-  const peaks = useMemo(
-    () =>
-      lanes.map((lane) =>
-        slice(lane, (index * lane.length) / zoom, ((index + 1) * lane.length) / zoom),
-      ),
-    [lanes, index, zoom],
-  );
-  const span = duration / zoom;
-  const step =
-    TICK_STEPS_S.find((candidate) => candidate >= span / 8) ??
-    TICK_STEPS_S[TICK_STEPS_S.length - 1];
-  // A tick too close to the end of the call has no room for its label.
-  const last = Math.min((index + 1) * span, duration - span * 0.04);
-  const ticks: number[] = [];
-  for (let tick = Math.ceil((index * span) / step) * step; tick < last; tick += step) {
-    ticks.push(tick);
-  }
-  return (
-    <div
-      className="absolute inset-y-0"
-      style={{ left: `${(index / zoom) * 100}%`, width: `${100 / zoom}%` }}
-    >
-      <div className="relative h-5">
-        {ticks.map((tick) => (
-          <span
-            key={tick}
-            className="absolute top-0 h-full border-l pl-1 text-xxs-400 leading-4 text-muted-foreground tabular-nums"
-            style={{ left: `${((tick - index * span) / span) * 100}%` }}
-          >
-            {stamp(tick)}
-          </span>
-        ))}
-      </div>
-      <div className="relative">
-        <Lanes peaks={peaks} listen={listen} className="opacity-30" />
-        <div className="absolute inset-0" style={{ clipPath: `inset(0 ${100 - played}% 0 0)` }}>
-          <Lanes peaks={peaks} listen={listen} />
-        </div>
-      </div>
-    </div>
-  );
-});
-
-const Lanes = memo(function Lanes({
-  peaks,
-  listen,
-  className = "",
-}: {
-  peaks: number[][];
-  listen: Listen;
-  className?: string;
-}) {
-  return (
-    <div className={`grid gap-2 ${className}`}>
-      {peaks.map((lane, index) => (
-        <svg
-          key={index}
-          viewBox={`0 0 ${lane.length} 2`}
-          preserveAspectRatio="none"
-          aria-hidden
-          className={`h-10 w-full fill-current transition-opacity duration-150 ${index === 0 ? "text-foreground" : "text-chart-1"} ${isMuted(listen, index, peaks.length) ? "opacity-30" : ""}`}
-        >
-          {lane.map((peak, bar) => {
-            const height = Math.max(peak, 0.02);
-            return <rect key={bar} x={bar + 0.15} width={0.7} y={1 - height} height={height * 2} />;
-          })}
-        </svg>
-      ))}
-    </div>
-  );
-});
 
 function Hint({
   label,
