@@ -4,13 +4,15 @@ transcript taps, and how a call ends."""
 import asyncio
 import contextlib
 import logging
-from collections.abc import Awaitable, Callable, Iterable, Mapping, Sequence
+from collections.abc import AsyncIterator, Awaitable, Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
 # The OpenAI client imports about 600 modules at its first request. Import them with this module,
 # at worker start, and not on the event loop of a live call.
 import openai.resources.responses  # noqa: F401
+from openai import APIError, AsyncStream
+from openai.types.responses import ResponseStreamEvent
 from pipecat.adapters.llm.schemas.function_schema import FunctionSchema
 from pipecat.adapters.llm.schemas.tools_schema import ToolsSchema
 from pipecat.audio.vad.vad_analyzer import VADParams
@@ -63,7 +65,7 @@ from yaksh.domain.conversations import (
 from yaksh.domain.latency import VAD_CONFIDENCE, VAD_START_S, VAD_STOP_S
 from yaksh.domain.settings import AppSettings, CallerModel
 from yaksh.integrations import elevenlabs
-from yaksh.integrations.openai_models import caller_effort
+from yaksh.integrations.openai_models import caller_effort, failure, retry_rate_limits
 
 log = logging.getLogger(__name__)
 
@@ -123,21 +125,66 @@ def caller_keys(settings: AppSettings) -> CallerKeys:
     )
 
 
+class Replayed(AsyncStream[ResponseStreamEvent]):
+    """A stream whose first event was read to check it: it gives that event again, then the
+    rest. It overrides each method that reads the stream; the inherited close() closes the
+    response that it shares with the stream."""
+
+    def __init__(self, first: ResponseStreamEvent, rest: AsyncStream[ResponseStreamEvent]) -> None:
+        self.response = rest.response
+        self._first: ResponseStreamEvent | None = first
+        self._rest = rest
+
+    async def __anext__(self) -> ResponseStreamEvent:
+        if self._first is None:
+            return await self._rest.__anext__()
+        first, self._first = self._first, None
+        return first
+
+    async def __aiter__(self) -> AsyncIterator[ResponseStreamEvent]:
+        while True:
+            try:
+                yield await self.__anext__()
+            except StopAsyncIteration:
+                return
+
+
+class PersonaLLM(OpenAIResponsesHttpLLMService):
+    """Asks again after a rate limit that comes before the reply's first event. The stream goes
+    to Pipecat only after its first event is in, so a retry never repeats part of a reply."""
+
+    refusal: str | None = None
+    """Why the model refused the latest request, until a later request gets its first event."""
+
+    async def _create_stream(self, params: dict) -> AsyncStream[ResponseStreamEvent]:
+        return await retry_rate_limits(lambda: self._opened(params), self._refused)
+
+    async def _opened(self, params: dict) -> AsyncStream[ResponseStreamEvent]:
+        stream = await super()._create_stream(params)
+        try:
+            first = await anext(stream)
+        except StopAsyncIteration:
+            return stream
+        self.refusal = None
+        return Replayed(first, stream)
+
+    def _refused(self, error: APIError) -> None:
+        self.refusal = failure(error)
+
+
 def llm_service(
     settings: AppSettings, caller: CallerModel, keys: CallerKeys, instructions: str
-) -> OpenAIResponsesHttpLLMService:
+) -> PersonaLLM:
     """The persona's model over the Responses API, at `caller_effort`. A reply calls at most one
     tool, so it can end the call only once."""
     effort = caller_effort(caller.model, caller.reasoning_effort)
-    return OpenAIResponsesHttpLLMService(
+    return PersonaLLM(
         api_key=keys.llm,
         base_url=settings.llm.base_url,
-        settings=OpenAIResponsesHttpLLMService.Settings(
+        settings=PersonaLLM.Settings(
             model=caller.model,
             system_instruction=instructions,
-            reasoning=OpenAIResponsesHttpLLMService.ReasoningConfig(effort=effort)
-            if effort
-            else None,
+            reasoning=PersonaLLM.ReasoningConfig(effort=effort) if effort else None,
             extra={"parallel_tool_calls": False},
         ),
     )
@@ -489,6 +536,8 @@ async def converse(
     broken = persona.unusable()
     if broken:
         state.blame(f"{', '.join(broken)} stopped working")
+    if persona.llm.refusal is not None:
+        state.blame(f"the caller's model refused its last request: {persona.llm.refusal}")
 
 
 async def close(quiet: Callable[[], bool], interrupts: Iterable[asyncio.Future[Any]]) -> None:

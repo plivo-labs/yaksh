@@ -167,6 +167,7 @@ class Line:
 
     def __init__(self, *, quiet: bool) -> None:
         self.worker = PipelineWorker(Pipeline([]), idle_timeout_secs=None, enable_rtvi=False)
+        self.llm = SimpleNamespace(refusal=None)
         self._quiet = quiet
 
     def quiet(self) -> bool:
