@@ -11,8 +11,8 @@ from typing import Any, Protocol
 # The OpenAI client imports about 600 modules at its first request. Import them with this module,
 # at worker start, and not on the event loop of a live call.
 import openai.resources.responses  # noqa: F401
-from pipecat.adapters.schemas.function_schema import FunctionSchema
-from pipecat.adapters.schemas.tools_schema import ToolsSchema
+from pipecat.adapters.llm.schemas.function_schema import FunctionSchema
+from pipecat.adapters.llm.schemas.tools_schema import ToolsSchema
 from pipecat.audio.vad.vad_analyzer import VADParams
 from pipecat.frames.frames import (
     ErrorFrame,
