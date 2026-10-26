@@ -307,8 +307,8 @@ async def test_each_run_counts_its_own_calls_and_a_failed_voicemail_call_fails_i
     assert [part["result"] for part in found["runs"]] == ["not_decided", "failed"]
     assert found["result"] == "failed"
     numbers = [part["numbers"] for part in found["runs"]]
-    assert [(n["passed"], n["failed"], n["not_scored"]) for n in numbers] == [(2, 0, 2), (2, 0, 0)]
-    assert [(n["unplayed_passed"], n["unplayed_failed"]) for n in numbers] == [(0, 0), (0, 1)]
+    assert [(n["passed"], n["failed"], n["not_scored"]) for n in numbers] == [(2, 0, 2), (1, 0, 0)]
+    assert [(n["unplayed_passed"], n["unplayed_failed"]) for n in numbers] == [(0, 0), (1, 1)]
 
 
 async def judge(db: Db) -> Evaluation | None:

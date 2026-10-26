@@ -119,8 +119,9 @@ class TranscriptBuilder:
         self._closed: Playout | None = None
         self.agent_speaking = False
         self.agent_spoke = False
-        self.agent_turns = 0
-        """How many agent turns have ended."""
+        self._agent_turn_ended_ms: int | None = None
+        self.caller_closed_ms: int | None = None
+        """When the last caller reply closed: its audio played, or it was cut."""
         self.agent_voice = False
         """The voice detector hears the agent now."""
         self.agent_voice_ended_ms: int | None = None
@@ -167,17 +168,24 @@ class TranscriptBuilder:
         self.agent_voice = False
         self._voice_stopped = self.agent_voice_ended_ms = self._clock.ms() - round(stop_secs * 1000)
 
+    def agent_turn_ended_since(self, ms: int) -> bool:
+        """An agent turn ended at or after ms, timed by its voice when the detector heard it."""
+        return self._agent_turn_ended_ms is not None and self._agent_turn_ended_ms >= ms
+
     def agent_said(self, text: str) -> None:
         self.agent_spoke = True
-        self.agent_turns += 1
         now = self._clock.ms()
         started = self._voice_started if self._voice_started is not None else self._agent_started
         stopped = self._voice_stopped if self._voice_stopped is not None else self._agent_stopped
         started = now if started is None else started
         stopped = now if stopped is None else stopped
+        self._agent_turn_ended_ms = max(started, stopped)
         self._observer.turn(
             Turn(
-                role=Role.AGENT, text=text, started_at_ms=started, ended_at_ms=max(started, stopped)
+                role=Role.AGENT,
+                text=text,
+                started_at_ms=started,
+                ended_at_ms=self._agent_turn_ended_ms,
             )
         )
         self._agent_started = self._agent_stopped = None
@@ -271,7 +279,7 @@ class TranscriptBuilder:
         self._reply = None
         if reply.playout is not None:
             self._closed = reply.playout
-        now = self._clock.ms()
+        now = self.caller_closed_ms = self._clock.ms()
         queued = self._generated.popleft() if self._generated else Queued("")
         heard = reply.heard()
         text = ("" if reply.self_spaced else " ").join(heard).strip()

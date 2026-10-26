@@ -10,7 +10,7 @@ from functools import partial
 from yaksh.db.models import Conversation
 from yaksh.domain.agent_records import StoredRecord
 from yaksh.domain.agents import AgentConfig, Direction, Transport
-from yaksh.domain.answering import AnsweredBy, Answering, plays_scenario, reaches
+from yaksh.domain.answering import AnsweredBy, Answering, reaches
 from yaksh.domain.conversations import (
     CallerSettings,
     CallerUsage,
@@ -18,6 +18,8 @@ from yaksh.domain.conversations import (
     Transcript,
     Turn,
     judges_score,
+    picked_up,
+    voicemail_answered,
 )
 from yaksh.domain.evaluations import DecidedBy, ItemRole, Metric, MetricKey, Outcome, UnsureKind
 from yaksh.domain.files import FileStore
@@ -97,13 +99,17 @@ async def evaluate(
     if not judged(conversation):
         return Evaluated(metrics=found)
     turns = transcript.turns
-    reached = reaches(conversation.answered_by, answering)
+    reached = reaches(
+        conversation.answered_by,
+        picked_up=picked_up(transcript.wire_events),
+        voicemail_answered=voicemail_answered(turns),
+    )
     agent_rules = [rule for rule in agent.rules if in_scope(rule, reached)]
     if judging is None:
         phrases = [phrase_item(rule, turns) for rule in agent_rules if isinstance(rule, PhraseRule)]
         return Evaluated(metrics=found, items=phrases)
     view = render(call_view(conversation, agent, scenario, transcript, answering, record))
-    played = plays_scenario(conversation.answered_by, answering)
+    played = AnsweredBy.CALLER in reached
     criteria_text = scenario.criteria if played else []
     kept = record.record if record is not None else None
     lines = record_lines(kept) if kept is not None else []

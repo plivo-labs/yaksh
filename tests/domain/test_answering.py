@@ -1,29 +1,28 @@
 import pytest
 
-from yaksh.domain.answering import AfterScreening, AnsweredBy, Answering, plays_scenario, reaches
+from yaksh.domain.answering import AnsweredBy, Answering, plays_scenario, reaches
 from yaksh.domain.rules import LlmRule, PhraseExpectation, PhraseRule, RuleScope, in_scope
 
 CALLER, VOICEMAIL, SCREENER = AnsweredBy.CALLER, AnsweredBy.VOICEMAIL, AnsweredBy.SCREENER
 
 
 @pytest.mark.parametrize(
-    ("answered_by", "after", "reached"),
+    ("answered_by", "picked_up", "voicemail_answered", "reached"),
     [
-        (CALLER, AfterScreening.REPLY, {CALLER}),
-        (VOICEMAIL, AfterScreening.PICKS_UP, {VOICEMAIL}),
-        (SCREENER, AfterScreening.PICKS_UP, {SCREENER, CALLER}),
-        (SCREENER, AfterScreening.VOICEMAIL, {SCREENER, VOICEMAIL}),
-        (SCREENER, AfterScreening.REPLY, {SCREENER}),
-        (SCREENER, AfterScreening.DECLINES, {SCREENER}),
+        (CALLER, False, False, {CALLER}),
+        (VOICEMAIL, False, False, {VOICEMAIL}),
+        (SCREENER, True, False, {SCREENER, CALLER}),
+        (SCREENER, False, True, {SCREENER, VOICEMAIL}),
+        (SCREENER, False, False, {SCREENER}),
     ],
 )
-def test_a_screener_passes_the_call_on_only_to_who_answers_after_it(
-    answered_by: AnsweredBy, after: AfterScreening, reached: set[AnsweredBy]
+def test_a_screener_call_reaches_only_who_answered_after_it_on_the_call(
+    answered_by: AnsweredBy, picked_up: bool, voicemail_answered: bool, reached: set[AnsweredBy]
 ) -> None:
-    answering = Answering(after_screening=after)
-
-    assert reaches(answered_by, answering) == reached
-    assert plays_scenario(answered_by, answering) is (CALLER in reached)
+    assert (
+        reaches(answered_by, picked_up=picked_up, voicemail_answered=voicemail_answered) == reached
+    )
+    assert plays_scenario(answered_by, picked_up=picked_up) is (CALLER in reached)
 
 
 def test_a_persona_with_no_answering_settings_has_the_most_common_phone() -> None:

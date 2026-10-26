@@ -216,7 +216,7 @@ function ConversationView({ id }: { id: string }) {
                     evaluation={data.evaluation}
                     onTurn={showTurn}
                     notPlayed={
-                      playsScenario(data.answered_by, data.answering)
+                      playsScenario(data.answered_by, data.wire_events)
                         ? null
                         : `${data.answered_by === "voicemail" ? "A voicemail" : "A call screener"} answered, so no caller talked.`
                     }
@@ -294,7 +294,7 @@ function ConversationFacts({ conversation }: { conversation: Conversation }) {
   const [initial] = useState(conversation.status);
   const arrived = conversation.status === initial ? undefined : APPEAR;
   const answered = conversation.answered_by !== "caller";
-  const persona = playsScenario(conversation.answered_by, conversation.answering);
+  const persona = playsScenario(conversation.answered_by, conversation.wire_events);
   const voicemail = answered
     ? voicemailFacts(conversation.transcript, conversation.wire_events)
     : null;

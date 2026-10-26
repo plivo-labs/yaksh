@@ -23,11 +23,13 @@ from yaksh.domain.conversations import (
     Turn,
     WireEvent,
     WireEventKind,
+    picked_up,
+    voicemail_answered,
 )
 from yaksh.domain.record_sources import RECORD_PROVIDERS
 from yaksh.domain.scenarios import Fact
 
-EVIDENCE_VIEW_VERSION = 5
+EVIDENCE_VIEW_VERSION = 6
 
 TRANSCRIPTION_NOTE = {
     Transport.PHONE: (
@@ -199,9 +201,9 @@ def answered(view: CallView) -> list[str]:
     lines = [
         f"Answered by: the call screener of Yaksh's caller ({SCREENER_LABELS[answering.screener]})."
     ]
-    if any(event.kind is WireEventKind.HANDOVER for event in view.events):
+    if picked_up(view.events):
         lines.append("After the screener, Yaksh's caller picked up.")
-    elif any(turn.machine is MachineLine.GREETING for turn in view.turns):
+    elif voicemail_answered(view.turns):
         lines.append(f"After the screener, the voicemail of Yaksh's caller answered ({voicemail}).")
     return lines
 

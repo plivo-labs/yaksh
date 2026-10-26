@@ -1,5 +1,6 @@
 import asyncio
 import uuid
+from collections.abc import Iterable
 from datetime import datetime
 from enum import StrEnum
 from typing import Protocol
@@ -222,6 +223,16 @@ class Transcript(BaseModel):
         """The call's audio started. The event is in the record even when the call later
         failed, as when its worker stopped."""
         return any(event.kind is WireEventKind.CONNECTED for event in self.wire_events)
+
+
+def picked_up(events: Iterable[WireEvent]) -> bool:
+    """The persona picked up after its call screener."""
+    return any(event.kind is WireEventKind.HANDOVER for event in events)
+
+
+def voicemail_answered(turns: Iterable[Turn]) -> bool:
+    """The persona's voicemail played its greeting or its full-mailbox line."""
+    return any(turn.machine in (MachineLine.GREETING, MachineLine.MAILBOX_FULL) for turn in turns)
 
 
 class LineFacts(BaseModel):

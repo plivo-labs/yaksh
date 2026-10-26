@@ -30,7 +30,7 @@ In the API, give `answered_by` in each item of `scenarios`, for example `["calle
 
 **Voicemail.** The voicemail plays its greeting, then a tone of 1 second, then it records. It stops the call after 5 seconds of silence from the agent, or after 120 seconds. **Carrier voicemail, no tone** starts to record after the greeting. **Mailbox full** plays one line and stops the call.
 
-**Call screener.** The screener asks who is calling and why. Some screeners ask one more question. After each question, it waits for the agent to answer. Then it puts the agent on hold. After the hold, the persona's **After screening** setting applies:
+**Call screener.** The screener asks who is calling and why. Some screeners ask one more question. After each question, it waits for the agent to answer. Speech that ends before the question ends does not count as an answer. Then it puts the agent on hold. After the hold, the persona's **After screening** setting applies:
 
 - **Picks up**: the persona says the first words of the scenario, or "Hello", and then talks to the agent as the scenario tells it.
 - **Sends it to voicemail**: the voicemail of the persona answers, as above.
@@ -41,9 +41,11 @@ If the agent does not answer a screener question, the screener stops the call. T
 
 ## Results
 
-A call where no caller talked has no scenario verdict: the scenario's criteria do not apply, and the call shows **Not scored**. The agent rules that check that answer judge the call. Each agent rule has **Answered by**: **The caller** (the default), **Voicemail**, **Call screener** or **Any**. A call that a screener sent to the persona or to the voicemail is also checked by the rules for that answer.
+A call where no caller talked has no scenario verdict: the scenario's criteria do not apply, and the call shows **Not scored**. The agent rules that check that answer judge the call. Each agent rule has **Answered by**: **The caller** (the default), **Voicemail**, **Call screener** or **Any**. A call that a screener sent to the persona or to the voicemail is also checked by the rules for that answer. A screener call counts as a call where the caller talked only when the persona picked up. If the screener ended the call first, or the agent hung up during the screening, no caller talked.
 
-The run dialog shows a warning when no deciding rule checks the voicemail or screener calls of a scenario: these calls then get no verdict.
+To fail an agent that says nothing to the screener, use a required phrase, or an LLM rule judged on every call. An LLM rule judged on calls where the agent spoke does not apply to a call with no agent speech.
+
+The run dialog shows a warning when no deciding rule checks the voicemail or the call screener of a scenario: a call that ends there then gets no verdict.
 
 The conversation page shows who answered. For a voicemail, it also shows if the agent talked over the greeting, and the length of the agent's message after the tone. The transcript shows the recorded lines of the voicemail and the screener, the tone, the hold and the pickup. These calls have no response time until the persona talks.
 

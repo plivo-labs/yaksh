@@ -93,25 +93,21 @@ test("a screened call says what answered after the screener, from what happened"
 });
 
 test("a voicemail answer gets no verdict without a deciding rule that checks voicemail", () => {
-  const personas = [DEFAULT_ANSWERING];
-
-  expect(withoutVerdict("voicemail", [], personas)).toBe(true);
-  expect(withoutVerdict("voicemail", [rule("voicemail", "reporting")], personas)).toBe(true);
-  expect(withoutVerdict("voicemail", [rule("caller", "deciding")], personas)).toBe(true);
-  expect(withoutVerdict("voicemail", [rule("voicemail", "deciding")], personas)).toBe(false);
-  expect(withoutVerdict("voicemail", [rule("any", "deciding")], personas)).toBe(false);
-  expect(withoutVerdict("caller", [], personas)).toBe(false);
+  expect(withoutVerdict("voicemail", [])).toBe(true);
+  expect(withoutVerdict("voicemail", [rule("voicemail", "reporting")])).toBe(true);
+  expect(withoutVerdict("voicemail", [rule("caller", "deciding")])).toBe(true);
+  expect(withoutVerdict("voicemail", [rule("voicemail", "deciding")])).toBe(false);
+  expect(withoutVerdict("voicemail", [rule("any", "deciding")])).toBe(false);
+  expect(withoutVerdict("caller", [])).toBe(false);
 });
 
-test("a screener answer needs a deciding rule only for personas that do not pick up", () => {
-  const declines = { ...DEFAULT_ANSWERING, after_screening: "declines" as const };
-  const toVoicemail = { ...DEFAULT_ANSWERING, after_screening: "voicemail" as const };
-
-  expect(withoutVerdict("screener", [], [DEFAULT_ANSWERING])).toBe(false);
-  expect(withoutVerdict("screener", [], [DEFAULT_ANSWERING, declines])).toBe(true);
-  expect(withoutVerdict("screener", [rule("screener", "deciding")], [declines])).toBe(false);
-  expect(withoutVerdict("screener", [rule("voicemail", "deciding")], [toVoicemail])).toBe(false);
-  expect(withoutVerdict("screener", [rule("voicemail", "deciding")], [declines])).toBe(true);
+test("a screener answer needs a deciding rule for the screener, whatever the persona does after it", () => {
+  expect(withoutVerdict("screener", [])).toBe(true);
+  expect(withoutVerdict("screener", [rule("caller", "deciding")])).toBe(true);
+  expect(withoutVerdict("screener", [rule("voicemail", "deciding")])).toBe(true);
+  expect(withoutVerdict("screener", [rule("screener", "reporting")])).toBe(true);
+  expect(withoutVerdict("screener", [rule("screener", "deciding")])).toBe(false);
+  expect(withoutVerdict("screener", [rule("any", "deciding")])).toBe(false);
 });
 
 test("the transcript shows the tone, the hold, the pickup and how a machine ended the call", () => {

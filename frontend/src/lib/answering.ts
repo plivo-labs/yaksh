@@ -154,11 +154,12 @@ export function machineBand(line: MachineLine): string {
   }
 }
 
-/** Whether the persona talks on a call with this answer, so the scenario's criteria apply. */
-export function playsScenario(answeredBy: AnsweredBy, answering: Answering | null): boolean {
+/** Whether the persona talked on the call, so the scenario's criteria apply: the caller answered,
+ * or the persona picked up after its screener. */
+export function playsScenario(answeredBy: AnsweredBy, events: WireEvent[]): boolean {
   return (
     answeredBy === "caller" ||
-    (answeredBy === "screener" && answering?.after_screening === "picks_up")
+    (answeredBy === "screener" && events.some((event) => event.kind === "handover"))
   );
 }
 
@@ -252,31 +253,15 @@ export function voicemailFacts(
   };
 }
 
-/** Whether the calls of an answer get no verdict: no rule that counts in the verdict checks
- * them. A call that the persona picks up after its screener is judged on the scenario's criteria,
- * so only the personas that do something else count. `personas` are the answering settings of the
- * personas of the scenario. */
-export function withoutVerdict(
-  answer: AnsweredBy,
-  rules: AgentRule[],
-  personas: Answering[],
-): boolean {
-  const decides = (reached: AnsweredBy[]) =>
-    rules.some(
+/** Whether a call of a voicemail or screener answer can end with no verdict: no rule that counts in
+ * the verdict checks that answer. A screener call reaches the persona or the voicemail only when
+ * the agent gets past the screener, so only the screener's own rules cover every such call. */
+export function withoutVerdict(answer: AnsweredBy, rules: AgentRule[]): boolean {
+  return (
+    answer !== "caller" &&
+    !rules.some(
       (rule) =>
-        rule.role === "deciding" &&
-        (rule.answered_by === "any" || reached.includes(rule.answered_by)),
-    );
-  switch (answer) {
-    case "caller":
-      return false;
-    case "voicemail":
-      return !decides(["voicemail"]);
-    case "screener":
-      return personas.some((persona) => {
-        if (persona.after_screening === "picks_up") return false;
-        const after: AnsweredBy[] = persona.after_screening === "voicemail" ? ["voicemail"] : [];
-        return !decides(["screener", ...after]);
-      });
-  }
+        rule.role === "deciding" && (rule.answered_by === "any" || rule.answered_by === answer),
+    )
+  );
 }

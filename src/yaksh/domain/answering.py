@@ -75,23 +75,23 @@ class Answering(BaseModel):
     after_screening: AfterScreening = AfterScreening.PICKS_UP
 
 
-def reaches(answered_by: AnsweredBy, answering: Answering) -> frozenset[AnsweredBy]:
-    """Who the agent talks to on the call: a screener passes the call on to the persona when it
-    picks up, or to its voicemail."""
+def reaches(
+    answered_by: AnsweredBy, *, picked_up: bool, voicemail_answered: bool
+) -> frozenset[AnsweredBy]:
+    """Who the agent talked to, from what the call recorded: after a screener, the persona when
+    it picked up, and the voicemail when a voicemail line played. A screener that ended the call,
+    or an agent that hung up on it, reached only the screener."""
     if answered_by is not AnsweredBy.SCREENER:
         return frozenset({answered_by})
-    match answering.after_screening:
-        case AfterScreening.PICKS_UP:
-            return frozenset({AnsweredBy.SCREENER, AnsweredBy.CALLER})
-        case AfterScreening.VOICEMAIL:
-            return frozenset({AnsweredBy.SCREENER, AnsweredBy.VOICEMAIL})
-        case _:
-            return frozenset({AnsweredBy.SCREENER})
+    after = {AnsweredBy.CALLER} if picked_up else set()
+    if voicemail_answered:
+        after.add(AnsweredBy.VOICEMAIL)
+    return frozenset({AnsweredBy.SCREENER, *after})
 
 
-def plays_scenario(answered_by: AnsweredBy, answering: Answering) -> bool:
+def plays_scenario(answered_by: AnsweredBy, *, picked_up: bool) -> bool:
     """The persona talks on the call, so the scenario's criteria and the caller check apply."""
-    return AnsweredBy.CALLER in reaches(answered_by, answering)
+    return answered_by is AnsweredBy.CALLER or (answered_by is AnsweredBy.SCREENER and picked_up)
 
 
 class MachineLine(StrEnum):

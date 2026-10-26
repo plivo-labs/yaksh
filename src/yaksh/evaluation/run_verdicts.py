@@ -9,7 +9,7 @@ from collections import Counter, defaultdict
 from collections.abc import Sequence
 from typing import Any
 
-from sqlalchemy import Row, select
+from sqlalchemy import ColumnElement, Row, case, false, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from yaksh.db.models import (
@@ -19,13 +19,12 @@ from yaksh.db.models import (
     EvaluationItem,
     JudgeVersion,
     Persona,
-    PersonaVersion,
     Scenario,
     ScenarioVersion,
 )
 from yaksh.domain.agent_records import RecordState
-from yaksh.domain.answering import Answering, plays_scenario
-from yaksh.domain.conversations import ConversationStatus, EndReason
+from yaksh.domain.answering import AnsweredBy, plays_scenario
+from yaksh.domain.conversations import ConversationStatus, EndReason, WireEventKind
 from yaksh.domain.evaluations import (
     AgentRecordCounts,
     CallerFidelity,
@@ -50,6 +49,17 @@ check."""
 FINISHED = frozenset({EvaluationState.DONE, EvaluationState.FAILED})
 
 
+def persona_picked_up() -> ColumnElement[bool]:
+    """SQL for domain.conversations.picked_up, read only for screener calls."""
+    return case(
+        (
+            Conversation.answered_by == AnsweredBy.SCREENER,
+            Conversation.transcript["wire_events"].contains([{"kind": WireEventKind.HANDOVER}]),
+        ),
+        else_=false(),
+    )
+
+
 async def run_verdicts(
     session: AsyncSession,
     conversation_ids: Sequence[uuid.UUID],
@@ -65,7 +75,7 @@ async def run_verdicts(
                 Conversation.data_set_id,
                 Conversation.answered_by,
                 Conversation.repeat,
-                PersonaVersion.config["answering"].label("answering"),
+                persona_picked_up().label("picked_up"),
                 ScenarioVersion.config["criteria"].label("criteria"),
                 Scenario.name,
                 Scenario.category,
@@ -78,7 +88,6 @@ async def run_verdicts(
             .join(Scenario, Scenario.id == Conversation.scenario_id)
             .join(ScenarioVersion, ScenarioVersion.id == Conversation.scenario_version_id)
             .join(Persona, Persona.id == Conversation.persona_id)
-            .join(PersonaVersion, PersonaVersion.id == Conversation.persona_version_id)
             .outerjoin(Evaluation, Evaluation.conversation_id == Conversation.id)
             .where(
                 Conversation.id.in_(set(conversation_ids)),
@@ -95,7 +104,7 @@ async def run_verdicts(
     played_ids = {
         row.conversation_id
         for row in rows
-        if plays_scenario(row.answered_by, Answering.model_validate(row.answering or {}))
+        if plays_scenario(row.answered_by, picked_up=bool(row.picked_up))
     }
     played_judged = [row for row in judged if row.conversation_id in played_ids]
     items = (
@@ -115,6 +124,9 @@ async def run_verdicts(
             ).where(EvaluationItem.evaluation_id.in_([row.evaluation_id for row in judged]))
         )
     ).all()
+    # A call judged under an earlier rule can be unplayed and still hold criteria items.
+    played_evaluations = {row.evaluation_id for row in played_judged}
+    played_items = [item for item in items if item.evaluation_id in played_evaluations]
     position = {scenario: index for index, scenario in enumerate(scenario_order)}
 
     def in_order(found: Sequence[Row[Any]]) -> list[Row[Any]]:
@@ -191,7 +203,7 @@ async def run_verdicts(
         inconsistent=list(
             dict.fromkeys(list(pairs)[index][0] for index in numbers.inconsistent(pair_results))
         ),
-        criteria=criterion_counts(list(grouped), played_judged, items),
+        criteria=criterion_counts(list(grouped), played_judged, played_items),
         rules=rule_counts(items),
         decided_by=dict(
             Counter(
@@ -199,7 +211,7 @@ async def run_verdicts(
             )
         ),
         errors=sum(item.machine_outcome is Outcome.ERROR for item in decided),
-        callers=caller_fidelity(played_judged, items),
+        callers=caller_fidelity(played_judged, played_items),
         judge_versions=await versions_used(session, items),
         agent_record=await record_counts(session, in_order(judged), items),
     )

@@ -9,11 +9,12 @@ from collections.abc import Mapping, Sequence
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from yaksh.db.models import Conversation, Evaluation, PersonaVersion
-from yaksh.domain.answering import Answering, plays_scenario
+from yaksh.db.models import Conversation, Evaluation
+from yaksh.domain.answering import plays_scenario
 from yaksh.domain.conversations import ACTIVE_STATUSES, judges_score
 from yaksh.domain.evaluations import EvaluationState, GateNumbers, Verdict
 from yaksh.evaluation import numbers
+from yaksh.evaluation.run_verdicts import persona_picked_up
 
 FINISHED = frozenset({EvaluationState.DONE, EvaluationState.FAILED})
 
@@ -31,12 +32,11 @@ async def gate_numbers(
             Conversation.status,
             Conversation.end_reason,
             Conversation.answered_by,
-            PersonaVersion.config["answering"].label("answering"),
+            persona_picked_up().label("picked_up"),
             Evaluation.state,
             Evaluation.effective_scenario_verdict.label("verdict"),
             Evaluation.effective_conversation_verdict.label("with_rules"),
         )
-        .join(PersonaVersion, PersonaVersion.id == Conversation.persona_version_id)
         .outerjoin(Evaluation, Evaluation.conversation_id == Conversation.id)
         .where(Conversation.id.in_(run_of.keys()))
     )
@@ -54,7 +54,7 @@ async def gate_numbers(
             pending[run] += 1
             continue
         done = scored and row.state is EvaluationState.DONE
-        if plays_scenario(row.answered_by, Answering.model_validate(row.answering or {})):
+        if plays_scenario(row.answered_by, picked_up=bool(row.picked_up)):
             played[run][row.scenario_id].append(row.verdict if done else None)
         else:
             unplayed[run].append(row.with_rules if done else None)

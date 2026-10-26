@@ -59,11 +59,13 @@ class FakePlayer:
 
 
 class TalkOverPlayer(FakePlayer):
-    """The agent answers each screener question while the question still plays."""
+    """The agent answers each screener question while the question still plays: its turn ends
+    before the question does."""
 
     async def play(self, pcm: bytes, text: str | None, line: MachineLine) -> None:
         if line is MachineLine.SCREENER:
             self.transcript.agent_said("Hi, this is Alex from Swift Movers, about your move.")
+            await asyncio.sleep(0.01)
         await super().play(pcm, text, line)
 
 
@@ -76,8 +78,9 @@ class Call:
         greeting: bytes | None = None,
         player: type[FakePlayer] = FakePlayer,
     ) -> None:
+        clock = Clock()
         self.observer = Observer()
-        self.transcript = TranscriptBuilder(Clock(), self.observer)
+        self.transcript = TranscriptBuilder(clock, self.observer)
         self.player = player(self.transcript)
         self.gate = MachineGate()
         self.state = CallState()
@@ -106,7 +109,7 @@ class Call:
             self.state,
             self.transcript,
             self.observer,
-            Clock(),
+            clock,
             own,
         )
 
@@ -323,7 +326,7 @@ async def test_a_screener_hangs_up_on_an_agent_that_does_not_answer(tmp_path: Pa
     )
 
 
-async def test_a_screener_takes_an_answer_that_the_agent_gave_over_its_question(
+async def test_a_screener_does_not_take_speech_that_ended_during_its_question(
     tmp_path: Path,
 ) -> None:
     plan = fast(answering_plan(AnsweredBy.SCREENER, Answering()), tmp_path)
@@ -331,8 +334,10 @@ async def test_a_screener_takes_an_answer_that_the_agent_gave_over_its_question(
 
     await call.run()
 
-    assert call.observer.kinds()[-1] is WireEventKind.HANDOVER
-    assert call.state.end_reason is None
+    assert (call.state.end_reason, call.state.caller_reason) == (
+        EndReason.SCREENER_ENDED,
+        "The agent did not answer the screener.",
+    )
 
 
 async def test_a_screener_waits_for_an_agent_that_is_still_speaking(tmp_path: Path) -> None:
