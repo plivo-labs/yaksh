@@ -35,7 +35,7 @@ from yaksh.domain.conversations import (
     WireEventKind,
 )
 from yaksh.domain.triggers import Filler, RenderError
-from yaksh.integrations.openai_models import caller_effort, failure
+from yaksh.integrations.openai_models import caller_effort, failure, retry_rate_limits
 from yaksh.integrations.text_agent import AgentReply, TextAgent, TextAgentError
 from yaksh.timings import TIMINGS
 
@@ -306,14 +306,18 @@ class TextConversation:
 
     async def _ask(self, silent_end: bool) -> Response:
         extra = [EasyInputMessageParam(role="developer", content=SILENT_END)] if silent_end else []
-        response = await self._model.responses.create(
-            model=self._request.caller.model,
-            instructions=self._request.instructions,
-            input=[*self._history, *extra],
-            tools=[END_CALL_TOOL],
-            parallel_tool_calls=False,
-            store=False,
-            extra_body=reasoning(self._request.caller.model, self._request.caller.reasoning_effort),
+        response = await retry_rate_limits(
+            lambda: self._model.responses.create(
+                model=self._request.caller.model,
+                instructions=self._request.instructions,
+                input=[*self._history, *extra],
+                tools=[END_CALL_TOOL],
+                parallel_tool_calls=False,
+                store=False,
+                extra_body=reasoning(
+                    self._request.caller.model, self._request.caller.reasoning_effort
+                ),
+            )
         )
         self._count(response)
         return response

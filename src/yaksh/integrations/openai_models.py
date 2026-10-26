@@ -4,6 +4,7 @@ generating test scenarios and for judging calls."""
 import asyncio
 import json
 import logging
+from collections.abc import Awaitable, Callable
 from typing import Any
 
 import openai
@@ -19,6 +20,9 @@ RETRIES = 1
 """One retry: someone is waiting for the answer in the console."""
 CHECK_TIMEOUT_S = 15.0
 """For one try of the reasoning check, which takes about a second even at the highest effort."""
+RATE_LIMIT_WAITS_S = (1.0, 2.0, 4.0, 8.0)
+"""Waits before the caller asks its model again after a rate limit, beyond the client's own
+quick retries."""
 
 
 def caller_effort(model: str, configured: str | None) -> str | None:
@@ -177,14 +181,47 @@ def temporary(error: openai.OpenAIError) -> bool:
     return False
 
 
+def rate_limited(error: openai.APIError) -> bool:
+    """An HTTP 429, or the plain APIError that the client raises for an error event in a stream.
+    The client retries the first only after the wait that the provider names, and never the
+    second."""
+    if isinstance(error, openai.APIStatusError):
+        return error.status_code == 429
+    return type(error) is openai.APIError
+
+
+async def retry_rate_limits[T](
+    ask: Callable[[], Awaitable[T]],
+    on_refusal: Callable[[openai.APIError], None] = lambda _: None,
+) -> T:
+    """ask's result, asked again after each of RATE_LIMIT_WAITS_S while it is rate limited;
+    on_refusal hears of each refusal that gets a wait."""
+    for wait in RATE_LIMIT_WAITS_S:
+        try:
+            return await ask()
+        except openai.APIError as error:
+            if not rate_limited(error):
+                raise
+            on_refusal(error)
+            log.warning(
+                "the caller's model refused a request (%s); asking again in %g s",
+                failure(error),
+                wait,
+            )
+        await asyncio.sleep(wait)
+    return await ask()
+
+
 def failure(error: openai.OpenAIError) -> str:
     """What went wrong, without the provider's response body, which can echo key material."""
     if isinstance(error, openai.APITimeoutError):
         return "timed out"
     if isinstance(error, openai.APIConnectionError):
         return "could not reach the model service"
+    body = error.body if isinstance(error, openai.APIError) and isinstance(error.body, dict) else {}
+    code = body.get("code") or body.get("type") or ""
     if isinstance(error, openai.APIStatusError):
-        body = error.body if isinstance(error.body, dict) else {}
-        code = body.get("code") or body.get("type") or ""
         return f"HTTP {error.status_code} {code}".strip()
+    if type(error) is openai.APIError:
+        return f"stream error {code}".strip()
     return type(error).__name__
