@@ -27,7 +27,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
-import { DEFAULT_ANSWERING } from "@/lib/answering";
 import { counted, runTitle } from "@/lib/format";
 import { revealErrors } from "@/lib/forms";
 import { useAgent, useAgents, usePersonas, useSaveSuite, useScenarios } from "@/lib/queries";
@@ -316,15 +315,7 @@ function EntryForm({
               <span className="text-xs-400 text-muted-foreground">
                 For every scenario. Each answer is a call of its own.
               </span>
-              <NoVerdictNote
-                answers={answers}
-                rules={rules}
-                personas={live.map(
-                  (scenario) =>
-                    known.find((persona) => persona.id === scenario.persona_id)?.answering ??
-                    DEFAULT_ANSWERING,
-                )}
-              />
+              <NoVerdictNote answers={answers} rules={rules} />
             </div>
           )}
 

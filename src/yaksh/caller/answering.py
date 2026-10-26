@@ -108,9 +108,8 @@ class AnsweringScript:
         try:
             async with asyncio.timeout(plan.limit_s):
                 for question in (plan.prompt, *plan.follow_ups):
-                    asked = self._transcript.agent_turns
-                    await self._play_clip(question)
-                    if not await self._answer(asked, plan.answer_wait_s):
+                    asked_ms = await self._play_clip(question)
+                    if not await self._answer(asked_ms, plan.answer_wait_s):
                         self._end(
                             EndReason.SCREENER_ENDED, "The agent did not answer the screener."
                         )
@@ -138,14 +137,14 @@ class AnsweringScript:
                 self._end(EndReason.SCREENER_ENDED, "The screener declined the call.")
                 return True
 
-    async def _answer(self, asked: int, wait_s: float) -> bool:
-        """Whether the agent ends a turn after `asked`, its turn count when the question started,
-        within wait_s of the question's end: an answer over the question counts, and an agent
-        still speaking at wait_s gets until its turn ends."""
+    async def _answer(self, asked_ms: int, wait_s: float) -> bool:
+        """Whether an agent turn ends at or after asked_ms, the end of the question, within
+        wait_s of it: a turn that ended while the question played is no answer. An agent still
+        speaking at wait_s gets until its turn ends."""
         loop = asyncio.get_running_loop()
         deadline = loop.time() + wait_s
         cap = loop.time() + ANSWER_CAP_S
-        while self._transcript.agent_turns == asked:
+        while not self._transcript.agent_turn_ended_since(asked_ms):
             now = loop.time()
             speaking = self._transcript.agent_speaking or self._transcript.agent_voice
             if now >= cap or (now >= deadline and not speaking):
@@ -200,14 +199,17 @@ class AnsweringScript:
                 return
             await asyncio.sleep(POLL_S)
 
-    async def _play_clip(self, clip: MachineClip) -> None:
-        await self._play(read_pcm(Path(clip.file)), clip.text, clip.line)
+    async def _play_clip(self, clip: MachineClip) -> int:
+        return await self._play(read_pcm(Path(clip.file)), clip.text, clip.line)
 
-    async def _play(self, pcm: bytes, text: str, line: MachineLine) -> None:
-        """Play a line and return once Plivo reports it played."""
+    async def _play(self, pcm: bytes, text: str, line: MachineLine) -> int:
+        """Play a line and return once Plivo reports it played, with when it ended: when the
+        line closed, or now when no report came within the slack."""
         self._transcript.machine(text, line)
         await self._player.play(pcm, text, line)
         await self._until(lambda: self._transcript.caller_quiet, bytes_ms(len(pcm)) / 1000)
+        closed = self._transcript.caller_closed_ms
+        return closed if self._transcript.caller_quiet and closed is not None else self._clock.ms()
 
     async def _tone(self, file: Path) -> None:
         pcm = read_pcm(file)

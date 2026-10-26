@@ -17,7 +17,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { ANSWERS, DEFAULT_ANSWERING, withoutVerdict } from "@/lib/answering";
+import { ANSWERS, withoutVerdict } from "@/lib/answering";
 import { counted } from "@/lib/format";
 import { mixPersonas } from "@/lib/mix";
 import { type Row, type RunSetup, answersToPlay } from "@/lib/run-setup";
@@ -26,7 +26,6 @@ import {
   type AgentRule,
   type AgentSummary,
   type AnsweredBy,
-  type Answering,
   type Language,
   LANGUAGE_NAMES,
   type Persona,
@@ -84,7 +83,6 @@ export function ScenarioCards({
         const answers = setup.answered[scenario.id] ?? [];
         const calls =
           ids.length * sets.length * answers.length * (repeatsOk && repeatCount ? repeatCount : 0);
-        const settings = ids.map((id) => byId.get(id)?.answering ?? DEFAULT_ANSWERING);
         return (
           <div
             key={scenario.id}
@@ -138,7 +136,7 @@ export function ScenarioCards({
                   </p>
                 ),
             )}
-            <NoVerdictNote answers={answers} rules={rules} personas={settings} />
+            <NoVerdictNote answers={answers} rules={rules} />
           </div>
         );
       })}
@@ -154,28 +152,26 @@ export function ScenarioCards({
   );
 }
 
-/** Names the voicemail or screener answers whose calls get no verdict: no deciding rule checks
- * them for these personas' answering settings. */
+/** Names the voicemail or screener answers whose calls can end with no verdict: no deciding rule
+ * checks them. */
 export function NoVerdictNote({
   answers,
   rules,
-  personas,
 }: {
   answers: AnsweredBy[];
   rules: AgentRule[] | undefined;
-  personas: Answering[];
 }) {
   const unjudged = rules
     ? answers.filter(
         (answer): answer is keyof typeof MACHINE_CALLS =>
-          answer !== "caller" && withoutVerdict(answer, rules, personas),
+          answer !== "caller" && withoutVerdict(answer, rules),
       )
     : [];
   if (unjudged.length === 0) return null;
   return (
     <p className="text-xs-400 text-status-warning-text">
-      No rule decides {unjudged.map((answer) => MACHINE_CALLS[answer]).join(" or ")}, so they get no
-      verdict.
+      No rule decides {unjudged.map((answer) => MACHINE_CALLS[answer]).join(" or ")}. A call that
+      ends there gets no verdict.
     </p>
   );
 }
