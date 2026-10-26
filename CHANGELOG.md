@@ -1,3 +1,15 @@
+## v0.5.2 (2026-10-26)
+
+### Fix
+
+- **caller**: wait and ask the model again after a rate limit (#18)
+  - When the LLM provider refuses a request of the caller's model for a rate limit, the caller waits 1, 2, 4 and 8 seconds and asks again, on phone and text tests. Before, one refusal made the whole conversation invalid, also when the call went on. A call that ends while the caller still waits stays invalid.
+- **screener**: count answers after the question and judge calls by who they reached (#17)
+  - Speech that ends before the screener's question ends no longer counts as the agent's answer. An agent that talks over the question now gets time to answer after it. Before, the screener took that speech as the answer and went on at once.
+  - A screener call counts as a call where the caller talked only when the persona picked up. A call that ends at the screener, because the screener ended it or the agent hung up, now shows under **No caller talked**, and only the rules for the call screener judge it. Before, the persona's **After screening** setting decided this, also for a call that ended at the screener.
+  - Screener calls judged before this version keep their verdicts. On the run page, the ones that ended at the screener move to **No caller talked**, and the run's numbers change with them. Run the scenario again to get new verdicts.
+  - The run dialog now warns for every persona when no deciding rule checks the call screener. Before, it did not warn when the persona picks up.
+
 ## v0.5.1 (2026-10-26)
 
 ### Feat
