@@ -1,3 +1,18 @@
+## v0.5.1 (2026-10-26)
+
+### Feat
+
+- **conversation**: open calls with a small player and expand it on demand (#14)
+
+### Fix
+
+- **deps**: upgrade Pipecat to 1.14.0, Pillow to 13.0.0 and pypdf to 6.21.2 (#16)
+  - Pillow and pypdf get their security fixes. The image is smaller: 1.08 GB, from 1.16 GB.
+  - When the caller's model gives a phone reply with no words and no tool call, the conversation is now invalid, and Yaksh retries it within the run's retries. Before, the caller stayed silent and the call counted.
+  - The end-of-turn model runs on onnxruntime 1.31. A few decisions on when the agent's turn ends can differ: 10 of 332 in a test on real calls, in both directions.
+  - The caller's words in the transcript stay in step with its ElevenLabs audio after a punctuation mark.
+- **console**: free recording audio and keep the search box in step with the address (#15)
+
 ## v0.5.0 (2026-10-25)
 
 ### Fix
