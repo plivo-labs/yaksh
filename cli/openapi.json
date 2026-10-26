@@ -15954,6 +15954,11 @@
               }
             ]
           },
+          "dtmf": {
+            "type": "boolean",
+            "title": "Dtmf",
+            "default": false
+          },
           "tools": {
             "items": {
               "$ref": "#/components/schemas/ToolItem"

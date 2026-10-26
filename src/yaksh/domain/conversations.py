@@ -184,6 +184,8 @@ class Turn(BaseModel):
     """Fixed text Yaksh spoke for the caller, such as the idle nudge, not model output."""
     machine: MachineLine | None = None
     """A recorded line of the persona's voicemail or call screener, not the persona."""
+    dtmf: bool = False
+    """Keys the caller pressed on its phone keypad (DTMF), not words it spoke."""
     tools: list[ToolItem] = Field(default_factory=list)
     """The text agent's tool calls in this turn, in its order."""
 

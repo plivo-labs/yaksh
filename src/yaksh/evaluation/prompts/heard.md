@@ -7,7 +7,7 @@ Find each value the caller said that the agent needs for its task: names, and th
 - result: same when the agent heard the same value, different when it heard another value, missing when no line has it.
 
 Rules:
-- The caller lines of the transcript are the words that Yaksh's caller spoke. Skip caller lines marked "cut off" or "audio not confirmed played".
+- The caller lines of the transcript are the words that Yaksh's caller spoke. Skip caller lines marked "cut off", "audio not confirmed played" or "pressed on the phone keypad, not spoken": keys are not speech.
 - One caller turn can be in two H lines, and two caller turns can be in one H line.
 - The same value in another form is the same: "thirty four" and 34, "two" and 2, "K A T H R Y N" and "K-A-T-H-R-Y-N".
 - A value is different only when the agent heard another value, such as 0147 for 0142, or Alice for Ellis.

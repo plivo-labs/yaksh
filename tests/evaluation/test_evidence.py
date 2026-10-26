@@ -163,6 +163,18 @@ def test_a_judge_sees_and_can_quote_the_tools_of_a_text_turn() -> None:
     assert quote_problems([{"turn": 1, "quote": call}], turns) != []
 
 
+def test_a_judge_can_quote_a_lone_key_press() -> None:
+    turns = [
+        Turn(
+            role=Role.AGENT, text="Press star to re-enter the card.", started_at_ms=0, ended_at_ms=1
+        ),
+        Turn(role=Role.CALLER, text="*", started_at_ms=2, ended_at_ms=2, dtmf=True),
+    ]
+
+    assert quote_problems([{"turn": 2, "quote": "*"}], turns, tools=True) == []
+    assert quote_problems([{"turn": 1, "quote": "*"}], turns, tools=True) != []
+
+
 def outbound_call(*lines: tuple[Role, str, MachineLine | None], **fields: Any) -> CallView:
     outbound: dict[str, Any] = {
         "brief": "Calls patients to confirm their cleaning appointments for Maple Dental.",

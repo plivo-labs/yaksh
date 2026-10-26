@@ -199,6 +199,13 @@ class TranscriptBuilder:
         """A recorded line of the persona's phone about to play."""
         self._generated.append(Queued(text, machine=line))
 
+    def pressed(self, keys: str) -> None:
+        """Keys the caller pressed on its keypad: a turn now, with no audio to wait for."""
+        now = self._clock.ms()
+        self._observer.turn(
+            Turn(role=Role.CALLER, text=keys, started_at_ms=now, ended_at_ms=now, dtmf=True)
+        )
+
     def generation_started(self) -> None:
         self._generating = []
         self._generated_words = False

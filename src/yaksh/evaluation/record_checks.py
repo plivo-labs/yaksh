@@ -156,6 +156,8 @@ def heard_problems(turns: Sequence[Turn], lines: Sequence[str]) -> Check:
             turn = said["turn"]
             if not 1 <= turn <= len(turns) or turns[turn - 1].role is not Role.CALLER:
                 hard.append(f"{name}: turn {turn} is not a caller turn of this call.")
+            elif turns[turn - 1].dtmf:
+                hard.append(f"{name}: turn {turn} was pressed on the keypad, not spoken.")
             elif not contains(turns[turn - 1].text, said["quote"]):
                 hard.append(f'{name}: "{said["quote"]}" is not in turn {turn}.')
             if (heard is None) != (value["result"] == "missing"):

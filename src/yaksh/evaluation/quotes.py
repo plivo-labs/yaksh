@@ -17,7 +17,13 @@ def quote_problems(
     problems = []
     for quote in evidence:
         turn, words = quote["turn"], quote["quote"]
-        if not canonical(words):
+        keys = (
+            1 <= turn <= len(turns)
+            and turns[turn - 1].dtmf
+            and bool(words.strip())
+            and words.strip() in turns[turn - 1].text
+        )
+        if not canonical(words) and not keys:
             problems.append(f"The quote for turn {turn} is empty. Quote the words that show it.")
         elif not 1 <= turn <= len(turns):
             problems.append(
