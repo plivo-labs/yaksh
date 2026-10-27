@@ -17,23 +17,24 @@ def quote_problems(
     problems = []
     for quote in evidence:
         turn, words = quote["turn"], quote["quote"]
-        if 1 <= turn <= len(turns):
-            # A judge can copy the line's number and speaker label along with its words.
-            label = f"{speaker(turns[turn - 1])}: "
-            words = words.removeprefix(f"[{turn}] ").removeprefix(label)
-        keys = (
-            1 <= turn <= len(turns)
-            and turns[turn - 1].dtmf
-            and bool(words.strip())
-            and words.strip() in turns[turn - 1].text
-        )
-        if not canonical(words) and not keys:
-            problems.append(f"The quote for turn {turn} is empty. Quote the words that show it.")
-        elif not 1 <= turn <= len(turns):
+        if not 1 <= turn <= len(turns):
             problems.append(
                 f'The quote "{words}" names turn {turn}; the call has turns 1 to {len(turns)}.'
             )
-        elif not contains(turn_evidence(turns[turn - 1]) if tools else turns[turn - 1].text, words):
+            continue
+        named = turns[turn - 1]
+        # A judge can copy the line's number and speaker label along with its words.
+        words = words.removeprefix(f"[{turn}] ").removeprefix(f"{speaker(named)}: ")
+        if named.dtmf:
+            # Keys are not speech: canonical() would drop * and #, so they are compared as written.
+            keys = words.strip().replace(" ", "").replace("-", "")
+            empty, found = not keys, keys in named.text
+        else:
+            empty = not canonical(words)
+            found = contains(turn_evidence(named) if tools else named.text, words)
+        if empty:
+            problems.append(f"The quote for turn {turn} is empty. Quote the words that show it.")
+        elif not found:
             problems.append(
                 f'The quote "{words}" is not in turn {turn}. '
                 f"Quote the words as turn {turn} has them."

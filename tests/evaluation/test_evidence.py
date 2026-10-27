@@ -177,6 +177,17 @@ def test_a_judge_can_quote_a_lone_key_press_with_or_without_its_line_label() -> 
     assert quote_problems([{"turn": 1, "quote": "*"}], turns, tools=True) != []
 
 
+def test_a_quote_of_other_keys_is_not_a_quote_of_the_key_press() -> None:
+    turns = [
+        Turn(role=Role.CALLER, text="4111#", started_at_ms=0, ended_at_ms=0, dtmf=True),
+        Turn(role=Role.CALLER, text="123", started_at_ms=1, ended_at_ms=1, dtmf=True),
+    ]
+
+    assert quote_problems([{"turn": 1, "quote": "41-11 #"}], turns) == []
+    assert quote_problems([{"turn": 1, "quote": "4111*"}], turns) != []
+    assert quote_problems([{"turn": 2, "quote": "123#"}], turns) != []
+
+
 def outbound_call(*lines: tuple[Role, str, MachineLine | None], **fields: Any) -> CallView:
     outbound: dict[str, Any] = {
         "brief": "Calls patients to confirm their cleaning appointments for Maple Dental.",
