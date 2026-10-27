@@ -1,3 +1,10 @@
+## v0.7.0 (2026-10-27)
+
+### Feat
+
+- **console**: show the server's release in the sidebar (#22)
+  - The sidebar footer shows the release the server runs, such as "Yaksh 0.7.0", linked to its release notes. An open console shows a new release within 5 minutes of a deploy.
+
 ## v0.6.0 (2026-10-27)
 
 ### Feat
