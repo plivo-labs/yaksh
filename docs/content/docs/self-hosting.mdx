@@ -33,6 +33,15 @@ The worker keeps the stream of each call in its memory. Thus, the webhooks and t
 - When the worker stops, it ends its live calls with the end reason `worker_stopped`. It saves their results, and the run tries them again.
 - Give the worker a stop grace period of 210 seconds or more. Docker Compose sets `stop_grace_period: 210s`.
 
+## Size of the server
+
+The worker holds the phone calls. **Phone calls at once** (Settings, **Limits** tab) sets how many calls one worker holds at the same time.
+
+- By default, all calls run in the worker process, on one CPU. In our tests on a server with 4 vCPU, one worker held about 14 calls at the same time. With more calls, the caller replied later in all calls. The worker uses about 320 MB of memory at rest, and each call adds about 25 MB.
+- With `YAKSH_CALL_PROCESSES=true`, each call runs in a process of its own, so the calls use all CPUs of the server. On Linux, at rest, the worker container then uses about 660 MB: the worker process, the process that starts the call processes, and 2 call processes that wait for calls. Each call adds about 100 MB. For example, 20 calls need about 2.7 GB. A call uses about 10% more CPU than in one process.
+- Use Linux for many calls. On macOS, each call process starts a new interpreter, which takes about 2 seconds.
+- With `YAKSH_CALL_PROCESSES=true`, run the worker under an init process, as `docker/compose.yaml` does with `init: true`. The init process collects the processes that stop after their parent stops.
+
 ## Plivo
 
 Each install must have its own Plivo Application, the receiving application. A number linked to it in Plivo is a test number of the install. Yaksh never takes a number that another application receives, so installs on the same Plivo account do not use the same numbers.
