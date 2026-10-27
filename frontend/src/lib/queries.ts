@@ -26,6 +26,7 @@ import {
   type ConversationSummary,
   type DataSet,
   type Defaults,
+  type Health,
   type DocumentRead,
   type DocumentSummary,
   type ElevenLabsAccount,
@@ -183,6 +184,16 @@ export function useAgentPage(
 }
 
 /** The server's values for fields a request leaves out; they change with the settings. */
+/** The server's release, for the sidebar. Asked again every 5 minutes, so an open console
+ * shows a new release after a deploy. */
+export function useHealth() {
+  return useQuery({
+    queryKey: ["health"],
+    queryFn: () => api<Health>("/health"),
+    refetchInterval: 5 * 60_000,
+  });
+}
+
 export function useDefaults() {
   return useQuery({
     queryKey: ["defaults"],

@@ -12,12 +12,12 @@ import { Link, Navigate, NavLink, Outlet, useLocation, useMatches } from "react-
 import { Toaster } from "sonner";
 
 import { CommandMenu } from "@/app/command-menu";
-import { DOCS_URL, NAV_GROUPS } from "@/app/nav";
+import { DOCS_URL, NAV_GROUPS, RELEASES_URL } from "@/app/nav";
 import { TokenGate } from "@/app/token";
 import { useDarkMode } from "@/app/use-dark-mode";
 import { useToken } from "@/app/use-token";
 import { API_TOKEN } from "@/lib/api";
-import { useSettings } from "@/lib/queries";
+import { useHealth, useSettings } from "@/lib/queries";
 import type { AppSettings } from "@/lib/types";
 import {
   Sidebar,
@@ -134,6 +134,7 @@ export function Shell() {
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>
+            <ServerVersion />
           </SidebarFooter>
           <SidebarRail />
         </Sidebar>
@@ -215,4 +216,21 @@ export function FirstPage() {
   if (settings.isPending) return null;
   const firstRun = settings.data !== undefined && !settings.data.secrets.llm_api_key;
   return <Navigate to={firstRun ? "/settings" : "/agents"} replace />;
+}
+
+/** The release the server runs, linked to its notes. Hidden while the sidebar shows icons only. */
+function ServerVersion() {
+  const { data } = useHealth();
+  if (!data) return null;
+  return (
+    <a
+      href={`${RELEASES_URL}/tag/v${data.version}`}
+      target="_blank"
+      rel="noreferrer"
+      className="px-2 text-xs-400 text-muted-foreground hover:text-foreground group-data-[collapsible=icon]:hidden"
+    >
+      Yaksh {data.version}
+      <span className="sr-only"> release notes (opens in a new tab)</span>
+    </a>
+  );
 }
