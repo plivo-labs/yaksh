@@ -6,7 +6,7 @@ from typing import Any
 
 from yaksh.domain.conversations import Turn
 from yaksh.evaluation.canonical import canonical, contains
-from yaksh.evaluation.evidence import turn_evidence
+from yaksh.evaluation.evidence import speaker, turn_evidence
 
 
 def quote_problems(
@@ -17,6 +17,10 @@ def quote_problems(
     problems = []
     for quote in evidence:
         turn, words = quote["turn"], quote["quote"]
+        if 1 <= turn <= len(turns):
+            # A judge can copy the line's number and speaker label along with its words.
+            label = f"{speaker(turns[turn - 1])}: "
+            words = words.removeprefix(f"[{turn}] ").removeprefix(label)
         keys = (
             1 <= turn <= len(turns)
             and turns[turn - 1].dtmf
