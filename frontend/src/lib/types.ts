@@ -1175,6 +1175,12 @@ export const MAX_GENERATED = 20;
 /** Scenarios one bulk change takes. */
 export const MAX_BULK = 500;
 
+/** The server's health check: it answers, and with which release. */
+export interface Health {
+  status: string;
+  version: string;
+}
+
 /** What the server uses for a field that a request leaves out. */
 export interface Defaults {
   max_duration_s: number;
