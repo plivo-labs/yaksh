@@ -190,9 +190,9 @@ async def failed_secrets(
     plivo: list[str] = [name for name in PLIVO_SECRETS if changed.get(name) is not None]
     if plivo:
         checks_to_run.append((plivo, _check_plivo_pair(candidate)))
-    nimble: list[str] = [name for name in NIMBLE_SECRETS if changed.get(name) is not None]
+    nimble: list[str] = [name for name in NIMBLE_SECRETS if name in changed]
     if nimble:
-        checks_to_run.append((nimble, _check_nimble_pair(candidate, len(nimble))))
+        checks_to_run.append((nimble, _check_nimble_pair(candidate, changed)))
     async with asyncio.TaskGroup() as group:
         tasks = [
             (names, group.create_task(_failure_reason(check))) for names, check in checks_to_run
@@ -232,11 +232,16 @@ async def _check_speech_key(candidate: AppSettings, name: str, key: str) -> None
         await check_tts(candidate, TTS_OF_KEY[name], key)
 
 
-async def _check_nimble_pair(candidate: AppSettings, changed: int) -> None:
-    """Both halves change together, so a check never pairs a new half with an old one."""
+async def _check_nimble_pair(candidate: AppSettings, changed: Mapping[str, str | None]) -> None:
+    """Both halves are saved together, or removed together: a check never pairs a new half
+    with an old one, and no half is left alone."""
+    values = [changed.get(name) for name in NIMBLE_SECRETS]
+    together = all(name in changed for name in NIMBLE_SECRETS)
+    if together and all(value is None for value in values):
+        return
     credential = candidate.tts_credential(VoiceProvider.NIMBLE)
-    if changed < len(NIMBLE_SECRETS) or credential is None:
-        raise ProviderCheckError("save the Nimble Auth ID and Auth token together")
+    if not together or any(value is None for value in values) or credential is None:
+        raise ProviderCheckError("save or remove the Nimble Auth ID and Auth token together")
     await check_tts(candidate, VoiceProvider.NIMBLE, credential)
 
 

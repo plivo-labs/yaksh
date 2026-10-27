@@ -22,6 +22,7 @@ from yaksh.domain.voices import (
     VoiceProvider,
     VoiceSettings,
     VoiceUpdate,
+    check_spoken,
 )
 from yaksh.simulation.languages import LANGUAGES
 
@@ -156,6 +157,10 @@ async def update_voice(session: AsyncSession, voice_id: uuid.UUID, update: Voice
     if "name" in changes:
         voice.name = changes["name"]
     if "languages" in changes:
+        try:
+            check_spoken(voice.provider, changes["languages"])
+        except ValueError as error:
+            raise ValidationError(str(error)) from None
         voice.languages = ordered(changes["languages"])
     await session.flush()
     await session.refresh(voice)

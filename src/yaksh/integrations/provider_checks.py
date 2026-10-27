@@ -26,7 +26,7 @@ from yaksh.domain.speech import SttProvider
 from yaksh.domain.voices import VoiceProvider, VoiceSettings
 from yaksh.integrations.openai_models import failure, takes_reasoning_effort
 from yaksh.integrations.plivo import PlivoApi, PlivoError
-from yaksh.integrations.speech.audio import SAMPLE_RATE, speak_once
+from yaksh.integrations.speech.audio import SAMPLE_RATE, settle, speak_once
 from yaksh.integrations.speech.stt import stt_service
 from yaksh.integrations.speech.tts import tts_service
 
@@ -113,11 +113,15 @@ async def check_stt(settings: AppSettings, provider: SttProvider, key: str, clip
     passes; silence alone would pass a provider that accepts the connection and refuses the
     key later."""
     heard = Heard()
+    try:
+        service = stt_service(settings, provider, key, Language.EN.value)
+    except ValueError as error:
+        raise ProviderCheckError(f"{provider.label}: {error}") from None
     worker = PipelineWorker(
         Pipeline(
             [
                 VADProcessor(vad_analyzer=SileroVADAnalyzer(params=VAD)),
-                stt_service(settings, provider, key, Language.EN.value),
+                service,
                 heard,
             ]
         ),
@@ -149,7 +153,7 @@ async def check_stt(settings: AppSettings, provider: SttProvider, key: str, clip
         errors.append(f"no transcript of a test clip in {STT_CHECK_S:.0f} s")
     finally:
         await runner.cancel()
-        await asyncio.gather(running, return_exceptions=True)
+        await settle(running)
     if errors:
         raise ProviderCheckError(f"{provider.label}: {errors[0]}")
 
@@ -157,13 +161,13 @@ async def check_stt(settings: AppSettings, provider: SttProvider, key: str, clip
 async def check_tts(
     settings: AppSettings, provider: VoiceProvider, key: str, voice_id: str
 ) -> None:
-    """One short word in a voice every account has, through the same text-to-speech as a
-    call, so a key limited to speech passes."""
+    """One short word in a voice the account has, through the same text-to-speech as a call,
+    so a key limited to speech passes. A setting the provider's service refuses, such as an
+    unknown model, fails the check."""
     voice = VoiceSettings(provider=provider, id=voice_id)
-    service = tts_service(settings, voice, Language.EN, key, one_shot=True)
     try:
-        await speak_once(service, "OK")
-    except UnavailableError as error:
+        await speak_once(tts_service(settings, voice, Language.EN, key, one_shot=True), "OK")
+    except (ValueError, UnavailableError) as error:
         raise ProviderCheckError(f"{provider.label}: {error}") from None
 
 

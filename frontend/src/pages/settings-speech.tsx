@@ -5,7 +5,6 @@ import { Badge } from "@/components/ui/badge";
 import { ConfirmDialog } from "@/components/confirm-dialogs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Spinner } from "@/components/ui/spinner";
 import {
   Select,
   SelectContent,
@@ -38,7 +37,13 @@ import {
   servedLanguages,
 } from "@/lib/types";
 import type { Change } from "@/pages/settings";
-import { KeyRow, ProviderPanel, SettingRow, KeyRemovedNote } from "@/pages/settings-keys";
+import {
+  CredentialPairRow,
+  KeyRemovedNote,
+  KeyRow,
+  ProviderPanel,
+  SettingRow,
+} from "@/pages/settings-keys";
 
 type Fields = { model: string; base_url?: string; url?: string };
 type TtsFields = { model?: string } & Partial<Record<TtsProvider["address"], string>>;
@@ -122,7 +127,14 @@ export function SpeechToTextPanel({
           onChange={(event) => edit("model", event.target.value)}
         />
       </SettingRow>
-      <KeyRow name={provider.secret} label="API key" state={key} url={address} checked />
+      <KeyRow
+        key={provider.value}
+        name={provider.secret}
+        label="API key"
+        state={key}
+        url={address}
+        checked
+      />
     </ProviderPanel>
   );
 }
@@ -314,8 +326,7 @@ function TtsProviderPanel({
   );
 }
 
-/** Nimble's Auth ID and Auth token: they change together, are checked at the base URL the form
- * shows, and are saved with it. */
+/** Nimble's Auth ID and Auth token: checked at the base URL the form shows, and saved with it. */
 function NimbleAccountRow({
   settings,
   baseUrl,
@@ -325,104 +336,44 @@ function NimbleAccountRow({
   baseUrl: string;
   removeWarning?: { title: string; description: string };
 }) {
-  const [editing, setEditing] = useState(false);
   const [confirming, setConfirming] = useState(false);
-  const [authId, setAuthId] = useState("");
-  const [token, setToken] = useState("");
   const save = useSaveNimbleAccount();
   const remove = useRemoveNimbleAccount();
   const id = settings.secrets.nimble_auth_id;
-  const saved = id && settings.secrets.nimble_auth_token;
-  const close = () => {
-    setEditing(false);
-    setAuthId("");
-    setToken("");
-    save.reset();
-  };
+  const token = settings.secrets.nimble_auth_token;
   return (
-    <SettingRow label="Auth ID and token" htmlFor={editing ? "nimble-auth-id" : undefined}>
-      {editing ? (
-        <form
-          className="grid gap-2"
-          onSubmit={(event) => {
-            event.preventDefault();
-            save.mutate(
-              { auth_id: authId.trim(), auth_token: token.trim(), base_url: baseUrl },
-              { onSuccess: close },
-            );
-          }}
-        >
-          <Input
-            id="nimble-auth-id"
-            autoComplete="off"
-            placeholder="Auth ID"
-            value={authId}
-            onChange={(event) => setAuthId(event.target.value)}
-          />
-          <Input
-            type="password"
-            autoComplete="off"
-            aria-label="Auth token"
-            placeholder="Auth token"
-            value={token}
-            onChange={(event) => setToken(event.target.value)}
-          />
-          {save.isError && <p className="text-xs-400 text-destructive">{save.error.message}</p>}
-          <div className="flex flex-wrap items-center gap-2">
-            <Button
-              type="submit"
-              size="sm"
-              disabled={!authId.trim() || !token.trim() || save.isPending}
-            >
-              {save.isPending && <Spinner />}
-              Check and save
-            </Button>
-            <Button type="button" size="sm" variant="ghost" onClick={close}>
-              Cancel
-            </Button>
-          </div>
-        </form>
-      ) : (
-        <div className="flex flex-wrap items-center gap-2">
-          {saved ? (
-            <>
-              <span className="font-mono text-s-400">
-                ••••{id.hint ?? ""} / ••••{saved.hint ?? ""}
-              </span>
-              <Badge variant="success">Saved</Badge>
-            </>
-          ) : (
-            <Badge>Not set</Badge>
-          )}
-          <span className="flex-1" />
-          {saved && (
-            <Button
-              size="sm"
-              variant="ghost"
-              disabled={remove.isPending}
-              onClick={() => (removeWarning ? setConfirming(true) : remove.mutate())}
-            >
-              Remove
-            </Button>
-          )}
-          <Button size="sm" variant="outline" onClick={() => setEditing(true)}>
-            {saved ? "Replace" : "Add"}
-          </Button>
-          {removeWarning && (
-            <ConfirmDialog
-              title={removeWarning.title}
-              description={removeWarning.description}
-              action="Remove"
-              destructive
-              pending={remove.isPending}
-              error={remove.error?.message}
-              open={confirming}
-              onOpenChange={setConfirming}
-              onConfirm={(done) => remove.mutate(undefined, { onSuccess: done })}
-            />
-          )}
-        </div>
+    <CredentialPairRow
+      label="Auth ID and token"
+      inputId="nimble-auth-id"
+      shown={id && token ? `••••${id.hint ?? ""} / ••••${token.hint ?? ""}` : null}
+      change="Replace"
+      add="Add"
+      pending={save.isPending}
+      error={save.isError ? save.error.message : undefined}
+      onSave={(pair, done) => save.mutate({ ...pair, base_url: baseUrl }, { onSuccess: done })}
+      onReset={save.reset}
+    >
+      <Button
+        size="sm"
+        variant="ghost"
+        disabled={remove.isPending}
+        onClick={() => (removeWarning ? setConfirming(true) : remove.mutate())}
+      >
+        Remove
+      </Button>
+      {removeWarning && (
+        <ConfirmDialog
+          title={removeWarning.title}
+          description={removeWarning.description}
+          action="Remove"
+          destructive
+          pending={remove.isPending}
+          error={remove.error?.message}
+          open={confirming}
+          onOpenChange={setConfirming}
+          onConfirm={(done) => remove.mutate(undefined, { onSuccess: done })}
+        />
       )}
-    </SettingRow>
+    </CredentialPairRow>
   );
 }

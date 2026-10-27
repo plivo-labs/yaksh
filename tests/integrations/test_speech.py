@@ -3,6 +3,7 @@ from typing import cast
 
 import pytest
 from pipecat.frames.frames import (
+    EndFrame,
     Frame,
     StartFrame,
     TranscriptionFrame,
@@ -20,7 +21,7 @@ from pipecat.transcriptions.language import Language as PipecatLanguage
 
 from yaksh.domain.errors import UnavailableError
 from yaksh.domain.languages import AgentLanguage, Language
-from yaksh.domain.settings import AppSettings
+from yaksh.domain.settings import AppSettings, SarvamStt
 from yaksh.domain.speech import SttProvider
 from yaksh.domain.voices import VoiceProvider, VoiceSettings
 from yaksh.integrations import provider_checks
@@ -192,6 +193,31 @@ async def test_speech_that_stalls_fails_at_the_deadline_and_leaves_no_task(
     assert len(asyncio.all_tasks()) == before
 
 
+class StopsThenStallsItsEnd(FrameProcessor):
+    """A provider that finishes its reply and then never lets the pipeline end."""
+
+    async def process_frame(self, frame: Frame, direction: FrameDirection) -> None:
+        await super().process_frame(frame, direction)
+        if isinstance(frame, TTSSpeakFrame):
+            await self.push_frame(TTSAudioRawFrame(bytes(320), 8000, 1))
+            await self.push_frame(TTSStoppedFrame())
+            return
+        if isinstance(frame, EndFrame):
+            await asyncio.Event().wait()
+        await self.push_frame(frame, direction)
+
+
+async def test_speech_whose_teardown_stalls_fails_within_its_deadline(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(audio, "SPEAK_ONCE_S", 0.5)
+    monkeypatch.setattr(audio, "TEARDOWN_S", 0.2)
+
+    async with asyncio.timeout(2):
+        with pytest.raises(UnavailableError, match="no speech"):
+            await speak_once(cast(TTSService, StopsThenStallsItsEnd()), "Hello")
+
+
 @pytest.mark.parametrize("provider", [VoiceProvider.ELEVENLABS, VoiceProvider.CARTESIA])
 def test_one_shot_speech_does_not_reconnect_a_dropped_socket(provider: VoiceProvider) -> None:
     voice = VoiceSettings(provider=provider, id="v1")
@@ -209,3 +235,10 @@ def test_every_voice_provider_has_a_vendor_and_looks_voices_up_as_its_traits_say
     assert {provider: TTS_VENDORS[provider].lookup is not None for provider in VoiceProvider} == {
         provider: provider.traits.lookup for provider in VoiceProvider
     }
+
+
+async def test_a_model_the_provider_does_not_know_fails_the_check() -> None:
+    settings = AppSettings(sarvam_stt=SarvamStt(model="unknown-model"))
+
+    with pytest.raises(ProviderCheckError, match="Sarvam"):
+        await provider_checks.check_stt(settings, SttProvider.SARVAM, "key", check_clip())

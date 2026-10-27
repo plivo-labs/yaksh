@@ -25,10 +25,10 @@ class SpeechVoiceClient:
         return await lookup(self._settings, self._credential, voice_id)
 
     async def speak(self, voice: VoiceSettings, language: Language, text: str) -> bytes:
-        service = tts_service(self._settings, voice, language, self._credential, one_shot=True)
         try:
+            service = tts_service(self._settings, voice, language, self._credential, one_shot=True)
             return as_wav(await speak_once(service, text))
-        except UnavailableError as error:
+        except (ValueError, UnavailableError) as error:
             raise UnavailableError(
                 f"{voice.provider.label} could not speak with voice {voice.id}: {error}"
             ) from None

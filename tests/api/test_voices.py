@@ -202,3 +202,20 @@ async def test_a_voice_of_a_provider_without_lookup_is_saved_once_it_speaks_a_li
     )
     assert sarvam.spoken[-1][1:] == (Language.EN, LANGUAGES[Language.EN].sample)
     assert sarvam.lookups == []
+
+
+async def test_a_voice_never_lists_a_language_its_provider_cannot_speak(
+    client: AsyncClient, voice_clients: dict[VoiceProvider, FakeVoiceClient]
+) -> None:
+    sarvam = FakeVoiceClient()
+    sarvam.voices["shubh"] = ProviderVoice(id="shubh", name="unused")
+    voice_clients[VoiceProvider.SARVAM] = sarvam
+    voice = {"provider": "sarvam", "provider_voice_id": "shubh", "name": "Shubh"}
+
+    spanish = await client.post("/api/v1/voices", json={**voice, "languages": ["hi", "es"]})
+    saved = await client.post("/api/v1/voices", json={**voice, "languages": ["hi"]})
+    edited = await client.patch(f"/api/v1/voices/{saved.json()['id']}", json={"languages": ["es"]})
+
+    assert spanish.status_code == edited.status_code == 422
+    assert "Sarvam does not speak Spanish" in spanish.text
+    assert "Sarvam does not speak Spanish" in edited.text

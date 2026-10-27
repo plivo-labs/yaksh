@@ -554,3 +554,28 @@ async def test_nimble_credentials_are_saved_together_and_checked_at_their_gatewa
     saved = both.json()
     assert saved["values"]["nimble"]["base_url"] == "https://gateway.example"
     assert {"nimble_auth_id", "nimble_auth_token"} <= set(saved["secrets"])
+
+
+async def test_half_of_a_nimble_pair_is_never_removed_or_replaced_alone(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    async def check_tts(*_args: Any) -> None:
+        return None
+
+    monkeypatch.setattr(service, "check_tts", check_tts)
+    pair = {"auth_id": "MANIMBLE01234", "auth_token": "nimble-token-0123"}
+    await client.put("/api/v1/settings/nimble", json=pair)
+    document = "secrets:\n  nimble_auth_id: null\n  nimble_auth_token: nimble-token-4567\n"
+
+    imported = await client.post("/api/v1/settings/import", json={"document": document})
+    deleted = await client.delete("/api/v1/settings/secrets/nimble_auth_id")
+    removed = await client.delete("/api/v1/settings/nimble")
+
+    assert imported.status_code == 200, imported.text
+    assert imported.json()["failed"] == [
+        "nimble_auth_id, nimble_auth_token: "
+        "save or remove the Nimble Auth ID and Auth token together"
+    ]
+    assert imported.json()["settings"]["secrets"]["nimble_auth_token"] == {"hint": "0123"}
+    assert deleted.status_code == 422
+    assert not {"nimble_auth_id", "nimble_auth_token"} & set(removed.json()["secrets"])

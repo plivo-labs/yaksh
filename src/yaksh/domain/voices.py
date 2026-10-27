@@ -44,16 +44,23 @@ class TtsTraits:
     """False: the provider times whole sentences, so a cut-off reply is cut at a sentence."""
     lookup: bool
     """The provider describes a voice by its ID; otherwise the person enters the details."""
+    languages: frozenset[Language] = frozenset(Language)
+    """The languages of Yaksh's that the provider can speak."""
 
 
+INDIAN_AND_ENGLISH = frozenset(Language) - {Language.ES}
 TTS = {
     VoiceProvider.ELEVENLABS: TtsTraits(
         "ElevenLabs", (0.7, 1.2), word_timestamps=True, lookup=True
     ),
     VoiceProvider.CARTESIA: TtsTraits("Cartesia", (0.6, 1.5), word_timestamps=True, lookup=False),
-    VoiceProvider.SARVAM: TtsTraits("Sarvam", (0.5, 2.0), word_timestamps=False, lookup=False),
+    VoiceProvider.SARVAM: TtsTraits(
+        "Sarvam", (0.5, 2.0), word_timestamps=False, lookup=False, languages=INDIAN_AND_ENGLISH
+    ),
     VoiceProvider.AZURE: TtsTraits("Azure", (0.5, 2.0), word_timestamps=True, lookup=False),
-    VoiceProvider.NIMBLE: TtsTraits("Nimble", (0.7, 1.0), word_timestamps=True, lookup=True),
+    VoiceProvider.NIMBLE: TtsTraits(
+        "Nimble", (0.7, 1.0), word_timestamps=True, lookup=True, languages=INDIAN_AND_ENGLISH
+    ),
 }
 
 
@@ -138,10 +145,18 @@ class VoiceCreate(BaseModel):
     accent: str | None = Field(default=None, min_length=1, max_length=80)
 
     @model_validator(mode="after")
-    def named_without_lookup(self) -> Self:
+    def provider_rules(self) -> Self:
         if not self.provider.traits.lookup and self.name is None:
             raise ValueError(f"{self.provider.label} has no voice lookup: give the voice a name")
+        check_spoken(self.provider, self.languages)
         return self
+
+
+def check_spoken(provider: VoiceProvider, languages: frozenset[Language]) -> None:
+    unspoken = sorted(languages - provider.traits.languages)
+    if unspoken:
+        names = ", ".join(language.label for language in unspoken)
+        raise ValueError(f"{provider.label} does not speak {names}")
 
 
 class VoiceUpdate(BaseModel):

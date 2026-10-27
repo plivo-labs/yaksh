@@ -145,6 +145,18 @@ class NimbleTTSService(WebsocketTTSService):
             self._by_gateway.clear()
             await self._call_event_handler("on_disconnected")
 
+    async def _reconnect_websocket(self, attempt_number: int) -> bool:
+        """A socket lost during a reply loses the reply: Pipecat closes its audio context, so
+        the reply can be neither finished nor sent again. That ends the call, as any other
+        Nimble failure does; a socket lost between replies is opened again."""
+        if self._replies:
+            self._replies.clear()
+            self._by_gateway.clear()
+            await self.push_error(
+                error_msg="Nimble's socket closed during a reply", force_treat_as_permanent=True
+            )
+        return await super()._reconnect_websocket(attempt_number)
+
     def _get_websocket(self) -> Any:
         if self._websocket:
             return self._websocket

@@ -141,6 +141,8 @@ async def checked_change(
 
 @router.delete("/secrets/{name}")
 async def delete_secret(name: SecretName, session: SessionDep, cipher: CipherDep) -> SettingsRead:
+    if name in service.NIMBLE_SECRETS:
+        raise ValidationError("remove the Nimble Auth ID and Auth token together")
     return SettingsRead.of(await store.change(session, cipher, secrets={name: None}))
 
 

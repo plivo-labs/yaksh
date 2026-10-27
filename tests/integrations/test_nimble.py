@@ -8,6 +8,7 @@ from typing import Any
 import pytest
 from pipecat.frames.frames import (
     EndFrame,
+    ErrorFrame,
     Frame,
     TTSAudioRawFrame,
     TTSSpeakFrame,
@@ -188,3 +189,39 @@ async def test_an_error_after_the_first_audio_ends_the_speech(
             tts(settings_for(fake), VOICE, Language.HI, CREDENTIAL, one_shot=True), "Haan ji."
         )
     assert len(fake.openings()) == 1
+
+
+async def test_a_socket_lost_during_a_call_reply_ends_the_call(
+    gateway: Callable[..., Awaitable[Gateway]],
+) -> None:
+    async def reply(socket: ServerConnection, context_id: str) -> None:
+        await socket.send(audio_frame(context_id, bytes(800)))
+        await socket.close(code=1011)
+
+    fake = await gateway(reply)
+    service = tts(settings_for(fake), VOICE, Language.HI, CREDENTIAL, one_shot=False)
+    worker = PipelineWorker(
+        Pipeline([service]),
+        params=PipelineParams(audio_out_sample_rate=8000),
+        idle_timeout_secs=None,
+        enable_rtvi=False,
+    )
+    errors: list[str] = []
+    failed = asyncio.Event()
+
+    @worker.event_handler("on_pipeline_error")
+    async def on_error(_worker: object, frame: ErrorFrame) -> None:
+        errors.append(frame.error)
+        failed.set()
+
+    runner = WorkerRunner(handle_sigint=False)
+    await runner.add_workers(worker)
+    running = asyncio.create_task(runner.run())
+    await worker.queue_frame(TTSSpeakFrame("Haan ji."))
+    async with asyncio.timeout(5):
+        await failed.wait()
+    await runner.cancel()
+    await asyncio.gather(running, return_exceptions=True)
+
+    assert errors == ["Nimble's socket closed during a reply"]
+    assert not service.is_usable

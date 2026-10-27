@@ -247,33 +247,53 @@ export function KeyRow({
   );
 }
 
-/** The Plivo account: its Auth ID and Auth token change together, so a check never pairs the
- * new half with the old account's other half. */
-export function PlivoAccountRow({ settings }: { settings: AppSettings }) {
+/** Two secrets that change together, such as an Auth ID and Auth token: a check never pairs a
+ * new half with the other half of the old pair. `shown` is the saved pair's hint, null while
+ * it is not saved; `children` are controls beside the change button, such as Remove. */
+export function CredentialPairRow({
+  label,
+  inputId,
+  shown,
+  change,
+  add,
+  pending,
+  error,
+  onSave,
+  onReset,
+  children,
+}: {
+  label: string;
+  inputId: string;
+  shown: string | null;
+  change: string;
+  add: string;
+  pending: boolean;
+  error?: string;
+  onSave: (pair: { auth_id: string; auth_token: string }, done: () => void) => void;
+  onReset: () => void;
+  children?: ReactNode;
+}) {
   const [editing, setEditing] = useState(false);
   const [authId, setAuthId] = useState("");
   const [token, setToken] = useState("");
-  const save = useSavePlivoAccount();
-  const id = settings.secrets.plivo_auth_id;
-  const saved = id && settings.secrets.plivo_auth_token;
   const close = () => {
     setEditing(false);
     setAuthId("");
     setToken("");
-    save.reset();
+    onReset();
   };
   return (
-    <SettingRow label="Auth ID and Auth token" htmlFor={editing ? "plivo-auth-id" : undefined}>
+    <SettingRow label={label} htmlFor={editing ? inputId : undefined}>
       {editing ? (
         <form
           className={`grid gap-2 ${REVEAL}`}
           onSubmit={(event) => {
             event.preventDefault();
-            save.mutate({ auth_id: authId.trim(), auth_token: token.trim() }, { onSuccess: close });
+            onSave({ auth_id: authId.trim(), auth_token: token.trim() }, close);
           }}
         >
           <Input
-            id="plivo-auth-id"
+            id={inputId}
             autoComplete="off"
             placeholder="Auth ID"
             value={authId}
@@ -287,14 +307,10 @@ export function PlivoAccountRow({ settings }: { settings: AppSettings }) {
             value={token}
             onChange={(event) => setToken(event.target.value)}
           />
-          {save.isError && <p className="text-xs-400 text-destructive">{save.error.message}</p>}
+          {error && <p className="text-xs-400 text-destructive">{error}</p>}
           <div className="flex flex-wrap items-center gap-2">
-            <Button
-              type="submit"
-              size="sm"
-              disabled={!authId.trim() || !token.trim() || save.isPending}
-            >
-              {save.isPending && <Spinner />}
+            <Button type="submit" size="sm" disabled={!authId.trim() || !token.trim() || pending}>
+              {pending && <Spinner />}
               Check and save
             </Button>
             <Button type="button" size="sm" variant="ghost" onClick={close}>
@@ -304,21 +320,41 @@ export function PlivoAccountRow({ settings }: { settings: AppSettings }) {
         </form>
       ) : (
         <div className="flex flex-wrap items-center gap-2">
-          {saved ? (
+          {shown !== null ? (
             <>
-              <span className="font-mono text-s-400">••••••••{id.hint ?? ""}</span>
+              <span className="font-mono text-s-400">{shown}</span>
               <Badge variant="success">Saved</Badge>
             </>
           ) : (
             <Badge>Not set</Badge>
           )}
           <span className="flex-1" />
+          {children}
           <Button size="sm" variant="outline" onClick={() => setEditing(true)}>
-            {saved ? "Change account" : "Add account"}
+            {shown !== null ? change : add}
           </Button>
         </div>
       )}
     </SettingRow>
+  );
+}
+
+/** The Plivo account: its Auth ID and Auth token change together. */
+export function PlivoAccountRow({ settings }: { settings: AppSettings }) {
+  const save = useSavePlivoAccount();
+  const id = settings.secrets.plivo_auth_id;
+  return (
+    <CredentialPairRow
+      label="Auth ID and Auth token"
+      inputId="plivo-auth-id"
+      shown={id && settings.secrets.plivo_auth_token ? `••••••••${id.hint ?? ""}` : null}
+      change="Change account"
+      add="Add account"
+      pending={save.isPending}
+      error={save.isError ? save.error.message : undefined}
+      onSave={(pair, done) => save.mutate(pair, { onSuccess: done })}
+      onReset={save.reset}
+    />
   );
 }
 

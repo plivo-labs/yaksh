@@ -29,6 +29,8 @@ SPEAK_ONCE_S = 20.0
 """The longest one piece of speech outside a call may take."""
 REPLY_QUIET_S = 3.0
 """Pipecat's default: on a call, a reply whose audio stops this long is finished."""
+TEARDOWN_S = 2.0
+"""How long a pipeline outside a call may take to end before its task is cancelled."""
 
 
 def quiet_s(one_shot: bool) -> float:
@@ -105,18 +107,27 @@ async def speak_once(service: TTSService, text: str) -> bytes:
     try:
         async with asyncio.timeout(SPEAK_ONCE_S):
             await spoken.stopped.wait()
-            await worker.queue_frame(EndFrame())
-            await asyncio.shield(running)
+            if not errors:
+                await worker.queue_frame(EndFrame())
+                await asyncio.shield(running)
     except TimeoutError:
         errors.append(f"no speech in {SPEAK_ONCE_S:.0f} s")
     finally:
         await runner.cancel()
-        await asyncio.gather(running, return_exceptions=True)
+        await settle(running)
     if errors:
         raise UnavailableError(errors[0])
     if not spoken.audio:
         raise UnavailableError("no audio came back")
     return bytes(spoken.audio)
+
+
+async def settle(running: asyncio.Task[None]) -> None:
+    """Wait TEARDOWN_S for a pipeline outside a call to end, then cancel its task: a provider
+    that stalls its own teardown must not hold up a preview, a greeting or a key check."""
+    running.add_done_callback(lambda task: task.cancelled() or task.exception())
+    await asyncio.wait({running}, timeout=TEARDOWN_S)
+    running.cancel()
 
 
 def as_wav(pcm: bytes) -> bytes:
