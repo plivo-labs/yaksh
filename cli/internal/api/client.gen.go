@@ -2699,11 +2699,13 @@ type RecordToolRead struct {
 
 // RecordTurnRead defines model for RecordTurnRead.
 type RecordTurnRead struct {
-	At   *time.Time `json:"at,omitempty"`
-	AtMs *int       `json:"at_ms"`
-	Role Role       `json:"role"`
-	Text string     `json:"text"`
-	Turn *int       `json:"turn"`
+	At          *time.Time `json:"at,omitempty"`
+	AtMs        *int       `json:"at_ms"`
+	Role        Role       `json:"role"`
+	StartedAt   *time.Time `json:"started_at,omitempty"`
+	StartedAtMs *int       `json:"started_at_ms"`
+	Text        string     `json:"text"`
+	Turn        *int       `json:"turn"`
 }
 
 // Reply The agent's answer to one caller reply, or to the start of the call.

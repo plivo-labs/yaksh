@@ -31,6 +31,9 @@ class RecordTurn(BaseModel):
     role: Role
     text: RecordText
     at: datetime | None = None
+    """When the provider logged the line: for Plivo CX, when its speech ended."""
+    started_at: datetime | None = None
+    """When its speech started, if the provider logs it."""
 
 
 class SavedValue(BaseModel):

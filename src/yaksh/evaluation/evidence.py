@@ -5,7 +5,7 @@ setting, the agent's configuration and its documents. A change to the text is a 
 from dataclasses import dataclass, field
 from datetime import date
 
-from yaksh.domain.agent_records import AgentRecord, RecordTool, StoredRecord
+from yaksh.domain.agent_records import AgentRecord, RecordTool, RecordTurn, StoredRecord
 from yaksh.domain.agents import Direction, Transport
 from yaksh.domain.answering import (
     SCREENER_LABELS,
@@ -29,7 +29,7 @@ from yaksh.domain.conversations import (
 from yaksh.domain.record_sources import RECORD_PROVIDERS
 from yaksh.domain.scenarios import Fact
 
-EVIDENCE_VIEW_VERSION = 6
+EVIDENCE_VIEW_VERSION = 7
 
 TRANSCRIPTION_NOTE = {
     Transport.PHONE: (
@@ -134,11 +134,40 @@ def render(view: CallView) -> str:
 
 
 def record_lines(record: AgentRecord) -> list[str]:
-    """The record's lines a judge can quote, numbered from 1 in the view: the values the agent
-    saved, then its tool calls. What the agent heard is left out: it repeats the transcript."""
-    return [f"Saved: {value.name} = {value.value}" for value in record.saved] + [
-        record_tool_line(tool) for tool in record.tools
-    ]
+    """The record's lines a judge can quote, numbered from 1 in the view: the call in the
+    agent's own words, with its tool calls in their place, then the values it saved. The
+    caller's lines are kept only when they are what the agent heard during the call."""
+    heard = RECORD_PROVIDERS[record.provider].live_transcript
+    spoken = [turn for turn in record.turns if heard or turn.role is Role.AGENT]
+    saved = [f"Saved: {value.name} = {value.value}" for value in record.saved]
+    return in_order(spoken, record.tools) + saved
+
+
+def in_order(spoken: list[RecordTurn], tools: list[RecordTool]) -> list[str]:
+    """The spoken lines in the record's order, each tool call before the first line that
+    started after it. The agent speaks while its tools run, so a line's start, not the time it
+    was logged, puts it before or after a tool call. A tool call with no time, or after every
+    line, comes last. The console's record tab follows the same rule."""
+    timed = [tool for tool in tools if tool.at is not None]
+    lines = []
+    for turn in spoken:
+        start = turn.started_at or turn.at
+        while timed and start is not None and timed[0].at is not None and timed[0].at <= start:
+            lines.append(record_tool_line(timed.pop(0)))
+        lines.append(record_turn_line(turn))
+    rest = timed + [tool for tool in tools if tool.at is None]
+    return lines + [record_tool_line(tool) for tool in rest]
+
+
+AGENT_SAID = "Agent said:"
+"""How a record line of the agent's own words starts."""
+AGENT_HEARD = "Agent heard:"
+"""How a record line of the caller's words, as the agent's speech-to-text heard them, starts."""
+
+
+def record_turn_line(turn: RecordTurn) -> str:
+    said = AGENT_SAID if turn.role is Role.AGENT else AGENT_HEARD
+    return f"{said} {turn.text}"
 
 
 def record_tool_line(tool: RecordTool) -> str:
@@ -154,13 +183,17 @@ def agent_record(stored: StoredRecord) -> list[str]:
     label = RECORD_PROVIDERS[record.provider].label
     lines = [
         "AGENT RECORD",
-        f"The agent's own record of this call, from {label}: the values it saved and the "
-        "tools it called. Quote a line by its number.",
+        f"The agent's own record of this call, from {label}: the text it sent to its voice "
+        '("Agent said"), what its speech-to-text heard ("Agent heard"), the tools it called and '
+        "the values it saved. The transcript is the call as Yaksh's caller heard and spoke it. "
+        "Judge the words the agent said from its own text here, the words the caller said from "
+        "the transcript, and what reached the agent from what it heard. Quote a line by its "
+        "number.",
     ]
     if stored.reason:
         lines.append(f"The record can be incomplete: it was {stored.reason}.")
     numbered = [f"[R{number}] {line}" for number, line in enumerate(record_lines(record), 1)]
-    return lines + (numbered or ["The agent saved no values and called no tools."])
+    return lines + (numbered or ["The record has no lines."])
 
 
 def with_item(view: str, item: str) -> str:
@@ -266,7 +299,10 @@ def speaker(turn: Turn) -> str:
             ("recorded", turn.machine is not None),
             ("Yaksh's fixed line", turn.scripted),
             ("audio not confirmed played", turn.provenance is Provenance.UNCONFIRMED),
-            ("not played: the agent spoke over it", turn.provenance is Provenance.CUT),
+            (
+                "cut off: the agent spoke over it, so part or none of it played",
+                turn.provenance is Provenance.CUT,
+            ),
         )
         if applies
     ]

@@ -12438,6 +12438,18 @@
             ],
             "title": "At"
           },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
           "at_ms": {
             "anyOf": [
               {
@@ -12448,6 +12460,17 @@
               }
             ],
             "title": "At Ms"
+          },
+          "started_at_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At Ms"
           },
           "turn": {
             "anyOf": [
@@ -12466,6 +12489,7 @@
           "role",
           "text",
           "at_ms",
+          "started_at_ms",
           "turn"
         ],
         "title": "RecordTurnRead"

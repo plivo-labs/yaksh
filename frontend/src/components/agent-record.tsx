@@ -197,18 +197,20 @@ type Line =
   | { kind: "tool"; tool: RecordTool };
 
 /** The record's lines and tool calls in one list, each tool call before the first line that
- * comes after it. */
+ * started after it, as the judges read them. A tool call with no time comes last. */
 function timeline(record: AgentRecord): Line[] {
-  const tools = [...record.tools];
+  const timed = record.tools.filter((tool) => tool.at_ms !== null);
   const lines: Line[] = [];
   let heard = 0;
   for (const turn of record.turns) {
-    while (tools.length && turn.at_ms !== null && (tools[0].at_ms ?? Infinity) <= turn.at_ms) {
-      lines.push({ kind: "tool", tool: tools.shift() as RecordTool });
+    const start = turn.started_at_ms ?? turn.at_ms;
+    while (timed.length && start !== null && (timed[0].at_ms as number) <= start) {
+      lines.push({ kind: "tool", tool: timed.shift() as RecordTool });
     }
     lines.push({ kind: "turn", turn, heard: turn.role === "caller" ? ++heard : null });
   }
-  return [...lines, ...tools.map((tool) => ({ kind: "tool" as const, tool }))];
+  const rest = [...timed, ...record.tools.filter((tool) => tool.at_ms === null)];
+  return [...lines, ...rest.map((tool) => ({ kind: "tool" as const, tool }))];
 }
 
 function AgentTranscript({

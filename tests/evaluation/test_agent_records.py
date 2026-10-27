@@ -99,7 +99,7 @@ class Judge:
         answers: dict[str, dict[str, Any]] = {
             "criterion": {
                 "evidence": [] if self.from_record else [{"turn": 3, "quote": "next Thursday"}],
-                "record_evidence": [{"line": 2, "quote": "move_booking"}]
+                "record_evidence": [{"line": 3, "quote": "move_booking"}]
                 if self.from_record
                 else [],
                 "absence": False,
@@ -235,8 +235,13 @@ async def test_a_record_still_being_written_waits_then_the_judges_read_it(
     assert items["criterion-1"].machine_outcome is Outcome.PASS
     assert (row.state, row.external_id) == (RecordState.FOUND, "run-1")
     view = judge.views["criterion"]
-    assert "[R1] Saved: new_time = Friday 4 pm" in view
-    assert '[R2] Tool call: move_booking {"day": "Friday"}, no output reported' in view
+    assert (
+        "[R1] Agent said: Thanks for calling, this is Ava.\n"
+        "[R2] Agent heard: Can I move my cleaning?\n"
+        '[R3] Tool call: move_booking {"day": "Friday"}, no output reported\n'
+        "[R4] Agent heard: Thanks.\n"
+        "[R5] Saved: new_time = Friday 4 pm"
+    ) in view, "the agent's own lines and tool calls in time order, then the saved values"
     assert "[H1] Can I move my cleaning?" in judge.views["heard"]
 
     shown = (await client.get(f"/api/v1/conversations/{conversation_id}")).json()

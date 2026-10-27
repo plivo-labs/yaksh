@@ -192,6 +192,8 @@ class PairedTurn:
     turn: RecordTurn
     at_ms: int | None
     """On the call's clock."""
+    started_ms: int | None
+    """When its speech started, on the call's clock."""
     number: int | None
     """The Yaksh turn it belongs to, counted from 1."""
 
@@ -237,6 +239,7 @@ async def record_view(session: AsyncSession, conversation: Conversation) -> Reco
     paired = []
     for line in kept.record.turns:
         at_ms = call_clock_ms(conversation, line.at)
-        paired.append(PairedTurn(line, at_ms, paired_turn(line, at_ms, turns)))
+        started_ms = call_clock_ms(conversation, line.started_at)
+        paired.append(PairedTurn(line, at_ms, started_ms, paired_turn(line, at_ms, turns)))
     tools = [PlacedTool(tool, call_clock_ms(conversation, tool.at)) for tool in kept.record.tools]
     return RecordView(status, source, kept.reason, row, paired, tools)

@@ -8,7 +8,7 @@ Answer three questions, each with pass, fail or not_applicable:
 Use not_applicable when the call never reached the situation that the question is about. A caller who refuses, hangs up or goes silent is not the agent's failure.
 
 Rules:
-- A fail needs two quotes, each word for word: call_quote, the agent's line in the call with its turn number; and instruction_quote, the line of the instructions that it breaks. Give both as null for a pass or not_applicable.
+- A fail needs two quotes, each word for word: the agent's line, and instruction_quote, the line of the instructions that it breaks. Give the agent's line as call_quote, from the transcript with its turn number, or, when the view has an AGENT RECORD, as record_quote, from one of its lines other than "Agent heard", with its line number. Give a quote you do not use as null, and every quote as null for a pass or not_applicable.
 - Judge the result, not the cause. Do not guess why the agent did something, and do not say that it misheard.
 - The transcript note says how the agent's lines were captured. Judge what was said, not the spelling or the written form of numbers.
 - A caller line marked "Yaksh's fixed line" is fixed text that Yaksh says, such as a nudge or a goodbye.

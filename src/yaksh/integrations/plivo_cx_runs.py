@@ -50,6 +50,10 @@ SETTLE = timedelta(seconds=90)
 lines late: on a live call, a caller line timed before FLOW_EXECUTION_COMPLETE was not in a
 read 22 s after the call, and the agent's goodbye was timed after FLOW_EXECUTION_COMPLETE."""
 SPEAKERS = {"user": Role.CALLER, "assistant": Role.AGENT}
+STARTED_SPEAKING = {"USER_STARTED_SPEAKING": Role.CALLER, "BOT_STARTED_SPEAKING": Role.AGENT}
+"""A speaker's line is logged when its speech ends; the last of these events before it, when its
+speech starts. An earlier one can be speech that gave no line. The agent speaks while its tools
+run, so only the start puts a line before or after a tool call."""
 
 
 class Stop(Exception):
@@ -293,6 +297,7 @@ def parse_run(detail: dict[str, Any], now: datetime) -> AgentRecord:
     turns: list[RecordTurn] = []
     tools: list[RecordTool] = []
     saved: dict[tuple[str, str], str] = {}
+    started: dict[Role, datetime] = {}
     for entry in logs:
         at = log_time(entry.get("timestamp"))
         event = entry.get("event_name")
@@ -300,11 +305,20 @@ def parse_run(detail: dict[str, Any], now: datetime) -> AgentRecord:
             role = SPEAKERS.get(str(entry.get("sender")))
             text = str(entry.get("text") or "").strip()
             if role is not None and text and len(turns) < MAX_TURNS:
-                turns.append(RecordTurn(role=role, text=clip(text, MAX_TEXT_CHARS), at=at))
+                turns.append(
+                    RecordTurn(
+                        role=role,
+                        text=clip(text, MAX_TEXT_CHARS),
+                        at=at,
+                        started_at=started.pop(role, None),
+                    )
+                )
             config = entry.get("node_config")
             variables = config.get("variables") if isinstance(config, dict) else None
             for name, value in (variables or {}).items():
                 saved[(nodes.get(str(entry.get("node_uuid")), ""), str(name))] = shown(value)
+        elif (role := STARTED_SPEAKING.get(str(entry.get("type")))) and at is not None:
+            started[role] = at
         elif event == "SYSTEM_CHUNK_CREATED" and entry.get("type") == "TOOL_CALL_EVENT":
             response = entry.get("tool_response")
             tools.append(

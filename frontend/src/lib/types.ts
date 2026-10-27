@@ -963,6 +963,8 @@ export interface RecordTurn {
   text: string;
   /** On the call's clock, as the transcript's turns. */
   at_ms: number | null;
+  /** When its speech started, on the call's clock. */
+  started_at_ms: number | null;
   /** The transcript turn it belongs to, counted from 1. */
   turn: number | null;
 }

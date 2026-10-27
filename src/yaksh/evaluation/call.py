@@ -220,6 +220,7 @@ async def evaluate(
                         turns,
                         agent.config,
                         judging.max_input_chars,
+                        record_lines=lines,
                         slots=judging.slots,
                     )
                 )
@@ -234,6 +235,7 @@ async def evaluate(
                         documents,
                         agent.config,
                         judging.max_input_chars,
+                        record_lines=lines,
                         slots=judging.slots,
                     )
                 )

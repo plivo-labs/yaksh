@@ -28,18 +28,40 @@ PRICES = Document(name="prices.md", text="New patient cleaning: $95\nX-rays: $40
 
 
 def part(
-    verdict: str, call: dict[str, Any] | None = None, line: str | None = None
+    verdict: str,
+    call: dict[str, Any] | None = None,
+    line: str | None = None,
+    record: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    return {"call_quote": call, "instruction_quote": line, "reasoning": "...", "verdict": verdict}
+    return {
+        "call_quote": call,
+        "record_quote": record,
+        "instruction_quote": line,
+        "reasoning": "...",
+        "verdict": verdict,
+    }
 
 
 def adherence(procedure: dict[str, Any]) -> dict[str, Any]:
     return {"objective": part("pass"), "procedure": procedure, "boundary": part("pass")}
 
 
+RECORD_LINES = [
+    "Agent said: Thanks for calling Maple Dental.",
+    "Agent heard: How much is a new patient cleaning?",
+    "Agent said: It is eighty five dollars.",
+]
+
+
 async def instructions(model: Scripted, config: str = CONFIG, max_chars: int = 100_000) -> Any:
     return await judge_instructions(
-        model, "VIEW", TURNS, config, max_chars, slots=asyncio.Semaphore(1)
+        model,
+        "VIEW",
+        TURNS,
+        config,
+        max_chars,
+        record_lines=RECORD_LINES,
+        slots=asyncio.Semaphore(1),
     )
 
 
@@ -86,6 +108,20 @@ async def test_a_source_judge_quotes_the_agent_never_the_caller() -> None:
     assert "Turn 2 is the caller's" in model.requests[1]
 
 
+async def test_a_source_judge_can_quote_the_agents_own_record_but_not_what_it_heard() -> None:
+    heard = {"line": 2, "quote": "How much is a new patient cleaning?"}
+    said = {"line": 3, "quote": "eighty five dollars"}
+    model = Scripted(
+        adherence(part("fail", None, "Do not offer discounts.", heard)),
+        adherence(part("fail", None, "Do not offer discounts.", said)),
+    )
+
+    found = await instructions(model)
+
+    assert (found.outcome, found.re_asks) == (Outcome.FAIL, 1)
+    assert "Record line R2 is what the agent heard from the caller" in model.requests[1]
+
+
 async def test_a_source_judge_that_times_out_is_its_items_error_at_once() -> None:
     busy = ModelCallError("timed out", temporary=True)
 
@@ -113,6 +149,7 @@ async def test_sources_too_large_for_one_request_are_an_error_with_no_model_call
 def contradiction(document: str, quote: str) -> dict[str, Any]:
     return {
         "call_quote": {"turn": 3, "quote": "eighty dollars"},
+        "record_quote": None,
         "document": document,
         "document_quote": quote,
         "reasoning": "The agent said $80; the price list says $95.",
@@ -139,6 +176,33 @@ async def test_a_contradiction_needs_the_document_line_word_for_word() -> None:
     assert (found.key, found.outcome, found.re_asks) == ("hallucination", Outcome.FAIL, 1)
     assert 'no document named "hours.md". The documents are: prices.md' in model.requests[1]
     assert "DOCUMENT: prices.md" in model.requests[0]
+
+
+async def test_a_contradiction_quotes_words_the_agent_said_not_a_tool_output() -> None:
+    lines = ['Tool call: price_list {}, output {"cleaning": "$80"}', "Agent said: It is $80."]
+    tool = contradiction("prices.md", "New patient cleaning: $95") | {
+        "call_quote": None,
+        "record_quote": {"line": 1, "quote": "$80"},
+    }
+    said = tool | {"record_quote": {"line": 2, "quote": "It is $80."}}
+    model = Scripted(
+        {"contradictions": [tool], "reasoning": "...", "verdict": "fail"},
+        {"contradictions": [said], "reasoning": "...", "verdict": "fail"},
+    )
+
+    found = await judge_hallucination(
+        model,
+        "VIEW",
+        TURNS,
+        [PRICES],
+        None,
+        100_000,
+        record_lines=lines,
+        slots=asyncio.Semaphore(1),
+    )
+
+    assert (found.outcome, found.re_asks) == (Outcome.FAIL, 1)
+    assert "Record line R1 is not words the agent said" in model.requests[1]
 
 
 async def test_a_pass_with_contradictions_is_asked_again() -> None:
