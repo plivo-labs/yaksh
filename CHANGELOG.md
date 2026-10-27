@@ -1,3 +1,16 @@
+## v0.8.0 (2026-10-28)
+
+### Feat
+
+- show where each caller reply's time goes, in the logs, the Metrics tab and Settings (#24)
+  - On a phone test, Yaksh now records how long its caller took to reply to the agent and where that time went: the silence wait, the transcript, the end-of-turn check, the LLM, the tools, the wait for a sentence, the speech synthesis and the output.
+  - The worker writes one `caller_reply_time` log line for each reply, with the caller's models, the total and each part in ms, so a log store can give daily numbers per caller model and per part.
+  - The **Metrics** tab of a conversation is now three cards: **Agent**, with a bar for each of its replies, then **Caller**, with the reply time and its parts, then **Call**.
+  - On the transcript, each reply of the caller's model shows its reply time. Point to it to see its parts.
+  - **Settings › Models** shows the caller's reply time for each model and effort over the phone calls of the last 7 days.
+  - Response times under a second now show in ms, such as 820ms.
+  - Only replies of the caller's model count: not its fixed lines, nudges or goodbyes, and not the lines of its voicemail or call screener. Calls from before this version have no caller reply time.
+
 ## v0.7.1 (2026-10-27)
 
 ### Feat
