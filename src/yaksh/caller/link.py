@@ -58,6 +58,10 @@ class Link:
         size, kind = HEADER.unpack(await self._reader.readexactly(HEADER.size))
         return Kind(kind), pickle.loads(await self._reader.readexactly(size))
 
+    def at_eof(self) -> bool:
+        """The other end has closed, and every message it sent has been read."""
+        return self._reader.at_eof()
+
     async def close(self) -> None:
         """Close after the queued messages are out, for at most CLOSE_TIMEOUT_S: a peer that has
         stopped reading cannot hold the caller."""

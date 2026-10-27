@@ -70,6 +70,10 @@ class Child:
     """The worker's end of the socket pair."""
     link: Link | None = None
     """Opened when the worker reads the child's first message."""
+    ready: bool = False
+    """The worker has read its READY: it waits for a call."""
+    started_at: float = field(default_factory=time.monotonic)
+    """When the process started; it has READY_TIMEOUT_S from then to get ready."""
     reaped: asyncio.Future[None] | None = field(default=None, repr=False)
 
 
@@ -146,8 +150,13 @@ class ChildConversations:
         self._background: set[asyncio.Future[Any]] = set()
 
     def warm(self) -> None:
-        """Start the spares; call it once the worker's event loop runs."""
-        self._top_up()
+        """Start processes until the spares, with those starting, reach SPARES. The worker calls
+        it once its event loop runs, and each call that starts calls it again."""
+        if self._closed or self._stuck_since is not None:
+            return
+        for _ in range(SPARES - len(self._spares) - self._spawning):
+            self._spawning += 1
+            self._keep(asyncio.ensure_future(self._add_spare()))
 
     def reserve(self) -> Seat:
         return ChildSeat(self, self._keep(asyncio.ensure_future(self._take())))
@@ -184,6 +193,15 @@ class ChildConversations:
     def release(self, taken: Child) -> None:
         """A child that sent its result leaves by itself: close the link and reap it."""
         self._reap(taken, close_link=True)
+
+    def give_back(self, taken: Child, reason: str) -> None:
+        """A process that no call holds waits for the next call, ready or still starting,
+        unless the spares are full; then it is killed for `reason`."""
+        if self._closed or len(self._spares) + self._spawning >= SPARES:
+            self.discard(taken, reason)
+        else:
+            self._spares.appendleft(taken)
+            log.info("call process %s waits for the next call", taken.process.pid)
 
     def _reap(self, taken: Child, close_link: bool) -> None:
         if taken.reaped is None:
@@ -269,40 +287,54 @@ class ChildConversations:
         self._unwanted(done)
 
     def _unwanted(self, done: asyncio.Future[Child]) -> None:
-        """Kill the process of a start that nobody waits for any more."""
+        """Give the process of a start that nobody waits for any more to the pool."""
         if not done.cancelled() and done.exception() is None:
             spawned = done.result()
             self._children.add(spawned)
-            self.discard(spawned, "nobody waits for it")
+            self.give_back(spawned, "nobody waits for it")
 
     async def _take(self) -> Child:
-        """A ready process for a call. Cancelled, it kills the process it was getting."""
+        """A ready process for a call. Cancelled, it gives the process it was getting to the
+        pool as it is."""
         for _ in range(TAKE_ATTEMPTS):
-            taken = self._spares.popleft() if self._spares else await self._spawned()
-            self._top_up()
+            taken = self._spare() or await self._spawned()
+            if taken.ready:
+                return taken
             try:
                 if taken.link is None:
                     taken.link = await open_link(taken.end)
-                kind, _ = await asyncio.wait_for(taken.link.receive(), READY_TIMEOUT_S)
+                left = READY_TIMEOUT_S - (time.monotonic() - taken.started_at)
+                kind, _ = await asyncio.wait_for(taken.link.receive(), max(left, 0.0))
             except (asyncio.IncompleteReadError, TimeoutError, OSError) as error:
                 self.discard(taken, f"it did not get ready: {describe_exception(error)}")
                 continue
             except BaseException:
-                self.discard(taken, "its call was given up")
+                if taken.link is None:  # a cancel inside open_link closes the socket
+                    self.discard(taken, "its call was given up")
+                else:
+                    self.give_back(taken, "its call was given up")
                 raise
             if kind is not Kind.READY:
                 self.discard(taken, f"it sent {kind.name} before it was ready")
                 raise ChildFailed(f"a call process sent {kind.name} before it was ready")
+            taken.ready = True
+            log.info(
+                "call process %s is ready in %.1f s",
+                taken.process.pid,
+                time.monotonic() - taken.started_at,
+            )
             return taken
         raise ChildFailed(f"no call process got ready in {TAKE_ATTEMPTS} tries")
 
-    def _top_up(self) -> None:
-        """Start processes until the spares, with those starting, reach SPARES."""
-        if self._closed or self._stuck_since is not None:
-            return
-        for _ in range(SPARES - len(self._spares) - self._spawning):
-            self._spawning += 1
-            self._keep(asyncio.ensure_future(self._add_spare()))
+    def _spare(self) -> Child | None:
+        """The next spare that still runs. One that stopped while it waited is dropped: its exit
+        was reported, or its end of the socket is closed."""
+        while self._spares:
+            spare = self._spares.popleft()
+            if spare.process.is_alive() and not (spare.link is not None and spare.link.at_eof()):
+                return spare
+            self.discard(spare, "it stopped while it waited for a call")
+        return None
 
     async def _add_spare(self) -> None:
         try:
@@ -334,17 +366,19 @@ class ChildSeat:
         except BaseException:
             await conversation.close()
             raise
+        self._pool.warm()
         return conversation
 
     async def release(self) -> None:
-        """A call that never started frees its child; a take still going kills its own."""
+        """A call that never started leaves its process to the pool: a take that still runs is
+        cancelled, and gives the process to the pool as it is."""
         taking, self._taking = self._taking, None
         if taking is None:
             return
         if not taking.done():
             taking.cancel()
         elif not taking.cancelled() and taking.exception() is None:
-            self._pool.discard(taking.result(), "its call never started")
+            self._pool.give_back(taking.result(), "its call never started")
 
 
 class ChildConversation:

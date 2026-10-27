@@ -1,5 +1,8 @@
 import asyncio
+import logging
 import multiprocessing
+import os
+import signal
 import subprocess
 import sys
 import time
@@ -184,30 +187,100 @@ def live_pids() -> set[int]:
     return {pid for pid in call_pids() if running(pid)}
 
 
-async def test_a_seat_given_back_before_its_call_starts_kills_only_its_process(pools: Any) -> None:
+DIAL_S = 0.3
+"""How long a dial that Plivo refuses takes before the call gives its seat back."""
+
+
+def logged(caplog: pytest.LogCaptureFixture, text: str) -> int:
+    return sum(text in record.getMessage() for record in caplog.records)
+
+
+def waiting_pids(caplog: pytest.LogCaptureFixture) -> list[int]:
+    return [
+        cast(tuple[int], record.args)[0]
+        for record in caplog.records
+        if "waits for the next call" in record.getMessage()
+    ]
+
+
+async def fail_the_dial(pool: ChildConversations) -> None:
+    seat = pool.reserve()
+    await asyncio.sleep(DIAL_S)
+    await seat.release()
+
+
+async def test_calls_that_never_start_leave_one_process_to_the_next_call(
+    pools: Any, caplog: pytest.LogCaptureFixture
+) -> None:
+    caplog.set_level(logging.INFO, logger=children.__name__)
+    pool = pools(targets.holds)
+    for _ in range(3):
+        await fail_the_dial(pool)
+    await wait_until(lambda: len(waiting_pids(caplog)) == 3)
+    assert logged(caplog, "started call process") == 1
+
+    conversation = await pool.reserve().start(started(Stream()))
+    heard = await conversation.heard()
+    await conversation.close()
+
+    assert heard.recording == b"wav"
+
+
+async def test_a_process_that_never_gets_ready_is_not_replaced_for_a_call_that_never_started(
+    pools: Any, caplog: pytest.LogCaptureFixture, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    caplog.set_level(logging.INFO, logger=children.__name__)
+    monkeypatch.setattr(children, "READY_TIMEOUT_S", 1.0)
+    pool = pools(targets.never_ready)
+
+    await fail_the_dial(pool)
+    await asyncio.sleep(2.0)  # past the time a take would give up on the process
+
+    assert logged(caplog, "started call process") == 1
+
+
+async def test_a_process_that_never_gets_ready_is_replaced_although_each_call_gives_it_back(
+    pools: Any, caplog: pytest.LogCaptureFixture, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    caplog.set_level(logging.INFO, logger=children.__name__)
+    monkeypatch.setattr(children, "READY_TIMEOUT_S", 1.0)
+    pool = pools(targets.never_ready)
+
+    for _ in range(5):
+        await fail_the_dial(pool)
+
+    assert logged(caplog, "it did not get ready") >= 1
+
+
+async def test_overlapping_calls_that_never_start_leave_only_the_spares(pools: Any) -> None:
+    pool = pools(targets.holds)
+    seats = [pool.reserve() for _ in range(2 * children.SPARES)]
+    await asyncio.sleep(DIAL_S)
+
+    for seat in seats:
+        await seat.release()
+
+    await wait_until(lambda: len(live_pids()) == children.SPARES)
+
+
+async def test_a_waiting_process_that_died_does_not_count_as_a_try(
+    pools: Any, caplog: pytest.LogCaptureFixture, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    caplog.set_level(logging.INFO, logger=children.__name__)
+    monkeypatch.setattr(children, "TAKE_ATTEMPTS", 1)
     pool = pools(targets.holds)
     seat = pool.reserve()
-    await wait_until(lambda: len(live_pids()) == 1 + children.SPARES)
+    await wait_until(lambda: logged(caplog, "is ready in") == 1, timeout=30)
+    await seat.release()  # after a dial long enough for the process to get ready
+    [pid] = waiting_pids(caplog)
+    os.kill(pid, signal.SIGKILL)
+    await wait_until(lambda: not running(pid))
 
-    await seat.release()
+    conversation = await pool.reserve().start(started(Stream()))
+    heard = await conversation.heard()
+    await conversation.close()
 
-    await wait_until(lambda: len(live_pids()) == children.SPARES)
-
-
-async def test_a_call_cancelled_while_it_takes_its_process_kills_only_that_process(
-    pools: Any,
-) -> None:
-    pool = pools(targets.never_ready)
-    seat = pool.reserve()
-    starting = asyncio.create_task(seat.start(started(Stream())))
-    await wait_until(lambda: len(live_pids()) == 1 + children.SPARES)
-
-    starting.cancel()
-    with pytest.raises(asyncio.CancelledError):
-        await starting
-    await seat.release()
-
-    await wait_until(lambda: len(live_pids()) == children.SPARES)
+    assert heard.recording == b"wav"
 
 
 async def test_the_pool_keeps_its_spares_and_no_more(pools: Any) -> None:
