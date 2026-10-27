@@ -1,8 +1,15 @@
 from dataclasses import replace
-from datetime import date
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+from yaksh.domain.agent_records import (
+    AgentRecord,
+    RecordState,
+    RecordTool,
+    RecordTurn,
+    StoredRecord,
+)
 from yaksh.domain.agents import Direction, Transport
 from yaksh.domain.answering import AfterScreening, AnsweredBy, Answering, MachineLine, Voicemail
 from yaksh.domain.conversations import (
@@ -14,6 +21,7 @@ from yaksh.domain.conversations import (
     WireEvent,
     WireEventKind,
 )
+from yaksh.domain.record_sources import RecordProvider
 from yaksh.domain.scenarios import Fact
 from yaksh.evaluation.evidence import CallView, render, with_item
 from yaksh.evaluation.quotes import quote_problems
@@ -117,7 +125,10 @@ def test_the_view_marks_yaksh_lines_and_words_the_agent_spoke_over() -> None:
     assert "The agent called Yaksh's number +15550177 from +15550200." in rendered
     assert "The call ended. End reason: unknown. Call length: unknown." in rendered
     assert "[1] Caller (Yaksh's fixed line): Hello?" in rendered
-    assert "[3] Caller (not played: the agent spoke over it): March fourteenth" in rendered
+    assert (
+        "[3] Caller (cut off: the agent spoke over it, so part or none of it played): "
+        "March fourteenth"
+    ) in rendered
 
 
 def test_a_text_conversation_has_its_own_transcript_note_and_no_phone_facts() -> None:
@@ -224,3 +235,32 @@ def test_the_evidence_tells_when_the_caller_picked_up_after_its_screener() -> No
     rendered = with_item(render(view), "Criterion: The agent asks to confirm the appointment.")
 
     assert rendered + "\n" == (FIXTURES / "evidence_screened.txt").read_text()
+
+
+def test_an_agent_line_said_while_a_tool_ran_comes_before_the_tools_result() -> None:
+    def at(second: float) -> datetime:
+        return datetime(2026, 10, 26, 14, 24, tzinfo=UTC) + timedelta(seconds=second)
+
+    record = AgentRecord(
+        provider=RecordProvider.PLIVO_CX,
+        external_id="run-1",
+        status="COMPLETED",
+        complete=True,
+        turns=[
+            RecordTurn(role=Role.AGENT, text="One moment.", at=at(43.5), started_at=at(41.2)),
+            RecordTurn(
+                role=Role.AGENT, text="I could not move it.", at=at(54.3), started_at=at(44.7)
+            ),
+        ],
+        tools=[RecordTool(name="reschedule", arguments="{}", output="failed", at=at(42.7))],
+    )
+
+    view = render(
+        replace(MAPLE_DENTAL, record=StoredRecord(state=RecordState.FOUND, record=record))
+    )
+
+    assert (
+        "[R1] Agent said: One moment.\n"
+        "[R2] Tool call: reschedule {}, output failed\n"
+        "[R3] Agent said: I could not move it."
+    ) in view

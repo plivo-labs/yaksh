@@ -80,6 +80,7 @@ class Judge:
         if name == "instructions":
             followed = {
                 "call_quote": None,
+                "record_quote": None,
                 "instruction_quote": None,
                 "reasoning": "...",
                 "verdict": "pass",
@@ -97,6 +98,7 @@ class Judge:
         if name == "hallucination":
             contradiction = {
                 "call_quote": {"turn": 3, "quote": "four p.m."},
+                "record_quote": None,
                 "document": "hours.md",
                 "document_quote": "Thursday: 8 am to 5 pm.",
                 "reasoning": "...",

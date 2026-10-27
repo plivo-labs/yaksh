@@ -160,6 +160,8 @@ class AgentRecordStatus(BaseModel):
 class RecordTurnRead(RecordTurn):
     at_ms: int | None
     """On the call's clock, as the transcript's turns."""
+    started_at_ms: int | None
+    """When its speech started, on the call's clock; None when the provider does not log it."""
     turn: int | None
     """The Yaksh turn the line belongs to, counted from 1; None when it pairs with none."""
 
@@ -196,7 +198,12 @@ class AgentRecordRead(AgentRecordStatus):
             fetched_at=row.fetched_at if row is not None else None,
             saved=[SavedValue.model_validate(value) for value in (record or {}).get("saved", [])],
             turns=[
-                RecordTurnRead(**paired.turn.model_dump(), at_ms=paired.at_ms, turn=paired.number)
+                RecordTurnRead(
+                    **paired.turn.model_dump(),
+                    at_ms=paired.at_ms,
+                    started_at_ms=paired.started_ms,
+                    turn=paired.number,
+                )
                 for paired in view.turns
             ],
             tools=[

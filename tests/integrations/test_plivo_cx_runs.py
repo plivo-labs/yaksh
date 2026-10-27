@@ -131,6 +131,7 @@ async def test_a_run_reads_into_its_lines_saved_values_and_completeness(cx: Cx) 
     ]
     assert record.turns[1].text.startswith("Jordan Ellis. Also, quick question.")
     assert record.turns[1].at == datetime(2026, 10, 23, 12, 28, 45, 306851, tzinfo=UTC)
+    assert record.turns[1].started_at == datetime(2026, 10, 23, 12, 28, 38, 542427, tzinfo=UTC)
     assert {value.name: value.value for value in record.saved} == {
         "caller_age": "34",
         "caller_full_name": "Jordan Ellis",
@@ -275,6 +276,28 @@ async def test_two_nodes_that_save_one_name_keep_their_node_in_it(cx: Cx) -> Non
         '{"slot": "09:30"}',
         '{"ok": true}',
         False,
+    )
+
+
+async def test_a_line_starts_at_the_last_start_of_its_speaker_before_it(cx: Cx) -> None:
+    detail = copy.deepcopy(LIVE_RUN)
+    noise = {
+        "event_name": "SYSTEM_CHUNK_CREATED",
+        "type": "USER_STARTED_SPEAKING",
+        "timestamp": "2026-10-23T12:28:36.000000",
+    }
+    at = next(
+        i for i, entry in enumerate(detail["logs"]) if entry.get("text") == "User started speaking"
+    )
+    detail["logs"].insert(at, noise)
+    cx.add(detail)
+
+    found = await find(cx, call())
+
+    assert isinstance(found, Found)
+    caller = found.record.turns[1]
+    assert caller.started_at == datetime(2026, 10, 23, 12, 28, 38, 542427, tzinfo=UTC), (
+        "speech that gave no line does not start the next line"
     )
 
 

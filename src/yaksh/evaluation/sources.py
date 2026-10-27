@@ -14,10 +14,10 @@ from yaksh.domain.evaluations import DecidedBy, ItemRole, Outcome
 from yaksh.domain.language_models import JsonModel
 from yaksh.evaluation.canonical import contains
 from yaksh.evaluation.criteria import schema
-from yaksh.evaluation.evidence import with_item
+from yaksh.evaluation.evidence import AGENT_HEARD, AGENT_SAID, with_item
 from yaksh.evaluation.judging import Check, ItemResult, JudgeSpec, ask, prompt
 from yaksh.evaluation.limit import Slots
-from yaksh.evaluation.quotes import quote_problems
+from yaksh.evaluation.quotes import quote_problems, record_quote_problems
 
 VERDICTS = {"type": "string", "enum": ["pass", "fail", "not_applicable"]}
 CALL_QUOTE = {
@@ -26,9 +26,16 @@ CALL_QUOTE = {
     "required": ["turn", "quote"],
     "additionalProperties": False,
 }
+RECORD_QUOTE = {
+    "anyOf": [
+        {"type": "null"},
+        schema({"line": {"type": "integer"}, "quote": {"type": "string"}}),
+    ]
+}
 PART = schema(
     {
         "call_quote": {"anyOf": [{"type": "null"}, CALL_QUOTE]},
+        "record_quote": RECORD_QUOTE,
         "instruction_quote": {"anyOf": [{"type": "null"}, {"type": "string"}]},
         "reasoning": {"type": "string"},
         "verdict": VERDICTS,
@@ -47,7 +54,8 @@ HALLUCINATION = JudgeSpec(
                 "type": "array",
                 "items": schema(
                     {
-                        "call_quote": CALL_QUOTE,
+                        "call_quote": {"anyOf": [{"type": "null"}, CALL_QUOTE]},
+                        "record_quote": RECORD_QUOTE,
                         "document": {"type": "string"},
                         "document_quote": {"type": "string"},
                         "reasoning": {"type": "string"},
@@ -90,6 +98,36 @@ def agent_quote_problems(quotes: Sequence[dict[str, Any]], turns: Sequence[Turn]
     return problems
 
 
+def agent_line_problems(
+    found: dict[str, Any],
+    turns: Sequence[Turn],
+    record_lines: Sequence[str],
+    *,
+    words_only: bool = False,
+) -> list[str]:
+    """The agent's line of a fail: a transcript turn of the agent in call_quote, or a line of
+    its own record in record_quote, other than what it heard from the caller. With words_only,
+    the record line must be words the agent said, not a tool call or a saved value."""
+    call, recorded = found["call_quote"], found["record_quote"]
+    if call is None and recorded is None:
+        return ["Give the agent's line in call_quote, or a line of its record in record_quote."]
+    problems = agent_quote_problems([call], turns) if call is not None else []
+    if recorded is not None:
+        problems += record_quote_problems([recorded], record_lines)
+        line = recorded["line"]
+        text = record_lines[line - 1] if 1 <= line <= len(record_lines) else ""
+        if text.startswith(AGENT_HEARD):
+            problems.append(
+                f"Record line R{line} is what the agent heard from the caller. "
+                "Quote the agent's own line."
+            )
+        elif words_only and text and not text.startswith(AGENT_SAID):
+            problems.append(
+                f'Record line R{line} is not words the agent said. Quote an "Agent said" line.'
+            )
+    return problems
+
+
 def readable(config: str) -> list[str]:
     """The texts an instruction can be quoted from: the config as pasted, and when it is JSON,
     such as a flow export, its string values one by one and joined by lines, so a quote of a
@@ -114,7 +152,7 @@ def readable(config: str) -> list[str]:
     return [config, *values, "\n".join(values)]
 
 
-def instruction_problems(turns: Sequence[Turn], config: str) -> Check:
+def instruction_problems(turns: Sequence[Turn], config: str, record_lines: Sequence[str]) -> Check:
     texts = readable(config)
 
     def check(answer: dict[str, Any]) -> tuple[list[str], list[str]]:
@@ -123,10 +161,10 @@ def instruction_problems(turns: Sequence[Turn], config: str) -> Check:
             part = answer[question]
             if part["verdict"] != "fail":
                 continue
-            if part["call_quote"] is None or part["instruction_quote"] is None:
-                problems.append(f"The {question} fail needs both call_quote and instruction_quote.")
+            if part["instruction_quote"] is None:
+                problems.append(f"The {question} fail needs instruction_quote.")
                 continue
-            problems += agent_quote_problems([part["call_quote"]], turns)
+            problems += agent_line_problems(part, turns, record_lines)
             if not any(contains(text, part["instruction_quote"]) for text in texts):
                 problems.append(
                     f'The instruction quote "{part["instruction_quote"]}" is not in the '
@@ -144,6 +182,7 @@ async def judge_instructions(
     config: str,
     max_chars: int,
     *,
+    record_lines: Sequence[str] = (),
     slots: Slots,
 ) -> ItemResult:
     subject = "Follows its instructions"
@@ -154,7 +193,7 @@ async def judge_instructions(
         model,
         INSTRUCTIONS,
         user,
-        instruction_problems(turns, config),
+        instruction_problems(turns, config, record_lines),
         slots=slots,
         retry_later=False,
         patient=False,
@@ -185,14 +224,17 @@ async def judge_instructions(
     )
 
 
-def contradiction_problems(turns: Sequence[Turn], documents: Sequence[Document]) -> Check:
+def contradiction_problems(
+    turns: Sequence[Turn], documents: Sequence[Document], record_lines: Sequence[str]
+) -> Check:
     texts = {document.name.lower(): document.text for document in documents}
     names = ", ".join(document.name for document in documents)
 
     def check(answer: dict[str, Any]) -> tuple[list[str], list[str]]:
         found = answer["contradictions"]
-        problems = agent_quote_problems([item["call_quote"] for item in found], turns)
+        problems = []
         for item in found:
+            problems += agent_line_problems(item, turns, record_lines, words_only=True)
             text = texts.get(item["document"].lower())
             if text is None:
                 problems.append(
@@ -220,6 +262,7 @@ async def judge_hallucination(
     config: str | None,
     max_chars: int,
     *,
+    record_lines: Sequence[str] = (),
     slots: Slots,
 ) -> ItemResult:
     subject = "States no fact its documents contradict"
@@ -233,7 +276,7 @@ async def judge_hallucination(
         model,
         HALLUCINATION,
         user,
-        contradiction_problems(turns, documents),
+        contradiction_problems(turns, documents, record_lines),
         slots=slots,
         retry_later=False,
         patient=False,

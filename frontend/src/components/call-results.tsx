@@ -242,12 +242,30 @@ function VerdictFact({
 }
 
 type Quote = { turn: number; quote: string };
+type RecordQuote = { line: number; quote: string };
 type Part = {
   verdict: string;
   call_quote: Quote | null;
+  record_quote?: RecordQuote | null;
   instruction_quote: string | null;
   reasoning?: string;
 };
+
+/** Quotes of the agent's own record, which has no turns to link to. */
+function RecordQuotes({ quotes }: { quotes: RecordQuote[] }) {
+  return (
+    <ul className="grid gap-1">
+      {quotes.map((quote, index) => (
+        <li key={index} className="flex items-start gap-2 text-xs-400">
+          <span className="shrink-0 rounded-sm bg-muted px-1.5 font-mono text-xs-400 text-muted-foreground">
+            Record
+          </span>
+          <q className="min-w-0 font-mono wrap-anywhere">{quote.quote}</q>
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 const INSTRUCTION_PARTS = [
   ["objective", "Goal"],
@@ -467,21 +485,8 @@ function Answer({ item, onTurn }: { item: EvaluationItem; onTurn?: OnTurn }) {
   const parts: ReactNode[] = [];
   const evidence = answer.evidence as Quote[] | undefined;
   if (evidence?.length) parts.push(<Quotes key="evidence" quotes={evidence} onTurn={onTurn} />);
-  const recorded = answer.record_evidence as { line: number; quote: string }[] | undefined;
-  if (recorded?.length) {
-    parts.push(
-      <ul key="record-evidence" className="grid gap-1">
-        {recorded.map((quote, index) => (
-          <li key={index} className="flex items-start gap-2 text-xs-400">
-            <span className="shrink-0 rounded-sm bg-muted px-1.5 font-mono text-xs-400 text-muted-foreground">
-              Record
-            </span>
-            <q className="min-w-0 font-mono wrap-anywhere">{quote.quote}</q>
-          </li>
-        ))}
-      </ul>,
-    );
-  }
+  const recorded = answer.record_evidence as RecordQuote[] | undefined;
+  if (recorded?.length) parts.push(<RecordQuotes key="record-evidence" quotes={recorded} />);
   if (itemKey === "saved_data") {
     for (const value of checkedValues<SavedValueResult>(item) ?? []) {
       parts.push(<SavedValueRow key={`saved-${value.name}`} value={value} onTurn={onTurn} />);
@@ -529,6 +534,7 @@ function Answer({ item, onTurn }: { item: EvaluationItem; onTurn?: OnTurn }) {
             {name} {part.verdict === "pass" ? "kept" : "not kept"}
           </span>
           {part.call_quote && <Quotes quotes={[part.call_quote]} onTurn={onTurn} />}
+          {part.record_quote && <RecordQuotes quotes={[part.record_quote]} />}
           {part.instruction_quote && (
             <blockquote className="border-l-2 pl-2 text-xs-400 text-muted-foreground">
               Instruction: {part.instruction_quote}
@@ -540,12 +546,19 @@ function Answer({ item, onTurn }: { item: EvaluationItem; onTurn?: OnTurn }) {
     }
   }
   const contradictions = answer.contradictions as
-    | { call_quote: Quote; document: string; document_quote: string; reasoning?: string }[]
+    | {
+        call_quote: Quote | null;
+        record_quote?: RecordQuote | null;
+        document: string;
+        document_quote: string;
+        reasoning?: string;
+      }[]
     | undefined;
   for (const [index, found] of (contradictions ?? []).entries()) {
     parts.push(
       <div key={`contradiction-${index}`} className="grid gap-1.5 rounded-md border px-2.5 py-2">
-        <Quotes quotes={[found.call_quote]} onTurn={onTurn} />
+        {found.call_quote && <Quotes quotes={[found.call_quote]} onTurn={onTurn} />}
+        {found.record_quote && <RecordQuotes quotes={[found.record_quote]} />}
         <blockquote className="border-l-2 pl-2 text-xs-400 text-muted-foreground">
           {found.document}: {found.document_quote}
         </blockquote>

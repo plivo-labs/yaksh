@@ -36,7 +36,7 @@ All judges read the same evidence view of the call: the agent's brief, the data 
 | Data the agent saved | The values in the agent record | One, when the record has saved values | Each value: matches, contradicts or not checkable, with quotes |
 | What the agent heard | The caller lines of the agent's own speech-to-text | One, when the provider's record holds the live transcript | Each value the caller said: heard the same, different or missing, with both quotes |
 
-With an [agent record](/docs/agent-record), the view also has an AGENT RECORD section: the values the agent saved and its tool calls, numbered R1 and up. A criterion or LLM rule can quote these lines. The saved data check counts in the verdict with agent rules; the heard check only reports.
+With an [agent record](/docs/agent-record), the view also has an AGENT RECORD section, numbered R1 and up: the text the agent sent to its voice, what its speech-to-text heard, its tool calls and the values it saved. The judges take the agent's words from this text and the caller's words from the transcript. A criterion or LLM rule can quote these lines. The saved data check counts in the verdict with agent rules; the heard check only reports.
 
 An agent rule checks only the calls of its **Answered by** value: the caller, the voicemail, the call screener, or any call. A call where no caller talked has no criteria and no caller check. Refer to [Voicemail and call screening](/docs/voicemail-and-call-screening).
 
