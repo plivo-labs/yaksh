@@ -302,10 +302,12 @@ def test_a_record_line_pairs_with_the_turn_that_holds_its_time() -> None:
     turns = [
         Turn(role=Role.CALLER, text="Hi.", started_at_ms=1000, ended_at_ms=2000),
         Turn(role=Role.CALLER, text="Friday.", started_at_ms=3500, ended_at_ms=4000),
+        Turn(role=Role.CALLER, text="4111#", started_at_ms=5000, ended_at_ms=5000, dtmf=True),
     ]
     line = RecordTurn(role=Role.CALLER, text="Friday.", at=None)
 
     assert paired_turn(line, 3900, turns) == 2
+    assert paired_turn(line, 5000, turns) == 2
     assert paired_turn(line, 9000, turns) is None
 
 
