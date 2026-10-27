@@ -378,6 +378,23 @@ class RunVerdicts(BaseModel):
     """None when no judged call read an agent record."""
 
 
+class ModelReplyTime(BaseModel):
+    """The caller's reply time with one model and effort: nearest-rank percentiles over the
+    measured replies of the calls that ran with it."""
+
+    model_config = ConfigDict(frozen=True)
+
+    model: str
+    reasoning_effort: str | None
+    """The effort the caller sent; None for none."""
+    calls: int
+    replies: int
+    p50_ms: int
+    p90_ms: int
+    llm_p50_ms: int
+    """The LLM inference part, a reply without one counted as 0, as on a conversation page."""
+
+
 class RunMetrics(BaseModel):
     model_config = ConfigDict(frozen=True)
 

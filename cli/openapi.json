@@ -7838,7 +7838,7 @@
           },
           "rows": {
             "items": {
-              "$ref": "#/components/schemas/ModelReplyTime"
+              "$ref": "#/components/schemas/ModelReplyTimeRead"
             },
             "type": "array",
             "title": "Rows"
@@ -10587,7 +10587,7 @@
         "title": "Metric",
         "description": "One metric's value and the flags it raised."
       },
-      "ModelReplyTime": {
+      "ModelReplyTimeRead": {
         "properties": {
           "model": {
             "type": "string",
@@ -10640,7 +10640,7 @@
           "llm_p50_ms",
           "in_use"
         ],
-        "title": "ModelReplyTime"
+        "title": "ModelReplyTimeRead"
       },
       "Models": {
         "properties": {

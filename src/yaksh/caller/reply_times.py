@@ -4,7 +4,8 @@ the caller's model spoke, with its parts, kept for the conversation and logged o
 import json
 import logging
 import time
-from collections.abc import Callable, Mapping, Sequence
+import uuid
+from collections.abc import Callable, Sequence
 from contextvars import ContextVar
 from enum import Enum, auto
 from typing import Any, NamedTuple
@@ -26,7 +27,9 @@ from pipecat.observers.user_bot_latency_observer import (
 )
 from pipecat.processors.frame_processor import FrameDirection
 
+from yaksh import __version__
 from yaksh.caller.audio import MACHINE
+from yaksh.domain.conversations import CallerSettings
 from yaksh.domain.latency import CallerReplyTime
 
 log = logging.getLogger(__name__)
@@ -78,9 +81,25 @@ class ReplyTimes(UserBotLatencyObserver):
     so the handler takes the audio start that closed it from its context, never the latest one.
     Times come from `now`, the observer's own clock."""
 
-    def __init__(self, log_fields: Mapping[str, Any], now: Callable[[], float] = time.time) -> None:
+    def __init__(
+        self,
+        conversation_id: uuid.UUID,
+        settings: CallerSettings,
+        llm_host: str | None,
+        now: Callable[[], float] = time.time,
+    ) -> None:
+        """`llm_host` is the host of the LLM base URL, for the log line: never its path or a key."""
         super().__init__(time_source=now)
-        self._log_fields = dict(log_fields)
+        self._log_fields = {
+            "conversation_id": str(conversation_id),
+            "caller_model": settings.llm_model,
+            "reasoning_effort": settings.reasoning_effort,
+            "llm_host": llm_host,
+            "stt_model": settings.stt_model,
+            "tts_model": settings.tts_model,
+            "language": settings.stt_language,
+            "version": __version__,
+        }
         self._time = now
         self._sources: list[tuple[float, Source]] = []
         self._audio_starts = 0

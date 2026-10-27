@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import uuid
 from types import SimpleNamespace
 from typing import Any, cast
 
@@ -21,14 +22,17 @@ from pipecat.frames.frames import (
 )
 from pipecat.metrics.metrics import TextAggregationMetricsData, TTFBMetricsData
 from pipecat.observers.base_observer import FramePushed
+from pipecat.observers.user_bot_latency_observer import LatencyContribution, LatencyOwnerKind
 from pipecat.processors.frame_processor import FrameDirection
 
 from yaksh.caller.audio import MACHINE
-from yaksh.caller.reply_times import ReplyTimes
+from yaksh.caller.reply_times import ReplyTimes, steps_within
 from yaksh.domain.answering import MachineLine
+from yaksh.domain.conversations import CallerSettings
 from yaksh.domain.latency import STEP_KEYS, CallerReplyTime
 
 SOURCE = SimpleNamespace(name="Caller#0")
+CONVERSATION = uuid.UUID("01a17ea2-9d59-7ac1-92ef-2bafb49e6dfe")
 AUDIO = b"\0\0" * 160
 
 
@@ -37,7 +41,12 @@ class Call:
 
     def __init__(self) -> None:
         self.now = 0.0
-        self.timer = ReplyTimes({"conversation_id": "c-1"}, now=lambda: self.now)
+        self.timer = ReplyTimes(
+            CONVERSATION,
+            CallerSettings(llm_model="caller-model", reasoning_effort="low", stt_language="en-US"),
+            "llm.example.com",
+            now=lambda: self.now,
+        )
 
     async def push(self, at: float, frame: Frame) -> None:
         self.now = at
@@ -194,9 +203,42 @@ async def test_each_reply_is_logged_on_one_line_with_every_part(
     event, payload = line.split(" ", 1)
     fields = json.loads(payload)
     assert event == "caller_reply_time"
-    assert fields["conversation_id"] == "c-1"
+    assert fields["conversation_id"] == str(CONVERSATION)
+    assert (fields["caller_model"], fields["llm_host"], fields["language"]) == (
+        "caller-model",
+        "llm.example.com",
+        "en-US",
+    )
     assert fields["reply"] == 0
     assert fields["total_ms"] == 1900
     assert fields["llm_inference_ms"] == 700
     assert fields["pipeline_ms"] == 0
     assert {f"{key}_ms" for key in STEP_KEYS} <= fields.keys()
+
+
+def test_a_part_that_comes_twice_in_a_reply_counts_both_times() -> None:
+    """A reply that the model ends without a word gets a second inference after its tool call:
+    two LLM inference parts with the tool between them."""
+
+    def part(key: str, start: float, secs: float) -> LatencyContribution:
+        return LatencyContribution(
+            key=key,
+            label=key,
+            owner="Caller#0",
+            owner_kind=LatencyOwnerKind.SERVICE,
+            start_time=start,
+            duration_secs=secs,
+        )
+
+    steps = steps_within(
+        [
+            part("endpointing_wait", 0.0, 0.6),
+            part("llm_inference", 0.6, 0.5),
+            part("function_handler", 1.1, 0.1),
+            part("llm_inference", 1.2, 0.7),
+        ],
+        start=0.0,
+        end=1.9,
+    )
+
+    assert steps == {"endpointing_wait": 600, "llm_inference": 1200, "function_handler": 100}

@@ -1664,8 +1664,8 @@ type CallerReplyTime struct {
 
 // CallerReplyTimes defines model for CallerReplyTimes.
 type CallerReplyTimes struct {
-	Days int              `json:"days"`
-	Rows []ModelReplyTime `json:"rows"`
+	Days int                  `json:"days"`
+	Rows []ModelReplyTimeRead `json:"rows"`
 }
 
 // Category What kind of situation a scenario tests. How the caller talks comes from the persona.
@@ -2257,8 +2257,8 @@ type Metric struct {
 	Value map[string]interface{} `json:"value"`
 }
 
-// ModelReplyTime defines model for ModelReplyTime.
-type ModelReplyTime struct {
+// ModelReplyTimeRead defines model for ModelReplyTimeRead.
+type ModelReplyTimeRead struct {
 	Calls           int     `json:"calls"`
 	InUse           bool    `json:"in_use"`
 	LlmP50Ms        int     `json:"llm_p50_ms"`

@@ -24,6 +24,7 @@ from yaksh.domain.evaluations import (
     EvaluationState,
     Metric,
     MetricKey,
+    ModelReplyTime,
     RunMetrics,
     RunNumbers,
     Share,
@@ -245,20 +246,6 @@ PENDING = frozenset({None, EvaluationState.QUEUED, EvaluationState.RUNNING})
 REPLY_TIME_WINDOW = timedelta(days=7)
 
 
-class ModelReplyTime(NamedTuple):
-    """The caller's reply time with one model and effort: nearest-rank percentiles over the
-    measured replies of the calls that ran with it."""
-
-    model: str
-    reasoning_effort: str | None
-    calls: int
-    replies: int
-    p50_ms: int
-    p90_ms: int
-    llm_p50_ms: int
-    """The LLM inference part, a reply without one counted as 0, as on a conversation page."""
-
-
 async def reply_time_by_model(session: AsyncSession) -> list[ModelReplyTime]:
     """The caller's reply time by caller model and effort, over the phone calls that ran in the
     last REPLY_TIME_WINDOW, most replies first. A call counts by when it ran, not by when its
@@ -294,4 +281,15 @@ async def reply_time_by_model(session: AsyncSession) -> list[ModelReplyTime]:
         .group_by(model, effort)
         .order_by(func.count().desc(), model, effort)
     )
-    return [ModelReplyTime(*row) for row in rows]
+    return [
+        ModelReplyTime(
+            model=model,
+            reasoning_effort=effort,
+            calls=calls,
+            replies=replies,
+            p50_ms=p50,
+            p90_ms=p90,
+            llm_p50_ms=llm_p50,
+        )
+        for model, effort, calls, replies, p50, p90, llm_p50 in rows
+    ]

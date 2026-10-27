@@ -47,7 +47,6 @@ from pipecat.turns.user_stop import TurnAnalyzerUserTurnStopStrategy
 from pipecat.turns.user_turn_strategies import UserTurnStrategies
 from pipecat.workers.runner import WorkerRunner
 
-from yaksh import __version__
 from yaksh.caller.audio import SAMPLE_RATE, Clock
 from yaksh.caller.machines import MachineGate, SoundPlayer
 from yaksh.caller.reply_times import ReplyTimes
@@ -470,16 +469,7 @@ class Persona:
         metrics = ServiceMetricsObserver()
         self.usage = UsageMeter(metrics)
         self.reply_times = ReplyTimes(
-            {
-                "conversation_id": str(request.conversation_id),
-                "caller_model": self.settings.llm_model,
-                "reasoning_effort": self.settings.reasoning_effort,
-                "llm_host": urlsplit(str(settings.llm.base_url)).hostname,
-                "stt_model": self.settings.stt_model,
-                "tts_model": self.settings.tts_model,
-                "language": hearing,
-                "version": __version__,
-            }
+            request.conversation_id, self.settings, urlsplit(str(settings.llm.base_url)).hostname
         )
         self.stt = DeepgramSTTService(
             api_key=keys.deepgram,

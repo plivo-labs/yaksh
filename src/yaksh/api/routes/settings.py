@@ -13,7 +13,7 @@ from yaksh.api.schemas.settings import (
     CallerReplyTimes,
     Efforts,
     ImportResult,
-    ModelReplyTime,
+    ModelReplyTimeRead,
     Models,
     PlivoAccount,
     ProviderTest,
@@ -199,7 +199,9 @@ async def caller_reply_times(session: SessionDep, settings: AppSettingsDep) -> C
     return CallerReplyTimes(
         days=results.REPLY_TIME_WINDOW.days,
         rows=[
-            ModelReplyTime(**row._asdict(), in_use=(row.model, row.reasoning_effort) == in_use)
+            ModelReplyTimeRead(
+                **row.model_dump(), in_use=(row.model, row.reasoning_effort) == in_use
+            )
             for row in await results.reply_time_by_model(session)
         ],
     )
