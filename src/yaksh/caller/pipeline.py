@@ -38,7 +38,6 @@ from pipecat.processors.aggregators.llm_response_universal import (
 )
 from pipecat.processors.audio.vad_processor import VADProcessor
 from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
-from pipecat.services.elevenlabs.tts import ElevenLabsTTSService
 from pipecat.services.llm_service import FunctionCallParams
 from pipecat.services.openai.responses.llm import OpenAIResponsesHttpLLMService
 from pipecat.turns.user_stop import TurnAnalyzerUserTurnStopStrategy
@@ -65,9 +64,11 @@ from yaksh.domain.conversations import (
 )
 from yaksh.domain.latency import VAD_CONFIDENCE, VAD_START_S, VAD_STOP_S
 from yaksh.domain.settings import AppSettings, CallerModel
-from yaksh.integrations import elevenlabs
+from yaksh.domain.voices import VoiceProvider
 from yaksh.integrations.openai_models import caller_effort, failure, retry_rate_limits
-from yaksh.integrations.speech import stt_language, stt_model, stt_service
+from yaksh.integrations.speech.audio import Resample8k
+from yaksh.integrations.speech.stt import stt_language, stt_model, stt_service
+from yaksh.integrations.speech.tts import tts_model, tts_service
 
 log = logging.getLogger(__name__)
 
@@ -124,20 +125,22 @@ class CallerKeys:
     llm: str
     stt: str
     """The key of the speech-to-text provider in use."""
-    elevenlabs: str
+    tts: str
+    """The key of the persona's voice provider."""
 
 
-def caller_keys(settings: AppSettings) -> CallerKeys:
-    """The keys of a call; raises ValueError naming each one that is not saved."""
-    if settings.missing_caller_keys:
-        missing = ", ".join(settings.missing_caller_keys)
-        raise ValueError(f"the caller needs the {missing} key; add it in Settings")
-    secrets = settings.secrets
-    assert secrets.llm_api_key and settings.stt_key and secrets.elevenlabs_api_key
+def caller_keys(settings: AppSettings, voice: VoiceProvider) -> CallerKeys:
+    """The keys of a call with a voice of `voice`; raises ValueError naming each one that is
+    not saved."""
+    tts = settings.tts_key(voice)
+    missing = [*settings.missing_caller_keys, *([voice.label] if tts is None else [])]
+    if missing:
+        raise ValueError(f"the caller needs the {', '.join(missing)} key; add it in Settings")
+    assert settings.secrets.llm_api_key and settings.stt_key and tts
     return CallerKeys(
-        llm=secrets.llm_api_key.get_secret_value(),
+        llm=settings.secrets.llm_api_key.get_secret_value(),
         stt=settings.stt_key.get_secret_value(),
-        elevenlabs=secrets.elevenlabs_api_key.get_secret_value(),
+        tts=tts.get_secret_value(),
     )
 
 
@@ -463,23 +466,13 @@ class Persona:
             stt_provider=hearer,
             stt_model=stt_model(settings, hearer),
             stt_language=hearing,
-            tts_model=elevenlabs.MODEL,
+            tts_model=tts_model(settings, request.voice.provider),
             voice=request.voice,
         )
         metrics = ServiceMetricsObserver()
         self.usage = UsageMeter(metrics)
         self.stt = stt_service(settings, hearer, keys.stt, hearing)
-        self.tts = ElevenLabsTTSService(
-            api_key=keys.elevenlabs,
-            sample_rate=SAMPLE_RATE,
-            settings=ElevenLabsTTSService.Settings(
-                model=elevenlabs.MODEL,
-                voice=request.voice.id,
-                speed=request.voice.speed,
-                stability=request.voice.stability,
-                language=elevenlabs.language_pin(request.caller_language),
-            ),
-        )
+        self.tts = tts_service(settings, request.voice, request.caller_language, keys.tts)
 
         self.ending = Ending(request, state, transcript, observer, clock, self.say)
         aggregators = LLMContextAggregatorPair(
@@ -510,6 +503,7 @@ class Persona:
                 self.llm,
                 GeneratedTap(transcript),
                 self.tts,
+                Resample8k(),
                 *([self.player] if self.player else []),
                 *before_output,
                 transport_output,

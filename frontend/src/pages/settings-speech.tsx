@@ -1,3 +1,8 @@
+import { useState } from "react";
+
+import { Panel, PanelHeader } from "@/components/panel";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -6,13 +11,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useAgents } from "@/lib/queries";
-import { STT_LANGUAGES, STT_PROVIDERS, sttProvider } from "@/lib/speech-providers";
+import { useAgents, usePersonas, useVoices } from "@/lib/queries";
+import {
+  STT_LANGUAGES,
+  STT_PROVIDERS,
+  TTS_PROVIDERS,
+  type TtsProvider,
+  sttProvider,
+  ttsProvider,
+} from "@/lib/speech-providers";
 import {
   type AppSettings,
   LANGUAGE_NAMES,
   type Language,
   type SettingsValues,
+  type VoiceProvider,
   servedLanguages,
 } from "@/lib/types";
 import type { Change } from "@/pages/settings";
@@ -123,4 +136,166 @@ function useUnheard(stt: SettingsValues["speech"]["stt"]): string | null {
         `${label} doesn't hear ${LANGUAGE_NAMES[language]}. ${count} ${count === 1 ? "agent serves" : "agents serve"} it.`,
     )
     .join(" ");
+}
+
+/** The providers that voice personas: a list with each one's state, and one provider's
+ * settings at a time. */
+export function TextToSpeechPanel({
+  settings,
+  draft,
+  change,
+}: {
+  settings: AppSettings;
+  draft: SettingsValues;
+  change: Change;
+}) {
+  const [open, setOpen] = useState<VoiceProvider | null>(null);
+  const voices = useVoices();
+  const personas = usePersonas();
+  const voicesOf = (provider: VoiceProvider) =>
+    (voices.data ?? []).filter((voice) => voice.provider === provider).length;
+  if (open !== null) {
+    const provider = ttsProvider(open);
+    const users = (personas.data ?? []).filter((persona) => persona.voice.provider === open);
+    return (
+      <TtsProviderPanel
+        provider={provider}
+        settings={settings}
+        draft={draft}
+        change={change}
+        voices={voicesOf(open)}
+        personas={users.length}
+        onBack={() => setOpen(null)}
+      />
+    );
+  }
+  return (
+    <Panel>
+      <PanelHeader title="Text to speech" />
+      <p className="px-5 py-3 text-s-400 text-muted-foreground">
+        The caller's voice. Each voice uses one provider. Built-in personas use ElevenLabs.
+      </p>
+      <ul className="border-t">
+        {TTS_PROVIDERS.map((provider) => {
+          const fields = draft[provider.section] as Fields;
+          const saved = Boolean(settings.secrets[provider.secret]);
+          return (
+            <li
+              key={provider.value}
+              className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b px-5 py-3 last:border-b-0"
+            >
+              <span className="w-28 text-s-500">{provider.label}</span>
+              <span className="w-40 truncate font-mono text-xs-400 text-muted-foreground">
+                {"model" in fields ? fields.model : ""}
+              </span>
+              <span className="flex flex-1 flex-wrap gap-1.5">
+                <Badge variant={saved ? "success" : undefined}>{saved ? "Saved" : "Not set"}</Badge>
+                {!provider.wordTimestamps && <Badge variant="warning">Sentence timing</Badge>}
+              </span>
+              <span className="w-20 text-right text-s-400 text-muted-foreground">
+                {voicesOf(provider.value)} {voicesOf(provider.value) === 1 ? "voice" : "voices"}
+              </span>
+              <Button size="sm" variant="outline" onClick={() => setOpen(provider.value)}>
+                {saved ? "Edit" : "Set up"}
+              </Button>
+            </li>
+          );
+        })}
+      </ul>
+      <p className="border-t px-5 py-3 text-xs-400 text-muted-foreground">
+        Sentence timing: a cut-off reply shows whole sentences, not words.
+      </p>
+    </Panel>
+  );
+}
+
+function TtsProviderPanel({
+  provider,
+  settings,
+  draft,
+  change,
+  voices,
+  personas,
+  onBack,
+}: {
+  provider: TtsProvider;
+  settings: AppSettings;
+  draft: SettingsValues;
+  change: Change;
+  voices: number;
+  personas: number;
+  onBack: () => void;
+}) {
+  const fields = draft[provider.section] as Fields & { region?: string };
+  const saved = settings.values[provider.section] as Fields & { region?: string };
+  const address = fields[provider.address];
+  const moved = address !== saved[provider.address];
+  const key = settings.secrets[provider.secret];
+  const region = provider.address === "region";
+  const edit = (field: string, value: string) =>
+    change(provider.section, field as never, value as never);
+  return (
+    <div className="grid gap-3">
+      <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-s-400">
+        <Button size="sm" variant="ghost" onClick={onBack}>
+          Text to speech
+        </Button>
+        <span aria-hidden className="text-muted-foreground">
+          /
+        </span>
+        <span className="text-s-500">{provider.label}</span>
+      </nav>
+      <ProviderPanel
+        title={provider.label}
+        provider={provider.test}
+        canTest={Boolean(key)}
+        edits={JSON.stringify(fields)}
+        description={
+          provider.wordTimestamps
+            ? undefined
+            : "Sentence timing: a cut-off reply shows whole sentences, not words."
+        }
+      >
+        <SettingRow
+          label={region ? "Region" : "Base URL"}
+          htmlFor="tts-address"
+          help={moved && key ? <KeyRemovedNote address={region ? "region" : "URL"} /> : undefined}
+        >
+          <Input
+            id="tts-address"
+            className={region ? "max-w-56 font-mono" : undefined}
+            value={address}
+            onChange={(event) => edit(provider.address, event.target.value.trim())}
+          />
+        </SettingRow>
+        {"model" in fields && (
+          <SettingRow label="Model" htmlFor="tts-model">
+            <Input
+              id="tts-model"
+              className="max-w-56"
+              value={fields.model}
+              onChange={(event) => edit("model", event.target.value)}
+            />
+          </SettingRow>
+        )}
+        <KeyRow
+          name={provider.secret}
+          label="API key"
+          help={provider.value === "sarvam" ? "Also Sarvam's speech to text key." : undefined}
+          state={key}
+          url={address}
+          checked
+          removable
+          removeWarning={
+            voices + personas > 0
+              ? {
+                  title: `Remove the ${provider.label} key?`,
+                  description: `${voices} ${voices === 1 ? "voice" : "voices"} and ${personas} ${personas === 1 ? "persona" : "personas"} use ${provider.label}. Their phone tests can't start until you add a key again.`,
+                }
+              : undefined
+          }
+        />
+      </ProviderPanel>
+    </div>
+  );
 }

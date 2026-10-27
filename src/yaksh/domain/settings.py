@@ -11,12 +11,15 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from pydantic import BaseModel, ConfigDict, Field, SecretStr, StringConstraints, field_validator
 
 from yaksh.domain.speech import SttProvider
+from yaksh.domain.voices import VoiceProvider
 
 TRIGGER_SECRET_NAME = re.compile(r"[A-Z][A-Z0-9_]{0,63}")
 
 Url = Annotated[str, StringConstraints(strip_whitespace=True, pattern=r"^https?://\S+$")]
 Address = Annotated[str, StringConstraints(strip_whitespace=True, pattern=r"^(https?|wss?)://\S+$")]
 """The address of a speech provider: an HTTP or a websocket URL."""
+AzureRegion = Annotated[str, StringConstraints(strip_whitespace=True, pattern=r"^[a-z0-9]{2,40}$")]
+"""An Azure region, such as centralindia, which names the Speech resource's address."""
 ModelName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
 Effort = Annotated[str, StringConstraints(pattern=r"^[a-z]{1,20}$")]
 ApplicationId = Annotated[str, StringConstraints(strip_whitespace=True, pattern=r"^[0-9]{1,40}$")]
@@ -62,6 +65,28 @@ class Soniox(Section):
 class Gladia(Section):
     url: Address = "https://api.gladia.io/v2/live"
     model: ModelName = "solaria-1"
+
+
+class ElevenLabs(Section):
+    url: Address = "wss://api.elevenlabs.io"
+    """A data residency address, such as wss://api.eu.residency.elevenlabs.io, keeps the speech
+    in that region."""
+    model: ModelName = "eleven_flash_v2_5"
+
+
+class Cartesia(Section):
+    url: Address = "wss://api.cartesia.ai/tts/websocket"
+    model: ModelName = "sonic-3.6"
+
+
+class SarvamTts(Section):
+    base_url: Address = "https://api.sarvam.ai"
+    model: ModelName = "bulbul:v4-flash"
+    """bulbul:v4-flash and bulbul:v3 name their speakers differently."""
+
+
+class Azure(Section):
+    region: AzureRegion = "eastus"
 
 
 class CallerModel(Section):
@@ -178,6 +203,8 @@ class SecretName(StrEnum):
     SONIOX_API_KEY = "soniox_api_key"
     GLADIA_API_KEY = "gladia_api_key"
     ELEVENLABS_API_KEY = "elevenlabs_api_key"
+    CARTESIA_API_KEY = "cartesia_api_key"
+    AZURE_API_KEY = "azure_api_key"
     TYPESAFE_API_KEY = "typesafe_api_key"
     """Jev, TypeSafe's classifier, answers criteria and agent rules before the judges; call
     transcripts are sent to TypeSafe."""
@@ -209,6 +236,8 @@ class Secrets(Section):
     soniox_api_key: SecretStr | None = None
     gladia_api_key: SecretStr | None = None
     elevenlabs_api_key: SecretStr | None = None
+    cartesia_api_key: SecretStr | None = None
+    azure_api_key: SecretStr | None = None
     typesafe_api_key: SecretStr | None = None
     plivo_auth_id: SecretStr | None = None
     plivo_auth_token: SecretStr | None = None
@@ -268,6 +297,10 @@ KEY_URLS = {
     SecretName.ASSEMBLYAI_API_KEY: ("assemblyai", "url"),
     SecretName.SONIOX_API_KEY: ("soniox", "url"),
     SecretName.GLADIA_API_KEY: ("gladia", "url"),
+    SecretName.SARVAM_API_KEY: ("sarvam_tts", "base_url"),
+    SecretName.ELEVENLABS_API_KEY: ("elevenlabs", "url"),
+    SecretName.CARTESIA_API_KEY: ("cartesia", "url"),
+    SecretName.AZURE_API_KEY: ("azure", "region"),
 }
 """The address each key is sent to. A new address removes the key, unless the same change
 saves a key for it: the key goes only where it was checked."""
@@ -278,6 +311,12 @@ STT_KEYS = {
     SttProvider.ASSEMBLYAI: SecretName.ASSEMBLYAI_API_KEY,
     SttProvider.SONIOX: SecretName.SONIOX_API_KEY,
     SttProvider.GLADIA: SecretName.GLADIA_API_KEY,
+}
+TTS_KEYS = {
+    VoiceProvider.ELEVENLABS: SecretName.ELEVENLABS_API_KEY,
+    VoiceProvider.CARTESIA: SecretName.CARTESIA_API_KEY,
+    VoiceProvider.SARVAM: SecretName.SARVAM_API_KEY,
+    VoiceProvider.AZURE: SecretName.AZURE_API_KEY,
 }
 
 
@@ -291,6 +330,10 @@ class SettingsValues(Section):
     assemblyai: AssemblyAI = AssemblyAI()
     soniox: Soniox = Soniox()
     gladia: Gladia = Gladia()
+    elevenlabs: ElevenLabs = ElevenLabs()
+    cartesia: Cartesia = Cartesia()
+    sarvam_tts: SarvamTts = SarvamTts()
+    azure: Azure = Azure()
     caller: CallerModel = CallerModel()
     generation: GenerationModel = GenerationModel()
     brief: BriefModel = BriefModel()
@@ -313,17 +356,19 @@ class AppSettings(SettingsValues):
 
     @property
     def missing_caller_keys(self) -> list[str]:
-        """The keys a call needs that are not saved, by the names Settings shows."""
-        secrets = self.secrets
+        """The keys every call needs that are not saved, by the names Settings shows. The key
+        of a persona's voice is checked when a run starts."""
         return [
             name
             for name, key in (
-                ("LLM provider", secrets.llm_api_key),
+                ("LLM provider", self.secrets.llm_api_key),
                 (self.speech.stt.label, self.stt_key),
-                ("ElevenLabs", secrets.elevenlabs_api_key),
             )
             if key is None
         ]
+
+    def tts_key(self, provider: VoiceProvider) -> SecretStr | None:
+        return getattr(self.secrets, TTS_KEYS[provider].value)
 
     @property
     def stt_key(self) -> SecretStr | None:

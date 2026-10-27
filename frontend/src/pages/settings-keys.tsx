@@ -1,6 +1,7 @@
 import { CheckCircle2, CircleAlert } from "lucide-react";
 import { type ReactNode, useEffect, useState } from "react";
 
+import { ConfirmDialog } from "@/components/confirm-dialogs";
 import { Panel, PanelHeader } from "@/components/panel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -126,6 +127,7 @@ export function KeyRow({
   state,
   url,
   removable = false,
+  removeWarning,
   checked = false,
 }: {
   name: SecretName;
@@ -136,10 +138,13 @@ export function KeyRow({
    * with it, so it never goes to an address the person does not see. */
   url?: string;
   removable?: boolean;
+  /** What stops working without the key; when set, removing it asks first. */
+  removeWarning?: { title: string; description: ReactNode };
   /** Whether the key's provider checks it before it is saved. */
   checked?: boolean;
 }) {
   const [editing, setEditing] = useState(false);
+  const [confirming, setConfirming] = useState(false);
   const [value, setValue] = useState("");
   const [saved, setSaved] = useState(false);
   const save = useSaveSecret();
@@ -204,10 +209,34 @@ export function KeyRow({
               size="sm"
               variant="ghost"
               disabled={remove.isPending}
-              onClick={() => remove.mutate(name, { onSuccess: () => setSaved(false) })}
+              onClick={() =>
+                removeWarning
+                  ? setConfirming(true)
+                  : remove.mutate(name, { onSuccess: () => setSaved(false) })
+              }
             >
               Remove
             </Button>
+          )}
+          {removeWarning && (
+            <ConfirmDialog
+              title={removeWarning.title}
+              description={removeWarning.description}
+              action="Remove"
+              destructive
+              pending={remove.isPending}
+              error={remove.error?.message}
+              open={confirming}
+              onOpenChange={setConfirming}
+              onConfirm={(close) =>
+                remove.mutate(name, {
+                  onSuccess: () => {
+                    setSaved(false);
+                    close();
+                  },
+                })
+              }
+            />
           )}
           <Button size="sm" variant="outline" onClick={() => setEditing(true)}>
             {state ? "Replace" : "Add key"}

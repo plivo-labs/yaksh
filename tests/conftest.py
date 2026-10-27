@@ -51,10 +51,11 @@ from yaksh.domain.settings import AppSettings, Phone, SecretName, Secrets
 from yaksh.domain.voices import ProviderVoice, VoiceGender, VoiceProvider, VoiceSettings
 from yaksh.evaluation import evaluations
 from yaksh.evaluation.evaluations import Evaluated
-from yaksh.integrations.elevenlabs import ElevenLabsAgentsApi, as_wav
+from yaksh.integrations.elevenlabs import ElevenLabsAgentsApi
 from yaksh.integrations.plivo import PlivoApi, PlivoError
 from yaksh.integrations.plivo_signature import signature, signed_text
 from yaksh.integrations.retell import RetellApi
+from yaksh.integrations.speech.audio import as_wav
 from yaksh.integrations.vapi import VapiApi
 from yaksh.settings import store
 from yaksh.settings.cipher import Cipher
@@ -936,10 +937,12 @@ class FakeVoiceClient:
         self.lookups.append(voice_id)
         return self.voices.get(voice_id)
 
-    async def speak(self, voice: VoiceSettings, language: Language, text: str) -> bytes | None:
+    async def speak(self, voice: VoiceSettings, language: Language, text: str) -> bytes:
         self._answer()
         self.spoken.append((voice, language, text))
-        return SPOKEN if voice.id in self.voices else None
+        if voice.id not in self.voices:
+            raise UnavailableError(f"voice {voice.id} was not found")
+        return SPOKEN
 
     def _answer(self) -> None:
         if self.down:

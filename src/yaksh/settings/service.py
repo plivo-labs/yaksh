@@ -16,15 +16,18 @@ from yaksh.domain.settings import (
     KEY_URLS,
     STT_KEYS,
     TRIGGER_SECRET,
+    TTS_KEYS,
     AppSettings,
     SecretName,
     is_secret_name,
 )
 from yaksh.domain.speech import SttProvider
+from yaksh.domain.voices import VoiceProvider
 from yaksh.evaluation.jev import JEV_MODEL
 from yaksh.integrations import provider_checks as checks
 from yaksh.integrations.openai_models import caller_effort
 from yaksh.integrations.provider_checks import ProviderCheckError
+from yaksh.integrations.speech.tts import check_voice as tts_check_voice
 from yaksh.settings.store import DEFAULTS, changed_values
 from yaksh.simulation.surroundings import SOUNDS
 from yaksh.simulation.voices import builtin_voices
@@ -46,6 +49,9 @@ class Provider(StrEnum):
     SONIOX = "soniox"
     GLADIA = "gladia"
     ELEVENLABS = "elevenlabs"
+    CARTESIA = "cartesia"
+    SARVAM_TTS = "sarvam_tts"
+    AZURE = "azure"
     TYPESAFE = "typesafe"
     PLIVO = "plivo"
 
@@ -59,12 +65,21 @@ STT_TESTS = {
 }
 """The speech-to-text test of each provider, which hears a short English line."""
 STT_OF_KEY = {key: provider for provider, key in STT_KEYS.items()}
+TTS_TESTS = {
+    Provider.ELEVENLABS: VoiceProvider.ELEVENLABS,
+    Provider.CARTESIA: VoiceProvider.CARTESIA,
+    Provider.SARVAM_TTS: VoiceProvider.SARVAM,
+    Provider.AZURE: VoiceProvider.AZURE,
+}
+"""The text-to-speech test of each provider, which speaks one word."""
+TTS_OF_KEY = {key: provider for provider, key in TTS_KEYS.items()}
+
 CHECK_CLIP = SOUNDS / "answering" / "iphone_screen_ack.wav"
 """8 kHz speech that every speech-to-text provider must transcribe to pass its check."""
 
 
-def check_voice() -> str:
-    return builtin_voices()[0].provider_voice_id
+def check_voice(settings: AppSettings, provider: VoiceProvider) -> str:
+    return tts_check_voice(settings, provider, builtin_voices()[0].provider_voice_id)
 
 
 def check_clip() -> bytes:
@@ -97,10 +112,11 @@ async def test_provider(settings: AppSettings, provider: Provider) -> str:
             key = required(getattr(secrets, STT_KEYS[stt].value), f"the {stt.label} key")
             await checks.check_stt(settings, stt, key, check_clip())
             return f"{stt.label} transcribed a test clip."
-        case Provider.ELEVENLABS:
-            key = required(secrets.elevenlabs_api_key, "the ElevenLabs key")
-            await checks.check_elevenlabs(key, check_voice())
-            return "ElevenLabs spoke a test word."
+        case Provider.ELEVENLABS | Provider.CARTESIA | Provider.SARVAM_TTS | Provider.AZURE:
+            tts = TTS_TESTS[provider]
+            key = required(settings.tts_key(tts), f"the {tts.label} key")
+            await checks.check_tts(settings, tts, key, check_voice(settings, tts))
+            return f"{tts.label} spoke a test word."
         case Provider.TYPESAFE:
             key = required(secrets.typesafe_api_key, "the TypeSafe key")
             await checks.check_typesafe(key, JEV_MODEL)
@@ -141,13 +157,12 @@ async def failed_secrets(
     for name, value in changed.items():
         if value is None or name in PLIVO_SECRETS:
             continue
+        if name in STT_OF_KEY or name in TTS_OF_KEY:
+            checks_to_run.append(([name], _check_speech_key(candidate, name, value)))
+            continue
         match name:
             case SecretName.LLM_API_KEY:
                 check = checks.llm_models(candidate.llm.base_url, value)
-            case name if name in STT_OF_KEY:
-                check = checks.check_stt(candidate, STT_OF_KEY[name], value, check_clip())
-            case SecretName.ELEVENLABS_API_KEY:
-                check = checks.check_elevenlabs(value, check_voice())
             case SecretName.TYPESAFE_API_KEY:
                 check = checks.check_typesafe(value, JEV_MODEL)
             case _:
@@ -185,6 +200,15 @@ def hold_back_addresses(
             reason += f"; {', '.join(held)} was not saved either"
         noted.append(Failure(failure.names, reason))
     return kept, noted
+
+
+async def _check_speech_key(candidate: AppSettings, name: str, key: str) -> None:
+    """Every use of a speech key: Sarvam's key both hears and speaks."""
+    if name in STT_OF_KEY:
+        await checks.check_stt(candidate, STT_OF_KEY[name], key, check_clip())
+    if name in TTS_OF_KEY:
+        tts = TTS_OF_KEY[name]
+        await checks.check_tts(candidate, tts, key, check_voice(candidate, tts))
 
 
 async def _check_plivo_pair(candidate: AppSettings) -> None:

@@ -24,10 +24,11 @@ from yaksh.domain.latency import VAD_CONFIDENCE, VAD_START_S, VAD_STOP_S
 from yaksh.domain.settings import AppSettings
 from yaksh.domain.speech import SttProvider
 from yaksh.domain.voices import VoiceProvider, VoiceSettings
-from yaksh.integrations.elevenlabs import ElevenLabsClient
 from yaksh.integrations.openai_models import failure, takes_reasoning_effort
 from yaksh.integrations.plivo import PlivoApi, PlivoError
-from yaksh.integrations.speech import SAMPLE_RATE, stt_service
+from yaksh.integrations.speech.audio import SAMPLE_RATE, speak_once
+from yaksh.integrations.speech.stt import stt_service
+from yaksh.integrations.speech.tts import tts_service
 
 TIMEOUT_S = 20.0
 REASONING_EFFORTS = ("none", "minimal", "low", "medium", "high", "xhigh", "max")
@@ -147,21 +148,23 @@ async def check_stt(settings: AppSettings, provider: SttProvider, key: str, clip
     except TimeoutError:
         errors.append(f"no transcript of a test clip in {STT_CHECK_S:.0f} s")
     finally:
-        await worker.cancel()
+        await runner.cancel()
         await asyncio.gather(running, return_exceptions=True)
     if errors:
         raise ProviderCheckError(f"{provider.label}: {errors[0]}")
 
 
-async def check_elevenlabs(api_key: str, voice_id: str) -> None:
-    """One short word of speech, so a key limited to speech passes."""
-    voice = VoiceSettings(provider=VoiceProvider.ELEVENLABS, id=voice_id)
+async def check_tts(
+    settings: AppSettings, provider: VoiceProvider, key: str, voice_id: str
+) -> None:
+    """One short word in a voice every account has, through the same text-to-speech as a
+    call, so a key limited to speech passes."""
+    voice = VoiceSettings(provider=provider, id=voice_id)
+    service = tts_service(settings, voice, Language.EN, key, one_shot=True)
     try:
-        spoken = await ElevenLabsClient(api_key).speak(voice, Language.EN, "OK")
+        await speak_once(service, "OK")
     except UnavailableError as error:
-        raise ProviderCheckError(str(error)) from None
-    if spoken is None:
-        raise ProviderCheckError(f"the ElevenLabs account cannot use voice {voice_id}")
+        raise ProviderCheckError(f"{provider.label}: {error}") from None
 
 
 async def check_typesafe(api_key: str, model: str) -> None:

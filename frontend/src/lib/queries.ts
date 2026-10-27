@@ -53,6 +53,7 @@ import {
   type ProviderDraft,
   type ProviderTest,
   type ProviderVoice,
+  type VoiceProvider,
   type QueuedReview,
   type RetellAccount,
   type RetellAgentPage,
@@ -426,12 +427,9 @@ export function useVoices(language?: Language) {
 
 export function useLookupVoice() {
   return useMutation({
-    mutationFn: (providerVoiceId: string) =>
+    mutationFn: ({ provider, id }: { provider: VoiceProvider; id: string }) =>
       api<ProviderVoice>(
-        `/voices/lookup?${new URLSearchParams({
-          provider: "elevenlabs",
-          provider_voice_id: providerVoiceId,
-        })}`,
+        `/voices/lookup?${new URLSearchParams({ provider, provider_voice_id: id })}`,
       ),
   });
 }

@@ -24,27 +24,55 @@ import {
   FieldSet,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 import { useCloseGuard } from "@/hooks/use-close-guard";
 import type { VoicePreview } from "@/hooks/use-voice-preview";
 import { revealErrors } from "@/lib/forms";
 import { APPEAR } from "@/lib/motion";
-import { useAddVoice, useDeleteVoice, useEditVoice, useLookupVoice } from "@/lib/queries";
+import {
+  useAddVoice,
+  useDeleteVoice,
+  useEditVoice,
+  useLookupVoice,
+  useSettings,
+} from "@/lib/queries";
+import { TTS_PROVIDERS, TTS_UNSPOKEN, ttsProvider } from "@/lib/speech-providers";
 import {
   LANGUAGE_NAMES,
   type Language,
   type ProviderVoice,
   type Voice,
+  type VoiceGender,
+  type VoiceProvider,
   type VoiceSettings,
 } from "@/lib/types";
 
 const LANGUAGES = Object.keys(LANGUAGE_NAMES) as Language[];
+const GENDERS: { value: VoiceGender | "unset"; label: string }[] = [
+  { value: "unset", label: "Not set" },
+  { value: "female", label: "Female" },
+  { value: "male", label: "Male" },
+  { value: "neutral", label: "Neutral" },
+];
 
 const previewKey = (language: Language) => `voice:${language}`;
+
+const genderOf = (value: string): VoiceGender | null =>
+  value === "female" || value === "male" || value === "neutral" ? value : null;
 
 interface Draft {
   name: string;
   languages: Language[];
+  /** Entered by hand for a provider without lookup. */
+  gender: VoiceGender | null;
+  accent: string;
 }
 
 interface Details {
@@ -58,7 +86,9 @@ function joined(names: string[]): string {
   return names.length < 2 ? names.join("") : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
 }
 
-/** Add a voice by its ElevenLabs ID, or edit one in the list. */
+/** Add a voice of any text-to-speech provider with a key, or edit one in the list. A provider
+ * with lookup fills the details from the voice's ID; for the others they are entered by hand,
+ * and the server speaks a line in the voice before it saves it. */
 export function VoiceDialog({
   voice,
   preview,
@@ -72,13 +102,20 @@ export function VoiceDialog({
   const edit = useEditVoice();
   const remove = useDeleteVoice();
   const lookup = useLookupVoice();
+  const settings = useSettings();
   const save = voice ? edit : add;
 
+  const [provider, setProvider] = useState<VoiceProvider>(voice?.provider ?? "elevenlabs");
+  const traits = ttsProvider(provider);
+  const unspoken = TTS_UNSPOKEN[provider] ?? [];
+  const languages = LANGUAGES.filter((language) => !unspoken.includes(language));
   const [typedId, setTypedId] = useState("");
   const [found, setFound] = useState<Details | null>(null);
   const [initial] = useState<Draft>(() => ({
     name: voice?.name ?? "",
     languages: voice?.languages ?? [],
+    gender: null,
+    accent: "",
   }));
   const [draft, setDraft] = useState<Draft>(initial);
   const [submitted, setSubmitted] = useState(false);
@@ -90,9 +127,18 @@ export function VoiceDialog({
         accent: voice.accent,
         listed: voice.listed_languages,
       }
-    : found && found.providerVoiceId === typedId.trim()
-      ? found
-      : null;
+    : traits.lookup
+      ? found && found.providerVoiceId === typedId.trim()
+        ? found
+        : null
+      : typedId.trim()
+        ? {
+            providerVoiceId: typedId.trim(),
+            gender: draft.gender,
+            accent: draft.accent.trim() || null,
+            listed: [],
+          }
+        : null;
   const dirty = voice ? JSON.stringify(draft) !== JSON.stringify(initial) : typedId.trim() !== "";
   const guard = useCloseGuard(dirty);
 
@@ -103,7 +149,7 @@ export function VoiceDialog({
 
   const toggleLanguage = (language: Language, on: boolean) =>
     change((current) => ({
-      languages: LANGUAGES.filter((item) =>
+      languages: languages.filter((item) =>
         item === language ? on : current.languages.includes(item),
       ),
     }));
@@ -122,17 +168,20 @@ export function VoiceDialog({
   const getDetails = () => {
     const providerVoiceId = typedId.trim();
     if (!providerVoiceId || details) return;
-    lookup.mutate(providerVoiceId, {
-      onSuccess: (answer) => {
-        setFound({
-          providerVoiceId,
-          gender: answer.gender,
-          accent: answer.accent,
-          listed: answer.listed_languages,
-        });
-        change(() => ({ name: answer.name, languages: answer.listed_languages }));
+    lookup.mutate(
+      { provider, id: providerVoiceId },
+      {
+        onSuccess: (answer) => {
+          setFound({
+            providerVoiceId,
+            gender: answer.gender,
+            accent: answer.accent,
+            listed: answer.listed_languages,
+          });
+          change(() => ({ name: answer.name, languages: answer.listed_languages }));
+        },
       },
-    });
+    );
   };
 
   const onIdKey = (event: KeyboardEvent<HTMLInputElement>) => {
@@ -151,20 +200,40 @@ export function VoiceDialog({
     if (voice) edit.mutate({ id: voice.id, ...body }, { onSuccess: guard.close });
     else
       add.mutate(
-        { ...body, provider: "elevenlabs", provider_voice_id: details.providerVoiceId },
+        {
+          ...body,
+          provider,
+          provider_voice_id: details.providerVoiceId,
+          ...(traits.lookup ? {} : { gender: draft.gender, accent: draft.accent.trim() || null }),
+        },
         { onSuccess: guard.close },
       );
   };
 
-  const settings: VoiceSettings | null = details
-    ? { provider: "elevenlabs", id: details.providerVoiceId, speed: 1, stability: 0.5 }
+  const chooseProvider = (next: VoiceProvider) => {
+    changeId("");
+    setFound(null);
+    setProvider(next);
+    change((current) => ({
+      languages: current.languages.filter((language) => !TTS_UNSPOKEN[next]?.includes(language)),
+    }));
+  };
+
+  const spoken: VoiceSettings | null = details
+    ? {
+        provider,
+        id: details.providerVoiceId,
+        speed: 1,
+        stability: provider === "elevenlabs" ? 0.5 : null,
+      }
     : null;
   const previewError = LANGUAGES.map((language) => preview.error(previewKey(language))).find(
     Boolean,
   );
-  const unlisted = details
-    ? draft.languages.filter((language) => !details.listed.includes(language))
-    : [];
+  const unlisted =
+    details && traits.lookup
+      ? draft.languages.filter((language) => !details.listed.includes(language))
+      : [];
 
   return (
     <Dialog
@@ -189,48 +258,123 @@ export function VoiceDialog({
         >
           <FieldGroup className="pb-6">
             {voice ? null : (
-              <Field>
-                <FieldLabel htmlFor="provider-voice-id">ElevenLabs voice ID</FieldLabel>
-                <div className="flex gap-2">
-                  <Input
-                    id="provider-voice-id"
-                    autoFocus
-                    autoComplete="off"
-                    spellCheck={false}
-                    className="font-mono"
-                    value={typedId}
-                    onChange={(e) => changeId(e.target.value)}
-                    onKeyDown={onIdKey}
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    disabled={!typedId.trim() || details !== null || lookup.isPending}
-                    onClick={getDetails}
+              <>
+                <Field>
+                  <FieldLabel htmlFor="voice-provider">Provider</FieldLabel>
+                  <Select
+                    items={TTS_PROVIDERS.map((item) => ({ value: item.value, label: item.label }))}
+                    value={provider}
+                    onValueChange={(next) => next && chooseProvider(next)}
                   >
-                    {lookup.isPending && <Spinner />}
-                    Get details
-                  </Button>
-                </div>
-                {lookup.error && <FieldError>{lookup.error.message}</FieldError>}
-              </Field>
+                    <SelectTrigger id="voice-provider" className="w-60">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {TTS_PROVIDERS.map((item) => (
+                        <SelectItem
+                          key={item.value}
+                          value={item.value}
+                          disabled={!settings.data?.secrets[item.secret]}
+                        >
+                          {item.label}
+                          {!settings.data?.secrets[item.secret] && " (no key)"}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {!traits.wordTimestamps && (
+                    <FieldDescription className="text-warning-foreground">
+                      Sentence timing: a cut-off reply shows whole sentences, not words.
+                    </FieldDescription>
+                  )}
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="provider-voice-id">{traits.label} voice ID</FieldLabel>
+                  <div className="flex gap-2">
+                    <Input
+                      id="provider-voice-id"
+                      autoFocus
+                      autoComplete="off"
+                      spellCheck={false}
+                      className="font-mono"
+                      value={typedId}
+                      onChange={(e) => changeId(e.target.value)}
+                      onKeyDown={onIdKey}
+                    />
+                    {traits.lookup && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        disabled={!typedId.trim() || details !== null || lookup.isPending}
+                        onClick={getDetails}
+                      >
+                        {lookup.isPending && <Spinner />}
+                        Get details
+                      </Button>
+                    )}
+                  </div>
+                  {!traits.lookup && (
+                    <FieldDescription>
+                      {traits.label} has no voice lookup. Enter the details below.
+                    </FieldDescription>
+                  )}
+                  {lookup.error && <FieldError>{lookup.error.message}</FieldError>}
+                </Field>
+              </>
             )}
 
             {details && (
               <>
-                <div className={`flex flex-wrap items-center gap-2 text-p-400 ${APPEAR}`}>
-                  {details.gender && <GenderBadge gender={details.gender} />}
-                  {details.accent && (
-                    <span className="text-muted-foreground capitalize">{details.accent}</span>
-                  )}
-                </div>
+                {voice || traits.lookup ? (
+                  <div className={`flex flex-wrap items-center gap-2 text-p-400 ${APPEAR}`}>
+                    {details.gender && <GenderBadge gender={details.gender} />}
+                    {details.accent && (
+                      <span className="text-muted-foreground capitalize">{details.accent}</span>
+                    )}
+                  </div>
+                ) : (
+                  <div className={`grid grid-cols-2 gap-4 ${APPEAR}`}>
+                    <Field>
+                      <FieldLabel htmlFor="voice-gender">Gender</FieldLabel>
+                      <Select
+                        items={GENDERS}
+                        value={draft.gender ?? "unset"}
+                        onValueChange={(next) => next && change(() => ({ gender: genderOf(next) }))}
+                      >
+                        <SelectTrigger id="voice-gender">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {GENDERS.map((item) => (
+                            <SelectItem key={item.value} value={item.value}>
+                              {item.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </Field>
+                    <Field>
+                      <FieldLabel htmlFor="voice-accent">Accent</FieldLabel>
+                      <Input
+                        id="voice-accent"
+                        maxLength={80}
+                        value={draft.accent}
+                        onChange={(e) => change(() => ({ accent: e.target.value }))}
+                      />
+                    </Field>
+                  </div>
+                )}
                 {voice && (
                   <dl className="flex flex-wrap gap-x-10 gap-y-3">
                     <Fact label="Voice id">
                       <CopyId id={voice.id} label="voice id" />
                     </Fact>
-                    <Fact label="ElevenLabs voice ID">
-                      <CopyId id={voice.provider_voice_id} label="ElevenLabs voice ID" full />
+                    <Fact label={`${traits.label} voice ID`}>
+                      <CopyId
+                        id={voice.provider_voice_id}
+                        label={`${traits.label} voice ID`}
+                        full
+                      />
                     </Fact>
                   </dl>
                 )}
@@ -251,7 +395,7 @@ export function VoiceDialog({
                 <FieldSet className={APPEAR}>
                   <FieldLegend variant="label">Languages</FieldLegend>
                   <ul className="grid gap-1">
-                    {LANGUAGES.map((language) => {
+                    {languages.map((language) => {
                       const key = previewKey(language);
                       return (
                         <li key={language} className="flex items-center gap-3">
@@ -273,7 +417,7 @@ export function VoiceDialog({
                                 : `Play ${LANGUAGE_NAMES[language]} preview`
                             }
                             aria-busy={preview.isLoading(key)}
-                            onClick={() => settings && preview.toggle(key, settings, language)}
+                            onClick={() => spoken && preview.toggle(key, spoken, language)}
                           >
                             {preview.isLoading(key) ? (
                               <Spinner />
@@ -289,8 +433,8 @@ export function VoiceDialog({
                   </ul>
                   {unlisted.length > 0 && (
                     <FieldDescription className={APPEAR}>
-                      ElevenLabs does not list {joined(unlisted.map((l) => LANGUAGE_NAMES[l]))} for
-                      this voice. Play the preview before you use it.
+                      {traits.label} does not list {joined(unlisted.map((l) => LANGUAGE_NAMES[l]))}{" "}
+                      for this voice. Play the preview before you use it.
                     </FieldDescription>
                   )}
                   {submitted && draft.languages.length === 0 && (
@@ -307,7 +451,12 @@ export function VoiceDialog({
           <FieldError className="px-6 pb-3">{(save.error ?? remove.error)?.message}</FieldError>
         )}
 
-        <DialogFooter className="border-t px-6 py-4">
+        <DialogFooter className="items-center border-t px-6 py-4">
+          {!voice && !traits.lookup && (
+            <span className="mr-auto text-xs-400 text-muted-foreground">
+              Saving speaks a test line in this voice.
+            </span>
+          )}
           {voice && (
             <DeleteConfirm
               name={initial.name}

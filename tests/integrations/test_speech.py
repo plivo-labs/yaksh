@@ -1,15 +1,35 @@
+import asyncio
+from typing import cast
+
 import pytest
-from pipecat.frames.frames import Frame, StartFrame, TranscriptionFrame, VADUserStoppedSpeakingFrame
+from pipecat.frames.frames import (
+    Frame,
+    StartFrame,
+    TranscriptionFrame,
+    TTSAudioRawFrame,
+    TTSSpeakFrame,
+    TTSStoppedFrame,
+    VADUserStoppedSpeakingFrame,
+)
 from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
+from pipecat.services.elevenlabs.tts import ElevenLabsTTSService
 from pipecat.services.gladia.config import LanguageConfig
+from pipecat.services.tts_service import TTSService, WebsocketTTSService
+from pipecat.tests.utils import run_test
 from pipecat.transcriptions.language import Language as PipecatLanguage
 
+from yaksh.domain.errors import UnavailableError
 from yaksh.domain.languages import AgentLanguage, Language
 from yaksh.domain.settings import AppSettings
 from yaksh.domain.speech import SttProvider
+from yaksh.domain.voices import VoiceProvider, VoiceSettings
 from yaksh.integrations import provider_checks
 from yaksh.integrations.provider_checks import ProviderCheckError
-from yaksh.integrations.speech import deepgram_language, stt_service
+from yaksh.integrations.speech import audio
+from yaksh.integrations.speech.audio import Resample8k, speak_once
+from yaksh.integrations.speech.deepgram import deepgram_language
+from yaksh.integrations.speech.stt import stt_service
+from yaksh.integrations.speech.tts import tts_service
 from yaksh.settings.service import check_clip
 
 
@@ -98,3 +118,86 @@ async def test_the_check_fails_when_the_provider_refuses_the_key(
 
     with pytest.raises(ProviderCheckError, match="Soniox: 401 Unauthorized"):
         await provider_checks.check_stt(AppSettings(), SttProvider.SONIOX, "key", check_clip())
+
+
+@pytest.mark.parametrize(
+    ("language", "pin"), [(Language.HI, "hi"), (Language.MR, None), (Language.ES, "es")]
+)
+def test_elevenlabs_speaks_with_the_voice_settings_and_pins_only_a_language_its_model_takes(
+    language: Language, pin: str | None
+) -> None:
+    voice = VoiceSettings(provider=VoiceProvider.ELEVENLABS, id="v1", speed=0.8, stability=0.3)
+
+    service = tts_service(AppSettings(), voice, language, "key")
+
+    settings = cast(ElevenLabsTTSService.Settings, service._settings)
+    assert (settings.voice, settings.speed, settings.stability, settings.language) == (
+        "v1",
+        0.8,
+        0.3,
+        pin,
+    )
+    assert settings.model == "eleven_flash_v2_5"
+
+
+async def test_speech_at_another_rate_reaches_the_call_at_8_khz() -> None:
+    second_at_24k = TTSAudioRawFrame(bytes(24_000 * 2), 24_000, 1)
+
+    received, _ = await run_test(Resample8k(), frames_to_send=[second_at_24k])
+
+    audio = [frame for frame in received if isinstance(frame, TTSAudioRawFrame)]
+    assert sum(len(frame.audio) for frame in audio) == pytest.approx(16_000, abs=800)
+    assert {frame.sample_rate for frame in audio} == {8000}
+
+
+class StopsThenFails(FrameProcessor):
+    """A provider that closes its reply and then reports an error, as Cartesia does."""
+
+    async def process_frame(self, frame: Frame, direction: FrameDirection) -> None:
+        await super().process_frame(frame, direction)
+        if isinstance(frame, TTSSpeakFrame):
+            await self.push_frame(TTSAudioRawFrame(bytes(320), 8000, 1))
+            await self.push_frame(TTSStoppedFrame())
+            await self.push_error(error_msg="voice not found")
+            return
+        await self.push_frame(frame, direction)
+
+
+class Stalls(FrameProcessor):
+    """A provider that sends one chunk of its reply and then nothing."""
+
+    async def process_frame(self, frame: Frame, direction: FrameDirection) -> None:
+        await super().process_frame(frame, direction)
+        if isinstance(frame, TTSSpeakFrame):
+            await self.push_frame(TTSAudioRawFrame(bytes(320), 8000, 1))
+            return
+        await self.push_frame(frame, direction)
+
+
+async def test_speech_that_ends_with_an_error_fails_even_after_its_stop_frame() -> None:
+    with pytest.raises(UnavailableError, match="voice not found"):
+        await speak_once(cast(TTSService, StopsThenFails()), "Hello")
+
+
+async def test_speech_that_stalls_fails_at_the_deadline_and_leaves_no_task(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(audio, "SPEAK_ONCE_S", 0.5)
+    before = len(asyncio.all_tasks())
+
+    with pytest.raises(UnavailableError, match="no speech"):
+        await speak_once(cast(TTSService, Stalls()), "Hello")
+
+    assert len(asyncio.all_tasks()) == before
+
+
+@pytest.mark.parametrize("provider", [VoiceProvider.ELEVENLABS, VoiceProvider.CARTESIA])
+def test_one_shot_speech_does_not_reconnect_a_dropped_socket(provider: VoiceProvider) -> None:
+    voice = VoiceSettings(provider=provider, id="v1")
+
+    one_shot = cast(
+        WebsocketTTSService, tts_service(AppSettings(), voice, Language.EN, "k", one_shot=True)
+    )
+    on_a_call = cast(WebsocketTTSService, tts_service(AppSettings(), voice, Language.EN, "k"))
+
+    assert (one_shot._reconnect_on_error, on_a_call._reconnect_on_error) == (False, True)

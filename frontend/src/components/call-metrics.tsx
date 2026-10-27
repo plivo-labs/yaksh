@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { duration, percent, seconds } from "@/lib/format";
 import { useConversationEvaluation } from "@/lib/queries";
-import { sttProvider } from "@/lib/speech-providers";
+import { sttProvider, ttsProvider } from "@/lib/speech-providers";
 import {
   type CaptureFaults,
   type ConversationEvaluation,
@@ -106,7 +106,10 @@ function Metrics({ found }: { found: ConversationEvaluation }) {
                 {settings.stt_language && ` (${settings.stt_language})`}
               </>
             )}
-            {settings.tts_model && `, text to speech ${settings.tts_model}`}
+            {settings.voice &&
+              `, text to speech ${ttsProvider(settings.voice.provider).label}${
+                settings.tts_model ? ` ${settings.tts_model}` : ""
+              }`}
           </Line>
         )}
         {consumed && (

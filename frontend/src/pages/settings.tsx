@@ -18,7 +18,7 @@ import { useSaveSettingsValues, useSettings } from "@/lib/queries";
 import type { AppSettings, SettingsValues } from "@/lib/types";
 import { KeyRow, ProviderPanel, SettingRow, KeyRemovedNote } from "@/pages/settings-keys";
 import { PhoneAccountPanel } from "@/pages/settings-phone";
-import { SpeechToTextPanel } from "@/pages/settings-speech";
+import { SpeechToTextPanel, TextToSpeechPanel } from "@/pages/settings-speech";
 import { ImportExport } from "@/pages/settings-import";
 import { TriggersPanel } from "@/pages/settings-triggers";
 
@@ -159,19 +159,7 @@ function Form({
             />
           </ProviderPanel>
           <SpeechToTextPanel settings={settings} draft={draft} change={change} />
-          <ProviderPanel
-            title="ElevenLabs"
-            description="Text to speech."
-            provider="elevenlabs"
-            canTest={Boolean(secrets.elevenlabs_api_key)}
-          >
-            <KeyRow
-              name="elevenlabs_api_key"
-              label="API key"
-              state={secrets.elevenlabs_api_key}
-              checked
-            />
-          </ProviderPanel>
+          <TextToSpeechPanel settings={settings} draft={draft} change={change} />
           <ProviderPanel
             title="TypeSafe"
             provider="typesafe"

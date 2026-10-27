@@ -6,10 +6,11 @@ from yaksh.domain.language_models import JsonModel
 from yaksh.domain.numbers import PhoneAccountApi
 from yaksh.domain.settings import AppSettings, reveal
 from yaksh.domain.voices import VoiceProvider
-from yaksh.integrations.elevenlabs import REGION_APIS, ElevenLabsAgentsApi, ElevenLabsClient
+from yaksh.integrations.elevenlabs import REGION_APIS, ElevenLabsAgentsApi
 from yaksh.integrations.openai_models import OpenAIJsonModel
 from yaksh.integrations.plivo import PlivoApi
 from yaksh.integrations.retell import RetellApi
+from yaksh.integrations.speech.voices import SpeechVoiceClient
 from yaksh.integrations.vapi import REGION_APIS as VAPI_APIS
 from yaksh.integrations.vapi import VapiApi
 from yaksh.simulation.voices import VoiceClients
@@ -17,8 +18,6 @@ from yaksh.simulation.voices import VoiceClients
 
 class Providers:
     def __init__(self) -> None:
-        self._voice_key: str | None = None
-        self._voice_clients: VoiceClients = {}
         self._models: dict[str, tuple[tuple[object, ...], JsonModel | None]] = {}
         """Each model by its use, with the settings it was built from."""
         self._replaced: list[JsonModel] = []
@@ -26,13 +25,13 @@ class Providers:
         shutdown."""
 
     def voice_clients(self, settings: AppSettings) -> VoiceClients:
-        key = reveal(settings.secrets.elevenlabs_api_key)
-        if key != self._voice_key:
-            self._voice_key = key
-            self._voice_clients = (
-                {} if key is None else {VoiceProvider.ELEVENLABS: ElevenLabsClient(key)}
-            )
-        return self._voice_clients
+        """A client for each voice provider with a saved key, built from these settings, so a
+        new model, address or key applies to the next request."""
+        return {
+            provider: SpeechVoiceClient(settings, provider, key.get_secret_value())
+            for provider in VoiceProvider
+            if (key := settings.tts_key(provider)) is not None
+        }
 
     def generation_model(self, settings: AppSettings) -> JsonModel | None:
         """The model that writes scenarios; None while no LLM provider key is saved."""

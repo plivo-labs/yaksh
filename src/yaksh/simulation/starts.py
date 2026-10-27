@@ -19,7 +19,7 @@ from yaksh.domain.languages import AgentLanguage, Language, answer_language
 from yaksh.domain.runs import RunScenario
 from yaksh.domain.scenarios import DataSet
 from yaksh.domain.settings import AppSettings
-from yaksh.domain.speech import STT_LANGUAGES, SttProvider
+from yaksh.domain.speech import SttProvider
 from yaksh.domain.triggers import check_agent_data
 from yaksh.simulation.agents import config_of as agent_config_of
 from yaksh.simulation.languages import LANGUAGES
@@ -150,6 +150,12 @@ async def snapshot(
         config = persona_config_of(persona)
         if transport is Transport.PHONE:
             check_heard(app.speech.stt, current.languages, config.language, persona.name)
+            if app.tts_key(config.voice.provider) is None:
+                raise ValidationError(
+                    f'phone calls are off: the persona "{persona.name}" uses a '
+                    f"{config.voice.provider.label} voice; add the {config.voice.provider.label} "
+                    "key in Settings"
+                )
         wants = scenario_config_of(scenario)
         if trigger is not None:
             check_agent_data(trigger, wants, scenario.name)
@@ -192,7 +198,7 @@ def check_heard(
     """Refuse a phone call whose agent should answer in a language the speech-to-text in use
     does not hear."""
     answer = answer_language(agent, caller).language
-    if answer not in STT_LANGUAGES[stt]:
+    if answer not in stt.traits.languages:
         raise ValidationError(
             f"speech to text ({stt.label}) doesn't hear {answer.label}, which the agent "
             f'answers the persona "{persona}" in; choose another provider in Settings'

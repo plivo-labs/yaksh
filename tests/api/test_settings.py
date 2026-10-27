@@ -8,13 +8,16 @@ from tests.conftest import (
     ENCRYPTION_KEY,
     Db,
     FakeProvider,
+    FakeVoiceClient,
     create_agent_id,
+    create_persona,
     create_scenario,
     new_persona_id,
     save_settings,
     start_run,
 )
 from yaksh.domain.speech import SttProvider
+from yaksh.domain.voices import ProviderVoice, VoiceProvider
 from yaksh.integrations import provider_checks
 from yaksh.integrations.provider_checks import ProviderCheckError
 from yaksh.settings import store
@@ -38,7 +41,7 @@ def checks(monkeypatch: pytest.MonkeyPatch) -> list[tuple[str, tuple[Any, ...]]]
 
         return check
 
-    for name in ("llm_models", "check_llm", "check_stt", "check_elevenlabs", "check_plivo"):
+    for name in ("llm_models", "check_llm", "check_stt", "check_tts", "check_plivo"):
         monkeypatch.setattr(provider_checks, name, fake(name))
     return asked
 
@@ -127,8 +130,8 @@ async def test_a_key_sent_with_a_new_address_is_checked_there_and_saved_with_it(
         json={"value": "bad-key", "url": "https://elsewhere.example"},
     )
     no_address = await client.put(
-        "/api/v1/settings/secrets/elevenlabs_api_key",
-        json={"value": "el-key", "url": "https://api.elevenlabs.io"},
+        "/api/v1/settings/secrets/typesafe_api_key",
+        json={"value": "ts-key", "url": "https://typesafe.example"},
     )
 
     assert moved.status_code == 200, moved.text
@@ -145,7 +148,7 @@ async def test_a_key_sent_with_a_new_address_is_checked_there_and_saved_with_it(
     saved = (await client.get("/api/v1/settings")).json()
     assert saved["values"]["deepgram"]["base_url"] == "https://api.deepgram.com"
     assert no_address.status_code == 422
-    assert no_address.json()["error"]["message"] == "elevenlabs_api_key has no address"
+    assert no_address.json()["error"]["message"] == "typesafe_api_key has no address"
 
 
 async def test_a_key_is_not_saved_when_its_address_moved_while_it_was_checked(
@@ -471,3 +474,54 @@ def test_an_encrypted_secret_cannot_be_moved_to_another_setting() -> None:
     assert cipher.decrypt("llm_api_key", sealed) == LLM_KEY
     with pytest.raises(SecretUnreadableError):
         cipher.decrypt("trigger:LEAK", sealed)
+
+
+async def test_a_sarvam_key_is_checked_for_hearing_and_for_speaking(
+    client: AsyncClient, checks: list[tuple[str, tuple[Any, ...]]]
+) -> None:
+    saved = await client.put(
+        "/api/v1/settings/secrets/sarvam_api_key", json={"value": "sarvam-key-0123"}
+    )
+
+    assert saved.status_code == 200, saved.text
+    assert [(name, args[1]) for name, args in checks] == [
+        ("check_stt", SttProvider.SARVAM),
+        ("check_tts", VoiceProvider.SARVAM),
+    ]
+
+
+async def test_a_phone_run_cannot_start_while_a_persona_voice_has_no_key(
+    client: AsyncClient, voice_clients: dict[VoiceProvider, FakeVoiceClient]
+) -> None:
+    sarvam = FakeVoiceClient()
+    sarvam.voices["shubh"] = ProviderVoice(id="shubh", name="unused")
+    voice_clients[VoiceProvider.SARVAM] = sarvam
+    added = await client.post(
+        "/api/v1/voices",
+        json={
+            "provider": "sarvam",
+            "provider_voice_id": "shubh",
+            "languages": ["en"],
+            "name": "Shubh",
+        },
+    )
+    persona = await create_persona(
+        client, name="Sarvam caller", voice={"provider": "sarvam", "id": "shubh", "speed": 1.5}
+    )
+    agent_id = await create_agent_id(client)
+    scenario = await create_scenario(client, agent_id, persona_id=persona["id"])
+
+    refused = await start_run(client, agent_id, [scenario["id"]])
+
+    assert added.status_code == 201, added.text
+    assert persona["voice"] == {
+        "provider": "sarvam",
+        "id": "shubh",
+        "speed": 1.5,
+        "stability": None,
+    }
+    assert refused.status_code == 422
+    assert refused.json()["error"]["message"] == (
+        'phone calls are off: the persona "Sarvam caller" uses a Sarvam voice; '
+        "add the Sarvam key in Settings"
+    )

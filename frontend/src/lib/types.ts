@@ -645,13 +645,15 @@ export interface PhoneAccount {
   test_numbers: number;
 }
 
-export type VoiceProvider = "elevenlabs";
+export type VoiceProvider = "elevenlabs" | "cartesia" | "sarvam" | "azure";
 
 export interface VoiceSettings {
   provider: VoiceProvider;
   id: string;
+  /** The provider's speed or pace, within its range. */
   speed: number;
-  stability: number;
+  /** ElevenLabs only; null for the other providers. */
+  stability: number | null;
 }
 
 export interface Voice {
@@ -681,6 +683,9 @@ export interface VoiceInput {
   provider_voice_id: string;
   name: string;
   languages: Language[];
+  /** For a provider without lookup; one with lookup fills these itself. */
+  gender?: VoiceGender | null;
+  accent?: string | null;
 }
 
 export interface VoiceEdit {
@@ -1271,7 +1276,9 @@ export interface Usage {
     stt_model: string | null;
     /** The language setting the speech-to-text heard the agent with; null on older calls. */
     stt_language: string | null;
+    /** Null for Azure, whose voice names its model. */
     tts_model: string | null;
+    voice: VoiceSettings | null;
   } | null;
   usage: {
     llm_prompt_tokens: number | null;
@@ -1689,6 +1696,10 @@ export interface SettingsValues {
   assemblyai: { url: string; model: string };
   soniox: { url: string; model: string };
   gladia: { url: string; model: string };
+  elevenlabs: { url: string; model: string };
+  cartesia: { url: string; model: string };
+  sarvam_tts: { base_url: string; model: string };
+  azure: { region: string };
   caller: CallerModel;
   generation: { model: string | null; reasoning_effort: string | null; timeout_s: number };
   brief: { model: string; reasoning_effort: string | null; timeout_s: number };
@@ -1731,6 +1742,8 @@ export type SecretName =
   | "soniox_api_key"
   | "gladia_api_key"
   | "elevenlabs_api_key"
+  | "cartesia_api_key"
+  | "azure_api_key"
   | "typesafe_api_key"
   | "plivo_auth_id"
   | "plivo_auth_token"
@@ -1759,6 +1772,9 @@ export type SettingsProvider =
   | "soniox"
   | "gladia"
   | "elevenlabs"
+  | "cartesia"
+  | "sarvam_tts"
+  | "azure"
   | "typesafe"
   | "plivo";
 
