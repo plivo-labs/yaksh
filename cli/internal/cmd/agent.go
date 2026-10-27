@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -21,17 +22,35 @@ func (a *app) agentCmd() *cobra.Command {
 }
 
 func (a *app) agentUpdateCmd() *cobra.Command {
-	var configFile string
+	var configFile, rulesFile string
 	cmd := &cobra.Command{
-		Use:   "update <id> --config-file <path>",
-		Short: "Change an agent's configuration in Yaksh, which the judges read; a change makes a new agent version",
-		Args:  cobra.ExactArgs(1),
+		Use:   "update <id> (--config-file <path> | --rules-file <path>)",
+		Short: "Change an agent's configuration or rules in Yaksh, which the judges read; a change makes a new agent version",
+		Long: `Change what the judges read about an agent. --config-file sets the agent's configuration:
+its prompt, flow or export, as text. --rules-file sets the agent's rules from a YAML or JSON
+list, and replaces all of them: "yaksh agent view" shows the rules that the agent has.`,
+		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			id, err := parseID("agent", args[0])
 			if err != nil {
 				return err
 			}
-			config, err := os.ReadFile(configFile)
+			change := map[string]any{}
+			if cmd.Flags().Changed("config-file") {
+				config, err := os.ReadFile(configFile)
+				if err != nil {
+					return err
+				}
+				change["config"] = string(config)
+			}
+			if cmd.Flags().Changed("rules-file") {
+				rules, err := readDocument(rulesFile)
+				if err != nil {
+					return err
+				}
+				change["rules"] = json.RawMessage(rules)
+			}
+			sent, err := json.Marshal(change)
 			if err != nil {
 				return err
 			}
@@ -39,8 +58,8 @@ func (a *app) agentUpdateCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			text := string(config)
-			body, err := api.Body(c.UpdateAgentApiV1AgentsAgentIdPatch(cmd.Context(), id, api.AgentUpdate{Config: &text}))
+			body, err := api.Body(c.UpdateAgentApiV1AgentsAgentIdPatchWithBody(
+				cmd.Context(), id, "application/json", bytes.NewReader(sent)))
 			if err != nil {
 				return err
 			}
@@ -49,7 +68,9 @@ func (a *app) agentUpdateCmd() *cobra.Command {
 	}
 	cmd.Flags().StringVar(&configFile, "config-file", "",
 		"a file with the agent's full configuration as text: a prompt, a flow or an export")
-	cmd.MarkFlagRequired("config-file")
+	cmd.Flags().StringVar(&rulesFile, "rules-file", "",
+		"a YAML or JSON file with the list of the agent's rules, which replaces all of its rules")
+	cmd.MarkFlagsOneRequired("config-file", "rules-file")
 	return cmd
 }
 

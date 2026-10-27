@@ -56,7 +56,7 @@ func (a *app) suiteRunCmd() *cobra.Command {
 	)
 	cmd := &cobra.Command{
 		Use:   "run <suite-id>",
-		Short: "Start one run for each agent of a suite; with --wait, wait for the result and fail unless the suite run passed",
+		Short: "Start one run for each entry of a suite; with --wait, wait for the result and fail unless the suite run passed",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			suiteID, err := parseID("suite", args[0])

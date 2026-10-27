@@ -37,14 +37,14 @@ func TestBodyReportsAnErrorBodyWithoutTheErrorShape(t *testing.T) {
 	}
 }
 
-// slowBody sends its headers at once and its body only after delay.
-func slowBody(t *testing.T, delay time.Duration) *httptest.Server {
+// slowBody sends its headers with status at once, and its body only after a minute.
+func slowBody(t *testing.T, status int) *httptest.Server {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
+		w.WriteHeader(status)
 		w.(http.Flusher).Flush()
 		select {
-		case <-time.After(delay):
+		case <-time.After(time.Minute):
 			w.Write([]byte(`{"status":"ok","version":"0.1.0"}`))
 		case <-r.Context().Done():
 		}
@@ -57,14 +57,28 @@ func TestABodyThatStallsFailsTheRequest(t *testing.T) {
 	old := requestTimeout
 	requestTimeout = 50 * time.Millisecond
 	t.Cleanup(func() { requestTimeout = old })
-	srv := slowBody(t, 200*time.Millisecond)
-	c, err := New(srv.URL, "t", "test")
-	if err != nil {
-		t.Fatal(err)
+	tests := []struct {
+		name      string
+		newClient func(server, token, userAgent string) (*Client, error)
+		status    int
+	}{
+		{"a response", New, http.StatusOK},
+		{"the error of a stream", NewStream, http.StatusServiceUnavailable},
 	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c, err := tt.newClient(slowBody(t, tt.status).URL, "t", "test")
+			if err != nil {
+				t.Fatal(err)
+			}
 
-	if _, err := Body(c.HealthApiV1HealthGet(context.Background())); err == nil {
-		t.Fatal("a body that stalled past the request timeout did not fail")
+			start := time.Now()
+			_, err = Body(c.HealthApiV1HealthGet(context.Background()))
+
+			if err == nil || time.Since(start) > 5*time.Second {
+				t.Fatalf("err = %v after %s; want an error before the body came", err, time.Since(start))
+			}
+		})
 	}
 }
 

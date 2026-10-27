@@ -89,13 +89,9 @@ func (a *app) startRun(cmd *cobra.Command, f runStartFlags) error {
 	if err != nil {
 		return err
 	}
-	var scenarioIDs []uuid.UUID
-	for _, s := range f.scenarios {
-		id, err := parseID("scenario", s)
-		if err != nil {
-			return err
-		}
-		scenarioIDs = append(scenarioIDs, id)
+	scenarioIDs, err := parseIDs("scenario", f.scenarios)
+	if err != nil {
+		return err
 	}
 	var answers []api.AnsweredBy
 	for _, s := range f.answers {
@@ -179,7 +175,7 @@ func allScenarios(ctx context.Context, c *api.Client, agentID uuid.UUID) ([]uuid
 		}
 	}
 	if len(ids) == 0 {
-		return nil, &nextStep{"agent " + agentID.String() + " has no scenarios", "add scenarios in the console"}
+		return nil, &nextStep{"agent " + agentID.String() + " has no scenarios", "yaksh scenario create --agent " + agentID.String() + " -f <file>"}
 	}
 	return ids, nil
 }
