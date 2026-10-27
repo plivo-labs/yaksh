@@ -23,6 +23,7 @@ class MetricKey(StrEnum):
     RESPONSE_TIME = "response_time"
     TURN_TAKING = "turn_taking"
     SPEAKING = "speaking"
+    CALLER_REPLY_TIME = "caller_reply_time"
 
 
 class Outcome(StrEnum):

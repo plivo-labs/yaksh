@@ -24,7 +24,7 @@ from yaksh.domain.conversations import (
 from yaksh.domain.evaluations import DecidedBy, ItemRole, Metric, MetricKey, Outcome, UnsureKind
 from yaksh.domain.files import FileStore
 from yaksh.domain.language_models import JsonModel
-from yaksh.domain.latency import Latency, Span, waits
+from yaksh.domain.latency import CallerReplyTime, Latency, Span, waits
 from yaksh.domain.record_sources import RECORD_PROVIDERS
 from yaksh.domain.rules import LlmRule, PhraseRule, in_scope
 from yaksh.domain.scenarios import PlayedScenario
@@ -375,6 +375,10 @@ async def measure_call(
     found[MetricKey.AGENT_REPETITION] = metrics.agent_repetition(transcript.turns)
     if conversation.transport is Transport.TEXT:
         return found
+    if conversation.caller_reply_times:
+        found[MetricKey.CALLER_REPLY_TIME] = metrics.caller_reply_time(
+            [CallerReplyTime.model_validate(reply) for reply in conversation.caller_reply_times]
+        )
     opened = transcript.stream_opened_ms
     if opened is None:
         found[MetricKey.CAPTURE_FAULTS] = metrics.incomplete_record()
