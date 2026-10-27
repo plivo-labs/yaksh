@@ -841,6 +841,8 @@ export interface Turn {
   scripted: boolean;
   /** A recorded line of the persona's voicemail or call screener, not the persona. */
   machine: MachineLine | null;
+  /** Keys the caller pressed on its phone keypad (DTMF), not words it spoke. */
+  dtmf: boolean;
   /** The text agent's tool calls in this turn; empty on a phone call. */
   tools: ToolItem[];
   /** On an agent turn that starts a reply: how long the agent made the caller wait. Turns that

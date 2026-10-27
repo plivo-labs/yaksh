@@ -6,7 +6,10 @@ from typing import cast
 import pytest
 from pipecat.frames.frames import (
     BotStoppedSpeakingFrame,
+    Frame,
+    FunctionCallResultProperties,
     LLMContextFrame,
+    OutputDTMFUrgentFrame,
     TranscriptionFrame,
     VADUserStartedSpeakingFrame,
     VADUserStoppedSpeakingFrame,
@@ -19,18 +22,19 @@ from pipecat.processors.aggregators.llm_response_universal import (
     LLMUserAggregator,
     LLMUserAggregatorParams,
 )
-from pipecat.services.llm_service import FunctionCallParams
+from pipecat.services.llm_service import FunctionCallFromLLM, FunctionCallParams
 from pipecat.tests.utils import SleepFrame, run_test
 from pipecat.turns.user_stop import SpeechTimeoutUserTurnStopStrategy
 from pipecat.turns.user_turn_strategies import UserTurnStrategies
 
-from tests.conftest import FakeProvider
+from tests.conftest import FakeProvider, FixedClock, Observer
 from yaksh.caller import pipeline
 from yaksh.caller.audio import Clock
 from yaksh.caller.pipeline import (
     CallerKeys,
     CallState,
     Ending,
+    Keypad,
     Persona,
     TurnLimit,
     llm_service,
@@ -38,7 +42,7 @@ from yaksh.caller.pipeline import (
     watch_silence,
 )
 from yaksh.caller.transcript import TranscriptBuilder
-from yaksh.domain.conversations import CallObserver, CallRequest, EndReason, WireEvent
+from yaksh.domain.conversations import CallObserver, CallRequest, EndReason, Role, WireEvent
 from yaksh.domain.settings import AppSettings, CallerModel, Llm
 
 
@@ -185,6 +189,37 @@ async def test_a_quiet_agent_still_gets_a_nudge_after_the_caller_says_nothing() 
         VADUserStoppedSpeakingFrame(),
     ]
     await run_test(user, frames_to_send=[*agent_turn, SleepFrame(0.3)])
+
+    assert nudges == [None]
+
+
+async def test_a_quiet_agent_still_gets_a_nudge_after_the_caller_only_presses_keys() -> None:
+    user = idle_user()
+    nudges: list[None] = []
+
+    async def nudge() -> None:
+        nudges.append(None)
+
+    watch_silence(user, CallState(), nudge)
+    settings = model_settings("http://127.0.0.1:9", "gpt-6-luna", None)
+    llm = llm_service(settings, settings.caller, CallerKeys("test", "", ""), "Be a caller.")
+    llm.register_function(
+        "press_keys", Keypad(TranscriptBuilder(FixedClock(), Observer()), user).press_keys
+    )
+    press = FunctionCallFromLLM(
+        function_name="press_keys",
+        tool_call_id="t-1",
+        arguments={"keys": "1#"},
+        context=LLMContext(),
+    )
+
+    async def presses() -> None:
+        await asyncio.sleep(0.1)
+        await llm.run_function_calls([press])
+
+    await asyncio.gather(
+        presses(), run_test(Pipeline([user, llm]), frames_to_send=[SleepFrame(0.3)])
+    )
 
     assert nudges == [None]
 
@@ -393,3 +428,40 @@ async def test_a_call_that_already_ended_records_no_second_end() -> None:
 
     assert line.log == ["say:Bye now."]
     assert (line.state.end_reason, line.state.caller_reason) == (EndReason.AGENT_HANGUP, None)
+
+
+async def test_pressed_keys_go_out_as_one_dtmf_frame_and_a_keypad_turn() -> None:
+    clock = FixedClock()
+    clock.now = 4200
+    observer = Observer()
+    transcript = TranscriptBuilder(clock, observer)
+    pushed: list[Frame] = []
+    results: list[tuple[dict, bool | None]] = []
+
+    async def push_frame(frame: Frame) -> None:
+        pushed.append(frame)
+
+    async def result_callback(result: dict, *, properties: FunctionCallResultProperties) -> None:
+        results.append((result, properties.run_llm))
+
+    def params(keys: str) -> FunctionCallParams:
+        return cast(
+            FunctionCallParams,
+            SimpleNamespace(
+                arguments={"keys": keys},
+                tool_call_id="t-1",
+                llm=SimpleNamespace(push_frame=push_frame),
+                result_callback=result_callback,
+            ),
+        )
+
+    keypad = Keypad(transcript, idle_user())
+    await keypad.press_keys(params("4111 1111 1111 111A#"))
+    await keypad.press_keys(params("4111 1111-1111 1111#"))
+
+    [press] = pushed
+    assert isinstance(press, OutputDTMFUrgentFrame) and press.to_string() == "4111111111111111#"
+    assert [(t.role, t.text, t.dtmf, t.started_at_ms, t.ended_at_ms) for t in observer.turns] == [
+        (Role.CALLER, "4111111111111111#", True, 4200, 4200)
+    ]
+    assert results == [({"status": pipeline.BAD_KEYS}, True), ({"status": "keys pressed"}, False)]

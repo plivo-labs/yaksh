@@ -19,6 +19,7 @@ from pipecat.frames.frames import (
     Frame,
     InputAudioRawFrame,
     InterruptionFrame,
+    OutputDTMFUrgentFrame,
     OutputTransportMessageFrame,
     OutputTransportMessageUrgentFrame,
     TTSAudioRawFrame,
@@ -395,6 +396,22 @@ class Checkpoints(FrameProcessor):
         playout, through = pending
         playout.played(through)
         self._transcript.audio_progressed()
+
+
+class KeyPresses(FrameProcessor):
+    """Before the transport output: sends the persona's key presses to Plivo as sendDTMF
+    messages. The websocket transport has no DTMF of its own and would play them as tones."""
+
+    def __init__(self) -> None:
+        super().__init__(enable_direct_mode=True)
+
+    async def process_frame(self, frame: Frame, direction: FrameDirection) -> None:
+        await super().process_frame(frame, direction)
+        if direction is FrameDirection.DOWNSTREAM and isinstance(frame, OutputDTMFUrgentFrame):
+            frame = OutputTransportMessageUrgentFrame(
+                {"event": "sendDTMF", "dtmf": frame.to_string()}
+            )
+        await self.push_frame(frame, direction)
 
 
 def pieces(frame: TTSAudioRawFrame) -> list[TTSAudioRawFrame]:
@@ -900,7 +917,7 @@ class PhoneCaller:
             transcript,
             transport_input=transport.input(),
             transport_output=transport.output(),
-            before_output=[checkpoints],
+            before_output=[checkpoints, KeyPresses()],
             after_output=[marks, WireTap(transcript, settled)],
             state=state,
             turn_models=self._turn_models,

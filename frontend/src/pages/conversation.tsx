@@ -858,6 +858,7 @@ const Transcript = memo(function Transcript({
                               )}
                               {turn.talked_over && <Badge>Talked over</Badge>}
                               {turn.scripted && <Badge>Fixed line</Badge>}
+                              {turn.dtmf && <Badge>DTMF</Badge>}
                               {turn.provenance === "cut" && <Badge>Cut off</Badge>}
                               {turn.provenance === "unconfirmed" && (
                                 <Badge>Not confirmed played</Badge>

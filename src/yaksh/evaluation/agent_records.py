@@ -175,13 +175,14 @@ def call_clock_ms(conversation: Conversation, at: datetime | None) -> int | None
 def paired_turn(line: RecordTurn, at_ms: int | None, turns: list[Turn]) -> int | None:
     """The number of the Yaksh turn a record line belongs to, counted from 1: the turn of the
     same speaker nearest the line's time, within the margin; a turn that holds the time is
-    nearest. One turn can hold several lines: speech-to-text splits and joins turns."""
+    nearest. One turn can hold several lines: speech-to-text splits and joins turns. Key presses
+    are not speech, so no line pairs with them."""
     if at_ms is None:
         return None
     gaps = [
         (max(turn.started_at_ms - at_ms, at_ms - turn.ended_at_ms, 0), number)
         for number, turn in enumerate(turns, 1)
-        if turn.role is line.role and turn.machine is None
+        if turn.role is line.role and turn.machine is None and not turn.dtmf
     ]
     gap, number = min(gaps, default=(None, None))
     return number if gap is not None and gap <= PAIR_MARGIN_MS else None

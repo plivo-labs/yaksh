@@ -20,8 +20,10 @@ from pipecat.audio.vad.vad_analyzer import VADParams
 from pipecat.frames.frames import (
     ErrorFrame,
     Frame,
+    FunctionCallResultFrame,
     FunctionCallResultProperties,
     LLMContextFrame,
+    OutputDTMFUrgentFrame,
     TTSSpeakFrame,
 )
 from pipecat.observers.base_observer import BaseObserver
@@ -103,6 +105,19 @@ SILENT_END = (
     "The call did not end, because you said nothing. Answer the agent's latest turn aloud. To "
     "end the call, say a short goodbye in the same reply that calls end_call."
 )
+PRESS_KEYS = FunctionSchema(
+    name="press_keys",
+    description=(
+        "Press keys on your phone keypad. Use it only when the agent asks you to type or enter "
+        "something on your phone keypad. Enter the value exactly as your facts give it, adding # "
+        "when the agent says to press pound. A reply that presses keys has no spoken words."
+    ),
+    properties={
+        "keys": {"type": "string", "description": "The keys to press in order: 0-9, * and #."},
+    },
+    required=["keys"],
+)
+BAD_KEYS = "Nothing was pressed, because a phone keypad has only the keys 0 to 9, * and #."
 
 
 @dataclass(frozen=True)
@@ -377,6 +392,43 @@ class Ending:
             await self._say(self._request.goodbye)
 
 
+class Keypad:
+    """The persona's phone keypad: its keys go out as one DTMF frame and into the transcript
+    as a caller turn."""
+
+    def __init__(self, transcript: TranscriptBuilder, user: LLMUserAggregator) -> None:
+        self._transcript = transcript
+        self._silent: set[str] = set()
+
+        @user.event_handler("on_after_process_frame")
+        async def on_frame(_user: Any, frame: Frame) -> None:
+            # Pipecat keeps the idle timer off until the press's result reaches `user`, which is
+            # after the handler returns, so the timer can only start again from here.
+            if isinstance(frame, FunctionCallResultFrame) and frame.tool_call_id in self._silent:
+                self._silent.remove(frame.tool_call_id)
+                await wait_for_agent(user)
+
+    async def press_keys(self, params: FunctionCallParams) -> None:
+        """Keys that are not on a phone keypad press nothing, and the model is told why. A reply
+        that only presses keys makes no sound, so the agent's idle timer starts again after it."""
+        spoke = self._transcript.called_after_words(params.tool_call_id)
+        keys = str(params.arguments.get("keys") or "").replace(" ", "").replace("-", "")
+        try:
+            press = OutputDTMFUrgentFrame.from_string(keys)
+        except ValueError:
+            await params.result_callback(
+                {"status": BAD_KEYS}, properties=FunctionCallResultProperties(run_llm=True)
+            )
+            return
+        await params.llm.push_frame(press)
+        self._transcript.pressed(keys)
+        if not spoke:
+            self._silent.add(params.tool_call_id)
+        await params.result_callback(
+            {"status": "keys pressed"}, properties=FunctionCallResultProperties(run_llm=False)
+        )
+
+
 class Persona:
     """One call's persona pipeline around a transport, with the transcript taps in place.
 
@@ -434,7 +486,7 @@ class Persona:
 
         self.ending = Ending(request, state, transcript, observer, clock, self.say)
         aggregators = LLMContextAggregatorPair(
-            LLMContext(tools=ToolsSchema(standard_tools=[END_CALL])),
+            LLMContext(tools=ToolsSchema(standard_tools=[END_CALL, PRESS_KEYS])),
             user_params=LLMUserAggregatorParams(
                 user_idle_timeout=IDLE_S,
                 # The user here is the agent under test: a turn of line noise with no words must
@@ -483,6 +535,11 @@ class Persona:
 
         self.llm.register_function(
             END_CALL.name, self.ending.end_call, cancel_on_interruption=False
+        )
+        self.llm.register_function(
+            PRESS_KEYS.name,
+            Keypad(transcript, aggregators.user()).press_keys,
+            cancel_on_interruption=False,
         )
         self._transcript = transcript
         self._observer = observer

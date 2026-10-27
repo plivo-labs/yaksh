@@ -29,7 +29,7 @@ from yaksh.domain.conversations import (
 from yaksh.domain.record_sources import RECORD_PROVIDERS
 from yaksh.domain.scenarios import Fact
 
-EVIDENCE_VIEW_VERSION = 7
+EVIDENCE_VIEW_VERSION = 8
 
 TRANSCRIPTION_NOTE = {
     Transport.PHONE: (
@@ -298,6 +298,7 @@ def speaker(turn: Turn) -> str:
         for mark, applies in (
             ("recorded", turn.machine is not None),
             ("Yaksh's fixed line", turn.scripted),
+            ("pressed on the phone keypad, not spoken", turn.dtmf),
             ("audio not confirmed played", turn.provenance is Provenance.UNCONFIRMED),
             (
                 "cut off: the agent spoke over it, so part or none of it played",

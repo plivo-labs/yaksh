@@ -3392,6 +3392,7 @@ type TriggerMethod string
 
 // TurnRead defines model for TurnRead.
 type TurnRead struct {
+	Dtmf        *bool        `json:"dtmf,omitempty"`
 	EndedAtMs   int          `json:"ended_at_ms"`
 	Machine     *MachineLine `json:"machine,omitempty"`
 	Provenance  *Provenance  `json:"provenance,omitempty"`
