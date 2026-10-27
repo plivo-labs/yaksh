@@ -1,3 +1,22 @@
+## v0.6.0 (2026-10-27)
+
+### Feat
+
+- **evaluation**: give the judges the agent's own side of the call (#20)
+  - For an agent with an agent record, the judges now read the agent's own words from it: what the agent said and what its speech-to-text heard, in order with its tool calls. A speech-to-text error in Yaksh's transcript of the agent no longer fails the agent, and a question the agent asks after it misheard the caller is judged by what it heard.
+  - The **Agent record** tab shows a line that the agent said while a tool ran before the tool's result, in the same order as the judges read it.
+  - The instruction and hallucination checks can quote a line of the agent record.
+  - A caller turn that the agent spoke over is now marked **cut off**: part or none of it played. Before, it was marked **not played**.
+  - **What the agent heard** no longer reports a name that the caller said, and did not spell, as heard differently when it sounds the same.
+  - Calls judged before this version keep their verdicts. Run the scenario again to get new verdicts.
+
+### Fix
+
+- **caller**: let the phone caller stay silent while the agent works (#21)
+  - On a phone test, the caller now says nothing when the agent only asks it to wait or says it is working, such as "let me check that". Before, it could say "Sure." a few seconds late, while the agent started its next line.
+  - A caller reply with no words is no longer an error. Before, it made a finished call invalid, and Yaksh ran the call again.
+  - On a text test, the caller still gives a short reply to such a turn, because a text agent answers only after the caller sends a message.
+
 ## v0.5.2 (2026-10-26)
 
 ### Fix

@@ -1,6 +1,6 @@
 [project]
 name = "yaksh"
-version = "0.5.2"
+version = "0.6.0"
 description = "Simulate, evaluate and improve AI agents"
 readme = "README.md"
 license = "BSD-2-Clause"
