@@ -20,6 +20,7 @@ from pipecat.observers.base_observer import FramePushed
 from pipecat.observers.user_bot_latency_observer import (
     LatencyBreakdown,
     LatencyContribution,
+    LatencyOwnerKind,
     MeasuredFrom,
     UserBotLatencyObserver,
 )
@@ -113,12 +114,14 @@ class ReplyTimes(UserBotLatencyObserver):
             or start is None
         ):
             return
-        if {source for at, source in self._sources if start <= at <= closing.at} != {Source.MODEL}:
+        heard = [(at, source) for at, source in self._sources if start <= at <= closing.at]
+        if {source for _, source in heard} != {Source.MODEL}:
             return
+        parts = with_turn_detection(breakdown.contributions, asked=min(at for at, _ in heard))
         reply = CallerReplyTime(
             audio_index=closing.index,
             total_ms=round((closing.at - start) * 1000),
-            steps=steps_within(breakdown.contributions, start, closing.at),
+            steps=steps_within(parts, start, closing.at),
         )
         self._replies.append(reply)
         fields = {
@@ -128,6 +131,34 @@ class ReplyTimes(UserBotLatencyObserver):
             **{f"{key}_ms": ms for key, ms in reply.step_times().items()},
         }
         log.info("caller_reply_time %s", json.dumps(fields, separators=(",", ":")))
+
+
+def with_turn_detection(
+    parts: Sequence[LatencyContribution], asked: float
+) -> Sequence[LatencyContribution]:
+    """The parts with the turn detection named when Pipecat left it out. Pipecat 1.14 drops a
+    transcript that arrives before the voice detector calls the agent's turn over
+    (pipecat-ai/pipecat#5921), and then names neither the transcription nor the turn detection:
+    the wait from that call to the model's request counts as `pipeline`. With the transcript
+    already in, that wait is the turn detection. `asked` is when the caller's model was asked."""
+    keys = {part.key for part in parts}
+    stopped = next(
+        (part.start_time + part.duration_secs for part in parts if part.key == "endpointing_wait"),
+        None,
+    )
+    if "transcription" in keys or "turn_detection" in keys or stopped is None or asked <= stopped:
+        return parts
+    return [
+        *parts,
+        LatencyContribution(
+            key="turn_detection",
+            label="turn detection",
+            owner="config: user turn strategies",
+            owner_kind=LatencyOwnerKind.SETTING,
+            start_time=stopped,
+            duration_secs=asked - stopped,
+        ),
+    ]
 
 
 def steps_within(parts: Sequence[LatencyContribution], start: float, end: float) -> dict[str, int]:

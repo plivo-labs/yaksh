@@ -97,6 +97,26 @@ async def test_a_model_reply_is_kept_with_where_its_time_went() -> None:
     ]
 
 
+async def test_a_transcript_before_the_end_of_the_agents_turn_keeps_the_turn_check() -> None:
+    """Pipecat drops such a transcript and names neither part; the wait from the end of the
+    agent's turn to the model's request is the turn check."""
+    call = Call()
+    await call.push(0.0, VADUserStartedSpeakingFrame())
+    await call.push(1.9, TranscriptionFrame("yes", "agent", "now"))
+    await call.push(2.6, VADUserStoppedSpeakingFrame(stop_secs=0.6, timestamp=2.6))
+    await call.push(5.6, LLMFullResponseStartFrame())
+    await call.push(6.3, MetricsFrame(data=[TTFBMetricsData(processor="Caller#0", value=0.7)]))
+    await call.push(6.3, LLMTextFrame("Yes."))
+    await call.push(6.6, TTSAudioRawFrame(AUDIO, 8000, 1))
+    await call.push(6.7, BotStartedSpeakingFrame())
+
+    [reply] = await settled(call)
+    assert reply.total_ms == 4700
+    assert reply.steps["turn_detection"] == 3000
+    assert "transcription" not in reply.steps
+    assert "pipeline" not in reply.steps
+
+
 async def test_fixed_lines_and_machine_lines_are_not_replies() -> None:
     call = Call()
     await call.agent_turn(0.0, 2.0)
