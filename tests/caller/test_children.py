@@ -92,8 +92,11 @@ def running(pid: int) -> bool:
 
 
 @pytest.fixture
-async def pools() -> AsyncIterator[Callable[[Callable[..., None]], ChildConversations]]:
-    """Pools of call processes running a test target; closing them must leave no process."""
+async def pools(
+    caplog: pytest.LogCaptureFixture,
+) -> AsyncIterator[Callable[[Callable[..., None]], ChildConversations]]:
+    """Pools of call processes running a test target. A test must not make the event loop log
+    an error, and closing its pools must leave no process."""
     made: list[ChildConversations] = []
     seen: set[int] = set()
 
@@ -107,6 +110,12 @@ async def pools() -> AsyncIterator[Callable[[Callable[..., None]], ChildConversa
     for pool in made:
         assert await pool.close()
     await wait_until(lambda: not any(running(pid) for pid in seen))
+    loop_errors = [
+        record.getMessage()
+        for record in caplog.get_records("call")
+        if record.name == "asyncio" and record.levelno >= logging.ERROR
+    ]
+    assert not loop_errors
 
 
 async def test_a_call_process_holds_the_conversation_and_leaves(pools: Any) -> None:
@@ -250,6 +259,24 @@ async def test_a_process_that_never_gets_ready_is_replaced_although_each_call_gi
         await fail_the_dial(pool)
 
     assert logged(caplog, "it did not get ready") >= 1
+
+
+async def test_a_spare_that_waited_longer_than_the_ready_timeout_takes_the_next_call(
+    pools: Any, caplog: pytest.LogCaptureFixture, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    caplog.set_level(logging.INFO, logger=children.__name__)
+    monkeypatch.setattr(children, "READY_TIMEOUT_S", 6.0)
+    pool = pools(targets.holds)
+    warmed = time.monotonic()
+    pool.warm()
+    await wait_until(lambda: logged(caplog, "is ready in") == children.SPARES, timeout=6)
+    await asyncio.sleep(warmed + 6.5 - time.monotonic())  # idle past the ready timeout
+
+    conversation = await pool.reserve().start(started(Stream()))
+    heard = await conversation.heard()
+    await conversation.close()
+
+    assert heard.recording == b"wav" and logged(caplog, "did not get ready") == 0
 
 
 async def test_overlapping_calls_that_never_start_leave_only_the_spares(pools: Any) -> None:

@@ -389,7 +389,10 @@ class Seat(Protocol):
 
 
 class Conversations(Protocol):
-    def reserve(self) -> Seat: ...
+    def reserve(self) -> Seat:
+        """A seat for a claimed call. It raises when no conversation can start, so the call
+        fails before it dials."""
+        ...
 
 
 async def hold_conversation(start: ConversationStart, live: LiveAudio, turns: TurnModels) -> Spoken:
@@ -481,6 +484,14 @@ async def hold_conversation(start: ConversationStart, live: LiveAudio, turns: Tu
     return Spoken(state, persona, recording, marks, serializer)
 
 
+async def waited[T](future: asyncio.Future[T]) -> T:
+    """The future's result. As with asyncio.shield, a cancel of the caller does not cancel the
+    future, but a failure that comes after that cancel is not logged as an error: the next wait
+    gets it."""
+    await asyncio.wait({future})
+    return future.result()
+
+
 async def hear(spoken: Spoken, started_ms: int, loop_lag: LoopLag | None) -> Heard:
     """Build the call's audio and read what the finished conversation left."""
     recording = await asyncio.to_thread(spoken.recording.to_wav, started_ms)
@@ -532,22 +543,21 @@ class LocalConversation:
         self._task = asyncio.ensure_future(hold_conversation(start, self._live, turns))
         self._ended: Ended | None = None
         self._loop_lag: LoopLag | None = None
-        self._started_ms = start.connected_ms
 
     async def ended(self) -> Ended:
-        spoken = await asyncio.shield(self._task)
+        spoken = await waited(self._task)
         if self._ended is None:
             self._loop_lag = self._lag.unwatch(self._watch)
-            self._started_ms = spoken.recording.start_ms(self._connected_ms)
-            self._ended = Ended(self._clock.ms(), self._started_ms)
+            self._ended = Ended(self._clock.ms(), spoken.recording.start_ms(self._connected_ms))
         return self._ended
 
     def cancel(self) -> None:
         self._task.cancel()
 
     async def heard(self) -> Heard:
+        ended = await self.ended()
         await self._live.close()
-        return await hear(self._task.result(), self._started_ms, self._loop_lag)
+        return await hear(self._task.result(), ended.started_ms, self._loop_lag)
 
     async def close(self) -> None:
         self._lag.unwatch(self._watch)

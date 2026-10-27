@@ -23,7 +23,14 @@ from fastapi import WebSocketDisconnect
 
 from yaksh.caller import child
 from yaksh.caller.child import ChildStart
-from yaksh.caller.conversation import Conversation, ConversationStart, Ended, Heard, Seat
+from yaksh.caller.conversation import (
+    Conversation,
+    ConversationStart,
+    Ended,
+    Heard,
+    Seat,
+    waited,
+)
 from yaksh.caller.lag import LagTicker, worse
 from yaksh.caller.link import Kind, Link, open_link
 from yaksh.diagnostics import describe_exception
@@ -69,11 +76,9 @@ class Child:
     end: socket.socket
     """The worker's end of the socket pair."""
     link: Link | None = None
-    """Opened when the worker reads the child's first message."""
-    ready: bool = False
-    """The worker has read its READY: it waits for a call."""
-    started_at: float = field(default_factory=time.monotonic)
-    """When the process started; it has READY_TIMEOUT_S from then to get ready."""
+    """Opened when the worker starts to read the child's first message."""
+    ready: asyncio.Future[None] | None = field(default=None, repr=False)
+    """Done when the worker has read READY; failed with ChildFailed when it does not come."""
     reaped: asyncio.Future[None] | None = field(default=None, repr=False)
 
 
@@ -159,6 +164,10 @@ class ChildConversations:
             self._keep(asyncio.ensure_future(self._add_spare()))
 
     def reserve(self) -> Seat:
+        """Raises ChildFailed at once while the pool is stuck, so no call is dialed that no
+        process can hold."""
+        if self._stuck_since is not None:
+            raise ChildFailed(STUCK.format(time.monotonic() - self._stuck_since))
         return ChildSeat(self, self._keep(asyncio.ensure_future(self._take())))
 
     async def close(self) -> bool:
@@ -190,7 +199,7 @@ class ChildConversations:
             taken.link.abort()
         self._reap(taken, close_link=False)
 
-    def release(self, taken: Child) -> None:
+    def retire(self, taken: Child) -> None:
         """A child that sent its result leaves by itself: close the link and reap it."""
         self._reap(taken, close_link=True)
 
@@ -253,14 +262,19 @@ class ChildConversations:
         """A new process. A start that does not return within START_TIMEOUT_S marks the pool
         stuck: later reservations fail at once until it returns. The process of a start that
         nobody waits for any more is killed once it exists."""
+        if self._closed:
+            raise ChildFailed("the worker stops")
         if self._stuck_since is not None:
             raise ChildFailed(STUCK.format(time.monotonic() - self._stuck_since))
         done = self._spawner.submit(self._spawn)
         self._starting.add(done)
         done.add_done_callback(self._starting.discard)
         try:
-            spawned = await asyncio.wait_for(asyncio.shield(done), START_TIMEOUT_S)
-        except TimeoutError:
+            await asyncio.wait({done}, timeout=START_TIMEOUT_S)
+        except asyncio.CancelledError:
+            done.add_done_callback(self._unwanted)
+            raise
+        if not done.done():
             if self._stuck_since is None:
                 self._stuck_since = time.monotonic()
                 log.error(
@@ -268,17 +282,44 @@ class ChildConversations:
                     START_TIMEOUT_S,
                 )
             done.add_done_callback(self._late)
-            raise ChildFailed(STUCK.format(START_TIMEOUT_S)) from None
-        except asyncio.CancelledError:
-            done.add_done_callback(self._unwanted)
-            raise
+            raise ChildFailed(STUCK.format(START_TIMEOUT_S))
+        try:
+            spawned = done.result()
         except Exception as error:
             raise ChildFailed(
                 f"a call process could not start: {describe_exception(error)}"
             ) from error
+        self._adopt(spawned)
+        return spawned
+
+    def _adopt(self, spawned: Child) -> None:
+        """Track a new process and start to read its READY."""
         self._children.add(spawned)
         log.info("started call process %s", spawned.process.pid)
-        return spawned
+        spawned.ready = self._keep(asyncio.ensure_future(self._get_ready(spawned)))
+        spawned.ready.add_done_callback(lambda ready: self._not_ready(spawned, ready))
+
+    async def _get_ready(self, spawned: Child) -> None:
+        started = time.monotonic()
+        try:
+            async with asyncio.timeout(READY_TIMEOUT_S):
+                spawned.link = await open_link(spawned.end)
+                kind, _ = await spawned.link.receive()
+        except Exception as error:
+            raise ChildFailed(f"it did not get ready: {describe_exception(error)}") from error
+        if kind is not Kind.READY:
+            raise ChildFailed(f"it sent {kind.name} before it was ready")
+        log.info(
+            "call process %s is ready in %.1f s", spawned.process.pid, time.monotonic() - started
+        )
+
+    def _not_ready(self, spawned: Child, ready: asyncio.Future[None]) -> None:
+        """Kill a process that did not get ready, also while it waits as a spare."""
+        if ready.cancelled() or ready.exception() is None:
+            return
+        if spawned in self._spares:
+            self._spares.remove(spawned)
+        self.discard(spawned, str(ready.exception()))
 
     def _late(self, done: asyncio.Future[Child]) -> None:
         """The start that marked the pool stuck has returned."""
@@ -290,7 +331,7 @@ class ChildConversations:
         """Give the process of a start that nobody waits for any more to the pool."""
         if not done.cancelled() and done.exception() is None:
             spawned = done.result()
-            self._children.add(spawned)
+            self._adopt(spawned)
             self.give_back(spawned, "nobody waits for it")
 
     async def _take(self) -> Child:
@@ -298,31 +339,14 @@ class ChildConversations:
         pool as it is."""
         for _ in range(TAKE_ATTEMPTS):
             taken = self._spare() or await self._spawned()
-            if taken.ready:
-                return taken
+            assert taken.ready is not None
             try:
-                if taken.link is None:
-                    taken.link = await open_link(taken.end)
-                left = READY_TIMEOUT_S - (time.monotonic() - taken.started_at)
-                kind, _ = await asyncio.wait_for(taken.link.receive(), max(left, 0.0))
-            except (asyncio.IncompleteReadError, TimeoutError, OSError) as error:
-                self.discard(taken, f"it did not get ready: {describe_exception(error)}")
-                continue
-            except BaseException:
-                if taken.link is None:  # a cancel inside open_link closes the socket
-                    self.discard(taken, "its call was given up")
-                else:
-                    self.give_back(taken, "its call was given up")
+                await asyncio.wait({taken.ready})
+            except asyncio.CancelledError:
+                self.give_back(taken, "its call was given up")
                 raise
-            if kind is not Kind.READY:
-                self.discard(taken, f"it sent {kind.name} before it was ready")
-                raise ChildFailed(f"a call process sent {kind.name} before it was ready")
-            taken.ready = True
-            log.info(
-                "call process %s is ready in %.1f s",
-                taken.process.pid,
-                time.monotonic() - taken.started_at,
-            )
+            if taken.ready.cancelled() or taken.ready.exception() is not None:
+                continue  # `_not_ready` has killed it, or the pool closes
             return taken
         raise ChildFailed(f"no call process got ready in {TAKE_ATTEMPTS} tries")
 
@@ -358,7 +382,7 @@ class ChildSeat:
 
     async def start(self, start: ConversationStart) -> Conversation:
         assert self._taking is not None, "a seat holds one conversation"
-        taken = await asyncio.shield(self._taking)
+        taken = await waited(self._taking)
         self._taking = None
         conversation = ChildConversation(self._pool, taken, start)
         try:
@@ -430,18 +454,17 @@ class ChildConversation:
             self._tasks.append(asyncio.create_task(self._pass_own(start.own)))
 
     async def ended(self) -> Ended:
-        return await asyncio.shield(self._ended)
+        return await waited(self._ended)
 
     def cancel(self) -> None:
         """The child ends the conversation as worker_stopped and sends its result; a child that
         has not sent it within CANCEL_KILL_S is killed."""
-        with suppress(OSError):
-            self._link.post(Kind.CANCEL, None)
+        self._link.post(Kind.CANCEL, None)
         if self._deadline is None and not self._heard.done():
             self._deadline = asyncio.get_running_loop().call_later(CANCEL_KILL_S, self._kill)
 
     async def heard(self) -> Heard:
-        return await asyncio.shield(self._heard)
+        return await waited(self._heard)
 
     async def close(self) -> None:
         self._disarm()
@@ -456,7 +479,7 @@ class ChildConversation:
             self._relayed_out,
         )
         if self._heard.done() and not self._heard.cancelled() and self._heard.exception() is None:
-            self._pool.release(self._child)
+            self._pool.retire(self._child)
         else:
             self._pool.discard(self._child, "its conversation did not finish")
 
@@ -552,7 +575,7 @@ class ChildConversation:
 
     async def _pass_own(self, own: asyncio.Future[bytes]) -> None:
         try:
-            payload: bytes | BaseException = await asyncio.shield(own)
+            payload: bytes | BaseException = await waited(own)
         except Exception as error:
             payload = error
         with suppress(OSError):
