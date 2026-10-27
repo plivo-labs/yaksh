@@ -30,7 +30,7 @@ from yaksh.domain.conversations import (
     WireEventKind,
 )
 from yaksh.domain.evaluations import EvaluationState, Metric, MetricKey
-from yaksh.domain.latency import CallerReplyWindow
+from yaksh.domain.latency import CallerReplyTime, CallerReplyWindow
 from yaksh.evaluation import evaluations
 from yaksh.evaluation.evaluations import MAX_ATTEMPTS, Evaluated
 
@@ -219,6 +219,7 @@ async def test_the_evaluator_measures_a_saved_call_from_its_files(
             "recording_start_ms": 0,
             "stream_opened_ms": 0,
             "caller_replies": [reply],
+            "caller_reply_times": [CallerReplyTime(audio_index=0, total_ms=1_900, steps={})],
         }
     )
     audio = StoredAudio(recording_key="recording.wav", caller_voice_key="caller-voice.wav")

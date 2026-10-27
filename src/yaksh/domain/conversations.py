@@ -10,7 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from yaksh.domain.agents import AgentConfig, Transport
 from yaksh.domain.answering import AnsweredBy, AnsweringPlan, MachineLine
 from yaksh.domain.languages import Language
-from yaksh.domain.latency import AgentMedia, CallerReplyWindow, LoopLag
+from yaksh.domain.latency import AgentMedia, CallerReplyTime, CallerReplyWindow, LoopLag
 from yaksh.domain.scenarios import Fact
 from yaksh.domain.settings import AppSettings, CallerModel
 from yaksh.domain.surroundings import SoundPlan
@@ -189,6 +189,9 @@ class Turn(BaseModel):
     play for keys, so a key press has no provenance and counts as sent."""
     tools: list[ToolItem] = Field(default_factory=list)
     """The text agent's tool calls in this turn, in its order."""
+    audio_index: int | None = None
+    """A caller turn that went out on a phone call: which caller audio start of the call played
+    it, its window in the transcript's caller replies."""
 
 
 class WireEvent(BaseModel):
@@ -358,6 +361,9 @@ class CallOutcome(BaseModel):
     stream_opened_ms: int | None = None
     caller_settings: CallerSettings | None = None
     caller_usage: CallerUsage | None = None
+    caller_reply_times: list[CallerReplyTime] | None = None
+    """Where the time of each measured caller reply went; None for a call with no live caller
+    speech pipeline (one that never connected, or a text call)."""
     line_facts: LineFacts | None = None
     loop_lag: LoopLag | None = None
     recording_start_ms: int | None = None

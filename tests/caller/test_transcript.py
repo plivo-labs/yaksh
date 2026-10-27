@@ -37,6 +37,24 @@ def test_an_interrupted_reply_keeps_what_the_agent_heard_apart_from_the_rest() -
     ]
 
 
+def test_the_heard_turn_keeps_the_audio_start_that_played_it_and_the_cut_rest_has_none() -> None:
+    observer = Observer()
+    builder = TranscriptBuilder(Clock(), observer)
+    generated(builder, "I would like to book a table for two tonight.")
+    playout = played(arrived=24_000, sent=8_000)
+    playout.audio_index = 3
+    builder.caller_started(playout)
+    for word, start in (("I", 0), ("would", 1_600), ("like", 4_800), ("to", 8_000)):
+        builder.transmitted(word, start, playout, self_spaced=False)
+
+    builder.caller_interrupted()
+
+    assert [(turn.provenance, turn.audio_index) for turn in observer.turns] == [
+        (Provenance.TRANSMITTED, 3),
+        (Provenance.CUT, None),
+    ]
+
+
 def test_the_line_is_quiet_only_once_the_last_words_are_reported_played() -> None:
     builder = TranscriptBuilder(Clock(), Observer())
     assert builder.quiet

@@ -16,7 +16,7 @@ from yaksh.domain.conversations import (
     WireEventKind,
 )
 from yaksh.domain.evaluations import Metric
-from yaksh.domain.latency import Span, Speech, Wait
+from yaksh.domain.latency import CallerReplyTime, Span, Speech, Wait, nearest_rank
 
 WAIT_LIMITS_MS = (3_000, 5_000, 10_000)
 LONG_WAIT_MS = 5_000
@@ -28,6 +28,10 @@ REPEATED = 0.9
 """How alike two agent answers are, from 0 to 1, to count as the same answer."""
 REPEATS = 3
 """How many same answers in a row make a repetition."""
+PART_MS = 5
+"""The least a part of the caller's reply time takes, at its 90th percentile, to be a part of its
+own. Pipecat counts a hop between frames that is shorter than this as `pipeline`, so a few ms
+there are not a step of the reply."""
 
 
 def goodbye_from(transcript: Transcript) -> int | None:
@@ -249,5 +253,27 @@ def usage(
             "ringing_ms": since_start(firsts.get(WireEventKind.RINGING)),
             "answered_ms": since_start(firsts.get(WireEventKind.ANSWERED)),
             "stream_opened_ms": since_start(transcript.stream_opened_ms),
+        }
+    )
+
+
+def caller_reply_time(replies: Sequence[CallerReplyTime]) -> Metric:
+    """How long the caller took to reply, over the replies its model spoke, and the same for each
+    part, in nearest-rank percentiles. Every reply counts every part, a missing part as 0, so
+    the parts' percentiles are over the same replies; a part under PART_MS at the 90th
+    percentile is left out. The parts' p50s need not add up to the reply's p50."""
+    parts = [reply.step_times() for reply in replies]
+    steps = []
+    for key in dict.fromkeys(key for times in parts for key in times):
+        values = sorted(times.get(key, 0) for times in parts)
+        if (p90 := nearest_rank(values, 0.9)) and p90 >= PART_MS:
+            steps.append({"key": key, "p50_ms": nearest_rank(values, 0.5), "p90_ms": p90})
+    totals = sorted(reply.total_ms for reply in replies)
+    return Metric(
+        value={
+            "replies": len(replies),
+            "p50_ms": nearest_rank(totals, 0.5),
+            "p90_ms": nearest_rank(totals, 0.9),
+            "steps": steps,
         }
     )

@@ -11,7 +11,15 @@ from yaksh.domain.conversations import (
     WireEventKind,
 )
 from yaksh.domain.evaluations import MetricKey
-from yaksh.domain.latency import AgentMedia, CallerReplyWindow, LoopLag, Span, Speech, waits
+from yaksh.domain.latency import (
+    AgentMedia,
+    CallerReplyTime,
+    CallerReplyWindow,
+    LoopLag,
+    Span,
+    Speech,
+    waits,
+)
 from yaksh.evaluation import call, metrics
 
 
@@ -185,6 +193,30 @@ def test_connect_timing_runs_from_the_first_event_of_each_kind() -> None:
     }
 
 
+def test_the_callers_reply_time_and_each_part_are_percentiles_over_the_same_replies() -> None:
+    def reply(total: int, **steps: int) -> CallerReplyTime:
+        return CallerReplyTime(audio_index=0, total_ms=total, steps=steps)
+
+    found = metrics.caller_reply_time(
+        [
+            reply(1_900, endpointing_wait=600, llm_inference=1_300),
+            reply(2_400, endpointing_wait=600, llm_inference=1_500, function_handler=300),
+            reply(1_700, endpointing_wait=600, llm_inference=1_100, pipeline=1),
+        ]
+    )
+
+    assert found.value == {
+        "replies": 3,
+        "p50_ms": 1_900,
+        "p90_ms": 2_400,
+        "steps": [
+            {"key": "endpointing_wait", "p50_ms": 600, "p90_ms": 600},
+            {"key": "llm_inference", "p50_ms": 1_300, "p90_ms": 1_500},
+            {"key": "function_handler", "p50_ms": 0, "p90_ms": 300},
+        ],
+    }
+
+
 async def test_a_call_gets_only_the_metrics_its_facts_support() -> None:
     def saved(transcript: Transcript) -> Conversation:
         return Conversation(
@@ -219,3 +251,22 @@ async def test_a_call_gets_only_the_metrics_its_facts_support() -> None:
     assert "missing_recording" in no_recording[MetricKey.CAPTURE_FAULTS].flags
     assert set(crashed) == set(no_recording)
     assert crashed[MetricKey.CAPTURE_FAULTS].flags == ["incomplete_record"]
+
+
+async def test_a_phone_call_with_measured_caller_replies_gets_their_reply_time() -> None:
+    connected = Transcript(
+        stream_opened_ms=900,
+        caller_replies=[],
+        wire_events=[WireEvent(kind=WireEventKind.CONNECTED, at_ms=900)],
+    )
+    measured = Conversation(
+        transcript=connected.model_dump(mode="json"),
+        caller_reply_times=[{"audio_index": 0, "total_ms": 1_900, "steps": {}}],
+    )
+    unmeasured = Conversation(transcript=connected.model_dump(mode="json"), caller_reply_times=[])
+
+    found = await call.measure_call(measured, FakeFileStore(), agent_speaks_first=True)
+    none = await call.measure_call(unmeasured, FakeFileStore(), agent_speaks_first=True)
+
+    assert found[MetricKey.CALLER_REPLY_TIME].value["p50_ms"] == 1_900
+    assert MetricKey.CALLER_REPLY_TIME not in none

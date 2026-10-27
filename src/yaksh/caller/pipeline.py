@@ -8,6 +8,7 @@ from collections.abc import AsyncIterator, Awaitable, Callable, Iterable, Mappin
 from dataclasses import dataclass, field
 from functools import partial
 from typing import Any, Protocol
+from urllib.parse import urlsplit
 
 # The OpenAI client imports about 600 modules at its first request. Import them with this module,
 # at worker start, and not on the event loop of a live call.
@@ -48,6 +49,7 @@ from pipecat.workers.runner import WorkerRunner
 
 from yaksh.caller.audio import SAMPLE_RATE, Clock
 from yaksh.caller.machines import MachineGate, SoundPlayer
+from yaksh.caller.reply_times import ReplyTimes
 from yaksh.caller.speech_to_text import deepgram_language
 from yaksh.caller.transcript import (
     AgentTurnTap,
@@ -466,6 +468,9 @@ class Persona:
         )
         metrics = ServiceMetricsObserver()
         self.usage = UsageMeter(metrics)
+        self.reply_times = ReplyTimes(
+            request.conversation_id, self.settings, urlsplit(str(settings.llm.base_url)).hostname
+        )
         self.stt = DeepgramSTTService(
             api_key=keys.deepgram,
             base_url=settings.deepgram.base_url,
@@ -525,12 +530,13 @@ class Persona:
             params=PipelineParams(
                 audio_in_sample_rate=SAMPLE_RATE,
                 audio_out_sample_rate=SAMPLE_RATE,
+                enable_metrics=True,
                 enable_usage_metrics=True,
             ),
             idle_timeout_secs=None,
             cancel_timeout_secs=END_GRACE_S,
             enable_rtvi=False,
-            observers=[metrics, *observers],
+            observers=[metrics, self.reply_times, *observers],
         )
 
         self.llm.register_function(

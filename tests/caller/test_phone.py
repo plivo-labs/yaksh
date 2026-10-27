@@ -13,6 +13,7 @@ from httpx import AsyncClient
 from pipecat.frames.frames import (
     BotStartedSpeakingFrame,
     BotStoppedSpeakingFrame,
+    TTSStartedFrame,
     TTSStoppedFrame,
     TTSTextFrame,
 )
@@ -598,3 +599,29 @@ async def test_a_reply_keeps_its_playout_even_when_a_barge_in_cuts_it_off() -> N
 
     assert [(r.playout is cut, r.finished) for r in marks.replies[:1]] == [(True, False)]
     assert [(r.playout is whole, r.finished) for r in marks.replies[1:]] == [(True, True)]
+
+
+async def test_each_reply_learns_which_caller_audio_start_played_it() -> None:
+    """The next reply's TTS can start while the current reply still plays: its audio start is
+    the next one, not the current one."""
+    first, second = Playout(), Playout()
+
+    def started(playout: Playout) -> TTSStartedFrame:
+        frame = TTSStartedFrame()
+        frame.metadata[PLAYOUT] = playout
+        return frame
+
+    marks = phone.AudioMarks(Clock(), Observer())
+
+    await run_test(
+        marks,
+        frames_to_send=[
+            started(first),
+            BotStartedSpeakingFrame(),
+            started(second),
+            BotStoppedSpeakingFrame(),
+            BotStartedSpeakingFrame(),
+        ],
+    )
+
+    assert (first.audio_index, second.audio_index) == (0, 1)

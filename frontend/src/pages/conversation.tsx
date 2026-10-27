@@ -17,6 +17,7 @@ import { Link, useParams, useSearchParams } from "react-router";
 import { ToolCalls } from "@/components/tool-calls";
 import { AgentRecordPanel } from "@/components/agent-record";
 import { CallMetricsCard } from "@/components/call-metrics";
+import { CallerReplyBadge } from "@/components/caller-reply-time";
 import { CallResults } from "@/components/call-results";
 import { CallSounds } from "@/components/call-sounds";
 import { EndCallDialog } from "@/components/confirm-dialogs";
@@ -234,7 +235,11 @@ function ConversationView({ id }: { id: string }) {
                   </TabsContent>
                 )}
                 <TabsContent value="metrics">
-                  <CallMetricsCard conversationId={data.id} evaluation={data.evaluation} />
+                  <CallMetricsCard
+                    conversationId={data.id}
+                    evaluation={data.evaluation}
+                    transport={data.transport}
+                  />
                 </TabsContent>
                 <TabsContent value="scenario">
                   <ScenarioCard
@@ -856,6 +861,7 @@ const Transcript = memo(function Transcript({
                               {typeof turn.response_ms === "number" && (
                                 <ResponseTime ms={turn.response_ms} />
                               )}
+                              {turn.caller_reply && <CallerReplyBadge reply={turn.caller_reply} />}
                               {turn.talked_over && <Badge>Talked over</Badge>}
                               {turn.scripted && <Badge>Fixed line</Badge>}
                               {turn.dtmf && <Badge>DTMF</Badge>}
