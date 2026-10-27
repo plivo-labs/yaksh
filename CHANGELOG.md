@@ -1,3 +1,17 @@
+## v0.7.1 (2026-10-27)
+
+### Feat
+
+- **caller**: press keypad keys when the agent asks the caller to type (#19)
+  - On a phone test, the caller now presses keys on its phone keypad (DTMF) when the agent asks it to type or enter something, such as a card number followed by the pound key. Before, the caller could only say the keys.
+  - The caller presses the keys 0 to 9, * and #. A press goes to the agent as DTMF, not as tones in the caller's audio.
+  - The transcript shows a press as a caller turn with a **DTMF** badge. The judges read it as keys pressed on the keypad, not spoken, and **What the agent heard** does not check it.
+  - After a press, a quiet agent gets the same nudge as after the caller speaks.
+  - A text test has no keypad, so its caller does not press keys.
+- **cli**: add scenarios and agent rules from files, and rewrite the skill (#23)
+  - `yaksh scenario create -f` and `yaksh scenario update -f` read a scenario from a YAML or JSON file. `yaksh scenario generate` lets a model write scenarios for an agent and prints each one that it saves. `yaksh agent update --rules-file` sets the agent rules from a file.
+  - The skill, which `yaksh guide` also prints, is new. It tells a coding agent how to write scenarios and agent rules, run them, read the verdicts, and find whether the agent or the test caused each failure. The coding agent reports the evidence, and the user decides what to change in the voice agent. Before, the skill told the coding agent to change the voice agent after each failure.
+
 ## v0.7.0 (2026-10-27)
 
 ### Feat
