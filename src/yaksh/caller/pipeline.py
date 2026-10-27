@@ -4,7 +4,6 @@ transcript taps, and how a call ends."""
 import asyncio
 import contextlib
 import logging
-import re
 from collections.abc import AsyncIterator, Awaitable, Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from functools import partial
@@ -24,7 +23,7 @@ from pipecat.frames.frames import (
     FunctionCallResultFrame,
     FunctionCallResultProperties,
     LLMContextFrame,
-    OutputTransportMessageUrgentFrame,
+    OutputDTMFUrgentFrame,
     TTSSpeakFrame,
 )
 from pipecat.observers.base_observer import BaseObserver
@@ -394,8 +393,8 @@ class Ending:
 
 
 class Keypad:
-    """The persona's phone keypad: its keys go to Plivo as one sendDTMF message and into the
-    transcript as a caller turn."""
+    """The persona's phone keypad: its keys go out as one DTMF frame and into the transcript
+    as a caller turn."""
 
     def __init__(self, transcript: TranscriptBuilder, user: LLMUserAggregator) -> None:
         self._transcript = transcript
@@ -414,14 +413,14 @@ class Keypad:
         that only presses keys makes no sound, so the agent's idle timer starts again after it."""
         spoke = self._transcript.called_after_words(params.tool_call_id)
         keys = str(params.arguments.get("keys") or "").replace(" ", "").replace("-", "")
-        if not re.fullmatch(r"[0-9*#]+", keys):
+        try:
+            press = OutputDTMFUrgentFrame.from_string(keys)
+        except ValueError:
             await params.result_callback(
                 {"status": BAD_KEYS}, properties=FunctionCallResultProperties(run_llm=True)
             )
             return
-        await params.llm.push_frame(
-            OutputTransportMessageUrgentFrame({"event": "sendDTMF", "dtmf": keys})
-        )
+        await params.llm.push_frame(press)
         self._transcript.pressed(keys)
         if not spoke:
             self._silent.add(params.tool_call_id)

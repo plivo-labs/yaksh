@@ -8,7 +8,9 @@ from pipecat.frames.frames import (
     InputAudioRawFrame,
     InterruptionFrame,
     OutputAudioRawFrame,
+    OutputDTMFUrgentFrame,
     OutputTransportMessageFrame,
+    OutputTransportMessageUrgentFrame,
     TTSAudioRawFrame,
     TTSStartedFrame,
     TTSStoppedFrame,
@@ -18,7 +20,7 @@ from pipecat.tests.utils import run_test
 
 from tests.conftest import FixedClock, Observer
 from yaksh.caller.audio import FRAME_BYTES, GAP_BYTES, PLAYOUT, SAMPLE_RATE, CallRecording, Clock
-from yaksh.caller.phone import CHUNK_BYTES, Checkpoints, StreamSerializer
+from yaksh.caller.phone import CHUNK_BYTES, Checkpoints, KeyPresses, StreamSerializer
 from yaksh.caller.transcript import TranscriptBuilder
 from yaksh.domain.conversations import Provenance, WireEventKind
 
@@ -231,3 +233,12 @@ def test_a_recording_starts_at_connected_when_no_agent_audio_came_before() -> No
     recording.agent(LOUD, 1_320, PLIVO_EPOCH + 1_220)
 
     assert recording.start_ms(1_000) == 1_000
+
+
+async def test_a_key_press_goes_to_plivo_as_one_send_dtmf_message() -> None:
+    [sent], _ = await run_test(
+        KeyPresses(), frames_to_send=[OutputDTMFUrgentFrame.from_string("4111#")]
+    )
+
+    assert isinstance(sent, OutputTransportMessageUrgentFrame)
+    assert sent.message == {"event": "sendDTMF", "dtmf": "4111#"}

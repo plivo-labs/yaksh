@@ -9,6 +9,7 @@ from pipecat.frames.frames import (
     Frame,
     FunctionCallResultProperties,
     LLMContextFrame,
+    OutputDTMFUrgentFrame,
     TranscriptionFrame,
     VADUserStartedSpeakingFrame,
     VADUserStoppedSpeakingFrame,
@@ -28,8 +29,7 @@ from pipecat.turns.user_turn_strategies import UserTurnStrategies
 
 from tests.conftest import FakeProvider, FixedClock, Observer
 from yaksh.caller import pipeline
-from yaksh.caller.audio import CallRecording, Clock
-from yaksh.caller.phone import Checkpoints, StreamSerializer
+from yaksh.caller.audio import Clock
 from yaksh.caller.pipeline import (
     CallerKeys,
     CallState,
@@ -430,24 +430,16 @@ async def test_a_call_that_already_ended_records_no_second_end() -> None:
     assert (line.state.end_reason, line.state.caller_reason) == (EndReason.AGENT_HANGUP, None)
 
 
-async def test_pressed_keys_go_to_plivo_as_one_dtmf_message_and_a_keypad_turn() -> None:
+async def test_pressed_keys_go_out_as_one_dtmf_frame_and_a_keypad_turn() -> None:
     clock = FixedClock()
     clock.now = 4200
     observer = Observer()
     transcript = TranscriptBuilder(clock, observer)
-    serializer = StreamSerializer(
-        "s-1",
-        "audio/x-l16;rate=8000",
-        clock,
-        observer,
-        Checkpoints("s-1", transcript),
-        CallRecording(),
-    )
-    sent: list[str | bytes | None] = []
+    pushed: list[Frame] = []
     results: list[tuple[dict, bool | None]] = []
 
     async def push_frame(frame: Frame) -> None:
-        sent.append(await serializer.serialize(frame))
+        pushed.append(frame)
 
     async def result_callback(result: dict, *, properties: FunctionCallResultProperties) -> None:
         results.append((result, properties.run_llm))
@@ -467,7 +459,8 @@ async def test_pressed_keys_go_to_plivo_as_one_dtmf_message_and_a_keypad_turn() 
     await keypad.press_keys(params("4111 1111 1111 111A#"))
     await keypad.press_keys(params("4111 1111-1111 1111#"))
 
-    assert sent == ['{"event": "sendDTMF", "dtmf": "4111111111111111#"}']
+    [press] = pushed
+    assert isinstance(press, OutputDTMFUrgentFrame) and press.to_string() == "4111111111111111#"
     assert [(t.role, t.text, t.dtmf, t.started_at_ms, t.ended_at_ms) for t in observer.turns] == [
         (Role.CALLER, "4111111111111111#", True, 4200, 4200)
     ]
