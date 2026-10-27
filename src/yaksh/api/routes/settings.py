@@ -10,8 +10,10 @@ from yaksh.api.auth import require_token
 from yaksh.api.deps import AppSettingsDep, SessionDep
 from yaksh.api.errors import CLIENT_ERRORS, UNAVAILABLE, json_errors
 from yaksh.api.schemas.settings import (
+    CallerReplyTimes,
     Efforts,
     ImportResult,
+    ModelReplyTime,
     Models,
     PlivoAccount,
     ProviderTest,
@@ -29,7 +31,9 @@ from yaksh.domain.settings import (
     SecretName,
     SettingsValues,
 )
+from yaksh.evaluation import results
 from yaksh.integrations import provider_checks
+from yaksh.integrations.openai_models import caller_effort
 from yaksh.integrations.provider_checks import ProviderCheckError
 from yaksh.settings import service, store
 from yaksh.settings.cipher import Cipher
@@ -184,6 +188,21 @@ async def model_efforts(model: str, settings: AppSettingsDep) -> Efforts:
     except ProviderCheckError as error:
         raise UnavailableError(str(error)) from None
     return Efforts(model=model, efforts=efforts)
+
+
+@router.get("/caller-reply-times")
+async def caller_reply_times(session: SessionDep, settings: AppSettingsDep) -> CallerReplyTimes:
+    """How long the caller took to reply with each model and effort, for choosing the caller's
+    model."""
+    caller = settings.caller
+    in_use = (caller.model, caller_effort(caller.model, caller.reasoning_effort))
+    return CallerReplyTimes(
+        days=results.REPLY_TIME_WINDOW.days,
+        rows=[
+            ModelReplyTime(**row._asdict(), in_use=(row.model, row.reasoning_effort) == in_use)
+            for row in await results.reply_time_by_model(session)
+        ],
+    )
 
 
 @router.get(

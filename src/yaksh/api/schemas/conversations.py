@@ -25,7 +25,7 @@ from yaksh.domain.evaluations import (
     Verdict,
 )
 from yaksh.domain.languages import Language
-from yaksh.domain.latency import Latency, Reply
+from yaksh.domain.latency import CallerReplyTime, Latency, Reply
 from yaksh.domain.record_sources import RECORD_PROVIDERS, RecordProvider
 from yaksh.domain.scenarios import PlayedScenario
 from yaksh.domain.surroundings import Layer, NoiseSound, SoundPlan, SpeakerKind, Surroundings
@@ -57,6 +57,9 @@ class TurnRead(Turn):
     """On an agent turn that starts a reply: how long the agent made the caller wait."""
     talked_over: bool = False
     """On an agent turn that starts a reply: the agent began before the caller finished."""
+    caller_reply: CallerReplyTime | None = None
+    """On a caller turn that the caller's model spoke on a phone call: where the time of its
+    reply went, from the end of the agent's speech to the turn's first audio."""
 
 
 class ConversationSummary(BaseModel):

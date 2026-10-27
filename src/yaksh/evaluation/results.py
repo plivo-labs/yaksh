@@ -5,9 +5,11 @@ import uuid
 from collections import defaultdict
 from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
+from datetime import timedelta
 from typing import Any, NamedTuple
 
-from sqlalchemy import ColumnElement, and_, case, select
+from sqlalchemy import ColumnElement, and_, case, column, distinct, func, select, true
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from yaksh.db.models import Conversation, Evaluation, EvaluationItem, MetricValue, Scenario
@@ -233,3 +235,56 @@ def numbers(calls: Sequence[CallFacts]) -> RunNumbers:
 
 UNENDED = frozenset({OutcomeGroup.WAITING, OutcomeGroup.IN_PROGRESS})
 PENDING = frozenset({None, EvaluationState.QUEUED, EvaluationState.RUNNING})
+
+
+REPLY_TIME_WINDOW = timedelta(days=7)
+
+
+class ModelReplyTime(NamedTuple):
+    """The caller's reply time with one model and effort: nearest-rank percentiles over the
+    measured replies of the calls that ran with it."""
+
+    model: str
+    reasoning_effort: str | None
+    calls: int
+    replies: int
+    p50_ms: int
+    p90_ms: int
+    llm_p50_ms: int
+    """The LLM inference part, a reply without one counted as 0, as on a conversation page."""
+
+
+async def reply_time_by_model(session: AsyncSession) -> list[ModelReplyTime]:
+    """The caller's reply time by caller model and effort, over the phone calls that ran in the
+    last REPLY_TIME_WINDOW, most replies first. A call counts by when it ran, not by when its
+    run was made."""
+    reply = (
+        func.jsonb_array_elements(Conversation.caller_reply_times)
+        .table_valued(column("value", JSONB), joins_implicitly=True)
+        .alias("reply")
+    )
+    total = reply.c.value["total_ms"].as_integer()
+    llm = func.coalesce(reply.c.value[("steps", "llm_inference")].as_integer(), 0)
+    model = Conversation.caller_settings["llm_model"].as_string()
+    effort = Conversation.caller_settings["reasoning_effort"].as_string()
+    rows = await session.execute(
+        select(
+            model,
+            effort,
+            func.count(distinct(Conversation.id)),
+            func.count(),
+            func.percentile_disc(0.5).within_group(total),
+            func.percentile_disc(0.9).within_group(total),
+            func.percentile_disc(0.5).within_group(llm),
+        )
+        .select_from(Conversation)
+        .join(reply, true())
+        .where(
+            Conversation.started_at >= func.now() - REPLY_TIME_WINDOW,
+            Conversation.caller_reply_times.is_not(None),
+            model.is_not(None),
+        )
+        .group_by(model, effort)
+        .order_by(func.count().desc(), model, effort)
+    )
+    return [ModelReplyTime(*row) for row in rows]

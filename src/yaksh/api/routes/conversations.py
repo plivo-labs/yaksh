@@ -1,5 +1,5 @@
 import uuid
-from collections.abc import AsyncIterable, Mapping
+from collections.abc import AsyncIterable, Mapping, Sequence
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
@@ -30,11 +30,13 @@ from yaksh.domain.conversations import (
     LIVE_STATUSES,
     ConversationStatus,
     OutcomeGroup,
+    Provenance,
     Role,
     Transcript,
+    Turn,
 )
 from yaksh.domain.errors import NotFoundError
-from yaksh.domain.latency import Latency, place
+from yaksh.domain.latency import CallerReplyTime, Latency, place
 from yaksh.evaluation import agent_records, results
 from yaksh.simulation import conversations
 from yaksh.simulation.listen import live_audio
@@ -100,12 +102,17 @@ async def summary(
     return (await summaries(session, [conversation], found))[0]
 
 
-def turns_with_replies(transcript: Transcript, latency: Latency | None) -> list[TurnRead]:
-    """The turns, each agent turn with the reply it starts with."""
+def turns_with_replies(
+    transcript: Transcript, latency: Latency | None, caller_times: Sequence[CallerReplyTime]
+) -> list[TurnRead]:
+    """The turns, each agent turn with the reply it starts with, and each caller turn that the
+    caller's model spoke with where the time of its reply went: the reply timed at the audio
+    start that played the turn, one turn for each."""
     replies = latency.replies if latency else []
     agent = [index for index, turn in enumerate(transcript.turns) if turn.role is Role.AGENT]
     starts = [transcript.turns[index].started_at_ms for index in agent]
     placed = dict(zip(agent, place(starts, replies), strict=True))
+    timed = {reply.audio_index: reply for reply in caller_times}
     turns = []
     for index, turn in enumerate(transcript.turns):
         reply = placed.get(index)
@@ -114,9 +121,21 @@ def turns_with_replies(transcript: Transcript, latency: Latency | None) -> list[
                 **turn.model_dump(),
                 response_ms=reply.response_ms if reply else None,
                 talked_over=reply is not None and reply.response_ms is None,
+                caller_reply=timed.pop(turn.audio_index, None)
+                if spoken(turn) and turn.audio_index is not None
+                else None,
             )
         )
     return turns
+
+
+def spoken(turn: Turn) -> bool:
+    """A caller turn that the caller's model spoke and that went out on the line."""
+    return (
+        turn.role is Role.CALLER
+        and turn.provenance is Provenance.TRANSMITTED
+        and not (turn.scripted or turn.machine or turn.dtmf)
+    )
 
 
 async def detail(session: AsyncSession, conversation: Conversation) -> ConversationRead:
@@ -133,7 +152,14 @@ async def detail(session: AsyncSession, conversation: Conversation) -> Conversat
         else await conversations.persona_answering(session, conversation),
         sounds=SoundRead.all_of(conversation.sound_plan),
         scenario=await conversations.played_scenario(session, conversation),
-        transcript=turns_with_replies(transcript, latency),
+        transcript=turns_with_replies(
+            transcript,
+            latency,
+            [
+                CallerReplyTime.model_validate(item)
+                for item in conversation.caller_reply_times or []
+            ],
+        ),
         replies=latency.replies if latency else [],
         wire_events=transcript.wire_events,
         validity=transcript.validity,
