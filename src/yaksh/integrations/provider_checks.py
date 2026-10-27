@@ -3,26 +3,42 @@ for Check and save before a key is stored, and for the Test buttons. Each one ra
 ProviderCheckError with a reason that never holds the key."""
 
 import asyncio
-import json
 
-import aiohttp
 import openai
 from openai import AsyncOpenAI
+from pipecat.audio.vad.silero import SileroVADAnalyzer
+from pipecat.audio.vad.vad_analyzer import VADParams
 from pipecat.classifiers.base_classifier import ChoiceQuestion
 from pipecat.classifiers.typesafe.jev.classifier import JevClassifier
+from pipecat.frames.frames import ErrorFrame, Frame, InputAudioRawFrame, TranscriptionFrame
+from pipecat.pipeline.pipeline import Pipeline
+from pipecat.pipeline.worker import PipelineParams, PipelineWorker
+from pipecat.processors.audio.vad_processor import VADProcessor
+from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
+from pipecat.workers.runner import WorkerRunner
 
 from yaksh.diagnostics import describe_exception
 from yaksh.domain.errors import UnavailableError
 from yaksh.domain.languages import Language
+from yaksh.domain.latency import VAD_CONFIDENCE, VAD_START_S, VAD_STOP_S
+from yaksh.domain.settings import AppSettings
+from yaksh.domain.speech import SttProvider
 from yaksh.domain.voices import VoiceProvider, VoiceSettings
 from yaksh.integrations.elevenlabs import ElevenLabsClient
 from yaksh.integrations.openai_models import failure, takes_reasoning_effort
 from yaksh.integrations.plivo import PlivoApi, PlivoError
+from yaksh.integrations.speech import SAMPLE_RATE, stt_service
 
 TIMEOUT_S = 20.0
 REASONING_EFFORTS = ("none", "minimal", "low", "medium", "high", "xhigh", "max")
-SILENCE_8K = bytes(8000)
-"""Half a second of 16-bit silence at 8 kHz: Deepgram transcribes it to nothing."""
+STT_CHECK_S = 10.0
+"""How long a speech-to-text check waits for the transcript of its clip."""
+FRAME_BYTES = SAMPLE_RATE * 2 // 50
+"""20 ms of 16-bit audio, the size of a phone frame."""
+TRAILING_SILENCE = bytes(SAMPLE_RATE * 2)
+"""One second after the clip, so the voice detector ends the turn and providers that finalize
+only then send the transcript."""
+VAD = VADParams(confidence=VAD_CONFIDENCE, start_secs=VAD_START_S, stop_secs=VAD_STOP_S)
 
 
 class ProviderCheckError(Exception):
@@ -74,34 +90,67 @@ async def reasoning_efforts(base_url: str, api_key: str, model: str) -> list[str
     return [effort for effort, takes in zip(REASONING_EFFORTS, answers, strict=True) if takes]
 
 
-async def check_deepgram(base_url: str, api_key: str, model: str) -> None:
-    """A transcription of a short silence with the model the caller uses."""
-    url = f"{base_url.rstrip('/')}/v1/listen"
-    params = {"model": model, "encoding": "linear16", "sample_rate": "8000", "channels": "1"}
-    headers = {"Authorization": f"Token {api_key}", "Content-Type": "audio/raw"}
-    try:
-        async with (
-            aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=TIMEOUT_S)) as session,
-            session.post(url, params=params, headers=headers, data=SILENCE_8K) as response,
-        ):
-            status, body = response.status, await response.text()
-    except (aiohttp.ClientError, TimeoutError) as error:
-        raise ProviderCheckError(f"Deepgram did not answer: {describe_exception(error)}") from None
-    if status >= 400:
-        raise ProviderCheckError(f"Deepgram answered {status}{deepgram_reason(body)}")
+class Heard(FrameProcessor):
+    """The end of a check pipeline: done at the first final transcript with words."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.text: str | None = None
+        self.done = asyncio.Event()
+
+    async def process_frame(self, frame: Frame, direction: FrameDirection) -> None:
+        await super().process_frame(frame, direction)
+        if isinstance(frame, TranscriptionFrame) and frame.text.strip():
+            self.text = frame.text
+            self.done.set()
+        await self.push_frame(frame, direction)
 
 
-def deepgram_reason(body: str) -> str:
-    """Deepgram's error code and message, never the rest of the body, which can echo the
-    request."""
+async def check_stt(settings: AppSettings, provider: SttProvider, key: str, clip: bytes) -> None:
+    """The provider transcribes a short English line, sent as a call sends it: in 20 ms frames
+    through the call's voice detector, then a second of silence. Only a transcript with words
+    passes; silence alone would pass a provider that accepts the connection and refuses the
+    key later."""
+    heard = Heard()
+    worker = PipelineWorker(
+        Pipeline(
+            [
+                VADProcessor(vad_analyzer=SileroVADAnalyzer(params=VAD)),
+                stt_service(settings, provider, key, Language.EN.value),
+                heard,
+            ]
+        ),
+        params=PipelineParams(audio_in_sample_rate=SAMPLE_RATE),
+        idle_timeout_secs=None,
+        enable_rtvi=False,
+    )
+    errors: list[str] = []
+
+    @worker.event_handler("on_pipeline_error")
+    async def on_error(_worker: object, frame: ErrorFrame) -> None:
+        errors.append(frame.error)
+        heard.done.set()
+
+    runner = WorkerRunner(handle_sigint=False)
+    await runner.add_workers(worker)
+    running = asyncio.create_task(runner.run())
+    audio = clip + TRAILING_SILENCE
     try:
-        error = json.loads(body)
-    except ValueError:
-        return ""
-    if not isinstance(error, dict):
-        return ""
-    parts = [str(error[key]) for key in ("err_code", "err_msg") if isinstance(error.get(key), str)]
-    return f": {' '.join(parts)}" if parts else ""
+        async with asyncio.timeout(STT_CHECK_S):
+            for at in range(0, len(audio), FRAME_BYTES):
+                if heard.done.is_set():
+                    break
+                frame = InputAudioRawFrame(audio[at : at + FRAME_BYTES], SAMPLE_RATE, 1)
+                await worker.queue_frame(frame)
+                await asyncio.sleep(0.02)
+            await heard.done.wait()
+    except TimeoutError:
+        errors.append(f"no transcript of a test clip in {STT_CHECK_S:.0f} s")
+    finally:
+        await worker.cancel()
+        await asyncio.gather(running, return_exceptions=True)
+    if errors:
+        raise ProviderCheckError(f"{provider.label}: {errors[0]}")
 
 
 async def check_elevenlabs(api_key: str, voice_id: str) -> None:

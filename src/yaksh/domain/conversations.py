@@ -13,6 +13,7 @@ from yaksh.domain.languages import Language
 from yaksh.domain.latency import AgentMedia, CallerReplyWindow, LoopLag
 from yaksh.domain.scenarios import Fact
 from yaksh.domain.settings import AppSettings, CallerModel
+from yaksh.domain.speech import SttProvider
 from yaksh.domain.surroundings import SoundPlan
 from yaksh.domain.voices import VoiceSettings
 
@@ -263,6 +264,8 @@ class CallerSettings(BaseModel):
     instead, where None meant the lowest effort that Pipecat lists for the model."""
     scenario_model: bool = False
     """The scenario chose the model and effort, not the settings."""
+    stt_provider: SttProvider | None = SttProvider.DEEPGRAM
+    """None for a text agent. Every call from before Yaksh recorded it used Deepgram."""
     stt_model: str | None = None
     """None for a text agent, which Yaksh reads with no speech-to-text."""
     stt_language: str | None = None

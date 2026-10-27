@@ -10,9 +10,13 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import BaseModel, ConfigDict, Field, SecretStr, StringConstraints, field_validator
 
+from yaksh.domain.speech import SttProvider
+
 TRIGGER_SECRET_NAME = re.compile(r"[A-Z][A-Z0-9_]{0,63}")
 
 Url = Annotated[str, StringConstraints(strip_whitespace=True, pattern=r"^https?://\S+$")]
+Address = Annotated[str, StringConstraints(strip_whitespace=True, pattern=r"^(https?|wss?)://\S+$")]
+"""The address of a speech provider: an HTTP or a websocket URL."""
 ModelName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
 Effort = Annotated[str, StringConstraints(pattern=r"^[a-z]{1,20}$")]
 ApplicationId = Annotated[str, StringConstraints(strip_whitespace=True, pattern=r"^[0-9]{1,40}$")]
@@ -29,9 +33,35 @@ class Llm(Section):
     base_url: Url = "https://api.openai.com/v1"
 
 
+class Speech(Section):
+    stt: SttProvider = SttProvider.DEEPGRAM
+    """The provider that hears the agent on every call."""
+
+
 class Deepgram(Section):
     base_url: Url = "https://api.deepgram.com"
     model: ModelName = "nova-3"
+
+
+class SarvamStt(Section):
+    """Sarvam's speech-to-text host is fixed by its SDK, so it has no address."""
+
+    model: ModelName = "saaras:v4"
+
+
+class AssemblyAI(Section):
+    url: Address = "wss://streaming.assemblyai.com/v3/ws"
+    model: ModelName = "universal-3-6-pro"
+
+
+class Soniox(Section):
+    url: Address = "wss://stt-rt.soniox.com/transcribe-websocket"
+    model: ModelName = "stt-rt-v5"
+
+
+class Gladia(Section):
+    url: Address = "https://api.gladia.io/v2/live"
+    model: ModelName = "solaria-1"
 
 
 class CallerModel(Section):
@@ -143,6 +173,10 @@ class Limits(Section):
 class SecretName(StrEnum):
     LLM_API_KEY = "llm_api_key"
     DEEPGRAM_API_KEY = "deepgram_api_key"
+    SARVAM_API_KEY = "sarvam_api_key"
+    ASSEMBLYAI_API_KEY = "assemblyai_api_key"
+    SONIOX_API_KEY = "soniox_api_key"
+    GLADIA_API_KEY = "gladia_api_key"
     ELEVENLABS_API_KEY = "elevenlabs_api_key"
     TYPESAFE_API_KEY = "typesafe_api_key"
     """Jev, TypeSafe's classifier, answers criteria and agent rules before the judges; call
@@ -170,6 +204,10 @@ class Secrets(Section):
 
     llm_api_key: SecretStr | None = None
     deepgram_api_key: SecretStr | None = None
+    sarvam_api_key: SecretStr | None = None
+    assemblyai_api_key: SecretStr | None = None
+    soniox_api_key: SecretStr | None = None
+    gladia_api_key: SecretStr | None = None
     elevenlabs_api_key: SecretStr | None = None
     typesafe_api_key: SecretStr | None = None
     plivo_auth_id: SecretStr | None = None
@@ -227,16 +265,32 @@ def is_secret_name(name: str) -> bool:
 KEY_URLS = {
     SecretName.LLM_API_KEY: ("llm", "base_url"),
     SecretName.DEEPGRAM_API_KEY: ("deepgram", "base_url"),
+    SecretName.ASSEMBLYAI_API_KEY: ("assemblyai", "url"),
+    SecretName.SONIOX_API_KEY: ("soniox", "url"),
+    SecretName.GLADIA_API_KEY: ("gladia", "url"),
 }
 """The address each key is sent to. A new address removes the key, unless the same change
 saves a key for it: the key goes only where it was checked."""
+
+STT_KEYS = {
+    SttProvider.DEEPGRAM: SecretName.DEEPGRAM_API_KEY,
+    SttProvider.SARVAM: SecretName.SARVAM_API_KEY,
+    SttProvider.ASSEMBLYAI: SecretName.ASSEMBLYAI_API_KEY,
+    SttProvider.SONIOX: SecretName.SONIOX_API_KEY,
+    SttProvider.GLADIA: SecretName.GLADIA_API_KEY,
+}
 
 
 class SettingsValues(Section):
     """Every setting that is not a secret."""
 
     llm: Llm = Llm()
+    speech: Speech = Speech()
     deepgram: Deepgram = Deepgram()
+    sarvam_stt: SarvamStt = SarvamStt()
+    assemblyai: AssemblyAI = AssemblyAI()
+    soniox: Soniox = Soniox()
+    gladia: Gladia = Gladia()
     caller: CallerModel = CallerModel()
     generation: GenerationModel = GenerationModel()
     brief: BriefModel = BriefModel()
@@ -265,11 +319,16 @@ class AppSettings(SettingsValues):
             name
             for name, key in (
                 ("LLM provider", secrets.llm_api_key),
-                ("Deepgram", secrets.deepgram_api_key),
+                (self.speech.stt.label, self.stt_key),
                 ("ElevenLabs", secrets.elevenlabs_api_key),
             )
             if key is None
         ]
+
+    @property
+    def stt_key(self) -> SecretStr | None:
+        """The key of the speech-to-text provider in use."""
+        return getattr(self.secrets, STT_KEYS[self.speech.stt].value)
 
     @property
     def plivo_credentials(self) -> tuple[str, str] | None:

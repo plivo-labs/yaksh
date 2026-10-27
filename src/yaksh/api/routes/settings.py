@@ -105,11 +105,12 @@ async def checked_change(
 ) -> AppSettings:
     """Check every new key with its provider, then save the change; nothing is saved when a
     check fails."""
+    candidate = store.planned(settings, values, secrets)
     try:
-        await service.check_secrets(store.planned(settings, values, secrets), secrets)
+        await service.check_secrets(candidate, secrets)
     except ProviderCheckError as error:
         raise ValidationError(f"{error}; nothing was saved") from None
-    return await store.change(session, cipher, values=values, secrets=secrets)
+    return await store.change(session, cipher, values=values, secrets=secrets, checked=candidate)
 
 
 @router.delete("/secrets/{name}")
@@ -221,7 +222,7 @@ async def import_settings(
     refused = {name for failure in failed for name in failure.names}
     passed = {name: value for name, value in plan.secrets.items() if name not in refused}
     saved = (
-        await store.change(session, cipher, values=values, secrets=passed)
+        await store.change(session, cipher, values=values, secrets=passed, checked=candidate)
         if values or passed
         else settings
     )

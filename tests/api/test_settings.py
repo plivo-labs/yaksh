@@ -14,6 +14,7 @@ from tests.conftest import (
     save_settings,
     start_run,
 )
+from yaksh.domain.speech import SttProvider
 from yaksh.integrations import provider_checks
 from yaksh.integrations.provider_checks import ProviderCheckError
 from yaksh.settings import store
@@ -37,7 +38,7 @@ def checks(monkeypatch: pytest.MonkeyPatch) -> list[tuple[str, tuple[Any, ...]]]
 
         return check
 
-    for name in ("llm_models", "check_llm", "check_deepgram", "check_elevenlabs", "check_plivo"):
+    for name in ("llm_models", "check_llm", "check_stt", "check_elevenlabs", "check_plivo"):
         monkeypatch.setattr(provider_checks, name, fake(name))
     return asked
 
@@ -131,7 +132,13 @@ async def test_a_key_sent_with_a_new_address_is_checked_there_and_saved_with_it(
     )
 
     assert moved.status_code == 200, moved.text
-    assert checks[0] == ("check_deepgram", ("https://api.deepgram.com", "dg-new-key", "nova-3"))
+    name, (checked, provider, key, _clip) = checks[0]
+    assert (name, checked.deepgram.base_url, provider, key) == (
+        "check_stt",
+        "https://api.deepgram.com",
+        SttProvider.DEEPGRAM,
+        "dg-new-key",
+    )
     assert moved.json()["values"]["deepgram"]["base_url"] == "https://api.deepgram.com"
     assert "deepgram_api_key" in moved.json()["secrets"]
     assert refused.status_code == 422 and "nothing was saved" in refused.text
@@ -139,6 +146,42 @@ async def test_a_key_sent_with_a_new_address_is_checked_there_and_saved_with_it(
     assert saved["values"]["deepgram"]["base_url"] == "https://api.deepgram.com"
     assert no_address.status_code == 422
     assert no_address.json()["error"]["message"] == "elevenlabs_api_key has no address"
+
+
+async def test_a_key_is_not_saved_when_its_address_moved_while_it_was_checked(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    values = (await client.get("/api/v1/settings")).json()["values"]
+    values["deepgram"]["base_url"] = "https://elsewhere.example"
+
+    async def check_stt(*_args: Any) -> None:
+        await client.put("/api/v1/settings/values", json=values)
+
+    monkeypatch.setattr(provider_checks, "check_stt", check_stt)
+    refused = await client.put(
+        "/api/v1/settings/secrets/deepgram_api_key", json={"value": "dg-new-key-0123"}
+    )
+
+    saved = (await client.get("/api/v1/settings")).json()
+    assert refused.status_code == 409
+    assert saved["values"]["deepgram"]["base_url"] == "https://elsewhere.example"
+    assert "deepgram_api_key" not in saved["secrets"]
+
+
+async def test_a_phone_run_cannot_start_when_the_speech_to_text_does_not_hear_the_agent(
+    client: AsyncClient, checks: list[Any]
+) -> None:
+    await client.put("/api/v1/settings/secrets/sarvam_api_key", json={"value": "sarvam-key-0123"})
+    values = (await client.get("/api/v1/settings")).json()["values"]
+    values["speech"]["stt"] = "sarvam"
+    await client.put("/api/v1/settings/values", json=values)
+    agent_id = await create_agent_id(client, languages=["es"])
+    scenario = await create_scenario(client, agent_id)
+
+    refused = await start_run(client, agent_id, [scenario["id"]])
+
+    assert refused.status_code == 422
+    assert "speech to text (Sarvam) doesn't hear Spanish" in refused.text
 
 
 async def test_a_run_cannot_start_while_a_caller_key_is_missing(client: AsyncClient) -> None:

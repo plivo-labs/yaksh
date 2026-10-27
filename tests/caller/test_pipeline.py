@@ -134,7 +134,7 @@ async def test_the_persona_asks_for_low_effort_or_the_models_lowest_unless_confi
 ) -> None:
     base, fake = provider
     settings = model_settings(base, model, effort)
-    keys = CallerKeys(llm="test", deepgram="", elevenlabs="")
+    keys = CallerKeys(llm="test", stt="", elevenlabs="")
     llm = llm_service(settings, settings.caller, keys, "Be a caller.")
 
     await llm.run_inference(LLMContext(messages=[{"role": "user", "content": "Hello."}]))
@@ -147,7 +147,7 @@ async def test_an_empty_message_is_the_caller_saying_nothing_and_any_other_empty
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     settings = model_settings("http://127.0.0.1:9", "gpt-6-luna", None)
-    keys = CallerKeys(llm="test", deepgram="", elevenlabs="")
+    keys = CallerKeys(llm="test", stt="", elevenlabs="")
     llm = llm_service(settings, settings.caller, keys, "Be a caller.")
     errors: list[str] = []
 

@@ -16,8 +16,9 @@ import { MAX_DATA_SETS } from "@/lib/types";
 import { RISE } from "@/lib/motion";
 import { useSaveSettingsValues, useSettings } from "@/lib/queries";
 import type { AppSettings, SettingsValues } from "@/lib/types";
-import { KeyRow, ProviderPanel, SettingRow } from "@/pages/settings-keys";
+import { KeyRow, ProviderPanel, SettingRow, KeyRemovedNote } from "@/pages/settings-keys";
 import { PhoneAccountPanel } from "@/pages/settings-phone";
+import { SpeechToTextPanel } from "@/pages/settings-speech";
 import { ImportExport } from "@/pages/settings-import";
 import { TriggersPanel } from "@/pages/settings-triggers";
 
@@ -30,7 +31,7 @@ const TABS = [
 
 type Tab = (typeof TABS)[number]["value"];
 type Section = keyof SettingsValues;
-type Change = <S extends Section, K extends keyof SettingsValues[S]>(
+export type Change = <S extends Section, K extends keyof SettingsValues[S]>(
   section: S,
   key: K,
   value: SettingsValues[S][K],
@@ -106,7 +107,6 @@ function Form({
     setDraft((current) => ({ ...current, [section]: { ...current[section], [key]: value } }));
   const secrets = settings.secrets;
   const llmMoved = draft.llm.base_url !== settings.values.llm.base_url;
-  const deepgramMoved = draft.deepgram.base_url !== settings.values.deepgram.base_url;
 
   useEffect(() => {
     if (!dirty) return;
@@ -135,13 +135,14 @@ function Form({
           <ProviderPanel
             title="LLM provider"
             provider="llm"
-            canTest={Boolean(secrets.llm_api_key) && !llmMoved}
+            canTest={Boolean(secrets.llm_api_key)}
+            edits={draft.llm.base_url}
             description="Any API with OpenAI's Responses endpoint, such as OpenAI or Azure OpenAI. Used by the caller, scenario writing and the judges."
           >
             <SettingRow
               label="Base URL"
               htmlFor="llm-url"
-              help={keyRemovedBy(llmMoved && secrets.llm_api_key)}
+              help={llmMoved && secrets.llm_api_key ? <KeyRemovedNote /> : undefined}
             >
               <Input
                 id="llm-url"
@@ -157,39 +158,7 @@ function Form({
               checked
             />
           </ProviderPanel>
-          <ProviderPanel
-            title="Deepgram"
-            description="Speech to text."
-            provider="deepgram"
-            canTest={Boolean(secrets.deepgram_api_key) && !deepgramMoved}
-          >
-            <SettingRow
-              label="Base URL"
-              htmlFor="deepgram-url"
-              help={keyRemovedBy(deepgramMoved && secrets.deepgram_api_key)}
-            >
-              <Input
-                id="deepgram-url"
-                value={draft.deepgram.base_url}
-                onChange={(event) => change("deepgram", "base_url", event.target.value.trim())}
-              />
-            </SettingRow>
-            <SettingRow label="Model" htmlFor="deepgram-model">
-              <Input
-                id="deepgram-model"
-                className="max-w-56"
-                value={draft.deepgram.model}
-                onChange={(event) => change("deepgram", "model", event.target.value)}
-              />
-            </SettingRow>
-            <KeyRow
-              name="deepgram_api_key"
-              label="API key"
-              state={secrets.deepgram_api_key}
-              url={draft.deepgram.base_url}
-              checked
-            />
-          </ProviderPanel>
+          <SpeechToTextPanel settings={settings} draft={draft} change={change} />
           <ProviderPanel
             title="ElevenLabs"
             description="Text to speech."
@@ -635,13 +604,4 @@ function NumberRow({
       </div>
     </SettingRow>
   );
-}
-
-/** The warning a changed base URL shows while its provider has a saved key. */
-function keyRemovedBy(changed: unknown) {
-  return changed ? (
-    <span className="text-warning-foreground">
-      Saving removes the saved key. A new key saves with this address.
-    </span>
-  ) : undefined;
 }

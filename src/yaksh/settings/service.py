@@ -3,6 +3,7 @@ it is saved, test the saved settings, and import or export them as a YAML docume
 
 import asyncio
 import re
+import wave
 from collections.abc import Coroutine, Mapping
 from dataclasses import dataclass, field
 from enum import StrEnum
@@ -13,16 +14,19 @@ import yaml
 from yaksh.domain.errors import ValidationError
 from yaksh.domain.settings import (
     KEY_URLS,
+    STT_KEYS,
     TRIGGER_SECRET,
     AppSettings,
     SecretName,
     is_secret_name,
 )
+from yaksh.domain.speech import SttProvider
 from yaksh.evaluation.jev import JEV_MODEL
 from yaksh.integrations import provider_checks as checks
 from yaksh.integrations.openai_models import caller_effort
 from yaksh.integrations.provider_checks import ProviderCheckError
 from yaksh.settings.store import DEFAULTS, changed_values
+from yaksh.simulation.surroundings import SOUNDS
 from yaksh.simulation.voices import builtin_voices
 
 MAX_SECRET_CHARS = 4000
@@ -37,13 +41,35 @@ DOCUMENT_HEADER = (
 class Provider(StrEnum):
     LLM = "llm"
     DEEPGRAM = "deepgram"
+    SARVAM_STT = "sarvam_stt"
+    ASSEMBLYAI = "assemblyai"
+    SONIOX = "soniox"
+    GLADIA = "gladia"
     ELEVENLABS = "elevenlabs"
     TYPESAFE = "typesafe"
     PLIVO = "plivo"
 
 
+STT_TESTS = {
+    Provider.DEEPGRAM: SttProvider.DEEPGRAM,
+    Provider.SARVAM_STT: SttProvider.SARVAM,
+    Provider.ASSEMBLYAI: SttProvider.ASSEMBLYAI,
+    Provider.SONIOX: SttProvider.SONIOX,
+    Provider.GLADIA: SttProvider.GLADIA,
+}
+"""The speech-to-text test of each provider, which hears a short English line."""
+STT_OF_KEY = {key: provider for provider, key in STT_KEYS.items()}
+CHECK_CLIP = SOUNDS / "answering" / "iphone_screen_ack.wav"
+"""8 kHz speech that every speech-to-text provider must transcribe to pass its check."""
+
+
 def check_voice() -> str:
     return builtin_voices()[0].provider_voice_id
+
+
+def check_clip() -> bytes:
+    with wave.open(str(CHECK_CLIP)) as clip:
+        return clip.readframes(clip.getnframes())
 
 
 async def test_provider(settings: AppSettings, provider: Provider) -> str:
@@ -60,10 +86,17 @@ async def test_provider(settings: AppSettings, provider: Provider) -> str:
                 caller_effort(settings.caller.model, settings.caller.reasoning_effort),
             )
             return f"{settings.caller.model} answered a test request."
-        case Provider.DEEPGRAM:
-            key = required(secrets.deepgram_api_key, "the Deepgram key")
-            await checks.check_deepgram(settings.deepgram.base_url, key, settings.deepgram.model)
-            return f"Deepgram {settings.deepgram.model} transcribed a test clip."
+        case (
+            Provider.DEEPGRAM
+            | Provider.SARVAM_STT
+            | Provider.ASSEMBLYAI
+            | Provider.SONIOX
+            | Provider.GLADIA
+        ):
+            stt = STT_TESTS[provider]
+            key = required(getattr(secrets, STT_KEYS[stt].value), f"the {stt.label} key")
+            await checks.check_stt(settings, stt, key, check_clip())
+            return f"{stt.label} transcribed a test clip."
         case Provider.ELEVENLABS:
             key = required(secrets.elevenlabs_api_key, "the ElevenLabs key")
             await checks.check_elevenlabs(key, check_voice())
@@ -111,10 +144,8 @@ async def failed_secrets(
         match name:
             case SecretName.LLM_API_KEY:
                 check = checks.llm_models(candidate.llm.base_url, value)
-            case SecretName.DEEPGRAM_API_KEY:
-                check = checks.check_deepgram(
-                    candidate.deepgram.base_url, value, candidate.deepgram.model
-                )
+            case name if name in STT_OF_KEY:
+                check = checks.check_stt(candidate, STT_OF_KEY[name], value, check_clip())
             case SecretName.ELEVENLABS_API_KEY:
                 check = checks.check_elevenlabs(value, check_voice())
             case SecretName.TYPESAFE_API_KEY:
