@@ -1,6 +1,6 @@
 ---
 title: Response time
-description: How long the agent makes the caller wait.
+description: How long the agent makes the caller wait, and how long the caller takes to reply.
 ---
 
 After each call, Yaksh measures how long the agent made the caller wait.
@@ -27,3 +27,57 @@ Yaksh measures at its own connection. Thus, the value includes the path between 
 The conversation page shows the p90 and the p50 (nearest rank). **Replies** shows the number of replies that the agent answered, with the start of the call if it has a value. This number includes the talk-overs, and the page also shows the number of talk-overs. The page shows the response time on each agent turn that answers a reply of the caller or the start of the call. On the recording, it shows a band for each wait: green below 1 second, amber from 1 to 2 seconds, and red above 2 seconds. If a call connected and stopped but has no measured reply, the page shows **Not measured**.
 
 `GET /api/v1/runs/<run id>` calculates `response_p50_ms` and `response_p90_ms` from the replies of the last conversation of each repeat. `GET /api/v1/conversations?run_id=<run id>&sort=-response_p90_ms` lists the slowest conversations first.
+
+## Caller reply time
+
+Yaksh also measures how long its own caller takes to reply on a phone call. The caller reply time is the time from the end of the speech of the agent to the start of the audio of the caller. Yaksh uses the latency breakdown of Pipecat to divide this time into parts.
+
+Only a reply that the model of the caller speaks gets a value. These replies get no value:
+
+- Fixed text that Yaksh speaks for the caller: the first words, the question when the agent is silent, the goodbye at the turn limit, and the goodbye after the model ends the call two times without a word.
+- The lines of the voicemail or the call screener of the persona.
+- A reply that only presses keys on the phone keypad. It has no audio.
+- Text tests. They have no speech.
+- A reply after a late transcript of the agent. The late transcript starts a new turn of the agent, and Pipecat then does not measure the reply.
+
+### Parts
+
+| Part | Log field | Time |
+|---|---|---|
+| Silence wait | `endpointing_wait_ms` | The silence that the voice detector waits for before it decides that the agent stopped. This is the stop setting of the voice detector, 0.6 seconds. |
+| Transcript | `transcription_ms` | From the stop of the voice detector to the last transcript of the agent turn. |
+| End-of-turn check | `turn_detection_ms` | From the transcript to the request to the model of the caller: the time until Yaksh decides that the turn of the agent is complete. |
+| LLM inference | `llm_inference_ms` | From the request to the model to the first words that the caller can speak. Reasoning is part of this time. |
+| LLM tool call | `llm_tool_call_ms` | The time of a tool call of the model, such as `end_call`. |
+| Tool | `function_handler_ms` | The time of the tool itself. |
+| Waiting for a sentence | `sentence_aggregation_ms` | The time until the first sentence is complete for the text-to-speech. |
+| Speech synthesis | `speech_synthesis_ms` | From the text to the first audio of the text-to-speech. |
+| Output | `output_transport_ms` | From the first audio to the start of the audio on the line. |
+| Not attributed | `pipeline_ms` | Time that no part covers. Pipecat also puts a step between two frames here when it is shorter than 5 ms. |
+
+The speech-to-text can give the last transcript before the voice detector stops. Then the transcript time is 0, and the end-of-turn check starts at the stop of the voice detector. Pipecat does not name this time ([pipecat-ai/pipecat#5921](https://github.com/pipecat-ai/pipecat/issues/5921)), so Yaksh names it.
+
+A part can stop after the audio of the caller starts. Yaksh cuts each part at the start of the audio, so the parts of a reply add up to its reply time.
+
+### Results
+
+The **Metrics** tab of the conversation page shows the caller reply time in the **Caller** card: the p50 and the p90 (nearest rank), a bar with the p50 of each part, and a table with the p50 and the p90 of each part. The p50 values of the parts do not add up to the p50 of the reply time. A part that is less than 5 ms at the p90 is not in the table.
+
+On the transcript, each reply of the model that went out on the line shows its reply time. Point to the time, or move the focus to it, to see its parts. A reply with no words that Plivo reported as played has no time on the transcript, but it counts in the percentiles.
+
+**Settings › Models** shows the caller reply time for each caller model and effort, over the phone calls of the last 7 days. It includes the models that scenarios set. It does not include invalid calls. `GET /api/v1/settings/caller-reply-times` gives the same values.
+
+### Log line
+
+The worker writes one log line at the INFO level for each reply, from the logger `yaksh.caller.reply_times`:
+
+```text
+caller_reply_time {"conversation_id":"…","caller_model":"…","reasoning_effort":"low","llm_host":"…","stt_model":"nova-3","tts_model":"eleven_flash_v2_5","language":"en-US","version":"0.8.0","reply":3,"total_ms":2054,"endpointing_wait_ms":600,"transcription_ms":53,"turn_detection_ms":36,"llm_inference_ms":808,…,"pipeline_ms":0}
+```
+
+- `reply` is the number of the caller audio start in the call, from 0.
+- `llm_host` is the host of the LLM base URL. The line has no path and no key.
+- Each part is a field, as in the table of parts. A part that the reply did not have is 0, so all replies count each part the same way. The line also has `first_request_ms`, `turn_completion_ms`, `waiting_for_user_ms` and `awaiting_speakable_text_ms`. These are parts of Pipecat that the caller of Yaksh does not use, so they are always 0.
+- `version` is the version of Yaksh. A Pipecat update can change the time that a part covers.
+
+To get daily values, filter the log on `caller_reply_time`, parse the JSON after it, and group by day and `caller_model`. Keep `conversation_id` as a normal field, not as a stream label: each call has a new value.
