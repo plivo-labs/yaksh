@@ -131,7 +131,7 @@
   --color-chart-3: hsl(var(--chart-3));
   --color-chart-4: hsl(var(--chart-4));
   --color-chart-5: hsl(var(--chart-5));
-  /* Chart colours by role, as the design system names them. */
+  /* Chart colors by role, as the design system names them. */
   --color-chart-category-1: hsl(var(--chart-category-1));
   --color-chart-category-2: hsl(var(--chart-category-2));
   --color-chart-category-4: hsl(var(--chart-category-4));

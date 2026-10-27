@@ -15,13 +15,15 @@ import { useCallerReplyTimes } from "@/lib/queries";
  * help choose the caller's model. */
 export function CallerModelTimes() {
   const times = useCallerReplyTimes();
-  const days = times.data?.days ?? 7;
+  const days = times.data?.days;
   return (
     <Panel className="overflow-hidden">
       <PanelHeader title="Caller reply time by model" />
-      <p className="px-5 pt-3 text-s-400 text-muted-foreground">
-        Phone calls of the last {days} days, scenarios with their own model included.
-      </p>
+      {days !== undefined && (
+        <p className="px-5 pt-3 text-s-400 text-muted-foreground">
+          Phone calls of the last {days} days, scenarios with their own model included.
+        </p>
+      )}
       {times.isError ? (
         <p role="alert" className="px-5 py-4 text-s-400 text-status-danger">
           Could not load the reply times: {times.error.message}

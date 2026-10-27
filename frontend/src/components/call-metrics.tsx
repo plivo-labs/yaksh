@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { BAND_FILL, duration, latency, percent, responseBand, seconds } from "@/lib/format";
 import { useConversationEvaluation } from "@/lib/queries";
-import { inOrder, STAGE_FILL, stepLabel, stepStage } from "@/lib/reply-steps";
+import { STAGE_FILL, stepLabel, stepStage } from "@/lib/reply-steps";
 import {
   type CaptureFaults,
   type ConversationEvaluation,
@@ -90,7 +90,7 @@ function AgentCard({ metrics }: { metrics: Metrics }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Agent response time</CardTitle>
+        <CardTitle>{response_time ? "Agent response time" : "Agent"}</CardTitle>
       </CardHeader>
       <CardContent className="grid gap-4 text-p-400">
         {response_time && (
@@ -148,11 +148,11 @@ function AgentCard({ metrics }: { metrics: Metrics }) {
   );
 }
 
-/** One bar per reply in call order, in the colour of its band, with the band limits drawn
- * across. A talk-over has no wait: a short grey bar. */
 /** The response bands' limits, drawn across the bars. */
 const LIMITS = [1000, 2000];
 
+/** One bar per reply in call order, in the color of its band, with the band limits drawn
+ * across. A talk-over has no wait: a short grey bar. */
 function ReplyBars({ waits }: { waits: number[] }) {
   // A wait over the top fills the bar; its title keeps the value.
   const top = Math.min(Math.max(2500, ...waits), 5000);
@@ -268,13 +268,12 @@ function CallerCard({ metrics, transport }: { metrics: Metrics; transport: Trans
   );
 }
 
+/** A part of the caller's reply time, as the metric serves it: in the order the parts happen. */
 type Step = { key: string; p50_ms: number; p90_ms: number };
 
 /** Where a typical reply's time goes: each part's p50, as a share of their sum. */
 function StepBar({ steps }: { steps: Step[] }) {
-  const parts = inOrder(steps.map((step): [string, Step] => [step.key, step])).filter(
-    ([, step]) => step.p50_ms > 0,
-  );
+  const parts = steps.filter((step) => step.p50_ms > 0);
   if (parts.length === 0) return null;
   return (
     <figure className="grid gap-1.5">
@@ -284,15 +283,15 @@ function StepBar({ steps }: { steps: Step[] }) {
       <div
         role="img"
         aria-label={parts
-          .map(([key, step]) => `${stepLabel(key)} ${latency(step.p50_ms)}`)
+          .map((step) => `${stepLabel(step.key)} ${latency(step.p50_ms)}`)
           .join(", ")}
         className="flex h-5 gap-0.5 overflow-hidden rounded-sm"
       >
-        {parts.map(([key, step]) => (
+        {parts.map((step) => (
           <span
-            key={key}
-            title={`${stepLabel(key)}: ${latency(step.p50_ms)}`}
-            className={STAGE_FILL[stepStage(key)]}
+            key={step.key}
+            title={`${stepLabel(step.key)}: ${latency(step.p50_ms)}`}
+            className={STAGE_FILL[stepStage(step.key)]}
             style={{ flex: `${step.p50_ms} 0 0` }}
           />
         ))}
@@ -312,12 +311,12 @@ function StepTable({ steps }: { steps: Step[] }) {
         </tr>
       </thead>
       <tbody>
-        {inOrder(steps.map((step): [string, Step] => [step.key, step])).map(([key, step]) => (
-          <tr key={key} className="border-t">
+        {steps.map((step) => (
+          <tr key={step.key} className="border-t">
             <td className="py-1.5">
               <span className="flex items-center gap-2">
-                <span className={cn("size-2 rounded-xs", STAGE_FILL[stepStage(key)])} />
-                {stepLabel(key)}
+                <span className={cn("size-2 rounded-xs", STAGE_FILL[stepStage(step.key)])} />
+                {stepLabel(step.key)}
               </span>
             </td>
             <td className="py-1.5 text-right">{latency(step.p50_ms)}</td>
@@ -332,15 +331,24 @@ function StepTable({ steps }: { steps: Step[] }) {
 function CallCard({ metrics }: { metrics: Metrics }) {
   const { usage, capture_faults } = metrics;
   const problems = capture_faults && capture_faults.flags.length > 0;
-  if (!usage && !problems) return null;
+  // A text call has no ringing, answer or audio times and no bill.
+  const timed =
+    usage &&
+    [
+      usage.value.ringing_ms,
+      usage.value.answered_ms,
+      usage.value.stream_opened_ms,
+      usage.value.bill_duration_s,
+    ].some((value) => value !== null);
+  if (!timed && !problems) return null;
   return (
     <Card>
       <CardHeader>
         <CardTitle>Call</CardTitle>
-        {usage && <CardDescription>Times from the start of the conversation.</CardDescription>}
+        {timed && <CardDescription>Times from the start of the conversation.</CardDescription>}
       </CardHeader>
       <CardContent className="grid gap-3 text-p-400">
-        {usage && (
+        {timed && (
           <dl className="grid grid-cols-3 gap-3 tabular-nums">
             <Line label="Ringing at">{since(usage.value.ringing_ms)}</Line>
             <Line label="Answered at">{since(usage.value.answered_ms)}</Line>

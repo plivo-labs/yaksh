@@ -5,7 +5,7 @@ import type { CallerReplyTime } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 /** How long the caller took to reply, in a neutral tag: the agent's response times keep the
- * colour. Hovering or focusing it lists the reply's parts. */
+ * color. Hovering or focusing it lists the reply's parts. */
 export function CallerReplyBadge({ reply }: { reply: CallerReplyTime }) {
   const parts = inOrder(Object.entries(reply.steps)).filter(([, ms]) => ms >= SHOWN_PART_MS);
   return (

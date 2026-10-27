@@ -35,7 +35,7 @@ const STAGES: Record<string, Stage> = {
   speech_synthesis: "speech",
 };
 
-/** A part's colour on the reply's bar: one per stage, from the chart palette. */
+/** A part's color on the reply's bar: one per stage, from the chart palette. */
 export const STAGE_FILL: Record<Stage, string> = {
   turn: "bg-chart-category-2",
   llm: "bg-chart-category-1",
