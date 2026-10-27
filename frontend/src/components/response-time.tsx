@@ -1,4 +1,4 @@
-import { BAND_TAG, responseBand, seconds } from "@/lib/format";
+import { BAND_TAG, latency, responseBand } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 /** How long the agent made the caller wait, in the colour of its band. */
@@ -12,7 +12,7 @@ export function ResponseTime({ ms, className }: { ms: number; className?: string
         className,
       )}
     >
-      {seconds(ms)}
+      {latency(ms)}
     </span>
   );
 }
