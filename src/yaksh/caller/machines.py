@@ -19,7 +19,8 @@ from yaksh.domain.answering import MachineLine
 class SoundPlayer(FrameProcessor):
     """Right after the TTS: plays machine audio as a reply of its own, so the transcript, the
     recording and the played-audio reports treat it as they treat the persona's speech. A
-    spoken line carries its words, kept out of the persona's context; the tone carries none."""
+    spoken line carries its words after its audio, as a TTS without word timestamps sends a
+    sentence, kept out of the persona's context; the tone carries none."""
 
     def __init__(self) -> None:
         super().__init__(enable_direct_mode=True)
@@ -32,12 +33,12 @@ class SoundPlayer(FrameProcessor):
         started = TTSStartedFrame(append_to_context=False)
         started.metadata[MACHINE] = line
         await self.push_frame(started)
+        for at in range(0, len(pcm), FRAME_BYTES):
+            await self.push_frame(TTSAudioRawFrame(pcm[at : at + FRAME_BYTES], SAMPLE_RATE, 1))
         if text:
             words = TTSTextFrame(text, text_type="sentence")
             words.append_to_context = False
             await self.push_frame(words)
-        for at in range(0, len(pcm), FRAME_BYTES):
-            await self.push_frame(TTSAudioRawFrame(pcm[at : at + FRAME_BYTES], SAMPLE_RATE, 1))
         await self.push_frame(TTSStoppedFrame())
 
 

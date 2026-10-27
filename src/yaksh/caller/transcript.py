@@ -44,32 +44,42 @@ class Queued:
 @dataclass
 class Reply:
     """The persona reply being spoken: its playout, the words released so far, and whether
-    the TTS has finished it."""
+    the TTS has finished it. A word is its text, the byte where its audio starts, its playout,
+    and whether it is untimed: a TTS without word timestamps releases a whole sentence after
+    its audio, at the byte where that audio ends."""
 
     playout: Playout | None
-    words: list[tuple[str, int, Playout | None]] = field(default_factory=list)
+    words: list[tuple[str, int, Playout | None, bool]] = field(default_factory=list)
     started_ms: int = 0
     self_spaced: bool = False
     ended: bool = False
 
     def add(
-        self, word: str, offset: int, playout: Playout | None, now_ms: int, *, self_spaced: bool
+        self,
+        word: str,
+        offset: int,
+        playout: Playout | None,
+        now_ms: int,
+        *,
+        self_spaced: bool,
+        untimed: bool,
     ) -> None:
         if not self.words:
             self.started_ms = now_ms
             self.self_spaced = self_spaced
-        self.words.append((word, offset, playout))
+        self.words.append((word, offset, playout, untimed))
 
     def finished(self) -> bool:
         """Ended, and the wire has played its audio and every stamped word is in."""
         return self.ended and (self.playout is None or self.playout.caught_up(len(self.words)))
 
     def heard(self) -> list[str]:
-        """The leading words whose audio, up to the next word, has played."""
+        """The leading words whose audio has played: a word's up to the next word, an untimed
+        sentence's up to its own end."""
         heard: list[str] = []
-        for index, (word, _, playout) in enumerate(self.words):
+        for index, (word, offset, playout, untimed) in enumerate(self.words):
             following = self.words[index + 1 : index + 2]
-            end = following[0][1] if following else None
+            end = offset if untimed else following[0][1] if following else None
             if playout is None or not playout.heard_until(end):
                 break
             heard.append(word)
@@ -239,7 +249,13 @@ class TranscriptBuilder:
         self._reply = Reply(playout)
 
     def transmitted(
-        self, word: str, offset: int, playout: Playout | None, *, self_spaced: bool
+        self,
+        word: str,
+        offset: int,
+        playout: Playout | None,
+        *,
+        self_spaced: bool,
+        untimed: bool = False,
     ) -> None:
         """A spoken word whose audio starts `offset` bytes into its reply.
 
@@ -251,7 +267,9 @@ class TranscriptBuilder:
             return
         if self._reply is None:
             self._reply = Reply(playout)
-        self._reply.add(word, offset, playout, self._clock.ms(), self_spaced=self_spaced)
+        self._reply.add(
+            word, offset, playout, self._clock.ms(), self_spaced=self_spaced, untimed=untimed
+        )
         self.audio_progressed()
 
     def reply_ended(self, playout: Playout | None = None) -> None:
@@ -295,7 +313,7 @@ class TranscriptBuilder:
         if cut or len(heard) < len(reply.words) or not text:
             rest = remainder(queued.text, text) if queued.text else None
             if rest is None:
-                rest = " ".join(word for word, _, _ in reply.words[len(heard) :]).strip()
+                rest = " ".join(word for word, *_ in reply.words[len(heard) :]).strip()
             if rest:
                 provenance = Provenance.CUT if cut else Provenance.UNCONFIRMED
                 self._caller_turn(queued, rest, now, now, provenance)
@@ -404,6 +422,7 @@ class WireTap(FrameProcessor):
                     frame.metadata.get(OFFSET, 0),
                     frame.metadata.get(PLAYOUT),
                     self_spaced=frame.includes_inter_frame_spaces,
+                    untimed=frame.pts is None,
                 )
             elif isinstance(frame, TTSAudioRawFrame):
                 self._transcript.audio_progressed()
