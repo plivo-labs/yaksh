@@ -31,6 +31,8 @@ services:
 
   worker:
     <<: *yaksh
+    # An init process reaps call processes that lose their parent (YAKSH_CALL_PROCESSES).
+    init: true
     command:
       - yaksh-server
       - worker

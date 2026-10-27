@@ -43,6 +43,9 @@ class Settings(BaseSettings):
     allow_private_hosts: bool = False
     """Allow trigger and text agent URLs on private or local addresses, for development."""
     public_url: str | None = None
+    call_processes: bool = False
+    """Hold each phone call in a process of its own, so that calls use every CPU of the host
+    instead of the worker's one event loop. Each call then needs memory of its own."""
     s3_endpoint: str | None = None
     """Where files are kept, uploaded documents and call audio: any S3-compatible service.
     Unset: AWS S3."""
