@@ -1,4 +1,5 @@
 import asyncio
+from functools import partial
 from types import SimpleNamespace
 from typing import cast
 
@@ -33,6 +34,7 @@ from yaksh.caller.pipeline import (
     Persona,
     TurnLimit,
     llm_service,
+    wait_for_agent,
     watch_silence,
 )
 from yaksh.caller.transcript import TranscriptBuilder
@@ -135,6 +137,56 @@ async def test_the_persona_asks_for_low_effort_or_the_models_lowest_unless_confi
 
     path, _, body = fake.requests[0]
     assert (path, body["model"], body.get("reasoning")) == ("/v1/responses", model, reasoning)
+
+
+async def test_an_empty_message_is_the_caller_saying_nothing_and_any_other_empty_reply_an_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = model_settings("http://127.0.0.1:9", "gpt-6-luna", None)
+    keys = CallerKeys(llm="test", deepgram="", elevenlabs="")
+    llm = llm_service(settings, settings.caller, keys, "Be a caller.")
+    errors: list[str] = []
+
+    async def push_error(error_msg: str, **_: object) -> None:
+        errors.append(error_msg)
+
+    monkeypatch.setattr(llm, "push_error", push_error)
+    empty = {"type": "message", "content": [{"type": "output_text", "text": " "}]}
+    refused = {"type": "message", "content": [{"type": "refusal", "refusal": "No."}]}
+
+    await llm._report_empty_response("silent", [{"type": "reasoning"}, empty])
+    await llm._report_empty_response("refused", [{"type": "reasoning"}, empty, refused])
+    await llm._report_empty_response("thought", [{"type": "reasoning"}])
+
+    assert [error.split()[2] for error in errors] == ["refused", "thought"]
+
+
+async def test_a_quiet_agent_still_gets_a_nudge_after_the_caller_says_nothing() -> None:
+    user = idle_user()
+    state = CallState()
+    nudges: list[None] = []
+
+    async def nudge() -> None:
+        nudges.append(None)
+
+    watch_silence(user, state, nudge)
+    settings = model_settings("http://127.0.0.1:9", "gpt-6-luna", None)
+    llm = llm_service(settings, settings.caller, CallerKeys("test", "", ""), "Be a caller.")
+    llm.on_silence = partial(wait_for_agent, user)
+    empty = {"type": "message", "content": [{"type": "output_text", "text": ""}]}
+
+    @user.event_handler("on_user_turn_stopped")
+    async def says_nothing(*_: object) -> None:
+        await llm._report_empty_response("silent", [empty])
+
+    agent_turn = [
+        VADUserStartedSpeakingFrame(),
+        TranscriptionFrame("One moment.", "agent", "now"),
+        VADUserStoppedSpeakingFrame(),
+    ]
+    await run_test(user, frames_to_send=[*agent_turn, SleepFrame(0.3)])
+
+    assert nudges == [None]
 
 
 async def test_the_persona_answers_its_most_agent_turns_and_then_the_limit_takes_over() -> None:
