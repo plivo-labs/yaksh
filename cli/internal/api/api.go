@@ -21,9 +21,20 @@ var requestTimeout = 2 * time.Minute
 // New returns a client for server that sends token as a bearer token on every request, each
 // within requestTimeout. Use it instead of the generated NewClient.
 func New(server, token, userAgent string) (*Client, error) {
+	return newClient(server, token, userAgent, &http.Client{Timeout: requestTimeout})
+}
+
+// NewStream is New with no time limit on the body, for a response that streams.
+func NewStream(server, token, userAgent string) (*Client, error) {
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.ResponseHeaderTimeout = requestTimeout
+	return newClient(server, token, userAgent, &http.Client{Transport: transport})
+}
+
+func newClient(server, token, userAgent string, httpClient *http.Client) (*Client, error) {
 	return NewClient(
 		strings.TrimRight(server, "/"),
-		WithHTTPClient(&http.Client{Timeout: requestTimeout}),
+		WithHTTPClient(httpClient),
 		WithRequestEditorFn(func(_ context.Context, req *http.Request) error {
 			req.Header.Set("Authorization", "Bearer "+token)
 			req.Header.Set("User-Agent", userAgent)
@@ -59,16 +70,33 @@ func (e *Error) Error() string {
 // and an *Error with the server's message for any other status. Pass a call straight in:
 // Body(client.GetRunApiV1RunsRunIdGet(ctx, id)).
 func Body(resp *http.Response, err error) ([]byte, error) {
+	stream, err := Stream(resp, err)
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
-	body, err := io.ReadAll(resp.Body)
+	defer stream.Close()
+	body, err := io.ReadAll(stream)
 	if err != nil {
 		return nil, fmt.Errorf("read the response: %w", err)
 	}
+	return body, nil
+}
+
+// Stream is Body for a response that streams: for a 2xx status, it returns the open body.
+func Stream(resp *http.Response, err error) (io.ReadCloser, error) {
+	if err != nil {
+		return nil, err
+	}
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
-		return body, nil
+		return resp.Body, nil
+	}
+	defer resp.Body.Close()
+	// A stream client sets no limit on the body.
+	stop := time.AfterFunc(requestTimeout, func() { resp.Body.Close() })
+	defer stop.Stop()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("read the response: %w", err)
 	}
 	return nil, responseError(resp.StatusCode, body)
 }

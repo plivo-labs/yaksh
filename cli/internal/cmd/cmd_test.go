@@ -22,11 +22,13 @@ import (
 )
 
 const (
-	agentID = "0b9e0c4a-0000-4000-8000-000000000001"
-	runID   = "7c1e2a0b-0000-4000-8000-000000000002"
-	convID  = "51aa09c3-0000-4000-8000-000000000003"
-	scenA   = "3f2a0000-0000-4000-8000-00000000000a"
-	scenB   = "9b1c0000-0000-4000-8000-00000000000b"
+	agentID   = "0b9e0c4a-0000-4000-8000-000000000001"
+	runID     = "7c1e2a0b-0000-4000-8000-000000000002"
+	convID    = "51aa09c3-0000-4000-8000-000000000003"
+	scenA     = "3f2a0000-0000-4000-8000-00000000000a"
+	scenB     = "9b1c0000-0000-4000-8000-00000000000b"
+	personaID = "5e6f0000-0000-4000-8000-00000000000c"
+	genID     = "6a7b0000-0000-4000-8000-00000000000d"
 )
 
 // request is what the fake API received.
@@ -211,6 +213,34 @@ func TestAgentImportAddsNoAgentWithoutALanguageYakshKnows(t *testing.T) {
 	}
 }
 
+func TestAgentUpdateSendsOnlyTheFilesThatWereGiven(t *testing.T) {
+	f := newFakeAPI(t, map[string]http.HandlerFunc{"PATCH /api/v1/agents/{id}": reply(200, `{"id":"`+agentID+`"}`)})
+	dir := t.TempDir()
+	rules := filepath.Join(dir, "rules.yaml")
+	config := filepath.Join(dir, "prompt.md")
+	if err := os.WriteFile(rules, []byte("- kind: phrase\n  key: no-dob\n  name: Never says the date of birth\n  expects: forbidden\n  value: date of birth\n  role: deciding\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(config, []byte("You book dental appointments."), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, args := range [][]string{{"--rules-file", rules}, {"--config-file", config}} {
+		if code, _, stderr := run(t, context.Background(), against(f), "", append([]string{"agent", "update", agentID}, args...)...); code != 0 {
+			t.Fatalf("%v: code = %d, stderr = %q", args, code, stderr)
+		}
+	}
+
+	sent := f.requests("PATCH", "/api/v1/agents/"+agentID)
+	want := []string{
+		`{"rules":[{"expects":"forbidden","key":"no-dob","kind":"phrase","name":"Never says the date of birth","role":"deciding","value":"date of birth"}]}`,
+		`{"config":"You book dental appointments."}`,
+	}
+	if len(sent) != 2 || string(sent[0].body) != want[0] || string(sent[1].body) != want[1] {
+		t.Fatalf("sent = %q, want %q", sent, want)
+	}
+}
+
 func TestListsSendOnlyTheFlagsThatWereSet(t *testing.T) {
 	tests := []struct {
 		args       []string
@@ -267,6 +297,7 @@ func TestErrorsSayTheNextStep(t *testing.T) {
 		{"server message", against(missing), []string{"agent", "view", agentID}, "404 Not Found: agent not found"},
 		{"server down", map[string]string{"YAKSH_URL": stopped.URL}, []string{"agent", "list"}, "cannot reach " + stopped.URL},
 		{"bad agent ID", against(missing), []string{"agent", "view", "support-line"}, `"support-line" is not an agent ID: find it with "yaksh agent list"`},
+		{"bad document ID", against(missing), []string{"scenario", "generate", "--agent", agentID, "--persona", personaID, "--document", "faq.pdf"}, `"faq.pdf" is not a document ID: find it under knowledge_base in "yaksh agent view <agent-id>"`},
 		{"bad answer", against(missing), []string{"run", "start", "--agent", agentID, "--all", "--answer", "machine"}, `"machine" is not an answer: use caller, voicemail or screener`},
 	}
 	for _, tt := range tests {

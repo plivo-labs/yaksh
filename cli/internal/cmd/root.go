@@ -86,6 +86,14 @@ func (a *app) execute(ctx context.Context, args []string, stdin io.Reader, stdou
 
 // client returns an API client for the server in the settings.
 func (a *app) client() (*api.Client, error) {
+	return a.connect(api.New)
+}
+
+func (a *app) streamClient() (*api.Client, error) {
+	return a.connect(api.NewStream)
+}
+
+func (a *app) connect(newClient func(server, token, userAgent string) (*api.Client, error)) (*api.Client, error) {
 	s, err := config.Load(a.getenv)
 	if err != nil {
 		return nil, err
@@ -93,7 +101,7 @@ func (a *app) client() (*api.Client, error) {
 	if s.Server == "" {
 		return nil, errNoServer
 	}
-	return api.New(s.Server, s.Token, a.userAgent())
+	return newClient(s.Server, s.Token, a.userAgent())
 }
 
 func (a *app) userAgent() string {
@@ -173,14 +181,35 @@ func (f timeFlag) String() string {
 
 func (timeFlag) Type() string { return "time" }
 
+var idHints = map[string]string{
+	"document":   `find it under knowledge_base in "yaksh agent view <agent-id>"`,
+	"generation": `find it in "yaksh scenario view <scenario-id>"`,
+	"suite run":  `find it in "yaksh suite list"`,
+}
+
 // parseID reads the ID of a kind of record, such as "agent", from an argument or a flag.
 func parseID(kind, value string) (uuid.UUID, error) {
 	id, err := uuid.Parse(value)
 	if err != nil {
-		return uuid.Nil, fmt.Errorf(`%q is not a%s %s ID: find it with "yaksh %s list"`,
-			value, article(kind), kind, kind)
+		hint, ok := idHints[kind]
+		if !ok {
+			hint = fmt.Sprintf(`find it with "yaksh %s list"`, kind)
+		}
+		return uuid.Nil, fmt.Errorf("%q is not a%s %s ID: %s", value, article(kind), kind, hint)
 	}
 	return id, nil
+}
+
+func parseIDs(kind string, values []string) ([]uuid.UUID, error) {
+	ids := make([]uuid.UUID, len(values))
+	for i, value := range values {
+		id, err := parseID(kind, value)
+		if err != nil {
+			return nil, err
+		}
+		ids[i] = id
+	}
+	return ids, nil
 }
 
 func article(kind string) string {

@@ -5,7 +5,7 @@ description: The yaksh CLI is a command-line client for coding agents, CI and pe
 
 `yaksh` is a command-line client for the Yaksh API. Coding agents, CI and persons use the same commands. The `agent`, `scenario`, `persona`, `run`, `suite` and `conversation` commands write the JSON of the server to stdout. With `--wait`, `yaksh run start` waits for the calls and then for the judges. Then it writes the run.
 
-`yaksh auth status` and `yaksh version` write JSON that the CLI makes. `yaksh guide` writes Markdown. `yaksh auth login` and `yaksh auth logout` do not write to stdout. Each command writes progress, hints and errors to stderr. Each command exits with 0 if it has no error, and with 1 if it has an error. If a test ran and did not pass, the last lines start with `failed:` and `next:`. If the command itself went wrong, the line starts with `error:`.
+`yaksh auth status`, `yaksh version` and `yaksh scenario generate` write JSON that the CLI makes. `yaksh guide` writes Markdown. `yaksh auth login` and `yaksh auth logout` do not write to stdout. Each command writes progress, hints and errors to stderr. Each command exits with 0 if it has no error, and with 1 if it has an error. If a test ran and did not pass, the last lines start with `failed:` and `next:`. If the command itself went wrong, the line starts with `error:`.
 
 ## Install
 
@@ -51,6 +51,18 @@ The command asks for the API token: the value of `YAKSH_API_TOKEN` on the server
 
 You can also set two variables and not use `yaksh auth login`, for example in CI. Set `YAKSH_URL` to the URL of the server without `/api/v1`, for example `http://localhost:8000`. Set `YAKSH_API_TOKEN` to the token. If you set `YAKSH_URL` or `YAKSH_API_TOKEN`, the CLI uses that variable and not the saved value.
 
+## Add scenarios
+
+```sh
+yaksh scenario create --agent <agent id> -f move-appointment.yaml
+```
+
+This command adds a scenario from a YAML or JSON file with the fields of a scenario: `name`, `persona_id`, `instructions`, `data_sets` and `criteria`, and if you need them `category`, `description`, `unknown_facts`, `first_words` and `caller`. `yaksh scenario view` shows these fields, and `yaksh persona list` shows the IDs of the personas. The CLI sends each value as the file writes it. Thus a date such as `2027-01-15` and a code such as `0042` do not change. For what to write, refer to [Writing instructions](/docs/writing-instructions) and [Writing criteria](/docs/writing-criteria).
+
+- `yaksh scenario update <scenario id> -f <file>` changes the fields that the file holds. A list in the file replaces the whole list. Keep the `id` of each data set that stays: a data set without an `id` is a new data set.
+- `yaksh scenario generate --agent <agent id> --persona <persona id> --count 5` lets a model write scenarios for the agent and save them. The command shows each scenario when Yaksh saves it. Then it writes the generation with its status and its scenarios. If you stop the command, the generation stops, and the scenarios that it saved stay. Refer to [Scenario generation](/docs/scenario-generation).
+- `yaksh agent update <agent id> --rules-file rules.yaml` sets the rules of the agent from a YAML or JSON list. The list replaces all rules of the agent. `yaksh agent view` shows the rules.
+
 ## Do a test of an agent
 
 ```sh
@@ -91,7 +103,7 @@ Yaksh takes the name, the agent ID and the languages from the file, and keeps th
 yaksh suite run <suite id> --wait
 ```
 
-This command starts one run for each agent of the suite, waits for the calls and for the judges, and writes the suite run. It exits with 0 only if the suite run passed. `yaksh suite list` shows the IDs of the suites. Refer to [Suites in CI](/docs/suites#suites-in-ci).
+This command starts one run for each entry of the suite, waits for the calls and for the judges, and writes the suite run. It exits with 0 only if the suite run passed. `yaksh suite list` shows the IDs of the suites. Refer to [Suites in CI](/docs/suites#suites-in-ci).
 
 ## Phone numbers
 

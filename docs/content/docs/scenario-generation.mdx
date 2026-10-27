@@ -31,7 +31,7 @@ Stay on the page until the generation completes. If you go to a different page o
 - Yaksh makes two tries for each scenario. If the two tries fail, Yaksh discards the scenario and continues.
 - Yaksh writes the scenarios in English.
 
-With the API, use `POST /api/v1/agents/<agent id>/scenarios/generate`. The response is a Server-Sent Events stream. It sends each scenario when Yaksh saves it. If you close the stream, the generation stops. The scenarios that Yaksh saved stay.
+With the CLI, use `yaksh scenario generate`. Refer to [CLI](/docs/cli#add-scenarios). With the API, use `POST /api/v1/agents/<agent id>/scenarios/generate`. The response is a Server-Sent Events stream. It sends each scenario when Yaksh saves it. If you close the stream, the generation stops. The scenarios that Yaksh saved stay.
 
 ## Knowledge base documents
 

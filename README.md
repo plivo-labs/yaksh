@@ -16,7 +16,7 @@ Yaksh runs those calls for you, in volume, every time you change your agent.
 - **Callers that act like people.** Personas with their own voice, language and background noise: a cafe, a car, a TV, a second person in the room.
 - **Verdicts you can trust.** Judges check each call against your criteria and quote the transcript, and code checks every quote. When the simulated caller makes a mistake, Yaksh marks the test as blocked, and does not blame your agent.
 - **Numbers that mean something.** Pass rate, the chance that a scenario passes twice in a row, response time p50 and p90, talk-overs and dead air, each with a confidence interval, so a run of five calls does not look like proof.
-- **Built for coding agents.** The CLI lets Claude Code, Codex and other coding agents run your tests, read why calls failed, fix your agent and test again, all in one loop.
+- **Built for coding agents.** The CLI and its skill let Claude Code, Codex and other coding agents write your test cases, run your tests, and find out if a failed call is a fault of your agent or of the test.
 - **Your data stays yours.** You run Yaksh on your own servers with your own provider accounts. Recordings, transcripts and results stay in your own database and storage.
 
 ## Works with your agent
