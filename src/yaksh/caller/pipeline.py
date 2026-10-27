@@ -6,6 +6,7 @@ import contextlib
 import logging
 from collections.abc import AsyncIterator, Awaitable, Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
+from functools import partial
 from typing import Any, Protocol
 
 # The OpenAI client imports about 600 modules at its first request. Import them with this module,
@@ -155,6 +156,8 @@ class PersonaLLM(OpenAIResponsesHttpLLMService):
 
     refusal: str | None = None
     """Why the model refused the latest request, until a later request gets its first event."""
+    on_silence: Callable[[], Awaitable[None]] | None = None
+    """Runs when the caller's reply has no words."""
 
     async def _create_stream(self, params: dict) -> AsyncStream[ResponseStreamEvent]:
         return await retry_rate_limits(lambda: self._opened(params), self._refused)
@@ -170,6 +173,38 @@ class PersonaLLM(OpenAIResponsesHttpLLMService):
 
     def _refused(self, error: APIError) -> None:
         self.refusal = failure(error)
+
+    async def _report_empty_response(
+        self, response_id: str | None, output: list[dict], *, incremental: bool | None = None
+    ) -> None:
+        """A response with only empty messages is the caller saying nothing, as its prompt asks
+        when the agent only asks it to wait. Any other response with no text and no tool call
+        is still an error."""
+        if silent(output):
+            if self.on_silence is not None:
+                await self.on_silence()
+            return
+        await super()._report_empty_response(response_id, output, incremental=incremental)
+
+
+def silent(output: list[dict]) -> bool:
+    """At least one message, and every item besides the reasoning is a message of empty text."""
+    said = [item for item in output if item.get("type") != "reasoning"]
+    return bool(said) and all(
+        item.get("type") == "message"
+        and all(
+            part.get("type") == "output_text" and not part.get("text", "").strip()
+            for part in item.get("content") or []
+        )
+        for item in said
+    )
+
+
+async def wait_for_agent(user: LLMUserAggregator) -> None:
+    """Restart the agent's idle timer after a caller reply with no words. Pipecat restarts it
+    when the caller stops speaking, which a reply with no words never does; Pipecat restarts it
+    the same way after an agent turn with no words."""
+    await user._user_idle_controller.wait_for_user()
 
 
 def llm_service(
@@ -410,6 +445,7 @@ class Persona:
                 ),
             ),
         )
+        self.llm.on_silence = partial(wait_for_agent, aggregators.user())
         self.gate = MachineGate() if request.answering else None
         """Closed while the persona's voicemail or call screener answers."""
         self.player = SoundPlayer() if request.answering else None
