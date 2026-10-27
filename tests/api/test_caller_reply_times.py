@@ -86,16 +86,20 @@ async def test_a_caller_turn_gets_the_reply_time_of_the_audio_start_that_played_
 async def test_the_caller_reply_time_by_model_counts_the_replies_of_last_weeks_calls(
     client: AsyncClient, db: Db
 ) -> None:
-    await new_run(client, repeats=5)
-    calls = [await claim(db) for _ in range(5)]
+    await new_run(client, repeats=6)
+    calls = [await claim(db) for _ in range(6)]
     assert all(calls)
-    first, second, other, old, text = (str(call) for call in calls)
+    first, second, other, old, text, invalid = (str(call) for call in calls)
     effort = caller_effort("gpt-6-luna", None)
     await finish(db, first, outcome("gpt-6-luna", effort, timed(0, 1_000), timed(1, 3_000)))
     await finish(db, second, outcome("gpt-6-luna", effort, timed(0, 2_000, 800)))
     await finish(db, other, outcome("other-model", "high", timed(0, 4_000, 3_000)))
     await finish(db, old, outcome("other-model", "high", timed(0, 9_000, 9_000)))
     await finish(db, text, CallOutcome(connected=True, end_reason=EndReason.AGENT_HANGUP))
+    broken = outcome("gpt-6-luna", effort, timed(0, 8_000)).model_copy(
+        update={"caller_error": "the stream dropped"}
+    )
+    await finish(db, invalid, broken)
     async with db() as session:
         await session.execute(
             update(Conversation)

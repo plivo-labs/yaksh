@@ -13,7 +13,12 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from yaksh.db.models import Conversation, Evaluation, EvaluationItem, MetricValue, Scenario
-from yaksh.domain.conversations import OutcomeGroup, WireEventKind, outcome_group
+from yaksh.domain.conversations import (
+    ConversationStatus,
+    OutcomeGroup,
+    WireEventKind,
+    outcome_group,
+)
 from yaksh.domain.evaluations import (
     CategoryNumbers,
     EvaluationState,
@@ -257,7 +262,8 @@ class ModelReplyTime(NamedTuple):
 async def reply_time_by_model(session: AsyncSession) -> list[ModelReplyTime]:
     """The caller's reply time by caller model and effort, over the phone calls that ran in the
     last REPLY_TIME_WINDOW, most replies first. A call counts by when it ran, not by when its
-    run was made."""
+    run was made. An invalid call is left out: a fault on Yaksh's side, such as a dropped
+    stream, can make its replies wait for nothing."""
     reply = (
         func.jsonb_array_elements(Conversation.caller_reply_times)
         .table_valued(column("value", JSONB), joins_implicitly=True)
@@ -282,6 +288,7 @@ async def reply_time_by_model(session: AsyncSession) -> list[ModelReplyTime]:
         .where(
             Conversation.started_at >= func.now() - REPLY_TIME_WINDOW,
             Conversation.caller_reply_times.is_not(None),
+            Conversation.status != ConversationStatus.INVALID,
             model.is_not(None),
         )
         .group_by(model, effort)

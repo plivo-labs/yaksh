@@ -201,7 +201,7 @@ def test_the_callers_reply_time_and_each_part_are_percentiles_over_the_same_repl
         [
             reply(1_900, endpointing_wait=600, llm_inference=1_300),
             reply(2_400, endpointing_wait=600, llm_inference=1_500, function_handler=300),
-            reply(1_700, endpointing_wait=600, llm_inference=1_100),
+            reply(1_700, endpointing_wait=600, llm_inference=1_100, pipeline=1),
         ]
     )
 
