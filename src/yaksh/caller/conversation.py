@@ -43,7 +43,7 @@ from yaksh.caller.audio import (
     Stamper,
     caller_voice,
 )
-from yaksh.caller.lag import LagSampler
+from yaksh.caller.lag import LagTicker
 from yaksh.caller.listen import AudioTap, LiveAudio
 from yaksh.caller.pipeline import CallerKeys, CallState, Persona, converse
 from yaksh.caller.transcript import TranscriptBuilder, WireTap
@@ -508,32 +508,39 @@ class LocalConversations:
     def __init__(self, turns: TurnModels, database_url: str) -> None:
         self._turns = turns
         self._database_url = database_url
+        self._lag = LagTicker()
 
     def reserve(self) -> Seat:
         return self
 
     async def start(self, start: ConversationStart) -> Conversation:
-        return LocalConversation(start, self._turns, self._database_url)
+        return LocalConversation(start, self._turns, self._database_url, self._lag)
 
     async def release(self) -> None:
         pass
 
 
 class LocalConversation:
-    def __init__(self, start: ConversationStart, turns: TurnModels, database_url: str) -> None:
+    def __init__(
+        self, start: ConversationStart, turns: TurnModels, database_url: str, lag: LagTicker
+    ) -> None:
         self._connected_ms = start.connected_ms
         self._clock = start.clock
         self._live = LiveAudio(database_url, start.request.conversation_id)
-        self._lag = LagSampler(start.clock.ms)
+        self._lag = lag
+        self._watch = lag.watch(start.clock.ms)
         self._task = asyncio.ensure_future(hold_conversation(start, self._live, turns))
+        self._ended: Ended | None = None
         self._loop_lag: LoopLag | None = None
         self._started_ms = start.connected_ms
 
     async def ended(self) -> Ended:
         spoken = await asyncio.shield(self._task)
-        self._loop_lag = self._lag.stop()
-        self._started_ms = spoken.recording.start_ms(self._connected_ms)
-        return Ended(self._clock.ms(), self._started_ms)
+        if self._ended is None:
+            self._loop_lag = self._lag.unwatch(self._watch)
+            self._started_ms = spoken.recording.start_ms(self._connected_ms)
+            self._ended = Ended(self._clock.ms(), self._started_ms)
+        return self._ended
 
     def cancel(self) -> None:
         self._task.cancel()
@@ -543,7 +550,7 @@ class LocalConversation:
         return await hear(self._task.result(), self._started_ms, self._loop_lag)
 
     async def close(self) -> None:
-        self._lag.stop()
+        self._lag.unwatch(self._watch)
         self._task.cancel()
         await asyncio.gather(self._task, return_exceptions=True)
         await self._live.close()

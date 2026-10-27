@@ -28,7 +28,7 @@ from yaksh.caller.conversation import (
     hear,
     hold_conversation,
 )
-from yaksh.caller.lag import LagSampler
+from yaksh.caller.lag import LagTicker
 from yaksh.caller.link import Kind, Link, open_link
 from yaksh.caller.listen import LiveAudio
 from yaksh.caller.pipeline import CallerKeys
@@ -182,13 +182,14 @@ async def hold(link: Link, start: ChildStart, turns: TurnModels) -> Heard:
             own,
             start.connected_ms,
         )
-        lag = LagSampler(clock.ms)
+        lag = LagTicker()
+        watch = lag.watch(clock.ms)
         holding = asyncio.ensure_future(hold_conversation(conversation, live, turns))
         listener = asyncio.create_task(listen(link, inbox, stop, own, holding))
         try:
             spoken = await holding
         finally:
-            loop_lag = lag.stop()
+            loop_lag = lag.unwatch(watch)
         started_ms = spoken.recording.start_ms(start.connected_ms)
         await link.send(Kind.ENDED, Ended(clock.ms(), started_ms))
         await live.close()

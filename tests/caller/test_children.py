@@ -116,6 +116,37 @@ async def test_a_call_process_holds_the_conversation_and_leaves(pools: Any) -> N
     assert ended == targets.ENDED and heard.recording == b"wav"
 
 
+async def test_a_stall_of_the_worker_loop_counts_in_the_lag_of_a_live_call(pools: Any) -> None:
+    pool = pools(targets.sends_audio)
+    stream = Stream()
+    conversation = await pool.reserve().start(started(stream))
+    await wait_until(lambda: bool(stream.sent))
+    time.sleep(0.3)  # holds the worker's loop while the call talks
+
+    conversation.cancel()
+    heard = await conversation.heard()
+    await conversation.close()
+
+    assert heard.loop_lag is not None and heard.loop_lag.max_ms >= 250
+
+
+async def test_a_stall_of_the_worker_loop_after_a_call_ended_does_not_count_for_it(
+    pools: Any,
+) -> None:
+    pool = pools(targets.ends_when_told)
+    stream = Stream()
+    conversation = await pool.reserve().start(started(stream))
+    stream.incoming.put_nowait({"type": "websocket.receive", "text": "audio"})
+    time.sleep(0.3)  # holds the worker's loop; the call ended before, at 0 ms
+
+    await conversation.ended()
+    conversation.cancel()
+    heard = await conversation.heard()
+    await conversation.close()
+
+    assert heard.loop_lag is None
+
+
 async def test_a_process_that_never_gets_ready_is_replaced_and_then_the_call_fails(
     pools: Any, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -133,6 +164,20 @@ async def test_a_process_that_dies_during_the_call_fails_only_that_call(pools: A
     with pytest.raises(ChildFailed, match="stopped before the call ended"):
         await conversation.ended()
     await conversation.close()
+
+
+async def test_a_call_whose_process_dies_leaves_no_lag_ticker(pools: Any) -> None:
+    pool = pools(targets.dies_at_start)
+    conversation = await pool.reserve().start(started(Stream()))
+    with pytest.raises(ChildFailed):
+        await conversation.ended()
+
+    await conversation.close()
+
+    assert not any(
+        task.get_name() == "yaksh-loop-lag" and not task.cancelling()
+        for task in asyncio.all_tasks()
+    )
 
 
 def live_pids() -> set[int]:

@@ -17,7 +17,8 @@ from yaksh.domain.conversations import (
     WireEventKind,
 )
 
-ENDED = Ended(at_ms=5_000, started_ms=1_000)
+ENDED = Ended(at_ms=60_000, started_ms=1_000)
+"""Late on the call clock, so a stall during a test falls inside the call."""
 HOLDING = WireEvent(kind=WireEventKind.AGENT_AUDIO, at_ms=0)
 """What each process sends once it holds the call."""
 HEARD = Heard(
@@ -99,6 +100,20 @@ def hears_but_stays(end: socket.socket, _preloaded: bool) -> None:
         time.sleep(3600)
 
     run(end, stay)
+
+
+def ends_when_told(end: socket.socket, _preloaded: bool) -> None:
+    """The conversation ends at the start of the call clock, but the process tells the worker
+    only once the stream gives a message; the result follows the worker's cancel."""
+
+    async def end_late(link: Link) -> None:
+        await until(link, Kind.SOCKET)
+        await link.send(Kind.ENDED, Ended(at_ms=0, started_ms=0))
+        await until(link, Kind.CANCEL)
+        await link.send(Kind.HEARD, HEARD)
+        await link.close()
+
+    run(end, end_late)
 
 
 def sends_audio(end: socket.socket, _preloaded: bool) -> None:

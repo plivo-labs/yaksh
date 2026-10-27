@@ -15,7 +15,7 @@ import time
 from collections import deque
 from collections.abc import Callable
 from contextlib import suppress
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from multiprocessing.process import BaseProcess
 from typing import Any, cast
 
@@ -24,9 +24,11 @@ from fastapi import WebSocketDisconnect
 from yaksh.caller import child
 from yaksh.caller.child import ChildStart
 from yaksh.caller.conversation import Conversation, ConversationStart, Ended, Heard, Seat
+from yaksh.caller.lag import LagTicker, worse
 from yaksh.caller.link import Kind, Link, open_link
 from yaksh.diagnostics import describe_exception
 from yaksh.domain.conversations import Turn, WireEvent
+from yaksh.domain.latency import LoopLag
 
 log = logging.getLogger(__name__)
 
@@ -128,6 +130,7 @@ class ChildConversations:
             self._context.set_forkserver_preload(PRELOAD)
             self._preloaded = True
         self.database_url = database_url
+        self.lag = LagTicker()
         self._target = target
         self._spawner = Spawner()
         self._children: set[Child] = set()
@@ -355,6 +358,8 @@ class ChildConversation:
         self._ended: asyncio.Future[Ended] = loop.create_future()
         self._heard: asyncio.Future[Heard] = loop.create_future()
         self._outbox: asyncio.Queue[tuple[float, dict[str, Any]]] = asyncio.Queue()
+        self._watch = pool.lag.watch(start.clock.ms)
+        self._worker_lag: LoopLag | None = None
         self._tasks: list[asyncio.Task[None]] = []
         self._deadline: asyncio.TimerHandle | None = None
         self._relayed_in = 0
@@ -406,6 +411,7 @@ class ChildConversation:
 
     async def close(self) -> None:
         self._disarm()
+        self._pool.lag.unwatch(self._watch)
         for task in self._tasks:
             task.cancel()
         await asyncio.gather(*self._tasks, return_exceptions=True)
@@ -449,9 +455,13 @@ class ChildConversation:
                 elif kind is Kind.WIRE:
                     observer.wire_event(cast(WireEvent, payload))
                 elif kind is Kind.ENDED:
-                    self._ended.set_result(cast(Ended, payload))
+                    ended = cast(Ended, payload)
+                    self._worker_lag = self._pool.lag.unwatch(self._watch, ended.at_ms)
+                    self._ended.set_result(ended)
                 elif kind is Kind.HEARD:
-                    self._heard.set_result(cast(Heard, payload))
+                    heard = cast(Heard, payload)
+                    loop_lag = worse(heard.loop_lag, self._worker_lag)
+                    self._heard.set_result(replace(heard, loop_lag=loop_lag))
                     return
                 elif kind is Kind.FAILED:
                     self._fail(f"the call process failed: {payload}")
