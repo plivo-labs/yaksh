@@ -1,7 +1,7 @@
 from typing import Any
 
 import pytest
-from httpx import AsyncClient
+from httpx import AsyncClient, Response
 from sqlalchemy import text
 
 from tests.conftest import (
@@ -243,10 +243,11 @@ async def test_a_value_out_of_range_is_refused_and_nothing_changes(client: Async
 async def test_a_run_cannot_start_while_the_plivo_keys_are_missing(client: AsyncClient) -> None:
     agent_id = await create_agent_id(client)
     scenario = await create_scenario(client, agent_id, persona_id=await new_persona_id(client))
-    await client.delete("/api/v1/settings/secrets/plivo_auth_token")
+    removed = await client.delete("/api/v1/settings/plivo")
 
     refused = await start_run(client, agent_id, [scenario["id"]])
 
+    assert removed.status_code == 200, removed.text
     assert refused.status_code == 422
     assert "add the Plivo Auth ID and Auth token in Settings" in refused.text
 
@@ -490,13 +491,13 @@ async def test_a_sarvam_key_is_checked_for_hearing_and_for_speaking(
     ]
 
 
-async def test_a_phone_run_cannot_start_while_a_persona_voice_has_no_key(
+async def add_sarvam_voice(
     client: AsyncClient, voice_clients: dict[VoiceProvider, FakeVoiceClient]
-) -> None:
+) -> Response:
     sarvam = FakeVoiceClient()
     sarvam.voices["shubh"] = ProviderVoice(id="shubh", name="unused")
     voice_clients[VoiceProvider.SARVAM] = sarvam
-    added = await client.post(
+    return await client.post(
         "/api/v1/voices",
         json={
             "provider": "sarvam",
@@ -505,6 +506,12 @@ async def test_a_phone_run_cannot_start_while_a_persona_voice_has_no_key(
             "name": "Shubh",
         },
     )
+
+
+async def test_a_phone_run_cannot_start_while_a_persona_voice_has_no_key(
+    client: AsyncClient, voice_clients: dict[VoiceProvider, FakeVoiceClient]
+) -> None:
+    added = await add_sarvam_voice(client, voice_clients)
     persona = await create_persona(
         client, name="Sarvam caller", voice={"provider": "sarvam", "id": "shubh", "speed": 1.5}
     )
@@ -524,6 +531,30 @@ async def test_a_phone_run_cannot_start_while_a_persona_voice_has_no_key(
     assert refused.json()["error"]["message"] == (
         'phone calls are off: the persona "Sarvam caller" uses a Sarvam voice; '
         "add the Sarvam key in Settings"
+    )
+
+
+async def test_a_phone_run_cannot_start_when_the_persona_voice_does_not_speak_its_language(
+    client: AsyncClient, checks: list[Any], voice_clients: dict[VoiceProvider, FakeVoiceClient]
+) -> None:
+    await client.put("/api/v1/settings/secrets/sarvam_api_key", json={"value": "sarvam-key-0123"})
+    added = await add_sarvam_voice(client, voice_clients)
+    persona = await create_persona(
+        client,
+        name="Sarvam caller",
+        language="es",
+        voice={"provider": "sarvam", "id": "shubh", "speed": 1.0},
+    )
+    agent_id = await create_agent_id(client, languages=["es"])
+    scenario = await create_scenario(client, agent_id, persona_id=persona["id"])
+
+    refused = await start_run(client, agent_id, [scenario["id"]])
+
+    assert added.status_code == 201, added.text
+    assert refused.status_code == 422
+    assert refused.json()["error"]["message"] == (
+        "text to speech (Sarvam) doesn't speak Spanish, the language of the persona "
+        '"Sarvam caller"; choose a voice of another provider'
     )
 
 
@@ -556,26 +587,32 @@ async def test_nimble_credentials_are_saved_together_and_checked_at_their_gatewa
     assert {"nimble_auth_id", "nimble_auth_token"} <= set(saved["secrets"])
 
 
-async def test_half_of_a_nimble_pair_is_never_removed_or_replaced_alone(
-    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+@pytest.mark.parametrize(("account", "label"), [("plivo", "Plivo"), ("nimble", "Nimble")])
+async def test_half_of_an_account_is_never_removed_or_replaced_alone(
+    client: AsyncClient,
+    monkeypatch: pytest.MonkeyPatch,
+    checks: list[Any],
+    account: str,
+    label: str,
 ) -> None:
     async def check_tts(*_args: Any) -> None:
         return None
 
     monkeypatch.setattr(service, "check_tts", check_tts)
-    pair = {"auth_id": "MANIMBLE01234", "auth_token": "nimble-token-0123"}
-    await client.put("/api/v1/settings/nimble", json=pair)
-    document = "secrets:\n  nimble_auth_id: null\n  nimble_auth_token: nimble-token-4567\n"
+    pair = {"auth_id": "MAACCOUNT0123", "auth_token": "account-token-0123"}
+    await client.put(f"/api/v1/settings/{account}", json=pair)
+    document = f"secrets:\n  {account}_auth_id: null\n  {account}_auth_token: token-4567\n"
 
     imported = await client.post("/api/v1/settings/import", json={"document": document})
-    deleted = await client.delete("/api/v1/settings/secrets/nimble_auth_id")
-    removed = await client.delete("/api/v1/settings/nimble")
+    deleted = await client.delete(f"/api/v1/settings/secrets/{account}_auth_id")
+    removed = await client.delete(f"/api/v1/settings/{account}")
 
     assert imported.status_code == 200, imported.text
     assert imported.json()["failed"] == [
-        "nimble_auth_id, nimble_auth_token: "
-        "save or remove the Nimble Auth ID and Auth token together"
+        f"{account}_auth_id, {account}_auth_token: "
+        f"save or remove the {label} Auth ID and Auth token together"
     ]
-    assert imported.json()["settings"]["secrets"]["nimble_auth_token"] == {"hint": "0123"}
+    assert imported.json()["settings"]["secrets"][f"{account}_auth_token"] == {"hint": "0123"}
     assert deleted.status_code == 422
-    assert not {"nimble_auth_id", "nimble_auth_token"} & set(removed.json()["secrets"])
+    assert removed.status_code == 200, removed.text
+    assert not {f"{account}_auth_id", f"{account}_auth_token"} & set(removed.json()["secrets"])

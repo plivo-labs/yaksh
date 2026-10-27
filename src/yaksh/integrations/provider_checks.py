@@ -10,12 +10,10 @@ from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.audio.vad.vad_analyzer import VADParams
 from pipecat.classifiers.base_classifier import ChoiceQuestion
 from pipecat.classifiers.typesafe.jev.classifier import JevClassifier
-from pipecat.frames.frames import ErrorFrame, Frame, InputAudioRawFrame, TranscriptionFrame
-from pipecat.pipeline.pipeline import Pipeline
-from pipecat.pipeline.worker import PipelineParams, PipelineWorker
+from pipecat.frames.frames import Frame, InputAudioRawFrame, TranscriptionFrame
+from pipecat.pipeline.worker import PipelineParams
 from pipecat.processors.audio.vad_processor import VADProcessor
 from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
-from pipecat.workers.runner import WorkerRunner
 
 from yaksh.diagnostics import describe_exception
 from yaksh.domain.errors import UnavailableError
@@ -26,7 +24,7 @@ from yaksh.domain.speech import SttProvider
 from yaksh.domain.voices import VoiceProvider, VoiceSettings
 from yaksh.integrations.openai_models import failure, takes_reasoning_effort
 from yaksh.integrations.plivo import PlivoApi, PlivoError
-from yaksh.integrations.speech.audio import SAMPLE_RATE, settle, speak_once
+from yaksh.integrations.speech.audio import SAMPLE_RATE, one_shot, speak_once
 from yaksh.integrations.speech.stt import stt_service
 from yaksh.integrations.speech.tts import tts_service
 
@@ -117,45 +115,25 @@ async def check_stt(settings: AppSettings, provider: SttProvider, key: str, clip
         service = stt_service(settings, provider, key, Language.EN.value)
     except ValueError as error:
         raise ProviderCheckError(f"{provider.label}: {error}") from None
-    worker = PipelineWorker(
-        Pipeline(
-            [
-                VADProcessor(vad_analyzer=SileroVADAnalyzer(params=VAD)),
-                service,
-                heard,
-            ]
-        ),
-        params=PipelineParams(audio_in_sample_rate=SAMPLE_RATE),
-        idle_timeout_secs=None,
-        enable_rtvi=False,
-    )
-    errors: list[str] = []
-
-    @worker.event_handler("on_pipeline_error")
-    async def on_error(_worker: object, frame: ErrorFrame) -> None:
-        errors.append(frame.error)
-        heard.done.set()
-
-    runner = WorkerRunner(handle_sigint=False)
-    await runner.add_workers(worker)
-    running = asyncio.create_task(runner.run())
+    pipeline = [VADProcessor(vad_analyzer=SileroVADAnalyzer(params=VAD)), service, heard]
+    params = PipelineParams(audio_in_sample_rate=SAMPLE_RATE)
     audio = clip + TRAILING_SILENCE
-    try:
-        async with asyncio.timeout(STT_CHECK_S):
-            for at in range(0, len(audio), FRAME_BYTES):
-                if heard.done.is_set():
-                    break
-                frame = InputAudioRawFrame(audio[at : at + FRAME_BYTES], SAMPLE_RATE, 1)
-                await worker.queue_frame(frame)
-                await asyncio.sleep(0.02)
-            await heard.done.wait()
-    except TimeoutError:
-        errors.append(f"no transcript of a test clip in {STT_CHECK_S:.0f} s")
-    finally:
-        await runner.cancel()
-        await settle(running)
-    if errors:
-        raise ProviderCheckError(f"{provider.label}: {errors[0]}")
+    async with one_shot(pipeline, params, heard.done) as run:
+        try:
+            async with asyncio.timeout(STT_CHECK_S):
+                for at in range(0, len(audio), FRAME_BYTES):
+                    if heard.done.is_set():
+                        break
+                    frame = InputAudioRawFrame(audio[at : at + FRAME_BYTES], SAMPLE_RATE, 1)
+                    await run.worker.queue_frame(frame)
+                    await asyncio.sleep(0.02)
+                await heard.done.wait()
+        except TimeoutError:
+            raise ProviderCheckError(
+                f"{provider.label}: no transcript of a test clip in {STT_CHECK_S:.0f} s"
+            ) from None
+    if run.errors:
+        raise ProviderCheckError(f"{provider.label}: {run.errors[0]}")
 
 
 async def check_tts(

@@ -26,12 +26,15 @@ def stt(settings: AppSettings, key: str, language: str) -> SarvamSTTService:
     )
 
 
-class SarvamTts(SarvamHttpTTSService):
-    """Sarvam's speech over HTTP with its own session, closed with the service."""
+class SarvamHttpTts(SarvamHttpTTSService):
+    """Sarvam's speech over HTTP with its own session, closed with the service. The model is
+    checked before the session opens, so a model Sarvam does not have leaves no session open."""
 
-    def __init__(self, **kwargs: Any) -> None:
+    def __init__(self, *, settings: SarvamHttpTTSService.Settings, **kwargs: Any) -> None:
+        if settings.model not in TTS_MODEL_CONFIGS:
+            raise ValueError(f"Sarvam has no speech model {settings.model}")
         self._own_session = aiohttp.ClientSession()
-        super().__init__(aiohttp_session=self._own_session, **kwargs)
+        super().__init__(aiohttp_session=self._own_session, settings=settings, **kwargs)
 
     async def cleanup(self) -> None:
         await super().cleanup()
@@ -40,9 +43,9 @@ class SarvamTts(SarvamHttpTTSService):
 
 def tts(
     settings: AppSettings, voice: VoiceSettings, language: Language, key: str, *, one_shot: bool
-) -> SarvamTts:
+) -> SarvamHttpTts:
     """At 8 kHz, which the service must be told: left out, Sarvam answers at 24 kHz."""
-    return SarvamTts(
+    return SarvamHttpTts(
         api_key=key,
         base_url=settings.sarvam_tts.base_url,
         sample_rate=SAMPLE_RATE,

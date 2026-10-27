@@ -4913,6 +4913,7 @@
           "settings"
         ],
         "summary": "Delete Secret",
+        "description": "Remove one key; the halves of a Plivo or Nimble account are removed together.",
         "operationId": "delete_secret_api_v1_settings_secrets__name__delete",
         "security": [
           {
@@ -4971,6 +4972,40 @@
           },
           "required": true
         },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingsRead"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "The request failed. The error tells why.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Delete Plivo Account",
+        "operationId": "delete_plivo_account_api_v1_settings_plivo_delete",
         "responses": {
           "200": {
             "description": "Successful Response",

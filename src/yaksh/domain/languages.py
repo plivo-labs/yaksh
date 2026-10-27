@@ -31,6 +31,22 @@ LANGUAGE_LABELS = {
     Language.TE: "Telugu",
     Language.ES: "Spanish",
 }
+INDIAN_AND_ENGLISH = frozenset(
+    {
+        Language.EN,
+        Language.HI,
+        Language.BN,
+        Language.GU,
+        Language.KN,
+        Language.MR,
+        Language.TA,
+        Language.TE,
+    }
+)
+"""Provider language lists are built from explicit sets like this one, never from every
+Language, so a language added to Yaksh counts for a provider only after its documentation is
+checked."""
+INDIAN_ENGLISH_AND_SPANISH = INDIAN_AND_ENGLISH | {Language.ES}
 
 
 class AgentLanguage(StrEnum):

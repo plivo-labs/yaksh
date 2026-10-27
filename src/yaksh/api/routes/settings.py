@@ -112,13 +112,25 @@ async def put_nimble_account(
     )
 
 
+@router.delete("/plivo")
+async def delete_plivo_account(
+    settings: AppSettingsDep, session: SessionDep, cipher: CipherDep
+) -> SettingsRead:
+    return SettingsRead.of(await remove_pair(service.PLIVO, settings, session, cipher))
+
+
 @router.delete("/nimble")
-async def delete_nimble_account(session: SessionDep, cipher: CipherDep) -> SettingsRead:
-    secrets: dict[str, str | None] = {
-        SecretName.NIMBLE_AUTH_ID: None,
-        SecretName.NIMBLE_AUTH_TOKEN: None,
-    }
-    return SettingsRead.of(await store.change(session, cipher, secrets=secrets))
+async def delete_nimble_account(
+    settings: AppSettingsDep, session: SessionDep, cipher: CipherDep
+) -> SettingsRead:
+    return SettingsRead.of(await remove_pair(service.NIMBLE, settings, session, cipher))
+
+
+async def remove_pair(
+    pair: service.Pair, settings: AppSettings, session: AsyncSession, cipher: Cipher
+) -> AppSettings:
+    secrets: dict[str, str | None] = dict.fromkeys(pair.names)
+    return await checked_change(settings, session, cipher, secrets=secrets)
 
 
 async def checked_change(
@@ -140,10 +152,12 @@ async def checked_change(
 
 
 @router.delete("/secrets/{name}")
-async def delete_secret(name: SecretName, session: SessionDep, cipher: CipherDep) -> SettingsRead:
-    if name in service.NIMBLE_SECRETS:
-        raise ValidationError("remove the Nimble Auth ID and Auth token together")
-    return SettingsRead.of(await store.change(session, cipher, secrets={name: None}))
+async def delete_secret(
+    name: SecretName, settings: AppSettingsDep, session: SessionDep, cipher: CipherDep
+) -> SettingsRead:
+    """Remove one key; the halves of a Plivo or Nimble account are removed together."""
+    secrets: dict[str, str | None] = {name: None}
+    return SettingsRead.of(await checked_change(settings, session, cipher, secrets=secrets))
 
 
 @router.put("/trigger-secrets/{name}")

@@ -4,7 +4,7 @@ it is saved, test the saved settings, and import or export them as a YAML docume
 import asyncio
 import re
 import wave
-from collections.abc import Coroutine, Mapping
+from collections.abc import Callable, Coroutine, Mapping
 from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Any
@@ -74,9 +74,8 @@ TTS_TESTS = {
     Provider.NIMBLE: VoiceProvider.NIMBLE,
 }
 """The text-to-speech test of each provider, which speaks one word."""
-NIMBLE_SECRETS = TTS_KEYS[VoiceProvider.NIMBLE]
 TTS_OF_KEY = {names[0]: provider for provider, names in TTS_KEYS.items() if len(names) == 1}
-"""The voice provider of each single key; Nimble's pair is checked together."""
+"""The voice provider of each single key; Nimble's pair is checked as a Pair."""
 
 CHECK_CLIP = SOUNDS / "answering" / "iphone_screen_ack.wav"
 """8 kHz speech that every speech-to-text provider must transcribe to pass its check."""
@@ -154,13 +153,37 @@ def required(secret: Any, what: str) -> str:
     return secret.get_secret_value()
 
 
-PLIVO_SECRETS = (SecretName.PLIVO_AUTH_ID, SecretName.PLIVO_AUTH_TOKEN)
+@dataclass(frozen=True)
+class Pair:
+    """An Auth ID and an Auth token that work only together. A change saves both or removes
+    both: a check never pairs a new half with an old one, and no half is left alone."""
+
+    label: str
+    names: tuple[SecretName, SecretName]
+    check: Callable[[AppSettings, str, str], Coroutine[Any, Any, object]]
+    """Checks the account with the new Auth ID and Auth token."""
+
+
+async def _check_plivo_account(_candidate: AppSettings, auth_id: str, auth_token: str) -> None:
+    await checks.check_plivo(auth_id, auth_token)
+
+
+async def _check_nimble_account(candidate: AppSettings, auth_id: str, auth_token: str) -> None:
+    await check_tts(candidate, VoiceProvider.NIMBLE, f"{auth_id}:{auth_token}")
+
+
+PLIVO = Pair("Plivo", (SecretName.PLIVO_AUTH_ID, SecretName.PLIVO_AUTH_TOKEN), _check_plivo_account)
+NIMBLE = Pair(
+    "Nimble", (SecretName.NIMBLE_AUTH_ID, SecretName.NIMBLE_AUTH_TOKEN), _check_nimble_account
+)
+PAIRS = (PLIVO, NIMBLE)
+PAIRED = {name: pair for pair in PAIRS for name in pair.names}
 
 
 @dataclass(frozen=True)
 class Failure:
     names: list[str]
-    """The keys one check covered: one key, or the Plivo Auth ID and Auth token together."""
+    """The keys one check covered: one key, or the halves of a Pair in the change."""
     reason: str
 
     def __str__(self) -> str:
@@ -174,7 +197,7 @@ async def failed_secrets(
     around it. Returns one Failure for each check that failed."""
     checks_to_run: list[tuple[list[str], Coroutine[Any, Any, object]]] = []
     for name, value in changed.items():
-        if value is None or name in PLIVO_SECRETS or name in NIMBLE_SECRETS:
+        if value is None or name in PAIRED:
             continue
         if name in STT_OF_KEY or name in TTS_OF_KEY:
             checks_to_run.append(([name], _check_speech_key(candidate, name, value)))
@@ -187,12 +210,10 @@ async def failed_secrets(
             case _:
                 continue
         checks_to_run.append(([name], check))
-    plivo: list[str] = [name for name in PLIVO_SECRETS if changed.get(name) is not None]
-    if plivo:
-        checks_to_run.append((plivo, _check_plivo_pair(candidate)))
-    nimble: list[str] = [name for name in NIMBLE_SECRETS if name in changed]
-    if nimble:
-        checks_to_run.append((nimble, _check_nimble_pair(candidate, changed)))
+    for pair in PAIRS:
+        halves: list[str] = [name for name in pair.names if name in changed]
+        if halves:
+            checks_to_run.append((halves, _check_pair(pair, candidate, changed)))
     async with asyncio.TaskGroup() as group:
         tasks = [
             (names, group.create_task(_failure_reason(check))) for names, check in checks_to_run
@@ -232,24 +253,15 @@ async def _check_speech_key(candidate: AppSettings, name: str, key: str) -> None
         await check_tts(candidate, TTS_OF_KEY[name], key)
 
 
-async def _check_nimble_pair(candidate: AppSettings, changed: Mapping[str, str | None]) -> None:
-    """Both halves are saved together, or removed together: a check never pairs a new half
-    with an old one, and no half is left alone."""
-    values = [changed.get(name) for name in NIMBLE_SECRETS]
-    together = all(name in changed for name in NIMBLE_SECRETS)
-    if together and all(value is None for value in values):
+async def _check_pair(
+    pair: Pair, candidate: AppSettings, changed: Mapping[str, str | None]
+) -> None:
+    auth_id, auth_token = (changed.get(name) for name in pair.names)
+    if auth_id is None and auth_token is None and all(name in changed for name in pair.names):
         return
-    credential = candidate.tts_credential(VoiceProvider.NIMBLE)
-    if not together or any(value is None for value in values) or credential is None:
-        raise ProviderCheckError("save or remove the Nimble Auth ID and Auth token together")
-    await check_tts(candidate, VoiceProvider.NIMBLE, credential)
-
-
-async def _check_plivo_pair(candidate: AppSettings) -> None:
-    credentials = candidate.plivo_credentials
-    if credentials is None:
-        raise ProviderCheckError("save the Plivo Auth ID and Auth token together")
-    await checks.check_plivo(*credentials)
+    if auth_id is None or auth_token is None:
+        raise ProviderCheckError(f"save or remove the {pair.label} Auth ID and Auth token together")
+    await pair.check(candidate, auth_id, auth_token)
 
 
 async def _failure_reason(check: Coroutine[Any, Any, object]) -> str | None:

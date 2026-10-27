@@ -4,7 +4,7 @@ call, and the languages each can hear."""
 from dataclasses import dataclass
 from enum import StrEnum
 
-from yaksh.domain.languages import Language
+from yaksh.domain.languages import INDIAN_AND_ENGLISH, INDIAN_ENGLISH_AND_SPANISH, Language
 
 
 class SttProvider(StrEnum):
@@ -32,13 +32,13 @@ class SttTraits:
 
 
 STT = {
-    SttProvider.DEEPGRAM: SttTraits("Deepgram", frozenset(Language)),
-    SttProvider.SARVAM: SttTraits("Sarvam", frozenset(Language) - {Language.ES}),
+    SttProvider.DEEPGRAM: SttTraits("Deepgram", INDIAN_ENGLISH_AND_SPANISH),
+    SttProvider.SARVAM: SttTraits("Sarvam", INDIAN_AND_ENGLISH),
     SttProvider.ASSEMBLYAI: SttTraits(
         "AssemblyAI", frozenset({Language.EN, Language.HI, Language.MR, Language.ES})
     ),
-    SttProvider.SONIOX: SttTraits("Soniox", frozenset(Language)),
-    SttProvider.GLADIA: SttTraits("Gladia", frozenset(Language)),
+    SttProvider.SONIOX: SttTraits("Soniox", INDIAN_ENGLISH_AND_SPANISH),
+    SttProvider.GLADIA: SttTraits("Gladia", INDIAN_ENGLISH_AND_SPANISH),
 }
 """Deepgram nova-3, Sarvam saaras:v4, AssemblyAI universal-3-6-pro, Soniox stt-rt-v5, Gladia
 solaria-1."""

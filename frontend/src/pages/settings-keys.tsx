@@ -144,7 +144,6 @@ export function KeyRow({
   checked?: boolean;
 }) {
   const [editing, setEditing] = useState(false);
-  const [confirming, setConfirming] = useState(false);
   const [value, setValue] = useState("");
   const [saved, setSaved] = useState(false);
   const save = useSaveSecret();
@@ -204,35 +203,17 @@ export function KeyRow({
             <Badge>Not set</Badge>
           )}
           <span className="flex-1" />
-          {state && removable && (
-            <Button
-              size="sm"
-              variant="ghost"
-              disabled={remove.isPending}
-              onClick={() =>
-                removeWarning
-                  ? setConfirming(true)
-                  : remove.mutate(name, { onSuccess: () => setSaved(false) })
-              }
-            >
-              Remove
-            </Button>
-          )}
-          {removeWarning && (
-            <ConfirmDialog
-              title={removeWarning.title}
-              description={removeWarning.description}
-              action="Remove"
-              destructive
+          {removable && (
+            <RemoveButton
+              saved={Boolean(state)}
+              warning={removeWarning}
               pending={remove.isPending}
               error={remove.error?.message}
-              open={confirming}
-              onOpenChange={setConfirming}
-              onConfirm={(close) =>
+              onRemove={(done) =>
                 remove.mutate(name, {
                   onSuccess: () => {
                     setSaved(false);
-                    close();
+                    done();
                   },
                 })
               }
@@ -244,6 +225,51 @@ export function KeyRow({
         </div>
       )}
     </SettingRow>
+  );
+}
+
+/** Remove, shown only while something is saved. With `warning`, it asks first; the dialog
+ * stays mounted, so it closes smoothly after the saved value is gone. */
+export function RemoveButton({
+  saved,
+  warning,
+  pending,
+  error,
+  onRemove,
+}: {
+  saved: boolean;
+  warning?: { title: string; description: ReactNode };
+  pending: boolean;
+  error?: string;
+  onRemove: (done: () => void) => void;
+}) {
+  const [confirming, setConfirming] = useState(false);
+  return (
+    <>
+      {saved && (
+        <Button
+          size="sm"
+          variant="ghost"
+          disabled={pending}
+          onClick={() => (warning ? setConfirming(true) : onRemove(() => {}))}
+        >
+          Remove
+        </Button>
+      )}
+      {warning && (
+        <ConfirmDialog
+          title={warning.title}
+          description={warning.description}
+          action="Remove"
+          destructive
+          pending={pending}
+          error={error}
+          open={confirming}
+          onOpenChange={setConfirming}
+          onConfirm={onRemove}
+        />
+      )}
+    </>
   );
 }
 

@@ -2,7 +2,6 @@ import { useState } from "react";
 
 import { Panel, PanelHeader } from "@/components/panel";
 import { Badge } from "@/components/ui/badge";
-import { ConfirmDialog } from "@/components/confirm-dialogs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -42,6 +41,7 @@ import {
   KeyRemovedNote,
   KeyRow,
   ProviderPanel,
+  RemoveButton,
   SettingRow,
 } from "@/pages/settings-keys";
 
@@ -336,16 +336,16 @@ function NimbleAccountRow({
   baseUrl: string;
   removeWarning?: { title: string; description: string };
 }) {
-  const [confirming, setConfirming] = useState(false);
   const save = useSaveNimbleAccount();
   const remove = useRemoveNimbleAccount();
   const id = settings.secrets.nimble_auth_id;
   const token = settings.secrets.nimble_auth_token;
+  const shown = id && token ? `••••${id.hint ?? ""} / ••••${token.hint ?? ""}` : null;
   return (
     <CredentialPairRow
       label="Auth ID and token"
       inputId="nimble-auth-id"
-      shown={id && token ? `••••${id.hint ?? ""} / ••••${token.hint ?? ""}` : null}
+      shown={shown}
       change="Replace"
       add="Add"
       pending={save.isPending}
@@ -353,27 +353,13 @@ function NimbleAccountRow({
       onSave={(pair, done) => save.mutate({ ...pair, base_url: baseUrl }, { onSuccess: done })}
       onReset={save.reset}
     >
-      <Button
-        size="sm"
-        variant="ghost"
-        disabled={remove.isPending}
-        onClick={() => (removeWarning ? setConfirming(true) : remove.mutate())}
-      >
-        Remove
-      </Button>
-      {removeWarning && (
-        <ConfirmDialog
-          title={removeWarning.title}
-          description={removeWarning.description}
-          action="Remove"
-          destructive
-          pending={remove.isPending}
-          error={remove.error?.message}
-          open={confirming}
-          onOpenChange={setConfirming}
-          onConfirm={(done) => remove.mutate(undefined, { onSuccess: done })}
-        />
-      )}
+      <RemoveButton
+        saved={shown !== null}
+        warning={removeWarning}
+        pending={remove.isPending}
+        error={remove.error?.message}
+        onRemove={(done) => remove.mutate(undefined, { onSuccess: done })}
+      />
     </CredentialPairRow>
   );
 }

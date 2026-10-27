@@ -4,10 +4,12 @@ Pipecat pipeline that turns one text into 8 kHz PCM through the same service a c
 import asyncio
 import io
 import wave
+from collections.abc import AsyncGenerator, Sequence
+from contextlib import asynccontextmanager
+from dataclasses import dataclass, field
 
 from pipecat.audio.utils import create_stream_resampler
 from pipecat.frames.frames import (
-    EndFrame,
     ErrorFrame,
     Frame,
     TTSAudioRawFrame,
@@ -30,7 +32,11 @@ SPEAK_ONCE_S = 20.0
 REPLY_QUIET_S = 3.0
 """Pipecat's default: on a call, a reply whose audio stops this long is finished."""
 TEARDOWN_S = 2.0
-"""How long a pipeline outside a call may take to end before its task is cancelled."""
+"""How long a cancelled pipeline outside a call waits for the cancel to pass through it. Each
+processor's cleanup comes after, bounded by its own timeouts, such as a socket's close."""
+STOP_GRACE_S = 0.5
+"""How long speech outside a call waits after its reply stops, for an error that a provider
+sends right after the stop, as Cartesia does."""
 
 
 def quiet_s(one_shot: bool) -> float:
@@ -61,6 +67,46 @@ class Resample8k(FrameProcessor):
         await self.push_frame(frame, direction)
 
 
+@dataclass
+class OneShot:
+    """A pipeline running outside a call, and the errors the pipeline has reported."""
+
+    worker: PipelineWorker
+    errors: list[str] = field(default_factory=list)
+
+
+@asynccontextmanager
+async def one_shot(
+    processors: Sequence[FrameProcessor], params: PipelineParams, done: asyncio.Event
+) -> AsyncGenerator[OneShot]:
+    """Runs a pipeline outside a call until the block ends, then cancels it. An error sets
+    `done`. The pipeline never gets an EndFrame: Pipecat queues a cancel behind a waiting
+    EndFrame, so a provider that stalled its end could not be cancelled. The worker, not the
+    runner, is cancelled: a runner cancelled before it starts running waits forever."""
+    worker = PipelineWorker(
+        Pipeline(list(processors)),
+        params=params,
+        idle_timeout_secs=None,
+        cancel_timeout_secs=TEARDOWN_S,
+        enable_rtvi=False,
+    )
+    run = OneShot(worker)
+
+    @worker.event_handler("on_pipeline_error")
+    async def on_error(_worker: object, frame: ErrorFrame) -> None:
+        run.errors.append(frame.error)
+        done.set()
+
+    runner = WorkerRunner(handle_sigint=False)
+    await runner.add_workers(worker)
+    running = asyncio.create_task(runner.run())
+    try:
+        yield run
+    finally:
+        await worker.cancel()
+        await asyncio.gather(running, return_exceptions=True)
+
+
 class Spoken(FrameProcessor):
     """The end of a one-shot pipeline: the reply's audio, and whether the reply has stopped."""
 
@@ -80,54 +126,23 @@ class Spoken(FrameProcessor):
 
 async def speak_once(service: TTSService, text: str) -> bytes:
     """The text spoken by a one-shot service, as 8 kHz 16-bit PCM. Any error, no audio, or no
-    end of the reply within SPEAK_ONCE_S raises UnavailableError with the provider's reason.
-
-    The pipeline gets its EndFrame only once the reply has stopped: Pipecat queues a cancel
-    behind a waiting EndFrame, so a provider that stalls with the EndFrame queued could not be
-    cancelled. An error the provider sends right after the stop, as Cartesia does, still comes
-    in before the pipeline ends."""
+    end of the reply within SPEAK_ONCE_S raises UnavailableError with the provider's reason."""
     spoken = Spoken()
-    worker = PipelineWorker(
-        Pipeline([service, Resample8k(), spoken]),
-        params=PipelineParams(audio_out_sample_rate=SAMPLE_RATE),
-        idle_timeout_secs=None,
-        enable_rtvi=False,
-    )
-    errors: list[str] = []
-
-    @worker.event_handler("on_pipeline_error")
-    async def on_error(_worker: object, frame: ErrorFrame) -> None:
-        errors.append(frame.error)
-        spoken.stopped.set()
-
-    runner = WorkerRunner(handle_sigint=False)
-    await runner.add_workers(worker)
-    running = asyncio.create_task(runner.run())
-    await worker.queue_frame(TTSSpeakFrame(text))
-    try:
-        async with asyncio.timeout(SPEAK_ONCE_S):
-            await spoken.stopped.wait()
-            if not errors:
-                await worker.queue_frame(EndFrame())
-                await asyncio.shield(running)
-    except TimeoutError:
-        errors.append(f"no speech in {SPEAK_ONCE_S:.0f} s")
-    finally:
-        await runner.cancel()
-        await settle(running)
-    if errors:
-        raise UnavailableError(errors[0])
+    params = PipelineParams(audio_out_sample_rate=SAMPLE_RATE)
+    async with one_shot([service, Resample8k(), spoken], params, spoken.stopped) as run:
+        await run.worker.queue_frame(TTSSpeakFrame(text))
+        try:
+            async with asyncio.timeout(SPEAK_ONCE_S):
+                await spoken.stopped.wait()
+        except TimeoutError:
+            raise UnavailableError(f"no speech in {SPEAK_ONCE_S:.0f} s") from None
+        if not run.errors:
+            await asyncio.sleep(STOP_GRACE_S)
+    if run.errors:
+        raise UnavailableError(run.errors[0])
     if not spoken.audio:
         raise UnavailableError("no audio came back")
     return bytes(spoken.audio)
-
-
-async def settle(running: asyncio.Task[None]) -> None:
-    """Wait TEARDOWN_S for a pipeline outside a call to end, then cancel its task: a provider
-    that stalls its own teardown must not hold up a preview, a greeting or a key check."""
-    running.add_done_callback(lambda task: task.cancelled() or task.exception())
-    await asyncio.wait({running}, timeout=TEARDOWN_S)
-    running.cancel()
 
 
 def as_wav(pcm: bytes) -> bytes:

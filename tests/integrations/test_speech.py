@@ -3,7 +3,7 @@ from typing import cast
 
 import pytest
 from pipecat.frames.frames import (
-    EndFrame,
+    CancelFrame,
     Frame,
     StartFrame,
     TranscriptionFrame,
@@ -12,6 +12,7 @@ from pipecat.frames.frames import (
     TTSStoppedFrame,
     VADUserStoppedSpeakingFrame,
 )
+from pipecat.pipeline.worker import PipelineParams
 from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
 from pipecat.services.elevenlabs.tts import ElevenLabsTTSService
 from pipecat.services.gladia.config import LanguageConfig
@@ -21,7 +22,7 @@ from pipecat.transcriptions.language import Language as PipecatLanguage
 
 from yaksh.domain.errors import UnavailableError
 from yaksh.domain.languages import AgentLanguage, Language
-from yaksh.domain.settings import AppSettings, SarvamStt
+from yaksh.domain.settings import AppSettings, SarvamStt, SarvamTts
 from yaksh.domain.speech import SttProvider
 from yaksh.domain.voices import VoiceProvider, VoiceSettings
 from yaksh.integrations import provider_checks
@@ -193,7 +194,7 @@ async def test_speech_that_stalls_fails_at_the_deadline_and_leaves_no_task(
     assert len(asyncio.all_tasks()) == before
 
 
-class StopsThenStallsItsEnd(FrameProcessor):
+class StallsItsEnd(FrameProcessor):
     """A provider that finishes its reply and then never lets the pipeline end."""
 
     async def process_frame(self, frame: Frame, direction: FrameDirection) -> None:
@@ -202,20 +203,28 @@ class StopsThenStallsItsEnd(FrameProcessor):
             await self.push_frame(TTSAudioRawFrame(bytes(320), 8000, 1))
             await self.push_frame(TTSStoppedFrame())
             return
-        if isinstance(frame, EndFrame):
+        if isinstance(frame, CancelFrame):
             await asyncio.Event().wait()
         await self.push_frame(frame, direction)
 
 
-async def test_speech_whose_teardown_stalls_fails_within_its_deadline(
+async def test_speech_whose_teardown_stalls_ends_within_its_deadline_and_leaves_no_task(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(audio, "SPEAK_ONCE_S", 0.5)
     monkeypatch.setattr(audio, "TEARDOWN_S", 0.2)
+    before = len(asyncio.all_tasks())
 
     async with asyncio.timeout(2):
-        with pytest.raises(UnavailableError, match="no speech"):
-            await speak_once(cast(TTSService, StopsThenStallsItsEnd()), "Hello")
+        assert await speak_once(cast(TTSService, StallsItsEnd()), "Hello") == bytes(320)
+
+    assert len(asyncio.all_tasks()) == before
+
+
+async def test_a_one_shot_pipeline_left_before_it_starts_still_ends() -> None:
+    async with asyncio.timeout(5):
+        with pytest.raises(RuntimeError):
+            async with audio.one_shot([Resample8k()], PipelineParams(), asyncio.Event()):
+                raise RuntimeError("left at once")
 
 
 @pytest.mark.parametrize("provider", [VoiceProvider.ELEVENLABS, VoiceProvider.CARTESIA])
@@ -242,3 +251,10 @@ async def test_a_model_the_provider_does_not_know_fails_the_check() -> None:
 
     with pytest.raises(ProviderCheckError, match="Sarvam"):
         await provider_checks.check_stt(settings, SttProvider.SARVAM, "key", check_clip())
+
+
+async def test_a_speech_model_the_provider_does_not_know_fails_the_check() -> None:
+    settings = AppSettings(sarvam_tts=SarvamTts(model="bulbul:v0"))
+
+    with pytest.raises(ProviderCheckError, match="Sarvam: Sarvam has no speech model bulbul:v0"):
+        await provider_checks.check_tts(settings, VoiceProvider.SARVAM, "key", "shubh")

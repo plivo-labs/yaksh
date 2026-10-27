@@ -19,7 +19,7 @@ Status: accepted. Changes 0005 (voices of any text-to-speech provider) and 0027 
 - **Key checks.** A speech-to-text key is checked when a short English clip gives a transcript with words. A text-to-speech key is checked when a voice that every account of the provider has speaks one word. Sarvam has one key for both, and both checks run.
 - **Addresses.** Each provider's key is bound to its address field, as in 0027: a URL, or Azure's region. The address is compared again when the key is saved, so a key is never saved next to an address that changed while it was checked.
 - **Voices.** A provider with voice lookup (ElevenLabs, Nimble) fills a voice's details from its ID. For the other providers, the details are entered by hand, and Yaksh saves the voice only after the provider speaks a line in it.
-- **Nimble.** Nimble has its own Auth ID and Auth token, bound to a base URL that the user sets for their region. A Nimble error before any audio of a reply is tried once more; any later error ends the call, because a replay would repeat words that the agent heard. Nimble never falls back to another provider's voice.
+- **Nimble.** Nimble has its own Auth ID and Auth token, bound to a base URL that the user sets for their region. As with Plivo, a change saves both or removes both, so a check never pairs a new half with an old half. A Nimble error before any audio of a reply is tried once more; any later error ends the call, because a replay would repeat words that the agent heard. Nimble never falls back to another provider's voice.
 - **Deploys.** Old processes do not know the new providers. Change the speech settings, and add voices of new providers, only after every process runs this release.
 
 ## Why

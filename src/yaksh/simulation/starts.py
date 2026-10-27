@@ -21,6 +21,7 @@ from yaksh.domain.scenarios import DataSet
 from yaksh.domain.settings import AppSettings
 from yaksh.domain.speech import SttProvider
 from yaksh.domain.triggers import check_agent_data
+from yaksh.domain.voices import VoiceProvider
 from yaksh.simulation.agents import config_of as agent_config_of
 from yaksh.simulation.languages import LANGUAGES
 from yaksh.simulation.numbers import inbound_problem, outbound_problem, phone_problem
@@ -150,12 +151,7 @@ async def snapshot(
         config = persona_config_of(persona)
         if transport is Transport.PHONE:
             check_heard(app.speech.stt, current.languages, config.language, persona.name)
-            if app.tts_credential(config.voice.provider) is None:
-                raise ValidationError(
-                    f'phone calls are off: the persona "{persona.name}" uses a '
-                    f"{config.voice.provider.label} voice; add the {config.voice.provider.label} "
-                    "key in Settings"
-                )
+            check_persona_voice(app, config.voice.provider, config.language, persona.name)
         wants = scenario_config_of(scenario)
         if trigger is not None:
             check_agent_data(trigger, wants, scenario.name)
@@ -202,6 +198,23 @@ def check_heard(
         raise ValidationError(
             f"speech to text ({stt.label}) doesn't hear {answer.label}, which the agent "
             f'answers the persona "{persona}" in; choose another provider in Settings'
+        )
+
+
+def check_persona_voice(
+    app: AppSettings, provider: VoiceProvider, language: Language, persona: str
+) -> None:
+    """Refuse a phone call whose persona speaks with a provider that has no key, or that does
+    not speak the persona's language."""
+    if app.tts_credential(provider) is None:
+        raise ValidationError(
+            f'phone calls are off: the persona "{persona}" uses a {provider.label} voice; add '
+            f"the {provider.label} key in Settings"
+        )
+    if language not in provider.traits.languages:
+        raise ValidationError(
+            f"text to speech ({provider.label}) doesn't speak {language.label}, the language of "
+            f'the persona "{persona}"; choose a voice of another provider'
         )
 
 

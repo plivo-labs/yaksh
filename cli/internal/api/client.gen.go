@@ -5593,6 +5593,11 @@ type ClientInterface interface {
 	// Corresponds with PUT /api/v1/settings/nimble (the `PutNimbleAccountApiV1SettingsNimblePut` operationId).
 	PutNimbleAccountApiV1SettingsNimblePut(ctx context.Context, body PutNimbleAccountApiV1SettingsNimblePutJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// DeletePlivoAccountApiV1SettingsPlivoDelete Delete Plivo Account
+	//
+	// Corresponds with DELETE /api/v1/settings/plivo (the `DeletePlivoAccountApiV1SettingsPlivoDelete` operationId).
+	DeletePlivoAccountApiV1SettingsPlivoDelete(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// PutPlivoAccountApiV1SettingsPlivoPutWithBody Put Plivo Account
 	//
 	// Save the Auth ID and Auth token of a Plivo account together, after Plivo accepts them;
@@ -5622,6 +5627,8 @@ type ClientInterface interface {
 	TestProviderApiV1SettingsProvidersProviderTestPost(ctx context.Context, provider Provider, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// DeleteSecretApiV1SettingsSecretsNameDelete Delete Secret
+	//
+	// Remove one key; the halves of a Plivo or Nimble account are removed together.
 	//
 	// Corresponds with DELETE /api/v1/settings/secrets/{name} (the `DeleteSecretApiV1SettingsSecretsNameDelete` operationId).
 	DeleteSecretApiV1SettingsSecretsNameDelete(ctx context.Context, name SecretName, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -8028,6 +8035,21 @@ func (c *Client) PutNimbleAccountApiV1SettingsNimblePut(ctx context.Context, bod
 	return c.Client.Do(req)
 }
 
+// DeletePlivoAccountApiV1SettingsPlivoDelete Delete Plivo Account
+//
+// Corresponds with DELETE /api/v1/settings/plivo (the `DeletePlivoAccountApiV1SettingsPlivoDelete` operationId).
+func (c *Client) DeletePlivoAccountApiV1SettingsPlivoDelete(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeletePlivoAccountApiV1SettingsPlivoDeleteRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // PutPlivoAccountApiV1SettingsPlivoPutWithBody Put Plivo Account
 //
 // Save the Auth ID and Auth token of a Plivo account together, after Plivo accepts them;
@@ -8087,6 +8109,8 @@ func (c *Client) TestProviderApiV1SettingsProvidersProviderTestPost(ctx context.
 }
 
 // DeleteSecretApiV1SettingsSecretsNameDelete Delete Secret
+//
+// Remove one key; the halves of a Plivo or Nimble account are removed together.
 //
 // Corresponds with DELETE /api/v1/settings/secrets/{name} (the `DeleteSecretApiV1SettingsSecretsNameDelete` operationId).
 func (c *Client) DeleteSecretApiV1SettingsSecretsNameDelete(ctx context.Context, name SecretName, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -12511,6 +12535,33 @@ func NewPutNimbleAccountApiV1SettingsNimblePutRequestWithBody(server string, con
 	return req, nil
 }
 
+// NewDeletePlivoAccountApiV1SettingsPlivoDeleteRequest constructs an http.Request for the DeletePlivoAccountApiV1SettingsPlivoDelete method
+func NewDeletePlivoAccountApiV1SettingsPlivoDeleteRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/settings/plivo")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewPutPlivoAccountApiV1SettingsPlivoPutRequest calls the generic PutPlivoAccountApiV1SettingsPlivoPut builder with application/json body
 func NewPutPlivoAccountApiV1SettingsPlivoPutRequest(server string, body PutPlivoAccountApiV1SettingsPlivoPutJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
@@ -14706,6 +14757,13 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with PUT /api/v1/settings/nimble (the `PutNimbleAccountApiV1SettingsNimblePut` operationId).
 	PutNimbleAccountApiV1SettingsNimblePutWithResponse(ctx context.Context, body PutNimbleAccountApiV1SettingsNimblePutJSONRequestBody, reqEditors ...RequestEditorFn) (*PutNimbleAccountApiV1SettingsNimblePutResponse, error)
 
+	// DeletePlivoAccountApiV1SettingsPlivoDeleteWithResponse Delete Plivo Account
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with DELETE /api/v1/settings/plivo (the `DeletePlivoAccountApiV1SettingsPlivoDelete` operationId).
+	DeletePlivoAccountApiV1SettingsPlivoDeleteWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*DeletePlivoAccountApiV1SettingsPlivoDeleteResponse, error)
+
 	// PutPlivoAccountApiV1SettingsPlivoPutWithBodyWithResponse Put Plivo Account
 	//
 	// Save the Auth ID and Auth token of a Plivo account together, after Plivo accepts them;
@@ -14737,6 +14795,8 @@ type ClientWithResponsesInterface interface {
 	TestProviderApiV1SettingsProvidersProviderTestPostWithResponse(ctx context.Context, provider Provider, reqEditors ...RequestEditorFn) (*TestProviderApiV1SettingsProvidersProviderTestPostResponse, error)
 
 	// DeleteSecretApiV1SettingsSecretsNameDeleteWithResponse Delete Secret
+	//
+	// Remove one key; the halves of a Plivo or Nimble account are removed together.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -19394,6 +19454,54 @@ func (r PutNimbleAccountApiV1SettingsNimblePutResponse) ContentType() string {
 	return ""
 }
 
+type DeletePlivoAccountApiV1SettingsPlivoDeleteResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *SettingsRead
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r DeletePlivoAccountApiV1SettingsPlivoDeleteResponse) GetJSON200() *SettingsRead {
+	return r.JSON200
+}
+
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r DeletePlivoAccountApiV1SettingsPlivoDeleteResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
+}
+
+// GetBody returns the raw response body bytes
+func (r DeletePlivoAccountApiV1SettingsPlivoDeleteResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r DeletePlivoAccountApiV1SettingsPlivoDeleteResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeletePlivoAccountApiV1SettingsPlivoDeleteResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r DeletePlivoAccountApiV1SettingsPlivoDeleteResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type PutPlivoAccountApiV1SettingsPlivoPutResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -22398,6 +22506,19 @@ func (c *ClientWithResponses) PutNimbleAccountApiV1SettingsNimblePutWithResponse
 	return ParsePutNimbleAccountApiV1SettingsNimblePutResponse(rsp)
 }
 
+// DeletePlivoAccountApiV1SettingsPlivoDeleteWithResponse Delete Plivo Account
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /api/v1/settings/plivo (the `DeletePlivoAccountApiV1SettingsPlivoDelete` operationId).
+func (c *ClientWithResponses) DeletePlivoAccountApiV1SettingsPlivoDeleteWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*DeletePlivoAccountApiV1SettingsPlivoDeleteResponse, error) {
+	rsp, err := c.DeletePlivoAccountApiV1SettingsPlivoDelete(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeletePlivoAccountApiV1SettingsPlivoDeleteResponse(rsp)
+}
+
 // PutPlivoAccountApiV1SettingsPlivoPutWithBodyWithResponse Put Plivo Account
 //
 // Save the Auth ID and Auth token of a Plivo account together, after Plivo accepts them;
@@ -22447,6 +22568,8 @@ func (c *ClientWithResponses) TestProviderApiV1SettingsProvidersProviderTestPost
 }
 
 // DeleteSecretApiV1SettingsSecretsNameDeleteWithResponse Delete Secret
+//
+// Remove one key; the halves of a Plivo or Nimble account are removed together.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -25936,6 +26059,39 @@ func ParsePutNimbleAccountApiV1SettingsNimblePutResponse(rsp *http.Response) (*P
 	}
 
 	response := &PutNimbleAccountApiV1SettingsNimblePutResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest SettingsRead
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseDeletePlivoAccountApiV1SettingsPlivoDeleteResponse parses an HTTP response from a DeletePlivoAccountApiV1SettingsPlivoDeleteWithResponse call
+func ParseDeletePlivoAccountApiV1SettingsPlivoDeleteResponse(rsp *http.Response) (*DeletePlivoAccountApiV1SettingsPlivoDeleteResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeletePlivoAccountApiV1SettingsPlivoDeleteResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}

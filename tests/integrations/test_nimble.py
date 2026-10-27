@@ -7,29 +7,26 @@ from typing import Any
 
 import pytest
 from pipecat.frames.frames import (
-    EndFrame,
-    ErrorFrame,
     Frame,
     TTSAudioRawFrame,
     TTSSpeakFrame,
     TTSStoppedFrame,
     TTSTextFrame,
 )
-from pipecat.pipeline.pipeline import Pipeline
-from pipecat.pipeline.worker import PipelineParams, PipelineWorker
+from pipecat.pipeline.worker import PipelineParams
 from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
-from pipecat.workers.runner import WorkerRunner
 from websockets.asyncio.server import ServerConnection, serve
 
 from yaksh.domain.errors import UnavailableError
 from yaksh.domain.languages import Language
 from yaksh.domain.settings import AppSettings, Nimble
 from yaksh.domain.voices import VoiceProvider, VoiceSettings
-from yaksh.integrations.speech.audio import speak_once
-from yaksh.integrations.speech.nimble import tts
+from yaksh.integrations.speech.audio import one_shot, speak_once
+from yaksh.integrations.speech.nimble import NimbleTTSService, tts
 
 CREDENTIAL = "MAID:token"
 VOICE = VoiceSettings(provider=VoiceProvider.NIMBLE, id="t4", speed=0.9)
+PARAMS = PipelineParams(audio_out_sample_rate=8000)
 
 
 def audio_frame(context_id: str, audio: bytes) -> bytes:
@@ -57,6 +54,9 @@ class Gateway:
 
     def openings(self) -> list[dict[str, Any]]:
         return [message for message in self.messages if "voice_id" in message]
+
+    def cancels(self) -> list[str]:
+        return [m["context_id"] for m in self.messages if m.get("type") == "cancel"]
 
 
 @pytest.fixture
@@ -97,22 +97,19 @@ class Frames(FrameProcessor):
 async def frames_of(settings: AppSettings, text: str) -> list[Frame]:
     """Every frame a one-shot Nimble service sends for the text."""
     frames = Frames()
-    worker = PipelineWorker(
-        Pipeline([tts(settings, VOICE, Language.HI, CREDENTIAL, one_shot=True), frames]),
-        params=PipelineParams(audio_out_sample_rate=8000),
-        idle_timeout_secs=None,
-        enable_rtvi=False,
-    )
-    runner = WorkerRunner(handle_sigint=False)
-    await runner.add_workers(worker)
-    running = asyncio.create_task(runner.run())
-    await worker.queue_frame(TTSSpeakFrame(text))
-    async with asyncio.timeout(5):
-        await frames.stopped.wait()
-    await worker.queue_frame(EndFrame())
-    async with asyncio.timeout(5):
-        await running
+    service = tts(settings, VOICE, Language.HI, CREDENTIAL, one_shot=True)
+    async with one_shot([service, frames], PARAMS, frames.stopped) as run:
+        await run.worker.queue_frame(TTSSpeakFrame(text))
+        async with asyncio.timeout(5):
+            await frames.stopped.wait()
+    assert run.errors == []
     return frames.seen
+
+
+async def until(condition: Callable[[], bool]) -> None:
+    async with asyncio.timeout(5):
+        while not condition():
+            await asyncio.sleep(0.01)
 
 
 async def test_a_reply_opens_a_context_streams_its_audio_and_times_each_word(
@@ -147,13 +144,17 @@ async def test_a_reply_opens_a_context_streams_its_audio_and_times_each_word(
     audio = b"".join(frame.audio for frame in seen if isinstance(frame, TTSAudioRawFrame))
     assert len(audio) == 1600
     assert [frame.text for frame in seen if isinstance(frame, TTSTextFrame)] == ["Haan", "ji"]
+    assert fake.cancels() == []
 
 
 async def test_a_reply_without_audio_is_tried_once_more_after_an_error_that_may_pass(
     gateway: Callable[..., Awaitable[Gateway]],
 ) -> None:
+    refused: list[str] = []
+
     async def reply(socket: ServerConnection, context_id: str) -> None:
-        if not context_id.endswith("-retry"):
+        if not refused:
+            refused.append(context_id)
             await socket.send(
                 json.dumps({"type": "error", "context_id": context_id, "code": "at_capacity"})
             )
@@ -168,7 +169,7 @@ async def test_a_reply_without_audio_is_tried_once_more_after_an_error_that_may_
     )
 
     first, retry = fake.openings()
-    assert retry["context_id"] == f"{first['context_id']}-retry"
+    assert retry["context_id"] != first["context_id"]
     assert (retry["text"], retry["finish"]) == (first["text"], True)
     assert len(audio) == 800
 
@@ -200,28 +201,44 @@ async def test_a_socket_lost_during_a_call_reply_ends_the_call(
 
     fake = await gateway(reply)
     service = tts(settings_for(fake), VOICE, Language.HI, CREDENTIAL, one_shot=False)
-    worker = PipelineWorker(
-        Pipeline([service]),
-        params=PipelineParams(audio_out_sample_rate=8000),
-        idle_timeout_secs=None,
-        enable_rtvi=False,
-    )
-    errors: list[str] = []
     failed = asyncio.Event()
 
-    @worker.event_handler("on_pipeline_error")
-    async def on_error(_worker: object, frame: ErrorFrame) -> None:
-        errors.append(frame.error)
-        failed.set()
+    async with one_shot([service], PARAMS, failed) as run:
+        await run.worker.queue_frame(TTSSpeakFrame("Haan ji."))
+        async with asyncio.timeout(5):
+            await failed.wait()
 
-    runner = WorkerRunner(handle_sigint=False)
-    await runner.add_workers(worker)
-    running = asyncio.create_task(runner.run())
-    await worker.queue_frame(TTSSpeakFrame("Haan ji."))
-    async with asyncio.timeout(5):
-        await failed.wait()
-    await runner.cancel()
-    await asyncio.gather(running, return_exceptions=True)
-
-    assert errors == ["Nimble's socket closed during a reply"]
+    assert run.errors == ["Nimble's socket closed during a reply"]
     assert not service.is_usable
+    assert len(fake.authorization) == 1
+
+
+async def test_a_reply_that_goes_quiet_is_stopped_and_a_later_lost_socket_opens_again(
+    gateway: Callable[..., Awaitable[Gateway]],
+) -> None:
+    sockets: list[ServerConnection] = []
+
+    async def reply(socket: ServerConnection, context_id: str) -> None:
+        sockets.append(socket)
+        await socket.send(audio_frame(context_id, bytes(800)))
+
+    fake = await gateway(reply)
+    service = NimbleTTSService(
+        credential=CREDENTIAL,
+        base_url=fake.url,
+        voice="t4",
+        language=Language.HI,
+        pace=0.9,
+        stop_frame_timeout_s=0.2,
+        reconnect_on_error=True,
+    )
+
+    async with one_shot([service], PARAMS, asyncio.Event()) as run:
+        await run.worker.queue_frame(TTSSpeakFrame("Haan ji."))
+        await until(lambda: len(fake.cancels()) == 1)
+        await sockets[0].close(code=1011)
+        await until(lambda: len(fake.authorization) == 2)
+
+    assert fake.cancels() == [fake.openings()[0]["context_id"]]
+    assert run.errors == []
+    assert service.is_usable

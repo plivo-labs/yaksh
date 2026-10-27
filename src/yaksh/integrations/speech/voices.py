@@ -25,6 +25,8 @@ class SpeechVoiceClient:
         return await lookup(self._settings, self._credential, voice_id)
 
     async def speak(self, voice: VoiceSettings, language: Language, text: str) -> bytes:
+        """A setting the provider's service refuses, such as an unknown model, fails the speech
+        as the provider's own refusal does."""
         try:
             service = tts_service(self._settings, voice, language, self._credential, one_shot=True)
             return as_wav(await speak_once(service, text))

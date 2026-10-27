@@ -12,7 +12,7 @@ from pydantic import (
     model_validator,
 )
 
-from yaksh.domain.languages import Language
+from yaksh.domain.languages import INDIAN_AND_ENGLISH, INDIAN_ENGLISH_AND_SPANISH, Language
 
 PROVIDER_VOICE_ID = r"^[A-Za-z0-9_-]+$"
 
@@ -44,20 +44,35 @@ class TtsTraits:
     """False: the provider times whole sentences, so a cut-off reply is cut at a sentence."""
     lookup: bool
     """The provider describes a voice by its ID; otherwise the person enters the details."""
-    languages: frozenset[Language] = frozenset(Language)
+    languages: frozenset[Language]
     """The languages of Yaksh's that the provider can speak."""
 
 
-INDIAN_AND_ENGLISH = frozenset(Language) - {Language.ES}
 TTS = {
     VoiceProvider.ELEVENLABS: TtsTraits(
-        "ElevenLabs", (0.7, 1.2), word_timestamps=True, lookup=True
+        "ElevenLabs",
+        (0.7, 1.2),
+        word_timestamps=True,
+        lookup=True,
+        languages=INDIAN_ENGLISH_AND_SPANISH,
     ),
-    VoiceProvider.CARTESIA: TtsTraits("Cartesia", (0.6, 1.5), word_timestamps=True, lookup=False),
+    VoiceProvider.CARTESIA: TtsTraits(
+        "Cartesia",
+        (0.6, 1.5),
+        word_timestamps=True,
+        lookup=False,
+        languages=INDIAN_ENGLISH_AND_SPANISH,
+    ),
     VoiceProvider.SARVAM: TtsTraits(
         "Sarvam", (0.5, 2.0), word_timestamps=False, lookup=False, languages=INDIAN_AND_ENGLISH
     ),
-    VoiceProvider.AZURE: TtsTraits("Azure", (0.5, 2.0), word_timestamps=True, lookup=False),
+    VoiceProvider.AZURE: TtsTraits(
+        "Azure",
+        (0.5, 2.0),
+        word_timestamps=True,
+        lookup=False,
+        languages=INDIAN_ENGLISH_AND_SPANISH,
+    ),
     VoiceProvider.NIMBLE: TtsTraits(
         "Nimble", (0.7, 1.0), word_timestamps=True, lookup=True, languages=INDIAN_AND_ENGLISH
     ),

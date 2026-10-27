@@ -9,6 +9,7 @@ and the audio. Events are JSON: `timestamps`, `warning`, `error` (ends the conte
 and `done`."""
 
 import base64
+import itertools
 import json
 from dataclasses import dataclass, field
 from typing import Any
@@ -24,22 +25,11 @@ from yaksh.diagnostics import describe_exception
 from yaksh.domain.errors import UnavailableError
 from yaksh.domain.languages import Language
 from yaksh.domain.settings import AppSettings
-from yaksh.domain.voices import ProviderVoice, VoiceGender, VoiceSettings
+from yaksh.domain.voices import ProviderVoice, VoiceGender, VoiceProvider, VoiceSettings
 from yaksh.integrations.speech.audio import SAMPLE_RATE, quiet_s
 from yaksh.integrations.speech.vendor import TtsVendor
 
-LANGUAGES = frozenset(
-    {
-        Language.EN,
-        Language.HI,
-        Language.BN,
-        Language.TA,
-        Language.TE,
-        Language.MR,
-        Language.GU,
-        Language.KN,
-    }
-)
+LANGUAGES = VoiceProvider.NIMBLE.traits.languages
 """The languages Nimble pins; it speaks no other of Yaksh's."""
 RETRYABLE = frozenset(
     {"auth_unavailable", "concurrency_limit", "at_capacity", "draining", "backend_error"}
@@ -63,8 +53,8 @@ def basic_auth(credential: str) -> str:
 class Reply:
     """One reply: its gateway context, the text sent so far, and its pending timestamp group."""
 
-    gateway_id: str
-    text: str = ""
+    text: str
+    gateway_id: str = ""
     finished: bool = False
     has_audio: bool = False
     retried: bool = False
@@ -103,6 +93,7 @@ class NimbleTTSService(WebsocketTTSService):
         self._replies: dict[str, Reply] = {}
         """Each open reply by Pipecat's context id."""
         self._by_gateway: dict[str, str] = {}
+        self._openings = itertools.count(1)
         self._receive_task = None
 
     def can_generate_metrics(self) -> bool:
@@ -146,16 +137,18 @@ class NimbleTTSService(WebsocketTTSService):
             await self._call_event_handler("on_disconnected")
 
     async def _reconnect_websocket(self, attempt_number: int) -> bool:
-        """A socket lost during a reply loses the reply: Pipecat closes its audio context, so
-        the reply can be neither finished nor sent again. That ends the call, as any other
-        Nimble failure does; a socket lost between replies is opened again."""
-        if self._replies:
-            self._replies.clear()
-            self._by_gateway.clear()
-            await self.push_error(
-                error_msg="Nimble's socket closed during a reply", force_treat_as_permanent=True
-            )
-        return await super()._reconnect_websocket(attempt_number)
+        """A socket lost during a reply loses the reply: the gateway does not resume it on a new
+        socket, and replaying it would repeat words the agent heard. That ends the call, as any
+        other Nimble failure does; a socket lost between replies is opened again."""
+        if not self._replies:
+            return await super()._reconnect_websocket(attempt_number)
+        self._replies.clear()
+        self._by_gateway.clear()
+        await self._close_connection_contexts()
+        await self.push_error(
+            error_msg="Nimble's socket closed during a reply", force_treat_as_permanent=True
+        )
+        return False
 
     def _get_websocket(self) -> Any:
         if self._websocket:
@@ -166,7 +159,11 @@ class NimbleTTSService(WebsocketTTSService):
         await self._get_websocket().send(json.dumps(message))
 
     async def _open(self, context_id: str, reply: Reply) -> None:
-        """Open the reply's gateway context with every piece of text it has so far."""
+        """Open a gateway context for the reply with every piece of text it has so far. Each
+        opening gets a new id: Pipecat can open a context again under the same id, and nothing
+        the gateway still sends for an earlier opening may reach the new one."""
+        self._by_gateway.pop(reply.gateway_id, None)
+        reply.gateway_id = f"{context_id}-{next(self._openings)}"
         self._by_gateway[reply.gateway_id] = context_id
         await self._send(
             {
@@ -186,7 +183,7 @@ class NimbleTTSService(WebsocketTTSService):
             text = " " + text
         try:
             if reply is None:
-                reply = self._replies[context_id] = Reply(gateway_id=context_id, text=text)
+                reply = self._replies[context_id] = Reply(text=text)
                 await self._open(context_id, reply)
             else:
                 reply.text += text
@@ -210,13 +207,27 @@ class NimbleTTSService(WebsocketTTSService):
         )
 
     async def on_audio_context_interrupted(self, context_id: str) -> None:
-        """Barge-in: the gateway stops the reply and keeps the socket; audio still on its way
-        for the reply is dropped by its context id."""
+        """Barge-in: the gateway stops the reply and keeps the socket."""
         await self.stop_all_metrics()
-        reply = self._replies.pop(context_id, None)
+        await self._stop_reply(context_id)
+        await super().on_audio_context_interrupted(context_id)
+
+    async def on_audio_context_completed(self, context_id: str) -> None:
+        """A reply's context ends after its `done`, or after its audio stopped for Pipecat's
+        quiet time; the gateway stops a reply that never sent `done`."""
+        await self._stop_reply(context_id)
+
+    async def _stop_reply(self, context_id: str) -> None:
+        """Audio still on its way for the reply is dropped by its context id."""
+        reply = self._forget(context_id)
         if reply is not None and self._websocket:
             await self._send({"type": "cancel", "context_id": reply.gateway_id})
-        await super().on_audio_context_interrupted(context_id)
+
+    def _forget(self, context_id: str) -> Reply | None:
+        reply = self._replies.pop(context_id, None)
+        if reply is not None:
+            self._by_gateway.pop(reply.gateway_id, None)
+        return reply
 
     async def _receive_messages(self) -> None:
         async for message in self._get_websocket():
@@ -253,7 +264,7 @@ class NimbleTTSService(WebsocketTTSService):
                 await self.append_to_audio_context(
                     context_id, TTSStoppedFrame(context_id=context_id)
                 )
-                await self._end(context_id, reply)
+                await self._end(context_id)
             case "error":
                 await self._error(context_id, reply, event)
             case "warning":
@@ -282,19 +293,16 @@ class NimbleTTSService(WebsocketTTSService):
         code = event.get("code")
         if code in RETRYABLE and not reply.has_audio and not reply.retried:
             reply.retried = True
-            self._by_gateway.pop(reply.gateway_id, None)
-            reply.gateway_id = f"{context_id}-retry"
             await self._open(context_id, reply)
             return
-        await self._end(context_id, reply)
+        await self._end(context_id)
         await self.push_error(
             error_msg=f"Nimble refused the reply: {code}: {event.get('message')}",
             force_treat_as_permanent=True,
         )
 
-    async def _end(self, context_id: str, reply: Reply) -> None:
-        self._by_gateway.pop(reply.gateway_id, None)
-        self._replies.pop(context_id, None)
+    async def _end(self, context_id: str) -> None:
+        self._forget(context_id)
         await self.remove_audio_context(context_id)
 
 
