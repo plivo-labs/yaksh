@@ -290,3 +290,43 @@ def nearest_rank(ordered: Sequence[int], fraction: float) -> int | None:
     if not ordered:
         return None
     return ordered[math.ceil(fraction * len(ordered)) - 1]
+
+
+STEP_KEYS = (
+    "endpointing_wait",
+    "first_request",
+    "transcription",
+    "turn_detection",
+    "llm_inference",
+    "turn_completion",
+    "waiting_for_user",
+    "llm_tool_call",
+    "function_handler",
+    "awaiting_speakable_text",
+    "sentence_aggregation",
+    "speech_synthesis",
+    "output_transport",
+    "pipeline",
+)
+"""The parts of a reply that Pipecat's latency breakdown names, in the order they happen;
+`pipeline` is the time that no named part covers."""
+
+
+class CallerReplyTime(BaseModel):
+    """Where the time of one caller reply went, from the end of the agent's speech to the
+    caller's first audio, as Pipecat's latency breakdown split it."""
+
+    model_config = ConfigDict(frozen=True)
+
+    audio_index: int
+    """Which caller audio start of the call the reply is: its window in the transcript's caller
+    replies."""
+    total_ms: int
+    steps: dict[str, int]
+    """ms by Pipecat's key; a part that did not happen is absent."""
+
+    def step_times(self) -> dict[str, int]:
+        """Every known part, 0 when absent, then any part that a later Pipecat adds, by name,
+        so the parts of every reply count the same way."""
+        known = {key: self.steps.get(key, 0) for key in STEP_KEYS}
+        return known | {key: self.steps[key] for key in sorted(self.steps) if key not in known}

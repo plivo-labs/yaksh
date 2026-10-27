@@ -1,0 +1,182 @@
+import asyncio
+import json
+import logging
+from types import SimpleNamespace
+from typing import Any, cast
+
+import pytest
+from pipecat.frames.frames import (
+    BotStartedSpeakingFrame,
+    ClientConnectedFrame,
+    Frame,
+    LLMFullResponseStartFrame,
+    LLMTextFrame,
+    MetricsFrame,
+    TranscriptionFrame,
+    TTSAudioRawFrame,
+    TTSSpeakFrame,
+    TTSStartedFrame,
+    VADUserStartedSpeakingFrame,
+    VADUserStoppedSpeakingFrame,
+)
+from pipecat.metrics.metrics import TextAggregationMetricsData, TTFBMetricsData
+from pipecat.observers.base_observer import FramePushed
+from pipecat.processors.frame_processor import FrameDirection
+
+from yaksh.caller.audio import MACHINE
+from yaksh.caller.reply_times import ReplyTimes
+from yaksh.domain.answering import MachineLine
+from yaksh.domain.latency import STEP_KEYS, CallerReplyTime
+
+SOURCE = SimpleNamespace(name="Caller#0")
+AUDIO = b"\0\0" * 160
+
+
+class Call:
+    """Frames pushed to the observer at set times."""
+
+    def __init__(self) -> None:
+        self.now = 0.0
+        self.timer = ReplyTimes({"conversation_id": "c-1"}, now=lambda: self.now)
+
+    async def push(self, at: float, frame: Frame) -> None:
+        self.now = at
+        await self.timer.on_push_frame(
+            FramePushed(
+                source=cast(Any, SOURCE),
+                destination=cast(Any, SOURCE),
+                frame=frame,
+                direction=FrameDirection.DOWNSTREAM,
+                timestamp=0,
+            )
+        )
+
+    async def agent_turn(self, start: float, stop: float) -> None:
+        """The agent speaks from start; the voice detector calls it over 0.6 s after stop."""
+        await self.push(start, VADUserStartedSpeakingFrame())
+        await self.push(
+            stop + 0.6, VADUserStoppedSpeakingFrame(stop_secs=0.6, timestamp=stop + 0.6)
+        )
+
+    async def model_reply(self, at: float) -> None:
+        """The transcript, then the model: first text 0.7 s after the request, audio 0.3 s
+        later, on the line 0.1 s after that."""
+        await self.push(at, TranscriptionFrame("yes", "agent", "now"))
+        await self.push(at + 0.15, LLMFullResponseStartFrame())
+        await self.push(
+            at + 0.85, MetricsFrame(data=[TTFBMetricsData(processor="Caller#0", value=0.7)])
+        )
+        await self.push(at + 0.85, LLMTextFrame("Yes."))
+        await self.push(at + 1.15, TTSAudioRawFrame(AUDIO, 8000, 1))
+        await self.push(at + 1.25, BotStartedSpeakingFrame())
+
+
+async def settled(call: Call) -> list[CallerReplyTime]:
+    await asyncio.sleep(0)
+    return call.timer.replies
+
+
+async def test_a_model_reply_is_kept_with_where_its_time_went() -> None:
+    call = Call()
+    await call.agent_turn(0.0, 2.0)
+    await call.model_reply(2.65)
+
+    assert await settled(call) == [
+        CallerReplyTime(
+            audio_index=0,
+            total_ms=1900,
+            steps={
+                "endpointing_wait": 600,
+                "transcription": 50,
+                "turn_detection": 150,
+                "llm_inference": 700,
+                "speech_synthesis": 300,
+                "output_transport": 100,
+            },
+        )
+    ]
+
+
+async def test_fixed_lines_and_machine_lines_are_not_replies() -> None:
+    call = Call()
+    await call.agent_turn(0.0, 2.0)
+    await call.push(17.0, TTSSpeakFrame("Hello? Are you still there?"))
+    await call.push(17.3, TTSAudioRawFrame(AUDIO, 8000, 1))
+    await call.push(17.4, BotStartedSpeakingFrame())
+    await call.agent_turn(20.0, 22.0)
+    started = TTSStartedFrame()
+    started.metadata[MACHINE] = MachineLine.GREETING
+    await call.push(22.7, started)
+    await call.push(22.8, TTSAudioRawFrame(AUDIO, 8000, 1))
+    await call.push(22.9, BotStartedSpeakingFrame())
+
+    assert await settled(call) == []
+
+
+async def test_the_callers_first_words_before_the_agent_spoke_are_not_a_reply() -> None:
+    call = Call()
+    await call.push(0.0, ClientConnectedFrame())
+    await call.push(0.1, LLMFullResponseStartFrame())
+    await call.push(0.8, LLMTextFrame("Hi."))
+    await call.push(1.0, BotStartedSpeakingFrame())
+
+    assert await settled(call) == []
+
+
+async def test_replies_whose_handlers_run_after_later_frames_keep_their_own_audio_start() -> None:
+    call = Call()
+    await call.push(0.0, TTSSpeakFrame("Hi, I am calling about my booking."))
+    await call.push(0.4, BotStartedSpeakingFrame())
+    await call.agent_turn(3.0, 5.0)
+    await call.model_reply(5.65)
+    await call.agent_turn(9.0, 11.0)
+    await call.model_reply(11.65)
+
+    assert [(reply.audio_index, reply.total_ms) for reply in await settled(call)] == [
+        (1, 1900),
+        (2, 1900),
+    ]
+
+
+async def test_a_reply_whose_breakdown_runs_past_its_own_audio_start_keeps_that_start() -> None:
+    """Pipecat adds the sentence wait to the first text's time, which can land after the audio
+    started; the fixed goodbye that follows is not part of the reply."""
+    call = Call()
+    await call.agent_turn(0.0, 2.0)
+    await call.push(2.65, TranscriptionFrame("bye", "agent", "now"))
+    await call.push(2.8, LLMFullResponseStartFrame())
+    await call.push(3.5, MetricsFrame(data=[TTFBMetricsData(processor="Caller#0", value=0.7)]))
+    await call.push(3.5, LLMTextFrame("Okay."))
+    await call.push(
+        3.8, MetricsFrame(data=[TextAggregationMetricsData(processor="Caller#0", value=1.0)])
+    )
+    await call.push(3.8, TTSAudioRawFrame(AUDIO, 8000, 1))
+    await call.push(3.9, BotStartedSpeakingFrame())
+    await call.push(4.2, TTSSpeakFrame("Okay, thanks. I have to go now. Bye."))
+    await call.push(4.6, BotStartedSpeakingFrame())
+
+    [reply] = await settled(call)
+    assert (reply.audio_index, reply.total_ms) == (0, 1900)
+    assert sum(reply.steps.values()) == 1900
+    assert "pipeline" not in reply.steps
+
+
+async def test_each_reply_is_logged_on_one_line_with_every_part(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    call = Call()
+    with caplog.at_level(logging.INFO, logger="yaksh.caller.reply_times"):
+        await call.agent_turn(0.0, 2.0)
+        await call.model_reply(2.65)
+        await settled(call)
+
+    [line] = caplog.messages
+    event, payload = line.split(" ", 1)
+    fields = json.loads(payload)
+    assert event == "caller_reply_time"
+    assert fields["conversation_id"] == "c-1"
+    assert fields["reply"] == 0
+    assert fields["total_ms"] == 1900
+    assert fields["llm_inference_ms"] == 700
+    assert fields["pipeline_ms"] == 0
+    assert {f"{key}_ms" for key in STEP_KEYS} <= fields.keys()
