@@ -8,7 +8,7 @@ description: Start Yaksh with Docker Compose. Then make a test call.
 You must have:
 
 - Docker with Docker Compose 2.24 or later.
-- An account with Plivo, Deepgram, OpenAI and ElevenLabs.
+- An account with Plivo and OpenAI, a speech-to-text provider (for example Deepgram), and a text-to-speech provider (for example ElevenLabs, which the built-in personas use).
 - A voice number in your Plivo account that no Plivo application receives.
 - A voice agent with a phone number.
 
@@ -38,7 +38,7 @@ You must have:
    Docker gets the image of the newest Yaksh release. Do not stop this command. Do the next steps in a second terminal. If you stop this command, all the containers stop.
 
 6. Open the console at http://localhost:8000. Enter the value of `YAKSH_API_TOKEN`.
-7. The console opens on **Settings**. Add the LLM provider key, the Deepgram key, the ElevenLabs key, and the Plivo Auth ID and Auth token. Yaksh checks each key with its provider before it saves it. Refer to [Configuration](/docs/configuration).
+7. The console opens on **Settings**. Add the LLM provider key, the speech-to-text key, the text-to-speech key, and the Plivo Auth ID and Auth token. Yaksh checks each key with its provider before it saves it. Refer to [Configuration](/docs/configuration).
 
 The API is at `/api/v1`. Send the token in the `Authorization` header as a bearer token. If a request fails, the body of the response is `{"error": {"code": "...", "message": "..."}}`. For a validation error, `error` also has `details`.
 

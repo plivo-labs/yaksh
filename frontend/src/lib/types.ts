@@ -645,7 +645,7 @@ export interface PhoneAccount {
   test_numbers: number;
 }
 
-export type VoiceProvider = "elevenlabs" | "cartesia" | "sarvam" | "azure";
+export type VoiceProvider = "elevenlabs" | "cartesia" | "sarvam" | "azure" | "nimble";
 
 export interface VoiceSettings {
   provider: VoiceProvider;
@@ -1700,6 +1700,7 @@ export interface SettingsValues {
   cartesia: { url: string; model: string };
   sarvam_tts: { base_url: string; model: string };
   azure: { region: string };
+  nimble: { base_url: string };
   caller: CallerModel;
   generation: { model: string | null; reasoning_effort: string | null; timeout_s: number };
   brief: { model: string; reasoning_effort: string | null; timeout_s: number };
@@ -1744,6 +1745,8 @@ export type SecretName =
   | "elevenlabs_api_key"
   | "cartesia_api_key"
   | "azure_api_key"
+  | "nimble_auth_id"
+  | "nimble_auth_token"
   | "typesafe_api_key"
   | "plivo_auth_id"
   | "plivo_auth_token"
@@ -1775,6 +1778,7 @@ export type SettingsProvider =
   | "cartesia"
   | "sarvam_tts"
   | "azure"
+  | "nimble"
   | "typesafe"
   | "plivo";
 

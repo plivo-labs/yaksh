@@ -20,7 +20,7 @@ from yaksh.domain.speech import SttProvider
 from yaksh.domain.voices import ProviderVoice, VoiceProvider
 from yaksh.integrations import provider_checks
 from yaksh.integrations.provider_checks import ProviderCheckError
-from yaksh.settings import store
+from yaksh.settings import service, store
 from yaksh.settings.cipher import Cipher, SecretUnreadableError
 
 LLM_KEY = "sk-live-0123456789abcdef"
@@ -525,3 +525,32 @@ async def test_a_phone_run_cannot_start_while_a_persona_voice_has_no_key(
         'phone calls are off: the persona "Sarvam caller" uses a Sarvam voice; '
         "add the Sarvam key in Settings"
     )
+
+
+async def test_nimble_credentials_are_saved_together_and_checked_at_their_gateway(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    checked: list[tuple[str, str]] = []
+
+    async def check_tts(settings: Any, provider: VoiceProvider, credential: str) -> None:
+        checked.append((settings.nimble.base_url, credential))
+
+    monkeypatch.setattr(service, "check_tts", check_tts)
+    half = await client.put(
+        "/api/v1/settings/secrets/nimble_auth_id", json={"value": "MANIMBLE01234"}
+    )
+    both = await client.put(
+        "/api/v1/settings/nimble",
+        json={
+            "auth_id": "MANIMBLE01234",
+            "auth_token": "nimble-token-0123",
+            "base_url": "https://gateway.example",
+        },
+    )
+
+    assert half.status_code == 422 and "together" in half.text
+    assert both.status_code == 200, both.text
+    assert checked == [("https://gateway.example", "MANIMBLE01234:nimble-token-0123")]
+    saved = both.json()
+    assert saved["values"]["nimble"]["base_url"] == "https://gateway.example"
+    assert {"nimble_auth_id", "nimble_auth_token"} <= set(saved["secrets"])

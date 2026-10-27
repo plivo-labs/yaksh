@@ -28,9 +28,9 @@ class Providers:
         """A client for each voice provider with a saved key, built from these settings, so a
         new model, address or key applies to the next request."""
         return {
-            provider: SpeechVoiceClient(settings, provider, key.get_secret_value())
+            provider: SpeechVoiceClient(settings, provider, credential)
             for provider in VoiceProvider
-            if (key := settings.tts_key(provider)) is not None
+            if (credential := settings.tts_credential(provider)) is not None
         }
 
     def generation_model(self, settings: AppSettings) -> JsonModel | None:

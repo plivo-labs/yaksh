@@ -29,6 +29,7 @@ from yaksh.integrations.speech import audio
 from yaksh.integrations.speech.audio import Resample8k, speak_once
 from yaksh.integrations.speech.deepgram import deepgram_language
 from yaksh.integrations.speech.stt import stt_service
+from yaksh.integrations.speech.tts import VENDORS as TTS_VENDORS
 from yaksh.integrations.speech.tts import tts_service
 from yaksh.settings.service import check_clip
 
@@ -201,3 +202,10 @@ def test_one_shot_speech_does_not_reconnect_a_dropped_socket(provider: VoiceProv
     on_a_call = cast(WebsocketTTSService, tts_service(AppSettings(), voice, Language.EN, "k"))
 
     assert (one_shot._reconnect_on_error, on_a_call._reconnect_on_error) == (False, True)
+
+
+def test_every_voice_provider_has_a_vendor_and_looks_voices_up_as_its_traits_say() -> None:
+    assert set(TTS_VENDORS) == set(VoiceProvider)
+    assert {provider: TTS_VENDORS[provider].lookup is not None for provider in VoiceProvider} == {
+        provider: provider.traits.lookup for provider in VoiceProvider
+    }

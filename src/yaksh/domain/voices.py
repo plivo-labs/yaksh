@@ -24,6 +24,7 @@ class VoiceProvider(StrEnum):
     CARTESIA = "cartesia"
     SARVAM = "sarvam"
     AZURE = "azure"
+    NIMBLE = "nimble"
 
     @property
     def label(self) -> str:
@@ -52,6 +53,7 @@ TTS = {
     VoiceProvider.CARTESIA: TtsTraits("Cartesia", (0.6, 1.5), word_timestamps=True, lookup=False),
     VoiceProvider.SARVAM: TtsTraits("Sarvam", (0.5, 2.0), word_timestamps=False, lookup=False),
     VoiceProvider.AZURE: TtsTraits("Azure", (0.5, 2.0), word_timestamps=True, lookup=False),
+    VoiceProvider.NIMBLE: TtsTraits("Nimble", (0.7, 1.0), word_timestamps=True, lookup=True),
 }
 
 

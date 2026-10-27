@@ -33,8 +33,10 @@ def tts(
     )
 
 
+async def check_voice(_settings: AppSettings, _key: str) -> str:
+    return CHECK_VOICE
+
+
 TTS = TtsVendor(
-    model=lambda settings: settings.cartesia.model,
-    service=tts,
-    check_voice=lambda _settings: CHECK_VOICE,
+    model=lambda settings: settings.cartesia.model, service=tts, check_voice=check_voice
 )

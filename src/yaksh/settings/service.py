@@ -11,7 +11,7 @@ from typing import Any
 
 import yaml
 
-from yaksh.domain.errors import ValidationError
+from yaksh.domain.errors import UnavailableError, ValidationError
 from yaksh.domain.settings import (
     KEY_URLS,
     STT_KEYS,
@@ -52,6 +52,7 @@ class Provider(StrEnum):
     CARTESIA = "cartesia"
     SARVAM_TTS = "sarvam_tts"
     AZURE = "azure"
+    NIMBLE = "nimble"
     TYPESAFE = "typesafe"
     PLIVO = "plivo"
 
@@ -70,16 +71,26 @@ TTS_TESTS = {
     Provider.CARTESIA: VoiceProvider.CARTESIA,
     Provider.SARVAM_TTS: VoiceProvider.SARVAM,
     Provider.AZURE: VoiceProvider.AZURE,
+    Provider.NIMBLE: VoiceProvider.NIMBLE,
 }
 """The text-to-speech test of each provider, which speaks one word."""
-TTS_OF_KEY = {key: provider for provider, key in TTS_KEYS.items()}
+NIMBLE_SECRETS = TTS_KEYS[VoiceProvider.NIMBLE]
+TTS_OF_KEY = {names[0]: provider for provider, names in TTS_KEYS.items() if len(names) == 1}
+"""The voice provider of each single key; Nimble's pair is checked together."""
 
 CHECK_CLIP = SOUNDS / "answering" / "iphone_screen_ack.wav"
 """8 kHz speech that every speech-to-text provider must transcribe to pass its check."""
 
 
-def check_voice(settings: AppSettings, provider: VoiceProvider) -> str:
-    return tts_check_voice(settings, provider, builtin_voices()[0].provider_voice_id)
+async def check_tts(settings: AppSettings, provider: VoiceProvider, credential: str) -> None:
+    """One word in a voice the account has: ElevenLabs speaks with Yaksh's first built-in
+    voice."""
+    builtin = builtin_voices()[0].provider_voice_id
+    try:
+        voice = await tts_check_voice(settings, provider, credential, builtin)
+    except UnavailableError as error:
+        raise ProviderCheckError(f"{provider.label}: {error}") from None
+    await checks.check_tts(settings, provider, credential, voice)
 
 
 def check_clip() -> bytes:
@@ -112,10 +123,18 @@ async def test_provider(settings: AppSettings, provider: Provider) -> str:
             key = required(getattr(secrets, STT_KEYS[stt].value), f"the {stt.label} key")
             await checks.check_stt(settings, stt, key, check_clip())
             return f"{stt.label} transcribed a test clip."
-        case Provider.ELEVENLABS | Provider.CARTESIA | Provider.SARVAM_TTS | Provider.AZURE:
+        case (
+            Provider.ELEVENLABS
+            | Provider.CARTESIA
+            | Provider.SARVAM_TTS
+            | Provider.AZURE
+            | Provider.NIMBLE
+        ):
             tts = TTS_TESTS[provider]
-            key = required(settings.tts_key(tts), f"the {tts.label} key")
-            await checks.check_tts(settings, tts, key, check_voice(settings, tts))
+            credential = settings.tts_credential(tts)
+            if credential is None:
+                raise ProviderCheckError(f"the {tts.label} key is not saved")
+            await check_tts(settings, tts, credential)
             return f"{tts.label} spoke a test word."
         case Provider.TYPESAFE:
             key = required(secrets.typesafe_api_key, "the TypeSafe key")
@@ -155,7 +174,7 @@ async def failed_secrets(
     around it. Returns one Failure for each check that failed."""
     checks_to_run: list[tuple[list[str], Coroutine[Any, Any, object]]] = []
     for name, value in changed.items():
-        if value is None or name in PLIVO_SECRETS:
+        if value is None or name in PLIVO_SECRETS or name in NIMBLE_SECRETS:
             continue
         if name in STT_OF_KEY or name in TTS_OF_KEY:
             checks_to_run.append(([name], _check_speech_key(candidate, name, value)))
@@ -171,6 +190,9 @@ async def failed_secrets(
     plivo: list[str] = [name for name in PLIVO_SECRETS if changed.get(name) is not None]
     if plivo:
         checks_to_run.append((plivo, _check_plivo_pair(candidate)))
+    nimble: list[str] = [name for name in NIMBLE_SECRETS if changed.get(name) is not None]
+    if nimble:
+        checks_to_run.append((nimble, _check_nimble_pair(candidate, len(nimble))))
     async with asyncio.TaskGroup() as group:
         tasks = [
             (names, group.create_task(_failure_reason(check))) for names, check in checks_to_run
@@ -207,8 +229,15 @@ async def _check_speech_key(candidate: AppSettings, name: str, key: str) -> None
     if name in STT_OF_KEY:
         await checks.check_stt(candidate, STT_OF_KEY[name], key, check_clip())
     if name in TTS_OF_KEY:
-        tts = TTS_OF_KEY[name]
-        await checks.check_tts(candidate, tts, key, check_voice(candidate, tts))
+        await check_tts(candidate, TTS_OF_KEY[name], key)
+
+
+async def _check_nimble_pair(candidate: AppSettings, changed: int) -> None:
+    """Both halves change together, so a check never pairs a new half with an old one."""
+    credential = candidate.tts_credential(VoiceProvider.NIMBLE)
+    if changed < len(NIMBLE_SECRETS) or credential is None:
+        raise ProviderCheckError("save the Nimble Auth ID and Auth token together")
+    await check_tts(candidate, VoiceProvider.NIMBLE, credential)
 
 
 async def _check_plivo_pair(candidate: AppSettings) -> None:

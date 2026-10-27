@@ -1283,6 +1283,25 @@ export function useSavePlivoAccount() {
   });
 }
 
+/** Nimble's Auth ID and Auth token, checked and saved together; with `base_url`, at that
+ * gateway. */
+export function useSaveNimbleAccount() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (account: { auth_id: string; auth_token: string; base_url?: string }) =>
+      api<AppSettings>("/settings/nimble", { method: "PUT", json: account }),
+    onSuccess: (settings) => settingsChanged(client, settings),
+  });
+}
+
+export function useRemoveNimbleAccount() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: () => api<AppSettings>("/settings/nimble", { method: "DELETE" }),
+    onSuccess: (settings) => settingsChanged(client, settings),
+  });
+}
+
 export function useRemoveSecret() {
   const client = useQueryClient();
   return useMutation({

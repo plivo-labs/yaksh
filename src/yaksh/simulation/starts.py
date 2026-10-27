@@ -150,7 +150,7 @@ async def snapshot(
         config = persona_config_of(persona)
         if transport is Transport.PHONE:
             check_heard(app.speech.stt, current.languages, config.language, persona.name)
-            if app.tts_key(config.voice.provider) is None:
+            if app.tts_credential(config.voice.provider) is None:
                 raise ValidationError(
                     f'phone calls are off: the persona "{persona.name}" uses a '
                     f"{config.voice.provider.label} voice; add the {config.voice.provider.label} "

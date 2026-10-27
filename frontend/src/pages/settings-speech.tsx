@@ -2,8 +2,10 @@ import { useState } from "react";
 
 import { Panel, PanelHeader } from "@/components/panel";
 import { Badge } from "@/components/ui/badge";
+import { ConfirmDialog } from "@/components/confirm-dialogs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Spinner } from "@/components/ui/spinner";
 import {
   Select,
   SelectContent,
@@ -11,12 +13,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useAgents, usePersonas, useVoices } from "@/lib/queries";
+import {
+  useAgents,
+  usePersonas,
+  useRemoveNimbleAccount,
+  useSaveNimbleAccount,
+  useVoices,
+} from "@/lib/queries";
 import {
   STT_LANGUAGES,
   STT_PROVIDERS,
   TTS_PROVIDERS,
   type TtsProvider,
+  hasCredential,
   sttProvider,
   ttsProvider,
 } from "@/lib/speech-providers";
@@ -32,6 +41,7 @@ import type { Change } from "@/pages/settings";
 import { KeyRow, ProviderPanel, SettingRow, KeyRemovedNote } from "@/pages/settings-keys";
 
 type Fields = { model: string; base_url?: string; url?: string };
+type TtsFields = { model?: string } & Partial<Record<TtsProvider["address"], string>>;
 
 /** The one provider that hears the agent on every call, with its own address, model and key. */
 export function SpeechToTextPanel({
@@ -178,7 +188,7 @@ export function TextToSpeechPanel({
       <ul className="border-t">
         {TTS_PROVIDERS.map((provider) => {
           const fields = draft[provider.section] as Fields;
-          const saved = Boolean(settings.secrets[provider.secret]);
+          const saved = hasCredential(provider, settings.secrets);
           return (
             <li
               key={provider.value}
@@ -226,12 +236,19 @@ function TtsProviderPanel({
   personas: number;
   onBack: () => void;
 }) {
-  const fields = draft[provider.section] as Fields & { region?: string };
-  const saved = settings.values[provider.section] as Fields & { region?: string };
-  const address = fields[provider.address];
+  const fields = draft[provider.section] as TtsFields;
+  const saved = settings.values[provider.section] as TtsFields;
+  const address = fields[provider.address] ?? "";
   const moved = address !== saved[provider.address];
-  const key = settings.secrets[provider.secret];
+  const key = hasCredential(provider, settings.secrets);
   const region = provider.address === "region";
+  const removeWarning =
+    voices + personas > 0
+      ? {
+          title: `Remove the ${provider.label} key?`,
+          description: `${voices} ${voices === 1 ? "voice" : "voices"} and ${personas} ${personas === 1 ? "persona" : "personas"} use ${provider.label}. Their phone tests can't start until you add a key again.`,
+        }
+      : undefined;
   const edit = (field: string, value: string) =>
     change(provider.section, field as never, value as never);
   return (
@@ -248,7 +265,7 @@ function TtsProviderPanel({
       <ProviderPanel
         title={provider.label}
         provider={provider.test}
-        canTest={Boolean(key)}
+        canTest={key}
         edits={JSON.stringify(fields)}
         description={
           provider.wordTimestamps
@@ -278,24 +295,134 @@ function TtsProviderPanel({
             />
           </SettingRow>
         )}
-        <KeyRow
-          name={provider.secret}
-          label="API key"
-          help={provider.value === "sarvam" ? "Also Sarvam's speech to text key." : undefined}
-          state={key}
-          url={address}
-          checked
-          removable
-          removeWarning={
-            voices + personas > 0
-              ? {
-                  title: `Remove the ${provider.label} key?`,
-                  description: `${voices} ${voices === 1 ? "voice" : "voices"} and ${personas} ${personas === 1 ? "persona" : "personas"} use ${provider.label}. Their phone tests can't start until you add a key again.`,
-                }
-              : undefined
-          }
-        />
+        {provider.secrets.length === 1 ? (
+          <KeyRow
+            name={provider.secrets[0]}
+            label="API key"
+            help={provider.value === "sarvam" ? "Also Sarvam's speech to text key." : undefined}
+            state={settings.secrets[provider.secrets[0]]}
+            url={address}
+            checked
+            removable
+            removeWarning={removeWarning}
+          />
+        ) : (
+          <NimbleAccountRow settings={settings} baseUrl={address} removeWarning={removeWarning} />
+        )}
       </ProviderPanel>
     </div>
+  );
+}
+
+/** Nimble's Auth ID and Auth token: they change together, are checked at the base URL the form
+ * shows, and are saved with it. */
+function NimbleAccountRow({
+  settings,
+  baseUrl,
+  removeWarning,
+}: {
+  settings: AppSettings;
+  baseUrl: string;
+  removeWarning?: { title: string; description: string };
+}) {
+  const [editing, setEditing] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const [authId, setAuthId] = useState("");
+  const [token, setToken] = useState("");
+  const save = useSaveNimbleAccount();
+  const remove = useRemoveNimbleAccount();
+  const id = settings.secrets.nimble_auth_id;
+  const saved = id && settings.secrets.nimble_auth_token;
+  const close = () => {
+    setEditing(false);
+    setAuthId("");
+    setToken("");
+    save.reset();
+  };
+  return (
+    <SettingRow label="Auth ID and token" htmlFor={editing ? "nimble-auth-id" : undefined}>
+      {editing ? (
+        <form
+          className="grid gap-2"
+          onSubmit={(event) => {
+            event.preventDefault();
+            save.mutate(
+              { auth_id: authId.trim(), auth_token: token.trim(), base_url: baseUrl },
+              { onSuccess: close },
+            );
+          }}
+        >
+          <Input
+            id="nimble-auth-id"
+            autoComplete="off"
+            placeholder="Auth ID"
+            value={authId}
+            onChange={(event) => setAuthId(event.target.value)}
+          />
+          <Input
+            type="password"
+            autoComplete="off"
+            aria-label="Auth token"
+            placeholder="Auth token"
+            value={token}
+            onChange={(event) => setToken(event.target.value)}
+          />
+          {save.isError && <p className="text-xs-400 text-destructive">{save.error.message}</p>}
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              type="submit"
+              size="sm"
+              disabled={!authId.trim() || !token.trim() || save.isPending}
+            >
+              {save.isPending && <Spinner />}
+              Check and save
+            </Button>
+            <Button type="button" size="sm" variant="ghost" onClick={close}>
+              Cancel
+            </Button>
+          </div>
+        </form>
+      ) : (
+        <div className="flex flex-wrap items-center gap-2">
+          {saved ? (
+            <>
+              <span className="font-mono text-s-400">
+                ••••{id.hint ?? ""} / ••••{saved.hint ?? ""}
+              </span>
+              <Badge variant="success">Saved</Badge>
+            </>
+          ) : (
+            <Badge>Not set</Badge>
+          )}
+          <span className="flex-1" />
+          {saved && (
+            <Button
+              size="sm"
+              variant="ghost"
+              disabled={remove.isPending}
+              onClick={() => (removeWarning ? setConfirming(true) : remove.mutate())}
+            >
+              Remove
+            </Button>
+          )}
+          <Button size="sm" variant="outline" onClick={() => setEditing(true)}>
+            {saved ? "Replace" : "Add"}
+          </Button>
+          {removeWarning && (
+            <ConfirmDialog
+              title={removeWarning.title}
+              description={removeWarning.description}
+              action="Remove"
+              destructive
+              pending={remove.isPending}
+              error={remove.error?.message}
+              open={confirming}
+              onOpenChange={setConfirming}
+              onConfirm={(done) => remove.mutate(undefined, { onSuccess: done })}
+            />
+          )}
+        </div>
+      )}
+    </SettingRow>
   );
 }

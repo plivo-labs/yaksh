@@ -78,7 +78,9 @@ export const STT_LANGUAGES: Record<SttProvider, readonly string[]> = {
 };
 
 /** A text-to-speech provider: its settings and key, and how its voices behave. */
-export interface TtsProvider extends Omit<SpeechProvider<VoiceProvider>, "address"> {
+export interface TtsProvider extends Omit<SpeechProvider<VoiceProvider>, "address" | "secret"> {
+  /** Its key, or Nimble's Auth ID and Auth token, which are saved together. */
+  secrets: readonly SecretName[];
   /** The section's address field; Azure's is its region. */
   address: "base_url" | "url" | "region";
   /** False: the provider times whole sentences, so a cut-off reply is cut at a sentence. */
@@ -95,7 +97,7 @@ export const TTS_PROVIDERS: TtsProvider[] = [
     label: "ElevenLabs",
     section: "elevenlabs",
     address: "url",
-    secret: "elevenlabs_api_key",
+    secrets: ["elevenlabs_api_key"],
     test: "elevenlabs",
     wordTimestamps: true,
     speed: [0.7, 1.2],
@@ -106,7 +108,7 @@ export const TTS_PROVIDERS: TtsProvider[] = [
     label: "Cartesia",
     section: "cartesia",
     address: "url",
-    secret: "cartesia_api_key",
+    secrets: ["cartesia_api_key"],
     test: "cartesia",
     wordTimestamps: true,
     speed: [0.6, 1.5],
@@ -117,7 +119,7 @@ export const TTS_PROVIDERS: TtsProvider[] = [
     label: "Sarvam",
     section: "sarvam_tts",
     address: "base_url",
-    secret: "sarvam_api_key",
+    secrets: ["sarvam_api_key"],
     test: "sarvam_tts",
     wordTimestamps: false,
     speed: [0.5, 2],
@@ -128,13 +130,30 @@ export const TTS_PROVIDERS: TtsProvider[] = [
     label: "Azure",
     section: "azure",
     address: "region",
-    secret: "azure_api_key",
+    secrets: ["azure_api_key"],
     test: "azure",
     wordTimestamps: true,
     speed: [0.5, 2],
     lookup: false,
   },
+  {
+    value: "nimble",
+    label: "Nimble",
+    section: "nimble",
+    address: "base_url",
+    secrets: ["nimble_auth_id", "nimble_auth_token"],
+    test: "nimble",
+    wordTimestamps: true,
+    speed: [0.7, 1],
+    lookup: true,
+  },
 ];
+
+/** Whether every secret the provider needs is saved. */
+export const hasCredential = (
+  provider: TtsProvider,
+  secrets: Partial<Record<SecretName, unknown>> | undefined,
+) => provider.secrets.every((name) => Boolean(secrets?.[name]));
 
 export const ttsProvider = (value: VoiceProvider) =>
   TTS_PROVIDERS.find((provider) => provider.value === value) ?? TTS_PROVIDERS[0];
@@ -142,4 +161,5 @@ export const ttsProvider = (value: VoiceProvider) =>
 /** The languages each provider cannot speak; the console leaves them out for its voices. */
 export const TTS_UNSPOKEN: Partial<Record<VoiceProvider, readonly Language[]>> = {
   sarvam: ["es"],
+  nimble: ["es"],
 };

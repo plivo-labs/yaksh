@@ -5,8 +5,8 @@ from pipecat.services.elevenlabs.tts import ElevenLabsTTSService
 
 from yaksh.domain.languages import Language
 from yaksh.domain.settings import AppSettings
-from yaksh.domain.voices import VoiceSettings
-from yaksh.integrations.elevenlabs import language_pin
+from yaksh.domain.voices import ProviderVoice, VoiceSettings
+from yaksh.integrations.elevenlabs import ElevenLabsClient, language_pin
 from yaksh.integrations.speech.audio import SAMPLE_RATE, quiet_s
 from yaksh.integrations.speech.vendor import TtsVendor
 
@@ -32,4 +32,18 @@ def tts(
     )
 
 
-TTS = TtsVendor(model=lambda settings: settings.elevenlabs.model, service=tts, check_voice=None)
+def https_of(url: str) -> str:
+    """The HTTP address of a websocket address, for the REST API at the same host."""
+    return "https://" + url.split("://", 1)[1].split("/", 1)[0]
+
+
+async def lookup(settings: AppSettings, key: str, voice_id: str) -> ProviderVoice | None:
+    """At the host of the checked address, so a residency key stays in its region."""
+    return await ElevenLabsClient(key, base_url=https_of(settings.elevenlabs.url)).get_voice(
+        voice_id
+    )
+
+
+TTS = TtsVendor(
+    model=lambda settings: settings.elevenlabs.model, service=tts, check_voice=None, lookup=lookup
+)

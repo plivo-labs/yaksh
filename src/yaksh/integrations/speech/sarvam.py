@@ -56,7 +56,7 @@ def tts(
     )
 
 
-def check_voice(settings: AppSettings) -> str:
+async def check_voice(settings: AppSettings, _key: str) -> str:
     """The speaker Pipecat uses for the model: bulbul:v3 and bulbul:v4-flash name their
     speakers differently."""
     model = settings.sarvam_tts.model

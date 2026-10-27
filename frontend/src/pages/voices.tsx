@@ -32,7 +32,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { useVoicePreview } from "@/hooks/use-voice-preview";
 import { useSettings, useVoices } from "@/lib/queries";
-import { TTS_PROVIDERS, ttsProvider } from "@/lib/speech-providers";
+import { TTS_PROVIDERS, hasCredential, ttsProvider } from "@/lib/speech-providers";
 import { LANGUAGE_NAMES, type Voice, type VoiceProvider } from "@/lib/types";
 
 const ALL = "all";
@@ -110,7 +110,8 @@ export function VoicesPage() {
         <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {listed.map((item) => {
             const provider = ttsProvider(item.provider);
-            const keyless = settings.data !== undefined && !settings.data.secrets[provider.secret];
+            const keyless =
+              settings.data !== undefined && !hasCredential(provider, settings.data.secrets);
             const spoken = {
               provider: item.provider,
               id: item.provider_voice_id,

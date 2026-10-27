@@ -126,13 +126,13 @@ class CallerKeys:
     stt: str
     """The key of the speech-to-text provider in use."""
     tts: str
-    """The key of the persona's voice provider."""
+    """The credential of the persona's voice provider."""
 
 
 def caller_keys(settings: AppSettings, voice: VoiceProvider) -> CallerKeys:
     """The keys of a call with a voice of `voice`; raises ValueError naming each one that is
     not saved."""
-    tts = settings.tts_key(voice)
+    tts = settings.tts_credential(voice)
     missing = [*settings.missing_caller_keys, *([voice.label] if tts is None else [])]
     if missing:
         raise ValueError(f"the caller needs the {', '.join(missing)} key; add it in Settings")
@@ -140,7 +140,7 @@ def caller_keys(settings: AppSettings, voice: VoiceProvider) -> CallerKeys:
     return CallerKeys(
         llm=settings.secrets.llm_api_key.get_secret_value(),
         stt=settings.stt_key.get_secret_value(),
-        tts=tts.get_secret_value(),
+        tts=tts,
     )
 
 

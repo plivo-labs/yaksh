@@ -43,7 +43,7 @@ import {
   useLookupVoice,
   useSettings,
 } from "@/lib/queries";
-import { TTS_PROVIDERS, TTS_UNSPOKEN, ttsProvider } from "@/lib/speech-providers";
+import { TTS_PROVIDERS, TTS_UNSPOKEN, hasCredential, ttsProvider } from "@/lib/speech-providers";
 import {
   LANGUAGE_NAMES,
   type Language,
@@ -274,10 +274,10 @@ export function VoiceDialog({
                         <SelectItem
                           key={item.value}
                           value={item.value}
-                          disabled={!settings.data?.secrets[item.secret]}
+                          disabled={!hasCredential(item, settings.data?.secrets)}
                         >
                           {item.label}
-                          {!settings.data?.secrets[item.secret] && " (no key)"}
+                          {!hasCredential(item, settings.data?.secrets) && " (no key)"}
                         </SelectItem>
                       ))}
                     </SelectContent>
