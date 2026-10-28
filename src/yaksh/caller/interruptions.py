@@ -262,11 +262,14 @@ class LineGate(FrameProcessor):
         context: LLMContext,
         clock: Clock,
         wait_for_agent: Callable[[], Awaitable[None]],
+        fixed_line: Callable[[], None],
     ) -> None:
         super().__init__(enable_direct_mode=True)
         self._context = context
         self._clock = clock
         self._wait_for_agent = wait_for_agent
+        self._fixed_line = fixed_line
+        """Tells the turn limit that a line plays, so that its audio counts as no answer."""
         self._latest: PlayingLine | None = None
         self._interrupting: list[PlayingLine] = []
         """The lines of the agent's speech that they interrupt, until that speech is decided."""
@@ -286,6 +289,7 @@ class LineGate(FrameProcessor):
     def line_started(self, line: PlayingLine) -> None:
         self._interrupting.append(line)
         self._latest = line
+        self._fixed_line()
 
     async def line_played(self) -> None:
         assert self._latest is not None
@@ -416,7 +420,6 @@ class Interrupter(FrameProcessor):
         order: TurnOrder,
         player: SoundPlayer,
         reply_times: ReplyTimes,
-        fixed_line: Callable[[], None],
         clock: Clock,
         listening: Callable[[], bool],
         ending: Callable[[], bool],
@@ -429,8 +432,6 @@ class Interrupter(FrameProcessor):
         self._order = order
         self._player = player
         self._reply_times = reply_times
-        self._fixed_line = fixed_line
-        """Tells the turn limit that a line plays, so that its audio counts as no answer."""
         self._clock = clock
         self._listening = listening
         self._ending = ending
@@ -610,7 +611,6 @@ class Interrupter(FrameProcessor):
         )
         self._order.line_started(line.number)
         self._gate.line_started(playing)
-        self._fixed_line()
         self._transcript.interruption(line.spec.say, line.number)
         self._event(
             started,

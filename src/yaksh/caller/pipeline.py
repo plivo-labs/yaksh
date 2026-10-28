@@ -570,7 +570,9 @@ class Persona:
         line_gates: list[FrameProcessor] = []
         if lines:
             assert self.player is not None
-            line_gate = LineGate(user.context, clock, partial(wait_for_agent, user))
+            line_gate = LineGate(
+                user.context, clock, partial(wait_for_agent, user), turn_limit.fixed_line
+            )
             interrupter = Interrupter(
                 lines,
                 prepared.lines,
@@ -580,7 +582,6 @@ class Persona:
                 order=order,
                 player=self.player,
                 reply_times=self.reply_times,
-                fixed_line=turn_limit.fixed_line,
                 clock=clock,
                 listening=self.listening,
                 ending=lambda: state.end_reason is not None,

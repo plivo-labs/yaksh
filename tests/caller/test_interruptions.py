@@ -173,7 +173,7 @@ class Call:
         self.vad = SimpleNamespace(state=VADState.QUIET)
         self.context = LLMContext()
         self.waited_for_agent = 0
-        self.gate = LineGate(self.context, self.clock, self.wait_for_agent)
+        self.gate = LineGate(self.context, self.clock, self.wait_for_agent, lambda: None)
         self.gate_out: list[Frame] = []
         self.gate.push_frame = self.pushed  # type: ignore[method-assign]
         self.player = Player(self.transcript)
@@ -192,7 +192,6 @@ class Call:
             order=self.order,
             player=cast(SoundPlayer, self.player),
             reply_times=cast(ReplyTimes, self.times),
-            fixed_line=lambda: None,
             clock=self.clock,
             listening=lambda: self.listening,
             ending=lambda: False,
@@ -723,7 +722,7 @@ def gate_with_context(clock: Clock) -> tuple[LineGate, LLMContext, list[Frame], 
     async def pushed(frame: Frame, _direction: FrameDirection = FrameDirection.DOWNSTREAM):
         out.append(frame)
 
-    line_gate = LineGate(context, clock, wait_for_agent)
+    line_gate = LineGate(context, clock, wait_for_agent, lambda: None)
     line_gate.push_frame = pushed  # type: ignore[method-assign]
     return line_gate, context, out, waited
 
@@ -1011,7 +1010,7 @@ async def test_behind_a_real_aggregator_a_talked_over_line_gets_one_reply_after_
     clock = FixedClock()
     user = aggregator()
     wait_for_agent, _ = waiter()
-    line_gate = LineGate(user.context, clock, wait_for_agent)
+    line_gate = LineGate(user.context, clock, wait_for_agent, lambda: None)
     playing = line(clock)
 
     async def starts() -> None:
@@ -1040,7 +1039,7 @@ async def test_behind_a_real_aggregator_an_answer_that_starts_during_the_line_ge
     clock = FixedClock()
     user = aggregator()
     wait_for_agent, waited = waiter()
-    line_gate = LineGate(user.context, clock, wait_for_agent)
+    line_gate = LineGate(user.context, clock, wait_for_agent, lambda: None)
     playing = line(clock)
 
     async def starts() -> None:
@@ -1324,3 +1323,14 @@ async def test_a_voice_that_comes_back_just_before_a_stop_is_heard_first() -> No
     assert notes(context) == [NOTE.format(line="Wait.")], "a pause of 0.55 s, heard 0.1 s late"
     assert sum(isinstance(frame, LLMContextFrame) for frame in out) == 1
     assert waited == []
+
+
+async def test_a_line_tells_the_turn_limit_that_its_audio_is_no_answer() -> None:
+    clock = FixedClock()
+    wait_for_agent, _ = waiter()
+    told: list[None] = []
+    line_gate = LineGate(LLMContext(), clock, wait_for_agent, lambda: told.append(None))
+
+    line_gate.line_started(line(clock))
+
+    assert told == [None]
