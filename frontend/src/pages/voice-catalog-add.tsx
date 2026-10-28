@@ -1,6 +1,5 @@
 import { Play, Square } from "lucide-react";
 import { useState } from "react";
-import { createPortal } from "react-dom";
 
 import { FilterSelect } from "@/components/filter-select";
 import { SearchInput } from "@/components/search-input";
@@ -28,7 +27,7 @@ import {
   voiceGender,
 } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import type { DialogPreview } from "@/pages/voice-dialog-shell";
+import { type DialogPreview, VoiceDialogBody } from "@/pages/voice-dialog-shell";
 import { NAME_MAX } from "@/pages/voice-fields";
 
 const ALL = "all";
@@ -75,7 +74,6 @@ export function VoiceCatalogAdd({
   addPicked,
   guard,
   onDirtyChange,
-  footer,
 }: {
   traits: TtsTraits;
   /** Undefined until the account's models load, or when it has none. */
@@ -86,8 +84,6 @@ export function VoiceCatalogAdd({
   guard: CloseGuard;
   /** Hears whether closing the dialog would lose picked voices. */
   onDirtyChange: (dirty: boolean) => void;
-  /** Where the report and the buttons go: below the part of the dialog that scrolls. */
-  footer: HTMLElement | null;
 }) {
   const [filters, setFilters] = useState<Filters>(NO_FILTERS);
   /** The voices checked in the provider's list, by ID. They stay while the list changes. */
@@ -170,44 +166,34 @@ export function VoiceCatalogAdd({
 
   return (
     <>
-      {model && (
-        <VoiceFinder
-          traits={traits}
-          model={model}
-          filters={filters}
-          onFilter={filter}
-          previews={previews}
-          picked={picked}
-          locked={adding}
-          onPick={pick}
-          onClear={() => choose(new Map())}
-        />
-      )}
-      {footer &&
-        createPortal(
-          <>
-            {report.length > 0 && <AddReport items={report} />}
-            <DialogFooter className="items-center border-t px-6 py-4">
-              <span className="mr-auto text-xs-400 text-muted-foreground">
-                Saving speaks a test line in each voice.
-              </span>
-              <Button type="button" variant="ghost" disabled={adding} onClick={guard.requestClose}>
-                Cancel
-              </Button>
-              <Button
-                type="button"
-                disabled={!model || picked.size === 0 || adding}
-                onClick={addAll}
-              >
-                {adding && <Spinner />}
-                {picked.size === 0
-                  ? "Add voices"
-                  : `Add ${counted(picked.size, "voice", "voices")}`}
-              </Button>
-            </DialogFooter>
-          </>,
-          footer,
+      <VoiceDialogBody>
+        {model && (
+          <VoiceFinder
+            traits={traits}
+            model={model}
+            filters={filters}
+            onFilter={filter}
+            previews={previews}
+            picked={picked}
+            locked={adding}
+            onPick={pick}
+            onClear={() => choose(new Map())}
+          />
         )}
+      </VoiceDialogBody>
+      {report.length > 0 && <AddReport items={report} />}
+      <DialogFooter className="items-center border-t px-6 py-4">
+        <span className="mr-auto text-xs-400 text-muted-foreground">
+          Saving speaks a test line in each voice.
+        </span>
+        <Button type="button" variant="ghost" disabled={adding} onClick={guard.requestClose}>
+          Cancel
+        </Button>
+        <Button type="button" disabled={!model || picked.size === 0 || adding} onClick={addAll}>
+          {adding && <Spinner />}
+          {picked.size === 0 ? "Add voices" : `Add ${counted(picked.size, "voice", "voices")}`}
+        </Button>
+      </DialogFooter>
     </>
   );
 }

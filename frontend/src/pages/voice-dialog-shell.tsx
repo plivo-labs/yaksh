@@ -13,6 +13,15 @@ export interface DialogPreview extends Pick<VoicePreview, "isPlaying" | "isLoadi
   stop: () => void;
 }
 
+/** The part of a voice dialog that scrolls, between its top and its footer. */
+export function VoiceDialogBody({ children }: { children: ReactNode }) {
+  return (
+    <div className="min-h-0 flex-1 overflow-y-auto px-6 py-1">
+      <div className="pb-6">{children}</div>
+    </div>
+  );
+}
+
 /** The frame of a voice dialog. It asks before it throws away unsaved changes, stays open while
  * `locked`, and calls `onClosed` once it has closed. */
 export function VoiceDialogShell({

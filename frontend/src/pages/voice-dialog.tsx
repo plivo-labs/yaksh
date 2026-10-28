@@ -111,15 +111,16 @@ function VoiceAddDialog({
   const offered = useVoiceModels(provider);
   /** The model the person chose; until then, the first one offered. */
   const [modelChoice, setModelChoice] = useState<string>();
-  /** A model only after the account's models load, and only if the account has one. */
-  const model = offered.isSuccess
-    ? (offered.data.find((item) => item.id === modelChoice) ?? offered.data[0])
-    : undefined;
+  /** A model once the account's models load, and only if the account has one. A failed refresh
+   * keeps the models that loaded, so the add form keeps its choices. */
+  const model = offered.data?.find((item) => item.id === modelChoice) ?? offered.data?.[0];
   /** Why a new voice cannot get a model. */
-  const modelProblem = offered.isError
-    ? offered.error.message
-    : offered.data?.length === 0
+  const modelProblem = offered.data
+    ? offered.data.length === 0
       ? `This ${traits.label} account has no model that Yaksh can use.`
+      : null
+    : offered.isError
+      ? offered.error.message
       : null;
   const choosesModel = traits.models.some((item) => item.id !== null);
   const [mode, setMode] = useState<Mode>("find");
@@ -132,8 +133,6 @@ function VoiceAddDialog({
   if (unsaved.form !== form) setUnsaved({ form, dirty: false });
   const guard = useCloseGuard(unsaved.dirty);
   const onDirtyChange = (dirty: boolean) => setUnsaved({ form, dirty });
-  /** The add form puts its report and buttons here, below the part that scrolls. */
-  const [footer, setFooter] = useState<HTMLDivElement | null>(null);
 
   const chooseProvider = (next: VoiceProvider) => {
     previews.stop();
@@ -154,114 +153,107 @@ function VoiceAddDialog({
 
   return (
     <VoiceDialogShell title="Add voice" guard={guard} locked={adding} onClosed={onClosed}>
-      <div className="min-h-0 flex-1 overflow-y-auto px-6 py-1">
-        <FieldGroup className="pb-6">
-          <div className="grid gap-4 sm:grid-cols-2">
+      <FieldGroup className="px-6 pb-3">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field>
+            <FieldLabel htmlFor="voice-provider">Provider</FieldLabel>
+            <Select
+              items={TTS_PROVIDERS.map((item) => ({ value: item.value, label: item.label }))}
+              value={provider}
+              disabled={adding}
+              onValueChange={(next) => next && chooseProvider(next)}
+            >
+              <SelectTrigger id="voice-provider" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {TTS_PROVIDERS.map((item) => (
+                  <SelectItem
+                    key={item.value}
+                    value={item.value}
+                    disabled={!hasCredential(item, settings.data?.secrets)}
+                  >
+                    {item.label}
+                    {!hasCredential(item, settings.data?.secrets) && " (no key)"}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {!traits.word_timestamps && (
+              <FieldDescription className="text-warning-foreground">
+                {CUTS_AT_SENTENCES.tip}
+              </FieldDescription>
+            )}
+          </Field>
+          {(choosesModel || modelProblem !== null) && (
             <Field>
-              <FieldLabel htmlFor="voice-provider">Provider</FieldLabel>
-              <Select
-                items={TTS_PROVIDERS.map((item) => ({ value: item.value, label: item.label }))}
-                value={provider}
-                disabled={adding}
-                onValueChange={(next) => next && chooseProvider(next)}
-              >
-                <SelectTrigger id="voice-provider" className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {TTS_PROVIDERS.map((item) => (
-                    <SelectItem
-                      key={item.value}
-                      value={item.value}
-                      disabled={!hasCredential(item, settings.data?.secrets)}
-                    >
-                      {item.label}
-                      {!hasCredential(item, settings.data?.secrets) && " (no key)"}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {!traits.word_timestamps && (
-                <FieldDescription className="text-warning-foreground">
-                  {CUTS_AT_SENTENCES.tip}
-                </FieldDescription>
+              <FieldLabel htmlFor={modelProblem === null ? "voice-model" : undefined}>
+                Model
+              </FieldLabel>
+              {modelProblem !== null ? (
+                <FieldError>{modelProblem}</FieldError>
+              ) : (
+                <Select
+                  items={(offered.data ?? []).map((item) => ({
+                    value: item.id,
+                    label: item.label,
+                  }))}
+                  value={model?.id ?? null}
+                  disabled={adding || !model}
+                  onValueChange={(next) => next && chooseModel(next)}
+                >
+                  <SelectTrigger id="voice-model" className="w-full">
+                    {model ? <SelectValue /> : <Spinner />}
+                  </SelectTrigger>
+                  <SelectContent>
+                    {offered.data?.map((item) => (
+                      <Tooltip key={item.id}>
+                        <TooltipTrigger render={<SelectItem value={item.id} />}>
+                          {item.label}
+                        </TooltipTrigger>
+                        <TooltipContent side="right" className="max-w-72">
+                          {modelHint(item)}
+                        </TooltipContent>
+                      </Tooltip>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+              {model && model.speed_min === model.speed_max && (
+                <FieldDescription>This model takes no speed setting.</FieldDescription>
               )}
             </Field>
-            {(choosesModel || modelProblem !== null) && (
-              <Field>
-                <FieldLabel htmlFor={modelProblem === null ? "voice-model" : undefined}>
-                  Model
-                </FieldLabel>
-                {modelProblem !== null ? (
-                  <FieldError>{modelProblem}</FieldError>
-                ) : (
-                  <Select
-                    items={(offered.data ?? []).map((item) => ({
-                      value: item.id,
-                      label: item.label,
-                    }))}
-                    value={model?.id ?? null}
-                    disabled={adding || !model}
-                    onValueChange={(next) => next && chooseModel(next)}
-                  >
-                    <SelectTrigger id="voice-model" className="w-full">
-                      {model ? <SelectValue /> : <Spinner />}
-                    </SelectTrigger>
-                    <SelectContent>
-                      {offered.data?.map((item) => (
-                        <Tooltip key={item.id}>
-                          <TooltipTrigger render={<SelectItem value={item.id} />}>
-                            {item.label}
-                          </TooltipTrigger>
-                          <TooltipContent side="right" className="max-w-72">
-                            {modelHint(item)}
-                          </TooltipContent>
-                        </Tooltip>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-                {model && model.speed_min === model.speed_max && (
-                  <FieldDescription>This model takes no speed setting.</FieldDescription>
-                )}
-              </Field>
-            )}
-          </div>
+          )}
+        </div>
 
-          <div className="grid gap-4">
-            <Segmented
-              label="Voice"
-              value={mode}
-              options={MODES}
-              disabled={adding}
-              onChange={chooseMode}
-            />
-            {mode === "find" ? (
-              <VoiceCatalogAdd
-                key={form}
-                traits={traits}
-                model={model}
-                previews={previews}
-                addPicked={addPicked}
-                guard={guard}
-                onDirtyChange={onDirtyChange}
-                footer={footer}
-              />
-            ) : (
-              <VoiceIdAdd
-                key={form}
-                traits={traits}
-                model={model}
-                previews={previews}
-                guard={guard}
-                onDirtyChange={onDirtyChange}
-                footer={footer}
-              />
-            )}
-          </div>
-        </FieldGroup>
-      </div>
-      <div ref={setFooter} className="contents" />
+        <Segmented
+          label="Voice"
+          value={mode}
+          options={MODES}
+          disabled={adding}
+          onChange={chooseMode}
+        />
+      </FieldGroup>
+      {mode === "find" ? (
+        <VoiceCatalogAdd
+          key={form}
+          traits={traits}
+          model={model}
+          previews={previews}
+          addPicked={addPicked}
+          guard={guard}
+          onDirtyChange={onDirtyChange}
+        />
+      ) : (
+        <VoiceIdAdd
+          key={form}
+          traits={traits}
+          model={model}
+          previews={previews}
+          guard={guard}
+          onDirtyChange={onDirtyChange}
+        />
+      )}
     </VoiceDialogShell>
   );
 }

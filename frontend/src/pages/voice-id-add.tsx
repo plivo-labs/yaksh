@@ -1,5 +1,4 @@
 import { type KeyboardEvent, type SubmitEvent, useState } from "react";
-import { createPortal } from "react-dom";
 
 import { GenderBadge } from "@/components/gender-badge";
 import { Button } from "@/components/ui/button";
@@ -28,7 +27,7 @@ import {
   type VoiceGender,
   voiceGender,
 } from "@/lib/types";
-import type { DialogPreview } from "@/pages/voice-dialog-shell";
+import { type DialogPreview, VoiceDialogBody } from "@/pages/voice-dialog-shell";
 import { VoiceFields } from "@/pages/voice-fields";
 
 const GENDERS: { value: VoiceGender | "unset"; label: string }[] = [
@@ -62,7 +61,6 @@ export function VoiceIdAdd({
   previews,
   guard,
   onDirtyChange,
-  footer,
 }: {
   traits: TtsTraits;
   /** Undefined until the account's models load, or when it has none. */
@@ -71,8 +69,6 @@ export function VoiceIdAdd({
   guard: CloseGuard;
   /** Hears whether closing the dialog would lose the typed ID. */
   onDirtyChange: (dirty: boolean) => void;
-  /** Where the buttons go: below the part of the dialog that scrolls. */
-  footer: HTMLElement | null;
 }) {
   const add = useAddVoice();
   const lookup = useLookupVoice();
@@ -155,119 +151,111 @@ export function VoiceIdAdd({
 
   return (
     <>
-      {model && (
-        <form id="voice-form" noValidate onSubmit={submit} className="flex flex-col gap-7">
-          <Field>
-            <FieldLabel htmlFor="provider-voice-id">{traits.label} voice ID</FieldLabel>
-            <div className="flex gap-2">
-              <Input
-                id="provider-voice-id"
-                autoFocus
-                autoComplete="off"
-                spellCheck={false}
-                className="font-mono"
-                value={typedId}
-                onChange={(e) => changeId(e.target.value)}
-                onKeyDown={onIdKey}
-              />
-              {traits.lookup && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={!providerVoiceId || details !== null || lookup.isPending}
-                  onClick={getDetails}
-                >
-                  {lookup.isPending && <Spinner />}
-                  Get details
-                </Button>
+      <VoiceDialogBody>
+        {model && (
+          <form id="voice-form" noValidate onSubmit={submit} className="flex flex-col gap-7">
+            <Field>
+              <FieldLabel htmlFor="provider-voice-id">{traits.label} voice ID</FieldLabel>
+              <div className="flex gap-2">
+                <Input
+                  id="provider-voice-id"
+                  autoFocus
+                  autoComplete="off"
+                  spellCheck={false}
+                  className="font-mono"
+                  value={typedId}
+                  onChange={(e) => changeId(e.target.value)}
+                  onKeyDown={onIdKey}
+                />
+                {traits.lookup && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={!providerVoiceId || details !== null || lookup.isPending}
+                    onClick={getDetails}
+                  >
+                    {lookup.isPending && <Spinner />}
+                    Get details
+                  </Button>
+                )}
+              </div>
+              {!traits.lookup && (
+                <FieldDescription>
+                  {traits.label} has no voice lookup. Enter the details below.
+                </FieldDescription>
               )}
-            </div>
-            {!traits.lookup && (
-              <FieldDescription>
-                {traits.label} has no voice lookup. Enter the details below.
-              </FieldDescription>
-            )}
-            {lookup.error && <FieldError>{lookup.error.message}</FieldError>}
-          </Field>
+              {lookup.error && <FieldError>{lookup.error.message}</FieldError>}
+            </Field>
 
-          {details && (
-            <>
-              {traits.lookup ? (
-                <div className={`flex flex-wrap items-center gap-2 text-p-400 ${APPEAR}`}>
-                  {details.gender && <GenderBadge gender={details.gender} />}
-                  {details.accent && (
-                    <span className="text-muted-foreground capitalize">{details.accent}</span>
-                  )}
-                </div>
-              ) : (
-                <div className={`grid grid-cols-2 gap-4 ${APPEAR}`}>
-                  <Field>
-                    <FieldLabel htmlFor="voice-gender">Gender</FieldLabel>
-                    <Select
-                      items={GENDERS}
-                      value={draft.gender ?? "unset"}
-                      onValueChange={(next) => next && change({ gender: voiceGender(next) })}
-                    >
-                      <SelectTrigger id="voice-gender">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {GENDERS.map((item) => (
-                          <SelectItem key={item.value} value={item.value}>
-                            {item.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </Field>
-                  <Field>
-                    <FieldLabel htmlFor="voice-accent">Accent</FieldLabel>
-                    <Input
-                      id="voice-accent"
-                      maxLength={80}
-                      value={draft.accent}
-                      onChange={(e) => change({ accent: e.target.value })}
-                    />
-                  </Field>
-                </div>
-              )}
-              <VoiceFields
-                draft={draft}
-                onChange={change}
-                model={model}
-                spoken={defaultSettings(traits.provider, details.providerVoiceId, model.id)}
-                listed={traits.lookup ? details.listed : null}
-                providerLabel={traits.label}
-                submitted={submitted}
-                previews={previews}
-              />
-            </>
-          )}
-        </form>
-      )}
-      {footer &&
-        createPortal(
-          <>
-            {add.error && <FieldError className="px-6 pb-3">{add.error.message}</FieldError>}
-            <DialogFooter className="items-center border-t px-6 py-4">
-              <span className="mr-auto text-xs-400 text-muted-foreground">
-                Saving speaks a test line in this voice.
-              </span>
-              <Button type="button" variant="ghost" onClick={guard.requestClose}>
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                form="voice-form"
-                disabled={!details || !model || add.isPending}
-              >
-                {add.isPending && <Spinner />}
-                Add voice
-              </Button>
-            </DialogFooter>
-          </>,
-          footer,
+            {details && (
+              <>
+                {traits.lookup ? (
+                  <div className={`flex flex-wrap items-center gap-2 text-p-400 ${APPEAR}`}>
+                    {details.gender && <GenderBadge gender={details.gender} />}
+                    {details.accent && (
+                      <span className="text-muted-foreground capitalize">{details.accent}</span>
+                    )}
+                  </div>
+                ) : (
+                  <div className={`grid grid-cols-2 gap-4 ${APPEAR}`}>
+                    <Field>
+                      <FieldLabel htmlFor="voice-gender">Gender</FieldLabel>
+                      <Select
+                        items={GENDERS}
+                        value={draft.gender ?? "unset"}
+                        onValueChange={(next) => next && change({ gender: voiceGender(next) })}
+                      >
+                        <SelectTrigger id="voice-gender">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {GENDERS.map((item) => (
+                            <SelectItem key={item.value} value={item.value}>
+                              {item.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </Field>
+                    <Field>
+                      <FieldLabel htmlFor="voice-accent">Accent</FieldLabel>
+                      <Input
+                        id="voice-accent"
+                        maxLength={80}
+                        value={draft.accent}
+                        onChange={(e) => change({ accent: e.target.value })}
+                      />
+                    </Field>
+                  </div>
+                )}
+                <VoiceFields
+                  draft={draft}
+                  onChange={change}
+                  model={model}
+                  spoken={defaultSettings(traits.provider, details.providerVoiceId, model.id)}
+                  listed={traits.lookup ? details.listed : null}
+                  providerLabel={traits.label}
+                  submitted={submitted}
+                  previews={previews}
+                />
+              </>
+            )}
+          </form>
         )}
+      </VoiceDialogBody>
+      {add.error && <FieldError className="px-6 pb-3">{add.error.message}</FieldError>}
+      <DialogFooter className="items-center border-t px-6 py-4">
+        <span className="mr-auto text-xs-400 text-muted-foreground">
+          Saving speaks a test line in this voice.
+        </span>
+        <Button type="button" variant="ghost" onClick={guard.requestClose}>
+          Cancel
+        </Button>
+        <Button type="submit" form="voice-form" disabled={!details || !model || add.isPending}>
+          {add.isPending && <Spinner />}
+          Add voice
+        </Button>
+      </DialogFooter>
     </>
   );
 }
