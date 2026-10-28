@@ -1,6 +1,13 @@
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { latency } from "@/lib/format";
-import { inOrder, SHOWN_PART_MS, STAGE_FILL, stepLabel, stepStage } from "@/lib/reply-steps";
+import {
+  inOrder,
+  SHOWN_PART_MS,
+  STAGE_FILL,
+  STT_TTFS,
+  stepLabel,
+  stepStage,
+} from "@/lib/reply-steps";
 import type { CallerReplyTime } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -31,6 +38,12 @@ export function CallerReplyBadge({ reply }: { reply: CallerReplyTime }) {
             {latency(ms)}
           </span>
         ))}
+        {reply.stt_ttfs_ms != null && (
+          <span className="flex items-center justify-between gap-4 border-t border-background/20 pt-1 tabular-nums">
+            {STT_TTFS.label} (overlaps VAD endpointing)
+            <span>{latency(reply.stt_ttfs_ms)}</span>
+          </span>
+        )}
       </TooltipContent>
     </Tooltip>
   );

@@ -8,8 +8,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { PartLabel } from "@/components/part-label";
 import { latency } from "@/lib/format";
 import { useCallerReplyTimes } from "@/lib/queries";
+import { stepLabel, stepTip } from "@/lib/reply-steps";
+
+const REPLY_TIP = "End of the agent's speech to the caller's first audio frame on the call.";
 
 /** How long the caller took to reply with each model and effort in the recent phone calls, to
  * help choose the caller's model. */
@@ -39,9 +43,17 @@ export function CallerModelTimes() {
               <TableHead className="pl-5">Model</TableHead>
               <TableHead>Effort</TableHead>
               <TableHead className="text-right">Calls</TableHead>
-              <TableHead className="text-right">Reply p50</TableHead>
-              <TableHead className="text-right">Reply p90</TableHead>
-              <TableHead className="pr-5 text-right">LLM p50</TableHead>
+              <TableHead className="text-right">
+                <PartLabel tip={REPLY_TIP}>Reply p50</PartLabel>
+              </TableHead>
+              <TableHead className="text-right">
+                <PartLabel tip={REPLY_TIP}>Reply p90</PartLabel>
+              </TableHead>
+              <TableHead className="pr-5 text-right">
+                <PartLabel tip={stepTip("llm_inference")}>
+                  {stepLabel("llm_inference")} p50
+                </PartLabel>
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
