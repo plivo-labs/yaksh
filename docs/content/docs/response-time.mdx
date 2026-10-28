@@ -44,9 +44,9 @@ Only a reply that the model of the caller speaks gets a value. These replies get
 
 | Part | Log field | Time |
 |---|---|---|
-| VAD endpointing | `endpointing_wait_ms` | The silence that the VAD waits for before it reports that the agent stopped speaking: its `stop_secs`, 0.6 seconds. |
+| VAD endpointing | `endpointing_wait_ms` | The silence that the VAD waits for before it reports that the agent stopped speaking: the **VAD stop** setting, 0.3 seconds by default. |
 | STT after VAD stop | `transcription_ms` | From the VAD stop to the final STT transcript of the agent turn. 0 when the transcript was final before the VAD stop. |
-| Turn detection | `turn_detection_ms` | From the transcript to the request to the caller LLM: the smart-turn model decides that the turn of the agent is complete. It is long when the model finds the turn incomplete. |
+| Turn detection | `turn_detection_ms` | From the transcript to the request to the caller LLM: the smart-turn model decides that the turn of the agent is complete. It is long when the model finds the turn incomplete: then the caller waits for more silence, up to the **Turn detection max wait** setting, 2 seconds by default. |
 | LLM TTFT | `llm_inference_ms` | From the request to the caller LLM to the first text token of the answer. Reasoning is part of this time. |
 | LLM tool call | `llm_tool_call_ms` | The LLM emits a tool call, such as `end_call`. |
 | Tool execution | `function_handler_ms` | The tool handler runs. |

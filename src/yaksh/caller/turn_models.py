@@ -4,7 +4,7 @@ call keeps its own audio and model state. Pipecat's analyzers build a session ea
 (pipecat-ai/pipecat#4818 would share them)."""
 
 from onnxruntime import InferenceSession
-from pipecat.audio.turn.smart_turn.base_smart_turn import BaseSmartTurn
+from pipecat.audio.turn.smart_turn.base_smart_turn import BaseSmartTurn, SmartTurnParams
 from pipecat.audio.turn.smart_turn.local_smart_turn_v3 import LocalSmartTurnAnalyzerV3
 from pipecat.audio.vad.silero import SileroOnnxModel, SileroVADAnalyzer
 from pipecat.audio.vad.vad_analyzer import VADAnalyzer, VADParams, VADState
@@ -20,8 +20,10 @@ class TurnModels:
     def vad(self, *, sample_rate: int, params: VADParams) -> SileroVADAnalyzer:
         return SharedSileroVAD(self._vad, sample_rate=sample_rate, params=params)
 
-    def end_of_turn(self) -> LocalSmartTurnAnalyzerV3:
-        return SharedSmartTurn(self._end_of_turn)
+    def end_of_turn(self, *, max_wait_s: float) -> LocalSmartTurnAnalyzerV3:
+        """`max_wait_s` is the most silence after the VAD stop that ends a turn the model calls
+        unfinished."""
+        return SharedSmartTurn(self._end_of_turn, params=SmartTurnParams(stop_secs=max_wait_s))
 
 
 class SharedSileroModel(SileroOnnxModel):
@@ -49,7 +51,7 @@ class SharedSileroVAD(SileroVADAnalyzer):
 
 
 class SharedSmartTurn(LocalSmartTurnAnalyzerV3):
-    def __init__(self, session: InferenceSession) -> None:
-        BaseSmartTurn.__init__(self)
+    def __init__(self, session: InferenceSession, *, params: SmartTurnParams) -> None:
+        BaseSmartTurn.__init__(self, params=params)
         self._log_data = False
         self._session = session

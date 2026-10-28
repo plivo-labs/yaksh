@@ -97,6 +97,20 @@ class CallerModel(Section):
     lists, and no effort to other models: a model without reasoning refuses any value."""
 
 
+class TurnTaking(Section):
+    """How long the caller waits after the agent's speech before its reply starts. A section of
+    its own, because a scenario's own caller model must not reset these."""
+
+    vad_stop_s: float = Field(default=0.3, ge=0.1, le=2.0)
+    """The silence after the agent's speech that the VAD waits for before turn detection runs.
+    A shorter wait answers sooner and sends more of the agent's short pauses to turn detection.
+    The measurement after the call keeps its own fixed value."""
+    turn_max_wait_s: float = Field(default=2.0, ge=0.5, le=4.0)
+    """When turn detection decides that the agent has not finished, the most silence after the
+    VAD stop that the caller waits for before it replies. At most 4 s: Pipecat ends a turn after
+    5 s with no new speech or transcript, whatever the turn detection says."""
+
+
 class GenerationModel(Section):
     model: ModelName | None = None
     """The caller's model when None."""
@@ -346,6 +360,7 @@ class SettingsValues(Section):
     azure: Azure = Azure()
     nimble: Nimble = Nimble()
     caller: CallerModel = CallerModel()
+    turn_taking: TurnTaking = TurnTaking()
     generation: GenerationModel = GenerationModel()
     brief: BriefModel = BriefModel()
     judges: JudgeModel = JudgeModel()
