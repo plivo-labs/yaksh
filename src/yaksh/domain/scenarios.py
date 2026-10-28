@@ -88,14 +88,6 @@ class DataSet(BaseModel):
     agent_data: list[Fact] = Field(default_factory=list, max_length=MAX_FACTS)
 
 
-class Expect(StrEnum):
-    """What a correct agent does when the caller's line comes while it speaks."""
-
-    STOP = "stop"
-    CONTINUE = "continue"
-    """The line is a backchannel, such as "Mm-hmm.": the agent keeps talking."""
-
-
 MAX_INTERRUPTIONS = 3
 
 
@@ -126,10 +118,6 @@ class Interruption(BaseModel):
     """The first answer of the agent that can start a wait: 2, which skips the greeting, or 1
     with `agent_says`. Answer 1 is the agent's first speech while the persona is on the line.
     After the persona speaks or presses keys, the agent's next turn starts the next answer."""
-    expect: Expect = Expect.STOP
-    within_s: float = Field(default=2.0, ge=0.5, le=10)
-    """Stop: the agent's speech ends within this time after the line's first word. Continue:
-    the agent still speaks at this time."""
 
     @model_validator(mode="before")
     @classmethod

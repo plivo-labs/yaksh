@@ -358,24 +358,6 @@ func (e EvaluationState) Valid() bool {
 	}
 }
 
-// Defines values for Expect.
-const (
-	ExpectContinue Expect = "continue"
-	ExpectStop     Expect = "stop"
-)
-
-// Valid indicates whether the value is a known member of the Expect enum.
-func (e Expect) Valid() bool {
-	switch e {
-	case ExpectContinue:
-		return true
-	case ExpectStop:
-		return true
-	default:
-		return false
-	}
-}
-
 // Defines values for GenerationMode.
 const (
 	GenerationModeAgent         GenerationMode = "agent"
@@ -2087,9 +2069,6 @@ type EvaluationLimits struct {
 // EvaluationState defines model for EvaluationState.
 type EvaluationState string
 
-// Expect What a correct agent does when the caller's line comes while it speaks.
-type Expect string
-
 // Fact A value the caller has and gives when the agent asks for it.
 type Fact struct {
 	Name  string `json:"name"`
@@ -2205,14 +2184,10 @@ type ImportResult struct {
 // `after_s`, and the line plays when a wait ends with the agent still speaking in that turn,
 // at most once.
 type Interruption struct {
-	AfterS    *float32 `json:"after_s,omitempty"`
-	AgentSays *string  `json:"agent_says,omitempty"`
-
-	// Expect What a correct agent does when the caller's line comes while it speaks.
-	Expect     *Expect  `json:"expect,omitempty"`
+	AfterS     *float32 `json:"after_s,omitempty"`
+	AgentSays  *string  `json:"agent_says,omitempty"`
 	FromAnswer *int     `json:"from_answer,omitempty"`
 	Say        string   `json:"say"`
-	WithinS    *float32 `json:"within_s,omitempty"`
 }
 
 // ItemRead defines model for ItemRead.

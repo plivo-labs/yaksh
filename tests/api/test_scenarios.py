@@ -306,7 +306,7 @@ async def test_interruptions_get_their_default_wait_and_a_change_writes_a_versio
 ) -> None:
     lines = [
         {"say": "Sorry, is there a fee for that?", "agent_says": "first visit"},
-        {"say": "Mm-hmm.", "expect": "continue"},
+        {"say": "Sorry, can you repeat that?"},
         {"say": "Hold on.", "agent_says": "your total", "after_s": 0.5},
     ]
     scenario = await create_scenario(client, await create_agent_id(client), interruptions=lines)
@@ -322,12 +322,10 @@ async def test_interruptions_get_their_default_wait_and_a_change_writes_a_versio
         (0.5, 1),
     ]
     assert scenario["interruptions"][1] == {
-        "say": "Mm-hmm.",
+        "say": "Sorry, can you repeat that?",
         "agent_says": None,
         "after_s": 2.0,
         "from_answer": 2,
-        "expect": "continue",
-        "within_s": 2.0,
     }
     assert same.json()["current_version"] == 1
     assert changed.json()["current_version"] == 2
@@ -335,7 +333,7 @@ async def test_interruptions_get_their_default_wait_and_a_change_writes_a_versio
     first = (await client.get(f"{url}/versions/1")).json()
     assert [item["say"] for item in first["config"]["interruptions"]] == [
         "Sorry, is there a fee for that?",
-        "Mm-hmm.",
+        "Sorry, can you repeat that?",
         "Hold on.",
     ]
 
@@ -373,7 +371,6 @@ async def test_interruptions_are_checked_like_the_rest_of_the_scenario(
             {"name": "Long", "known_facts": [{"name": "Name", "value": "Priyadarshini Raman"}]},
         ],
     )
-    window = await refused({"say": "Wait.", "within_s": 0.2})
     turn = await refused({"say": "Wait.", "from_answer": 0})
     empty = await refused({"say": "  "})
     scenario = await create_scenario(client, agent)
@@ -389,7 +386,7 @@ async def test_interruptions_are_checked_like_the_rest_of_the_scenario(
     assert f'the line {too_long} "Data set 1"' in long_line
     assert f'the phrase {too_long} "Data set 1"' in long_phrase
     assert f'the line {too_long} "Long"' in second_set_long
-    assert "within_s" in window and "from_answer" in turn and "say" in empty
+    assert "from_answer" in turn and "say" in empty
     assert cleared.status_code == 422 and "interruptions cannot be null" in cleared.text
 
 

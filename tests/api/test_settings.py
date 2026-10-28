@@ -196,12 +196,12 @@ async def test_a_phrase_interruption_runs_only_on_a_speech_to_text_that_gives_wo
         agent_id,
         name="Phrase",
         interruptions=[
-            {"say": "Mm-hmm.", "expect": "continue"},
+            {"say": "Hold on."},
             {"say": "Wait.", "agent_says": "fee"},
         ],
     )
     timed = await create_scenario(
-        client, agent_id, name="Timed", interruptions=[{"say": "Mm-hmm.", "expect": "continue"}]
+        client, agent_id, name="Timed", interruptions=[{"say": "Hold on."}]
     )
     on_deepgram = await start_run(client, agent_id, [phrase["id"]])
     await client.put("/api/v1/settings/secrets/sarvam_api_key", json={"value": "sarvam-key-0123"})

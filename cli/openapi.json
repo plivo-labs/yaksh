@@ -9525,15 +9525,6 @@
         ],
         "title": "EvaluationState"
       },
-      "Expect": {
-        "type": "string",
-        "enum": [
-          "stop",
-          "continue"
-        ],
-        "title": "Expect",
-        "description": "What a correct agent does when the caller's line comes while it speaks."
-      },
       "Fact": {
         "properties": {
           "name": {
@@ -9998,17 +9989,6 @@
             "minimum": 1.0,
             "title": "From Answer",
             "default": 2
-          },
-          "expect": {
-            "$ref": "#/components/schemas/Expect",
-            "default": "stop"
-          },
-          "within_s": {
-            "type": "number",
-            "maximum": 10.0,
-            "minimum": 0.5,
-            "title": "Within S",
-            "default": 2.0
           }
         },
         "additionalProperties": false,
