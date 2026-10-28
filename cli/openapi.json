@@ -16909,7 +16909,6 @@
           "caller_speaking",
           "key_press",
           "other_line",
-          "reply_owed",
           "call_ending",
           "audio_not_ready",
           "audio_failed",

@@ -147,6 +147,8 @@ class TranscriptBuilder:
         """Replies of the persona whose audio went out on the line, not counting interruption
         lines: a new answer of the agent starts after one."""
         self.keys_pressed = 0
+        self.cuts = 0
+        """The cuts that reached the end of the pipeline."""
 
     @property
     def caller_quiet(self) -> bool:
@@ -322,6 +324,7 @@ class TranscriptBuilder:
             self._caller_turn(self._generated.popleft(), None, now, now, Provenance.UNCONFIRMED)
 
     def caller_interrupted(self) -> None:
+        self.cuts += 1
         self.generation_ended()
         self._close(cut=True)
 

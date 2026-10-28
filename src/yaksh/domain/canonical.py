@@ -186,7 +186,9 @@ def whole(text: str, part: str) -> int:
 
 
 def in_word(char: str) -> bool:
-    return unicodedata.category(char)[0] in "LMN"
+    """A letter, a combining mark or a digit, as `tokens` reads them."""
+    category = unicodedata.category(char)
+    return category[0] in "LM" or category == "Nd"
 
 
 def contains(text: str, part: str) -> bool:

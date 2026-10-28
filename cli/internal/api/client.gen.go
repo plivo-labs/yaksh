@@ -1238,7 +1238,6 @@ const (
 	KeyPress             TryReason = "key_press"
 	NoWordsWhileSpeaking TryReason = "no_words_while_speaking"
 	OtherLine            TryReason = "other_line"
-	ReplyOwed            TryReason = "reply_owed"
 	TurnEnded            TryReason = "turn_ended"
 )
 
@@ -1260,8 +1259,6 @@ func (e TryReason) Valid() bool {
 	case NoWordsWhileSpeaking:
 		return true
 	case OtherLine:
-		return true
-	case ReplyOwed:
 		return true
 	case TurnEnded:
 		return true

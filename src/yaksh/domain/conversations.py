@@ -178,8 +178,6 @@ class TryReason(StrEnum):
     """The caller pressed keys in this turn of the agent."""
     OTHER_LINE = "other_line"
     """Another line was playing, or its window was open."""
-    REPLY_OWED = "reply_owed"
-    """The caller still owed its reply to an earlier line."""
     CALL_ENDING = "call_ending"
     """The call was ending when the wait ended, or it ended during the wait."""
     AUDIO_NOT_READY = "audio_not_ready"
