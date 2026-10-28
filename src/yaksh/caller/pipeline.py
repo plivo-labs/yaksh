@@ -530,13 +530,9 @@ class Persona:
             observers=[metrics, self.reply_times, *observers],
         )
 
+        self.llm.register_function(END_CALL.name, self.ending.end_call)
         self.llm.register_function(
-            END_CALL.name, self.ending.end_call, cancel_on_interruption=False
-        )
-        self.llm.register_function(
-            PRESS_KEYS.name,
-            Keypad(transcript, aggregators.user()).press_keys,
-            cancel_on_interruption=False,
+            PRESS_KEYS.name, Keypad(transcript, aggregators.user()).press_keys
         )
         self._transcript = transcript
         self._observer = observer
