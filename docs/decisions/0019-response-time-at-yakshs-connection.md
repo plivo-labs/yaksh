@@ -1,7 +1,7 @@
 # 0019 Measure the agent's response time at Yaksh's connection
 
 Date: 2026-10-04
-Status: accepted
+Status: accepted. Changed by 0040 (an interruption line is not a caller reply).
 
 ## Decision
 

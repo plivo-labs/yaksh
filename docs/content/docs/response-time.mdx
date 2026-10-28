@@ -36,7 +36,7 @@ Yaksh also measures how long its own caller takes to reply on a phone call. The 
 Only a reply that the model of the caller speaks gets a value. These replies get no value:
 
 - Fixed text that Yaksh speaks for the caller: the first words, the question when the agent is silent, the goodbye at the turn limit, the goodbye after the model ends the call two times without a word, and the interruption lines.
-- A reply to an agent turn that started before an interruption line stopped playing.
+- A reply whose wait holds the end of an interruption line: the speech of the agent stopped before the line stopped playing.
 - The lines of the voicemail or the call screener of the persona.
 - A reply that only presses keys on the phone keypad. It has no audio.
 - Text tests. They have no speech.

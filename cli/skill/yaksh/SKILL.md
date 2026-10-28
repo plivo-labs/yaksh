@@ -103,10 +103,10 @@ criteria:
 
 - On a phone run, `interruptions` (up to 3) make the caller say a fixed line while the agent speaks. Each has `say`, and `agent_says` (a phrase) or none, `after_s` and `from_answer`.
 - A line with a phrase can play `after_s` (default 0) after the agent says the phrase, if the agent still speaks in that turn.
-- A line with no phrase can play `after_s` (default 2) after the start of each answer of the agent, from `from_answer` on (default 2, which skips the greeting), if the agent still speaks then.
+- A line with no phrase can play `after_s` (default 2) after the start of each answer of the agent, if the agent still speaks then. The answers count from `from_answer` on (default 2, which skips the greeting).
 - Each line plays at most once.
 - Nothing checks yet how fast the agent stops. Write a criterion with the value that the agent must give after the line, such as the answer to the question in it. The judges see where each line came.
-- Write lines that ask something, or that ask the agent to wait. Backchannel lines such as "Mm-hmm." are not supported.
+- Write lines that ask something, or that ask the agent to wait. Not lines that give a value: the caller keeps to its known facts. Backchannel lines such as "Mm-hmm." are not supported.
 - A phrase needs a speech-to-text provider that gives the agent's words while it speaks: not Sarvam.
 
 ### Add them
