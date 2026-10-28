@@ -734,7 +734,7 @@ class PhoneCaller:
                 EndReason.ERROR, "phone calls are off: add the Plivo Auth ID and Auth token"
             )
         try:
-            keys = caller_keys(request.app_settings)
+            keys = caller_keys(request.app_settings, request.voice.provider)
         except ValueError as error:
             return unreached(EndReason.ERROR, str(error))
         api = self._plivo_api(*credentials)

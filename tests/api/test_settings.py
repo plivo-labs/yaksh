@@ -1,22 +1,26 @@
 from typing import Any
 
 import pytest
-from httpx import AsyncClient
+from httpx import AsyncClient, Response
 from sqlalchemy import text
 
 from tests.conftest import (
     ENCRYPTION_KEY,
     Db,
     FakeProvider,
+    FakeVoiceClient,
     create_agent_id,
+    create_persona,
     create_scenario,
     new_persona_id,
     save_settings,
     start_run,
 )
+from yaksh.domain.speech import SttProvider
+from yaksh.domain.voices import ProviderVoice, VoiceProvider
 from yaksh.integrations import provider_checks
 from yaksh.integrations.provider_checks import ProviderCheckError
-from yaksh.settings import store
+from yaksh.settings import service, store
 from yaksh.settings.cipher import Cipher, SecretUnreadableError
 
 LLM_KEY = "sk-live-0123456789abcdef"
@@ -37,7 +41,7 @@ def checks(monkeypatch: pytest.MonkeyPatch) -> list[tuple[str, tuple[Any, ...]]]
 
         return check
 
-    for name in ("llm_models", "check_llm", "check_deepgram", "check_elevenlabs", "check_plivo"):
+    for name in ("llm_models", "check_llm", "check_stt", "check_tts", "check_plivo"):
         monkeypatch.setattr(provider_checks, name, fake(name))
     return asked
 
@@ -126,19 +130,61 @@ async def test_a_key_sent_with_a_new_address_is_checked_there_and_saved_with_it(
         json={"value": "bad-key", "url": "https://elsewhere.example"},
     )
     no_address = await client.put(
-        "/api/v1/settings/secrets/elevenlabs_api_key",
-        json={"value": "el-key", "url": "https://api.elevenlabs.io"},
+        "/api/v1/settings/secrets/typesafe_api_key",
+        json={"value": "ts-key", "url": "https://typesafe.example"},
     )
 
     assert moved.status_code == 200, moved.text
-    assert checks[0] == ("check_deepgram", ("https://api.deepgram.com", "dg-new-key", "nova-3"))
+    name, (checked, provider, key, _clip) = checks[0]
+    assert (name, checked.deepgram.base_url, provider, key) == (
+        "check_stt",
+        "https://api.deepgram.com",
+        SttProvider.DEEPGRAM,
+        "dg-new-key",
+    )
     assert moved.json()["values"]["deepgram"]["base_url"] == "https://api.deepgram.com"
     assert "deepgram_api_key" in moved.json()["secrets"]
     assert refused.status_code == 422 and "nothing was saved" in refused.text
     saved = (await client.get("/api/v1/settings")).json()
     assert saved["values"]["deepgram"]["base_url"] == "https://api.deepgram.com"
     assert no_address.status_code == 422
-    assert no_address.json()["error"]["message"] == "elevenlabs_api_key has no address"
+    assert no_address.json()["error"]["message"] == "typesafe_api_key has no address"
+
+
+async def test_a_key_is_not_saved_when_its_address_moved_while_it_was_checked(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    values = (await client.get("/api/v1/settings")).json()["values"]
+    values["deepgram"]["base_url"] = "https://elsewhere.example"
+
+    async def check_stt(*_args: Any) -> None:
+        await client.put("/api/v1/settings/values", json=values)
+
+    monkeypatch.setattr(provider_checks, "check_stt", check_stt)
+    refused = await client.put(
+        "/api/v1/settings/secrets/deepgram_api_key", json={"value": "dg-new-key-0123"}
+    )
+
+    saved = (await client.get("/api/v1/settings")).json()
+    assert refused.status_code == 409
+    assert saved["values"]["deepgram"]["base_url"] == "https://elsewhere.example"
+    assert "deepgram_api_key" not in saved["secrets"]
+
+
+async def test_a_phone_run_cannot_start_when_the_speech_to_text_does_not_hear_the_agent(
+    client: AsyncClient, checks: list[Any]
+) -> None:
+    await client.put("/api/v1/settings/secrets/sarvam_api_key", json={"value": "sarvam-key-0123"})
+    values = (await client.get("/api/v1/settings")).json()["values"]
+    values["speech"]["stt"] = "sarvam"
+    await client.put("/api/v1/settings/values", json=values)
+    agent_id = await create_agent_id(client, languages=["es"])
+    scenario = await create_scenario(client, agent_id)
+
+    refused = await start_run(client, agent_id, [scenario["id"]])
+
+    assert refused.status_code == 422
+    assert "speech to text (Sarvam) doesn't hear Spanish" in refused.text
 
 
 async def test_a_run_cannot_start_while_a_caller_key_is_missing(client: AsyncClient) -> None:
@@ -197,10 +243,11 @@ async def test_a_value_out_of_range_is_refused_and_nothing_changes(client: Async
 async def test_a_run_cannot_start_while_the_plivo_keys_are_missing(client: AsyncClient) -> None:
     agent_id = await create_agent_id(client)
     scenario = await create_scenario(client, agent_id, persona_id=await new_persona_id(client))
-    await client.delete("/api/v1/settings/secrets/plivo_auth_token")
+    removed = await client.delete("/api/v1/settings/plivo")
 
     refused = await start_run(client, agent_id, [scenario["id"]])
 
+    assert removed.status_code == 200, removed.text
     assert refused.status_code == 422
     assert "add the Plivo Auth ID and Auth token in Settings" in refused.text
 
@@ -428,3 +475,144 @@ def test_an_encrypted_secret_cannot_be_moved_to_another_setting() -> None:
     assert cipher.decrypt("llm_api_key", sealed) == LLM_KEY
     with pytest.raises(SecretUnreadableError):
         cipher.decrypt("trigger:LEAK", sealed)
+
+
+async def test_a_sarvam_key_is_checked_for_hearing_and_for_speaking(
+    client: AsyncClient, checks: list[tuple[str, tuple[Any, ...]]]
+) -> None:
+    saved = await client.put(
+        "/api/v1/settings/secrets/sarvam_api_key", json={"value": "sarvam-key-0123"}
+    )
+
+    assert saved.status_code == 200, saved.text
+    assert [(name, args[1]) for name, args in checks] == [
+        ("check_stt", SttProvider.SARVAM),
+        ("check_tts", VoiceProvider.SARVAM),
+    ]
+
+
+async def add_sarvam_voice(
+    client: AsyncClient, voice_clients: dict[VoiceProvider, FakeVoiceClient]
+) -> Response:
+    sarvam = FakeVoiceClient()
+    sarvam.voices["shubh"] = ProviderVoice(id="shubh", name="unused")
+    voice_clients[VoiceProvider.SARVAM] = sarvam
+    return await client.post(
+        "/api/v1/voices",
+        json={
+            "provider": "sarvam",
+            "provider_voice_id": "shubh",
+            "languages": ["en"],
+            "name": "Shubh",
+        },
+    )
+
+
+async def test_a_phone_run_cannot_start_while_a_persona_voice_has_no_key(
+    client: AsyncClient, voice_clients: dict[VoiceProvider, FakeVoiceClient]
+) -> None:
+    added = await add_sarvam_voice(client, voice_clients)
+    persona = await create_persona(
+        client, name="Sarvam caller", voice={"provider": "sarvam", "id": "shubh", "speed": 1.5}
+    )
+    agent_id = await create_agent_id(client)
+    scenario = await create_scenario(client, agent_id, persona_id=persona["id"])
+
+    refused = await start_run(client, agent_id, [scenario["id"]])
+
+    assert added.status_code == 201, added.text
+    assert persona["voice"] == {
+        "provider": "sarvam",
+        "id": "shubh",
+        "speed": 1.5,
+        "stability": None,
+    }
+    assert refused.status_code == 422
+    assert refused.json()["error"]["message"] == (
+        'phone calls are off: the persona "Sarvam caller" uses a Sarvam voice; '
+        "add the Sarvam key in Settings"
+    )
+
+
+async def test_a_phone_run_cannot_start_when_the_persona_voice_does_not_speak_its_language(
+    client: AsyncClient, checks: list[Any], voice_clients: dict[VoiceProvider, FakeVoiceClient]
+) -> None:
+    await client.put("/api/v1/settings/secrets/sarvam_api_key", json={"value": "sarvam-key-0123"})
+    added = await add_sarvam_voice(client, voice_clients)
+    persona = await create_persona(
+        client,
+        name="Sarvam caller",
+        language="es",
+        voice={"provider": "sarvam", "id": "shubh", "speed": 1.0},
+    )
+    agent_id = await create_agent_id(client, languages=["es"])
+    scenario = await create_scenario(client, agent_id, persona_id=persona["id"])
+
+    refused = await start_run(client, agent_id, [scenario["id"]])
+
+    assert added.status_code == 201, added.text
+    assert refused.status_code == 422
+    assert refused.json()["error"]["message"] == (
+        "text to speech (Sarvam) doesn't speak Spanish, the language of the persona "
+        '"Sarvam caller"; choose a voice of another provider'
+    )
+
+
+async def test_nimble_credentials_are_saved_together_and_checked_at_their_gateway(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    checked: list[tuple[str, str]] = []
+
+    async def check_tts(settings: Any, provider: VoiceProvider, credential: str) -> None:
+        checked.append((settings.nimble.base_url, credential))
+
+    monkeypatch.setattr(service, "check_tts", check_tts)
+    half = await client.put(
+        "/api/v1/settings/secrets/nimble_auth_id", json={"value": "MANIMBLE01234"}
+    )
+    both = await client.put(
+        "/api/v1/settings/nimble",
+        json={
+            "auth_id": "MANIMBLE01234",
+            "auth_token": "nimble-token-0123",
+            "base_url": "https://gateway.example",
+        },
+    )
+
+    assert half.status_code == 422 and "together" in half.text
+    assert both.status_code == 200, both.text
+    assert checked == [("https://gateway.example", "MANIMBLE01234:nimble-token-0123")]
+    saved = both.json()
+    assert saved["values"]["nimble"]["base_url"] == "https://gateway.example"
+    assert {"nimble_auth_id", "nimble_auth_token"} <= set(saved["secrets"])
+
+
+@pytest.mark.parametrize(("account", "label"), [("plivo", "Plivo"), ("nimble", "Nimble")])
+async def test_half_of_an_account_is_never_removed_or_replaced_alone(
+    client: AsyncClient,
+    monkeypatch: pytest.MonkeyPatch,
+    checks: list[Any],
+    account: str,
+    label: str,
+) -> None:
+    async def check_tts(*_args: Any) -> None:
+        return None
+
+    monkeypatch.setattr(service, "check_tts", check_tts)
+    pair = {"auth_id": "MAACCOUNT0123", "auth_token": "account-token-0123"}
+    await client.put(f"/api/v1/settings/{account}", json=pair)
+    document = f"secrets:\n  {account}_auth_id: null\n  {account}_auth_token: token-4567\n"
+
+    imported = await client.post("/api/v1/settings/import", json={"document": document})
+    deleted = await client.delete(f"/api/v1/settings/secrets/{account}_auth_id")
+    removed = await client.delete(f"/api/v1/settings/{account}")
+
+    assert imported.status_code == 200, imported.text
+    assert imported.json()["failed"] == [
+        f"{account}_auth_id, {account}_auth_token: "
+        f"save or remove the {label} Auth ID and Auth token together"
+    ]
+    assert imported.json()["settings"]["secrets"][f"{account}_auth_token"] == {"hint": "0123"}
+    assert deleted.status_code == 422
+    assert removed.status_code == 200, removed.text
+    assert not {f"{account}_auth_id", f"{account}_auth_token"} & set(removed.json()["secrets"])

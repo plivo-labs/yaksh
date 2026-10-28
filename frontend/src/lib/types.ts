@@ -645,13 +645,15 @@ export interface PhoneAccount {
   test_numbers: number;
 }
 
-export type VoiceProvider = "elevenlabs";
+export type VoiceProvider = "elevenlabs" | "cartesia" | "sarvam" | "azure" | "nimble";
 
 export interface VoiceSettings {
   provider: VoiceProvider;
   id: string;
+  /** The provider's speed or pace, within its range. */
   speed: number;
-  stability: number;
+  /** ElevenLabs only; null for the other providers. */
+  stability: number | null;
 }
 
 export interface Voice {
@@ -681,6 +683,9 @@ export interface VoiceInput {
   provider_voice_id: string;
   name: string;
   languages: Language[];
+  /** For a provider without lookup; one with lookup fills these itself. */
+  gender?: VoiceGender | null;
+  accent?: string | null;
 }
 
 export interface VoiceEdit {
@@ -1278,10 +1283,13 @@ export interface Usage {
     /** The scenario chose the model, not the settings. */
     scenario_model: boolean;
     /** Null on a text test, which has no speech-to-text or text-to-speech. */
+    stt_provider: SttProvider | null;
     stt_model: string | null;
     /** The language setting the speech-to-text heard the agent with; null on older calls. */
     stt_language: string | null;
+    /** Null for Azure, whose voice names its model. */
     tts_model: string | null;
+    voice: VoiceSettings | null;
   } | null;
   usage: {
     llm_prompt_tokens: number | null;
@@ -1724,9 +1732,22 @@ export const LABEL_REASONS: { value: LabelReason; label: string; example: string
   { value: "other", label: "Other", example: "Needs a note." },
 ];
 
+export type SttProvider = "deepgram" | "sarvam" | "assemblyai" | "soniox" | "gladia";
+
 export interface SettingsValues {
   llm: { base_url: string };
+  /** The provider that hears the agent on every call. */
+  speech: { stt: SttProvider };
   deepgram: { base_url: string; model: string };
+  sarvam_stt: { model: string };
+  assemblyai: { url: string; model: string };
+  soniox: { url: string; model: string };
+  gladia: { url: string; model: string };
+  elevenlabs: { url: string; model: string };
+  cartesia: { url: string; model: string };
+  sarvam_tts: { base_url: string; model: string };
+  azure: { region: string };
+  nimble: { base_url: string };
   caller: CallerModel;
   generation: { model: string | null; reasoning_effort: string | null; timeout_s: number };
   brief: { model: string; reasoning_effort: string | null; timeout_s: number };
@@ -1764,7 +1785,15 @@ export interface SettingsValues {
 export type SecretName =
   | "llm_api_key"
   | "deepgram_api_key"
+  | "sarvam_api_key"
+  | "assemblyai_api_key"
+  | "soniox_api_key"
+  | "gladia_api_key"
   | "elevenlabs_api_key"
+  | "cartesia_api_key"
+  | "azure_api_key"
+  | "nimble_auth_id"
+  | "nimble_auth_token"
   | "typesafe_api_key"
   | "plivo_auth_id"
   | "plivo_auth_token"
@@ -1785,7 +1814,20 @@ export interface AppSettings {
   trigger_secrets: Record<string, SecretState>;
 }
 
-export type SettingsProvider = "llm" | "deepgram" | "elevenlabs" | "typesafe" | "plivo";
+export type SettingsProvider =
+  | "llm"
+  | "deepgram"
+  | "sarvam_stt"
+  | "assemblyai"
+  | "soniox"
+  | "gladia"
+  | "elevenlabs"
+  | "cartesia"
+  | "sarvam_tts"
+  | "azure"
+  | "nimble"
+  | "typesafe"
+  | "plivo";
 
 export interface ProviderTest {
   provider: SettingsProvider;

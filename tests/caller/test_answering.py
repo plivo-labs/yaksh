@@ -383,15 +383,15 @@ async def test_the_player_sends_a_line_as_a_reply_kept_out_of_the_persona_contex
 
     assert [type(frame) for frame in sent] == [
         TTSStartedFrame,
+        TTSAudioRawFrame,
+        TTSAudioRawFrame,
         TTSTextFrame,
-        TTSAudioRawFrame,
-        TTSAudioRawFrame,
         TTSStoppedFrame,
         TTSStartedFrame,
         TTSAudioRawFrame,
         TTSStoppedFrame,
     ]
-    started, words = cast(TTSStartedFrame, sent[0]), cast(TTSTextFrame, sent[1])
+    started, words = cast(TTSStartedFrame, sent[0]), cast(TTSTextFrame, sent[3])
     assert started.metadata[MACHINE] is MachineLine.SCREENER and not started.append_to_context
     assert words.text == "Thanks. Please stay on the line." and not words.append_to_context
     assert sent[5].metadata[MACHINE] is MachineLine.TONE

@@ -202,6 +202,7 @@ class TextConversation:
                     self._request.caller.model, self._request.caller.reasoning_effort
                 ),
                 scenario_model=self._request.scenario_model,
+                stt_provider=None,
             ),
             caller_usage=CallerUsage.model_validate(self._usage),
         )

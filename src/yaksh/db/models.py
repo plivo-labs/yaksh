@@ -636,7 +636,8 @@ class Persona(Base):
     voice_provider: Mapped[VoiceProvider] = mapped_column(pg_enum(VoiceProvider, "voice_provider"))
     voice_id: Mapped[str] = mapped_column(Text)
     voice_speed: Mapped[float] = mapped_column(Float)
-    voice_stability: Mapped[float] = mapped_column(Float)
+    voice_stability: Mapped[float | None] = mapped_column(Float)
+    """ElevenLabs only."""
     voice_gender: Mapped[VoiceGender | None] = mapped_column(pg_enum(VoiceGender, "voice_gender"))
     surroundings: Mapped[dict[str, Any]] = mapped_column(JSONB)
     sample_line: Mapped[str | None] = mapped_column(Text)

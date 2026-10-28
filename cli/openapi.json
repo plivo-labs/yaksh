@@ -4913,6 +4913,7 @@
           "settings"
         ],
         "summary": "Delete Secret",
+        "description": "Remove one key; the halves of a Plivo or Nimble account are removed together.",
         "operationId": "delete_secret_api_v1_settings_secrets__name__delete",
         "security": [
           {
@@ -4971,6 +4972,121 @@
           },
           "required": true
         },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingsRead"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "The request failed. The error tells why.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Delete Plivo Account",
+        "operationId": "delete_plivo_account_api_v1_settings_plivo_delete",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingsRead"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "The request failed. The error tells why.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/settings/nimble": {
+      "put": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Put Nimble Account",
+        "description": "Save Nimble's Auth ID and Auth token together, after Nimble speaks with them; with\n`base_url`, they are checked at that gateway and saved with it.",
+        "operationId": "put_nimble_account_api_v1_settings_nimble_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NimbleAccount"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingsRead"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "The request failed. The error tells why.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Delete Nimble Account",
+        "operationId": "delete_nimble_account_api_v1_settings_nimble_delete",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -7561,6 +7677,26 @@
         ],
         "title": "ApplicationRead"
       },
+      "AssemblyAI": {
+        "properties": {
+          "url": {
+            "type": "string",
+            "pattern": "^(https?|wss?)://\\S+$",
+            "title": "Url",
+            "default": "wss://streaming.assemblyai.com/v3/ws"
+          },
+          "model": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Model",
+            "default": "universal-3-6-pro"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "AssemblyAI"
+      },
       "AssignPersona": {
         "properties": {
           "scenario_ids": {
@@ -7631,6 +7767,19 @@
         ],
         "title": "AutoNoise",
         "description": "Sounds that start and stop at random: one under the whole call and a few that come and\ngo. The seed fixes which ones and when."
+      },
+      "Azure": {
+        "properties": {
+          "region": {
+            "type": "string",
+            "pattern": "^[a-z0-9]{2,40}$",
+            "title": "Region",
+            "default": "eastus"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "Azure"
       },
       "Body_upload_document_api_v1_documents_upload_post": {
         "properties": {
@@ -7850,6 +7999,26 @@
           "rows"
         ],
         "title": "CallerReplyTimes"
+      },
+      "Cartesia": {
+        "properties": {
+          "url": {
+            "type": "string",
+            "pattern": "^(https?|wss?)://\\S+$",
+            "title": "Url",
+            "default": "wss://api.cartesia.ai/tts/websocket"
+          },
+          "model": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Model",
+            "default": "sonic-3.6"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "Cartesia"
       },
       "Category": {
         "type": "string",
@@ -9061,6 +9230,26 @@
         ],
         "title": "Efforts"
       },
+      "ElevenLabs": {
+        "properties": {
+          "url": {
+            "type": "string",
+            "pattern": "^(https?|wss?)://\\S+$",
+            "title": "Url",
+            "default": "wss://api.elevenlabs.io"
+          },
+          "model": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Model",
+            "default": "eleven_flash_v2_5"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "ElevenLabs"
+      },
       "ElevenLabsAgent": {
         "properties": {
           "id": {
@@ -9651,6 +9840,26 @@
           "stopped"
         ],
         "title": "GenerationStatus"
+      },
+      "Gladia": {
+        "properties": {
+          "url": {
+            "type": "string",
+            "pattern": "^(https?|wss?)://\\S+$",
+            "title": "Url",
+            "default": "https://api.gladia.io/v2/live"
+          },
+          "model": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Model",
+            "default": "solaria-1"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "Gladia"
       },
       "Header": {
         "properties": {
@@ -10657,6 +10866,53 @@
           "models"
         ],
         "title": "Models"
+      },
+      "Nimble": {
+        "properties": {
+          "base_url": {
+            "type": "string",
+            "pattern": "^(https?|wss?)://\\S+$",
+            "title": "Base Url",
+            "default": "https://in.tts.plivo.com"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "Nimble"
+      },
+      "NimbleAccount": {
+        "properties": {
+          "auth_id": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Auth Id"
+          },
+          "auth_token": {
+            "type": "string",
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Auth Token"
+          },
+          "base_url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Url"
+          }
+        },
+        "type": "object",
+        "required": [
+          "auth_id",
+          "auth_token"
+        ],
+        "title": "NimbleAccount"
       },
       "NoiseSound": {
         "type": "string",
@@ -12210,7 +12466,15 @@
         "enum": [
           "llm",
           "deepgram",
+          "sarvam_stt",
+          "assemblyai",
+          "soniox",
+          "gladia",
           "elevenlabs",
+          "cartesia",
+          "sarvam_tts",
+          "azure",
+          "nimble",
           "typesafe",
           "plivo"
         ],
@@ -14056,6 +14320,41 @@
         "title": "RunVerdicts",
         "description": "The run's verdict numbers over its judged calls: completed calls that no one stopped,\nwhose evaluation gave a verdict or failed."
       },
+      "SarvamStt": {
+        "properties": {
+          "model": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Model",
+            "default": "saaras:v4"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "SarvamStt",
+        "description": "Sarvam's speech-to-text host is fixed by its SDK, so it has no address."
+      },
+      "SarvamTts": {
+        "properties": {
+          "base_url": {
+            "type": "string",
+            "pattern": "^(https?|wss?)://\\S+$",
+            "title": "Base Url",
+            "default": "https://api.sarvam.ai"
+          },
+          "model": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Model",
+            "default": "bulbul:v4-flash"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "SarvamTts"
+      },
       "SavedValue": {
         "properties": {
           "name": {
@@ -14719,7 +15018,15 @@
         "enum": [
           "llm_api_key",
           "deepgram_api_key",
+          "sarvam_api_key",
+          "assemblyai_api_key",
+          "soniox_api_key",
+          "gladia_api_key",
           "elevenlabs_api_key",
+          "cartesia_api_key",
+          "azure_api_key",
+          "nimble_auth_id",
+          "nimble_auth_token",
           "typesafe_api_key",
           "plivo_auth_id",
           "plivo_auth_token",
@@ -14760,7 +15067,7 @@
             "anyOf": [
               {
                 "type": "string",
-                "pattern": "^https?://\\S+$"
+                "maxLength": 2000
               },
               {
                 "type": "null"
@@ -14846,11 +15153,77 @@
               "base_url": "https://api.openai.com/v1"
             }
           },
+          "speech": {
+            "$ref": "#/components/schemas/Speech",
+            "default": {
+              "stt": "deepgram"
+            }
+          },
           "deepgram": {
             "$ref": "#/components/schemas/Deepgram",
             "default": {
               "base_url": "https://api.deepgram.com",
               "model": "nova-3"
+            }
+          },
+          "sarvam_stt": {
+            "$ref": "#/components/schemas/SarvamStt",
+            "default": {
+              "model": "saaras:v4"
+            }
+          },
+          "assemblyai": {
+            "$ref": "#/components/schemas/AssemblyAI",
+            "default": {
+              "url": "wss://streaming.assemblyai.com/v3/ws",
+              "model": "universal-3-6-pro"
+            }
+          },
+          "soniox": {
+            "$ref": "#/components/schemas/Soniox",
+            "default": {
+              "url": "wss://stt-rt.soniox.com/transcribe-websocket",
+              "model": "stt-rt-v5"
+            }
+          },
+          "gladia": {
+            "$ref": "#/components/schemas/Gladia",
+            "default": {
+              "url": "https://api.gladia.io/v2/live",
+              "model": "solaria-1"
+            }
+          },
+          "elevenlabs": {
+            "$ref": "#/components/schemas/ElevenLabs",
+            "default": {
+              "url": "wss://api.elevenlabs.io",
+              "model": "eleven_flash_v2_5"
+            }
+          },
+          "cartesia": {
+            "$ref": "#/components/schemas/Cartesia",
+            "default": {
+              "url": "wss://api.cartesia.ai/tts/websocket",
+              "model": "sonic-3.6"
+            }
+          },
+          "sarvam_tts": {
+            "$ref": "#/components/schemas/SarvamTts",
+            "default": {
+              "base_url": "https://api.sarvam.ai",
+              "model": "bulbul:v4-flash"
+            }
+          },
+          "azure": {
+            "$ref": "#/components/schemas/Azure",
+            "default": {
+              "region": "eastus"
+            }
+          },
+          "nimble": {
+            "$ref": "#/components/schemas/Nimble",
+            "default": {
+              "base_url": "https://in.tts.plivo.com"
             }
           },
           "caller": {
@@ -14990,6 +15363,26 @@
         ],
         "title": "SigningKey"
       },
+      "Soniox": {
+        "properties": {
+          "url": {
+            "type": "string",
+            "pattern": "^(https?|wss?)://\\S+$",
+            "title": "Url",
+            "default": "wss://stt-rt.soniox.com/transcribe-websocket"
+          },
+          "model": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Model",
+            "default": "stt-rt-v5"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "Soniox"
+      },
       "Sound": {
         "properties": {
           "sound": {
@@ -15125,6 +15518,17 @@
         "title": "SpeakerKind",
         "description": "What the person behind the caller does."
       },
+      "Speech": {
+        "properties": {
+          "stt": {
+            "$ref": "#/components/schemas/SttProvider",
+            "default": "deepgram"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "Speech"
+      },
       "SpokenLine": {
         "properties": {
           "at_s": {
@@ -15201,6 +15605,17 @@
         ],
         "title": "StartRequestDraft",
         "description": "A start request read from a cURL command, for the person to check. `number_field` names\nthe body field or query parameter that now holds `{{yaksh.number}}`, if one looked like the\nnumber to call."
+      },
+      "SttProvider": {
+        "type": "string",
+        "enum": [
+          "deepgram",
+          "sarvam",
+          "assemblyai",
+          "soniox",
+          "gladia"
+        ],
+        "title": "SttProvider"
       },
       "SuiteCreate": {
         "properties": {
@@ -16451,6 +16866,29 @@
               }
             ],
             "title": "Name"
+          },
+          "gender": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VoiceGender"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "accent": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 80,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accent"
           }
         },
         "additionalProperties": false,
@@ -16460,7 +16898,8 @@
           "provider_voice_id",
           "languages"
         ],
-        "title": "VoiceCreate"
+        "title": "VoiceCreate",
+        "description": "A voice to add. A provider with lookup fills the details it has; for any other, the\nname is required and the gender and accent come from here."
       },
       "VoiceGender": {
         "type": "string",
@@ -16504,9 +16943,14 @@
       "VoiceProvider": {
         "type": "string",
         "enum": [
-          "elevenlabs"
+          "elevenlabs",
+          "cartesia",
+          "sarvam",
+          "azure",
+          "nimble"
         ],
-        "title": "VoiceProvider"
+        "title": "VoiceProvider",
+        "description": "A text-to-speech provider that voices personas."
       },
       "VoiceRead": {
         "properties": {
@@ -16604,17 +17048,21 @@
           },
           "speed": {
             "type": "number",
-            "maximum": 1.2,
-            "minimum": 0.7,
             "title": "Speed",
             "default": 1.0
           },
           "stability": {
-            "type": "number",
-            "maximum": 1.0,
-            "minimum": 0.0,
-            "title": "Stability",
-            "default": 0.5
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 1.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stability"
           }
         },
         "additionalProperties": false,

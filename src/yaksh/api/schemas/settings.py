@@ -1,7 +1,7 @@
 from pydantic import BaseModel, Field, SecretStr
 
 from yaksh.domain.evaluations import ModelReplyTime
-from yaksh.domain.settings import AppSettings, SecretName, SettingsValues, Url
+from yaksh.domain.settings import AppSettings, SecretName, SettingsValues
 from yaksh.settings.service import Provider
 
 
@@ -49,14 +49,22 @@ def hint(value: SecretStr) -> str | None:
 
 class SecretWrite(BaseModel):
     value: str = Field(min_length=1, max_length=4000)
-    url: Url | None = None
+    url: str | None = Field(default=None, max_length=2000)
     """The new address of a key that has one, saved with the key; the key is checked there.
+    It is checked as the setting it replaces: an HTTP or websocket URL, or Azure's region.
     None keeps the saved address."""
 
 
 class PlivoAccount(BaseModel):
     auth_id: str = Field(min_length=1, max_length=200)
     auth_token: str = Field(min_length=1, max_length=4000)
+
+
+class NimbleAccount(BaseModel):
+    auth_id: str = Field(min_length=1, max_length=200)
+    auth_token: str = Field(min_length=1, max_length=4000)
+    base_url: str | None = Field(default=None, max_length=2000)
+    """A new gateway address, saved with the pair; None keeps the saved one."""
 
 
 class SigningKey(BaseModel):

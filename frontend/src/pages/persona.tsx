@@ -46,6 +46,7 @@ import {
   useSavePersona,
   useVoices,
 } from "@/lib/queries";
+import { ttsProvider } from "@/lib/speech-providers";
 import {
   type Answering,
   LANGUAGE_ITEMS,
@@ -56,6 +57,7 @@ import {
   QUIET,
   type Surroundings,
   type Voice,
+  type VoiceProvider,
 } from "@/lib/types";
 import type { GeneratedPersona } from "@/pages/new-persona-dialog";
 import { PersonaFork } from "@/pages/persona-fork";
@@ -64,8 +66,10 @@ interface Draft {
   name: string;
   prompt: string;
   language: Language;
+  provider: VoiceProvider;
   voice_id: string;
   speed: number;
+  /** Kept while another provider's voice is chosen; only ElevenLabs takes it. */
   stability: number;
   surroundings: Surroundings;
   sample_line: string;
@@ -76,6 +80,7 @@ const EMPTY: Draft = {
   name: "",
   prompt: "",
   language: "en",
+  provider: "elevenlabs",
   voice_id: "",
   speed: 1,
   stability: 0.5,
@@ -91,9 +96,10 @@ function toDraft(persona: Persona): Draft {
     name: persona.name,
     prompt: persona.prompt,
     language: persona.language,
+    provider: persona.voice.provider,
     voice_id: persona.voice.id,
     speed: persona.voice.speed,
-    stability: persona.voice.stability,
+    stability: persona.voice.stability ?? 0.5,
     surroundings: persona.surroundings,
     sample_line: persona.sample_line ?? "",
     answering: persona.answering,
@@ -106,14 +112,25 @@ function toInput(draft: Draft): PersonaInput {
     prompt: draft.prompt.trim(),
     language: draft.language,
     voice: {
-      provider: "elevenlabs",
+      provider: draft.provider,
       id: draft.voice_id.trim(),
       speed: draft.speed,
-      stability: draft.stability,
+      stability: draft.provider === "elevenlabs" ? draft.stability : null,
     },
     surroundings: draft.surroundings,
     sample_line: draft.sample_line.trim() || null,
     answering: { ...draft.answering, greeting: draft.answering.greeting?.trim() || null },
+  };
+}
+
+/** The draft with a listed voice, its speed brought into the voice provider's range. */
+function withVoice(draft: Draft, voice: Voice): Draft {
+  const [slowest, fastest] = ttsProvider(voice.provider).speed;
+  return {
+    ...draft,
+    provider: voice.provider,
+    voice_id: voice.provider_voice_id,
+    speed: Math.min(Math.max(draft.speed, slowest), fastest),
   };
 }
 
@@ -271,15 +288,18 @@ function PersonaEditor({
     const gender = generated?.draft.voice_gender;
     const match = voices.data.find((voice) => voice.gender === gender) ?? voices.data[0];
     setPickVoice(false);
-    if (match) setDraft((current) => ({ ...current, voice_id: match.provider_voice_id }));
+    if (match) setDraft((current) => withVoice(current, match));
   }
 
   const listed = voices.data ?? [];
-  const chosen = listed.find((voice) => voice.provider_voice_id === draft.voice_id);
+  const chosen = listed.find(
+    (voice) => voice.provider === draft.provider && voice.provider_voice_id === draft.voice_id,
+  );
   const voiceItems = listed.map((voice) => ({
-    value: voice.provider_voice_id,
-    label: voiceLabel(voice),
+    value: voice.id,
+    label: `${voiceLabel(voice)} · ${ttsProvider(voice.provider).label}`,
   }));
+  const [slowest, fastest] = ttsProvider(draft.provider).speed;
   const hasVoice = draft.voice_id !== "";
   const input = toInput(draft);
   // What would be saved, so a change the server trims away, such as a trailing space, is none.
@@ -488,8 +508,13 @@ function PersonaEditor({
                   <FieldLabel htmlFor="voice">Voice</FieldLabel>
                   <Select
                     items={voiceItems}
-                    value={chosen ? draft.voice_id : null}
-                    onValueChange={(value) => value && set("voice_id", value)}
+                    value={chosen ? chosen.id : null}
+                    onValueChange={(value) => {
+                      const voice = listed.find((item) => item.id === value);
+                      if (!voice) return;
+                      save.reset();
+                      setDraft((current) => withVoice(current, voice));
+                    }}
                     disabled={voices.isPending || voices.isPlaceholderData || voices.isError}
                   >
                     <SelectTrigger
@@ -529,23 +554,25 @@ function PersonaEditor({
                   <SliderField
                     id="speed"
                     label="Speed"
-                    min={0.7}
-                    max={1.2}
+                    min={slowest}
+                    max={fastest}
                     value={draft.speed}
                     onChange={(value) => set("speed", value)}
                   />
-                  <SliderField
-                    id="stability"
-                    label="Stability"
-                    min={0}
-                    max={1}
-                    value={draft.stability}
-                    onChange={(value) => set("stability", value)}
-                  >
-                    <FieldDescription>
-                      Lower values make each call sound more different; 0.5 is the default.
-                    </FieldDescription>
-                  </SliderField>
+                  {draft.provider === "elevenlabs" && (
+                    <SliderField
+                      id="stability"
+                      label="Stability"
+                      min={0}
+                      max={1}
+                      value={draft.stability}
+                      onChange={(value) => set("stability", value)}
+                    >
+                      <FieldDescription>
+                        Lower values make each call sound more different; 0.5 is the default.
+                      </FieldDescription>
+                    </SliderField>
+                  )}
                 </div>
               </FieldGroup>
             </CardContent>

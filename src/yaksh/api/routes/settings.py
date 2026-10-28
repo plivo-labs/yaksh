@@ -15,6 +15,7 @@ from yaksh.api.schemas.settings import (
     ImportResult,
     ModelReplyTimeRead,
     Models,
+    NimbleAccount,
     PlivoAccount,
     ProviderTest,
     SecretWrite,
@@ -99,6 +100,43 @@ async def put_plivo_account(
     return SettingsRead.of(await checked_change(settings, session, cipher, secrets=secrets))
 
 
+@router.put("/nimble")
+async def put_nimble_account(
+    account: NimbleAccount, settings: AppSettingsDep, session: SessionDep, cipher: CipherDep
+) -> SettingsRead:
+    """Save Nimble's Auth ID and Auth token together, after Nimble speaks with them; with
+    `base_url`, they are checked at that gateway and saved with it."""
+    secrets: dict[str, str | None] = {
+        SecretName.NIMBLE_AUTH_ID: account.auth_id,
+        SecretName.NIMBLE_AUTH_TOKEN: account.auth_token,
+    }
+    values = None if account.base_url is None else {"nimble": {"base_url": account.base_url}}
+    return SettingsRead.of(
+        await checked_change(settings, session, cipher, values=values, secrets=secrets)
+    )
+
+
+@router.delete("/plivo")
+async def delete_plivo_account(
+    settings: AppSettingsDep, session: SessionDep, cipher: CipherDep
+) -> SettingsRead:
+    return SettingsRead.of(await remove_pair(service.PLIVO, settings, session, cipher))
+
+
+@router.delete("/nimble")
+async def delete_nimble_account(
+    settings: AppSettingsDep, session: SessionDep, cipher: CipherDep
+) -> SettingsRead:
+    return SettingsRead.of(await remove_pair(service.NIMBLE, settings, session, cipher))
+
+
+async def remove_pair(
+    pair: service.Pair, settings: AppSettings, session: AsyncSession, cipher: Cipher
+) -> AppSettings:
+    secrets: dict[str, str | None] = dict.fromkeys(pair.names)
+    return await checked_change(settings, session, cipher, secrets=secrets)
+
+
 async def checked_change(
     settings: AppSettings,
     session: AsyncSession,
@@ -109,16 +147,21 @@ async def checked_change(
 ) -> AppSettings:
     """Check every new key with its provider, then save the change; nothing is saved when a
     check fails."""
+    candidate = store.planned(settings, values, secrets)
     try:
-        await service.check_secrets(store.planned(settings, values, secrets), secrets)
+        await service.check_secrets(candidate, secrets)
     except ProviderCheckError as error:
         raise ValidationError(f"{error}; nothing was saved") from None
-    return await store.change(session, cipher, values=values, secrets=secrets)
+    return await store.change(session, cipher, values=values, secrets=secrets, checked=candidate)
 
 
 @router.delete("/secrets/{name}")
-async def delete_secret(name: SecretName, session: SessionDep, cipher: CipherDep) -> SettingsRead:
-    return SettingsRead.of(await store.change(session, cipher, secrets={name: None}))
+async def delete_secret(
+    name: SecretName, settings: AppSettingsDep, session: SessionDep, cipher: CipherDep
+) -> SettingsRead:
+    """Remove one key; the halves of a Plivo or Nimble account are removed together."""
+    secrets: dict[str, str | None] = {name: None}
+    return SettingsRead.of(await checked_change(settings, session, cipher, secrets=secrets))
 
 
 @router.put("/trigger-secrets/{name}")
@@ -242,7 +285,7 @@ async def import_settings(
     refused = {name for failure in failed for name in failure.names}
     passed = {name: value for name, value in plan.secrets.items() if name not in refused}
     saved = (
-        await store.change(session, cipher, values=values, secrets=passed)
+        await store.change(session, cipher, values=values, secrets=passed, checked=candidate)
         if values or passed
         else settings
     )

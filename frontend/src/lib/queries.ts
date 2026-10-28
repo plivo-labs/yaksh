@@ -54,6 +54,7 @@ import {
   type ProviderDraft,
   type ProviderTest,
   type ProviderVoice,
+  type VoiceProvider,
   type QueuedReview,
   type RetellAccount,
   type RetellAgentPage,
@@ -427,12 +428,9 @@ export function useVoices(language?: Language) {
 
 export function useLookupVoice() {
   return useMutation({
-    mutationFn: (providerVoiceId: string) =>
+    mutationFn: ({ provider, id }: { provider: VoiceProvider; id: string }) =>
       api<ProviderVoice>(
-        `/voices/lookup?${new URLSearchParams({
-          provider: "elevenlabs",
-          provider_voice_id: providerVoiceId,
-        })}`,
+        `/voices/lookup?${new URLSearchParams({ provider, provider_voice_id: id })}`,
       ),
   });
 }
@@ -1292,6 +1290,25 @@ export function useSavePlivoAccount() {
   return useMutation({
     mutationFn: (account: { auth_id: string; auth_token: string }) =>
       api<AppSettings>("/settings/plivo", { method: "PUT", json: account }),
+    onSuccess: (settings) => settingsChanged(client, settings),
+  });
+}
+
+/** Nimble's Auth ID and Auth token, checked and saved together; with `base_url`, at that
+ * gateway. */
+export function useSaveNimbleAccount() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (account: { auth_id: string; auth_token: string; base_url?: string }) =>
+      api<AppSettings>("/settings/nimble", { method: "PUT", json: account }),
+    onSuccess: (settings) => settingsChanged(client, settings),
+  });
+}
+
+export function useRemoveNimbleAccount() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: () => api<AppSettings>("/settings/nimble", { method: "DELETE" }),
     onSuccess: (settings) => settingsChanged(client, settings),
   });
 }

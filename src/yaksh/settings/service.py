@@ -3,26 +3,33 @@ it is saved, test the saved settings, and import or export them as a YAML docume
 
 import asyncio
 import re
-from collections.abc import Coroutine, Mapping
+import wave
+from collections.abc import Callable, Coroutine, Mapping
 from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Any
 
 import yaml
 
-from yaksh.domain.errors import ValidationError
+from yaksh.domain.errors import UnavailableError, ValidationError
 from yaksh.domain.settings import (
     KEY_URLS,
+    STT_KEYS,
     TRIGGER_SECRET,
+    TTS_KEYS,
     AppSettings,
     SecretName,
     is_secret_name,
 )
+from yaksh.domain.speech import SttProvider
+from yaksh.domain.voices import VoiceProvider
 from yaksh.evaluation.jev import JEV_MODEL
 from yaksh.integrations import provider_checks as checks
 from yaksh.integrations.openai_models import caller_effort
 from yaksh.integrations.provider_checks import ProviderCheckError
+from yaksh.integrations.speech.tts import check_voice as tts_check_voice
 from yaksh.settings.store import DEFAULTS, changed_values
+from yaksh.simulation.surroundings import SOUNDS
 from yaksh.simulation.voices import builtin_voices
 
 MAX_SECRET_CHARS = 4000
@@ -37,13 +44,57 @@ DOCUMENT_HEADER = (
 class Provider(StrEnum):
     LLM = "llm"
     DEEPGRAM = "deepgram"
+    SARVAM_STT = "sarvam_stt"
+    ASSEMBLYAI = "assemblyai"
+    SONIOX = "soniox"
+    GLADIA = "gladia"
     ELEVENLABS = "elevenlabs"
+    CARTESIA = "cartesia"
+    SARVAM_TTS = "sarvam_tts"
+    AZURE = "azure"
+    NIMBLE = "nimble"
     TYPESAFE = "typesafe"
     PLIVO = "plivo"
 
 
-def check_voice() -> str:
-    return builtin_voices()[0].provider_voice_id
+STT_TESTS = {
+    Provider.DEEPGRAM: SttProvider.DEEPGRAM,
+    Provider.SARVAM_STT: SttProvider.SARVAM,
+    Provider.ASSEMBLYAI: SttProvider.ASSEMBLYAI,
+    Provider.SONIOX: SttProvider.SONIOX,
+    Provider.GLADIA: SttProvider.GLADIA,
+}
+"""The speech-to-text test of each provider, which hears a short English line."""
+STT_OF_KEY = {key: provider for provider, key in STT_KEYS.items()}
+TTS_TESTS = {
+    Provider.ELEVENLABS: VoiceProvider.ELEVENLABS,
+    Provider.CARTESIA: VoiceProvider.CARTESIA,
+    Provider.SARVAM_TTS: VoiceProvider.SARVAM,
+    Provider.AZURE: VoiceProvider.AZURE,
+    Provider.NIMBLE: VoiceProvider.NIMBLE,
+}
+"""The text-to-speech test of each provider, which speaks one word."""
+TTS_OF_KEY = {names[0]: provider for provider, names in TTS_KEYS.items() if len(names) == 1}
+"""The voice provider of each single key; Nimble's pair is checked as a Pair."""
+
+CHECK_CLIP = SOUNDS / "answering" / "iphone_screen_ack.wav"
+"""8 kHz speech that every speech-to-text provider must transcribe to pass its check."""
+
+
+async def check_tts(settings: AppSettings, provider: VoiceProvider, credential: str) -> None:
+    """One word in a voice the account has: ElevenLabs speaks with Yaksh's first built-in
+    voice."""
+    builtin = builtin_voices()[0].provider_voice_id
+    try:
+        voice = await tts_check_voice(settings, provider, credential, builtin)
+    except UnavailableError as error:
+        raise ProviderCheckError(f"{provider.label}: {error}") from None
+    await checks.check_tts(settings, provider, credential, voice)
+
+
+def check_clip() -> bytes:
+    with wave.open(str(CHECK_CLIP)) as clip:
+        return clip.readframes(clip.getnframes())
 
 
 async def test_provider(settings: AppSettings, provider: Provider) -> str:
@@ -60,14 +111,30 @@ async def test_provider(settings: AppSettings, provider: Provider) -> str:
                 caller_effort(settings.caller.model, settings.caller.reasoning_effort),
             )
             return f"{settings.caller.model} answered a test request."
-        case Provider.DEEPGRAM:
-            key = required(secrets.deepgram_api_key, "the Deepgram key")
-            await checks.check_deepgram(settings.deepgram.base_url, key, settings.deepgram.model)
-            return f"Deepgram {settings.deepgram.model} transcribed a test clip."
-        case Provider.ELEVENLABS:
-            key = required(secrets.elevenlabs_api_key, "the ElevenLabs key")
-            await checks.check_elevenlabs(key, check_voice())
-            return "ElevenLabs spoke a test word."
+        case (
+            Provider.DEEPGRAM
+            | Provider.SARVAM_STT
+            | Provider.ASSEMBLYAI
+            | Provider.SONIOX
+            | Provider.GLADIA
+        ):
+            stt = STT_TESTS[provider]
+            key = required(getattr(secrets, STT_KEYS[stt].value), f"the {stt.label} key")
+            await checks.check_stt(settings, stt, key, check_clip())
+            return f"{stt.label} transcribed a test clip."
+        case (
+            Provider.ELEVENLABS
+            | Provider.CARTESIA
+            | Provider.SARVAM_TTS
+            | Provider.AZURE
+            | Provider.NIMBLE
+        ):
+            tts = TTS_TESTS[provider]
+            credential = settings.tts_credential(tts)
+            if credential is None:
+                raise ProviderCheckError(f"the {tts.label} key is not saved")
+            await check_tts(settings, tts, credential)
+            return f"{tts.label} spoke a test word."
         case Provider.TYPESAFE:
             key = required(secrets.typesafe_api_key, "the TypeSafe key")
             await checks.check_typesafe(key, JEV_MODEL)
@@ -86,13 +153,37 @@ def required(secret: Any, what: str) -> str:
     return secret.get_secret_value()
 
 
-PLIVO_SECRETS = (SecretName.PLIVO_AUTH_ID, SecretName.PLIVO_AUTH_TOKEN)
+@dataclass(frozen=True)
+class Pair:
+    """An Auth ID and an Auth token that work only together. A change saves both or removes
+    both: a check never pairs a new half with an old one, and no half is left alone."""
+
+    label: str
+    names: tuple[SecretName, SecretName]
+    check: Callable[[AppSettings, str, str], Coroutine[Any, Any, object]]
+    """Checks the account with the new Auth ID and Auth token."""
+
+
+async def _check_plivo_account(_candidate: AppSettings, auth_id: str, auth_token: str) -> None:
+    await checks.check_plivo(auth_id, auth_token)
+
+
+async def _check_nimble_account(candidate: AppSettings, auth_id: str, auth_token: str) -> None:
+    await check_tts(candidate, VoiceProvider.NIMBLE, f"{auth_id}:{auth_token}")
+
+
+PLIVO = Pair("Plivo", (SecretName.PLIVO_AUTH_ID, SecretName.PLIVO_AUTH_TOKEN), _check_plivo_account)
+NIMBLE = Pair(
+    "Nimble", (SecretName.NIMBLE_AUTH_ID, SecretName.NIMBLE_AUTH_TOKEN), _check_nimble_account
+)
+PAIRS = (PLIVO, NIMBLE)
+PAIRED = {name: pair for pair in PAIRS for name in pair.names}
 
 
 @dataclass(frozen=True)
 class Failure:
     names: list[str]
-    """The keys one check covered: one key, or the Plivo Auth ID and Auth token together."""
+    """The keys one check covered: one key, or the halves of a Pair in the change."""
     reason: str
 
     def __str__(self) -> str:
@@ -106,25 +197,23 @@ async def failed_secrets(
     around it. Returns one Failure for each check that failed."""
     checks_to_run: list[tuple[list[str], Coroutine[Any, Any, object]]] = []
     for name, value in changed.items():
-        if value is None or name in PLIVO_SECRETS:
+        if value is None or name in PAIRED:
+            continue
+        if name in STT_OF_KEY or name in TTS_OF_KEY:
+            checks_to_run.append(([name], _check_speech_key(candidate, name, value)))
             continue
         match name:
             case SecretName.LLM_API_KEY:
                 check = checks.llm_models(candidate.llm.base_url, value)
-            case SecretName.DEEPGRAM_API_KEY:
-                check = checks.check_deepgram(
-                    candidate.deepgram.base_url, value, candidate.deepgram.model
-                )
-            case SecretName.ELEVENLABS_API_KEY:
-                check = checks.check_elevenlabs(value, check_voice())
             case SecretName.TYPESAFE_API_KEY:
                 check = checks.check_typesafe(value, JEV_MODEL)
             case _:
                 continue
         checks_to_run.append(([name], check))
-    plivo: list[str] = [name for name in PLIVO_SECRETS if changed.get(name) is not None]
-    if plivo:
-        checks_to_run.append((plivo, _check_plivo_pair(candidate)))
+    for pair in PAIRS:
+        halves: list[str] = [name for name in pair.names if name in changed]
+        if halves:
+            checks_to_run.append((halves, _check_pair(pair, candidate, changed)))
     async with asyncio.TaskGroup() as group:
         tasks = [
             (names, group.create_task(_failure_reason(check))) for names, check in checks_to_run
@@ -156,11 +245,23 @@ def hold_back_addresses(
     return kept, noted
 
 
-async def _check_plivo_pair(candidate: AppSettings) -> None:
-    credentials = candidate.plivo_credentials
-    if credentials is None:
-        raise ProviderCheckError("save the Plivo Auth ID and Auth token together")
-    await checks.check_plivo(*credentials)
+async def _check_speech_key(candidate: AppSettings, name: str, key: str) -> None:
+    """Every use of a speech key: Sarvam's key both hears and speaks."""
+    if name in STT_OF_KEY:
+        await checks.check_stt(candidate, STT_OF_KEY[name], key, check_clip())
+    if name in TTS_OF_KEY:
+        await check_tts(candidate, TTS_OF_KEY[name], key)
+
+
+async def _check_pair(
+    pair: Pair, candidate: AppSettings, changed: Mapping[str, str | None]
+) -> None:
+    auth_id, auth_token = (changed.get(name) for name in pair.names)
+    if auth_id is None and auth_token is None and all(name in changed for name in pair.names):
+        return
+    if auth_id is None or auth_token is None:
+        raise ProviderCheckError(f"save or remove the {pair.label} Auth ID and Auth token together")
+    await pair.check(candidate, auth_id, auth_token)
 
 
 async def _failure_reason(check: Coroutine[Any, Any, object]) -> str | None:

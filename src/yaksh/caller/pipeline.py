@@ -39,8 +39,6 @@ from pipecat.processors.aggregators.llm_response_universal import (
 )
 from pipecat.processors.audio.vad_processor import VADProcessor
 from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
-from pipecat.services.deepgram.stt import DeepgramSTTService
-from pipecat.services.elevenlabs.tts import ElevenLabsTTSService
 from pipecat.services.llm_service import FunctionCallParams
 from pipecat.services.openai.responses.llm import OpenAIResponsesHttpLLMService
 from pipecat.turns.user_stop import TurnAnalyzerUserTurnStopStrategy
@@ -50,7 +48,6 @@ from pipecat.workers.runner import WorkerRunner
 from yaksh.caller.audio import SAMPLE_RATE, Clock
 from yaksh.caller.machines import MachineGate, SoundPlayer
 from yaksh.caller.reply_times import ReplyTimes
-from yaksh.caller.speech_to_text import deepgram_language
 from yaksh.caller.transcript import (
     AgentTurnTap,
     GeneratedTap,
@@ -69,8 +66,11 @@ from yaksh.domain.conversations import (
 )
 from yaksh.domain.latency import VAD_CONFIDENCE, VAD_START_S, VAD_STOP_S
 from yaksh.domain.settings import AppSettings, CallerModel
-from yaksh.integrations import elevenlabs
+from yaksh.domain.voices import VoiceProvider
 from yaksh.integrations.openai_models import caller_effort, failure, retry_rate_limits
+from yaksh.integrations.speech.audio import Resample8k
+from yaksh.integrations.speech.stt import stt_language, stt_model, stt_service
+from yaksh.integrations.speech.tts import tts_model, tts_service
 
 log = logging.getLogger(__name__)
 
@@ -125,21 +125,24 @@ BAD_KEYS = "Nothing was pressed, because a phone keypad has only the keys 0 to 9
 @dataclass(frozen=True)
 class CallerKeys:
     llm: str
-    deepgram: str
-    elevenlabs: str
+    stt: str
+    """The key of the speech-to-text provider in use."""
+    tts: str
+    """The credential of the persona's voice provider."""
 
 
-def caller_keys(settings: AppSettings) -> CallerKeys:
-    """The keys of a call; raises ValueError naming each one that is not saved."""
-    if settings.missing_caller_keys:
-        missing = ", ".join(settings.missing_caller_keys)
-        raise ValueError(f"the caller needs the {missing} key; add it in Settings")
-    secrets = settings.secrets
-    assert secrets.llm_api_key and secrets.deepgram_api_key and secrets.elevenlabs_api_key
+def caller_keys(settings: AppSettings, voice: VoiceProvider) -> CallerKeys:
+    """The keys of a call with a voice of `voice`; raises ValueError naming each one that is
+    not saved."""
+    tts = settings.tts_credential(voice)
+    missing = [*settings.missing_caller_keys, *([voice.label] if tts is None else [])]
+    if missing:
+        raise ValueError(f"the caller needs the {', '.join(missing)} key; add it in Settings")
+    assert settings.secrets.llm_api_key and settings.stt_key and tts
     return CallerKeys(
-        llm=secrets.llm_api_key.get_secret_value(),
-        deepgram=secrets.deepgram_api_key.get_secret_value(),
-        elevenlabs=secrets.elevenlabs_api_key.get_secret_value(),
+        llm=settings.secrets.llm_api_key.get_secret_value(),
+        stt=settings.stt_key.get_secret_value(),
+        tts=tts,
     )
 
 
@@ -456,14 +459,16 @@ class Persona:
     ) -> None:
         settings = request.app_settings
         self.llm = llm_service(settings, request.caller, keys, request.instructions)
-        hearing = deepgram_language(request.agent.languages, request.caller_language)
+        hearer = settings.speech.stt
+        hearing = stt_language(hearer, request.agent.languages, request.caller_language)
         self.settings = CallerSettings(
             llm_model=request.caller.model,
             reasoning_effort=caller_effort(request.caller.model, request.caller.reasoning_effort),
             scenario_model=request.scenario_model,
-            stt_model=settings.deepgram.model,
+            stt_provider=hearer,
+            stt_model=stt_model(settings, hearer),
             stt_language=hearing,
-            tts_model=elevenlabs.MODEL,
+            tts_model=tts_model(settings, request.voice.provider),
             voice=request.voice,
         )
         metrics = ServiceMetricsObserver()
@@ -471,23 +476,8 @@ class Persona:
         self.reply_times = ReplyTimes(
             request.conversation_id, self.settings, urlsplit(str(settings.llm.base_url)).hostname
         )
-        self.stt = DeepgramSTTService(
-            api_key=keys.deepgram,
-            base_url=settings.deepgram.base_url,
-            sample_rate=SAMPLE_RATE,
-            settings=DeepgramSTTService.Settings(model=settings.deepgram.model, language=hearing),
-        )
-        self.tts = ElevenLabsTTSService(
-            api_key=keys.elevenlabs,
-            sample_rate=SAMPLE_RATE,
-            settings=ElevenLabsTTSService.Settings(
-                model=elevenlabs.MODEL,
-                voice=request.voice.id,
-                speed=request.voice.speed,
-                stability=request.voice.stability,
-                language=elevenlabs.language_pin(request.caller_language),
-            ),
-        )
+        self.stt = stt_service(settings, hearer, keys.stt, hearing)
+        self.tts = tts_service(settings, request.voice, request.caller_language, keys.tts)
 
         self.ending = Ending(request, state, transcript, observer, clock, self.say)
         aggregators = LLMContextAggregatorPair(
@@ -518,6 +508,7 @@ class Persona:
                 self.llm,
                 GeneratedTap(transcript),
                 self.tts,
+                Resample8k(),
                 *([self.player] if self.player else []),
                 *before_output,
                 transport_output,
