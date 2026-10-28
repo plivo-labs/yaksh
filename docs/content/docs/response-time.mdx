@@ -76,7 +76,7 @@ On the transcript, each reply of the model that went out on the line shows its r
 The worker writes one log line at the INFO level for each reply, from the logger `yaksh.caller.reply_times`:
 
 ```text
-caller_reply_time {"conversation_id":"…","caller_model":"…","reasoning_effort":"low","llm_host":"…","stt_provider":"deepgram","stt_model":"nova-3","tts_provider":"elevenlabs","tts_model":"eleven_flash_v2_5","language":"en-US","version":"0.8.2","reply":3,"total_ms":2054,"endpointing_wait_ms":600,"transcription_ms":53,"turn_detection_ms":36,"llm_inference_ms":808,…,"pipeline_ms":0,"stt_ttfs_ms":653}
+caller_reply_time {"conversation_id":"…","caller_model":"…","reasoning_effort":"low","llm_host":"…","stt_provider":"deepgram","stt_model":"nova-3","tts_provider":"elevenlabs","tts_model":"eleven_flash_v2_5","language":"en-US","version":"0.9.1","reply":3,"total_ms":2054,"endpointing_wait_ms":600,"transcription_ms":53,"turn_detection_ms":36,"llm_inference_ms":808,…,"pipeline_ms":0,"stt_ttfs_ms":653}
 ```
 
 - `reply` is the number of the caller audio start in the call, from 0.
