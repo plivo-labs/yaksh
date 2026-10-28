@@ -140,6 +140,12 @@ export const hasCredential = (
 export const ttsProvider = (value: VoiceProvider) =>
   TTS_PROVIDERS.find((provider) => provider.value === value) ?? TTS_PROVIDERS[0];
 
+/** The tag of a provider without word timestamps, and what it means for a call. */
+export const CUTS_AT_SENTENCES = {
+  label: "Cuts at sentences",
+  tip: "If the agent talks over the caller, the transcript cuts the caller's line at a whole sentence, not at a word. This provider does not report when each word plays.",
+};
+
 export const ttsTraits = (providers: readonly TtsTraits[], value: VoiceProvider) =>
   providers.find((provider) => provider.provider === value) ?? providers[0];
 

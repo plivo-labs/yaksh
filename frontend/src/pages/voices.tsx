@@ -1,6 +1,7 @@
 import { AudioLines, Play, Plus, Square } from "lucide-react";
 import { useState } from "react";
 
+import { ExplainedBadge } from "@/components/explained-badge";
 import { GenderBadge } from "@/components/gender-badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -33,6 +34,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { useVoicePreview } from "@/hooks/use-voice-preview";
 import { useSettings, useVoiceProviders, useVoices } from "@/lib/queries";
 import {
+  CUTS_AT_SENTENCES,
   TTS_PROVIDERS,
   defaultSettings,
   hasCredential,
@@ -41,13 +43,15 @@ import {
   ttsTraits,
 } from "@/lib/speech-providers";
 import { LANGUAGE_NAMES, type Voice, type VoiceProvider } from "@/lib/types";
+import { VoiceDialog } from "@/pages/voice-dialog";
 
 const ALL = "all";
 const PROVIDER_ITEMS = [
   { value: ALL, label: "All providers" },
   ...TTS_PROVIDERS.map((provider) => ({ value: provider.value, label: provider.label })),
 ];
-import { VoiceDialog } from "@/pages/voice-dialog";
+const MODEL_HINT =
+  "The text-to-speech model this voice speaks with. To use another model, add the voice again with that model.";
 
 export function VoicesPage() {
   const voices = useVoices();
@@ -148,10 +152,18 @@ export function VoicesPage() {
                       {item.builtin && <Badge>Built-in</Badge>}
                       <Badge>{provider.label}</Badge>
                       {traits && item.model !== null && (
-                        <Badge>{ttsModel(traits, item.model)?.label ?? item.model}</Badge>
+                        <ExplainedBadge hint={MODEL_HINT} className="relative z-10">
+                          {ttsModel(traits, item.model)?.label ?? item.model}
+                        </ExplainedBadge>
                       )}
                       {traits && !traits.word_timestamps && (
-                        <Badge variant="warning">Sentence timing</Badge>
+                        <ExplainedBadge
+                          variant="warning"
+                          hint={CUTS_AT_SENTENCES.tip}
+                          className="relative z-10"
+                        >
+                          {CUTS_AT_SENTENCES.label}
+                        </ExplainedBadge>
                       )}
                       {keyless && <Badge variant="danger">No key</Badge>}
                     </CardDescription>

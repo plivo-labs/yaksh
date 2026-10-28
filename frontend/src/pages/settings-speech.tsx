@@ -1,5 +1,6 @@
 import { useState } from "react";
 
+import { ExplainedBadge } from "@/components/explained-badge";
 import { Panel, PanelHeader } from "@/components/panel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -20,6 +21,7 @@ import {
   useVoices,
 } from "@/lib/queries";
 import {
+  CUTS_AT_SENTENCES,
   STT_LANGUAGES,
   STT_PROVIDERS,
   TTS_PROVIDERS,
@@ -178,7 +180,7 @@ export function TextToSpeechPanel({
   const providers = useVoiceProviders();
   const voicesOf = (provider: VoiceProvider) =>
     (voices.data ?? []).filter((voice) => voice.provider === provider).length;
-  const sentenceTiming = (provider: VoiceProvider) =>
+  const cutsAtSentences = (provider: VoiceProvider) =>
     providers.data?.find((item) => item.provider === provider)?.word_timestamps === false;
   if (open !== null) {
     const provider = ttsProvider(open);
@@ -191,7 +193,7 @@ export function TextToSpeechPanel({
         change={change}
         voices={voicesOf(open)}
         personas={users.length}
-        sentenceTiming={sentenceTiming(open)}
+        cutsAtSentences={cutsAtSentences(open)}
         onBack={() => setOpen(null)}
       />
     );
@@ -214,7 +216,11 @@ export function TextToSpeechPanel({
               <span className="w-28 text-s-500">{provider.label}</span>
               <span className="flex flex-1 flex-wrap gap-1.5">
                 <Badge variant={saved ? "success" : undefined}>{saved ? "Saved" : "Not set"}</Badge>
-                {sentenceTiming(provider.value) && <Badge variant="warning">Sentence timing</Badge>}
+                {cutsAtSentences(provider.value) && (
+                  <ExplainedBadge variant="warning" hint={CUTS_AT_SENTENCES.tip}>
+                    {CUTS_AT_SENTENCES.label}
+                  </ExplainedBadge>
+                )}
               </span>
               <span className="w-20 text-right text-s-400 text-muted-foreground">
                 {voicesOf(provider.value)} {voicesOf(provider.value) === 1 ? "voice" : "voices"}
@@ -227,7 +233,7 @@ export function TextToSpeechPanel({
         })}
       </ul>
       <p className="border-t px-5 py-3 text-xs-400 text-muted-foreground">
-        Sentence timing: a cut-off reply shows whole sentences, not words.
+        {CUTS_AT_SENTENCES.label}: {CUTS_AT_SENTENCES.tip}
       </p>
     </Panel>
   );
@@ -240,7 +246,7 @@ function TtsProviderPanel({
   change,
   voices,
   personas,
-  sentenceTiming,
+  cutsAtSentences,
   onBack,
 }: {
   provider: TtsProvider;
@@ -249,8 +255,8 @@ function TtsProviderPanel({
   change: Change;
   voices: number;
   personas: number;
-  /** The provider times whole sentences, not words. */
-  sentenceTiming: boolean;
+  /** The provider does not report when each word plays. */
+  cutsAtSentences: boolean;
   onBack: () => void;
 }) {
   const fields = draft[provider.section] as TtsFields;
@@ -284,11 +290,7 @@ function TtsProviderPanel({
         provider={provider.test}
         canTest={key}
         edits={JSON.stringify(fields)}
-        description={
-          sentenceTiming
-            ? "Sentence timing: a cut-off reply shows whole sentences, not words."
-            : undefined
-        }
+        description={cutsAtSentences ? CUTS_AT_SENTENCES.tip : undefined}
       >
         <SettingRow
           label={region ? "Region" : "Base URL"}

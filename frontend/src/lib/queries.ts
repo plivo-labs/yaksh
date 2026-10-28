@@ -486,6 +486,56 @@ export function useAddVoice() {
   });
 }
 
+/** Where one voice of a batch stands. "listed": the voices list already has it. */
+export type VoiceAddState =
+  | { status: "waiting" | "adding" | "added" | "listed" }
+  | { status: "failed"; message: string };
+
+/** Each request has the provider speak a test line before the server saves the voice, and a
+ * provider limits the requests it serves at once. */
+const VOICES_AT_ONCE = 3;
+
+async function addOne(input: VoiceInput): Promise<VoiceAddState> {
+  try {
+    await api<Voice>("/voices", { method: "POST", json: input });
+    return { status: "added" };
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 409) return { status: "listed" };
+    return { status: "failed", message: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+/** Adds voices, a request each, at most `VOICES_AT_ONCE` at a time. `onState` hears each voice,
+ * by its provider voice ID, when its request starts and when it ends; the result holds how each
+ * one ended. The voices list is read again once, after the last. */
+export function useAddVoices() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      inputs,
+      onState,
+    }: {
+      inputs: VoiceInput[];
+      onState: (id: string, state: VoiceAddState) => void;
+    }) => {
+      const ended = new Map<string, VoiceAddState>();
+      let next = 0;
+      const lane = async () => {
+        while (next < inputs.length) {
+          const input = inputs[next++];
+          onState(input.provider_voice_id, { status: "adding" });
+          const state = await addOne(input);
+          ended.set(input.provider_voice_id, state);
+          onState(input.provider_voice_id, state);
+        }
+      };
+      await Promise.all(Array.from({ length: VOICES_AT_ONCE }, lane));
+      return ended;
+    },
+    onSettled: () => client.invalidateQueries({ queryKey: keys.voices }),
+  });
+}
+
 export function useEditVoice() {
   const client = useQueryClient();
   return useMutation({

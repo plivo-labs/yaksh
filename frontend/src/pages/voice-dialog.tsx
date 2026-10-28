@@ -8,7 +8,7 @@ import { GenderBadge } from "@/components/gender-badge";
 import { Fact } from "@/components/panel";
 import { SearchInput } from "@/components/search-input";
 import { Segmented } from "@/components/segmented";
-import { Badge } from "@/components/ui/badge";
+import { StatusLabel } from "@/components/status-label";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -36,13 +36,16 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useCloseGuard } from "@/hooks/use-close-guard";
 import type { VoicePreview } from "@/hooks/use-voice-preview";
 import { counted } from "@/lib/format";
 import { revealErrors } from "@/lib/forms";
 import { APPEAR } from "@/lib/motion";
 import {
+  type VoiceAddState,
   useAddVoice,
+  useAddVoices,
   useDeleteVoice,
   useEditVoice,
   useLookupVoice,
@@ -50,12 +53,14 @@ import {
   useVoiceCatalog,
 } from "@/lib/queries";
 import {
+  CUTS_AT_SENTENCES,
   TTS_PROVIDERS,
   defaultSettings,
   hasCredential,
   ttsModel,
   ttsTraits,
 } from "@/lib/speech-providers";
+import type { Tone } from "@/lib/status";
 import {
   LANGUAGE_NAMES,
   type Language,
@@ -64,10 +69,12 @@ import {
   type TtsTraits,
   type Voice,
   type VoiceGender,
+  type VoiceInput,
   type VoiceProvider,
   type VoiceSettings,
   type VoiceSource,
 } from "@/lib/types";
+import { cn } from "@/lib/utils";
 
 const ALL = "all";
 const GENDER_ITEMS: { value: VoiceGender; label: string }[] = [
@@ -90,6 +97,11 @@ const SOURCES: { value: VoiceSource; label: string }[] = [
   { value: "account", label: "Account" },
   { value: "library", label: "Library" },
 ];
+const LIBRARY_HINT =
+  "Library: ElevenLabs' public voices. The account's plan must allow library voices; Yaksh adds a voice only after it speaks a line.";
+
+/** The longest name the server takes, in code points. */
+const NAME_MAX = 80;
 
 const previewKey = (language: Language) => `voice:${language}`;
 const catalogKey = (id: string) => `catalog:${id}`;
@@ -128,14 +140,44 @@ interface Picked {
   source: VoiceSource;
 }
 
+/** A voice of the last batch and where it stands. */
+interface Reported {
+  id: string;
+  name: string;
+  state: VoiceAddState;
+}
+
+const STATES: Record<VoiceAddState["status"], { tone: Tone; text: string }> = {
+  waiting: { tone: "amber", text: "Waiting" },
+  adding: { tone: "green", text: "Adding" },
+  added: { tone: "green", text: "Added" },
+  listed: { tone: "off", text: "Already listed" },
+  failed: { tone: "red", text: "Not added" },
+};
+
+const NO_LANGUAGE: VoiceAddState = {
+  status: "failed",
+  message: "It lists no language of this model; set the language filter and add it again.",
+};
+
 function joined(names: string[]): string {
   return names.length < 2 ? names.join("") : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
 }
 
-/** Add a voice of any text-to-speech provider with a key, or edit one in the list. A new voice
- * gets one of its provider's models, and is picked from the provider's voices or entered by its
- * ID. A provider with lookup fills the details from the ID; for the others they are entered by
- * hand. The server speaks a line in the voice and model before it saves it. */
+/** What sets a model apart from the provider's other models: its speeds and its languages. */
+function modelHint(model: TtsModel): string {
+  const speed =
+    model.speed_min === model.speed_max
+      ? "No speed setting."
+      : `Speed ${model.speed_min.toFixed(2)} to ${model.speed_max.toFixed(2)}.`;
+  return `${speed} Speaks ${joined(model.languages.map((language) => LANGUAGE_NAMES[language]))}.`;
+}
+
+/** Add voices of any text-to-speech provider with a key, or edit one in the list. A new voice
+ * gets one of its provider's models. Several are picked from the provider's voices and added
+ * at once, each with its name and the languages the provider lists for it; or one is entered by
+ * its ID. A provider with lookup fills the details from the ID; for the others they are entered
+ * by hand. The server speaks a line in each voice and model before it saves it. */
 export function VoiceDialog({
   voice,
   providers,
@@ -149,6 +191,7 @@ export function VoiceDialog({
   onClosed: () => void;
 }) {
   const add = useAddVoice();
+  const addPicked = useAddVoices();
   const edit = useEditVoice();
   const remove = useDeleteVoice();
   const lookup = useLookupVoice();
@@ -166,7 +209,9 @@ export function VoiceDialog({
   const model = ttsModel(traits, modelId) ?? traits.models[0];
   const [mode, setMode] = useState<Mode>("find");
   const [filters, setFilters] = useState<Filters>(NO_FILTERS);
-  const [picked, setPicked] = useState<Picked | null>(null);
+  /** The voices checked in the provider's list, by ID. They stay while the list changes. */
+  const [picked, setPicked] = useState<ReadonlyMap<string, Picked>>(new Map());
+  const [report, setReport] = useState<Reported[]>([]);
   const [typedId, setTypedId] = useState("");
   const [found, setFound] = useState<Details | null>(null);
   const [initial] = useState<Draft>(() => ({
@@ -179,6 +224,8 @@ export function VoiceDialog({
   const [submitted, setSubmitted] = useState(false);
   /** The previews this dialog started, so that closing it or changing the voice stops them. */
   const played = useRef(new Set<string>());
+  /** While the picked voices are added, the choices that made the batch stay as they are. */
+  const adding = addPicked.isPending;
 
   const details: Details | null = voice
     ? {
@@ -188,12 +235,7 @@ export function VoiceDialog({
         listed: voice.listed_languages,
       }
     : mode === "find"
-      ? picked && {
-          providerVoiceId: picked.voice.id,
-          gender: picked.voice.gender,
-          accent: picked.voice.accent,
-          listed: picked.voice.listed_languages,
-        }
+      ? null
       : traits.lookup
         ? found && found.providerVoiceId === typedId.trim()
           ? found
@@ -209,12 +251,10 @@ export function VoiceDialog({
   /** The person enters the gender and accent: no lookup or list describes the voice. */
   const entered = !voice && mode === "id" && !traits.lookup;
   /** `details.listed` holds what the provider lists for the voice. */
-  const listedKnown = voice
-    ? traits.lookup || voice.listed_languages.length > 0
-    : mode === "find" || traits.lookup;
+  const listedKnown = voice ? traits.lookup || voice.listed_languages.length > 0 : traits.lookup;
   const dirty = voice
     ? JSON.stringify(draft) !== JSON.stringify(initial)
-    : picked !== null || typedId.trim() !== "";
+    : picked.size > 0 || typedId.trim() !== "";
   const guard = useCloseGuard(dirty);
 
   const change = (next: (current: Draft) => Partial<Draft>) => {
@@ -279,16 +319,68 @@ export function VoiceDialog({
     setFilters((current) => ({ ...current, ...next }));
   };
 
-  const pick = (entry: ProviderVoice) => {
-    stopPreviews();
-    setPicked({ voice: entry, source: filters.source });
-    change(() => ({ name: entry.name, languages: spokenOf(entry.listed_languages) }));
-  };
+  const pick = (entry: ProviderVoice, on: boolean) =>
+    setPicked((current) => {
+      const next = new Map(current);
+      if (on) next.set(entry.id, { voice: entry, source: filters.source });
+      else next.delete(entry.id);
+      return next;
+    });
 
-  const unpick = () => {
-    stopPreviews();
-    add.reset();
-    setPicked(null);
+  /** Adds the picked voices with the chosen model. A voice gets the languages that the provider
+   * lists for it and the model speaks; without one, the language of the filter. When every voice
+   * is in the list, the dialog closes; if not, the voices not added stay picked, to add again. */
+  const addAll = () => {
+    const batch = [...picked.values()].map(({ voice: entry, source }) => {
+      const spoken = spokenOf(entry.listed_languages);
+      const languages = spoken.length > 0 ? spoken : filters.language ? [filters.language] : [];
+      const input: VoiceInput | null =
+        languages.length > 0
+          ? {
+              provider,
+              provider_voice_id: entry.id,
+              model: model.id ?? undefined,
+              name: [...entry.name.trim()].slice(0, NAME_MAX).join(""),
+              languages,
+              source,
+              ...(traits.lookup && source === "account"
+                ? {}
+                : {
+                    gender: entry.gender,
+                    accent: entry.accent,
+                    listed_languages: entry.listed_languages,
+                  }),
+            }
+          : null;
+      return { entry, input };
+    });
+    setReport(
+      batch.map(({ entry, input }): Reported => ({
+        id: entry.id,
+        name: entry.name,
+        state: input ? { status: "waiting" } : NO_LANGUAGE,
+      })),
+    );
+    addPicked.mutate(
+      {
+        inputs: batch.flatMap(({ input }) => (input ? [input] : [])),
+        onState: (id, state) =>
+          setReport((current) =>
+            current.map((item) => (item.id === id ? { ...item, state } : item)),
+          ),
+      },
+      {
+        onSuccess: (ended) => {
+          const done = new Set(
+            [...ended]
+              .filter(([, state]) => state.status === "added" || state.status === "listed")
+              .map(([id]) => id),
+          );
+          if (done.size === batch.length) guard.close();
+          else setPicked((current) => new Map([...current].filter(([id]) => !done.has(id))));
+        },
+      },
+    );
   };
 
   const submit = (event: SubmitEvent<HTMLFormElement>) => {
@@ -302,15 +394,13 @@ export function VoiceDialog({
       edit.mutate({ id: voice.id, ...body }, { onSuccess: guard.close });
       return;
     }
-    const source = picked?.source ?? "account";
     add.mutate(
       {
         ...body,
         provider,
         provider_voice_id: details.providerVoiceId,
         model: modelId,
-        source,
-        ...(traits.lookup && source === "account"
+        ...(traits.lookup
           ? {}
           : { gender: details.gender, accent: details.accent, listed_languages: details.listed }),
       },
@@ -322,7 +412,8 @@ export function VoiceDialog({
     const first = ttsTraits(providers, next).models[0];
     changeId("");
     setFound(null);
-    setPicked(null);
+    setPicked(new Map());
+    setReport([]);
     setFilters(NO_FILTERS);
     setProvider(next);
     setModelId(first.id);
@@ -347,7 +438,8 @@ export function VoiceDialog({
     if (next === mode) return;
     changeId("");
     setFound(null);
-    setPicked(null);
+    setPicked(new Map());
+    setReport([]);
     setDraft(initial);
     setSubmitted(false);
     setMode(next);
@@ -365,7 +457,7 @@ export function VoiceDialog({
   return (
     <Dialog
       open={guard.open}
-      onOpenChange={(next) => !next && guard.requestClose()}
+      onOpenChange={(next) => !next && !adding && guard.requestClose()}
       onOpenChangeComplete={(next) => {
         if (next) return;
         stopPreviews();
@@ -395,6 +487,7 @@ export function VoiceDialog({
                         label: item.label,
                       }))}
                       value={provider}
+                      disabled={adding}
                       onValueChange={(next) => next && chooseProvider(next)}
                     >
                       <SelectTrigger id="voice-provider" className="w-full">
@@ -415,7 +508,7 @@ export function VoiceDialog({
                     </Select>
                     {!traits.word_timestamps && (
                       <FieldDescription className="text-warning-foreground">
-                        Sentence timing: a cut-off reply shows whole sentences, not words.
+                        {CUTS_AT_SENTENCES.tip}
                       </FieldDescription>
                     )}
                   </Field>
@@ -425,6 +518,7 @@ export function VoiceDialog({
                       <Select
                         items={traits.models.map((item) => ({ value: item.id, label: item.label }))}
                         value={model.id}
+                        disabled={adding}
                         onValueChange={(next) => next && chooseModel(next)}
                       >
                         <SelectTrigger id="voice-model" className="w-full">
@@ -432,9 +526,14 @@ export function VoiceDialog({
                         </SelectTrigger>
                         <SelectContent>
                           {traits.models.map((item) => (
-                            <SelectItem key={item.id} value={item.id}>
-                              {item.label}
-                            </SelectItem>
+                            <Tooltip key={item.id}>
+                              <TooltipTrigger render={<SelectItem value={item.id} />}>
+                                {item.label}
+                              </TooltipTrigger>
+                              <TooltipContent side="right" className="max-w-72">
+                                {modelHint(item)}
+                              </TooltipContent>
+                            </Tooltip>
                           ))}
                         </SelectContent>
                       </Select>
@@ -447,10 +546,17 @@ export function VoiceDialog({
 
                 <div className="grid gap-4">
                   <div className="flex flex-wrap items-end gap-x-6 gap-y-4">
-                    <Segmented label="Voice" value={mode} options={MODES} onChange={chooseMode} />
-                    {mode === "find" && !picked && traits.library && (
+                    <Segmented
+                      label="Voice"
+                      value={mode}
+                      options={MODES}
+                      disabled={adding}
+                      onChange={chooseMode}
+                    />
+                    {mode === "find" && traits.library && (
                       <Segmented
                         label="Source"
+                        hint={LIBRARY_HINT}
                         value={filters.source}
                         options={SOURCES}
                         onChange={(source) => filter({ source })}
@@ -490,21 +596,6 @@ export function VoiceDialog({
                       )}
                       {lookup.error && <FieldError>{lookup.error.message}</FieldError>}
                     </Field>
-                  ) : picked ? (
-                    <div
-                      className={`flex items-center gap-3 rounded-md border px-3 py-2 ${APPEAR}`}
-                    >
-                      <span className="grid min-w-0 flex-1">
-                        <span className="truncate text-p-500">{picked.voice.name}</span>
-                        <span className="truncate font-mono text-xs-400 text-muted-foreground">
-                          {picked.voice.id}
-                        </span>
-                      </span>
-                      {picked.source === "library" && <Badge>Library</Badge>}
-                      <Button type="button" variant="outline" size="sm" onClick={unpick}>
-                        Change
-                      </Button>
-                    </div>
                   ) : (
                     <VoiceFinder
                       traits={traits}
@@ -513,7 +604,10 @@ export function VoiceDialog({
                       onFilter={filter}
                       preview={preview}
                       onPlay={togglePreview}
+                      picked={picked}
+                      locked={adding}
                       onPick={pick}
+                      onClear={() => setPicked(new Map())}
                     />
                   )}
                 </div>
@@ -586,7 +680,7 @@ export function VoiceDialog({
                   <Input
                     id="voice-name"
                     required
-                    maxLength={80}
+                    maxLength={NAME_MAX}
                     aria-invalid={submitted && !draft.name.trim()}
                     value={draft.name}
                     onChange={(e) => change(() => ({ name: e.target.value }))}
@@ -649,6 +743,8 @@ export function VoiceDialog({
           </FieldGroup>
         </form>
 
+        {report.length > 0 && <AddReport items={report} />}
+
         {(save.error || remove.error) && (
           <FieldError className="px-6 pb-3">{(save.error ?? remove.error)?.message}</FieldError>
         )}
@@ -656,7 +752,7 @@ export function VoiceDialog({
         <DialogFooter className="items-center border-t px-6 py-4">
           {!voice && (
             <span className="mr-auto text-xs-400 text-muted-foreground">
-              Saving speaks a test line in this voice.
+              Saving speaks a test line in {mode === "find" ? "each" : "this"} voice.
             </span>
           )}
           {voice && (
@@ -669,13 +765,20 @@ export function VoiceDialog({
               }
             />
           )}
-          <Button type="button" variant="ghost" onClick={guard.requestClose}>
+          <Button type="button" variant="ghost" disabled={adding} onClick={guard.requestClose}>
             Cancel
           </Button>
-          <Button type="submit" form="voice-form" disabled={!details || save.isPending}>
-            {save.isPending && <Spinner />}
-            {voice ? "Save changes" : "Add voice"}
-          </Button>
+          {!voice && mode === "find" ? (
+            <Button type="button" disabled={picked.size === 0 || adding} onClick={addAll}>
+              {adding && <Spinner />}
+              {picked.size === 0 ? "Add voices" : `Add ${counted(picked.size, "voice", "voices")}`}
+            </Button>
+          ) : (
+            <Button type="submit" form="voice-form" disabled={!details || save.isPending}>
+              {save.isPending && <Spinner />}
+              {voice ? "Save changes" : "Add voice"}
+            </Button>
+          )}
         </DialogFooter>
 
         <DiscardConfirm subject="voice" {...guard.discard} />
@@ -684,7 +787,8 @@ export function VoiceDialog({
   );
 }
 
-/** A search of the provider's own voices: each plays in the chosen model, and one is picked. */
+/** A search of the provider's own voices: each plays in the chosen model, and any number are
+ * picked. The picks stay while the search, the filters and the pages change. */
 function VoiceFinder({
   traits,
   model,
@@ -692,7 +796,10 @@ function VoiceFinder({
   onFilter,
   preview,
   onPlay,
+  picked,
+  locked,
   onPick,
+  onClear,
 }: {
   traits: TtsTraits;
   model: TtsModel;
@@ -700,7 +807,11 @@ function VoiceFinder({
   onFilter: (next: Partial<Filters>) => void;
   preview: VoicePreview;
   onPlay: (key: string, voice: VoiceSettings, language: Language) => void;
-  onPick: (voice: ProviderVoice) => void;
+  picked: ReadonlyMap<string, Picked>;
+  /** The picks cannot change: the picked voices are being added. */
+  locked: boolean;
+  onPick: (voice: ProviderVoice, on: boolean) => void;
+  onClear: () => void;
 }) {
   const catalog = useVoiceCatalog({ provider: traits.provider, model: model.id, ...filters });
   const rows = (catalog.data?.pages ?? []).flatMap((page) => page.items);
@@ -763,17 +874,30 @@ function VoiceFinder({
               return (
                 <li
                   key={entry.id}
-                  className="flex items-center gap-2 border-b px-3 py-2 last:border-b-0"
+                  className="flex items-center gap-2 border-b px-3 py-2 transition-colors last:border-b-0 hover:bg-hv1"
                 >
-                  <span className="grid min-w-0 flex-1">
-                    <span className="truncate text-p-500">{entry.name}</span>
-                    {about && (
-                      <span className="truncate text-s-400 text-muted-foreground capitalize">
-                        {about}
-                      </span>
+                  <label
+                    className={cn(
+                      "flex min-w-0 flex-1 items-center gap-3",
+                      locked ? "cursor-not-allowed" : "cursor-pointer",
                     )}
-                    {error && <span className="text-xs-400 text-destructive">{error}</span>}
-                  </span>
+                  >
+                    <Checkbox
+                      aria-label={`Select ${entry.name}`}
+                      checked={picked.has(entry.id)}
+                      disabled={locked}
+                      onCheckedChange={(on) => onPick(entry, on)}
+                    />
+                    <span className="grid min-w-0 flex-1">
+                      <span className="truncate text-p-500">{entry.name}</span>
+                      {about && (
+                        <span className="truncate text-s-400 text-muted-foreground capitalize">
+                          {about}
+                        </span>
+                      )}
+                      {error && <span className="text-xs-400 text-destructive">{error}</span>}
+                    </span>
+                  </label>
                   <Button
                     type="button"
                     variant="ghost"
@@ -794,22 +918,28 @@ function VoiceFinder({
                       <Play />
                     )}
                   </Button>
-                  <Button type="button" variant="outline" size="sm" onClick={() => onPick(entry)}>
-                    Pick
-                  </Button>
                 </li>
               );
             })}
           </ul>
-          <div className="flex items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
             <span className="text-s-400 text-muted-foreground tabular-nums">
               Showing {counted(rows.length, "voice", "voices")}
             </span>
+            {picked.size > 0 && (
+              <span className="flex items-center gap-1">
+                <span className="text-s-500 tabular-nums">{picked.size} selected</span>
+                <Button type="button" variant="ghost" size="sm" disabled={locked} onClick={onClear}>
+                  Clear
+                </Button>
+              </span>
+            )}
             {catalog.hasNextPage && (
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
+                className="ml-auto"
                 disabled={catalog.isFetchingNextPage}
                 onClick={() => void catalog.fetchNextPage()}
               >
@@ -822,4 +952,50 @@ function VoiceFinder({
       )}
     </div>
   );
+}
+
+/** The voices of the last batch: where each one stands while they are added, and why a voice
+ * was not added. */
+function AddReport({ items }: { items: Reported[] }) {
+  return (
+    <div className="max-h-48 shrink-0 overflow-y-auto border-t px-6 py-3">
+      <p role="status" className="text-s-500">
+        {reportSummary(items)}
+      </p>
+      <ul className="mt-2 flex flex-col gap-2">
+        {items.map(({ id, name, state }) => (
+          <li key={id}>
+            <span className="flex items-center justify-between gap-3">
+              <span className="truncate text-s-400">{name}</span>
+              <StatusLabel tone={STATES[state.status].tone} live={state.status === "adding"}>
+                {STATES[state.status].text}
+              </StatusLabel>
+            </span>
+            {state.status === "failed" && (
+              <p className="mt-0.5 text-xs-400 text-destructive">{state.message}</p>
+            )}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/** "Adding 5 voices: 2 done" while they are added; then how many ended each way. */
+function reportSummary(items: Reported[]): string {
+  const count = (status: VoiceAddState["status"]) =>
+    items.filter((item) => item.state.status === status).length;
+  const open = count("waiting") + count("adding");
+  if (open > 0) {
+    return `Adding ${counted(items.length, "voice", "voices")}: ${items.length - open} done`;
+  }
+  const ends: [number, string][] = [
+    [count("added"), "added"],
+    [count("listed"), "already listed"],
+    [count("failed"), "not added"],
+  ];
+  return ends
+    .filter(([amount]) => amount > 0)
+    .map(([amount, text]) => `${amount} ${text}`)
+    .join(", ");
 }
