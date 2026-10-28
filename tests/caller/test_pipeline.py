@@ -166,16 +166,12 @@ async def test_an_empty_message_is_the_caller_saying_nothing_and_any_other_empty
     assert [error.split()[2] for error in errors] == ["refused", "thought"]
 
 
-NOTE: LLMContextMessage = {"role": "developer", "content": pipeline.SAID_NOTHING}
 LATER: LLMContextMessage = {"role": "user", "content": "Are you still there?"}
 
 
-@pytest.mark.parametrize(
-    ("reasoning_ids", "later", "tail"),
-    [(["rs_a", "rs_b"], [LATER], [NOTE, LATER]), ([], [], [NOTE])],
-)
-async def test_a_reply_with_no_words_leaves_a_note_in_the_context_in_place_of_its_reasoning(
-    reasoning_ids: list[str], later: list[LLMContextMessage], tail: list[LLMContextMessage]
+@pytest.mark.parametrize(("reasoning_ids", "later"), [(["rs_a", "rs_b"], [LATER]), ([], [])])
+async def test_a_reply_with_no_words_leaves_none_of_its_reasoning_in_the_context(
+    reasoning_ids: list[str], later: list[LLMContextMessage]
 ) -> None:
     settings = model_settings("http://127.0.0.1:9", "gpt-6-luna", None)
     llm = llm_service(settings, settings.caller, CallerKeys("test", "", ""), "Be a caller.")
@@ -212,7 +208,7 @@ async def test_a_reply_with_no_words_leaves_a_note_in_the_context_in_place_of_it
         earlier,
         {"role": "assistant", "content": "Yes, speaking."},
         {"role": "user", "content": "Let me pull up your file."},
-        *tail,
+        *later,
     ]
 
 
