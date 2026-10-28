@@ -32,3 +32,12 @@ For each reply of the phone caller, Yaksh records where the time went, from the 
 - A timer of Yaksh's own from the VAD stop to the first audio. Rejected: it gives the total, not the parts.
 - Matching breakdowns to replies by time. Rejected: the handler can run after later frames, and Pipecat can derive a moment after the audio start, so a time match picks the wrong reply. The context and the playout identity are exact.
 - Leaving #5921's time as `pipeline`. Rejected: on real calls it held up to 5 s of smart-turn waiting in most replies.
+
+## Update: STT TTFS per reply (0.9.1)
+
+- With an STT that finalizes on its own endpointing, such as Deepgram, the final transcript almost always comes inside the VAD endpointing wait, so the STT part is 0 and does not show the speed of the STT. Each reply now also keeps the STT's TTFS (`stt_ttfs_ms`): from the end of the agent's speech, which is the reply's start, to the last final transcript that the STT pushed before the caller's model started. It overlaps the parts, so it is shown beside them, not added to them.
+- The observer keeps the time when the STT pushes a final transcript, clears it when the agent starts to speak again, and stores it with each frame that makes the caller speak. A reply reads the time stored with the start of its model, so a transcript after that start does not change it. Pipecat tells this observer of a frame only at its first push, which is the STT's own push.
+- Pipecat's own STT TTFB is not used. With Deepgram it stops at the answer to the finalize request that Pipecat sends at the VAD stop, so it always includes the `stop_secs`. Pipecat's breakdown also records no transcript before the VAD stop (pipecat-ai/pipecat#5921), so Yaksh keeps the time itself.
+- An STT that sends its final transcript only when the VAD stops, such as Soniox as Yaksh sets it up, cannot finalize before the VAD stop. Its TTFS always includes the `stop_secs` and shows nothing about a shorter `stop_secs`.
+- A final transcript has no audio time that Yaksh can read for every STT. So when the agent speaks again soon after a VAD stop and the new speech gives no final transcript, the STT's late final transcript for the earlier speech counts for the reply.
+- The core parts (VAD endpointing, STT after VAD stop, turn detection, LLM TTFT, TTS TTFB) are always listed, also at 0 ms: a 0 there is a result.

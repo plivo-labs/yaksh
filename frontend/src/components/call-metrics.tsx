@@ -2,11 +2,13 @@ import type { ReactNode } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Explained } from "@/components/verdict-ui";
 import { BAND_FILL, duration, latency, percent, responseBand, seconds } from "@/lib/format";
 import { useConversationEvaluation } from "@/lib/queries";
-import { STAGE_FILL, stepLabel, stepStage } from "@/lib/reply-steps";
+import { STAGE_FILL, STT_TTFS, stepLabel, stepStage, stepTip } from "@/lib/reply-steps";
 import { sttProvider, ttsProvider } from "@/lib/speech-providers";
 import {
+  type CallerReplyTimeMetric,
   type CaptureFaults,
   type ConversationEvaluation,
   type EvaluationState,
@@ -248,7 +250,7 @@ function CallerCard({ metrics, transport }: { metrics: Metrics; transport: Trans
               <Stat label="Replies" value={String(replies.replies)} />
             </Stats>
             <StepBar steps={replies.steps} />
-            <StepTable steps={replies.steps} />
+            <StepTable steps={replies.steps} stt={replies.stt_ttfs} />
           </>
         ) : (
           transport === "phone" && (
@@ -306,7 +308,7 @@ function StepBar({ steps }: { steps: Step[] }) {
   );
 }
 
-function StepTable({ steps }: { steps: Step[] }) {
+function StepTable({ steps, stt }: { steps: Step[]; stt: CallerReplyTimeMetric["stt_ttfs"] }) {
   return (
     <table className="text-s-400 tabular-nums">
       <thead className="text-xs-400 text-muted-foreground">
@@ -317,18 +319,34 @@ function StepTable({ steps }: { steps: Step[] }) {
         </tr>
       </thead>
       <tbody>
-        {steps.map((step) => (
-          <tr key={step.key} className="border-t">
-            <td className="py-1.5">
-              <span className="flex items-center gap-2">
-                <span className={cn("size-2 rounded-xs", STAGE_FILL[stepStage(step.key)])} />
-                {stepLabel(step.key)}
-              </span>
+        {steps.map((step) => {
+          const tip = stepTip(step.key);
+          return (
+            <tr key={step.key} className="border-t">
+              <td className="py-1.5">
+                <span className="flex items-center gap-2">
+                  <span className={cn("size-2 rounded-xs", STAGE_FILL[stepStage(step.key)])} />
+                  {tip ? (
+                    <Explained hint={tip}>{stepLabel(step.key)}</Explained>
+                  ) : (
+                    stepLabel(step.key)
+                  )}
+                </span>
+              </td>
+              <td className="py-1.5 text-right">{latency(step.p50_ms)}</td>
+              <td className="py-1.5 text-right text-muted-foreground">{latency(step.p90_ms)}</td>
+            </tr>
+          );
+        })}
+        {stt && (
+          <tr className="border-t-2 border-dashed">
+            <td className="py-1.5 pl-4 text-muted-foreground">
+              <Explained hint={STT_TTFS.tip}>{STT_TTFS.label}</Explained>
             </td>
-            <td className="py-1.5 text-right">{latency(step.p50_ms)}</td>
-            <td className="py-1.5 text-right text-muted-foreground">{latency(step.p90_ms)}</td>
+            <td className="py-1.5 text-right">{latency(stt.p50_ms)}</td>
+            <td className="py-1.5 text-right text-muted-foreground">{latency(stt.p90_ms)}</td>
           </tr>
-        ))}
+        )}
       </tbody>
     </table>
   );
