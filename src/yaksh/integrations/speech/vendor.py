@@ -52,3 +52,6 @@ class TtsVendor:
     lookup: Callable[[AppSettings, str, str], Awaitable[ProviderVoice | None]] | None = None
     """The provider's description of a voice, by the settings, the key and the voice's ID; None
     when the account does not have it. None for a provider without lookup."""
+    available_models: Callable[[AppSettings, str], Awaitable[frozenset[str]]] | None = None
+    """The model IDs the account may speak with, by the settings and the key; None for a
+    provider whose accounts all have every model."""

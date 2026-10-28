@@ -33,6 +33,10 @@ class SpeechVoiceClient:
     async def catalog(self, query: CatalogQuery) -> CatalogPage:
         return await VENDORS[self._provider].catalog(self._settings, self._credential, query)
 
+    async def available_models(self) -> frozenset[str] | None:
+        check = VENDORS[self._provider].available_models
+        return None if check is None else await check(self._settings, self._credential)
+
     async def speak(self, voice: VoiceSettings, language: Language, text: str) -> bytes:
         """A setting the provider's service refuses, such as an unknown model, fails the speech
         as the provider's own refusal does."""

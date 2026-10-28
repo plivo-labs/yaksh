@@ -939,6 +939,8 @@ class FakeVoiceClient:
         self.lookups: list[str] = []
         self.spoken: list[tuple[VoiceSettings, Language, str]] = []
         self.down = False
+        self.offered: frozenset[str] | None = None
+        """The models the account offers; None for every model."""
 
     async def get_voice(self, voice_id: str) -> ProviderVoice | None:
         self._answer()
@@ -955,6 +957,10 @@ class FakeVoiceClient:
     async def catalog(self, query: CatalogQuery) -> CatalogPage:
         self._answer()
         return page_of(list(self.voices.values()), query)
+
+    async def available_models(self) -> frozenset[str] | None:
+        self._answer()
+        return self.offered
 
     def _answer(self) -> None:
         if self.down:

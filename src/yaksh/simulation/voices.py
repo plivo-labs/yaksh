@@ -17,8 +17,8 @@ from yaksh.domain.voices import (
     PROVIDER_VOICE_ID,
     CatalogPage,
     CatalogQuery,
-    CatalogSource,
     ProviderVoice,
+    TtsModel,
     VoiceClient,
     VoiceCreate,
     VoiceGender,
@@ -52,10 +52,9 @@ async def lookup_voice(
         raise ValidationError(f"{provider.label} has no voice lookup; enter the voice's details")
     found = await client_for(clients, provider).get_voice(provider_voice_id)
     if found is None:
-        library = " A voice of its public library is found and added under Library."
         raise ValidationError(
-            f"voice {provider_voice_id} was not found on the {provider.label} account."
-            + (library if provider.traits.library else "")
+            f"voice {provider_voice_id} was not found on the {provider.label} account; add it to "
+            "the account first"
         )
     return found
 
@@ -64,13 +63,18 @@ async def search_catalog(
     clients: VoiceClients, provider: VoiceProvider, query: CatalogQuery
 ) -> CatalogPage:
     """A page of the provider's own voices, to pick one to add."""
-    if query.source is CatalogSource.LIBRARY and not provider.traits.library:
-        raise ValidationError(f"{provider.label} has no voice library")
     try:
         provider.traits.chosen(query.model)
     except ValueError as error:
         raise ValidationError(str(error)) from None
     return await client_for(clients, provider).catalog(query)
+
+
+async def available_models(clients: VoiceClients, provider: VoiceProvider) -> list[TtsModel]:
+    """The provider's models, in Yaksh's order, that the account may speak with: a model that
+    the account lacks sends no audio at all."""
+    offered = await client_for(clients, provider).available_models()
+    return [model for model in provider.traits.models if offered is None or model.id in offered]
 
 
 async def preview_voice(
@@ -108,7 +112,12 @@ async def create_voice(session: AsyncSession, clients: VoiceClients, command: Vo
     Every voice must then speak a line in its model, so a voice that the provider does not know,
     or that its model cannot speak, is never listed."""
     model = command.model_in_use.id
-    if command.looked_up:
+    if model not in [offered.id for offered in await available_models(clients, command.provider)]:
+        raise ValidationError(
+            f"{command.provider.traits.name_of(command.model_in_use)} is not available to this "
+            f"{command.provider.label} account; choose another model"
+        )
+    if command.provider.traits.lookup:
         found = await lookup_voice(clients, command.provider, command.provider_voice_id)
     else:
         found = ProviderVoice(

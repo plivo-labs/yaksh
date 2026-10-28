@@ -1,6 +1,8 @@
 """ElevenLabs speech over its websockets, with word timestamps; a data residency address keeps
 the speech in its region. The v3 and v4 models work only on its dialogue socket."""
 
+import time
+
 from pipecat.services.elevenlabs.dialogue.tts import ElevenLabsDialogueTTSService
 from pipecat.services.elevenlabs.tts import ElevenLabsTTSService
 from pipecat.transcriptions.language import Language as PipecatLanguage
@@ -75,4 +77,27 @@ async def catalog(settings: AppSettings, key: str, query: CatalogQuery) -> Catal
     return await ElevenLabsClient(key, base_url=rest_address(settings.elevenlabs.url)).voices(query)
 
 
-TTS = TtsVendor(service=tts, check_voice=None, catalog=catalog, lookup=lookup)
+MODEL_LISTS: dict[tuple[str, str], tuple[float, frozenset[str]]] = {}
+"""Each key's model list at its host, with when it was asked: every voice dialog and every
+added voice needs it."""
+MODELS_FOR_S = 600.0
+
+
+async def available_models(settings: AppSettings, key: str) -> frozenset[str]:
+    """The models that the account may speak with: a model it lacks sends no audio at all."""
+    host = rest_address(settings.elevenlabs.url)
+    listed = MODEL_LISTS.get((host, key))
+    if listed is not None and time.monotonic() - listed[0] < MODELS_FOR_S:
+        return listed[1]
+    models = await ElevenLabsClient(key, base_url=host).models()
+    MODEL_LISTS[(host, key)] = (time.monotonic(), models)
+    return models
+
+
+TTS = TtsVendor(
+    service=tts,
+    check_voice=None,
+    catalog=catalog,
+    lookup=lookup,
+    available_models=available_models,
+)

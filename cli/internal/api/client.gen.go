@@ -142,24 +142,6 @@ func (e AnsweredBy) Valid() bool {
 	}
 }
 
-// Defines values for CatalogSource.
-const (
-	Account CatalogSource = "account"
-	Library CatalogSource = "library"
-)
-
-// Valid indicates whether the value is a known member of the CatalogSource enum.
-func (e CatalogSource) Valid() bool {
-	switch e {
-	case Account:
-		return true
-	case Library:
-		return true
-	default:
-		return false
-	}
-}
-
 // Defines values for Category.
 const (
 	EdgeCase   Category = "edge_case"
@@ -1795,9 +1777,6 @@ type CatalogPage struct {
 	Items      []ProviderVoice `json:"items"`
 	NextCursor *string         `json:"next_cursor"`
 }
-
-// CatalogSource defines model for CatalogSource.
-type CatalogSource string
 
 // Category What kind of situation a scenario tests. How the caller talks comes from the persona.
 type Category string
@@ -3620,10 +3599,9 @@ type TtsModelRead struct {
 
 // TtsProviderRead defines model for TtsProviderRead.
 type TtsProviderRead struct {
-	Label   string         `json:"label"`
-	Library bool           `json:"library"`
-	Lookup  bool           `json:"lookup"`
-	Models  []TtsModelRead `json:"models"`
+	Label  string         `json:"label"`
+	Lookup bool           `json:"lookup"`
+	Models []TtsModelRead `json:"models"`
 
 	// Provider A text-to-speech provider that voices personas.
 	Provider       VoiceProvider `json:"provider"`
@@ -3730,9 +3708,8 @@ type VoiceCreate struct {
 	Name            *string      `json:"name,omitempty"`
 
 	// Provider A text-to-speech provider that voices personas.
-	Provider        VoiceProvider  `json:"provider"`
-	ProviderVoiceId string         `json:"provider_voice_id"`
-	Source          *CatalogSource `json:"source,omitempty"`
+	Provider        VoiceProvider `json:"provider"`
+	ProviderVoiceId string        `json:"provider_voice_id"`
 }
 
 // VoiceGender defines model for VoiceGender.
@@ -3930,19 +3907,23 @@ type ListVoicesApiV1VoicesGetParams struct {
 
 // VoiceCatalogApiV1VoicesCatalogGetParams defines parameters for VoiceCatalogApiV1VoicesCatalogGet.
 type VoiceCatalogApiV1VoicesCatalogGetParams struct {
-	Source   *CatalogSource `form:"source,omitempty" json:"source,omitempty"`
-	Model    *string        `form:"model,omitempty" json:"model,omitempty"`
-	Search   *string        `form:"search,omitempty" json:"search,omitempty"`
-	Language *Language      `form:"language,omitempty" json:"language,omitempty"`
-	Gender   *VoiceGender   `form:"gender,omitempty" json:"gender,omitempty"`
-	Cursor   *string        `form:"cursor,omitempty" json:"cursor,omitempty"`
-	Provider VoiceProvider  `form:"provider" json:"provider"`
+	Model    *string       `form:"model,omitempty" json:"model,omitempty"`
+	Search   *string       `form:"search,omitempty" json:"search,omitempty"`
+	Language *Language     `form:"language,omitempty" json:"language,omitempty"`
+	Gender   *VoiceGender  `form:"gender,omitempty" json:"gender,omitempty"`
+	Cursor   *string       `form:"cursor,omitempty" json:"cursor,omitempty"`
+	Provider VoiceProvider `form:"provider" json:"provider"`
 }
 
 // LookupVoiceApiV1VoicesLookupGetParams defines parameters for LookupVoiceApiV1VoicesLookupGet.
 type LookupVoiceApiV1VoicesLookupGetParams struct {
 	Provider        VoiceProvider `form:"provider" json:"provider"`
 	ProviderVoiceId string        `form:"provider_voice_id" json:"provider_voice_id"`
+}
+
+// AvailableModelsApiV1VoicesModelsGetParams defines parameters for AvailableModelsApiV1VoicesModelsGet.
+type AvailableModelsApiV1VoicesModelsGetParams struct {
+	Provider VoiceProvider `form:"provider" json:"provider"`
 }
 
 // CreateAgentApiV1AgentsPostJSONRequestBody defines body for CreateAgentApiV1AgentsPost for application/json ContentType.
@@ -5919,8 +5900,7 @@ type ClientInterface interface {
 
 	// VoiceCatalogApiV1VoicesCatalogGet Voice Catalog
 	//
-	// A page of the provider's own voices, to pick one to add; `source=library` searches
-	// ElevenLabs' public library. Saves nothing.
+	// A page of the provider's own voices, to pick one to add. Saves nothing.
 	//
 	// Corresponds with GET /api/v1/voices/catalog (the `VoiceCatalogApiV1VoicesCatalogGet` operationId).
 	VoiceCatalogApiV1VoicesCatalogGet(ctx context.Context, params *VoiceCatalogApiV1VoicesCatalogGetParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -5931,6 +5911,14 @@ type ClientInterface interface {
 	//
 	// Corresponds with GET /api/v1/voices/lookup (the `LookupVoiceApiV1VoicesLookupGet` operationId).
 	LookupVoiceApiV1VoicesLookupGet(ctx context.Context, params *LookupVoiceApiV1VoicesLookupGetParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// AvailableModelsApiV1VoicesModelsGet Available Models
+	//
+	// The provider's models that the saved key's account may speak with, from the provider
+	// where its accounts differ (ElevenLabs), else all of them.
+	//
+	// Corresponds with GET /api/v1/voices/models (the `AvailableModelsApiV1VoicesModelsGet` operationId).
+	AvailableModelsApiV1VoicesModelsGet(ctx context.Context, params *AvailableModelsApiV1VoicesModelsGetParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// PreviewVoiceApiV1VoicesPreviewPostWithBody Preview Voice
 	//
@@ -8695,8 +8683,7 @@ func (c *Client) CreateVoiceApiV1VoicesPost(ctx context.Context, body CreateVoic
 
 // VoiceCatalogApiV1VoicesCatalogGet Voice Catalog
 //
-// A page of the provider's own voices, to pick one to add; `source=library` searches
-// ElevenLabs' public library. Saves nothing.
+// A page of the provider's own voices, to pick one to add. Saves nothing.
 //
 // Corresponds with GET /api/v1/voices/catalog (the `VoiceCatalogApiV1VoicesCatalogGet` operationId).
 func (c *Client) VoiceCatalogApiV1VoicesCatalogGet(ctx context.Context, params *VoiceCatalogApiV1VoicesCatalogGetParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -8718,6 +8705,24 @@ func (c *Client) VoiceCatalogApiV1VoicesCatalogGet(ctx context.Context, params *
 // Corresponds with GET /api/v1/voices/lookup (the `LookupVoiceApiV1VoicesLookupGet` operationId).
 func (c *Client) LookupVoiceApiV1VoicesLookupGet(ctx context.Context, params *LookupVoiceApiV1VoicesLookupGetParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewLookupVoiceApiV1VoicesLookupGetRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// AvailableModelsApiV1VoicesModelsGet Available Models
+//
+// The provider's models that the saved key's account may speak with, from the provider
+// where its accounts differ (ElevenLabs), else all of them.
+//
+// Corresponds with GET /api/v1/voices/models (the `AvailableModelsApiV1VoicesModelsGet` operationId).
+func (c *Client) AvailableModelsApiV1VoicesModelsGet(ctx context.Context, params *AvailableModelsApiV1VoicesModelsGetParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewAvailableModelsApiV1VoicesModelsGetRequest(c.Server, params)
 	if err != nil {
 		return nil, err
 	}
@@ -13696,18 +13701,6 @@ func NewVoiceCatalogApiV1VoicesCatalogGetRequest(server string, params *VoiceCat
 		// per the OpenAPI spec (e.g. "color=blue,black,brown").
 		var rawQueryFragments []string
 
-		if params.Source != nil {
-
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "source", *params.Source, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			} else {
-				for _, qp := range strings.Split(queryFrag, "&") {
-					rawQueryFragments = append(rawQueryFragments, qp)
-				}
-			}
-
-		}
-
 		if params.Model != nil {
 
 			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "model", *params.Model, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "", Format: ""}); err != nil {
@@ -13827,6 +13820,56 @@ func NewLookupVoiceApiV1VoicesLookupGetRequest(server string, params *LookupVoic
 		}
 
 		if queryFrag, err := runtime.StyleParamWithOptions("form", true, "provider_voice_id", params.ProviderVoiceId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+			return nil, err
+		} else {
+			for _, qp := range strings.Split(queryFrag, "&") {
+				rawQueryFragments = append(rawQueryFragments, qp)
+			}
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewAvailableModelsApiV1VoicesModelsGetRequest constructs an http.Request for the AvailableModelsApiV1VoicesModelsGet method
+func NewAvailableModelsApiV1VoicesModelsGetRequest(server string, params *AvailableModelsApiV1VoicesModelsGetParams) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/voices/models")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if queryFrag, err := runtime.StyleParamWithOptions("form", true, "provider", params.Provider, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
 			return nil, err
 		} else {
 			for _, qp := range strings.Split(queryFrag, "&") {
@@ -15367,8 +15410,7 @@ type ClientWithResponsesInterface interface {
 
 	// VoiceCatalogApiV1VoicesCatalogGetWithResponse Voice Catalog
 	//
-	// A page of the provider's own voices, to pick one to add; `source=library` searches
-	// ElevenLabs' public library. Saves nothing.
+	// A page of the provider's own voices, to pick one to add. Saves nothing.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -15383,6 +15425,16 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with GET /api/v1/voices/lookup (the `LookupVoiceApiV1VoicesLookupGet` operationId).
 	LookupVoiceApiV1VoicesLookupGetWithResponse(ctx context.Context, params *LookupVoiceApiV1VoicesLookupGetParams, reqEditors ...RequestEditorFn) (*LookupVoiceApiV1VoicesLookupGetResponse, error)
+
+	// AvailableModelsApiV1VoicesModelsGetWithResponse Available Models
+	//
+	// The provider's models that the saved key's account may speak with, from the provider
+	// where its accounts differ (ElevenLabs), else all of them.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/voices/models (the `AvailableModelsApiV1VoicesModelsGet` operationId).
+	AvailableModelsApiV1VoicesModelsGetWithResponse(ctx context.Context, params *AvailableModelsApiV1VoicesModelsGetParams, reqEditors ...RequestEditorFn) (*AvailableModelsApiV1VoicesModelsGetResponse, error)
 
 	// PreviewVoiceApiV1VoicesPreviewPostWithBodyWithResponse Preview Voice
 	//
@@ -21047,6 +21099,61 @@ func (r LookupVoiceApiV1VoicesLookupGetResponse) ContentType() string {
 	return ""
 }
 
+type AvailableModelsApiV1VoicesModelsGetResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *[]TtsModelRead
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *ErrorResponse
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r AvailableModelsApiV1VoicesModelsGetResponse) GetJSON200() *[]TtsModelRead {
+	return r.JSON200
+}
+
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r AvailableModelsApiV1VoicesModelsGetResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r AvailableModelsApiV1VoicesModelsGetResponse) GetJSON503() *ErrorResponse {
+	return r.JSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r AvailableModelsApiV1VoicesModelsGetResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r AvailableModelsApiV1VoicesModelsGetResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r AvailableModelsApiV1VoicesModelsGetResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r AvailableModelsApiV1VoicesModelsGetResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type PreviewVoiceApiV1VoicesPreviewPostResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -23483,8 +23590,7 @@ func (c *ClientWithResponses) CreateVoiceApiV1VoicesPostWithResponse(ctx context
 
 // VoiceCatalogApiV1VoicesCatalogGetWithResponse Voice Catalog
 //
-// A page of the provider's own voices, to pick one to add; `source=library` searches
-// ElevenLabs' public library. Saves nothing.
+// A page of the provider's own voices, to pick one to add. Saves nothing.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -23510,6 +23616,22 @@ func (c *ClientWithResponses) LookupVoiceApiV1VoicesLookupGetWithResponse(ctx co
 		return nil, err
 	}
 	return ParseLookupVoiceApiV1VoicesLookupGetResponse(rsp)
+}
+
+// AvailableModelsApiV1VoicesModelsGetWithResponse Available Models
+//
+// The provider's models that the saved key's account may speak with, from the provider
+// where its accounts differ (ElevenLabs), else all of them.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/voices/models (the `AvailableModelsApiV1VoicesModelsGet` operationId).
+func (c *ClientWithResponses) AvailableModelsApiV1VoicesModelsGetWithResponse(ctx context.Context, params *AvailableModelsApiV1VoicesModelsGetParams, reqEditors ...RequestEditorFn) (*AvailableModelsApiV1VoicesModelsGetResponse, error) {
+	rsp, err := c.AvailableModelsApiV1VoicesModelsGet(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseAvailableModelsApiV1VoicesModelsGetResponse(rsp)
 }
 
 // PreviewVoiceApiV1VoicesPreviewPostWithBodyWithResponse Preview Voice
@@ -27479,6 +27601,46 @@ func ParseLookupVoiceApiV1VoicesLookupGetResponse(rsp *http.Response) (*LookupVo
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest ProviderVoice
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseAvailableModelsApiV1VoicesModelsGetResponse parses an HTTP response from a AvailableModelsApiV1VoicesModelsGetWithResponse call
+func ParseAvailableModelsApiV1VoicesModelsGetResponse(rsp *http.Response) (*AvailableModelsApiV1VoicesModelsGetResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &AvailableModelsApiV1VoicesModelsGetResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest []TtsModelRead
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}

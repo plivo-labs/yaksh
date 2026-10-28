@@ -58,8 +58,6 @@ class TtsProviderRead(BaseModel):
     """False: a reply cut off by the agent is exact to a sentence, not to a word."""
     lookup: bool
     """The provider describes a voice by its ID."""
-    library: bool
-    """The provider has a public voice library to search."""
     models: list[TtsModelRead]
     """The first is the one a new voice gets."""
 
@@ -71,6 +69,5 @@ class TtsProviderRead(BaseModel):
             label=traits.label,
             word_timestamps=traits.word_timestamps,
             lookup=traits.lookup,
-            library=traits.library,
             models=[TtsModelRead.of(model) for model in traits.models],
         )

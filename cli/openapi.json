@@ -6292,7 +6292,7 @@
           "voices"
         ],
         "summary": "Voice Catalog",
-        "description": "A page of the provider's own voices, to pick one to add; `source=library` searches\nElevenLabs' public library. Saves nothing.",
+        "description": "A page of the provider's own voices, to pick one to add. Saves nothing.",
         "operationId": "voice_catalog_api_v1_voices_catalog_get",
         "security": [
           {
@@ -6300,15 +6300,6 @@
           }
         ],
         "parameters": [
-          {
-            "name": "source",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "$ref": "#/components/schemas/CatalogSource",
-              "default": "account"
-            }
-          },
           {
             "name": "model",
             "in": "query",
@@ -6408,6 +6399,67 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/CatalogPage"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "The request failed. The error tells why.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "An outside service is not set up, or it did not answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/voices/models": {
+      "get": {
+        "tags": [
+          "voices"
+        ],
+        "summary": "Available Models",
+        "description": "The provider's models that the saved key's account may speak with, from the provider\nwhere its accounts differ (ElevenLabs), else all of them.",
+        "operationId": "available_models_api_v1_voices_models_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "provider",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/VoiceProvider"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TtsModelRead"
+                  },
+                  "title": "Response Available Models Api V1 Voices Models Get"
                 }
               }
             }
@@ -8241,14 +8293,6 @@
           "next_cursor"
         ],
         "title": "CatalogPage"
-      },
-      "CatalogSource": {
-        "type": "string",
-        "enum": [
-          "account",
-          "library"
-        ],
-        "title": "CatalogSource"
       },
       "Category": {
         "type": "string",
@@ -16740,10 +16784,6 @@
             "type": "boolean",
             "title": "Lookup"
           },
-          "library": {
-            "type": "boolean",
-            "title": "Library"
-          },
           "models": {
             "items": {
               "$ref": "#/components/schemas/TtsModelRead"
@@ -16758,7 +16798,6 @@
           "label",
           "word_timestamps",
           "lookup",
-          "library",
           "models"
         ],
         "title": "TtsProviderRead"
@@ -17196,10 +17235,6 @@
               }
             ],
             "title": "Model"
-          },
-          "source": {
-            "$ref": "#/components/schemas/CatalogSource",
-            "default": "account"
           },
           "listed_languages": {
             "items": {

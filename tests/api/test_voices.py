@@ -49,7 +49,7 @@ async def test_a_lookup_shows_the_provider_details_and_saves_nothing(
         "listed_languages": [],
     }
     assert unknown.status_code == 422
-    assert "found and added under Library" in unknown.json()["error"]["message"]
+    assert "add it to the account first" in unknown.json()["error"]["message"]
     assert (await voices(client))["total"] == 2
 
     voice_client.down = True
@@ -264,52 +264,34 @@ async def test_the_providers_list_their_models_with_speed_and_languages(
     assert "mr" in elevenlabs["eleven_v4"]["languages"]
     assert "es" not in providers["sarvam"]["models"][0]["languages"]
     assert [model["id"] for model in providers["azure"]["models"]] == [None]
-    assert (providers["elevenlabs"]["library"], providers["cartesia"]["library"]) == (True, False)
 
 
-async def test_the_catalog_searches_the_provider_voices_and_only_elevenlabs_has_a_library(
+async def test_the_catalog_searches_the_provider_voices(
     client: AsyncClient, voice_clients: dict[VoiceProvider, FakeVoiceClient]
 ) -> None:
     voice_clients[VoiceProvider.CARTESIA] = FakeVoiceClient()
     url = "/api/v1/voices/catalog"
 
     found = await client.get(url, params={"provider": "elevenlabs", "search": HINDI_VOICE.name})
-    library = await client.get(url, params={"provider": "cartesia", "source": "library"})
     missing = await client.get(url, params={"provider": "azure"})
 
     assert found.status_code == 200, found.text
     assert [voice["id"] for voice in found.json()["items"]] == [HINDI_VOICE.id]
     assert found.json()["next_cursor"] is None
-    assert library.status_code == 422 and "no voice library" in library.text
     assert missing.status_code == 503
 
 
-async def test_a_library_voice_is_added_from_its_details_once_it_speaks_in_its_model(
+async def test_only_the_models_that_the_account_offers_are_listed_and_added(
     client: AsyncClient, voice_client: FakeVoiceClient
 ) -> None:
-    voice_client.voices["lib1"] = ProviderVoice(id="lib1", name="unused")
+    voice_client.offered = frozenset({"eleven_flash_v2_5", "eleven_v3"})
 
-    added = await client.post(
-        "/api/v1/voices",
-        json={
-            "provider": "elevenlabs",
-            "provider_voice_id": "lib1",
-            "source": "library",
-            "model": "eleven_v4",
-            "name": "Kavya",
-            "gender": "female",
-            "languages": ["mr"],
-            "listed_languages": ["mr", "hi"],
-        },
+    listed = await client.get("/api/v1/voices/models", params={"provider": "elevenlabs"})
+    refused = await client.post(
+        "/api/v1/voices", json={**NEW_VOICE, "languages": ["en"], "model": "eleven_v4"}
     )
 
-    assert added.status_code == 201, added.text
-    body = added.json()
-    assert (body["name"], body["model"], body["gender"], body["listed_languages"]) == (
-        "Kavya",
-        "eleven_v4",
-        "female",
-        ["hi", "mr"],
-    )
-    assert "lib1" not in voice_client.lookups
-    assert voice_client.spoken[-1][0].model == "eleven_v4"
+    assert [model["id"] for model in listed.json()] == ["eleven_flash_v2_5", "eleven_v3"]
+    assert refused.status_code == 422
+    assert "ElevenLabs v4 is not available to this ElevenLabs account" in refused.text
+    assert voice_client.spoken == []
