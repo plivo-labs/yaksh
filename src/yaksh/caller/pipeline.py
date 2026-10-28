@@ -24,6 +24,7 @@ from pipecat.frames.frames import (
     FunctionCallResultFrame,
     FunctionCallResultProperties,
     LLMContextFrame,
+    LLMMessagesTransformFrame,
     OutputDTMFUrgentFrame,
     TTSSpeakFrame,
 )
@@ -31,7 +32,11 @@ from pipecat.observers.base_observer import BaseObserver
 from pipecat.observers.service_metrics_observer import ServiceMetricsObserver
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.worker import PipelineParams, PipelineWorker
-from pipecat.processors.aggregators.llm_context import LLMContext
+from pipecat.processors.aggregators.llm_context import (
+    LLMContext,
+    LLMContextMessage,
+    LLMSpecificMessage,
+)
 from pipecat.processors.aggregators.llm_response_universal import (
     LLMContextAggregatorPair,
     LLMUserAggregator,
@@ -199,8 +204,18 @@ class PersonaLLM(OpenAIResponsesHttpLLMService):
     ) -> None:
         """A response with only empty messages is the caller saying nothing, as its prompt asks
         when the agent only asks it to wait. Any other response with no text and no tool call
-        is still an error."""
+        is still an error.
+
+        Pipecat has already queued the response's reasoning for the context. With no message
+        after it, the model reads that reasoning on later turns as a reply it gave, and keeps
+        quiet when the agent asks again. So the reasoning goes out of the context, which then
+        holds what a model without reasoning sees: nothing for this reply."""
         if silent(output):
+            reasoning = {
+                item["id"] for item in output if item.get("type") == "reasoning" and item.get("id")
+            }
+            if reasoning:
+                await self.push_frame(LLMMessagesTransformFrame(partial(without, reasoning)))
             if self.on_silence is not None:
                 await self.on_silence()
             return
@@ -218,6 +233,20 @@ def silent(output: list[dict]) -> bool:
         )
         for item in said
     )
+
+
+def without(reasoning: set[str], messages: list[LLMContextMessage]) -> list[LLMContextMessage]:
+    """The context without the reasoning items whose ids are in `reasoning`."""
+    return [
+        message
+        for message in messages
+        if not (
+            isinstance(message, LLMSpecificMessage)
+            and isinstance(message.message, dict)
+            and message.message.get("type") == "reasoning"
+            and message.message.get("id") in reasoning
+        )
+    ]
 
 
 async def wait_for_agent(user: LLMUserAggregator) -> None:
