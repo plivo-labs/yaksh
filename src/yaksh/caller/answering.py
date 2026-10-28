@@ -9,7 +9,7 @@ from pathlib import Path
 from pipecat.frames.frames import LLMMessagesAppendFrame
 
 from yaksh.caller.audio import Clock, bytes_ms, read_pcm
-from yaksh.caller.pipeline import CallerKeys, CallState, Persona
+from yaksh.caller.pipeline import CallState, Persona
 from yaksh.caller.transcript import TranscriptBuilder
 from yaksh.diagnostics import describe_exception
 from yaksh.domain.answering import (
@@ -22,13 +22,10 @@ from yaksh.domain.answering import (
 )
 from yaksh.domain.conversations import (
     CallObserver,
-    CallRequest,
     EndReason,
     WireEvent,
     WireEventKind,
 )
-from yaksh.integrations.speech.audio import speak_once
-from yaksh.integrations.speech.tts import tts_service
 
 log = logging.getLogger(__name__)
 
@@ -42,24 +39,6 @@ HANDOVER_NOTE = (
     "it calls. The agent's answers to the screener are above. You have read them, and you pick "
     "up the call now."
 )
-
-
-def own_greeting(request: CallRequest, keys: CallerKeys) -> asyncio.Future[bytes] | None:
-    """Start speaking the persona's own voicemail greeting, so it is ready when the call
-    connects; None when the call plays no own greeting."""
-    plan = request.answering
-    text = plan.voicemail.own_greeting if plan and plan.voicemail else None
-    if text is None:
-        return None
-    return asyncio.ensure_future(spoken(keys.tts, request, text))
-
-
-async def spoken(key: str, request: CallRequest, text: str) -> bytes:
-    """The text in the persona's voice, through the same text-to-speech as its replies."""
-    service = tts_service(
-        request.app_settings, request.voice, request.caller_language, key, one_shot=True
-    )
-    return await speak_once(service, text)
 
 
 class AnsweringScript:

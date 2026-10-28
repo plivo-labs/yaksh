@@ -23,7 +23,7 @@ from yaksh.db.models import (
     ScenarioVersion,
 )
 from yaksh.domain.agents import AgentConfig, Direction, Transport
-from yaksh.domain.answering import AnsweredBy, Answering
+from yaksh.domain.answering import AnsweredBy, Answering, plays_scenario
 from yaksh.domain.conversations import (
     ACTIVE_STATUSES,
     LIVE_STATUSES,
@@ -376,6 +376,8 @@ async def call_request(
     persona_version = await session.get_one(PersonaVersion, conversation.persona_version_id)
     persona = PersonaConfig.model_validate(persona_version.config)
     scenario = await played_scenario(session, conversation)
+    reaches_persona = plays_scenario(conversation.answered_by, picked_up=persona.answering.picks_up)
+    phone = conversation.transport is Transport.PHONE
     return CallRequest(
         conversation_id=conversation.id,
         agent=agent,
@@ -397,6 +399,7 @@ async def call_request(
         scenario_model=scenario.caller is not None,
         answered_by=conversation.answered_by,
         answering=answering_plan(conversation.answered_by, persona.answering),
+        interruptions=scenario.interruptions if phone and reaches_persona else [],
     )
 
 

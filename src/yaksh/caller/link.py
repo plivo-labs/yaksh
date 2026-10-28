@@ -16,8 +16,9 @@ class Kind(IntEnum):
     """Worker to child: the call to hold."""
     STOP = 3
     """Worker to child: the call's stop event was set."""
-    OWN = 4
-    """Worker to child: the persona's own voicemail greeting, or what speaking it raised."""
+    SPEECH = 4
+    """Worker to child: one item of the speech made before the call, as its index in
+    `Prepared.items` and its audio, or what making it raised."""
     SOCKET = 5
     """Either way: one ASGI message of the stream's WebSocket."""
     TURN = 6

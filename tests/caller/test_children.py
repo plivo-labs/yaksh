@@ -6,7 +6,6 @@ import signal
 import subprocess
 import sys
 import time
-import uuid
 from collections.abc import AsyncIterator, Callable
 from typing import Any, cast
 
@@ -14,14 +13,21 @@ import pytest
 from fastapi import WebSocket, WebSocketDisconnect
 
 from tests.caller import call_process_targets as targets
-from tests.conftest import AGENT, APP_SETTINGS, CALLER, Observer, wait_until
+from tests.conftest import Observer, phone_request, wait_until
 from yaksh.caller import children, phone
 from yaksh.caller.audio import Clock
 from yaksh.caller.children import ChildConversations, ChildFailed
 from yaksh.caller.conversation import Connected, ConversationStart
 from yaksh.caller.pipeline import CallerKeys
-from yaksh.domain.agents import AgentConfig, Transport
-from yaksh.domain.conversations import CallObserver, CallOutcome, CallRequest, EndReason
+from yaksh.caller.prepared import Prepared
+from yaksh.domain.conversations import (
+    CallObserver,
+    CallOutcome,
+    CallRequest,
+    EndReason,
+    WireEventKind,
+)
+from yaksh.domain.scenarios import Interruption
 from yaksh.simulation.calls import LiveCall, run_call
 
 
@@ -43,30 +49,21 @@ class Stream:
         self.sent.append(message)
 
 
-def request() -> CallRequest:
-    return CallRequest(
-        conversation_id=uuid.uuid4(),
-        agent=AgentConfig.model_validate({"agent_number": "+14155550100", "brief": AGENT["brief"]}),
-        transport=Transport.PHONE,
-        **CALLER,
-        caller_number="+17862242321",
-        max_duration_s=120,
-        app_settings=APP_SETTINGS,
-        caller=APP_SETTINGS.caller,
-    )
-
-
 def started(
-    stream: Stream, observer: CallObserver | None = None, stop: asyncio.Event | None = None
+    stream: Stream,
+    observer: CallObserver | None = None,
+    stop: asyncio.Event | None = None,
+    call: CallRequest | None = None,
 ) -> ConversationStart:
+    call = call or phone_request()
     return ConversationStart(
-        request(),
+        call,
         cast(CallerKeys, None),
         observer or Observer(),
         stop or asyncio.Event(),
         Clock(),
         Connected(cast(WebSocket, stream), "stream-1", "call-1", "audio/x-l16"),
-        None,
+        Prepared(call),
         connected_ms=0,
     )
 
@@ -126,6 +123,30 @@ async def test_a_call_process_holds_the_conversation_and_leaves(pools: Any) -> N
     await conversation.close()
 
     assert ended == targets.ENDED and heard.recording == b"wav"
+
+
+async def test_the_worker_sends_each_item_of_the_speech_by_its_place(pools: Any) -> None:
+    pool = pools(targets.echoes_speech)
+    observer = Observer()
+    lines = [Interruption(say="Wait."), Interruption(say="Mm-hmm.")]
+    start = started(Stream(), observer, call=phone_request(interruptions=lines))
+    start.prepared.fill(1, b"mm")
+    start.prepared.fill(0, RuntimeError("no voice"))
+
+    conversation = await pool.reserve().start(start)
+    await wait_until(lambda: len(echoed(observer)) == 2)
+    conversation.cancel()
+    await conversation.ended()
+    await conversation.heard()
+    await conversation.close()
+
+    assert sorted(echoed(observer)) == ["0:RuntimeError", "1:b'mm'"]
+
+
+def echoed(observer: Observer) -> list[str]:
+    return [
+        event.detail or "" for event in observer.events if event.kind is WireEventKind.CALLER_SOUND
+    ]
 
 
 async def test_a_stall_of_the_worker_loop_counts_in_the_lag_of_a_live_call(pools: Any) -> None:
@@ -406,7 +427,7 @@ async def test_a_stopped_call_settles_within_the_stop_deadline_whatever_its_proc
     running = asyncio.create_task(
         run_call(
             SeatedCaller(pools(target), hang_up_s=0.5),
-            request(),
+            phone_request(),
             live,
             end_timeout_s=end_timeout_s,
             dial_timeout_s=30,

@@ -440,7 +440,6 @@ class ChildConversation:
                 call_uuid=start.dialed.call_uuid,
                 encoding=start.dialed.encoding,
                 connected_ms=start.connected_ms,
-                own=start.own is not None,
                 database_url=self._pool.database_url,
             ),
         )
@@ -450,8 +449,10 @@ class ChildConversation:
             asyncio.create_task(self._forward()),
             asyncio.create_task(self._pass_stop()),
         ]
-        if start.own is not None:
-            self._tasks.append(asyncio.create_task(self._pass_own(start.own)))
+        self._tasks += [
+            asyncio.create_task(self._pass_speech(index, item))
+            for index, item in enumerate(start.prepared.items)
+        ]
 
     async def ended(self) -> Ended:
         return await waited(self._ended)
@@ -573,13 +574,13 @@ class ChildConversation:
         with suppress(OSError):
             await self._link.send(Kind.STOP, None)
 
-    async def _pass_own(self, own: asyncio.Future[bytes]) -> None:
+    async def _pass_speech(self, index: int, item: asyncio.Future[bytes]) -> None:
         try:
-            payload: bytes | BaseException = await waited(own)
+            made: bytes | BaseException = await waited(item)
         except Exception as error:
-            payload = error
+            made = error
         with suppress(OSError):
-            await self._link.send(Kind.OWN, payload)
+            await self._link.send(Kind.SPEECH, (index, made))
 
 
 async def exited(process: BaseProcess, timeout: float) -> bool:

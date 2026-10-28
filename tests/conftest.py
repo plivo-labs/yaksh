@@ -24,7 +24,7 @@ from yaksh.db.models import Conversation, PhoneNumber, Voice
 from yaksh.db.session import create_engine, create_sessionmaker
 from yaksh.domain.agent_import import ElevenLabsRegion, VapiRegion
 from yaksh.domain.agent_records import RecordReader
-from yaksh.domain.agents import Transport
+from yaksh.domain.agents import AgentConfig, Transport
 from yaksh.domain.conversations import (
     Admission,
     CallObserver,
@@ -164,6 +164,23 @@ PERSONA = {
     "prompt": "You are in a hurry.",
     "voice": {"provider": "elevenlabs", "id": ENGLISH_VOICE.id},
 }
+
+
+def phone_request(**fields: Any) -> CallRequest:
+    """A phone call to a test agent, with these fields changed."""
+    call: dict[str, Any] = {
+        "conversation_id": uuid.uuid4(),
+        "agent": AgentConfig.model_validate(
+            {"agent_number": "+14155550100", "brief": AGENT["brief"]}
+        ),
+        "transport": Transport.PHONE,
+        **CALLER,
+        "caller_number": "+17862242321",
+        "max_duration_s": 120,
+        "app_settings": APP_SETTINGS,
+        "caller": APP_SETTINGS.caller,
+    }
+    return CallRequest(**{**call, **fields})
 
 
 def data_sets(**fields: Any) -> list[dict[str, Any]]:

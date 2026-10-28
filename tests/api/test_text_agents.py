@@ -60,7 +60,8 @@ async def test_a_text_run_starts_and_is_claimed_with_no_voice_number_and_leases_
         await session.execute(update(PhoneNumber).values(voice=False))
         await session.commit()
     agent = await create_agent(client, **TEXT_AGENT)
-    conversation = await start(client, agent["id"])
+    scenario = await create_scenario(client, agent["id"], interruptions=[{"say": "Mm-hmm."}])
+    conversation = await start(client, agent["id"], scenario_id=scenario["id"])
 
     claimed = await claim(db)
     async with db() as session:
@@ -71,6 +72,7 @@ async def test_a_text_run_starts_and_is_claimed_with_no_voice_number_and_leases_
     assert claimed == conversation["id"]
     assert call.caller_number is None
     assert call.agent.endpoint is not None
+    assert call.interruptions == [], "a text run plays no interruption"
 
 
 async def test_text_and_phone_conversations_are_claimed_within_their_own_limits(

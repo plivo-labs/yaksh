@@ -11,7 +11,7 @@ from yaksh.domain.agents import AgentConfig, Transport
 from yaksh.domain.answering import AnsweredBy, AnsweringPlan, MachineLine
 from yaksh.domain.languages import Language
 from yaksh.domain.latency import AgentMedia, CallerReplyTime, CallerReplyWindow, LoopLag
-from yaksh.domain.scenarios import Fact
+from yaksh.domain.scenarios import Fact, Interruption
 from yaksh.domain.settings import AppSettings, CallerModel
 from yaksh.domain.speech import SttProvider
 from yaksh.domain.surroundings import SoundPlan
@@ -346,6 +346,9 @@ class CallRequest(BaseModel):
     answering: AnsweringPlan | None = None
     """What the persona's phone plays before or in place of the persona; None when the persona
     answers."""
+    interruptions: list[Interruption] = []
+    """The scenario's interruptions, with the data set's facts filled; none on a text run or
+    when the answer cannot reach the persona."""
 
 
 class CallOutcome(BaseModel):
