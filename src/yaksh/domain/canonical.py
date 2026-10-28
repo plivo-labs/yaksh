@@ -153,13 +153,13 @@ def count(text: str, part: str) -> int:
     numbers, dates and times in one form, whichever finds more. Digits are not joined across
     punctuation, so "fifty. Five" holds no 505, but words are: "Okay, so your total" holds
     "okay so your total". `contains` also finds part inside a longer word, as phrase rules do."""
-    written = len(re.findall(whole(part.casefold()), text.casefold()))
+    written = whole(text.casefold(), part.casefold())
     one_form = compact(part)
     if not one_form:
         return written
     pieces = re.split(r"[.,;!?](?=\s|$)", text)
     joined = " ".join(piece for piece in map(compact, pieces) if piece)
-    return max(written, len(re.findall(whole(one_form), joined)))
+    return max(written, whole(joined, one_form))
 
 
 def settled(text: str) -> str:
@@ -171,9 +171,22 @@ def settled(text: str) -> str:
     return " ".join(words)
 
 
-def whole(part: str) -> str:
-    """A pattern for part with no letter or digit just before or after it."""
-    return rf"(?<![^\W_]){re.escape(part)}(?![^\W_])"
+def whole(text: str, part: str) -> int:
+    """How many times part is in text, not overlapping, with no letter, combining mark or digit
+    of any script just before or after it: a vowel sign such as "ि" goes on the word."""
+    found = start = 0
+    while (at := text.find(part, start)) != -1:
+        end = at + len(part)
+        if (at and in_word(text[at - 1])) or (end < len(text) and in_word(text[end])):
+            start = at + 1
+        else:
+            found += 1
+            start = end
+    return found
+
+
+def in_word(char: str) -> bool:
+    return unicodedata.category(char)[0] in "LMN"
 
 
 def contains(text: str, part: str) -> bool:

@@ -53,3 +53,5 @@ def test_a_phrase_is_counted_as_whole_words_in_the_form_that_finds_it_more_often
     assert count("The fee is fifty. Five dollars.", "505") == 0
     assert count("Okay, so your total is fifty dollars.", "okay so your total") == 1
     assert count("at twelve thirty", "2:30") == 0
+    assert count("आपकी बुकिंग हो गई है", "बुक") == 0
+    assert count("आपका नाम क्या है", "नाम") == 1
