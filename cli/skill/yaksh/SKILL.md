@@ -167,7 +167,7 @@ Fix a faulty scenario and run it again. For a fault of Yaksh's caller, a judge o
 
 Check each pass too. A pass does not prove the check when the criterion that the scenario exists for is `not_applicable` or `hidden_action`, or has a `caller_effect`. A pass with `decided_by: jev` has no `answer`: check it in the transcript.
 
-On a call, the turn limit counts each part of an agent turn that a pause split. When `turn_limit` or `duration_limit` blocked the late criteria, run again with a higher `--max-turns` (up to 100) or `--max-duration-s` (up to 1800) than in `yaksh run view`.
+On a call, the turn limit counts each answer of the caller that started to play. A pause can still split one agent turn into two answered turns. When `turn_limit` or `duration_limit` blocked the late criteria, run again with a higher `--max-turns` (up to 100) or `--max-duration-s` (up to 1800) than in `yaksh run view`.
 
 ## Report
 
