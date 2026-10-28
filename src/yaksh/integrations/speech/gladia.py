@@ -1,6 +1,7 @@
 """Gladia speech-to-text: live v2 with solaria-1. The language goes in `language_config`;
 Pipecat's `language` setting is not sent. Gladia's own voice detection stays off, so Yaksh's
-decides the turns."""
+decides the turns. Gladia keeps its own endpointing, so it sends a final at each short pause
+while the agent speaks: `SttTraits.words_while_speaking` follows from that."""
 
 from pipecat.services.gladia.config import LanguageConfig
 from pipecat.services.gladia.stt import GladiaSTTService

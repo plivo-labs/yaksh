@@ -27,6 +27,7 @@ from tests.conftest import (
     receive_outbound_calls,
     report_receiving_worker,
     run_conversations,
+    save_settings,
     start,
     start_run,
 )
@@ -285,6 +286,32 @@ async def test_preparing_a_call_that_a_machine_answers_plans_what_the_phone_play
     assert Path(plan.screener.prompt.file).is_file()
     assert (plan.voicemail.greeting, plan.voicemail.own_greeting) == (None, "Hi, it's Rachel.")
     assert plan.voicemail.tone is not None
+
+
+async def test_a_phrase_interruption_blocks_no_run_whose_answer_never_reaches_the_persona(
+    client: AsyncClient, settings: Settings, db: Db
+) -> None:
+    await report_receiving_worker(settings)
+    await link_receiving_number(settings)
+    await save_settings(
+        db, values={"speech": {"stt": "sarvam"}}, secrets={"sarvam_api_key": "sarvam-key-0123"}
+    )
+    agent = await create_agent(client, **OUTBOUND_AGENT)
+    scenario = await create_scenario(
+        client,
+        agent["id"],
+        data_sets=WITH_AGENT_DATA,
+        interruptions=[{"say": "Wait.", "agent_says": "fee"}],
+    )
+
+    def answered_by(answer: str) -> list[str | dict[str, Any]]:
+        return [{"scenario_id": scenario["id"], "answered_by": [answer]}]
+
+    to_voicemail = await start_run(client, agent["id"], answered_by("voicemail"))
+    to_persona = await start_run(client, agent["id"], answered_by("caller"))
+
+    assert to_voicemail.status_code == 202, to_voicemail.text
+    assert to_persona.status_code == 422, to_persona.text
 
 
 async def test_a_retry_keeps_who_answers(client: AsyncClient, settings: Settings, db: Db) -> None:

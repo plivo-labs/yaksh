@@ -13,11 +13,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from yaksh.config import Settings
 from yaksh.db.models import Agent, AgentVersion, Persona, PersonaVersion, Scenario, ScenarioVersion
 from yaksh.domain.agents import Direction, Transport, machines_answer
-from yaksh.domain.answering import AnsweredBy
+from yaksh.domain.answering import AnsweredBy, plays_scenario
 from yaksh.domain.errors import NotFoundError, ValidationError
 from yaksh.domain.languages import AgentLanguage, Language, answer_language
 from yaksh.domain.runs import RunScenario
-from yaksh.domain.scenarios import DataSet
+from yaksh.domain.scenarios import DataSet, ScenarioConfig
 from yaksh.domain.settings import AppSettings
 from yaksh.domain.speech import SttProvider
 from yaksh.domain.triggers import check_agent_data
@@ -149,10 +149,12 @@ async def snapshot(
     for scenario, persona_id, data_set, answer in plays:
         persona = personas[persona_id]
         config = persona_config_of(persona)
+        wants = scenario_config_of(scenario)
         if transport is Transport.PHONE:
             check_heard(app.speech.stt, current.languages, config.language, persona.name)
             check_persona_voice(app, config.voice.provider, config.language, persona.name)
-        wants = scenario_config_of(scenario)
+            if plays_scenario(answer, picked_up=config.answering.picks_up):
+                check_words_while_speaking(app.speech.stt, wants, scenario.name)
         if trigger is not None:
             check_agent_data(trigger, wants, scenario.name)
         played = wants.played(data_set.id)
@@ -199,6 +201,21 @@ def check_heard(
             f"speech to text ({stt.label}) doesn't hear {answer.label}, which the agent "
             f'answers the persona "{persona}" in; choose another provider in Settings'
         )
+
+
+def check_words_while_speaking(stt: SttProvider, scenario: ScenarioConfig, name: str) -> None:
+    """Refuse a phone call whose interruption waits for a phrase when the speech to text in use
+    gives the agent's words only after it stops: the line could not play."""
+    if stt.traits.words_while_speaking:
+        return
+    for number, item in enumerate(scenario.interruptions, 1):
+        if item.agent_says is not None:
+            raise ValidationError(
+                f'interruption {number} of the scenario "{name}" waits for a phrase, and speech to '
+                f"text ({stt.label}) gives the agent's words only after it stops, so it cannot "
+                "play; start it when the agent starts to talk, or choose another provider in "
+                "Settings"
+            )
 
 
 def check_persona_voice(
