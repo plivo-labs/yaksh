@@ -9,6 +9,7 @@ from pipecat.frames.frames import (
     Frame,
     FunctionCallResultProperties,
     LLMContextFrame,
+    LLMMessagesAppendFrame,
     OutputDTMFUrgentFrame,
     TranscriptionFrame,
     VADUserStartedSpeakingFrame,
@@ -16,7 +17,7 @@ from pipecat.frames.frames import (
 )
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.worker import PipelineWorker
-from pipecat.processors.aggregators.llm_context import LLMContext
+from pipecat.processors.aggregators.llm_context import LLMContext, LLMContextMessage
 from pipecat.processors.aggregators.llm_response_universal import (
     LLMContextAggregatorPair,
     LLMUserAggregator,
@@ -163,6 +164,49 @@ async def test_an_empty_message_is_the_caller_saying_nothing_and_any_other_empty
     await llm._report_empty_response("thought", [{"type": "reasoning"}])
 
     assert [error.split()[2] for error in errors] == ["refused", "thought"]
+
+
+@pytest.mark.parametrize("reasoning_ids", [["rs_a", "rs_b"], []])
+async def test_a_reply_with_no_words_leaves_none_of_its_reasoning_in_the_context(
+    reasoning_ids: list[str],
+) -> None:
+    settings = model_settings("http://127.0.0.1:9", "gpt-6-luna", None)
+    llm = llm_service(settings, settings.caller, CallerKeys("test", "", ""), "Be a caller.")
+    adapter = llm.get_llm_adapter()
+    earlier = adapter.create_llm_specific_message(
+        {"type": "reasoning", "id": "rs_spoke", "summary": [], "encrypted_content": "e"}
+    )
+    context = LLMContext(
+        [
+            {"role": "user", "content": "Am I speaking with Ana?"},
+            earlier,
+            {"role": "assistant", "content": "Yes, speaking."},
+            {"role": "user", "content": "Let me pull up your file."},
+        ]
+    )
+    empty = {"type": "message", "content": [{"type": "output_text", "text": ""}]}
+    later: LLMContextMessage = {"role": "user", "content": "Are you still there?"}
+
+    async def says_nothing() -> None:
+        await asyncio.sleep(0.05)
+        for item_id in reasoning_ids:
+            await llm._append_reasoning_message(item_id, [], "e")
+        await llm.push_frame(LLMMessagesAppendFrame([later]))
+        reasoning = [{"type": "reasoning", "id": item_id} for item_id in reasoning_ids]
+        await llm._report_empty_response("silent", [*reasoning, empty])
+
+    assistant = LLMContextAggregatorPair(context).assistant()
+    await asyncio.gather(
+        says_nothing(), run_test(Pipeline([llm, assistant]), frames_to_send=[SleepFrame(0.3)])
+    )
+
+    assert context.get_messages() == [
+        {"role": "user", "content": "Am I speaking with Ana?"},
+        earlier,
+        {"role": "assistant", "content": "Yes, speaking."},
+        {"role": "user", "content": "Let me pull up your file."},
+        later,
+    ]
 
 
 async def test_a_quiet_agent_still_gets_a_nudge_after_the_caller_says_nothing() -> None:

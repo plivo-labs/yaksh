@@ -1,3 +1,12 @@
+## v0.9.4 (2026-10-28)
+
+### Fix
+
+- **caller**: stop a reply with no words from silencing the next turns (#32)
+  - When the caller's reasoning model gives a reply with no words where it had to speak, the caller now answers the agent's next turn, such as "Are you still there?". Before, it often stayed silent through two or three of the agent's reminders, until the agent hung up.
+  - A reply with no words leaves none of the model's reasoning in the conversation that the model sees on later turns. Nothing changes for a model without reasoning.
+  - After the caller rightly stays silent while the agent works, it can miss the agent's next "Are you still there?" a little more often; the agent then asks again.
+
 ## v0.9.3 (2026-10-28)
 
 ### Feat
