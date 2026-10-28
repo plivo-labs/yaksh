@@ -27,7 +27,12 @@ function turn(
   };
 }
 
-const TONE: WireEvent = { kind: "caller_sound", at_ms: 7_000, detail: "tone, 1 s" };
+const TONE: WireEvent = {
+  kind: "caller_sound",
+  at_ms: 7_000,
+  detail: "tone, 1 s",
+  interruption: null,
+};
 
 function rule(answeredBy: AgentRule["answered_by"], role: AgentRule["role"]): AgentRule {
   return {
@@ -87,7 +92,7 @@ test("a screened call says what answered after the screener, from what happened"
   ).toBe("Call screener, iPhone call screening, then voicemail");
   expect(
     answeredText("screener", DEFAULT_ANSWERING, screened, [
-      { kind: "handover", at_ms: 5, detail: null },
+      { kind: "handover", at_ms: 5, detail: null, interruption: null },
     ]),
   ).toBe("Call screener, iPhone call screening, then the caller");
 });
@@ -112,10 +117,10 @@ test("a screener answer needs a deciding rule for the screener, whatever the per
 
 test("the transcript shows the tone, the hold, the pickup and how a machine ended the call", () => {
   const events: WireEvent[] = [
-    { kind: "connected", at_ms: 1_000, detail: null },
+    { kind: "connected", at_ms: 1_000, detail: null, interruption: null },
     TONE,
-    { kind: "hold_started", at_ms: 9_000, detail: "14000" },
-    { kind: "handover", at_ms: 23_000, detail: null },
+    { kind: "hold_started", at_ms: 9_000, detail: "14000", interruption: null },
+    { kind: "handover", at_ms: 23_000, detail: null, interruption: null },
   ];
 
   expect(

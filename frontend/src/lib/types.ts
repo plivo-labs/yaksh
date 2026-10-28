@@ -100,7 +100,8 @@ type WireEventKind =
   | "waiting_for_call"
   | "caller_sound"
   | "hold_started"
-  | "handover";
+  | "handover"
+  | "interruption";
 
 /** What each wire event means, from where Yaksh records it. */
 export const WIRE_EVENT_HELP: Record<WireEventKind, string> = {
@@ -126,6 +127,8 @@ export const WIRE_EVENT_HELP: Record<WireEventKind, string> = {
   hold_started:
     "The persona's call screener put the agent on hold. The text below gives the hold in ms.",
   handover: "The persona picked up after its call screener.",
+  interruption:
+    "A try of one of the scenario's interruptions: the caller said its fixed line over the agent, or the text below says why it did not.",
 };
 
 export const ACTIVE_STATUSES: ConversationStatus[] = ["queued", "running", "ending"];
@@ -935,10 +938,17 @@ export interface Reply {
   speech_ms: number;
 }
 
+/** One try of an interruption; `reason` is null when its line played. */
+interface InterruptionTry {
+  number: number;
+  reason: string | null;
+}
+
 export interface WireEvent {
   kind: WireEventKind;
   at_ms: number;
   detail: string | null;
+  interruption: InterruptionTry | null;
 }
 
 interface Validity {
