@@ -1,3 +1,13 @@
+## v0.9.2 (2026-10-28)
+
+### Perf
+
+- **caller**: send fewer input tokens in each caller request (#31)
+  - Each request to the caller's model sends about 30% fewer input tokens, so more calls fit in the model's tokens-per-minute limit. The caller's rules are shorter, and Pipecat no longer adds its guidance for async tools to the caller's system prompt.
+  - The caller answers the agent's opening turn more often. With the old rules, many of these replies had no words.
+  - When a scenario tells the caller to end the call at a named point, the caller ends it there more often.
+  - The caller follows its scenarios with new rules, so a scenario can give a different result than on 0.9.1.
+
 ## v0.9.1 (2026-10-28)
 
 ### Feat
