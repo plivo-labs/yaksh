@@ -1,4 +1,5 @@
 import type {
+  Language,
   SecretName,
   SettingsProvider,
   SettingsValues,
@@ -154,6 +155,10 @@ export const ttsModel = (
   traits: TtsTraits,
   model: string | null | undefined,
 ): TtsModel | undefined => traits.models.find((item) => item.id === (model ?? null));
+
+/** The languages of `listed` that the model speaks, in the model's order. */
+export const spokenOf = (listed: readonly Language[], model: TtsModel) =>
+  model.languages.filter((language) => listed.includes(language));
 
 /** The speed range of a voice's model. A model that is not in the list takes the widest range
  * of the provider, as the server does. */

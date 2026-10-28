@@ -733,6 +733,16 @@ export interface VoiceEdit {
   languages: Language[];
 }
 
+export const VOICE_GENDER_ITEMS: { value: VoiceGender; label: string }[] = [
+  { value: "female", label: "Female" },
+  { value: "male", label: "Male" },
+  { value: "neutral", label: "Neutral" },
+];
+
+/** The gender that a select's value names; null for any other value, such as "all". */
+export const voiceGender = (value: string): VoiceGender | null =>
+  VOICE_GENDER_ITEMS.find((item) => item.value === value)?.value ?? null;
+
 export interface PersonaInput {
   name: string;
   /** The persona a new one is forked from. */

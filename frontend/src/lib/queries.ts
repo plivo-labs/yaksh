@@ -444,12 +444,11 @@ export function useVoiceProviders() {
 
 /** The provider's models that the saved key's account may speak with; the first is the default
  * for a new voice. The server asks the provider for them, so they are kept for a few minutes. */
-export function useVoiceModels(provider: VoiceProvider, enabled: boolean) {
+export function useVoiceModels(provider: VoiceProvider) {
   return useQuery({
     queryKey: [...keys.voiceModels, provider],
     queryFn: ({ signal }) =>
       api<TtsModel[]>(`/voices/models?${new URLSearchParams({ provider })}`, { signal }),
-    enabled,
     staleTime: 5 * 60_000,
   });
 }
