@@ -1,6 +1,7 @@
 import { CheckCircle2, CircleAlert } from "lucide-react";
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 
+import { ConfirmDialog } from "@/components/confirm-dialogs";
 import { Panel, PanelHeader } from "@/components/panel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -46,62 +47,72 @@ export function SettingRow({
 }
 
 /** A provider's settings, with a Test button that uses the saved ones for a small piece of
- * real work. `canTest` is off while no key is saved, or while the form changes the address, since
- * the saved key goes only to its saved address. */
+ * real work, even while the form holds changes. `canTest` is off while no key is saved. The
+ * result sits beside the button, and the reason of a failure under the header; `edits` is the
+ * panel's form values, and a change to them clears the result, which no longer describes them. */
 export function ProviderPanel({
   title,
   description,
   provider,
   canTest,
+  edits,
   children,
 }: {
   title: string;
   description?: ReactNode;
   provider: SettingsProvider;
   canTest: boolean;
+  edits?: string;
   children: ReactNode;
 }) {
   const test = useTestProvider();
+  const { reset } = test;
+  useEffect(() => reset(), [edits, provider, reset]);
   const result = test.data;
+  const failure = test.isError ? test.error.message : result && !result.ok ? result.detail : null;
   return (
     <Panel>
       <PanelHeader
         title={title}
         action={
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={!canTest || test.isPending}
-            onClick={() => test.mutate(provider)}
-          >
-            {test.isPending && <Spinner />}
-            Test
-          </Button>
+          <div className="flex items-center gap-3">
+            {(result || test.isError) && (
+              <span
+                key={test.submittedAt}
+                role="status"
+                className={`flex items-center gap-1.5 text-s-500 ${APPEAR} ${
+                  failure === null ? "text-success-tag-foreground" : "text-destructive"
+                }`}
+              >
+                {failure === null ? (
+                  <CheckCircle2 className="size-4" aria-hidden />
+                ) : (
+                  <CircleAlert className="size-4" aria-hidden />
+                )}
+                {failure === null ? "Passed" : "Failed"}
+              </span>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={!canTest || test.isPending}
+              onClick={() => test.mutate(provider)}
+            >
+              {test.isPending && <Spinner />}
+              {test.isPending ? "Testing" : "Test"}
+            </Button>
+          </div>
         }
       />
-      {description && <p className="px-5 py-3 text-s-400 text-muted-foreground">{description}</p>}
-      {(result || test.isError) && (
+      {failure !== null && (
         <p
           key={test.submittedAt}
-          role="status"
-          className={`mx-5 mb-3 flex items-start gap-2 rounded-md px-3 py-2 text-s-400 ${APPEAR} ${
-            result?.ok
-              ? "bg-success-tag text-success-tag-foreground"
-              : "bg-danger text-danger-foreground"
-          }`}
+          className={`border-b px-5 py-2.5 text-xs-400 text-destructive ${REVEAL}`}
         >
-          {result?.ok ? (
-            <CheckCircle2 className="mt-0.5 size-4 shrink-0" />
-          ) : (
-            <CircleAlert className="mt-0.5 size-4 shrink-0" />
-          )}
-          {test.isError
-            ? test.error.message
-            : result?.ok
-              ? `Works. ${result.detail}`
-              : `Failed: ${result?.detail}`}
+          {failure}
         </p>
       )}
+      {description && <p className="px-5 py-3 text-s-400 text-muted-foreground">{description}</p>}
       {children}
     </Panel>
   );
@@ -116,6 +127,7 @@ export function KeyRow({
   state,
   url,
   removable = false,
+  removeWarning,
   checked = false,
 }: {
   name: SecretName;
@@ -126,6 +138,8 @@ export function KeyRow({
    * with it, so it never goes to an address the person does not see. */
   url?: string;
   removable?: boolean;
+  /** What stops working without the key; when set, removing it asks first. */
+  removeWarning?: { title: string; description: ReactNode };
   /** Whether the key's provider checks it before it is saved. */
   checked?: boolean;
 }) {
@@ -189,15 +203,21 @@ export function KeyRow({
             <Badge>Not set</Badge>
           )}
           <span className="flex-1" />
-          {state && removable && (
-            <Button
-              size="sm"
-              variant="ghost"
-              disabled={remove.isPending}
-              onClick={() => remove.mutate(name, { onSuccess: () => setSaved(false) })}
-            >
-              Remove
-            </Button>
+          {removable && (
+            <RemoveButton
+              saved={Boolean(state)}
+              warning={removeWarning}
+              pending={remove.isPending}
+              error={remove.error?.message}
+              onRemove={(done) =>
+                remove.mutate(name, {
+                  onSuccess: () => {
+                    setSaved(false);
+                    done();
+                  },
+                })
+              }
+            />
           )}
           <Button size="sm" variant="outline" onClick={() => setEditing(true)}>
             {state ? "Replace" : "Add key"}
@@ -208,33 +228,98 @@ export function KeyRow({
   );
 }
 
-/** The Plivo account: its Auth ID and Auth token change together, so a check never pairs the
- * new half with the old account's other half. */
-export function PlivoAccountRow({ settings }: { settings: AppSettings }) {
+/** Remove, shown only while something is saved. With `warning`, it asks first; the dialog
+ * stays mounted, so it closes smoothly after the saved value is gone. */
+export function RemoveButton({
+  saved,
+  warning,
+  pending,
+  error,
+  onRemove,
+}: {
+  saved: boolean;
+  warning?: { title: string; description: ReactNode };
+  pending: boolean;
+  error?: string;
+  onRemove: (done: () => void) => void;
+}) {
+  const [confirming, setConfirming] = useState(false);
+  return (
+    <>
+      {saved && (
+        <Button
+          size="sm"
+          variant="ghost"
+          disabled={pending}
+          onClick={() => (warning ? setConfirming(true) : onRemove(() => {}))}
+        >
+          Remove
+        </Button>
+      )}
+      {warning && (
+        <ConfirmDialog
+          title={warning.title}
+          description={warning.description}
+          action="Remove"
+          destructive
+          pending={pending}
+          error={error}
+          open={confirming}
+          onOpenChange={setConfirming}
+          onConfirm={onRemove}
+        />
+      )}
+    </>
+  );
+}
+
+/** Two secrets that change together, such as an Auth ID and Auth token: a check never pairs a
+ * new half with the other half of the old pair. `shown` is the saved pair's hint, null while
+ * it is not saved; `children` are controls beside the change button, such as Remove. */
+export function CredentialPairRow({
+  label,
+  inputId,
+  shown,
+  change,
+  add,
+  pending,
+  error,
+  onSave,
+  onReset,
+  children,
+}: {
+  label: string;
+  inputId: string;
+  shown: string | null;
+  change: string;
+  add: string;
+  pending: boolean;
+  error?: string;
+  onSave: (pair: { auth_id: string; auth_token: string }, done: () => void) => void;
+  onReset: () => void;
+  children?: ReactNode;
+}) {
   const [editing, setEditing] = useState(false);
   const [authId, setAuthId] = useState("");
   const [token, setToken] = useState("");
-  const save = useSavePlivoAccount();
-  const id = settings.secrets.plivo_auth_id;
-  const saved = id && settings.secrets.plivo_auth_token;
   const close = () => {
     setEditing(false);
     setAuthId("");
     setToken("");
-    save.reset();
+    onReset();
   };
   return (
-    <SettingRow label="Auth ID and Auth token" htmlFor={editing ? "plivo-auth-id" : undefined}>
+    <SettingRow label={label} htmlFor={editing ? inputId : undefined}>
       {editing ? (
         <form
           className={`grid gap-2 ${REVEAL}`}
           onSubmit={(event) => {
             event.preventDefault();
-            save.mutate({ auth_id: authId.trim(), auth_token: token.trim() }, { onSuccess: close });
+            onSave({ auth_id: authId.trim(), auth_token: token.trim() }, close);
           }}
         >
           <Input
-            id="plivo-auth-id"
+            id={inputId}
             autoComplete="off"
             placeholder="Auth ID"
             value={authId}
@@ -248,14 +333,10 @@ export function PlivoAccountRow({ settings }: { settings: AppSettings }) {
             value={token}
             onChange={(event) => setToken(event.target.value)}
           />
-          {save.isError && <p className="text-xs-400 text-destructive">{save.error.message}</p>}
+          {error && <p className="text-xs-400 text-destructive">{error}</p>}
           <div className="flex flex-wrap items-center gap-2">
-            <Button
-              type="submit"
-              size="sm"
-              disabled={!authId.trim() || !token.trim() || save.isPending}
-            >
-              {save.isPending && <Spinner />}
+            <Button type="submit" size="sm" disabled={!authId.trim() || !token.trim() || pending}>
+              {pending && <Spinner />}
               Check and save
             </Button>
             <Button type="button" size="sm" variant="ghost" onClick={close}>
@@ -265,20 +346,49 @@ export function PlivoAccountRow({ settings }: { settings: AppSettings }) {
         </form>
       ) : (
         <div className="flex flex-wrap items-center gap-2">
-          {saved ? (
+          {shown !== null ? (
             <>
-              <span className="font-mono text-s-400">••••••••{id.hint ?? ""}</span>
+              <span className="font-mono text-s-400">{shown}</span>
               <Badge variant="success">Saved</Badge>
             </>
           ) : (
             <Badge>Not set</Badge>
           )}
           <span className="flex-1" />
+          {children}
           <Button size="sm" variant="outline" onClick={() => setEditing(true)}>
-            {saved ? "Change account" : "Add account"}
+            {shown !== null ? change : add}
           </Button>
         </div>
       )}
     </SettingRow>
+  );
+}
+
+/** The Plivo account: its Auth ID and Auth token change together. */
+export function PlivoAccountRow({ settings }: { settings: AppSettings }) {
+  const save = useSavePlivoAccount();
+  const id = settings.secrets.plivo_auth_id;
+  return (
+    <CredentialPairRow
+      label="Auth ID and Auth token"
+      inputId="plivo-auth-id"
+      shown={id && settings.secrets.plivo_auth_token ? `••••••••${id.hint ?? ""}` : null}
+      change="Change account"
+      add="Add account"
+      pending={save.isPending}
+      error={save.isError ? save.error.message : undefined}
+      onSave={(pair, done) => save.mutate(pair, { onSuccess: done })}
+      onReset={save.reset}
+    />
+  );
+}
+
+/** The warning a changed address shows while its provider has a saved key. */
+export function KeyRemovedNote({ address = "URL" }: { address?: string }) {
+  return (
+    <span className="text-warning-foreground">
+      Saving removes the key for the old {address}. Add a key for this {address}.
+    </span>
   );
 }

@@ -1,6 +1,6 @@
 [project]
 name = "yaksh"
-version = "0.8.0"
+version = "0.8.1"
 description = "Simulate, evaluate and improve AI agents"
 readme = "README.md"
 license = "BSD-2-Clause"
@@ -17,7 +17,7 @@ dependencies = [
     "fastapi>=0.141.1",
     "jinja2>=3.1.6",
     "openai>=3.14.1",
-    "pipecat-ai[deepgram,elevenlabs,silero,typesafe]>=1.14.0",
+    "pipecat-ai[assemblyai,azure,cartesia,deepgram,elevenlabs,gladia,openai,sarvam,silero,soniox,typesafe]>=1.14.0",
     "pydantic>=2.12",
     "pydantic-settings>=2.15.0",
     "pypdf>=6.21.2",

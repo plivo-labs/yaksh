@@ -1,9 +1,7 @@
-"""ElevenLabs voice lookup and speech, for adding voices and playing previews; and, to import
+"""ElevenLabs voice lookup, for adding voices; the language pin of its speech; and, to import
 agents, reads of a workspace's ElevenLabs agents with its own key."""
 
-import io
 import json
-import wave
 from typing import Any
 from urllib.parse import quote
 
@@ -14,7 +12,7 @@ from yaksh.diagnostics import describe_exception
 from yaksh.domain.agent_import import ElevenLabsRegion
 from yaksh.domain.errors import ProviderCallError, UnavailableError
 from yaksh.domain.languages import Language
-from yaksh.domain.voices import ProviderVoice, VoiceGender, VoiceSettings
+from yaksh.domain.voices import ProviderVoice, VoiceGender
 
 ELEVENLABS_API = "https://api.elevenlabs.io"
 REGION_APIS: dict[ElevenLabsRegion, str] = {
@@ -24,9 +22,6 @@ REGION_APIS: dict[ElevenLabsRegion, str] = {
     ElevenLabsRegion.SG: "https://api.sg.residency.elevenlabs.io",
 }
 TIMEOUT = aiohttp.ClientTimeout(total=10)
-SPEECH_TIMEOUT = aiohttp.ClientTimeout(total=20)
-MODEL = "eleven_flash_v2_5"
-CALL_AUDIO = "pcm_8000"
 
 LANGUAGE_CODES: dict[Language, str] = {
     Language.EN: "en",
@@ -50,8 +45,7 @@ def language_pin(language: Language) -> str | None:
 
 
 class ElevenLabsClient:
-    """Looks up one voice through v1, which has the only single-voice endpoint, and makes
-    speech in the 8 kHz format a call uses."""
+    """Looks up one voice through v1, which has the only single-voice endpoint."""
 
     def __init__(self, api_key: str, *, base_url: str = ELEVENLABS_API) -> None:
         self.base_url = base_url.rstrip("/")
@@ -78,34 +72,6 @@ class ElevenLabsClient:
                 f"ElevenLabs refused the voice lookup with {status}: {excerpt(text)}"
             )
         return provider_voice(parsed(text))
-
-    async def speak(self, voice: VoiceSettings, language: Language, text: str) -> bytes | None:
-        body: dict[str, Any] = {
-            "text": text,
-            "model_id": MODEL,
-            "voice_settings": {"speed": voice.speed, "stability": voice.stability},
-        }
-        pin = language_pin(language)
-        if pin is not None:
-            body["language_code"] = pin
-        url = f"{self.base_url}/v1/text-to-speech/{quote(voice.id, safe='')}"
-        try:
-            async with (
-                aiohttp.ClientSession(headers=self._headers, timeout=SPEECH_TIMEOUT) as session,
-                session.post(url, params={"output_format": CALL_AUDIO}, json=body) as response,
-            ):
-                if response.status < 400:
-                    return as_wav(await response.read())
-                status, text_body = response.status, await response.text()
-        except (aiohttp.ClientError, TimeoutError, UnicodeDecodeError) as error:
-            raise UnavailableError(
-                f"the ElevenLabs speech request failed: {describe_exception(error)}"
-            ) from error
-        if voice_not_found(text_body):
-            return None
-        raise UnavailableError(
-            f"ElevenLabs refused the speech request with {status}: {excerpt(text_body)}"
-        )
 
 
 class ElevenLabsError(ProviderCallError):
@@ -176,17 +142,6 @@ def parsed(text: str) -> dict[str, Any]:
     if not isinstance(body, dict):
         raise UnavailableError(f"ElevenLabs sent a body that is not an object: {excerpt(text)}")
     return body
-
-
-def as_wav(pcm: bytes) -> bytes:
-    """8 kHz 16-bit mono PCM, the audio a call gets, in a WAV container a browser can play."""
-    out = io.BytesIO()
-    with wave.open(out, "wb") as file:
-        file.setnchannels(1)
-        file.setsampwidth(2)
-        file.setframerate(8000)
-        file.writeframes(pcm)
-    return out.getvalue()
 
 
 def voice_not_found(text: str) -> bool:

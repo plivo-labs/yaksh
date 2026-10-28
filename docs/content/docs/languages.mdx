@@ -27,7 +27,17 @@ A phrase rule checks the words of the agent as they are written. For an agent wi
 
 ## How Yaksh hears the agent
 
-Yaksh writes what the agent says with Deepgram. Each call uses one language setting. Yaksh chooses it from the languages of the agent and the language of the persona:
+Yaksh writes what the agent says with the speech-to-text provider in Settings. The agent should answer in the language of the persona. If the agent does not serve that language, it should answer in its main language. Each provider hears these languages:
+
+| Provider | Hears |
+| --- | --- |
+| Deepgram (`nova-3`) | All of Yaksh's languages |
+| Sarvam (`saaras:v4`) | All but Spanish |
+| AssemblyAI (`universal-3-6-pro`) | English, Hindi, Marathi and Spanish |
+| Soniox (`stt-rt-v5`) | All of Yaksh's languages |
+| Gladia (`solaria-1`) | All of Yaksh's languages |
+
+A phone run is refused when the provider does not hear the language that the agent should answer in. Every provider except Deepgram hears that one language. Deepgram uses one language setting for each call, chosen from the languages of the agent and the language of the persona:
 
 1. The agent should answer in the language of the persona. If the agent does not serve that language, it should answer in its main language.
 2. From the settings that hear that language, Yaksh uses the one that hears the most of the other languages of the call. On a tie, a model for one language comes first.

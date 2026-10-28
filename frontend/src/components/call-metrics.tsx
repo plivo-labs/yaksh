@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { BAND_FILL, duration, latency, percent, responseBand, seconds } from "@/lib/format";
 import { useConversationEvaluation } from "@/lib/queries";
 import { STAGE_FILL, stepLabel, stepStage } from "@/lib/reply-steps";
+import { sttProvider, ttsProvider } from "@/lib/speech-providers";
 import {
   type CaptureFaults,
   type ConversationEvaluation,
@@ -225,11 +226,16 @@ function CallerCard({ metrics, transport }: { metrics: Metrics; transport: Trans
             {settings.scenario_model && " (set by the scenario)"}
             {settings.stt_model && (
               <>
-                , speech to text {settings.stt_model}
+                , speech to text{" "}
+                {settings.stt_provider && `${sttProvider(settings.stt_provider).label} `}
+                {settings.stt_model}
                 {settings.stt_language && ` (${settings.stt_language})`}
               </>
             )}
-            {settings.tts_model && `, text to speech ${settings.tts_model}`}
+            {settings.voice &&
+              `, text to speech ${ttsProvider(settings.voice.provider).label}${
+                settings.tts_model ? ` ${settings.tts_model}` : ""
+              }`}
           </CardDescription>
         )}
       </CardHeader>

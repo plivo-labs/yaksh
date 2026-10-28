@@ -1,16 +1,14 @@
-import io
-import wave
 from collections.abc import AsyncIterator
 from typing import Any
 
 import pytest
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI, Response
 from fastapi.responses import JSONResponse, RedirectResponse
 
 from yaksh.caller.plivo_server import PlivoServer
 from yaksh.domain.errors import UnavailableError
 from yaksh.domain.languages import Language
-from yaksh.domain.voices import VoiceGender, VoiceProvider, VoiceSettings
+from yaksh.domain.voices import VoiceGender
 from yaksh.integrations.elevenlabs import ElevenLabsClient
 
 API_KEY = "el-key"
@@ -33,17 +31,6 @@ async def elevenlabs() -> AsyncIterator[tuple[str, list[dict[str, Any]]]]:
     """A stand-in for api.elevenlabs.io that records requests."""
     seen: list[dict[str, Any]] = []
     app = FastAPI()
-
-    @app.post("/v1/text-to-speech/{voice_id}")
-    async def speak(voice_id: str, request: Request) -> Response:
-        seen.append(
-            {"speak": voice_id, "query": dict(request.query_params), **await request.json()}
-        )
-        if voice_id == "gone":
-            return Response('{"detail": {"code": "voice_not_found"}}', status_code=400)
-        if voice_id == "busy":
-            return Response('{"detail": {"code": "too_many_concurrent_requests"}}', status_code=429)
-        return Response(b"\x01\x00" * 800, media_type="audio/basic")
 
     @app.get("/v1/voices/{voice_id}")
     async def voice(voice_id: str) -> Response:
@@ -92,10 +79,6 @@ async def test_an_unreachable_provider_is_reported_as_unavailable() -> None:
 
     with pytest.raises(UnavailableError):
         await client.get_voice("v1")
-    with pytest.raises(UnavailableError):
-        await client.speak(
-            VoiceSettings(provider=VoiceProvider.ELEVENLABS, id="v1"), Language.EN, "Hi"
-        )
 
 
 async def test_a_broken_answer_is_unavailable_with_its_status_and_never_the_key(
@@ -111,32 +94,3 @@ async def test_a_broken_answer_is_unavailable_with_its_status_and_never_the_key(
     with pytest.raises(UnavailableError, match="TooManyRedirects") as looped:
         await client.get_voice("loop")
     assert API_KEY not in str(looped.value)
-
-
-async def test_speech_uses_the_call_model_voice_settings_and_a_pin_the_model_takes(
-    elevenlabs: tuple[str, list[dict[str, Any]]],
-) -> None:
-    base_url, seen = elevenlabs
-    client = ElevenLabsClient(API_KEY, base_url=base_url)
-    voice = VoiceSettings(provider=VoiceProvider.ELEVENLABS, id="v1", speed=0.8, stability=0.3)
-
-    hindi = await client.speak(voice, Language.HI, "नमस्ते")
-    await client.speak(voice, Language.EN, "Hello")
-    await client.speak(voice, Language.MR, "नमस्कार")
-    gone = await client.speak(voice.model_copy(update={"id": "gone"}), Language.EN, "Hi")
-
-    assert gone is None and hindi is not None
-    with pytest.raises(UnavailableError, match="429"):
-        await client.speak(voice.model_copy(update={"id": "busy"}), Language.EN, "Hi")
-    with wave.open(io.BytesIO(hindi)) as audio:
-        assert (audio.getframerate(), audio.getsampwidth(), audio.getnframes()) == (8000, 2, 800)
-    assert seen[0] == {
-        "speak": "v1",
-        "query": {"output_format": "pcm_8000"},
-        "text": "नमस्ते",
-        "model_id": "eleven_flash_v2_5",
-        "voice_settings": {"speed": 0.8, "stability": 0.3},
-        "language_code": "hi",
-    }
-    assert seen[1]["language_code"] == "en"
-    assert "language_code" not in seen[2]

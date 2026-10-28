@@ -21,16 +21,33 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { useVoicePreview } from "@/hooks/use-voice-preview";
-import { useVoices } from "@/lib/queries";
-import { LANGUAGE_NAMES, type Voice } from "@/lib/types";
+import { useSettings, useVoices } from "@/lib/queries";
+import { TTS_PROVIDERS, hasCredential, ttsProvider } from "@/lib/speech-providers";
+import { LANGUAGE_NAMES, type Voice, type VoiceProvider } from "@/lib/types";
+
+const ALL = "all";
+const PROVIDER_ITEMS = [
+  { value: ALL, label: "All providers" },
+  ...TTS_PROVIDERS.map((provider) => ({ value: provider.value, label: provider.label })),
+];
 import { VoiceDialog } from "@/pages/voice-dialog";
 
 export function VoicesPage() {
   const voices = useVoices();
+  const settings = useSettings();
   const preview = useVoicePreview();
+  const [shown, setShown] = useState<VoiceProvider | typeof ALL>(ALL);
+  const listed = (voices.data ?? []).filter((item) => shown === ALL || item.provider === shown);
   const [editing, setEditing] = useState<Voice | "new" | null>(null);
   const voice = editing === "new" ? undefined : (editing ?? undefined);
   const close = () => setEditing(null);
@@ -39,6 +56,24 @@ export function VoicesPage() {
     <div className="grid gap-6">
       <div className="flex min-h-[30px] flex-wrap items-center gap-x-2 gap-y-4">
         <h1 className="mr-auto text-h3-500">Voices</h1>
+        <Select
+          items={PROVIDER_ITEMS}
+          value={shown}
+          onValueChange={(next) =>
+            next && setShown(TTS_PROVIDERS.find((item) => item.value === next)?.value ?? ALL)
+          }
+        >
+          <SelectTrigger aria-label="Provider" size="sm" className="w-44">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {PROVIDER_ITEMS.map((item) => (
+              <SelectItem key={item.value} value={item.value}>
+                {item.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         <Button size="sm" onClick={() => setEditing("new")}>
           <Plus />
           Add voice
@@ -62,9 +97,7 @@ export function VoicesPage() {
               <AudioLines />
             </EmptyMedia>
             <EmptyTitle>No voices</EmptyTitle>
-            <EmptyDescription>
-              Add an ElevenLabs voice so that a persona can speak with it.
-            </EmptyDescription>
+            <EmptyDescription>Add a voice so that a persona can speak with it.</EmptyDescription>
           </EmptyHeader>
           <EmptyContent>
             <Button onClick={() => setEditing("new")}>
@@ -75,12 +108,15 @@ export function VoicesPage() {
         </Empty>
       ) : (
         <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {voices.data.map((item) => {
-            const settings = {
+          {listed.map((item) => {
+            const provider = ttsProvider(item.provider);
+            const keyless =
+              settings.data !== undefined && !hasCredential(provider, settings.data.secrets);
+            const spoken = {
               provider: item.provider,
               id: item.provider_voice_id,
               speed: 1,
-              stability: 0.5,
+              stability: item.provider === "elevenlabs" ? 0.5 : null,
             };
             return (
               <li key={item.id}>
@@ -100,6 +136,9 @@ export function VoicesPage() {
                       {item.accent && <span className="mr-1 capitalize">{item.accent}</span>}
                       {item.gender && <GenderBadge gender={item.gender} />}
                       {item.builtin && <Badge>Built-in</Badge>}
+                      <Badge>{provider.label}</Badge>
+                      {!provider.wordTimestamps && <Badge variant="warning">Sentence timing</Badge>}
+                      {keyless && <Badge variant="danger">No key</Badge>}
                     </CardDescription>
                     <CardAction>
                       <Button
@@ -111,7 +150,8 @@ export function VoicesPage() {
                           preview.isPlaying(item.id) ? `Stop ${item.name}` : `Play ${item.name}`
                         }
                         aria-busy={preview.isLoading(item.id)}
-                        onClick={() => preview.toggle(item.id, settings, item.languages[0])}
+                        disabled={keyless}
+                        onClick={() => preview.toggle(item.id, spoken, item.languages[0])}
                       >
                         {preview.isLoading(item.id) ? (
                           <Spinner />

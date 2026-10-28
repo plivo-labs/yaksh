@@ -37,6 +37,38 @@ def test_an_interrupted_reply_keeps_what_the_agent_heard_apart_from_the_rest() -
     ]
 
 
+def test_an_untimed_sentence_counts_as_heard_once_its_own_audio_has_played() -> None:
+    observer = Observer()
+    builder = TranscriptBuilder(Clock(), observer)
+    generated(builder, "Sure, I can do Friday. What time works for you?")
+    playout = played(arrived=16_000, sent=16_000)
+    builder.caller_started(playout)
+    builder.transmitted("Sure, I can do Friday.", 16_000, playout, self_spaced=False, untimed=True)
+    playout.received(bytes(8_000), 0)
+
+    builder.caller_interrupted()
+
+    assert [(turn.provenance, turn.text) for turn in observer.turns] == [
+        (Provenance.TRANSMITTED, "Sure, I can do Friday."),
+        (Provenance.CUT, "What time works for you?"),
+    ]
+
+
+def test_an_untimed_sentence_cut_before_its_audio_played_is_all_cut() -> None:
+    observer = Observer()
+    builder = TranscriptBuilder(Clock(), observer)
+    generated(builder, "Sure, I can do Friday.")
+    playout = played(arrived=16_000, sent=8_000)
+    builder.caller_started(playout)
+    builder.transmitted("Sure, I can do Friday.", 16_000, playout, self_spaced=False, untimed=True)
+
+    builder.caller_interrupted()
+
+    assert [(turn.provenance, turn.text) for turn in observer.turns] == [
+        (Provenance.CUT, "Sure, I can do Friday."),
+    ]
+
+
 def test_the_heard_turn_keeps_the_audio_start_that_played_it_and_the_cut_rest_has_none() -> None:
     observer = Observer()
     builder = TranscriptBuilder(Clock(), observer)

@@ -11,7 +11,7 @@ from tests.conftest import (
     listed_voice_id,
 )
 from yaksh.domain.languages import Language
-from yaksh.domain.voices import VoiceProvider
+from yaksh.domain.voices import ProviderVoice, VoiceProvider
 from yaksh.simulation.languages import LANGUAGES
 
 NEW_VOICE = {"provider": "elevenlabs", "provider_voice_id": UNLISTED_VOICE.id}
@@ -167,4 +167,55 @@ async def test_a_preview_speaks_the_sample_line_or_the_language_sample_with_the_
 
     voice_client.down = True
     down = await client.post("/api/v1/voices/preview", json={"voice": voice, "language": "en"})
-    assert down.status_code == 503
+    assert down.status_code == 422 and "did not answer" in down.text
+
+
+async def test_a_voice_of_a_provider_without_lookup_is_saved_once_it_speaks_a_line(
+    client: AsyncClient, voice_clients: dict[VoiceProvider, FakeVoiceClient]
+) -> None:
+    sarvam = FakeVoiceClient()
+    sarvam.voices["shubh"] = ProviderVoice(id="shubh", name="unused")
+    voice_clients[VoiceProvider.SARVAM] = sarvam
+    voice = {
+        "provider": "sarvam",
+        "provider_voice_id": "shubh",
+        "languages": ["hi", "en"],
+        "name": "Shubh",
+        "gender": "male",
+        "accent": "indian",
+    }
+
+    unnamed = await client.post("/api/v1/voices", json={**voice, "name": None})
+    unknown = await client.post("/api/v1/voices", json={**voice, "provider_voice_id": "nobody"})
+    lookup = await client.get(
+        "/api/v1/voices/lookup", params={"provider": "sarvam", "provider_voice_id": "shubh"}
+    )
+    saved = await client.post("/api/v1/voices", json=voice)
+
+    assert unnamed.status_code == unknown.status_code == lookup.status_code == 422
+    assert "nobody" in unknown.text
+    assert saved.status_code == 201, saved.text
+    assert (saved.json()["name"], saved.json()["gender"], saved.json()["accent"]) == (
+        "Shubh",
+        "male",
+        "indian",
+    )
+    assert sarvam.spoken[-1][1:] == (Language.EN, LANGUAGES[Language.EN].sample)
+    assert sarvam.lookups == []
+
+
+async def test_a_voice_never_lists_a_language_its_provider_cannot_speak(
+    client: AsyncClient, voice_clients: dict[VoiceProvider, FakeVoiceClient]
+) -> None:
+    sarvam = FakeVoiceClient()
+    sarvam.voices["shubh"] = ProviderVoice(id="shubh", name="unused")
+    voice_clients[VoiceProvider.SARVAM] = sarvam
+    voice = {"provider": "sarvam", "provider_voice_id": "shubh", "name": "Shubh"}
+
+    spanish = await client.post("/api/v1/voices", json={**voice, "languages": ["hi", "es"]})
+    saved = await client.post("/api/v1/voices", json={**voice, "languages": ["hi"]})
+    edited = await client.patch(f"/api/v1/voices/{saved.json()['id']}", json={"languages": ["es"]})
+
+    assert spanish.status_code == edited.status_code == 422
+    assert "Sarvam does not speak Spanish" in spanish.text
+    assert "Sarvam does not speak Spanish" in edited.text

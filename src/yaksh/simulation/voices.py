@@ -22,6 +22,7 @@ from yaksh.domain.voices import (
     VoiceProvider,
     VoiceSettings,
     VoiceUpdate,
+    check_spoken,
 )
 from yaksh.simulation.languages import LANGUAGES
 
@@ -44,6 +45,8 @@ def ordered(languages: Collection[Language]) -> list[Language]:
 async def lookup_voice(
     clients: VoiceClients, provider: VoiceProvider, provider_voice_id: str
 ) -> ProviderVoice:
+    if not provider.traits.lookup:
+        raise ValidationError(f"{provider.label} has no voice lookup; enter the voice's details")
     found = await client_for(clients, provider).get_voice(provider_voice_id)
     if found is None:
         raise ValidationError(
@@ -59,17 +62,14 @@ async def preview_voice(
     language: Language,
     sample_line: str | None = None,
 ) -> bytes:
-    """The sample line, else the language's sample sentence, spoken with the same model, voice
-    settings and 8 kHz format as a call. A call streams through a websocket and this is one
-    request, so the delivery can differ a little."""
-    audio = await client_for(clients, voice.provider).speak(
-        voice, language, sample_line or LANGUAGES[language].sample
-    )
-    if audio is None:
-        raise ValidationError(
-            f"voice {voice.id} was not found on the {voice.provider.label} account"
-        )
-    return audio
+    """The sample line, else the language's sample sentence, spoken through the same
+    text-to-speech, voice settings and 8 kHz format as a call. A provider that cannot speak it,
+    as with a voice it does not know, gives its reason."""
+    client = client_for(clients, voice.provider)
+    try:
+        return await client.speak(voice, language, sample_line or LANGUAGES[language].sample)
+    except UnavailableError as error:
+        raise ValidationError(str(error)) from None
 
 
 async def flush(session: AsyncSession) -> None:
@@ -83,7 +83,26 @@ async def flush(session: AsyncSession) -> None:
 
 
 async def create_voice(session: AsyncSession, clients: VoiceClients, command: VoiceCreate) -> Voice:
-    found = await lookup_voice(clients, command.provider, command.provider_voice_id)
+    """A provider with lookup describes the voice; any other must speak a line in it first, so
+    a voice ID the provider does not know is never listed."""
+    if command.provider.traits.lookup:
+        found = await lookup_voice(clients, command.provider, command.provider_voice_id)
+    else:
+        language = ordered(command.languages)[0]
+        try:
+            await client_for(clients, command.provider).speak(
+                VoiceSettings(provider=command.provider, id=command.provider_voice_id),
+                language,
+                LANGUAGES[language].sample,
+            )
+        except UnavailableError as error:
+            raise ValidationError(f"not saved: {error}") from None
+        found = ProviderVoice(
+            id=command.provider_voice_id,
+            name=command.name or command.provider_voice_id,
+            gender=command.gender,
+            accent=command.accent,
+        )
     voice = Voice(
         provider=command.provider,
         provider_voice_id=command.provider_voice_id,
@@ -138,6 +157,10 @@ async def update_voice(session: AsyncSession, voice_id: uuid.UUID, update: Voice
     if "name" in changes:
         voice.name = changes["name"]
     if "languages" in changes:
+        try:
+            check_spoken(voice.provider, changes["languages"])
+        except ValueError as error:
+            raise ValidationError(str(error)) from None
         voice.languages = ordered(changes["languages"])
     await session.flush()
     await session.refresh(voice)

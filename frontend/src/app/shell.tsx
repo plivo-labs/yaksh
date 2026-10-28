@@ -17,6 +17,7 @@ import { TokenGate } from "@/app/token";
 import { useDarkMode } from "@/app/use-dark-mode";
 import { useToken } from "@/app/use-token";
 import { API_TOKEN } from "@/lib/api";
+import { TTS_PROVIDERS, hasCredential, sttProvider } from "@/lib/speech-providers";
 import { useHealth, useSettings } from "@/lib/queries";
 import type { AppSettings } from "@/lib/types";
 import {
@@ -178,8 +179,8 @@ function missingKeys(settings: AppSettings): string[] {
   const secrets = settings.secrets;
   return [
     !secrets.llm_api_key && "LLM provider",
-    !secrets.deepgram_api_key && "Deepgram",
-    !secrets.elevenlabs_api_key && "ElevenLabs",
+    !secrets[sttProvider(settings.values.speech.stt).secret] && "Speech to text",
+    !TTS_PROVIDERS.some((provider) => hasCredential(provider, secrets)) && "Text to speech",
     !(secrets.plivo_auth_id && secrets.plivo_auth_token) && "Plivo",
   ].filter((name): name is string => Boolean(name));
 }

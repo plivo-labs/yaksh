@@ -2,9 +2,7 @@
 when it listens, and how it ends the call or hands it to the persona."""
 
 import asyncio
-import io
 import logging
-import wave
 from collections.abc import Callable
 from pathlib import Path
 
@@ -29,7 +27,8 @@ from yaksh.domain.conversations import (
     WireEvent,
     WireEventKind,
 )
-from yaksh.integrations.elevenlabs import ElevenLabsClient
+from yaksh.integrations.speech.audio import speak_once
+from yaksh.integrations.speech.tts import tts_service
 
 log = logging.getLogger(__name__)
 
@@ -52,15 +51,15 @@ def own_greeting(request: CallRequest, keys: CallerKeys) -> asyncio.Future[bytes
     text = plan.voicemail.own_greeting if plan and plan.voicemail else None
     if text is None:
         return None
-    return asyncio.ensure_future(spoken(keys.elevenlabs, request, text))
+    return asyncio.ensure_future(spoken(keys.tts, request, text))
 
 
 async def spoken(key: str, request: CallRequest, text: str) -> bytes:
-    audio = await ElevenLabsClient(key).speak(request.voice, request.caller_language, text)
-    if audio is None:
-        raise ValueError("ElevenLabs no longer has the persona's voice")
-    with wave.open(io.BytesIO(audio)) as file:
-        return file.readframes(file.getnframes())
+    """The text in the persona's voice, through the same text-to-speech as its replies."""
+    service = tts_service(
+        request.app_settings, request.voice, request.caller_language, key, one_shot=True
+    )
+    return await speak_once(service, text)
 
 
 class AnsweringScript:

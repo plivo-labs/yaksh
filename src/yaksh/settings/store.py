@@ -13,10 +13,11 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from yaksh.db.models import StoredSettings
-from yaksh.domain.errors import ValidationError
+from yaksh.domain.errors import ConflictError, ValidationError
 from yaksh.domain.settings import (
     KEY_URLS,
     AppSettings,
+    SecretName,
     Secrets,
     SettingsValues,
     is_secret_name,
@@ -93,6 +94,11 @@ def planned(
     return build(settings.version + 1, after, flat)
 
 
+def address(settings: AppSettings, name: str) -> str:
+    section, field = KEY_URLS[SecretName(name)]
+    return getattr(getattr(settings, section), field)
+
+
 async def stored_version(session: AsyncSession) -> int:
     return await session.scalar(select(StoredSettings.version)) or 0
 
@@ -122,12 +128,28 @@ async def change(
     *,
     values: Mapping[str, Any] | None = None,
     secrets: Mapping[str, str | None] | None = None,
+    checked: AppSettings | None = None,
 ) -> AppSettings:
     """Save planned() of the stored settings in one step, or nothing. A secret that did not
-    change keeps its stored encryption."""
+    change keeps its stored encryption. `checked` is the settings a provider checked the new
+    keys with: a key whose address changed since then is not saved, so it never goes to an
+    address it was not checked at."""
     row = await session.get_one(StoredSettings, 1, with_for_update=True, populate_existing=True)
     candidate = planned(await load(session, cipher), values, secrets)
     changed = secrets or {}
+    if checked is not None:
+        moved = [
+            name
+            for name, value in changed.items()
+            if value is not None
+            and name in KEY_URLS
+            and address(candidate, name) != address(checked, name)
+        ]
+        if moved:
+            await session.rollback()
+            raise ConflictError(
+                f"the address of {', '.join(moved)} changed while it was checked; try again"
+            )
     stored = {
         name: row.secrets[name]
         if name in row.secrets and name not in changed
