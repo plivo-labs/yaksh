@@ -44,24 +44,28 @@ Only a reply that the model of the caller speaks gets a value. These replies get
 
 | Part | Log field | Time |
 |---|---|---|
-| Silence wait | `endpointing_wait_ms` | The silence that the voice detector waits for before it decides that the agent stopped. This is the stop setting of the voice detector, 0.6 seconds. |
-| Transcript | `transcription_ms` | From the stop of the voice detector to the last transcript of the agent turn. |
-| End-of-turn check | `turn_detection_ms` | From the transcript to the request to the model of the caller: the time until Yaksh decides that the turn of the agent is complete. |
-| LLM inference | `llm_inference_ms` | From the request to the model to the first words that the caller can speak. Reasoning is part of this time. |
-| LLM tool call | `llm_tool_call_ms` | The time of a tool call of the model, such as `end_call`. |
-| Tool | `function_handler_ms` | The time of the tool itself. |
-| Waiting for a sentence | `sentence_aggregation_ms` | The time until the first sentence is complete for the text-to-speech. |
-| Speech synthesis | `speech_synthesis_ms` | From the text to the first audio of the text-to-speech. |
-| Output | `output_transport_ms` | From the first audio to the start of the audio on the line. |
-| Not attributed | `pipeline_ms` | Time that no part covers. Pipecat also puts a step between two frames here when it is shorter than 5 ms. |
+| VAD endpointing | `endpointing_wait_ms` | The silence that the VAD waits for before it reports that the agent stopped speaking: its `stop_secs`, 0.6 seconds. |
+| STT after VAD stop | `transcription_ms` | From the VAD stop to the final STT transcript of the agent turn. 0 when the transcript was final before the VAD stop. |
+| Turn detection | `turn_detection_ms` | From the transcript to the request to the caller LLM: the smart-turn model decides that the turn of the agent is complete. It is long when the model finds the turn incomplete. |
+| LLM TTFT | `llm_inference_ms` | From the request to the caller LLM to the first text token of the answer. Reasoning is part of this time. |
+| LLM tool call | `llm_tool_call_ms` | The LLM emits a tool call, such as `end_call`. |
+| Tool execution | `function_handler_ms` | The tool handler runs. |
+| Sentence aggregation | `sentence_aggregation_ms` | The LLM tokens wait until the first sentence is complete for the TTS. |
+| TTS TTFB | `speech_synthesis_ms` | From the request to the TTS to the first audio chunk. |
+| Output transport | `output_transport_ms` | From the first TTS audio chunk to the first audio frame that Yaksh sends on the call. |
+| Unattributed | `pipeline_ms` | Pipeline time that no part covers. Pipecat also puts a step between two frames here when it is shorter than 5 ms. |
 
-The speech-to-text can give the last transcript before the voice detector stops. Then the transcript time is 0, and the end-of-turn check starts at the stop of the voice detector. Pipecat does not name this time ([pipecat-ai/pipecat#5921](https://github.com/pipecat-ai/pipecat/issues/5921)), so Yaksh names it.
+The STT can give the final transcript before the VAD stop. Then the STT after VAD stop is 0, and the turn detection starts at the VAD stop. Pipecat does not name this time ([pipecat-ai/pipecat#5921](https://github.com/pipecat-ai/pipecat/issues/5921)), so Yaksh names it.
+
+Yaksh also records the **STT TTFS** of each reply (`stt_ttfs_ms`): the time from the end of the speech of the agent to the last final STT transcript before the caller LLM gets the request. The end of the speech is the VAD stop less its `stop_secs`. The value is less than 0 when the STT gave the transcript before that point. Rarely, the value comes from the earlier speech of the agent: the agent speaks again soon after a VAD stop, the new speech gives no final transcript, and the STT's late final transcript for the earlier speech counts. The STT TTFS overlaps the VAD endpointing, so it is not one of the parts that add up to the reply time. It adds time to the reply only when it is longer than the VAD endpointing. For an STT that finalizes on its own endpointing, such as Deepgram, it shows if the STT is fast enough for a shorter `stop_secs`. An STT that sends its final transcript only when the VAD stops, such as Soniox, always has a TTFS longer than the `stop_secs`.
+
+The STT TTFB metric of Pipecat is a different value. With Deepgram, it stops at the answer to the finalize request that Pipecat sends at the VAD stop, so it always includes the `stop_secs`.
 
 A part can stop after the audio of the caller starts. Yaksh cuts each part at the start of the audio, so the parts of a reply add up to its reply time.
 
 ### Results
 
-The **Metrics** tab of the conversation page shows the caller reply time in the **Caller** card: the p50 and the p90 (nearest rank), a bar with the p50 of each part, and a table with the p50 and the p90 of each part. The p50 values of the parts do not add up to the p50 of the reply time. A part that is less than 5 ms at the p90 is not in the table.
+The **Metrics** tab of the conversation page shows the caller reply time in the **Caller** card: the p50 and the p90 (nearest rank), a bar with the p50 of each part, and a table with the p50 and the p90 of each part. The p50 values of the parts do not add up to the p50 of the reply time. The table always shows VAD endpointing, STT after VAD stop, turn detection, LLM TTFT and TTS TTFB, also at 0 ms. It does not show another part that is less than 5 ms at the p90. Under the parts, the table shows the STT TTFS over the replies that have one. Point to the name of a part, or move the focus to it, to see what it measures.
 
 On the transcript, each reply of the model that went out on the line shows its reply time. Point to the time, or move the focus to it, to see its parts. A reply with no words that Plivo reported as played has no time on the transcript, but it counts in the percentiles.
 
@@ -72,13 +76,14 @@ On the transcript, each reply of the model that went out on the line shows its r
 The worker writes one log line at the INFO level for each reply, from the logger `yaksh.caller.reply_times`:
 
 ```text
-caller_reply_time {"conversation_id":"…","caller_model":"…","reasoning_effort":"low","llm_host":"…","stt_provider":"deepgram","stt_model":"nova-3","tts_provider":"elevenlabs","tts_model":"eleven_flash_v2_5","language":"en-US","version":"0.8.0","reply":3,"total_ms":2054,"endpointing_wait_ms":600,"transcription_ms":53,"turn_detection_ms":36,"llm_inference_ms":808,…,"pipeline_ms":0}
+caller_reply_time {"conversation_id":"…","caller_model":"…","reasoning_effort":"low","llm_host":"…","stt_provider":"deepgram","stt_model":"nova-3","tts_provider":"elevenlabs","tts_model":"eleven_flash_v2_5","language":"en-US","version":"0.9.1","reply":3,"total_ms":2054,"endpointing_wait_ms":600,"transcription_ms":53,"turn_detection_ms":36,"llm_inference_ms":808,…,"pipeline_ms":0,"stt_ttfs_ms":653}
 ```
 
 - `reply` is the number of the caller audio start in the call, from 0.
 - `llm_host` is the host of the LLM base URL. The line has no path and no key.
 - `stt_provider` and `tts_provider` name the speech providers of the call. `tts_model` is `null` for a text-to-speech provider that has no model setting, such as Azure or Nimble.
 - Each part is a field, as in the table of parts. A part that the reply did not have is 0, so all replies count each part the same way. The line also has `first_request_ms`, `turn_completion_ms`, `waiting_for_user_ms` and `awaiting_speakable_text_ms`. These are parts of Pipecat that the caller of Yaksh does not use, so they are always 0.
+- `stt_ttfs_ms` is the STT TTFS. It is `null` when no final transcript came after the agent last started to speak.
 - `version` is the version of Yaksh. A Pipecat update can change the time that a part covers.
 
 To get daily values, filter the log on `caller_reply_time`, parse the JSON after it, and group by day and `caller_model`. Keep `conversation_id` as a normal field, not as a stream label: each call has a new value.

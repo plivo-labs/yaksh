@@ -866,6 +866,8 @@ export interface CallerReplyTime {
   audio_index: number;
   total_ms: number;
   steps: Record<string, number>;
+  /** The STT's TTFS for the agent's turn the reply answers; null when no final transcript came. */
+  stt_ttfs_ms?: number | null;
 }
 
 /** The agent's response times in one call; null on a call that was not measured. */
@@ -1349,6 +1351,8 @@ export interface CallerReplyTimeMetric {
   p50_ms: number;
   p90_ms: number;
   steps: { key: string; p50_ms: number; p90_ms: number }[];
+  /** Over the replies that have one; null when none has. Older calls lack it. */
+  stt_ttfs?: { replies: number; p50_ms: number; p90_ms: number } | null;
 }
 
 /** The caller's reply time with one model and effort over the phone calls of the last days. */
