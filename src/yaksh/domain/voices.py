@@ -86,16 +86,26 @@ class TtsTraits:
 
 
 TTS = {
+    # Flash and Multilingual take no language setting for Bengali, Gujarati, Kannada, Marathi and
+    # Telugu and read them from the text. v3 and v4 take every language, but no speed.
     VoiceProvider.ELEVENLABS: TtsTraits(
         "ElevenLabs",
         word_timestamps=True,
         lookup=True,
-        models=tuple(
-            TtsModel(model_id, label, (0.7, 1.2), INDIAN_ENGLISH_AND_SPANISH)
-            for model_id, label in (
-                ("eleven_flash_v2_5", "Flash v2.5"),
-                ("eleven_multilingual_v2", "Multilingual v2"),
-            )
+        models=(
+            TtsModel("eleven_flash_v2_5", "Flash v2.5", (0.7, 1.2), INDIAN_ENGLISH_AND_SPANISH),
+            TtsModel(
+                "eleven_multilingual_v2", "Multilingual v2", (0.7, 1.2), INDIAN_ENGLISH_AND_SPANISH
+            ),
+            TtsModel("eleven_v4_turbo", "v4 Turbo", (1.0, 1.0), INDIAN_ENGLISH_AND_SPANISH),
+            TtsModel("eleven_v4", "v4", (1.0, 1.0), INDIAN_ENGLISH_AND_SPANISH),
+            TtsModel("eleven_v3", "v3", (1.0, 1.0), INDIAN_ENGLISH_AND_SPANISH),
+            TtsModel(
+                "eleven_v3_conversational",
+                "v3 Conversational",
+                (1.0, 1.0),
+                INDIAN_ENGLISH_AND_SPANISH,
+            ),
         ),
     ),
     VoiceProvider.CARTESIA: TtsTraits(
