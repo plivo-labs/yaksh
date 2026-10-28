@@ -358,6 +358,24 @@ func (e EvaluationState) Valid() bool {
 	}
 }
 
+// Defines values for Expect.
+const (
+	ExpectContinue Expect = "continue"
+	ExpectStop     Expect = "stop"
+)
+
+// Valid indicates whether the value is a known member of the Expect enum.
+func (e Expect) Valid() bool {
+	switch e {
+	case ExpectContinue:
+		return true
+	case ExpectStop:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for GenerationMode.
 const (
 	GenerationModeAgent         GenerationMode = "agent"
@@ -2069,6 +2087,9 @@ type EvaluationLimits struct {
 // EvaluationState defines model for EvaluationState.
 type EvaluationState string
 
+// Expect What a correct agent does when the caller's line comes while it speaks.
+type Expect string
+
 // Fact A value the caller has and gives when the agent asks for it.
 type Fact struct {
 	Name  string `json:"name"`
@@ -2176,6 +2197,22 @@ type ImportResult struct {
 	Failed   []string     `json:"failed"`
 	Settings SettingsRead `json:"settings"`
 	Skipped  []string     `json:"skipped"`
+}
+
+// Interruption A fixed line the caller says while the agent is still speaking, on phone calls. A start
+// is each new match of `agent_says` in the agent's words or, with no phrase, the agent's first
+// speech in a turn; starts count from answer `from_answer` on. Each start opens one wait of
+// `after_s`, and the line plays when a wait ends with the agent still speaking in that turn,
+// at most once.
+type Interruption struct {
+	AfterS    *float32 `json:"after_s,omitempty"`
+	AgentSays *string  `json:"agent_says,omitempty"`
+
+	// Expect What a correct agent does when the caller's line comes while it speaks.
+	Expect     *Expect  `json:"expect,omitempty"`
+	FromAnswer *int     `json:"from_answer,omitempty"`
+	Say        string   `json:"say"`
+	WithinS    *float32 `json:"within_s,omitempty"`
 }
 
 // ItemRead defines model for ItemRead.
@@ -2727,15 +2764,16 @@ type PlanPreview struct {
 
 // PlayedScenario A scenario version as one data set plays it: placeholders filled with the set's values.
 type PlayedScenario struct {
-	AgentData    []Fact             `json:"agent_data"`
-	Caller       *CallerModel       `json:"caller"`
-	Criteria     []string           `json:"criteria"`
-	DataSetId    openapi_types.UUID `json:"data_set_id"`
-	DataSetName  string             `json:"data_set_name"`
-	FirstWords   *string            `json:"first_words"`
-	Instructions string             `json:"instructions"`
-	KnownFacts   []Fact             `json:"known_facts"`
-	UnknownFacts []string           `json:"unknown_facts"`
+	AgentData     []Fact             `json:"agent_data"`
+	Caller        *CallerModel       `json:"caller"`
+	Criteria      []string           `json:"criteria"`
+	DataSetId     openapi_types.UUID `json:"data_set_id"`
+	DataSetName   string             `json:"data_set_name"`
+	FirstWords    *string            `json:"first_words"`
+	Instructions  string             `json:"instructions"`
+	Interruptions []Interruption     `json:"interruptions"`
+	KnownFacts    []Fact             `json:"known_facts"`
+	UnknownFacts  []string           `json:"unknown_facts"`
 }
 
 // PlivoAccount defines model for PlivoAccount.
@@ -3143,12 +3181,13 @@ type SavedValue struct {
 // criteria never do: they are what the agent must say or do on the call. Agent data goes only
 // to the agent, in an outbound agent's trigger. Each data set is played as its own call.
 type ScenarioConfig struct {
-	Caller       *CallerModel `json:"caller,omitempty"`
-	Criteria     []string     `json:"criteria"`
-	DataSets     []DataSet    `json:"data_sets"`
-	FirstWords   *string      `json:"first_words,omitempty"`
-	Instructions string       `json:"instructions"`
-	UnknownFacts *[]string    `json:"unknown_facts,omitempty"`
+	Caller        *CallerModel    `json:"caller,omitempty"`
+	Criteria      []string        `json:"criteria"`
+	DataSets      []DataSet       `json:"data_sets"`
+	FirstWords    *string         `json:"first_words,omitempty"`
+	Instructions  string          `json:"instructions"`
+	Interruptions *[]Interruption `json:"interruptions,omitempty"`
+	UnknownFacts  *[]string       `json:"unknown_facts,omitempty"`
 }
 
 // ScenarioCreate defines model for ScenarioCreate.
@@ -3156,16 +3195,17 @@ type ScenarioCreate struct {
 	Caller *CallerModel `json:"caller,omitempty"`
 
 	// Category What kind of situation a scenario tests. How the caller talks comes from the persona.
-	Category     *Category           `json:"category,omitempty"`
-	Criteria     []string            `json:"criteria"`
-	DataSets     []DataSet           `json:"data_sets"`
-	Description  *string             `json:"description,omitempty"`
-	FirstWords   *string             `json:"first_words,omitempty"`
-	ForkedFromId *openapi_types.UUID `json:"forked_from_id,omitempty"`
-	Instructions string              `json:"instructions"`
-	Name         string              `json:"name"`
-	PersonaId    openapi_types.UUID  `json:"persona_id"`
-	UnknownFacts *[]string           `json:"unknown_facts,omitempty"`
+	Category      *Category           `json:"category,omitempty"`
+	Criteria      []string            `json:"criteria"`
+	DataSets      []DataSet           `json:"data_sets"`
+	Description   *string             `json:"description,omitempty"`
+	FirstWords    *string             `json:"first_words,omitempty"`
+	ForkedFromId  *openapi_types.UUID `json:"forked_from_id,omitempty"`
+	Instructions  string              `json:"instructions"`
+	Interruptions *[]Interruption     `json:"interruptions,omitempty"`
+	Name          string              `json:"name"`
+	PersonaId     openapi_types.UUID  `json:"persona_id"`
+	UnknownFacts  *[]string           `json:"unknown_facts,omitempty"`
 }
 
 // ScenarioDelete Scenarios of one agent to delete together: all of them, or none if one is missing.
@@ -3202,6 +3242,7 @@ type ScenarioRead struct {
 	GenerationId   *openapi_types.UUID `json:"generation_id"`
 	Id             openapi_types.UUID  `json:"id"`
 	Instructions   string              `json:"instructions"`
+	Interruptions  []Interruption      `json:"interruptions"`
 	Name           string              `json:"name"`
 	PersonaId      openapi_types.UUID  `json:"persona_id"`
 	UnknownFacts   []string            `json:"unknown_facts"`
@@ -3210,16 +3251,17 @@ type ScenarioRead struct {
 
 // ScenarioUpdate A partial change; lists replace the stored list as a whole.
 type ScenarioUpdate struct {
-	Caller       *CallerModel        `json:"caller,omitempty"`
-	Category     *Category           `json:"category,omitempty"`
-	Criteria     *[]string           `json:"criteria,omitempty"`
-	DataSets     *[]DataSet          `json:"data_sets,omitempty"`
-	Description  *string             `json:"description,omitempty"`
-	FirstWords   *string             `json:"first_words,omitempty"`
-	Instructions *string             `json:"instructions,omitempty"`
-	Name         *string             `json:"name,omitempty"`
-	PersonaId    *openapi_types.UUID `json:"persona_id,omitempty"`
-	UnknownFacts *[]string           `json:"unknown_facts,omitempty"`
+	Caller        *CallerModel        `json:"caller,omitempty"`
+	Category      *Category           `json:"category,omitempty"`
+	Criteria      *[]string           `json:"criteria,omitempty"`
+	DataSets      *[]DataSet          `json:"data_sets,omitempty"`
+	Description   *string             `json:"description,omitempty"`
+	FirstWords    *string             `json:"first_words,omitempty"`
+	Instructions  *string             `json:"instructions,omitempty"`
+	Interruptions *[]Interruption     `json:"interruptions,omitempty"`
+	Name          *string             `json:"name,omitempty"`
+	PersonaId     *openapi_types.UUID `json:"persona_id,omitempty"`
+	UnknownFacts  *[]string           `json:"unknown_facts,omitempty"`
 }
 
 // ScenarioVerdicts defines model for ScenarioVerdicts.

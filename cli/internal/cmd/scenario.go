@@ -33,9 +33,9 @@ func (a *app) scenarioCreateCmd() *cobra.Command {
 		Short: "Add a scenario to an agent from a YAML or JSON file",
 		Long: `Add a scenario to an agent from a YAML or JSON file with the fields of a scenario: name,
 persona_id, instructions, data_sets and criteria, and if you need them category, description,
-unknown_facts, first_words and caller. "yaksh scenario view" shows these fields. Each value
-goes to the server as the file writes it, so a date or a number with a leading zero keeps its
-form.`,
+unknown_facts, first_words, caller and interruptions. "yaksh scenario view" shows these fields.
+Each value goes to the server as the file writes it, so a date or a number with a leading zero
+keeps its form.`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			agentID, err := parseID("agent", agent)

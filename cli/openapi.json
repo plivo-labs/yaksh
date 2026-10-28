@@ -9525,6 +9525,15 @@
         ],
         "title": "EvaluationState"
       },
+      "Expect": {
+        "type": "string",
+        "enum": [
+          "stop",
+          "continue"
+        ],
+        "title": "Expect",
+        "description": "What a correct agent does when the caller's line comes while it speaks."
+      },
       "Fact": {
         "properties": {
           "name": {
@@ -9954,6 +9963,61 @@
           "settings"
         ],
         "title": "ImportResult"
+      },
+      "Interruption": {
+        "properties": {
+          "say": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Say"
+          },
+          "agent_says": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Says"
+          },
+          "after_s": {
+            "type": "number",
+            "maximum": 30.0,
+            "minimum": 0.0,
+            "title": "After S",
+            "default": 2.0
+          },
+          "from_answer": {
+            "type": "integer",
+            "maximum": 100.0,
+            "minimum": 1.0,
+            "title": "From Answer",
+            "default": 2
+          },
+          "expect": {
+            "$ref": "#/components/schemas/Expect",
+            "default": "stop"
+          },
+          "within_s": {
+            "type": "number",
+            "maximum": 10.0,
+            "minimum": 0.5,
+            "title": "Within S",
+            "default": 2.0
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "say"
+        ],
+        "title": "Interruption",
+        "description": "A fixed line the caller says while the agent is still speaking, on phone calls. A start\nis each new match of `agent_says` in the agent's words or, with no phrase, the agent's first\nspeech in a turn; starts count from answer `from_answer` on. Each start opens one wait of\n`after_s`, and the line plays when a wait ends with the agent still speaking in that turn,\nat most once."
       },
       "ItemRead": {
         "properties": {
@@ -12273,6 +12337,13 @@
                 "type": "null"
               }
             ]
+          },
+          "interruptions": {
+            "items": {
+              "$ref": "#/components/schemas/Interruption"
+            },
+            "type": "array",
+            "title": "Interruptions"
           }
         },
         "additionalProperties": false,
@@ -12286,7 +12357,8 @@
           "criteria",
           "agent_data",
           "first_words",
-          "caller"
+          "caller",
+          "interruptions"
         ],
         "title": "PlayedScenario",
         "description": "A scenario version as one data set plays it: placeholders filled with the set's values."
@@ -14444,6 +14516,14 @@
                 "type": "null"
               }
             ]
+          },
+          "interruptions": {
+            "items": {
+              "$ref": "#/components/schemas/Interruption"
+            },
+            "type": "array",
+            "maxItems": 3,
+            "title": "Interruptions"
           }
         },
         "additionalProperties": false,
@@ -14516,6 +14596,14 @@
                 "type": "null"
               }
             ]
+          },
+          "interruptions": {
+            "items": {
+              "$ref": "#/components/schemas/Interruption"
+            },
+            "type": "array",
+            "maxItems": 3,
+            "title": "Interruptions"
           },
           "name": {
             "type": "string",
@@ -14746,6 +14834,13 @@
               }
             ]
           },
+          "interruptions": {
+            "items": {
+              "$ref": "#/components/schemas/Interruption"
+            },
+            "type": "array",
+            "title": "Interruptions"
+          },
           "current_version": {
             "type": "integer",
             "title": "Current Version"
@@ -14788,6 +14883,7 @@
           "data_sets",
           "first_words",
           "caller",
+          "interruptions",
           "current_version",
           "forked_from_id",
           "created_at",
@@ -14930,6 +15026,21 @@
                 "type": "null"
               }
             ]
+          },
+          "interruptions": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/Interruption"
+                },
+                "type": "array",
+                "maxItems": 3
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Interruptions"
           }
         },
         "additionalProperties": false,

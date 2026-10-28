@@ -103,14 +103,12 @@ async def create_scenario(
         description=command.description or None,
         generation_id=generation_id,
         forked_from_id=command.forked_from_id,
-        config=config.model_dump(mode="json"),
+        config=config.stored(),
         current_version=1,
     )
     session.add(scenario)
     await flush(session)
-    session.add(
-        ScenarioVersion(scenario_id=scenario.id, version=1, config=config.model_dump(mode="json"))
-    )
+    session.add(ScenarioVersion(scenario_id=scenario.id, version=1, config=config.stored()))
     await session.commit()
     return scenario
 
@@ -181,13 +179,13 @@ async def update_scenario(
         new = validate_config({**current.model_dump(), **changes})
         check_data_set_limit(limits, new.data_sets, held=len(current.data_sets))
         if new != current:
-            scenario.config = new.model_dump(mode="json")
+            scenario.config = new.stored()
             scenario.current_version += 1
             session.add(
                 ScenarioVersion(
                     scenario_id=scenario.id,
                     version=scenario.current_version,
-                    config=new.model_dump(mode="json"),
+                    config=new.stored(),
                 )
             )
     await flush(session)

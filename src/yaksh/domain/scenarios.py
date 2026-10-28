@@ -5,6 +5,7 @@ from enum import StrEnum
 from typing import Annotated, Any
 
 from pydantic import (
+    AfterValidator,
     BaseModel,
     ConfigDict,
     Field,
@@ -30,7 +31,11 @@ FactValue = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1
 Criterion = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=500)]
 Name = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=80)]
 Description = Annotated[str, StringConstraints(strip_whitespace=True, max_length=500)]
-FirstWords = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
+MAX_LINE_CHARS = 200
+Line = Annotated[
+    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=MAX_LINE_CHARS)
+]
+"""A fixed line that the caller says without its model: its first words or an interruption."""
 
 
 class Category(StrEnum):
@@ -83,6 +88,67 @@ class DataSet(BaseModel):
     agent_data: list[Fact] = Field(default_factory=list, max_length=MAX_FACTS)
 
 
+class Expect(StrEnum):
+    """What a correct agent does when the caller's line comes while it speaks."""
+
+    STOP = "stop"
+    CONTINUE = "continue"
+    """The line is a backchannel, such as "Mm-hmm.": the agent keeps talking."""
+
+
+MAX_INTERRUPTIONS = 3
+
+
+def can_match(phrase: str) -> str:
+    """A phrase needs a word or a number, or it would match every turn."""
+    if not any(char.isalnum() for char in phrase):
+        raise ValueError("a phrase needs at least one word or number")
+    return phrase
+
+
+Phrase = Annotated[Line, AfterValidator(can_match)]
+
+
+class Interruption(BaseModel):
+    """A fixed line the caller says while the agent is still speaking, on phone calls. A start
+    is each new match of `agent_says` in the agent's words or, with no phrase, the agent's first
+    speech in a turn; starts count from answer `from_answer` on. Each start opens one wait of
+    `after_s`, and the line plays when a wait ends with the agent still speaking in that turn,
+    at most once."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    say: Line
+    agent_says: Phrase | None = None
+    after_s: float = Field(default=2.0, ge=0, le=30)
+    """Seconds from the start to the end of the wait: 2, or 0 with `agent_says`."""
+    from_answer: int = Field(default=2, ge=1, le=100)
+    """The first answer of the agent that can start a wait: 2, which skips the greeting, or 1
+    with `agent_says`. Answer 1 is the agent's first speech while the persona is on the line.
+    After the persona speaks or presses keys, the agent's next turn starts the next answer."""
+    expect: Expect = Expect.STOP
+    within_s: float = Field(default=2.0, ge=0.5, le=10)
+    """Stop: the agent's speech ends within this time after the line's first word. Continue:
+    the agent still speaks at this time."""
+
+    @model_validator(mode="before")
+    @classmethod
+    def phrase_defaults(cls, data: Any) -> Any:
+        if isinstance(data, dict) and data.get("agent_says"):
+            return {"after_s": 0.0, "from_answer": 1, **data}
+        return data
+
+    def played(self, facts: list[Fact]) -> Interruption:
+        """The interruption as a data set plays it, its placeholders filled with the set's
+        values."""
+        return self.model_copy(
+            update={
+                "say": filled(self.say, facts),
+                "agent_says": filled(self.agent_says, facts) if self.agent_says else None,
+            }
+        )
+
+
 def fact_names(text: str) -> list[str]:
     """The fact names that `{{name}}` placeholders in the text use, as written."""
     rest = PLACEHOLDER.sub("", text)
@@ -111,6 +177,7 @@ class PlayedScenario(BaseModel):
     agent_data: list[Fact]
     first_words: str | None
     caller: CallerModel | None
+    interruptions: list[Interruption]
 
 
 class ScenarioConfig(BaseModel):
@@ -124,11 +191,12 @@ class ScenarioConfig(BaseModel):
     unknown_facts: list[FactName] = Field(default_factory=list, max_length=20)
     criteria: list[Criterion] = Field(min_length=1, max_length=10)
     data_sets: list[DataSet] = Field(min_length=1, max_length=MAX_DATA_SETS)
-    first_words: FirstWords | None = None
+    first_words: Line | None = None
     """What the caller says first when it speaks first, without its model; None says its
     language's opening."""
     caller: CallerModel | None = None
     """The caller's model and reasoning effort for this scenario; None uses the settings'."""
+    interruptions: list[Interruption] = Field(default_factory=list, max_length=MAX_INTERRUPTIONS)
 
     @property
     def known_fact_names(self) -> list[str]:
@@ -137,6 +205,13 @@ class ScenarioConfig(BaseModel):
     @property
     def agent_data_names(self) -> list[str]:
         return [fact.name for fact in self.data_sets[0].agent_data]
+
+    def stored(self) -> dict[str, Any]:
+        """The config as a scenario and its versions keep it. With no interruptions it has no
+        `interruptions` key: a process of an older version refuses a field that it does not
+        know, and it must still read the scenario during a rolling deploy."""
+        unknown_to_older = None if self.interruptions else {"interruptions"}
+        return self.model_dump(mode="json", exclude=unknown_to_older)
 
     @model_validator(mode="after")
     def names_and_criteria_are_distinct(self) -> ScenarioConfig:
@@ -167,13 +242,32 @@ class ScenarioConfig(BaseModel):
                     f'the data set "{data_set.name}" must have the same agent data, in the same '
                     "order, as the other data sets"
                 )
-        for text in (self.instructions, *self.criteria):
+        texts = [
+            text for item in self.interruptions for text in (item.say, item.agent_says) if text
+        ]
+        for text in (self.instructions, *self.criteria, *texts):
             for name in fact_names(text):
                 if normalized(name) not in known:
                     raise ValueError(
                         f"{{{{{name}}}}} names no known fact; use one of: "
                         f"{', '.join(self.known_fact_names) or 'none, add a known fact first'}"
                     )
+        return self
+
+    @model_validator(mode="after")
+    def interruptions_fit_every_data_set(self) -> ScenarioConfig:
+        """Each interruption's line and phrase stay within the line limit when a data set's facts
+        fill them. It runs after the check above, so every placeholder names a known fact."""
+        for data_set in self.data_sets:
+            for number, item in enumerate(self.interruptions, 1):
+                played = item.played(data_set.known_facts)
+                for part, text in (("line", played.say), ("phrase", played.agent_says)):
+                    if text is not None and len(text) > MAX_LINE_CHARS:
+                        raise ValueError(
+                            f"the {part} of interruption {number} is longer than "
+                            f"{MAX_LINE_CHARS} characters with the facts of the data set "
+                            f'"{data_set.name}"'
+                        )
         return self
 
     def chosen(self, ids: Sequence[uuid.UUID] | None) -> list[DataSet]:
@@ -190,16 +284,18 @@ class ScenarioConfig(BaseModel):
         """The scenario as the data set plays it. A version keeps its data sets, so a
         conversation's data set is always there."""
         data_set = next(item for item in self.data_sets if item.id == data_set_id)
+        facts = data_set.known_facts
         return PlayedScenario(
             data_set_id=data_set.id,
             data_set_name=data_set.name,
-            instructions=filled(self.instructions, data_set.known_facts),
-            known_facts=data_set.known_facts,
+            instructions=filled(self.instructions, facts),
+            known_facts=facts,
             unknown_facts=self.unknown_facts,
-            criteria=[filled(text, data_set.known_facts) for text in self.criteria],
+            criteria=[filled(text, facts) for text in self.criteria],
             agent_data=data_set.agent_data,
             first_words=self.first_words,
             caller=self.caller,
+            interruptions=[item.played(facts) for item in self.interruptions],
         )
 
 
@@ -239,10 +335,11 @@ class ScenarioUpdate(BaseModel):
     unknown_facts: list[FactName] | None = Field(default=None, max_length=20)
     criteria: list[Criterion] | None = Field(default=None, min_length=1, max_length=10)
     data_sets: list[DataSet] | None = Field(default=None, min_length=1, max_length=MAX_DATA_SETS)
-    first_words: FirstWords | None = None
+    first_words: Line | None = None
     """None clears it."""
     caller: CallerModel | None = None
     """None clears it: the scenario uses the settings' caller model."""
+    interruptions: list[Interruption] | None = Field(default=None, max_length=MAX_INTERRUPTIONS)
 
     @field_validator(
         "name",
@@ -252,6 +349,7 @@ class ScenarioUpdate(BaseModel):
         "unknown_facts",
         "criteria",
         "data_sets",
+        "interruptions",
     )
     @classmethod
     def cannot_be_cleared(cls, value: Any, info: ValidationInfo) -> Any:
