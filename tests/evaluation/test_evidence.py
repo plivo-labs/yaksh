@@ -177,6 +177,56 @@ def test_the_view_shows_where_each_interruption_line_came_in_the_agent_turn() ->
         "(Yaksh's caller said the fixed line above while the agent was speaking: 0.1 s into "
         "turn [3].)"
     ) in rendered
+    assert (
+        "Fixed lines that Yaksh said for the caller while the agent spoke: "
+        '"Hold on, is there a fee?"; "Mm-hmm.".'
+    ) in rendered, "in the CALLER section: the caller's test includes them"
+    assert "Fixed lines" not in render(MAPLE_DENTAL)
+
+
+def test_a_line_over_sound_with_no_words_or_after_a_late_transcript_is_still_placed() -> None:
+    said = "Your first visit is one hundred and twenty dollars and that includes the cleaning and"
+    turns = [
+        Turn(role=Role.AGENT, text="Please hold.", started_at_ms=1_000, ended_at_ms=2_000),
+        Turn(
+            role=Role.CALLER,
+            text="Sure, I can wait.",
+            started_at_ms=3_000,
+            ended_at_ms=4_000,
+            scripted=True,
+            interruption=1,
+        ),
+        Turn(role=Role.AGENT, text=f"{said} the x-rays.", started_at_ms=9_400, ended_at_ms=16_000),
+        Turn(
+            role=Role.CALLER,
+            text="Sorry, how much?",
+            started_at_ms=14_000,
+            ended_at_ms=15_000,
+            scripted=True,
+            interruption=2,
+        ),
+    ]
+    tries = [
+        InterruptionTry(number=1, answer=2, turn_started_ms=2_500, words=""),
+        InterruptionTry(number=2, answer=3, turn_started_ms=9_000, words=said),
+    ]
+    events = [
+        WireEvent(kind=WireEventKind.INTERRUPTION, at_ms=at_ms, interruption=attempt)
+        for at_ms, attempt in zip([3_000, 14_000], tries, strict=True)
+    ]
+
+    rendered = render(replace(MAPLE_DENTAL, turns=turns, events=events))
+
+    assert (
+        "[2] Caller (Yaksh's fixed line): Sure, I can wait.\n"
+        "(Yaksh's caller said the fixed line above while the agent's side played sound with no "
+        "words.)"
+    ) in rendered, "hold music has no stored turn"
+    assert (
+        "(Yaksh's caller said the fixed line above while the agent was speaking: 4.6 s into "
+        'turn [3], after the words "…is one hundred and twenty dollars and that includes the '
+        'cleaning and".)'
+    ) in rendered, "the stored turn starts at the agent's voice, after the late transcript"
 
 
 def test_a_text_conversation_has_its_own_transcript_note_and_no_phone_facts() -> None:

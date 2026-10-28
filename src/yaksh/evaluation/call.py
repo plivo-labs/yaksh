@@ -388,13 +388,14 @@ async def measure_call(
     found[MetricKey.CAPTURE_FAULTS] = metrics.capture_faults(
         transcript, conversation.recording_key is not None, gaps
     )
-    heard = await hear(conversation, transcript, store)
+    spoken = spoken_replies(transcript)
+    heard = await hear(conversation, transcript, store, spoken)
     if heard is None:
         return found
     goodbye = metrics.goodbye_from(transcript)
     replies = [
         pair
-        for pair, reply in zip(heard.replies, spoken_replies(transcript), strict=True)
+        for pair, reply in zip(heard.replies, spoken, strict=True)
         if reply.interruption is None
     ]
     paired = waits(
@@ -430,9 +431,13 @@ def parsed[T: (CallerSettings, CallerUsage, LineFacts)](
 
 
 async def hear(
-    conversation: Conversation, transcript: Transcript, store: FileStore
+    conversation: Conversation,
+    transcript: Transcript,
+    store: FileStore,
+    spoken: list[CallerReplyWindow],
 ) -> speech.Heard | None:
-    """Both sides' speech; None for a call without a recording or its caller replies."""
+    """Both sides' speech, with a reply pair for each of the `spoken` replies; None for a call
+    without a recording or its caller replies."""
     if (
         conversation.recording_key is None
         or transcript.recording_start_ms is None
@@ -447,9 +452,7 @@ async def hear(
         voice, voice_rate = await asyncio.to_thread(speech.read_mono, caller_voice)
         if voice_rate != rate:
             raise ValueError(f"the caller voice is at {voice_rate} Hz, the recording at {rate} Hz")
-    return await speech.measure(
-        agent, voice, rate, transcript.recording_start_ms, spoken_replies(transcript)
-    )
+    return await speech.measure(agent, voice, rate, transcript.recording_start_ms, spoken)
 
 
 def spoken_replies(transcript: Transcript) -> list[CallerReplyWindow]:

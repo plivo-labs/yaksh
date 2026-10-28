@@ -236,9 +236,7 @@ def silence(channels: int, seconds: float) -> bytes:
     return buffer.getvalue()
 
 
-async def test_an_interruption_line_is_caller_speech_but_no_reply_that_waits_for_the_agent() -> (
-    None
-):
+async def test_an_interruption_line_is_no_reply_that_waits_for_the_agent() -> None:
     store = FakeFileStore()
     await store.put("recording.wav", silence(2, 6), "audio/wav")
     await store.put("caller-voice.wav", silence(1, 1), "audio/wav")

@@ -109,6 +109,7 @@ def render(view: CallView) -> str:
                 f"Instructions: {view.instructions}",
                 f"Known facts: {facts(view.known_facts)}.",
                 f"Facts the caller does not know: {', '.join(view.unknown_facts) or 'none'}.",
+                *fixed_lines(view.turns),
             ]
         ),
         "\n".join(
@@ -271,31 +272,67 @@ def transcript(turns: list[Turn], events: list[WireEvent]) -> list[str]:
     return lines + [mark_line(event) for event in marks]
 
 
+def fixed_lines(turns: list[Turn]) -> list[str]:
+    """The interruption lines that Yaksh said for the caller are part of the caller's test, so
+    the caller can follow one up, as when a line asks for another day."""
+    said = [f'"{turn.text}"' for turn in turns if turn.interruption is not None]
+    if not said:
+        return []
+    return [f"Fixed lines that Yaksh said for the caller while the agent spoke: {'; '.join(said)}."]
+
+
+QUOTED_WORDS = 12
+"""The most words of the agent before a line that the line's note quotes."""
+
+
 def interruption_line(event: WireEvent, turns: list[Turn]) -> str:
     """Where Yaksh's caller said a fixed line while the agent spoke. The line's turn comes after
     the whole agent turn that it interrupted, so without this the agent's answer to the line
-    reads as if it came before the line."""
+    reads as if it came before the line. The interrupted turn is the stored agent turn that
+    holds the start of the agent's turn, or else the line's start: the stored turn of a turn
+    that a late transcript started begins at the agent's voice. Audio with no words, such as
+    hold music, has no stored turn."""
     attempt = event.interruption
     assert attempt is not None
-    started = attempt.turn_started_ms
-    if started is None:
-        return "(Yaksh's caller said the fixed line above while the agent was speaking.)"
-    number = next(
+    held = holding(turns, attempt.turn_started_ms) or holding(turns, event.at_ms)
+    words = attempt.words or ""
+    if held is None and not words:
+        return (
+            "(Yaksh's caller said the fixed line above while the agent's side played sound with "
+            "no words.)"
+        )
+    parts = []
+    if held is not None:
+        number, turn = held
+        parts.append(f"{(event.at_ms - turn.started_at_ms) / 1000:.1f} s into turn [{number}]")
+    if words:
+        parts.append(f'after the words "{last_words(words)}"')
+    return (
+        "(Yaksh's caller said the fixed line above while the agent was speaking: "
+        f"{', '.join(parts)}.)"
+    )
+
+
+def holding(turns: list[Turn], ms: int | None) -> tuple[int, Turn] | None:
+    """The numbered agent turn whose span holds the moment."""
+    if ms is None:
+        return None
+    return next(
         (
-            number
+            (number, turn)
             for number, turn in enumerate(turns, 1)
             if turn.role is Role.AGENT
-            and turn.started_at_ms <= started <= max(turn.started_at_ms, turn.ended_at_ms or 0)
+            and turn.started_at_ms <= ms <= max(turn.started_at_ms, turn.ended_at_ms or 0)
         ),
         None,
     )
-    into = f"{(event.at_ms - started) / 1000:.1f} s into " + (
-        f"turn [{number}]" if number is not None else "the agent's turn"
-    )
-    after = f', after the words "{attempt.words}"' if attempt.words else ""
-    return (
-        f"(Yaksh's caller said the fixed line above while the agent was speaking: {into}{after}.)"
-    )
+
+
+def last_words(words: str) -> str:
+    split = words.split()
+    if len(split) <= QUOTED_WORDS:
+        return words
+    return "…" + " ".join(split[-QUOTED_WORDS:])
 
 
 BETWEEN_TURNS = frozenset(
