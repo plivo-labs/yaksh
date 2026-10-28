@@ -1,3 +1,18 @@
+## v0.8.1 (2026-10-28)
+
+### Feat
+
+- **speech**: choose speech-to-text and text-to-speech providers in Settings (#25)
+  - **Settings** has a **Speech to text** panel. One provider hears the agent on every call: Deepgram, Sarvam, AssemblyAI, Soniox or Gladia, with its model, key and address. Deepgram stays the default, so an install with a Deepgram key needs no change.
+  - **Settings** has a **Text to speech** list. ElevenLabs, Cartesia, Sarvam, Azure and Nimble (Plivo's text-to-speech) can each have a key, and each voice uses one of them. Nimble has its own Auth ID and Auth token, and a base URL for the gateway of your region. The built-in personas keep their ElevenLabs voices.
+  - **Test** on a provider checks its saved settings and shows the result next to the button. A speech-to-text key passes when the provider writes a transcript of a short English clip. A text-to-speech key passes when the provider speaks one word.
+  - On the **Voices** page, ElevenLabs and Nimble fill in a voice's details from its ID. For the other providers, you enter the details, and Yaksh adds the voice only after the provider speaks a line in it. Each voice shows its provider.
+  - A phone run does not start when the speech-to-text provider does not hear the language that the agent should answer in, or when a persona's voice provider has no key or does not speak the persona's language.
+  - Sarvam gives no word timing. When the agent cuts off a Sarvam voice, the transcript is exact to a sentence, not to a word.
+  - The **Metrics** tab and the `caller_reply_time` log line name the speech providers of the call.
+  - The Plivo Auth ID and Auth token are now saved and removed only together.
+  - Change the speech settings, and add voices of the new providers, only after every Yaksh process runs this version.
+
 ## v0.8.0 (2026-10-28)
 
 ### Feat
