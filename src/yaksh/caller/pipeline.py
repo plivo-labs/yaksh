@@ -69,7 +69,7 @@ from yaksh.domain.conversations import (
     WireEvent,
     WireEventKind,
 )
-from yaksh.domain.latency import VAD_CONFIDENCE, VAD_START_S, VAD_STOP_S
+from yaksh.domain.latency import VAD_CONFIDENCE, VAD_START_S
 from yaksh.domain.settings import AppSettings, CallerModel
 from yaksh.domain.voices import VoiceProvider
 from yaksh.integrations.openai_models import caller_effort, failure, retry_rate_limits
@@ -87,7 +87,6 @@ CLOSING_QUIET_S = 8.0
 CLOSING_LIMIT_S = 30.0
 """The longest a close lasts, for a reply that Plivo never reports played."""
 QUIET_POLL_S = 0.25
-VAD = VADParams(confidence=VAD_CONFIDENCE, start_secs=VAD_START_S, stop_secs=VAD_STOP_S)
 IDLE_S = 15.0
 IDLE_NUDGES = 2
 
@@ -487,6 +486,7 @@ class Persona:
         observers: Sequence[BaseObserver] = (),
     ) -> None:
         settings = request.app_settings
+        turns = settings.turn_taking
         self.llm = llm_service(settings, request.caller, keys, request.instructions)
         hearer = settings.speech.stt
         hearing = stt_language(hearer, request.agent.languages, request.caller_language)
@@ -499,6 +499,8 @@ class Persona:
             stt_language=hearing,
             tts_model=request.voice.model_in_use.id,
             voice=request.voice,
+            vad_stop_s=turns.vad_stop_s,
+            turn_max_wait_s=turns.turn_max_wait_s,
         )
         metrics = ServiceMetricsObserver()
         self.usage = UsageMeter(metrics)
@@ -517,7 +519,11 @@ class Persona:
                 # not make the persona ask it to repeat.
                 empty_user_turn=None,
                 user_turn_strategies=UserTurnStrategies(
-                    stop=[TurnAnalyzerUserTurnStopStrategy(turn_analyzer=turn_models.end_of_turn())]
+                    stop=[
+                        TurnAnalyzerUserTurnStopStrategy(
+                            turn_analyzer=turn_models.end_of_turn(max_wait_s=turns.turn_max_wait_s)
+                        )
+                    ]
                 ),
             ),
         )
@@ -528,7 +534,16 @@ class Persona:
         pipeline = Pipeline(
             [
                 transport_input,
-                VADProcessor(vad_analyzer=turn_models.vad(sample_rate=SAMPLE_RATE, params=VAD)),
+                VADProcessor(
+                    vad_analyzer=turn_models.vad(
+                        sample_rate=SAMPLE_RATE,
+                        params=VADParams(
+                            confidence=VAD_CONFIDENCE,
+                            start_secs=VAD_START_S,
+                            stop_secs=turns.vad_stop_s,
+                        ),
+                    )
+                ),
                 self.stt,
                 aggregators.user(),
                 AgentTurnTap(transcript),

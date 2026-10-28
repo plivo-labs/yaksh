@@ -276,6 +276,10 @@ class CallerSettings(BaseModel):
     Yaksh recorded it."""
     tts_model: str | None = None
     voice: VoiceSettings | None = None
+    vad_stop_s: float | None = None
+    """None for a text agent, and on calls from before Yaksh recorded it, which waited 0.6 s."""
+    turn_max_wait_s: float | None = None
+    """None for a text agent, and on calls from before Yaksh recorded it, which waited 3 s."""
 
 
 class CallerUsage(BaseModel):
