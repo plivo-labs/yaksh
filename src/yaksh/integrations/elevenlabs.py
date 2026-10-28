@@ -12,7 +12,13 @@ from yaksh.diagnostics import describe_exception
 from yaksh.domain.agent_import import ElevenLabsRegion
 from yaksh.domain.errors import ProviderCallError, UnavailableError
 from yaksh.domain.languages import Language
-from yaksh.domain.voices import ProviderVoice, VoiceGender
+from yaksh.domain.voices import (
+    CatalogPage,
+    CatalogQuery,
+    ProviderVoice,
+    VoiceGender,
+)
+from yaksh.integrations.speech.catalog import PAGE_SIZE, get_json
 
 ELEVENLABS_API = "https://api.elevenlabs.io"
 REGION_APIS: dict[ElevenLabsRegion, str] = {
@@ -35,13 +41,6 @@ LANGUAGE_CODES: dict[Language, str] = {
     Language.ES: "es",
 }
 """ElevenLabs' code for each language, as a voice lists the languages it is verified in."""
-PINNED_LANGUAGES = frozenset({Language.EN, Language.HI, Language.TA, Language.ES})
-"""The languages that the model takes as a language_code; it refuses a code it does not take, and
-reads any other language from the text."""
-
-
-def language_pin(language: Language) -> str | None:
-    return LANGUAGE_CODES[language] if language in PINNED_LANGUAGES else None
 
 
 class ElevenLabsClient:
@@ -72,6 +71,38 @@ class ElevenLabsClient:
                 f"ElevenLabs refused the voice lookup with {status}: {excerpt(text)}"
             )
         return provider_voice(parsed(text))
+
+    async def voices(self, query: CatalogQuery) -> CatalogPage:
+        """The account's own voices: a voice of the public library speaks only once it is
+        added to the account."""
+        params = {"page_size": str(PAGE_SIZE)}
+        if query.search:
+            params["search"] = query.search
+        if query.gender:
+            params["gender"] = query.gender.value
+        if query.language:
+            params["language"] = LANGUAGE_CODES[query.language]
+        if query.cursor:
+            params["next_page_token"] = query.cursor
+        body = await get_json("ElevenLabs", f"{self.base_url}/v2/voices", params, self._headers)
+        if not isinstance(body, dict):
+            raise UnavailableError("ElevenLabs sent a voice list in an unknown shape")
+        items = [provider_voice(entry) for entry in body.get("voices") or []]
+        more = bool(body.get("has_more"))
+        return CatalogPage(items=items, next_cursor=body.get("next_page_token") if more else None)
+
+    async def models(self) -> frozenset[str]:
+        """The models the account may speak with: each account has its own list."""
+        body = await get_json("ElevenLabs", f"{self.base_url}/v1/models", {}, self._headers)
+        if not isinstance(body, list):
+            raise UnavailableError("ElevenLabs sent a model list in an unknown shape")
+        return frozenset(
+            entry["model_id"]
+            for entry in body
+            if isinstance(entry, dict)
+            and entry.get("can_do_text_to_speech")
+            and "model_id" in entry
+        )
 
 
 class ElevenLabsError(ProviderCallError):

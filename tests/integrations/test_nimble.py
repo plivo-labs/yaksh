@@ -3,6 +3,7 @@ import base64
 import json
 from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass, field
+from http import HTTPStatus
 from typing import Any
 
 import pytest
@@ -16,6 +17,7 @@ from pipecat.frames.frames import (
 from pipecat.pipeline.worker import PipelineParams
 from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
 from websockets.asyncio.server import ServerConnection, serve
+from websockets.http11 import Request, Response
 
 from yaksh.domain.errors import UnavailableError
 from yaksh.domain.languages import Language
@@ -242,3 +244,20 @@ async def test_a_reply_that_goes_quiet_is_stopped_and_a_later_lost_socket_opens_
     assert fake.cancels() == [fake.openings()[0]["context_id"]]
     assert run.errors == []
     assert service.is_usable
+
+
+async def test_a_refused_socket_names_the_gateway_reason() -> None:
+    def refuse(connection: ServerConnection, _request: Request) -> Response:
+        reason = {"type": "error", "code": "backend_error", "message": "no node is reachable"}
+        return connection.respond(HTTPStatus.BAD_GATEWAY, json.dumps(reason))
+
+    async def never(_socket: ServerConnection) -> None:
+        return None
+
+    async with serve(never, "127.0.0.1", 0, process_request=refuse) as server:
+        settings = AppSettings(
+            nimble=Nimble(base_url=f"http://127.0.0.1:{server.sockets[0].getsockname()[1]}")
+        )
+        service = tts(settings, VOICE, Language.HI, CREDENTIAL, one_shot=True)
+        with pytest.raises(UnavailableError, match="HTTP 502: backend_error: no node is reachable"):
+            await speak_once(service, "Haan ji.")

@@ -1,10 +1,14 @@
 import asyncio
-from typing import cast
+import json
+from typing import Any, cast
+from urllib.parse import parse_qsl, urlsplit
 
 import pytest
 from pipecat.frames.frames import (
     CancelFrame,
     Frame,
+    LLMFullResponseStartFrame,
+    LLMTextFrame,
     StartFrame,
     TranscriptionFrame,
     TTSAudioRawFrame,
@@ -19,10 +23,11 @@ from pipecat.services.gladia.config import LanguageConfig
 from pipecat.services.tts_service import TTSService, WebsocketTTSService
 from pipecat.tests.utils import run_test
 from pipecat.transcriptions.language import Language as PipecatLanguage
+from websockets.asyncio.server import ServerConnection, serve
 
 from yaksh.domain.errors import UnavailableError
 from yaksh.domain.languages import AgentLanguage, Language
-from yaksh.domain.settings import AppSettings, SarvamStt, SarvamTts
+from yaksh.domain.settings import AppSettings, ElevenLabs, SarvamStt
 from yaksh.domain.speech import SttProvider
 from yaksh.domain.voices import VoiceProvider, VoiceSettings
 from yaksh.integrations import provider_checks
@@ -30,6 +35,7 @@ from yaksh.integrations.provider_checks import ProviderCheckError
 from yaksh.integrations.speech import audio
 from yaksh.integrations.speech.audio import Resample8k, speak_once
 from yaksh.integrations.speech.deepgram import deepgram_language
+from yaksh.integrations.speech.elevenlabs import SentenceDialogue
 from yaksh.integrations.speech.stt import stt_service
 from yaksh.integrations.speech.tts import VENDORS as TTS_VENDORS
 from yaksh.integrations.speech.tts import tts_service
@@ -124,23 +130,27 @@ async def test_the_check_fails_when_the_provider_refuses_the_key(
 
 
 @pytest.mark.parametrize(
-    ("language", "pin"), [(Language.HI, "hi"), (Language.MR, None), (Language.ES, "es")]
+    ("model", "language", "code"),
+    [
+        ("eleven_flash_v2_5", Language.HI, "hi"),
+        ("eleven_flash_v2_5", Language.MR, None),
+        ("eleven_flash_v2_5", Language.ES, "es"),
+        ("eleven_multilingual_v2", Language.HI, None),
+    ],
 )
-def test_elevenlabs_speaks_with_the_voice_settings_and_pins_only_a_language_its_model_takes(
-    language: Language, pin: str | None
+def test_elevenlabs_speaks_with_the_voice_model_and_sends_a_language_only_where_it_is_taken(
+    model: str, language: Language, code: str | None
 ) -> None:
-    voice = VoiceSettings(provider=VoiceProvider.ELEVENLABS, id="v1", speed=0.8, stability=0.3)
+    voice = VoiceSettings(
+        provider=VoiceProvider.ELEVENLABS, id="v1", model=model, speed=0.8, stability=0.3
+    )
 
-    service = tts_service(AppSettings(), voice, language, "key")
+    service = cast(ElevenLabsTTSService, tts_service(AppSettings(), voice, language, "key"))
 
     settings = cast(ElevenLabsTTSService.Settings, service._settings)
-    assert (settings.voice, settings.speed, settings.stability, settings.language) == (
-        "v1",
-        0.8,
-        0.3,
-        pin,
-    )
-    assert settings.model == "eleven_flash_v2_5"
+    sent = dict(parse_qsl(urlsplit(service._build_websocket_url()).query))
+    assert (settings.voice, settings.speed, settings.stability) == ("v1", 0.8, 0.3)
+    assert (sent["model_id"], sent.get("language_code")) == (model, code)
 
 
 async def test_speech_at_another_rate_reaches_the_call_at_8_khz() -> None:
@@ -253,8 +263,40 @@ async def test_a_model_the_provider_does_not_know_fails_the_check() -> None:
         await provider_checks.check_stt(settings, SttProvider.SARVAM, "key", check_clip())
 
 
-async def test_a_speech_model_the_provider_does_not_know_fails_the_check() -> None:
-    settings = AppSettings(sarvam_tts=SarvamTts(model="bulbul:v0"))
+def test_a_v4_voice_speaks_on_the_dialogue_socket_and_takes_no_speed() -> None:
+    voice = VoiceSettings(provider=VoiceProvider.ELEVENLABS, id="v1", model="eleven_v4_turbo")
 
-    with pytest.raises(ProviderCheckError, match="Sarvam: Sarvam has no speech model bulbul:v0"):
-        await provider_checks.check_tts(settings, VoiceProvider.SARVAM, "key", "shubh")
+    service = tts_service(AppSettings(), voice, Language.MR, "key")
+
+    assert isinstance(service, SentenceDialogue)
+    sent = dict(parse_qsl(urlsplit(service._build_websocket_url()).query))
+    assert sent["model_id"] == "eleven_v4_turbo"
+    with pytest.raises(ValueError, match="ElevenLabs v4 takes only speed 1"):
+        VoiceSettings(provider=VoiceProvider.ELEVENLABS, id="v1", model="eleven_v4", speed=1.15)
+
+
+async def test_a_dialogue_voice_flushes_each_sentence_while_the_reply_is_still_coming() -> None:
+    received: list[dict[str, Any]] = []
+    flushed = asyncio.Event()
+
+    async def handle(socket: ServerConnection) -> None:
+        async for raw in socket:
+            message = json.loads(raw)
+            received.append(message)
+            if message.get("flush"):
+                flushed.set()
+
+    async with serve(handle, "127.0.0.1", 0) as server:
+        url = f"ws://127.0.0.1:{server.sockets[0].getsockname()[1]}"
+        voice = VoiceSettings(provider=VoiceProvider.ELEVENLABS, id="v1", model="eleven_v4")
+        service = tts_service(AppSettings(elevenlabs=ElevenLabs(url=url)), voice, Language.HI, "k")
+        reply = [LLMFullResponseStartFrame(), LLMTextFrame("Haan ji. "), LLMTextFrame("Main")]
+        async with audio.one_shot([service], PipelineParams(), asyncio.Event()) as run:
+            await run.worker.queue_frames(reply)
+            async with asyncio.timeout(5):
+                await flushed.wait()
+
+    [said] = [message for message in received if message.get("inputs")]
+    [flush] = [message for message in received if message.get("flush")]
+    assert said["inputs"][0]["text"].strip() == "Haan ji."
+    assert flush["context_id"] == said["context_id"]

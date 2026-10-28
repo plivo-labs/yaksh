@@ -4,17 +4,27 @@ Yaksh's transcript needs; Sarvam's websocket service sends the text first. The s
 service sends no partials, and one final for each utterance, when Yaksh's VAD has heard the
 agent stop: so `SttTraits.words_while_speaking` is false."""
 
+import functools
+from importlib.resources import files
 from typing import Any
 
 import aiohttp
+import yaml
 from pipecat.services.sarvam.stt import SarvamSTTService
 from pipecat.services.sarvam.tts import TTS_MODEL_CONFIGS, SarvamHttpTTSService
 from pipecat.transcriptions.language import Language as PipecatLanguage
 
 from yaksh.domain.languages import Language
 from yaksh.domain.settings import AppSettings
-from yaksh.domain.voices import VoiceSettings
+from yaksh.domain.voices import (
+    CatalogPage,
+    CatalogQuery,
+    ProviderVoice,
+    VoiceProvider,
+    VoiceSettings,
+)
 from yaksh.integrations.speech.audio import SAMPLE_RATE, quiet_s
+from yaksh.integrations.speech.catalog import page_of
 from yaksh.integrations.speech.vendor import SttVendor, TtsVendor
 
 
@@ -52,7 +62,7 @@ def tts(
         base_url=settings.sarvam_tts.base_url,
         sample_rate=SAMPLE_RATE,
         settings=SarvamHttpTTSService.Settings(
-            model=settings.sarvam_tts.model,
+            model=voice.model_in_use.id,
             voice=voice.id,
             language=PipecatLanguage(language.value),
             pace=voice.speed,
@@ -61,14 +71,46 @@ def tts(
     )
 
 
-async def check_voice(settings: AppSettings, _key: str) -> str:
-    """The speaker Pipecat uses for the model: bulbul:v3 and bulbul:v4-flash name their
-    speakers differently."""
-    model = settings.sarvam_tts.model
-    return TTS_MODEL_CONFIGS.get(model, TTS_MODEL_CONFIGS["bulbul:v4-flash"]).default_speaker
+async def check_voice(_settings: AppSettings, _key: str) -> str:
+    """The speaker Pipecat uses for the first model, the one the key check speaks with:
+    bulbul:v3 and bulbul:v4-flash name their speakers differently."""
+    return TTS_MODEL_CONFIGS[VoiceProvider.SARVAM.traits.models[0].id or ""].default_speaker
 
 
 STT = SttVendor(model=lambda settings: settings.sarvam_stt.model, service=stt)
-TTS = TtsVendor(
-    model=lambda settings: settings.sarvam_tts.model, service=tts, check_voice=check_voice
-)
+
+
+@functools.cache
+def speaker_lists() -> dict[str, list[ProviderVoice]]:
+    """Each model's speakers, from Sarvam's API reference: Sarvam has no API that lists them,
+    and a speaker of one model is not valid in another. A speaker without languages speaks every
+    language of its model; a speaker made only for languages outside Yaksh's is left out."""
+    text = (files("yaksh.integrations.speech") / "sarvam_speakers.yaml").read_text("utf-8")
+    lists: dict[str, list[ProviderVoice]] = {}
+    for model, entries in yaml.safe_load(text)["models"].items():
+        spoken = VoiceProvider.SARVAM.traits.chosen(model).languages
+        lists[model] = []
+        for entry in entries:
+            codes = entry.get("languages")
+            made_for = (
+                spoken if codes is None else {Language(code) for code in codes if code in Language}
+            )
+            listed = tuple(language for language in Language if language in made_for & spoken)
+            if listed:
+                lists[model].append(
+                    ProviderVoice(
+                        id=entry["speaker"],
+                        name=entry["speaker"],
+                        gender=entry.get("gender"),
+                        listed_languages=listed,
+                    )
+                )
+    return lists
+
+
+async def catalog(_settings: AppSettings, _key: str, query: CatalogQuery) -> CatalogPage:
+    model = VoiceProvider.SARVAM.traits.chosen(query.model).id or ""
+    return page_of(speaker_lists()[model], query)
+
+
+TTS = TtsVendor(service=tts, check_voice=check_voice, catalog=catalog)

@@ -107,6 +107,11 @@ export function textSize(characters: number): string {
   return `${characters.toLocaleString()} characters, about ${tokens.toLocaleString()} tokens`;
 }
 
+/** Names in a sentence: "Hindi", "Hindi and Tamil", "Hindi, Tamil and Telugu". */
+export function joined(names: string[]): string {
+  return names.length < 2 ? names.join("") : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
+}
+
 /** A count with its noun, such as "1 scenario" or "3 scenarios". */
 export function counted(count: number, one: string, many: string): string {
   return `${count} ${count === 1 ? one : many}`;

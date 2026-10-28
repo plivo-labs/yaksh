@@ -654,12 +654,16 @@ export interface VoiceSettings {
   speed: number;
   /** ElevenLabs only; null for the other providers. */
   stability: number | null;
+  /** The provider's model; left out for a provider without a model choice. */
+  model?: string | null;
 }
 
 export interface Voice {
   id: string;
   provider: VoiceProvider;
   provider_voice_id: string;
+  /** Null for a provider without a model choice. */
+  model: string | null;
   name: string;
   gender: VoiceGender | null;
   accent: string | null;
@@ -678,20 +682,66 @@ export interface ProviderVoice {
   listed_languages: Language[];
 }
 
+/** A page of a provider's own voices. */
+export interface VoiceCatalogPage {
+  items: ProviderVoice[];
+  /** Where the next page starts, or null after the last. */
+  next_cursor: string | null;
+}
+
+/** A text-to-speech model that a voice can use. */
+export interface TtsModel {
+  /** Null for a provider without a model choice. */
+  id: string | null;
+  label: string;
+  /** Equal ends: the model takes no speed setting. */
+  speed_min: number;
+  speed_max: number;
+  /** The languages the model speaks. */
+  languages: Language[];
+}
+
+/** A text-to-speech provider as the server describes it. */
+export interface TtsTraits {
+  provider: VoiceProvider;
+  label: string;
+  /** False: the provider times whole sentences, so a cut-off reply is cut at a sentence. */
+  word_timestamps: boolean;
+  /** It describes a voice of the account by its ID. */
+  lookup: boolean;
+  /** All of the provider's models, also the ones that the account does not have. A new voice
+   * gets one of the account's models (`useVoiceModels`). */
+  models: TtsModel[];
+}
+
 export interface VoiceInput {
   provider: VoiceProvider;
   provider_voice_id: string;
   name: string;
   languages: Language[];
-  /** For a provider without lookup; one with lookup fills these itself. */
+  /** The provider's first model when left out. */
+  model?: string | null;
+  /** For a voice that the server does not look up; one it looks up gets these from the
+   * provider. */
   gender?: VoiceGender | null;
   accent?: string | null;
+  listed_languages?: Language[];
 }
 
 export interface VoiceEdit {
   name: string;
   languages: Language[];
 }
+
+export const VOICE_GENDER_ITEMS: { value: VoiceGender; label: string }[] = [
+  { value: "female", label: "Female" },
+  { value: "male", label: "Male" },
+  { value: "neutral", label: "Neutral" },
+];
+
+/** The gender that a select's value names; null for any other value, such as "all". */
+export const voiceGender = (value: string): VoiceGender | null =>
+  VOICE_GENDER_ITEMS.find((item) => item.value === value)?.value ?? null;
 
 export interface PersonaInput {
   name: string;
@@ -1747,9 +1797,9 @@ export interface SettingsValues {
   assemblyai: { url: string; model: string };
   soniox: { url: string; model: string };
   gladia: { url: string; model: string };
-  elevenlabs: { url: string; model: string };
-  cartesia: { url: string; model: string };
-  sarvam_tts: { base_url: string; model: string };
+  elevenlabs: { url: string };
+  cartesia: { url: string };
+  sarvam_tts: { base_url: string };
   azure: { region: string };
   nimble: { base_url: string };
   caller: CallerModel;

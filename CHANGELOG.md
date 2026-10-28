@@ -1,3 +1,16 @@
+## v0.9.3 (2026-10-28)
+
+### Feat
+
+- **voices**: give each voice its own text-to-speech model, and search providers' voices (#29)
+  - Each voice now has its own text-to-speech model. You can add the same provider voice once for each model, for example an ElevenLabs voice in Flash v2.5 and in v3. **Settings** no longer has a text-to-speech model; each provider panel keeps its key and address.
+  - Each provider has a fixed list of models: ElevenLabs Flash v2.5, Multilingual v2, v4 Turbo, v4, v3 and v3 Conversational; Cartesia Sonic 3.6, 3.5 and 3; Sarvam Bulbul v4 Flash and Bulbul v3. Azure and Nimble have one model each. The **Add voice** dialog offers only the models that the saved key's account can use.
+  - ElevenLabs v3 and v4 take the persona's language as a setting, also for Bengali, Gujarati, Kannada, Marathi and Telugu. Flash and Multilingual read these languages from the text. The v3 and v4 models have no speed setting, so their voices speak at speed 1.
+  - The **Add voice** dialog searches the provider's own voices: the voices of your ElevenLabs and Cartesia accounts, the Azure voices of your region, Nimble's voices, and Sarvam's speakers of the chosen model. Select one or more voices and add them together. The dialog shows the result of each voice. You can still add a voice by its ID. To use a voice from ElevenLabs' public library, first add it to your ElevenLabs account.
+  - The **Voices** page shows the model of each voice, and the persona editor keeps the speed in the model's range. Tooltips explain the models and **Cuts at sentences**, the tag of a provider without word timing.
+  - The upgrade gives each saved voice and persona the model that its provider had in **Settings**.
+  - Add voices, change persona voices or change the speech settings only after every Yaksh process runs this version. A Settings document exported from an earlier version still imports, and Yaksh ignores its text-to-speech models.
+
 ## v0.9.2 (2026-10-28)
 
 ### Perf

@@ -18,3 +18,5 @@ export function useCloseGuard(dirty: boolean) {
     },
   };
 }
+
+export type CloseGuard = ReturnType<typeof useCloseGuard>;

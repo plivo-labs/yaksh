@@ -81,10 +81,14 @@ import {
   type SuiteSummary,
   type SuiteUpdate,
   type Surroundings,
+  type TtsModel,
+  type TtsTraits,
   type VapiAccount,
   type VapiAssistantPage,
   type Voice,
+  type VoiceCatalogPage,
   type VoiceEdit,
+  type VoiceGender,
   type VoiceInput,
   type VoiceSettings,
 } from "@/lib/types";
@@ -110,6 +114,7 @@ export const keys = {
   generations: (agentId: string) => ["agents", agentId, "generations"] as const,
   voices: ["voices"] as const,
   voicesFor: (language: Language | "all") => ["voices", language] as const,
+  voiceModels: ["voice-models"] as const,
   phoneNumbers: ["phone-numbers"] as const,
   phoneAccount: ["phone-account"] as const,
   applications: ["phone-account", "applications"] as const,
@@ -426,6 +431,55 @@ export function useVoices(language?: Language) {
   });
 }
 
+/** Each text-to-speech provider with the models a voice can use. They change only with a
+ * release. */
+export function useVoiceProviders() {
+  return useQuery({
+    queryKey: ["voice-providers"],
+    queryFn: ({ signal }) => api<TtsTraits[]>("/voices/providers", { signal }),
+    staleTime: Infinity,
+    gcTime: Infinity,
+  });
+}
+
+/** The provider's models that the saved key's account may speak with; the first is the default
+ * for a new voice. The server asks the provider for them, so they are kept for a few minutes. */
+export function useVoiceModels(provider: VoiceProvider) {
+  return useQuery({
+    queryKey: [...keys.voiceModels, provider],
+    queryFn: ({ signal }) =>
+      api<TtsModel[]>(`/voices/models?${new URLSearchParams({ provider })}`, { signal }),
+    staleTime: 5 * 60_000,
+  });
+}
+
+export interface VoiceCatalogQuery {
+  provider: VoiceProvider;
+  /** Sarvam's speakers differ by model. */
+  model: string | null;
+  search: string;
+  language: Language | null;
+  gender: VoiceGender | null;
+}
+
+/** A provider's own voices, 30 a page, to pick one to add. Saves nothing. */
+export function useVoiceCatalog(query: VoiceCatalogQuery) {
+  return useInfiniteQuery({
+    queryKey: ["voice-catalog", query] as const,
+    queryFn: ({ pageParam, signal }) => {
+      const params = new URLSearchParams({ provider: query.provider });
+      if (query.model) params.set("model", query.model);
+      if (query.search) params.set("search", query.search);
+      if (query.language) params.set("language", query.language);
+      if (query.gender) params.set("gender", query.gender);
+      if (pageParam) params.set("cursor", pageParam);
+      return api<VoiceCatalogPage>(`/voices/catalog?${params}`, { signal });
+    },
+    initialPageParam: null as string | null,
+    getNextPageParam: (last) => last.next_cursor ?? undefined,
+  });
+}
+
 export function useLookupVoice() {
   return useMutation({
     mutationFn: ({ provider, id }: { provider: VoiceProvider; id: string }) =>
@@ -440,6 +494,56 @@ export function useAddVoice() {
   return useMutation({
     mutationFn: (input: VoiceInput) => api<Voice>("/voices", { method: "POST", json: input }),
     onSuccess: () => client.invalidateQueries({ queryKey: keys.voices }),
+  });
+}
+
+/** Where one voice of a batch stands. "listed": the voices list already has it. */
+export type VoiceAddState =
+  | { status: "waiting" | "adding" | "added" | "listed" }
+  | { status: "failed"; message: string };
+
+/** Each request has the provider speak a test line before the server saves the voice, and a
+ * provider limits the requests it serves at once. */
+const VOICES_AT_ONCE = 3;
+
+async function addOne(input: VoiceInput): Promise<VoiceAddState> {
+  try {
+    await api<Voice>("/voices", { method: "POST", json: input });
+    return { status: "added" };
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 409) return { status: "listed" };
+    return { status: "failed", message: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+/** Adds voices, a request each, at most `VOICES_AT_ONCE` at a time. `onState` hears each voice,
+ * by its provider voice ID, when its request starts and when it ends; the result holds how each
+ * one ended. The voices list is read again once, after the last. */
+export function useAddVoices() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      inputs,
+      onState,
+    }: {
+      inputs: VoiceInput[];
+      onState: (id: string, state: VoiceAddState) => void;
+    }) => {
+      const ended = new Map<string, VoiceAddState>();
+      let next = 0;
+      const lane = async () => {
+        while (next < inputs.length) {
+          const input = inputs[next++];
+          onState(input.provider_voice_id, { status: "adding" });
+          const state = await addOne(input);
+          ended.set(input.provider_voice_id, state);
+          onState(input.provider_voice_id, state);
+        }
+      };
+      await Promise.all(Array.from({ length: VOICES_AT_ONCE }, lane));
+      return ended;
+    },
+    onSettled: () => client.invalidateQueries({ queryKey: keys.voices }),
   });
 }
 
@@ -1255,8 +1359,9 @@ export function useCallerReplyTimes() {
 /** After a change of the settings: what the server reads from them may change too. */
 function settingsChanged(client: QueryClient, settings: AppSettings) {
   client.setQueryData(settingsKey, settings);
-  // A new key or base URL can change the provider's models and what each takes.
+  // A new key or address can change the provider's models and what each takes.
   void client.invalidateQueries({ queryKey: [...settingsKey, "models"] });
+  void client.invalidateQueries({ queryKey: keys.voiceModels });
   // Which model and effort are in use follows the caller settings.
   void client.invalidateQueries({ queryKey: [...settingsKey, "caller-reply-times"] });
   void client.invalidateQueries({ queryKey: [...settingsKey, "efforts"] });

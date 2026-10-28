@@ -1,12 +1,14 @@
 import uuid
 
 from fastapi import APIRouter, Depends, status
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from yaksh.api.auth import require_token
 from yaksh.api.deps import BriefModelDep, SessionDep
 from yaksh.api.errors import UNAVAILABLE
 from yaksh.api.pagination import Page, PageDep
 from yaksh.api.schemas.personas import PersonaRead, PersonaScenario, PersonaVersionRead
+from yaksh.db.models import PersonaVersion
 from yaksh.domain.personas import PersonaCreate, PersonaDraft, PersonaIdea, PersonaUpdate
 from yaksh.simulation import personas
 from yaksh.simulation.persona_drafts import draft_persona
@@ -69,6 +71,17 @@ async def list_persona_scenarios(
     ]
 
 
+async def version_read(session: AsyncSession, version: PersonaVersion) -> PersonaVersionRead:
+    """A version with its voice's model, which is stored beside its config."""
+    return PersonaVersionRead(
+        id=version.id,
+        persona_id=version.persona_id,
+        version=version.version,
+        config=await personas.version_config(session, version),
+        created_at=version.created_at,
+    )
+
+
 @router.get("/{persona_id}/versions")
 async def list_versions(
     persona_id: uuid.UUID, session: SessionDep, page: PageDep
@@ -76,13 +89,11 @@ async def list_versions(
     rows, total = await personas.list_versions(
         session, persona_id, offset=page.offset, limit=page.page_size
     )
-    return Page.of([PersonaVersionRead.model_validate(row) for row in rows], total, page)
+    return Page.of([await version_read(session, row) for row in rows], total, page)
 
 
 @router.get("/{persona_id}/versions/{version}")
 async def get_version(
     persona_id: uuid.UUID, version: int, session: SessionDep
 ) -> PersonaVersionRead:
-    return PersonaVersionRead.model_validate(
-        await personas.get_version(session, persona_id, version)
-    )
+    return await version_read(session, await personas.get_version(session, persona_id, version))

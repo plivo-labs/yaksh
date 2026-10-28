@@ -72,7 +72,7 @@ from yaksh.domain.voices import VoiceProvider
 from yaksh.integrations.openai_models import caller_effort, failure, retry_rate_limits
 from yaksh.integrations.speech.audio import Resample8k
 from yaksh.integrations.speech.stt import stt_language, stt_model, stt_service
-from yaksh.integrations.speech.tts import tts_model, tts_service
+from yaksh.integrations.speech.tts import tts_service
 
 log = logging.getLogger(__name__)
 
@@ -474,7 +474,7 @@ class Persona:
             stt_provider=hearer,
             stt_model=stt_model(settings, hearer),
             stt_language=hearing,
-            tts_model=tts_model(settings, request.voice.provider),
+            tts_model=request.voice.model_in_use.id,
             voice=request.voice,
         )
         metrics = ServiceMetricsObserver()
