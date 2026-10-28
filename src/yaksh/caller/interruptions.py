@@ -6,6 +6,7 @@ import asyncio
 import logging
 from collections.abc import Awaitable, Callable, Coroutine, Sequence
 from dataclasses import dataclass, field
+from enum import Enum, auto
 from functools import partial
 from typing import Any
 
@@ -42,7 +43,7 @@ from yaksh.domain.conversations import (
     WireEvent,
     WireEventKind,
 )
-from yaksh.domain.latency import VAD_STOP_S
+from yaksh.domain.latency import VAD_START_S, VAD_STOP_S
 from yaksh.domain.scenarios import Interruption
 
 NOTE = 'While the agent said the turn above, you interrupted it and said: "{line}"'
@@ -60,6 +61,9 @@ STOP_WINDOW_S = 2.0
 STOP_MS = round(VAD_STOP_S * 1000)
 """The shortest quiet of the agent that is a stop: the VAD stop of the measurement after the
 call, whatever the live VAD's stop is, so a pause between two sentences is no stop."""
+SETTLE_MS = STOP_MS + round(VAD_START_S * 1000)
+"""How long a quiet at the end of the agent's speech lasts before it decides: a stop, and the
+time in which the voice detector reports a voice that came back."""
 ANSWER_WAIT_S = 3.0
 """How long the persona waits for the agent's answer to a line before it goes on with the call:
 an agent that finished its own question inside the line's window waits for the caller too."""
@@ -163,6 +167,19 @@ class LineState:
     matches: PhraseMatches | None = None
 
 
+class Reaction(Enum):
+    """What the agent did after the latest line, once its speech is decided."""
+
+    TALKED_ON = auto()
+    STOPPED = auto()
+    """It stopped within the line's window and stayed quiet: the persona waits for its answer."""
+    ANSWERED = auto()
+    """It stopped within the window, and its voice came back after the line had played."""
+
+
+REACTION_NOTES = {Reaction.STOPPED: STOPPED, Reaction.ANSWERED: ANSWERED}
+
+
 @dataclass
 class PlayingLine:
     """A line that plays, on the call clock, as the gate and its try follow it."""
@@ -180,8 +197,9 @@ class PlayingLine:
     noted: bool = False
     """The line's note is in the persona's context, after the words of the turn it interrupted."""
     stop_ms: int | None = None
-    """The start of the first quiet of at least STOP_MS after the line started, once the agent
-    spoke again after it."""
+    """The start of the first quiet of at least STOP_MS after the line started, once the agent's
+    voice came back after the line had played. A voice that comes back while the line plays is
+    part of the speech that the line interrupted, so the quiet after it counts instead."""
     quiet_ms: int | None = None
     """When the agent's voice went quiet, while it stays quiet and no stop came before."""
 
@@ -191,30 +209,39 @@ class PlayingLine:
 
     def voice_started(self, at_ms: int) -> None:
         quiet = self.quiet_ms
-        if quiet is not None and at_ms - quiet >= STOP_MS:
+        if quiet is not None and self.played and at_ms - quiet >= STOP_MS:
             self.stop_ms = quiet
         self.quiet_ms = None
 
     def unsettled_ms(self, now_ms: int) -> int:
-        """How much longer the quiet that the agent's speech ends in must last to be a stop: 0
-        when that quiet decides nothing, or when it already lasts long enough."""
+        """How much longer the quiet that the agent's speech ends in must last before it
+        decides: 0 when that quiet decides nothing, or when it already lasts SETTLE_MS."""
         quiet = self.quiet_ms
         if self.stop_ms is not None or quiet is None or not self._in_window(quiet):
             return 0
-        return max(0, quiet + STOP_MS - now_ms)
+        return max(0, quiet + SETTLE_MS - now_ms)
 
-    def stop_note(self) -> str | None:
-        """What the agent did, once its speech is decided: ANSWERED when it stopped within the
-        line's window and spoke again, STOPPED when it went quiet within the window and stayed
-        quiet, None when it talked on."""
+    def reaction(self) -> Reaction:
+        """What the agent did, once its speech is decided."""
         if self.stop_ms is not None:
-            return ANSWERED if self._in_window(self.stop_ms) else None
+            return Reaction.ANSWERED if self._in_window(self.stop_ms) else Reaction.TALKED_ON
         if self.quiet_ms is not None and self._in_window(self.quiet_ms):
-            return STOPPED
-        return None
+            return Reaction.STOPPED
+        return Reaction.TALKED_ON
 
     def _in_window(self, ms: int) -> bool:
         return self.started_ms <= ms <= self.window_end_ms
+
+
+@dataclass
+class Wait:
+    """The persona's wait for the agent's answer to a line that the agent stopped for."""
+
+    heard: bool = False
+    """The agent's voice started during the wait: only then is a context frame its answer, not
+    late words of the speech before."""
+    going_on: asyncio.Task[None] | None = None
+    """While no agent turn is open: the time after which the persona goes on with the call."""
 
 
 class LineGate(FrameProcessor):
@@ -223,11 +250,12 @@ class LineGate(FrameProcessor):
     interrupt: each agent turn that starts before the latest line has played. Each line gets a
     note in the context after the turn that it interrupted. Once the latest line has played and
     no agent turn is open, the last line decides what the persona does. The agent stopped for it
-    when its first stop after the line started came within the line's window; a quiet that the
-    speech ends in first gets the time to become a stop. Then, if the agent said nothing more,
-    the persona waits for its answer: the next agent turn with the agent's voice gets the reply,
-    and when no agent turn is open for ANSWER_WAIT_S, the persona goes on with the call. In every
-    other case the persona answers the agent's speech as usual."""
+    when its voice went quiet within the line's window, and answered when its voice came back
+    after the line had played; a quiet that the speech ends in first gets the time to become a
+    stop. When the agent stopped and stayed quiet, the persona waits for its answer: the next
+    agent turn with the agent's voice gets the reply, and when no agent turn is open for
+    ANSWER_WAIT_S, the persona goes on with the call. In every other case the persona answers the
+    agent's speech as usual."""
 
     def __init__(
         self,
@@ -242,16 +270,11 @@ class LineGate(FrameProcessor):
         self._latest: PlayingLine | None = None
         self._interrupting: list[PlayingLine] = []
         """The lines of the agent's speech that they interrupt, until that speech is decided."""
-        self._waiting = False
-        """The persona waits for the agent's answer to the last line."""
-        self._heard = False
-        """The agent's voice started since the persona began to wait: only then is a context
-        frame the agent's answer, not late words of the speech before."""
+        self._wait: Wait | None = None
+        """The persona waits for the agent's answer to the last line; a decision ends it."""
         self._turn_open = False
         self._settling: asyncio.Task[None] | None = None
         """While the quiet that the agent's speech ends in is too short to decide."""
-        self._going_on: asyncio.Task[None] | None = None
-        """While the persona waits and no agent turn is open: the time after which it goes on."""
         self.cuts = 0
         """The agent's cuts that went on down the pipeline."""
 
@@ -291,12 +314,13 @@ class LineGate(FrameProcessor):
                 return False
             self.cuts += 1
         elif isinstance(frame, LLMContextFrame):
-            if self._interrupting or (self._waiting and not self._heard):
+            wait = self._wait
+            if self._interrupting or (wait is not None and not wait.heard):
                 return False
-            self._waiting = False
-            self._stop_going_on()
+            self._end_wait()
         elif isinstance(frame, VADUserStartedSpeakingFrame):
-            self._heard = True
+            if self._wait is not None:
+                self._wait.heard = True
             if self._interrupting:
                 self._interrupting[-1].voice_started(
                     self._clock.ms() - round(frame.start_secs * 1000)
@@ -313,16 +337,16 @@ class LineGate(FrameProcessor):
         elif isinstance(frame, UserStoppedSpeakingFrame):
             self._turn_open = False
         elif isinstance(frame, EndFrame | CancelFrame):
-            self._stop_going_on()
+            self._end_wait()
             if self._settling is not None:
                 self._settling.cancel()
         return True
 
     async def _settle(self) -> None:
         """Once the latest line has played and no agent turn is open: decide the speech that the
-        lines interrupted, and reply or start the persona's wait. A wait stays until a context
-        frame passes or the persona goes on: the agent's voice or a new turn stops its time, and
-        the end of a turn with no words starts it again."""
+        lines interrupted, and reply or start the persona's wait. A wait ends with a decision, a
+        context frame of the agent's voice, or the persona going on; the agent's voice or a new
+        turn stops its time, and the end of a turn with no words starts it again."""
         line = self._latest
         if line is None or not line.played or self._turn_open:
             return
@@ -334,15 +358,17 @@ class LineGate(FrameProcessor):
                     self._settling = asyncio.create_task(self._settle_after(unsettled / 1000))
                 return
             self._interrupting = []
-            note = last.stop_note()
-            if note is not None:
+            self._end_wait()
+            reaction = last.reaction()
+            if (note := REACTION_NOTES.get(reaction)) is not None:
                 self._note(note)
-            if note is not STOPPED:
+            if reaction is not Reaction.STOPPED:
                 await self.push_frame(LLMContextFrame(context=self._context))
                 return
-            self._waiting, self._heard = True, False
-        if self._waiting and self._going_on is None:
-            self._going_on = asyncio.create_task(self._go_on())
+            self._wait = Wait()
+        wait = self._wait
+        if wait is not None and wait.going_on is None:
+            wait.going_on = asyncio.create_task(self._go_on(wait))
             await self._wait_for_agent()
 
     async def _settle_after(self, delay_s: float) -> None:
@@ -350,10 +376,10 @@ class LineGate(FrameProcessor):
         self._settling = None
         await self._settle()
 
-    async def _go_on(self) -> None:
+    async def _go_on(self, wait: Wait) -> None:
         await asyncio.sleep(ANSWER_WAIT_S)
-        self._going_on = None
-        self._waiting = False
+        wait.going_on = None
+        self._wait = None
         self._note(GO_ON)
         await self.push_frame(LLMContextFrame(context=self._context))
 
@@ -361,9 +387,14 @@ class LineGate(FrameProcessor):
         self._context.add_message({"role": "system", "content": text})
 
     def _stop_going_on(self) -> None:
-        if self._going_on is not None:
-            self._going_on.cancel()
-            self._going_on = None
+        wait = self._wait
+        if wait is not None and wait.going_on is not None:
+            wait.going_on.cancel()
+            wait.going_on = None
+
+    def _end_wait(self) -> None:
+        self._stop_going_on()
+        self._wait = None
 
 
 class Interrupter(FrameProcessor):

@@ -773,6 +773,7 @@ async def test_the_persona_waits_for_the_agent_that_stopped_for_a_stop_line() ->
     clock.now = 600
     await send(line_gate, VADUserStoppedSpeakingFrame(stop_secs=0.6), UserStoppedSpeakingFrame())
     await line_gate.turn_ended()
+    clock.now = 700
     await line_gate.line_played()
 
     await send(line_gate, EndFrame())
@@ -818,7 +819,9 @@ async def test_an_answer_during_a_long_line_gets_one_reply_once_the_line_played(
 
     await line_gate.line_played()
 
-    assert notes(context) == [NOTE.format(line="Wait."), "Sure, go ahead.", ANSWERED]
+    assert notes(context) == [NOTE.format(line="Wait."), "Sure, go ahead."], (
+        "speech while the line plays is part of the speech that it interrupted"
+    )
     assert sum(isinstance(frame, LLMContextFrame) for frame in out) == 1, "the reply to it"
     assert waited == []
 
@@ -839,7 +842,7 @@ async def test_a_turn_that_starts_during_the_line_is_part_of_the_speech_it_inter
     context.add_message({"role": "user", "content": "May I please"})
     clock.now = 1_600
     await send(line_gate, VADUserStoppedSpeakingFrame(stop_secs=0.3))
-    clock.now = 1_900
+    clock.now = 2_000
     await send(line_gate, LLMContextFrame(context=context), UserStoppedSpeakingFrame())
     await line_gate.turn_ended()
 
@@ -864,6 +867,7 @@ async def test_two_lines_in_one_turn_get_a_note_each_and_the_last_line_decides()
     clock.now = 600
     await send(line_gate, VADUserStoppedSpeakingFrame(stop_secs=0.6), UserStoppedSpeakingFrame())
     await line_gate.turn_ended()
+    clock.now = 700
     await line_gate.line_played()
 
     await send(line_gate, EndFrame())
@@ -906,12 +910,13 @@ async def test_an_agent_that_stops_for_the_line_and_answers_in_its_turn_gets_a_r
     line_gate.line_started(line(clock))
     clock.now = 600
     await send(line_gate, VADUserStoppedSpeakingFrame(stop_secs=0.0))
+    clock.now = 1_500
+    await line_gate.line_played()
     clock.now = 1_800
     await send(line_gate, VADUserStartedSpeakingFrame(start_secs=0.2))
     clock.now = 3_600
     await send(line_gate, VADUserStoppedSpeakingFrame(stop_secs=0.0), UserStoppedSpeakingFrame())
     await line_gate.turn_ended()
-    await line_gate.line_played()
 
     assert notes(context) == [NOTE.format(line="Wait."), ANSWERED], "its first stop decides"
     assert sum(isinstance(frame, LLMContextFrame) for frame in out) == 1
@@ -1078,9 +1083,8 @@ async def test_behind_a_real_aggregator_an_answer_that_starts_during_the_line_ge
         "We open at nine",
         NOTE.format(line="Wait."),
         "Sure, take your time.",
-        ANSWERED,
-    ]
-    assert waited == [], "the agent answered in the speech that the line interrupted"
+    ], "speech while the line plays is part of the speech that it interrupted"
+    assert waited == []
 
 
 async def test_a_persona_that_waits_goes_on_when_the_agent_says_nothing(
@@ -1126,6 +1130,7 @@ async def waiting_gate(
     clock.now = 600
     await send(line_gate, VADUserStoppedSpeakingFrame(stop_secs=0.6), UserStoppedSpeakingFrame())
     await line_gate.turn_ended()
+    clock.now = 700
     await line_gate.line_played()
     return line_gate, context, out, waited
 
@@ -1231,10 +1236,90 @@ async def test_a_quiet_that_the_turn_ends_in_is_a_stop_once_it_lasts() -> None:
     await line_gate.turn_ended()
     assert notes(context) == [NOTE.format(line="Wait.")], "a quiet of 0.3 s so far"
 
-    clock.now = 1_400
-    await asyncio.sleep(0.35)
+    clock.now = 1_500
+    await asyncio.sleep(0.45)
     await send(line_gate, EndFrame())
 
     assert notes(context) == [NOTE.format(line="Wait."), STOPPED]
     assert not any(isinstance(frame, LLMContextFrame) for frame in out)
     assert waited == [1]
+
+
+async def test_a_fragment_after_a_long_pause_during_the_line_is_no_answer() -> None:
+    clock = FixedClock()
+    line_gate, context, out, waited = gate_with_context(clock)
+    await send(line_gate, VADUserStartedSpeakingFrame(start_secs=0.2), UserStartedSpeakingFrame())
+    line_gate.line_started(line(clock))
+    clock.now = 800
+    await send(line_gate, VADUserStoppedSpeakingFrame(stop_secs=0.3), UserStoppedSpeakingFrame())
+    await line_gate.turn_ended()
+    clock.now = 1_300
+    await send(line_gate, VADUserStartedSpeakingFrame(start_secs=0.1), UserStartedSpeakingFrame())
+    clock.now = 1_550
+    await send(line_gate, VADUserStoppedSpeakingFrame(stop_secs=0.3))
+    clock.now = 1_600
+    await send(line_gate, UserStoppedSpeakingFrame())
+    await line_gate.turn_ended()
+    clock.now = 1_700
+    await line_gate.line_played()
+    assert not any(isinstance(frame, LLMContextFrame) for frame in out), "no reply to it"
+
+    clock.now = 2_000
+    await asyncio.sleep(0.35)
+    await send(line_gate, EndFrame())
+
+    assert notes(context) == [NOTE.format(line="Wait."), STOPPED], "its quiet after the fragment"
+    assert not any(isinstance(frame, LLMContextFrame) for frame in out)
+    assert waited == [1]
+
+
+async def test_a_reply_to_a_later_line_ends_the_wait_for_an_earlier_one(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(interruptions, "ANSWER_WAIT_S", WAIT)
+    clock = FixedClock()
+    line_gate, context, out, _ = gate_with_context(clock)
+    await send(line_gate, VADUserStartedSpeakingFrame(start_secs=0.2), UserStartedSpeakingFrame())
+    line_gate.line_started(line(clock))
+    clock.now = 600
+    await send(line_gate, VADUserStoppedSpeakingFrame(stop_secs=0.6), UserStoppedSpeakingFrame())
+    await line_gate.turn_ended()
+    clock.now = 700
+    await line_gate.line_played()
+    clock.now = 1_500
+    await send(line_gate, VADUserStartedSpeakingFrame(start_secs=0.2), UserStartedSpeakingFrame())
+    line_gate.line_started(line(clock, say="Hold on."))
+    clock.now = 2_000
+    await line_gate.line_played()
+    clock.now = 4_300
+    await send(line_gate, VADUserStoppedSpeakingFrame(stop_secs=0.3), UserStoppedSpeakingFrame())
+    await line_gate.turn_ended()
+
+    await send(line_gate, VADUserStartedSpeakingFrame(start_secs=0.2), UserStartedSpeakingFrame())
+    await send(line_gate, VADUserStoppedSpeakingFrame(stop_secs=0.0), UserStoppedSpeakingFrame())
+    await line_gate.turn_ended()
+    await asyncio.sleep(WAIT * 3)
+
+    assert GO_ON not in notes(context), "the agent talked over the second line, which decides"
+    assert sum(isinstance(frame, LLMContextFrame) for frame in out) == 1
+
+
+async def test_a_voice_that_comes_back_just_before_a_stop_is_heard_first() -> None:
+    clock = FixedClock()
+    line_gate, context, out, waited = gate_with_context(clock)
+    await send(line_gate, VADUserStartedSpeakingFrame(start_secs=0.2), UserStartedSpeakingFrame())
+    line_gate.line_started(line(clock))
+    await line_gate.line_played()
+    clock.now = 1_100
+    await send(line_gate, VADUserStoppedSpeakingFrame(stop_secs=0.3), UserStoppedSpeakingFrame())
+    clock.now = 1_450
+    await line_gate.turn_ended()
+    await send(line_gate, VADUserStartedSpeakingFrame(start_secs=0.1), UserStartedSpeakingFrame())
+    await asyncio.sleep(0.1)
+    clock.now = 4_300
+    await send(line_gate, VADUserStoppedSpeakingFrame(stop_secs=0.3), UserStoppedSpeakingFrame())
+    await line_gate.turn_ended()
+
+    assert notes(context) == [NOTE.format(line="Wait.")], "a pause of 0.55 s, heard 0.1 s late"
+    assert sum(isinstance(frame, LLMContextFrame) for frame in out) == 1
+    assert waited == []
