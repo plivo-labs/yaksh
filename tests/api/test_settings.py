@@ -638,3 +638,28 @@ async def test_half_of_an_account_is_never_removed_or_replaced_alone(
     assert deleted.status_code == 422
     assert removed.status_code == 200, removed.text
     assert not {f"{account}_auth_id", f"{account}_auth_token"} & set(removed.json()["secrets"])
+
+
+async def test_retired_model_settings_stay_stored_for_older_processes_and_are_ignored(
+    client: AsyncClient, db: Db
+) -> None:
+    async with db() as session:
+        await session.execute(
+            text(
+                "UPDATE app_settings SET values = jsonb_set(values, '{sarvam_tts}',"
+                ' \'{"model": "bulbul:v3"}\')'
+            )
+        )
+        await session.commit()
+    before = await client.get("/api/v1/settings")
+    values = before.json()["values"]
+    values["phone"]["timezone"] = "Asia/Kolkata"
+    saved = await client.put("/api/v1/settings/values", json=values)
+    document = "sarvam_tts:\n  model: bulbul:v3\n"
+    imported = await client.post("/api/v1/settings/import", json={"document": document})
+    async with db() as session:
+        stored = await session.scalar(text("SELECT values -> 'sarvam_tts' FROM app_settings"))
+
+    assert before.status_code == saved.status_code == imported.status_code == 200
+    assert "model" not in before.json()["values"]["sarvam_tts"]
+    assert stored == {"model": "bulbul:v3"}

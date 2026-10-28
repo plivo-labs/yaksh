@@ -136,8 +136,7 @@ async def test_each_voice_gets_the_model_its_provider_had_in_settings(database_u
     await engine.dispose()
     expected = {"elevenlabs": "eleven_flash_v2_5", "sarvam": "bulbul:v3", "azure": None}
     assert voices == personas == versions == expected
-    assert values == {"elevenlabs": {"url": "wss://api.elevenlabs.io"}, "sarvam_tts": {}}
-    assert version == 4
+    assert (values, version) == (stored, 3)
 
 
 async def test_an_upgrade_from_before_the_speech_providers_in_one_step_maps_old_models(

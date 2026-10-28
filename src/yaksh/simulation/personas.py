@@ -7,7 +7,7 @@ from typing import Any
 import pydantic
 import yaml
 from pydantic import Field
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -18,7 +18,7 @@ from yaksh.domain.errors import ConflictError, NotFoundError, ValidationError
 from yaksh.domain.names import fork_name
 from yaksh.domain.personas import PersonaConfig, PersonaCreate, PersonaSettings, PersonaUpdate
 from yaksh.domain.surroundings import Surroundings
-from yaksh.domain.voices import VoiceSettings
+from yaksh.domain.voices import VoiceProvider, VoiceSettings
 from yaksh.simulation.voices import builtin_voices, live_voice
 
 NAME_INDEX = "ix_personas_name_live"
@@ -81,6 +81,28 @@ async def version_config(session: AsyncSession, version: PersonaVersion) -> Pers
             model = persona.voice_model
     voice = config.voice.model_copy(update={"model": model})
     return config.model_copy(update={"voice": voice})
+
+
+def voice_of(config: PersonaConfig) -> tuple[VoiceProvider, str, str | None]:
+    return config.voice.provider, config.voice.id, config.voice.model
+
+
+async def keep_version_models(
+    session: AsyncSession, persona_id: uuid.UUID, voice: VoiceSettings
+) -> None:
+    """A version that an older process wrote without a model speaks with the persona's model
+    while it keeps the persona's voice. Before that voice changes, such a version gets the model
+    it speaks with now, so a queued call or a retry speaks as before."""
+    await session.execute(
+        update(PersonaVersion)
+        .where(
+            PersonaVersion.persona_id == persona_id,
+            PersonaVersion.voice_model.is_(None),
+            PersonaVersion.config["voice"]["provider"].astext == voice.provider.value,
+            PersonaVersion.config["voice"]["id"].astext == voice.id,
+        )
+        .values(voice_model=voice.model)
+    )
 
 
 def with_listed_voice(settings: dict[str, Any], voice: Voice) -> dict[str, Any]:
@@ -225,6 +247,8 @@ async def update_persona(
                 merged = with_listed_voice(merged, await live_voice(session, voice))
         new = validate_config(merged)
         if new != current:
+            if voice_of(new) != voice_of(current):
+                await keep_version_models(session, persona.id, current.voice)
             apply_config(persona, new)
             persona.current_version += 1
             session.add(version_row(persona.id, persona.current_version, new))
@@ -314,18 +338,31 @@ async def seed_builtin_personas(session: AsyncSession) -> list[str]:
     deleted built-in keeps its row, and a user persona with the same name is kept, so nothing
     a user changed comes back. Run it after the voice seed: the gender comes from the voice's
     row, even a deleted one."""
-    shipped = {(voice.provider, voice.provider_voice_id) for voice in builtin_voices()}
+    shipped = {
+        (voice.provider, voice.provider_voice_id): voice.provider.traits.chosen(voice.model).id
+        for voice in builtin_voices()
+    }
+    present = set(
+        await session.scalars(select(Persona.builtin_key).where(Persona.builtin_key.is_not(None)))
+    )
     seeded: list[str] = []
     for key, builtin in builtin_personas():
-        if (builtin.voice.provider, builtin.voice.id) not in shipped:
+        voice_key = (builtin.voice.provider, builtin.voice.id)
+        if voice_key not in shipped:
             raise RuntimeError(f"built-in persona {key} uses a voice that is not a built-in voice")
+        if key in present:
+            continue
         voice = await session.scalar(
             select(Voice)
             .where(
                 Voice.provider == builtin.voice.provider,
                 Voice.provider_voice_id == builtin.voice.id,
             )
-            .order_by(Voice.deleted_at.is_not(None), Voice.created_at.desc())
+            .order_by(
+                Voice.model.is_not_distinct_from(shipped[voice_key]).desc(),
+                Voice.deleted_at.is_not(None),
+                Voice.created_at.desc(),
+            )
             .limit(1)
         )
         if voice is None:

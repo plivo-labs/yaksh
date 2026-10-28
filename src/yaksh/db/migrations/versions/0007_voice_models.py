@@ -19,7 +19,7 @@ MODELS = {
     "cartesia": ("cartesia", ("sonic-3.6", "sonic-3.5", "sonic-3")),
     "sarvam": ("sarvam_tts", ("bulbul:v4-flash", "bulbul:v3")),
 }
-"""Each provider with a model choice: the Settings section that held its one model, and the
+"""Each provider with a model choice: the Settings section that holds its one model, and the
 models that the previous release could speak with. A stored model outside the list becomes the
 first, the default the Settings page showed. ElevenLabs' v3 and v4 are left out: its socket of
 the previous release refused them, so no voice ever spoke with them."""
@@ -41,12 +41,6 @@ def upgrade() -> None:
             " WHERE config -> 'voice' ->> 'provider' = :provider",
         ):
             connection.execute(sa.text(statement), {"model": model, "provider": provider})
-    connection.execute(
-        sa.text(
-            "UPDATE app_settings SET version = version + 1,"
-            " values = values #- '{elevenlabs,model}' #- '{cartesia,model}' #- '{sarvam_tts,model}'"
-        )
-    )
     op.drop_index(INDEX, table_name="voices")
     op.create_index(
         INDEX,

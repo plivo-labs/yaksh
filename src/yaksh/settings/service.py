@@ -28,7 +28,7 @@ from yaksh.integrations import provider_checks as checks
 from yaksh.integrations.openai_models import caller_effort
 from yaksh.integrations.provider_checks import ProviderCheckError
 from yaksh.integrations.speech.tts import check_voice as tts_check_voice
-from yaksh.settings.store import DEFAULTS, changed_values
+from yaksh.settings.store import DEFAULTS, RETIRED, changed_values
 from yaksh.simulation.surroundings import SOUNDS
 from yaksh.simulation.voices import builtin_voices
 
@@ -335,7 +335,10 @@ def parse_document(text: str, env: Mapping[str, str]) -> Import:
         elif section == "trigger_secrets":
             add_secrets(plan, mapping(content, "trigger_secrets"), env, prefix=TRIGGER_SECRET)
         elif section in DEFAULTS:
-            values[section] = mapping(content, section)
+            fields = mapping(content, section)
+            values[section] = {
+                key: value for key, value in fields.items() if RETIRED.get(section) != key
+            }
         else:
             raise ValidationError(f"{section}: no such section")
     unknown = [name for name in plan.secrets if not is_secret_name(name)]

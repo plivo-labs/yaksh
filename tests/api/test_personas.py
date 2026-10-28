@@ -1,7 +1,7 @@
 import uuid
 
 from httpx import AsyncClient
-from sqlalchemy import text
+from sqlalchemy import select, text
 
 from tests.conftest import (
     ENGLISH_VOICE,
@@ -15,6 +15,11 @@ from tests.conftest import (
     create_scenario,
     listed_voice_id,
 )
+from yaksh.db.models import Persona, Voice
+from yaksh.domain.languages import Language
+from yaksh.domain.voices import VoiceProvider
+from yaksh.simulation.personas import seed_builtin_personas
+from yaksh.simulation.voices import seed_builtin_voices
 
 
 async def test_changing_config_creates_a_version_but_renaming_does_not(
@@ -338,3 +343,41 @@ async def test_a_persona_voice_keeps_its_model_and_changes_it_only_to_a_listed_o
         1.1,
     )
     assert "model" not in stored_voice and stored_model == "eleven_multilingual_v2"
+
+
+async def test_a_built_in_voice_listed_again_in_another_model_does_not_stop_the_seed(
+    db: Db,
+) -> None:
+    async with db() as session:
+        await seed_builtin_voices(session)
+        first = await seed_builtin_personas(session)
+        session.add(
+            Voice(
+                provider=VoiceProvider.ELEVENLABS,
+                provider_voice_id="pqHfZKP75CvOlQylNhV4",
+                model="eleven_v3",
+                name="Bill in v3",
+                languages=[Language.EN],
+                listed_languages=[],
+                builtin=False,
+            )
+        )
+        await session.commit()
+        again = await seed_builtin_personas(session)
+        confused = await session.scalar(
+            select(Persona.voice_model).where(Persona.builtin_key == "confused")
+        )
+
+    assert "confused" in first and again == []
+    assert confused == "eleven_flash_v2_5"
+
+
+async def test_a_persona_version_shows_the_model_of_its_voice(client: AsyncClient) -> None:
+    persona = await create_persona(client)
+    url = f"/api/v1/personas/{persona['id']}/versions"
+
+    listed = (await client.get(url)).json()["items"]
+    first = (await client.get(f"{url}/1")).json()
+
+    assert listed[0]["config"]["voice"]["model"] == "eleven_flash_v2_5"
+    assert first["config"]["voice"]["model"] == "eleven_flash_v2_5"

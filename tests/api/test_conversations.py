@@ -832,7 +832,7 @@ async def call_request_of(settings: Settings, conversation_id: str) -> CallReque
         await engine.dispose()
 
 
-async def test_a_version_written_without_a_model_speaks_with_the_persona_model(
+async def test_a_version_written_without_a_model_keeps_the_persona_model_it_was_made_with(
     client: AsyncClient, settings: Settings, db: Db
 ) -> None:
     await client.post(
@@ -864,9 +864,13 @@ async def test_a_version_written_without_a_model_speaks_with_the_persona_model(
         await session.commit()
     started = await start(client, agent_id, persona_id=persona["id"])
 
-    request = await call_request_of(settings, started["id"])
+    before = await call_request_of(settings, started["id"])
+    voice = {"provider": "elevenlabs", "id": ENGLISH_VOICE.id, "model": "eleven_flash_v2_5"}
+    changed = await client.patch(f"/api/v1/personas/{persona['id']}", json={"voice": voice})
+    after = await call_request_of(settings, started["id"])
 
-    assert request.voice.model == "eleven_multilingual_v2"
+    assert changed.status_code == 200, changed.text
+    assert before.voice.model == after.voice.model == "eleven_multilingual_v2"
 
 
 async def test_a_conversation_freezes_its_persona_scenario_and_prompt(
