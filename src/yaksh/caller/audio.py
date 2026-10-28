@@ -35,10 +35,17 @@ MACHINE = "yaksh.machine"
 
 
 class Clock:
-    def __init__(self) -> None:
-        self._started = time.monotonic()
-        self.started_at = datetime.now(UTC)
+    def __init__(self, origin: tuple[float, datetime] | None = None) -> None:
+        """`origin` is another clock's `origin`: the monotonic clock is the same for every
+        process on the host, so the two clocks read the same."""
+        started, started_at = origin or (time.monotonic(), datetime.now(UTC))
+        self._started = started
+        self.started_at = started_at
         """The wall time when the clock read 0."""
+
+    @property
+    def origin(self) -> tuple[float, datetime]:
+        return self._started, self.started_at
 
     def ms(self) -> int:
         return int((time.monotonic() - self._started) * 1000)

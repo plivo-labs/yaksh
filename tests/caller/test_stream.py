@@ -20,7 +20,7 @@ from pipecat.tests.utils import run_test
 
 from tests.conftest import FixedClock, Observer
 from yaksh.caller.audio import FRAME_BYTES, GAP_BYTES, PLAYOUT, SAMPLE_RATE, CallRecording, Clock
-from yaksh.caller.phone import CHUNK_BYTES, Checkpoints, KeyPresses, StreamSerializer
+from yaksh.caller.conversation import CHUNK_BYTES, Checkpoints, KeyPresses, StreamSerializer
 from yaksh.caller.transcript import TranscriptBuilder
 from yaksh.domain.conversations import Provenance, WireEventKind
 
