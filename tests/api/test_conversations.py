@@ -39,7 +39,13 @@ from tests.conftest import (
     wait_until,
 )
 from yaksh.config import Settings
-from yaksh.db.models import AgentVersion, Conversation, RunningWorker, ScenarioVersion
+from yaksh.db.models import (
+    AgentVersion,
+    Conversation,
+    PersonaVersion,
+    RunningWorker,
+    ScenarioVersion,
+)
 from yaksh.db.session import create_engine, create_sessionmaker
 from yaksh.domain.agents import AgentConfig
 from yaksh.domain.conversations import CallRequest, ConversationStatus
@@ -48,6 +54,7 @@ from yaksh.domain.runs import RunCreate
 from yaksh.domain.surroundings import Layer, NoiseSound, SoundPlan
 from yaksh.simulation import conversations, runs
 from yaksh.simulation.calls import STOP_IGNORED
+from yaksh.simulation.personas import version_config
 from yaksh.simulation.surroundings import NOISE_DBFS, SOUNDS, gain
 from yaksh.worker.worker import FINALIZE_ATTEMPTS, Worker
 
@@ -866,11 +873,15 @@ async def test_a_version_written_without_a_model_keeps_the_persona_model_it_was_
 
     before = await call_request_of(settings, started["id"])
     voice = {"provider": "elevenlabs", "id": ENGLISH_VOICE.id, "model": "eleven_flash_v2_5"}
-    changed = await client.patch(f"/api/v1/personas/{persona['id']}", json={"voice": voice})
+    async with db() as session:
+        conversation = await conversations.get_conversation(session, uuid.UUID(started["id"]))
+        loaded = await session.get_one(PersonaVersion, conversation.persona_version_id)
+        changed = await client.patch(f"/api/v1/personas/{persona['id']}", json={"voice": voice})
+        during = await version_config(session, loaded)
     after = await call_request_of(settings, started["id"])
 
     assert changed.status_code == 200, changed.text
-    assert before.voice.model == after.voice.model == "eleven_multilingual_v2"
+    assert before.voice.model == during.voice.model == after.voice.model == "eleven_multilingual_v2"
 
 
 async def test_a_conversation_freezes_its_persona_scenario_and_prompt(

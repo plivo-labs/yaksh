@@ -72,13 +72,25 @@ def version_row(persona_id: uuid.UUID, version: int, config: PersonaConfig) -> P
 async def version_config(session: AsyncSession, version: PersonaVersion) -> PersonaConfig:
     """A stored version's config, with its voice's model from its column. A version that an
     older process wrote during a rollout has no model: its voice keeps the persona's model while
-    it is the persona's voice."""
+    it is the persona's voice. One SELECT reads both, because a persona edit gives such a version
+    its model before it changes the persona's voice."""
     config = PersonaConfig.model_validate(version.config)
     model = version.voice_model
     if model is None:
-        persona = await session.get_one(Persona, version.persona_id)
-        if (persona.voice_provider, persona.voice_id) == (config.voice.provider, config.voice.id):
-            model = persona.voice_model
+        model, provider, voice_id, persona_model = (
+            await session.execute(
+                select(
+                    PersonaVersion.voice_model,
+                    Persona.voice_provider,
+                    Persona.voice_id,
+                    Persona.voice_model,
+                )
+                .join(Persona, Persona.id == PersonaVersion.persona_id)
+                .where(PersonaVersion.id == version.id)
+            )
+        ).one()
+        if model is None and (provider, voice_id) == (config.voice.provider, config.voice.id):
+            model = persona_model
     voice = config.voice.model_copy(update={"model": model})
     return config.model_copy(update={"voice": voice})
 
