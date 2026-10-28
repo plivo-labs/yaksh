@@ -310,6 +310,11 @@ STEP_KEYS = (
 )
 """The parts of a reply that Pipecat's latency breakdown names, in the order they happen;
 `pipeline` is the time that no named part covers."""
+CORE_STEP_KEYS = frozenset(
+    {"endpointing_wait", "transcription", "turn_detection", "llm_inference", "speech_synthesis"}
+)
+"""The parts that every reply goes through. A 0 for one of them is a result, as an STT transcript
+that was already final at the VAD stop, not a part that did not happen."""
 
 
 class CallerReplyTime(BaseModel):
@@ -324,6 +329,11 @@ class CallerReplyTime(BaseModel):
     total_ms: int
     steps: dict[str, int]
     """ms by Pipecat's key; a part that did not happen is absent."""
+    stt_ttfs_ms: int | None = None
+    """The STT's TTFS: from the end of the agent's speech to the last final transcript before the
+    caller's model started, below 0 when that transcript came first. It overlaps the endpointing
+    wait, so it adds to the reply only past the VAD stop. None when no final transcript came
+    after the agent last started to speak."""
 
     def step_times(self) -> dict[str, int]:
         """Every known part, 0 when absent, then any part that a later Pipecat adds, by name,

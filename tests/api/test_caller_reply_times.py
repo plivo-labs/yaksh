@@ -78,7 +78,7 @@ async def test_a_caller_turn_gets_the_reply_time_of_the_audio_start_that_played_
         None,
         None,
         None,
-        {"audio_index": 1, "total_ms": 1_900, "steps": {"llm_inference": 700}},
+        {"audio_index": 1, "total_ms": 1_900, "steps": {"llm_inference": 700}, "stt_ttfs_ms": None},
         None,
     ]
 

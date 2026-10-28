@@ -7968,6 +7968,17 @@
             },
             "type": "object",
             "title": "Steps"
+          },
+          "stt_ttfs_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stt Ttfs Ms"
           }
         },
         "type": "object",

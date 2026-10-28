@@ -16,7 +16,14 @@ from yaksh.domain.conversations import (
     WireEventKind,
 )
 from yaksh.domain.evaluations import Metric
-from yaksh.domain.latency import CallerReplyTime, Span, Speech, Wait, nearest_rank
+from yaksh.domain.latency import (
+    CORE_STEP_KEYS,
+    CallerReplyTime,
+    Span,
+    Speech,
+    Wait,
+    nearest_rank,
+)
 
 WAIT_LIMITS_MS = (3_000, 5_000, 10_000)
 LONG_WAIT_MS = 5_000
@@ -260,20 +267,31 @@ def usage(
 def caller_reply_time(replies: Sequence[CallerReplyTime]) -> Metric:
     """How long the caller took to reply, over the replies its model spoke, and the same for each
     part, in nearest-rank percentiles. Every reply counts every part, a missing part as 0, so
-    the parts' percentiles are over the same replies; a part under PART_MS at the 90th
-    percentile is left out. The parts' p50s need not add up to the reply's p50."""
+    the parts' percentiles are over the same replies. A core part is always listed; another
+    part under PART_MS at the 90th percentile is left out. The parts' p50s need not add up to
+    the reply's p50. The STT's TTFS is apart from the parts, over the replies that have one:
+    it overlaps the endpointing wait."""
     parts = [reply.step_times() for reply in replies]
     steps = []
     for key in dict.fromkeys(key for times in parts for key in times):
         values = sorted(times.get(key, 0) for times in parts)
-        if (p90 := nearest_rank(values, 0.9)) and p90 >= PART_MS:
+        p90 = nearest_rank(values, 0.9)
+        if key in CORE_STEP_KEYS or (p90 and p90 >= PART_MS):
             steps.append({"key": key, "p50_ms": nearest_rank(values, 0.5), "p90_ms": p90})
     totals = sorted(reply.total_ms for reply in replies)
+    stt = sorted(reply.stt_ttfs_ms for reply in replies if reply.stt_ttfs_ms is not None)
     return Metric(
         value={
             "replies": len(replies),
             "p50_ms": nearest_rank(totals, 0.5),
             "p90_ms": nearest_rank(totals, 0.9),
             "steps": steps,
+            "stt_ttfs": {
+                "replies": len(stt),
+                "p50_ms": nearest_rank(stt, 0.5),
+                "p90_ms": nearest_rank(stt, 0.9),
+            }
+            if stt
+            else None,
         }
     )
