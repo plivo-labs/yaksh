@@ -3387,11 +3387,15 @@ type SettingsValues struct {
 	Phone  *Phone  `json:"phone,omitempty"`
 
 	// SarvamStt Sarvam's speech-to-text host is fixed by its SDK, so it has no address.
-	SarvamStt *SarvamStt    `json:"sarvam_stt,omitempty"`
-	SarvamTts *SarvamTts    `json:"sarvam_tts,omitempty"`
-	Soniox    *Soniox       `json:"soniox,omitempty"`
-	Speech    *Speech       `json:"speech,omitempty"`
-	Worker    *WorkerLimits `json:"worker,omitempty"`
+	SarvamStt *SarvamStt `json:"sarvam_stt,omitempty"`
+	SarvamTts *SarvamTts `json:"sarvam_tts,omitempty"`
+	Soniox    *Soniox    `json:"soniox,omitempty"`
+	Speech    *Speech    `json:"speech,omitempty"`
+
+	// TurnTaking How long the caller waits after the agent's speech before its reply starts. A section of
+	// its own, because a scenario's own caller model must not reset these.
+	TurnTaking *TurnTaking   `json:"turn_taking,omitempty"`
+	Worker     *WorkerLimits `json:"worker,omitempty"`
 }
 
 // Share How many of a total, with the 95% Wilson interval of the rate: few calls give a wide
@@ -3701,6 +3705,13 @@ type TurnRead struct {
 	TalkedOver   *bool            `json:"talked_over,omitempty"`
 	Text         string           `json:"text"`
 	Tools        *[]ToolItem      `json:"tools,omitempty"`
+}
+
+// TurnTaking How long the caller waits after the agent's speech before its reply starts. A section of
+// its own, because a scenario's own caller model must not reset these.
+type TurnTaking struct {
+	TurnMaxWaitS *float32 `json:"turn_max_wait_s,omitempty"`
+	VadStopS     *float32 `json:"vad_stop_s,omitempty"`
 }
 
 // UnplayedCallVerdict A judged call that the persona never talked on: its voicemail or call screener answered,

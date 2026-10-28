@@ -120,6 +120,8 @@ class ReplyTimes(UserBotLatencyObserver):
             "tts_provider": settings.voice.provider if settings.voice else None,
             "tts_model": settings.tts_model,
             "language": settings.stt_language,
+            "vad_stop_s": settings.vad_stop_s,
+            "turn_max_wait_s": settings.turn_max_wait_s,
             "version": __version__,
         }
         self._time = now

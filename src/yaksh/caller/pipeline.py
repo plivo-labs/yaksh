@@ -24,6 +24,7 @@ from pipecat.frames.frames import (
     FunctionCallResultFrame,
     FunctionCallResultProperties,
     LLMContextFrame,
+    LLMMessagesTransformFrame,
     OutputDTMFUrgentFrame,
     TTSSpeakFrame,
 )
@@ -31,7 +32,11 @@ from pipecat.observers.base_observer import BaseObserver
 from pipecat.observers.service_metrics_observer import ServiceMetricsObserver
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.worker import PipelineParams, PipelineWorker
-from pipecat.processors.aggregators.llm_context import LLMContext
+from pipecat.processors.aggregators.llm_context import (
+    LLMContext,
+    LLMContextMessage,
+    LLMSpecificMessage,
+)
 from pipecat.processors.aggregators.llm_response_universal import (
     LLMContextAggregatorPair,
     LLMUserAggregator,
@@ -66,7 +71,7 @@ from yaksh.domain.conversations import (
     WireEvent,
     WireEventKind,
 )
-from yaksh.domain.latency import VAD_CONFIDENCE, VAD_START_S, VAD_STOP_S
+from yaksh.domain.latency import VAD_CONFIDENCE, VAD_START_S
 from yaksh.domain.settings import AppSettings, CallerModel
 from yaksh.domain.voices import VoiceProvider
 from yaksh.integrations.openai_models import caller_effort, failure, retry_rate_limits
@@ -84,7 +89,6 @@ CLOSING_QUIET_S = 8.0
 CLOSING_LIMIT_S = 30.0
 """The longest a close lasts, for a reply that Plivo never reports played."""
 QUIET_POLL_S = 0.25
-VAD = VADParams(confidence=VAD_CONFIDENCE, start_secs=VAD_START_S, stop_secs=VAD_STOP_S)
 IDLE_S = 15.0
 IDLE_NUDGES = 2
 
@@ -201,8 +205,18 @@ class PersonaLLM(OpenAIResponsesHttpLLMService):
     ) -> None:
         """A response with only empty messages is the caller saying nothing, as its prompt asks
         when the agent only asks it to wait. Any other response with no text and no tool call
-        is still an error."""
+        is still an error.
+
+        Pipecat has already queued the response's reasoning for the context. With no message
+        after it, the model reads that reasoning on later turns as a reply it gave, and keeps
+        quiet when the agent asks again. So the reasoning goes out of the context, which then
+        holds what a model without reasoning sees: nothing for this reply."""
         if silent(output):
+            reasoning = {
+                item["id"] for item in output if item.get("type") == "reasoning" and item.get("id")
+            }
+            if reasoning:
+                await self.push_frame(LLMMessagesTransformFrame(partial(without, reasoning)))
             if self.on_silence is not None:
                 await self.on_silence()
             return
@@ -220,6 +234,20 @@ def silent(output: list[dict]) -> bool:
         )
         for item in said
     )
+
+
+def without(reasoning: set[str], messages: list[LLMContextMessage]) -> list[LLMContextMessage]:
+    """The context without the reasoning items whose ids are in `reasoning`."""
+    return [
+        message
+        for message in messages
+        if not (
+            isinstance(message, LLMSpecificMessage)
+            and isinstance(message.message, dict)
+            and message.message.get("type") == "reasoning"
+            and message.message.get("id") in reasoning
+        )
+    ]
 
 
 async def wait_for_agent(user: LLMUserAggregator) -> None:
@@ -464,6 +492,7 @@ class Persona:
         """`prepared` and `order` play the scenario's interruptions: the lines' speech, and the
         observer that keeps the transcript's turns in order around a line."""
         settings = request.app_settings
+        turns = settings.turn_taking
         self.llm = llm_service(settings, request.caller, keys, request.instructions)
         hearer = settings.speech.stt
         hearing = stt_language(hearer, request.agent.languages, request.caller_language)
@@ -476,6 +505,8 @@ class Persona:
             stt_language=hearing,
             tts_model=request.voice.model_in_use.id,
             voice=request.voice,
+            vad_stop_s=turns.vad_stop_s,
+            turn_max_wait_s=turns.turn_max_wait_s,
         )
         metrics = ServiceMetricsObserver()
         self.usage = UsageMeter(metrics)
@@ -494,7 +525,11 @@ class Persona:
                 # not make the persona ask it to repeat.
                 empty_user_turn=None,
                 user_turn_strategies=UserTurnStrategies(
-                    stop=[TurnAnalyzerUserTurnStopStrategy(turn_analyzer=turn_models.end_of_turn())]
+                    stop=[
+                        TurnAnalyzerUserTurnStopStrategy(
+                            turn_analyzer=turn_models.end_of_turn(max_wait_s=turns.turn_max_wait_s)
+                        )
+                    ]
                 ),
             ),
         )
@@ -504,7 +539,12 @@ class Persona:
         """Closed while the persona's voicemail or call screener answers."""
         lines = request.interruptions
         self.player = SoundPlayer() if request.answering or lines else None
-        vad = turn_models.vad(sample_rate=SAMPLE_RATE, params=VAD)
+        vad = turn_models.vad(
+            sample_rate=SAMPLE_RATE,
+            params=VADParams(
+                confidence=VAD_CONFIDENCE, start_secs=VAD_START_S, stop_secs=turns.vad_stop_s
+            ),
+        )
         interrupters: list[FrameProcessor] = []
         line_gates: list[FrameProcessor] = []
         if lines:

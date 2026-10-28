@@ -1,3 +1,21 @@
+## v0.9.5 (2026-10-28)
+
+### Feat
+
+- **caller**: set the VAD stop and the turn detection wait in Settings (#33)
+  - **Settings** has two new fields in the **Caller** panel. **VAD stop** is the silence after the agent's speech before turn detection runs, 0.1 to 2 seconds. **Turn detection max wait** is the most silence that the caller waits for when turn detection decides that the agent did not finish, 0.5 to 4 seconds.
+  - The defaults are shorter than the old fixed values: a VAD stop of 0.3 seconds, not 0.6, and a max wait of 2 seconds, not 3. The caller now replies about 300 ms sooner after the agent stops speaking. With the shorter VAD stop, the caller's model sometimes runs a second time for a reply, when the agent's final transcript comes after the turn ended.
+  - Each call records the two values that it used, and the `caller_reply_time` log line shows them. The agent's response time is still measured with a fixed VAD stop of 0.6 seconds, so it stays comparable with earlier calls.
+
+## v0.9.4 (2026-10-28)
+
+### Fix
+
+- **caller**: stop a reply with no words from silencing the next turns (#32)
+  - When the caller's reasoning model gives a reply with no words where it had to speak, the caller now answers the agent's next turn, such as "Are you still there?". Before, it often stayed silent through two or three of the agent's reminders, until the agent hung up.
+  - A reply with no words leaves none of the model's reasoning in the conversation that the model sees on later turns. Nothing changes for a model without reasoning.
+  - After the caller rightly stays silent while the agent works, it can miss the agent's next "Are you still there?" a little more often; the agent then asks again.
+
 ## v0.9.3 (2026-10-28)
 
 ### Feat

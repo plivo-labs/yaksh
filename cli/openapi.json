@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Yaksh",
-    "version": "0.9.3"
+    "version": "0.9.5"
   },
   "paths": {
     "/api/v1/health": {
@@ -15670,6 +15670,13 @@
               "model": "gpt-6-luna"
             }
           },
+          "turn_taking": {
+            "$ref": "#/components/schemas/TurnTaking",
+            "default": {
+              "vad_stop_s": 0.3,
+              "turn_max_wait_s": 2.0
+            }
+          },
           "generation": {
             "$ref": "#/components/schemas/GenerationModel",
             "default": {
@@ -17111,6 +17118,28 @@
           "ended_at_ms"
         ],
         "title": "TurnRead"
+      },
+      "TurnTaking": {
+        "properties": {
+          "vad_stop_s": {
+            "type": "number",
+            "maximum": 2.0,
+            "minimum": 0.1,
+            "title": "Vad Stop S",
+            "default": 0.3
+          },
+          "turn_max_wait_s": {
+            "type": "number",
+            "maximum": 4.0,
+            "minimum": 0.5,
+            "title": "Turn Max Wait S",
+            "default": 2.0
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "TurnTaking",
+        "description": "How long the caller waits after the agent's speech before its reply starts. A section of\nits own, because a scenario's own caller model must not reset these."
       },
       "UnplayedCallVerdict": {
         "properties": {

@@ -10,8 +10,9 @@ from yaksh.domain.answering import MachineLine
 VAD_CONFIDENCE = 0.5
 VAD_START_S = 0.1
 VAD_STOP_S = 0.6
-"""The voice detector's settings, shared by the live caller and the measurement after the call,
-so both find speech the same way."""
+"""The voice detector's settings for the measurement after the call, fixed so that results stay
+comparable. The live caller shares the confidence and the start, and takes its stop from the
+turn-taking settings."""
 
 
 class Span(BaseModel):
