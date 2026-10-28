@@ -14,9 +14,11 @@ from yaksh.domain.agents import Direction, Transport
 from yaksh.domain.answering import AfterScreening, AnsweredBy, Answering, MachineLine, Voicemail
 from yaksh.domain.conversations import (
     EndReason,
+    InterruptionTry,
     Provenance,
     Role,
     ToolItem,
+    TryReason,
     Turn,
     WireEvent,
     WireEventKind,
@@ -128,6 +130,52 @@ def test_the_view_marks_yaksh_lines_and_words_the_agent_spoke_over() -> None:
     assert (
         "[3] Caller (cut off: the agent spoke over it, so part or none of it played): "
         "March fourteenth"
+    ) in rendered
+
+
+def test_the_view_shows_where_each_interruption_line_came_in_the_agent_turn() -> None:
+    agent = "Thank you, Jordan. Could you please tell me your age? Yes, there is no fee."
+    turns = [
+        Turn(role=Role.AGENT, text=agent, started_at_ms=1_000, ended_at_ms=6_000),
+        Turn(
+            role=Role.CALLER,
+            text="Hold on, is there a fee?",
+            started_at_ms=2_500,
+            ended_at_ms=3_600,
+            scripted=True,
+            interruption=1,
+        ),
+        Turn(role=Role.AGENT, text="Sure.", started_at_ms=7_000, ended_at_ms=7_400),
+        Turn(
+            role=Role.CALLER,
+            text="Mm-hmm.",
+            started_at_ms=7_100,
+            ended_at_ms=7_500,
+            scripted=True,
+            interruption=2,
+        ),
+    ]
+    tries = [
+        InterruptionTry(number=1, answer=2, turn_started_ms=1_000, words="Thank you, Jordan."),
+        InterruptionTry(number=2, answer=3, turn_started_ms=7_000, words=""),
+        InterruptionTry(number=2, answer=2, turn_started_ms=1_000, reason=TryReason.OTHER_LINE),
+    ]
+    events = [
+        WireEvent(kind=WireEventKind.INTERRUPTION, at_ms=at_ms, interruption=attempt)
+        for at_ms, attempt in zip([2_500, 7_100, 2_600], tries, strict=True)
+    ]
+
+    rendered = render(replace(MAPLE_DENTAL, turns=turns, events=events))
+
+    assert (
+        "[2] Caller (Yaksh's fixed line): Hold on, is there a fee?\n"
+        "(Yaksh's caller said the fixed line above while the agent was speaking: 1.5 s into "
+        'turn [1], after the words "Thank you, Jordan.".)\n'
+        "[3] Agent: Sure."
+    ) in rendered
+    assert (
+        "(Yaksh's caller said the fixed line above while the agent was speaking: 0.1 s into "
+        "turn [3].)"
     ) in rendered
 
 

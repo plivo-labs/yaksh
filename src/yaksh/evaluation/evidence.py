@@ -29,7 +29,7 @@ from yaksh.domain.conversations import (
 from yaksh.domain.record_sources import RECORD_PROVIDERS
 from yaksh.domain.scenarios import Fact
 
-EVIDENCE_VIEW_VERSION = 8
+EVIDENCE_VIEW_VERSION = 9
 
 TRANSCRIPTION_NOTE = {
     Transport.PHONE: (
@@ -250,17 +250,52 @@ def how_it_ended(view: CallView) -> str:
 
 
 def transcript(turns: list[Turn], events: list[WireEvent]) -> list[str]:
-    """The numbered turns, with what the phone of Yaksh's caller did between them on lines
-    that have no number, so a criterion's turn numbers stay the turns' own."""
+    """The numbered turns, with what the phone of Yaksh's caller did between them, and where
+    each of its interruption lines came, on lines that have no number, so a criterion's turn
+    numbers stay the turns' own."""
     marks = sorted(
         (event for event in events if event.kind in BETWEEN_TURNS), key=lambda event: event.at_ms
     )
+    played = {
+        event.interruption.number: event
+        for event in events
+        if event.interruption is not None and event.interruption.reason is None
+    }
     lines = []
     for number, turn in enumerate(turns, 1):
         while marks and marks[0].at_ms <= turn.started_at_ms:
             lines.append(mark_line(marks.pop(0)))
         lines.append(f"[{number}] {speaker(turn)}: {turn_evidence(turn)}")
+        if turn.interruption is not None and turn.interruption in played:
+            lines.append(interruption_line(played[turn.interruption], turns))
     return lines + [mark_line(event) for event in marks]
+
+
+def interruption_line(event: WireEvent, turns: list[Turn]) -> str:
+    """Where Yaksh's caller said a fixed line while the agent spoke. The line's turn comes after
+    the whole agent turn that it interrupted, so without this the agent's answer to the line
+    reads as if it came before the line."""
+    attempt = event.interruption
+    assert attempt is not None
+    started = attempt.turn_started_ms
+    if started is None:
+        return "(Yaksh's caller said the fixed line above while the agent was speaking.)"
+    number = next(
+        (
+            number
+            for number, turn in enumerate(turns, 1)
+            if turn.role is Role.AGENT
+            and turn.started_at_ms <= started <= max(turn.started_at_ms, turn.ended_at_ms or 0)
+        ),
+        None,
+    )
+    into = f"{(event.at_ms - started) / 1000:.1f} s into " + (
+        f"turn [{number}]" if number is not None else "the agent's turn"
+    )
+    after = f', after the words "{attempt.words}"' if attempt.words else ""
+    return (
+        f"(Yaksh's caller said the fixed line above while the agent was speaking: {into}{after}.)"
+    )
 
 
 BETWEEN_TURNS = frozenset(

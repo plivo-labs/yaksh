@@ -1,5 +1,9 @@
+import io
+import wave
+
 from tests.conftest import FakeFileStore
 from yaksh.db.models import Conversation
+from yaksh.domain.answering import AnsweredBy
 from yaksh.domain.conversations import (
     LineFacts,
     Provenance,
@@ -220,6 +224,55 @@ def test_the_callers_reply_time_and_each_part_are_percentiles_over_the_same_repl
         ],
         "stt_ttfs": {"replies": 2, "p50_ms": 280, "p90_ms": 310},
     }
+
+
+def silence(channels: int, seconds: float) -> bytes:
+    buffer = io.BytesIO()
+    with wave.open(buffer, "wb") as file:
+        file.setnchannels(channels)
+        file.setsampwidth(2)
+        file.setframerate(8000)
+        file.writeframes(bytes(2 * channels * round(8000 * seconds)))
+    return buffer.getvalue()
+
+
+async def test_an_interruption_line_is_caller_speech_but_no_reply_that_waits_for_the_agent() -> (
+    None
+):
+    store = FakeFileStore()
+    await store.put("recording.wav", silence(2, 6), "audio/wav")
+    await store.put("caller-voice.wav", silence(1, 1), "audio/wav")
+    persona = CallerReplyWindow(
+        start_ms=1_000, end_ms=1_500, finished=True, audio_start_ms=0, audio_ms=500
+    )
+    line = CallerReplyWindow(
+        start_ms=3_000,
+        end_ms=3_500,
+        finished=True,
+        audio_start_ms=500,
+        audio_ms=500,
+        interruption=1,
+    )
+    transcript = Transcript(
+        stream_opened_ms=0,
+        recording_start_ms=0,
+        caller_replies=[persona, line],
+        wire_events=[WireEvent(kind=WireEventKind.CONNECTED, at_ms=0)],
+    )
+    conversation = Conversation(
+        transcript=transcript.model_dump(mode="json"),
+        recording_key="recording.wav",
+        caller_voice_key="caller-voice.wav",
+        answered_by=AnsweredBy.CALLER,
+        caller_settings=None,
+        caller_usage=None,
+        line_facts=None,
+    )
+
+    found = await call.measure_call(conversation, store, agent_speaks_first=True)
+
+    waits_for = [wait["start_ms"] for wait in found[MetricKey.TURN_TAKING].value["waits"]]
+    assert waits_for == [0, 1_500], "the call's start and the persona's reply, not the line"
 
 
 async def test_a_call_gets_only_the_metrics_its_facts_support() -> None:

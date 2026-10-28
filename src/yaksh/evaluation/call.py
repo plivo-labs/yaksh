@@ -24,7 +24,7 @@ from yaksh.domain.conversations import (
 from yaksh.domain.evaluations import DecidedBy, ItemRole, Metric, MetricKey, Outcome, UnsureKind
 from yaksh.domain.files import FileStore
 from yaksh.domain.language_models import JsonModel
-from yaksh.domain.latency import CallerReplyTime, Latency, Span, waits
+from yaksh.domain.latency import CallerReplyTime, CallerReplyWindow, Latency, Span, waits
 from yaksh.domain.record_sources import RECORD_PROVIDERS
 from yaksh.domain.rules import LlmRule, PhraseRule, in_scope
 from yaksh.domain.scenarios import PlayedScenario
@@ -360,7 +360,8 @@ async def measure_call(
     metrics: a missing value, never a zero. agent_speaks_first is the pinned agent's setting:
     without it, Yaksh's caller opens the call. The persona's voicemail or call screener is not
     a reply that waits for the agent, so its lines, and the call's start when it answers, have
-    no response time."""
+    no response time. Neither is an interruption line, which the caller said over the agent: it
+    counts in the caller's speech, but in no wait for an answer."""
     transcript = Transcript.model_validate(conversation.transcript or {})
     found = {
         MetricKey.USAGE: metrics.usage(
@@ -391,9 +392,14 @@ async def measure_call(
     if heard is None:
         return found
     goodbye = metrics.goodbye_from(transcript)
+    replies = [
+        pair
+        for pair, reply in zip(heard.replies, spoken_replies(transcript), strict=True)
+        if reply.interruption is None
+    ]
     paired = waits(
         opened,
-        heard.replies,
+        replies,
         heard.speech.agent,
         heard.end_ms,
         goodbye_from_ms=goodbye,
@@ -441,5 +447,12 @@ async def hear(
         voice, voice_rate = await asyncio.to_thread(speech.read_mono, caller_voice)
         if voice_rate != rate:
             raise ValueError(f"the caller voice is at {voice_rate} Hz, the recording at {rate} Hz")
-    replies = [reply for reply in transcript.caller_replies if reply.machine is None]
-    return await speech.measure(agent, voice, rate, transcript.recording_start_ms, replies)
+    return await speech.measure(
+        agent, voice, rate, transcript.recording_start_ms, spoken_replies(transcript)
+    )
+
+
+def spoken_replies(transcript: Transcript) -> list[CallerReplyWindow]:
+    """The caller's replies with audio of its own: the persona's replies and its fixed lines,
+    not the recordings of its voicemail or call screener."""
+    return [reply for reply in transcript.caller_replies or [] if reply.machine is None]
