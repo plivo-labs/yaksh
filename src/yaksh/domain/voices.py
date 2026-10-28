@@ -14,7 +14,7 @@ from pydantic import (
 
 from yaksh.domain.languages import INDIAN_AND_ENGLISH, INDIAN_ENGLISH_AND_SPANISH, Language
 
-PROVIDER_VOICE_ID = r"^[A-Za-z0-9_-]+$"
+PROVIDER_VOICE_ID = r"^[A-Za-z0-9_:-]+$"
 
 
 class VoiceProvider(StrEnum):
@@ -153,7 +153,8 @@ class VoiceGender(StrEnum):
 
 class VoiceSettings(BaseModel):
     """A voice of one text-to-speech provider and how it speaks; the id means nothing
-    outside that provider. The id goes into provider URLs, so dots and slashes are refused."""
+    outside that provider. The id goes into provider URLs, so dots and slashes are refused; a
+    colon is allowed, as in Azure's HD voice names."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 

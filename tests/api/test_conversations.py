@@ -10,12 +10,13 @@ from zoneinfo import ZoneInfo
 
 import pytest
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import func, insert, select, update
+from sqlalchemy import func, insert, select, text, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from tests.conftest import (
     APP_SETTINGS,
+    ENGLISH_VOICE,
     FAST,
     FINAL,
     OUTBOUND_AGENT,
@@ -829,6 +830,43 @@ async def call_request_of(settings: Settings, conversation_id: str) -> CallReque
             )
     finally:
         await engine.dispose()
+
+
+async def test_a_version_written_without_a_model_speaks_with_the_persona_model(
+    client: AsyncClient, settings: Settings, db: Db
+) -> None:
+    await client.post(
+        "/api/v1/voices",
+        json={
+            "provider": "elevenlabs",
+            "provider_voice_id": ENGLISH_VOICE.id,
+            "languages": ["en"],
+            "model": "eleven_multilingual_v2",
+        },
+    )
+    persona = await create_persona(
+        client,
+        voice={"provider": "elevenlabs", "id": ENGLISH_VOICE.id, "model": "eleven_multilingual_v2"},
+    )
+    agent_id = await create_agent_id(client)
+    async with db() as session:
+        await session.execute(
+            text(
+                "INSERT INTO persona_versions (id, persona_id, version, config)"
+                " SELECT gen_random_uuid(), persona_id, 2, config FROM persona_versions"
+                " WHERE persona_id = :id"
+            ),
+            {"id": persona["id"]},
+        )
+        await session.execute(
+            text("UPDATE personas SET current_version = 2 WHERE id = :id"), {"id": persona["id"]}
+        )
+        await session.commit()
+    started = await start(client, agent_id, persona_id=persona["id"])
+
+    request = await call_request_of(settings, started["id"])
+
+    assert request.voice.model == "eleven_multilingual_v2"
 
 
 async def test_a_conversation_freezes_its_persona_scenario_and_prompt(

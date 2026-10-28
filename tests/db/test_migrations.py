@@ -71,13 +71,18 @@ def migrate(database_url: str, revision: str) -> None:
     command.upgrade(config, revision)
 
 
-async def test_each_voice_gets_the_model_its_provider_had_in_settings(database_url: str) -> None:
+async def database_at(database_url: str, name: str, revision: str) -> str:
     admin = create_async_engine(database_url, isolation_level="AUTOCOMMIT")
     async with admin.connect() as connection:
-        await connection.execute(text("CREATE DATABASE voice_models"))
+        await connection.execute(text(f"CREATE DATABASE {name}"))
     await admin.dispose()
-    url = database_url.rsplit("/", 1)[0] + "/voice_models"
-    await asyncio.to_thread(migrate, url, "0006")
+    url = database_url.rsplit("/", 1)[0] + f"/{name}"
+    await asyncio.to_thread(migrate, url, revision)
+    return url
+
+
+async def test_each_voice_gets_the_model_its_provider_had_in_settings(database_url: str) -> None:
+    url = await database_at(database_url, "voice_models", "0006")
     stored = {
         "elevenlabs": {"url": "wss://api.elevenlabs.io", "model": "eleven_turbo_v2_5"},
         "sarvam_tts": {"model": "bulbul:v3"},
@@ -133,3 +138,29 @@ async def test_each_voice_gets_the_model_its_provider_had_in_settings(database_u
     assert voices == personas == versions == expected
     assert values == {"elevenlabs": {"url": "wss://api.elevenlabs.io"}, "sarvam_tts": {}}
     assert version == 4
+
+
+async def test_an_upgrade_from_before_the_speech_providers_in_one_step_maps_old_models(
+    database_url: str,
+) -> None:
+    url = await database_at(database_url, "voice_models_old", "0005")
+    engine = create_async_engine(url)
+    async with engine.begin() as connection:
+        await connection.execute(
+            text("UPDATE app_settings SET values = CAST(:values AS jsonb)"),
+            {"values": json.dumps({"elevenlabs": {"model": "eleven_v3"}})},
+        )
+        await connection.execute(
+            text(
+                "INSERT INTO voices (id, provider, provider_voice_id, name, languages,"
+                " listed_languages, builtin) VALUES (gen_random_uuid(), 'elevenlabs', 'el1',"
+                " 'el1', '{en}', '{}', false)"
+            )
+        )
+
+    await asyncio.to_thread(migrate, url, "head")
+
+    async with engine.connect() as connection:
+        voices = await models_by_provider(connection, "SELECT provider::text, model FROM voices")
+    await engine.dispose()
+    assert voices == {"elevenlabs": "eleven_flash_v2_5"}

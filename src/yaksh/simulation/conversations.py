@@ -376,7 +376,7 @@ async def call_request(
     agent: AgentConfig,
 ) -> CallRequest:
     persona_version = await session.get_one(PersonaVersion, conversation.persona_version_id)
-    persona = version_config(persona_version)
+    persona = await version_config(session, persona_version)
     scenario = await played_scenario(session, conversation)
     return CallRequest(
         conversation_id=conversation.id,

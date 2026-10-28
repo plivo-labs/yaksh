@@ -15,23 +15,14 @@ depends_on = None
 
 INDEX = "ix_voices_provider_voice_live"
 MODELS = {
-    "elevenlabs": (
-        "elevenlabs",
-        (
-            "eleven_flash_v2_5",
-            "eleven_multilingual_v2",
-            "eleven_v4_turbo",
-            "eleven_v4",
-            "eleven_v3",
-            "eleven_v3_conversational",
-        ),
-    ),
+    "elevenlabs": ("elevenlabs", ("eleven_flash_v2_5", "eleven_multilingual_v2")),
     "cartesia": ("cartesia", ("sonic-3.6", "sonic-3.5", "sonic-3")),
     "sarvam": ("sarvam_tts", ("bulbul:v4-flash", "bulbul:v3")),
 }
 """Each provider with a model choice: the Settings section that held its one model, and the
-models of this release. A stored model outside the list becomes the first, the default the
-Settings page showed."""
+models that the previous release could speak with. A stored model outside the list becomes the
+first, the default the Settings page showed. ElevenLabs' v3 and v4 are left out: its socket of
+the previous release refused them, so no voice ever spoke with them."""
 
 
 def upgrade() -> None:

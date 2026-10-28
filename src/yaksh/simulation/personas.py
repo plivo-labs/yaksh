@@ -69,10 +69,17 @@ def version_row(persona_id: uuid.UUID, version: int, config: PersonaConfig) -> P
     )
 
 
-def version_config(version: PersonaVersion) -> PersonaConfig:
-    """A stored version's config, with its voice's model from its column."""
+async def version_config(session: AsyncSession, version: PersonaVersion) -> PersonaConfig:
+    """A stored version's config, with its voice's model from its column. A version that an
+    older process wrote during a rollout has no model: its voice keeps the persona's model while
+    it is the persona's voice."""
     config = PersonaConfig.model_validate(version.config)
-    voice = config.voice.model_copy(update={"model": version.voice_model})
+    model = version.voice_model
+    if model is None:
+        persona = await session.get_one(Persona, version.persona_id)
+        if (persona.voice_provider, persona.voice_id) == (config.voice.provider, config.voice.id):
+            model = persona.voice_model
+    voice = config.voice.model_copy(update={"model": model})
     return config.model_copy(update={"voice": voice})
 
 
