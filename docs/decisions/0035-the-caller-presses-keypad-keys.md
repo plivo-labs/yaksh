@@ -21,7 +21,7 @@ On a phone call, the caller's model has a second tool, `press_keys`, beside `end
 
 ## Cost
 
-- A reply that speaks and presses keys records the keypad turn at the press, before its spoken turn, which is recorded when its audio has played. The tool description and the caller prompt ask for no words in a reply that presses keys.
+- A reply that speaks and presses keys records the keypad turn at the press, before its spoken turn, which is recorded when its audio has played. The tool description asks for no words in a reply that presses keys.
 - Only the keys of a phone: Plivo also takes A to D.
 - The model can send keys that are not on a keypad again; each try runs the model once more, until the call's time limit.
 
