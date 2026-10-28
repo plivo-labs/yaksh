@@ -2246,7 +2246,6 @@ type InterruptionTry struct {
 	Number        int        `json:"number"`
 	Reason        *TryReason `json:"reason,omitempty"`
 	TurnStartedMs *int       `json:"turn_started_ms,omitempty"`
-	TurnWords     *bool      `json:"turn_words,omitempty"`
 	WindowEndMs   *int       `json:"window_end_ms,omitempty"`
 	Words         *string    `json:"words,omitempty"`
 }

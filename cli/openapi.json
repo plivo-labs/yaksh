@@ -10315,17 +10315,6 @@
             ],
             "title": "Words"
           },
-          "turn_words": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Turn Words"
-          },
           "window_end_ms": {
             "anyOf": [
               {

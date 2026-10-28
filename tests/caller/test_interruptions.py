@@ -1,5 +1,6 @@
 import asyncio
 from array import array
+from collections.abc import Awaitable, Callable
 from types import SimpleNamespace
 from typing import cast
 
@@ -21,9 +22,10 @@ from pipecat.pipeline.pipeline import Pipeline
 from pipecat.processors.aggregators.llm_context import LLMContext
 from pipecat.processors.aggregators.llm_response_universal import (
     LLMContextAggregatorPair,
+    LLMUserAggregator,
     LLMUserAggregatorParams,
 )
-from pipecat.processors.frame_processor import FrameDirection
+from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
 from pipecat.tests.utils import SleepFrame, run_test
 from pipecat.turns.user_stop import SpeechTimeoutUserTurnStopStrategy
 from pipecat.turns.user_turn_strategies import UserTurnStrategies
@@ -391,8 +393,8 @@ async def test_a_time_line_and_a_phrase_line_in_one_turn_take_turns() -> None:
 
 async def test_two_waits_that_end_together_play_only_the_first_line() -> None:
     call = Call(
-        Interruption(say="Wait.", agent_says="fee", after_s=0),
-        Interruption(say="Hold on.", agent_says="fee", after_s=0),
+        Interruption(say="Wait.", agent_says="fee", after_s=WAIT),
+        Interruption(say="Hold on.", agent_says="fee", after_s=WAIT),
     )
 
     call.agent_starts()
@@ -481,7 +483,7 @@ async def test_a_start_waits_for_the_voice_detector_to_decide() -> None:
     assert call.player.played == [(1, "Wait.")]
 
 
-async def test_a_played_line_keeps_the_words_before_it_and_whether_its_turn_had_words() -> None:
+async def test_a_played_line_keeps_the_words_before_it() -> None:
     call = Call(Interruption(say="Wait.", after_s=WAIT, from_answer=1))
     music = Call(Interruption(say="Wait.", after_s=WAIT, from_answer=1))
 
@@ -491,15 +493,15 @@ async def test_a_played_line_keeps_the_words_before_it_and_whether_its_turn_had_
     await ends(call)
     await ends(music)
 
-    assert (call.tries()[0].words, call.tries()[0].turn_words) == ("We open at nine", True)
-    assert (music.tries()[0].words, music.tries()[0].turn_words) == ("", False)
+    assert call.tries()[0].words == "We open at nine"
+    assert music.tries()[0].words == ""
 
 
 async def test_a_played_line_keeps_the_window_that_starts_at_its_first_sound() -> None:
     call = Call(Interruption(say="Wait.", after_s=WAIT, from_answer=1))
 
     call.agent_starts()
-    await ends(call)
+    await asyncio.sleep(WAIT * 3)
 
     [event] = [event for event in call.observer.events if event.interruption is not None]
     assert event.interruption is not None
@@ -696,13 +698,20 @@ def gate(clock: Clock) -> tuple[LineGate, list[Frame], list[int]]:
     return line_gate, out, waited
 
 
-def gate_with_context(clock: Clock) -> tuple[LineGate, LLMContext, list[Frame], list[int]]:
+def waiter() -> tuple[Callable[[], Awaitable[None]], list[int]]:
+    """A gate's `wait_for_agent`, and a list that grows at each call."""
     waited: list[int] = []
-    out: list[Frame] = []
-    context = LLMContext()
 
     async def wait_for_agent() -> None:
         waited.append(1)
+
+    return wait_for_agent, waited
+
+
+def gate_with_context(clock: Clock) -> tuple[LineGate, LLMContext, list[Frame], list[int]]:
+    wait_for_agent, waited = waiter()
+    out: list[Frame] = []
+    context = LLMContext()
 
     async def pushed(frame: Frame, _direction: FrameDirection = FrameDirection.DOWNSTREAM):
         out.append(frame)
@@ -894,9 +903,36 @@ async def test_an_agent_that_talks_over_the_line_gets_the_usual_reply() -> None:
     assert waited == []
 
 
-async def test_behind_a_real_turn_aggregator_the_gate_holds_the_turn_it_waits_out() -> None:
-    clock = FixedClock()
-    user = LLMContextAggregatorPair(
+class Seen(FrameProcessor):
+    """After the gate: each frame that passed it, and whether the line had played then. A step
+    runs when the given frame of its kind passes, counted from 1."""
+
+    def __init__(
+        self,
+        playing: PlayingLine,
+        steps: dict[tuple[type[Frame], int], Callable[[], Awaitable[None]]],
+    ) -> None:
+        super().__init__(enable_direct_mode=True)
+        self.playing = playing
+        self.frames: list[tuple[type[Frame], bool]] = []
+        self._steps = steps
+
+    async def process_frame(self, frame: Frame, direction: FrameDirection) -> None:
+        await super().process_frame(frame, direction)
+        if direction is FrameDirection.DOWNSTREAM:
+            self.frames.append((type(frame), self.playing.played))
+            nth = sum(kind is type(frame) for kind, _ in self.frames)
+            step = self._steps.get((type(frame), nth))
+            if step is not None:
+                await step()
+        await self.push_frame(frame, direction)
+
+    def played_at(self, kind: type[Frame]) -> list[bool]:
+        return [played for seen, played in self.frames if seen is kind]
+
+
+def aggregator() -> LLMUserAggregator:
+    return LLMContextAggregatorPair(
         LLMContext(),
         user_params=LLMUserAggregatorParams(
             user_turn_strategies=UserTurnStrategies(
@@ -904,31 +940,78 @@ async def test_behind_a_real_turn_aggregator_the_gate_holds_the_turn_it_waits_ou
             ),
         ),
     ).user()
-    waited: list[int] = []
 
-    async def wait_for_agent() -> None:
-        waited.append(1)
 
+AGENT_TURN = [
+    VADUserStartedSpeakingFrame(start_secs=0.2),
+    TranscriptionFrame("We open at nine", "agent", "now"),
+    VADUserStoppedSpeakingFrame(stop_secs=0.0),
+    SleepFrame(0.2),
+]
+
+
+async def test_behind_a_real_aggregator_a_talked_over_line_gets_one_reply_after_it_played() -> None:
+    clock = FixedClock()
+    user = aggregator()
+    wait_for_agent, _ = waiter()
     line_gate = LineGate(user.context, clock, wait_for_agent)
+    playing = line(clock)
+
+    async def starts() -> None:
+        line_gate.line_started(playing)
+        clock.now = 5_000  # the agent speaks on, past the line's window
+
+    @user.event_handler("on_user_turn_stopped")
+    async def turn_stopped(*_: object) -> None:
+        await line_gate.turn_ended()
+        await line_gate.line_played()
+
+    seen = Seen(playing, {(InterruptionFrame, 1): starts})
+    await run_test(
+        Pipeline([user, AgentTurnTap(TranscriptBuilder(clock, Observer())), line_gate, seen]),
+        frames_to_send=AGENT_TURN,
+    )
+
+    assert seen.played_at(LLMContextFrame) == [True], "one reply, and only once the line played"
+    assert notes(user.context)[-1] == NOTE.format(line="Wait.")
+
+
+async def test_behind_a_real_aggregator_an_answer_that_starts_during_the_line_gets_one_reply(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(interruptions, "ANSWER_WAIT_S", WAIT)
+    clock = FixedClock()
+    user = aggregator()
+    wait_for_agent, waited = waiter()
+    line_gate = LineGate(user.context, clock, wait_for_agent)
+    playing = line(clock)
+
+    async def starts() -> None:
+        line_gate.line_started(playing)
 
     @user.event_handler("on_user_turn_stopped")
     async def turn_stopped(*_: object) -> None:
         await line_gate.turn_ended()
 
-    line_gate.line_started(line(clock))
-    await line_gate.line_played()
-    down, _ = await run_test(
-        Pipeline([user, AgentTurnTap(TranscriptBuilder(clock, Observer())), line_gate]),
+    seen = Seen(
+        playing,
+        {(InterruptionFrame, 1): starts, (VADUserStoppedSpeakingFrame, 2): line_gate.line_played},
+    )
+    await run_test(
+        Pipeline([user, AgentTurnTap(TranscriptBuilder(clock, Observer())), line_gate, seen]),
         frames_to_send=[
+            *AGENT_TURN,
             VADUserStartedSpeakingFrame(start_secs=0.2),
-            TranscriptionFrame("We open at nine", "agent", "now"),
+            TranscriptionFrame("Sure, take your time.", "agent", "now"),
             VADUserStoppedSpeakingFrame(stop_secs=0.0),
-            SleepFrame(0.3),
+            SleepFrame(WAIT * 4),
         ],
     )
 
-    assert not any(isinstance(frame, LLMContextFrame) for frame in down), "no reply over it"
-    assert waited == [1]
+    assert seen.played_at(InterruptionFrame) == [False], "only the cut before the line started"
+    assert seen.played_at(LLMContextFrame) == [True], "one reply, to the answer"
+    assert notes(user.context)[-2:] == [STOPPED, "Sure, take your time."]
+    assert waited == [], "an agent turn was open when the line had played"
 
 
 async def test_a_persona_that_waits_goes_on_when_the_agent_says_nothing(
@@ -967,3 +1050,84 @@ async def test_a_persona_that_waits_hears_the_agent_answer_and_does_not_go_on(
 
     assert GO_ON not in notes(context)
     assert not any(isinstance(frame, LLMContextFrame) for frame in out)
+
+
+async def waiting_gate(
+    monkeypatch: pytest.MonkeyPatch,
+) -> tuple[LineGate, LLMContext, list[Frame], list[int]]:
+    """A gate whose persona waits for the agent's answer to a line that the agent stopped for."""
+    monkeypatch.setattr(interruptions, "ANSWER_WAIT_S", WAIT)
+    clock = FixedClock()
+    line_gate, context, out, waited = gate_with_context(clock)
+    await send(line_gate, VADUserStartedSpeakingFrame(start_secs=0.2), UserStartedSpeakingFrame())
+    line_gate.line_started(line(clock))
+    await send(line_gate, VADUserStoppedSpeakingFrame(stop_secs=0.0), UserStoppedSpeakingFrame())
+    await line_gate.turn_ended()
+    await line_gate.line_played()
+    return line_gate, context, out, waited
+
+
+async def test_a_turn_with_no_words_while_the_persona_waits_starts_its_wait_again(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    line_gate, context, out, waited = await waiting_gate(monkeypatch)
+
+    for _ in range(2):
+        await send(
+            line_gate, VADUserStartedSpeakingFrame(start_secs=0.2), UserStartedSpeakingFrame()
+        )
+        await send(
+            line_gate, VADUserStoppedSpeakingFrame(stop_secs=0.0), UserStoppedSpeakingFrame()
+        )
+        await line_gate.turn_ended()
+        await asyncio.sleep(WAIT * 3)
+
+    assert notes(context).count(GO_ON) == 1, "a noise with no words is no answer; one go-on"
+    assert sum(isinstance(frame, LLMContextFrame) for frame in out) == 1
+    assert waited == [1, 1]
+
+
+async def test_a_turn_that_a_late_transcript_starts_while_the_persona_waits_gets_one_reply(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    line_gate, context, out, _ = await waiting_gate(monkeypatch)
+
+    await send(line_gate, UserStartedSpeakingFrame())
+    await asyncio.sleep(WAIT * 3)
+    await send(line_gate, LLMContextFrame(context=LLMContext()), UserStoppedSpeakingFrame())
+    await line_gate.turn_ended()
+    await asyncio.sleep(WAIT * 3)
+
+    assert GO_ON not in notes(context)
+    assert sum(isinstance(frame, LLMContextFrame) for frame in out) == 1
+
+
+async def test_late_words_of_a_turn_while_the_persona_waits_get_one_reply(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    line_gate, context, out, _ = await waiting_gate(monkeypatch)
+
+    await send(line_gate, LLMContextFrame(context=LLMContext()))
+    await asyncio.sleep(WAIT * 3)
+
+    assert GO_ON not in notes(context)
+    assert sum(isinstance(frame, LLMContextFrame) for frame in out) == 1
+
+
+async def test_a_pause_shorter_than_a_stop_after_the_line_is_no_stop() -> None:
+    clock = FixedClock()
+    line_gate, context, out, waited = gate_with_context(clock)
+    await send(line_gate, VADUserStartedSpeakingFrame(start_secs=0.2), UserStartedSpeakingFrame())
+    line_gate.line_started(line(clock))
+    clock.now = 700
+    await send(line_gate, VADUserStoppedSpeakingFrame(stop_secs=0.3))
+    clock.now = 900
+    await send(line_gate, VADUserStartedSpeakingFrame(start_secs=0.1))
+    clock.now = 4_300
+    await send(line_gate, VADUserStoppedSpeakingFrame(stop_secs=0.3), UserStoppedSpeakingFrame())
+    await line_gate.turn_ended()
+    await line_gate.line_played()
+
+    assert notes(context) == [NOTE.format(line="Wait.")], "a pause of 0.4 s, then more speech"
+    assert sum(isinstance(frame, LLMContextFrame) for frame in out) == 1
+    assert waited == []

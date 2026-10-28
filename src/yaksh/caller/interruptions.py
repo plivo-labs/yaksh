@@ -42,6 +42,7 @@ from yaksh.domain.conversations import (
     WireEvent,
     WireEventKind,
 )
+from yaksh.domain.latency import VAD_STOP_S
 from yaksh.domain.scenarios import Interruption
 
 NOTE = 'While the agent said the turn above, you interrupted it and said: "{line}"'
@@ -168,7 +169,31 @@ class PlayingLine:
     words: str
     """The agent's words in its turn up to the line's start."""
     played: bool = False
-    saved: bool = False
+    stop_ms: int | None = None
+    """When the agent's voice first stopped after the line started. A quiet is a stop when it
+    lasts VAD_STOP_S, the stop of the voice detector after the call, whatever the live VAD's
+    stop is: a pause between two sentences is no stop."""
+    quiet_ms: int | None = None
+    """When the agent's voice went quiet, while it stays quiet and no stop came before."""
+    spoke_again: bool = False
+    """Whether the agent spoke again after that stop."""
+
+    def voice_stopped(self, at_ms: int) -> None:
+        if self.stop_ms is None:
+            self.quiet_ms = at_ms
+
+    def voice_started(self, at_ms: int) -> None:
+        quiet = self.quiet_ms
+        if quiet is not None and at_ms - quiet >= round(VAD_STOP_S * 1000):
+            self.stop_ms = quiet
+        self.quiet_ms = None
+        self.spoke_again = self.stop_ms is not None
+
+    def stopped(self) -> bool:
+        """Whether the agent stopped for the line, once its turn ended: its first stop, or the
+        quiet that the turn ended in, came within the line's window."""
+        stop = self.stop_ms if self.stop_ms is not None else self.quiet_ms
+        return stop is not None and self.started_ms <= stop <= self.window_end_ms
 
 
 class After(Enum):
@@ -188,11 +213,12 @@ class LineGate(FrameProcessor):
     cut and every context frame. When the turn that the lines interrupted ends, the gate writes
     a note for each line into the context, and the last line decides what the persona does. The
     agent stopped for it when its first stop after the line started came within the line's
-    window. Then, if the agent said nothing more in that turn, the persona waits for its answer,
-    and goes on with the call when the agent says nothing for ANSWER_WAIT_S; if it spoke again,
-    the persona answers it. In every other case the persona answers the turn as usual. A later
-    turn of the agent that ends during a line owes a reply too. The end of the next agent turn
-    gives the reply, or the gate itself once the line has played and no agent turn is open."""
+    window. Then, if the agent said nothing more in that turn, the persona waits for its answer:
+    the next agent turn with words gets the reply, and when no agent turn is open for
+    ANSWER_WAIT_S, the persona goes on with the call. If the agent spoke again, the persona
+    answers it. In every other case the persona answers the turn as usual. A later turn of the
+    agent that ends during a line owes a reply too. The end of the next agent turn gives the
+    reply, or the gate itself once the line has played and no agent turn is open."""
 
     def __init__(
         self,
@@ -211,12 +237,8 @@ class LineGate(FrameProcessor):
         self._turn_open = False
         self._turn_voiced = False
         self._voice = False
-        self._first_stop_ms: int | None = None
-        """When the agent first stopped after the latest line started."""
-        self._spoke_again = False
-        """Whether the agent spoke again after that first stop."""
         self._going_on: asyncio.Task[None] | None = None
-        """While the persona waits for the agent's answer: the time after which it goes on."""
+        """While the persona waits and no agent turn is open: the time after which it goes on."""
 
     @property
     def owed(self) -> bool:
@@ -230,8 +252,6 @@ class LineGate(FrameProcessor):
     def line_started(self, line: PlayingLine) -> None:
         self._interrupting.append(line)
         self._latest = line
-        self._first_stop_ms = None
-        self._spoke_again = False
 
     async def line_played(self) -> None:
         assert self._latest is not None
@@ -245,16 +265,13 @@ class LineGate(FrameProcessor):
         if self._interrupting:
             lines, self._interrupting = self._interrupting, []
             last = lines[-1]
-            stopped = (
-                self._first_stop_ms is not None
-                and last.started_ms <= self._first_stop_ms <= last.window_end_ms
-            )
+            stopped = last.stopped()
             notes = [NOTE.format(line=playing.spec.say) for playing in lines]
             if stopped:
-                notes.append(ANSWERED if self._spoke_again else STOPPED)
+                notes.append(ANSWERED if last.spoke_again else STOPPED)
             for note in notes:
                 self._context.add_message({"role": "system", "content": note})
-            self._after = After.WAIT if stopped and not self._spoke_again else After.REPLY
+            self._after = After.WAIT if stopped and not last.spoke_again else After.REPLY
         await self._settle()
 
     async def process_frame(self, frame: Frame, direction: FrameDirection) -> None:
@@ -273,17 +290,24 @@ class LineGate(FrameProcessor):
                     self._after = After.REPLY
                 return False
             self._after = After.NOTHING
+            self._stop_going_on()
         elif isinstance(frame, VADUserStartedSpeakingFrame):
             self._voice = self._turn_voiced = True
-            self._spoke_again = self._spoke_again or self._first_stop_ms is not None
+            if self._interrupting:
+                self._interrupting[-1].voice_started(
+                    self._clock.ms() - round(frame.start_secs * 1000)
+                )
             self._stop_going_on()
         elif isinstance(frame, VADUserStoppedSpeakingFrame):
             self._voice = False
-            if self._interrupting and self._first_stop_ms is None:
-                self._first_stop_ms = self._clock.ms() - round(frame.stop_secs * 1000)
+            if self._interrupting:
+                self._interrupting[-1].voice_stopped(
+                    self._clock.ms() - round(frame.stop_secs * 1000)
+                )
         elif isinstance(frame, UserStartedSpeakingFrame):
             # A turn that starts with no voice was started by a late transcript alone.
             self._turn_open, self._turn_voiced = True, self._voice
+            self._stop_going_on()
         elif isinstance(frame, UserStoppedSpeakingFrame):
             self._turn_open = False
         elif isinstance(frame, EndFrame | CancelFrame):
@@ -291,19 +315,24 @@ class LineGate(FrameProcessor):
         return True
 
     async def _settle(self) -> None:
-        if self._latest is None or not self._latest.played or self._interrupting:
+        """Give the owed reply, or start the persona's wait, once the lines have played and no
+        agent turn is open. A wait stays until a context frame passes or the persona goes on:
+        the agent's voice or a new turn stops its time, and the end of a turn with no words
+        starts it again."""
+        line = self._latest
+        if line is None or not line.played or self._interrupting or self._turn_open:
             return
-        if self._after is After.REPLY and not self._turn_open:
+        if self._after is After.REPLY:
             self._after = After.NOTHING
             await self.push_frame(LLMContextFrame(context=self._context))
-        elif self._after is After.WAIT:
-            self._after = After.NOTHING
+        elif self._after is After.WAIT and self._going_on is None:
             await self._wait_for_agent()
             self._going_on = asyncio.create_task(self._go_on())
 
     async def _go_on(self) -> None:
         await asyncio.sleep(ANSWER_WAIT_S)
         self._going_on = None
+        self._after = After.NOTHING
         self._context.add_message({"role": "system", "content": GO_ON})
         await self.push_frame(LLMContextFrame(context=self._context))
 
@@ -356,7 +385,6 @@ class Interrupter(FrameProcessor):
         self._turn: AgentTurn | None = None
         self._last_turns: dict[int, AgentTurn] = {}
         """The latest turn of each answer, which a time start's try names."""
-        self._playing: list[PlayingLine] = []
         self._tasks: set[asyncio.Task[None]] = set()
         for line in self._lines:
             if line.spec.agent_says is not None and not words_while_speaking:
@@ -411,13 +439,10 @@ class Interrupter(FrameProcessor):
             if line.matches is None or turn.answer < line.spec.from_answer:
                 continue
             for _ in range(line.matches.heard(turn.words(), final=final)):
-                until_ms = self._clock.ms() + round(line.spec.after_s * 1000)
-                self._task(self._phrase_waited(line, until_ms, turn))
+                self._task(self._phrase_waited(line, line.spec.after_s, turn))
 
     async def call_ended(self) -> None:
-        """A played line's try is saved now, and each start that still waits is used up."""
-        for playing in self._playing:
-            self._save(playing)
+        """Each start that still waits is used up."""
         tasks, self._tasks = self._tasks, set()
         for task in tasks:
             task.cancel()
@@ -425,16 +450,19 @@ class Interrupter(FrameProcessor):
 
     def _answer_started(self) -> None:
         """Each time trigger counts from the start of each answer, from its `from_answer` on."""
-        started = self._transcript.agent_turn_started_ms or self._clock.ms()
+        now = self._clock.ms()
+        started = self._transcript.agent_turn_started_ms or now
         for line in self._open():
             if line.spec.agent_says is None and self._answer >= line.spec.from_answer:
-                until_ms = started + round(line.spec.after_s * 1000)
-                self._task(self._time_waited(line, until_ms, self._answer))
+                wait_s = max(0, started + round(line.spec.after_s * 1000) - now) / 1000
+                self._task(self._time_waited(line, wait_s, self._answer))
 
-    async def _phrase_waited(self, line: LineState, until_ms: int, turn: AgentTurn) -> None:
-        """A phrase start lives in its turn: the line plays if the agent still speaks in it."""
+    async def _phrase_waited(self, line: LineState, wait_s: float, turn: AgentTurn) -> None:
+        """A phrase start lives in its turn: the line plays if the agent still speaks in it.
+        Each wait is a length from its start, so waits of one length that start together end in
+        the order of the list."""
         try:
-            await asyncio.sleep(max(0, until_ms - self._clock.ms()) / 1000)
+            await asyncio.sleep(wait_s)
             state = await self._decided() if turn.open and not line.done else None
         except asyncio.CancelledError:
             self._cut_short(line, turn.answer, turn)
@@ -447,12 +475,12 @@ class Interrupter(FrameProcessor):
         reason = TryReason.AGENT_QUIET if turn.open else TryReason.TURN_ENDED
         self._try(line, reason, turn.answer, turn)
 
-    async def _time_waited(self, line: LineState, until_ms: int, answer: int) -> None:
+    async def _time_waited(self, line: LineState, wait_s: float, answer: int) -> None:
         """A time start lives in its answer. When its wait ends, the line plays at the agent's
         speech in the turn that is open then, at once or after a pause; the end of that turn
         uses the start up, and so does a wait that ends with no turn of the answer open."""
         try:
-            await asyncio.sleep(max(0, until_ms - self._clock.ms()) / 1000)
+            await asyncio.sleep(wait_s)
             turn = self._turn
             if self._answer != answer or turn is None or not turn.open:
                 if not line.done:
@@ -500,11 +528,19 @@ class Interrupter(FrameProcessor):
             window_end_ms=started + first_sound_ms(pcm) + round(STOP_WINDOW_S * 1000),
             words=turn.words(),
         )
-        self._playing.append(playing)
         self._order.line_started(line.number)
         self._gate.line_started(playing)
         self._transcript.interruption(line.spec.say, line.number)
-        self._task(self._save_at_window_end(playing))
+        self._event(
+            started,
+            InterruptionTry(
+                number=line.number,
+                answer=turn.answer,
+                turn_started_ms=turn.started_ms,
+                words=playing.words,
+                window_end_ms=playing.window_end_ms,
+            ),
+        )
         self._task(self._sound(line, pcm))
 
     def _blocked(self, line: LineState, turn: AgentTurn) -> TryReason | None:
@@ -527,26 +563,6 @@ class Interrupter(FrameProcessor):
         await until_played(lambda: self._transcript.caller_quiet, bytes_ms(len(pcm)) / 1000)
         self._reply_times.line_played()
         await self._gate.line_played()
-
-    async def _save_at_window_end(self, playing: PlayingLine) -> None:
-        await asyncio.sleep(max(0, playing.window_end_ms - self._clock.ms()) / 1000)
-        self._save(playing)
-
-    def _save(self, playing: PlayingLine) -> None:
-        if playing.saved:
-            return
-        playing.saved = True
-        self._event(
-            playing.started_ms,
-            InterruptionTry(
-                number=playing.number,
-                answer=playing.turn.answer,
-                turn_started_ms=playing.turn.started_ms,
-                words=playing.words,
-                turn_words=bool(playing.turn.words()),
-                window_end_ms=playing.window_end_ms,
-            ),
-        )
 
     def _made(self, line: LineState, audio: asyncio.Future[bytes]) -> None:
         if audio.cancelled():

@@ -209,9 +209,6 @@ class InterruptionTry(BaseModel):
     """More on the reason: for AUDIO_FAILED, the error."""
     words: str | None = None
     """For a line that played: the agent's words in its turn up to the line's start."""
-    turn_words: bool | None = None
-    """For a line that played: whether any words of its turn came by the end of the line's
-    window. A line over audio with no words, such as hold music, gets none."""
     window_end_ms: int | None = None
     """For a line that played: the end of its window on the call clock, 2 s after the first
     sound of its audio. A stop of the agent in the window is a stop for the line."""
