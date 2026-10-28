@@ -8,7 +8,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { PartLabel } from "@/components/part-label";
+import { Explained } from "@/components/verdict-ui";
 import { latency } from "@/lib/format";
 import { useCallerReplyTimes } from "@/lib/queries";
 import { stepLabel, stepTip } from "@/lib/reply-steps";
@@ -44,15 +44,15 @@ export function CallerModelTimes() {
               <TableHead>Effort</TableHead>
               <TableHead className="text-right">Calls</TableHead>
               <TableHead className="text-right">
-                <PartLabel tip={REPLY_TIP}>Reply p50</PartLabel>
+                <Explained hint={REPLY_TIP}>Reply p50</Explained>
               </TableHead>
               <TableHead className="text-right">
-                <PartLabel tip={REPLY_TIP}>Reply p90</PartLabel>
+                <Explained hint={REPLY_TIP}>Reply p90</Explained>
               </TableHead>
               <TableHead className="pr-5 text-right">
-                <PartLabel tip={stepTip("llm_inference")}>
+                <Explained hint={stepTip("llm_inference")}>
                   {stepLabel("llm_inference")} p50
-                </PartLabel>
+                </Explained>
               </TableHead>
             </TableRow>
           </TableHeader>

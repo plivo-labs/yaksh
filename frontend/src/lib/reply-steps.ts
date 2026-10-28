@@ -7,7 +7,7 @@ export type Stage = "turn" | "llm" | "speech" | "other";
 const PARTS: Record<string, { label: string; tip: string }> = {
   endpointing_wait: {
     label: "VAD endpointing",
-    tip: "Silence the VAD waits for before it ends the agent's turn (stop_secs).",
+    tip: "Silence the VAD waits for before it reports that the agent stopped speaking (stop_secs).",
   },
   first_request: { label: "First request", tip: "Pipeline ready to the first LLM request." },
   transcription: {

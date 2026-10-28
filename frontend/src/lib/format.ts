@@ -137,7 +137,7 @@ export function seconds(ms: number): string {
 /** A latency in ms below a second, else in seconds with one decimal: 820ms, 2.1s. */
 export function latency(ms: number): string {
   const whole = Math.round(ms);
-  return whole < 1000 ? `${whole}ms` : seconds(whole);
+  return Math.abs(whole) < 1000 ? `${whole}ms` : seconds(whole);
 }
 
 export type ResponseBand = "good" | "slow" | "bad";
