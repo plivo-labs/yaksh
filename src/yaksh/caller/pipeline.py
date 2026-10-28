@@ -19,6 +19,7 @@ from pipecat.adapters.llm.schemas.function_schema import FunctionSchema
 from pipecat.adapters.llm.schemas.tools_schema import ToolsSchema
 from pipecat.audio.vad.vad_analyzer import VADParams
 from pipecat.frames.frames import (
+    BotStartedSpeakingFrame,
     ErrorFrame,
     Frame,
     FunctionCallResultFrame,
@@ -338,25 +339,39 @@ def watch_silence(
 
 class TurnLimit(FrameProcessor):
     """Between the agent's turns and the persona model: the model answers at most `turns` agent
-    turns. At the next one, `at_limit` runs instead, once."""
+    turns. At the next one, `at_limit` runs instead, once.
+
+    A turn counts when its answer starts to play. When the agent pauses inside its turn, the model
+    is asked for an answer that the agent's next words cut before any of it plays; when the
+    agent's turn ends, that answer is dropped and uses no turn. A fixed line, such as the idle
+    nudge, is no answer, and keys pressed without words use no turn."""
 
     def __init__(self, turns: int, at_limit: Callable[[], Awaitable[None]]) -> None:
         super().__init__()
-        self._left = turns
+        self._turns = turns
+        self._answered = 0
+        self._asked = False
+        """An answer was asked for, and none of it has played."""
         self._at_limit = at_limit
         self._reached = False
 
     async def process_frame(self, frame: Frame, direction: FrameDirection) -> None:
         await super().process_frame(frame, direction)
-        if isinstance(frame, LLMContextFrame) and direction is FrameDirection.DOWNSTREAM:
+        if isinstance(frame, BotStartedSpeakingFrame) and direction is FrameDirection.UPSTREAM:
+            if self._asked:
+                self._asked = False
+                self._answered += 1
+        elif isinstance(frame, TTSSpeakFrame) and direction is FrameDirection.DOWNSTREAM:
+            self._asked = False
+        elif isinstance(frame, LLMContextFrame) and direction is FrameDirection.DOWNSTREAM:
             answers = not frame.speculation
-            if self._left == 0:
+            if self._answered >= self._turns:
                 if answers and not self._reached:
                     self._reached = True
                     await self._at_limit()
                 return
             if answers:
-                self._left -= 1
+                self._asked = True
         await self.push_frame(frame, direction)
 
 

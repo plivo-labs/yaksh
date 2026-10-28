@@ -1,3 +1,11 @@
+## v0.9.7 (2026-10-28)
+
+### Fix
+
+- **caller**: count a turn toward the turn limit only when its answer plays (#35)
+  - The caller's turn limit now counts only the agent turns that the caller answered aloud. When the agent paused inside its own turn, for example between two sentences or during a tool call, the caller was asked for an answer that the agent's next words cut before it played. That pause used up a turn, so calls often ended at the turn limit before their scenarios were done.
+  - The idle nudge, and a reply that only presses keys, do not count as answers. Calls can be longer than on 0.9.6, up to the turn limit or the call length limit.
+
 ## v0.9.6 (2026-10-28)
 
 ### Fix
