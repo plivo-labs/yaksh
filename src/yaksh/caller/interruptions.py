@@ -416,6 +416,7 @@ class Interrupter(FrameProcessor):
         order: TurnOrder,
         player: SoundPlayer,
         reply_times: ReplyTimes,
+        fixed_line: Callable[[], None],
         clock: Clock,
         listening: Callable[[], bool],
         ending: Callable[[], bool],
@@ -428,6 +429,8 @@ class Interrupter(FrameProcessor):
         self._order = order
         self._player = player
         self._reply_times = reply_times
+        self._fixed_line = fixed_line
+        """Tells the turn limit that a line plays, so that its audio counts as no answer."""
         self._clock = clock
         self._listening = listening
         self._ending = ending
@@ -607,6 +610,7 @@ class Interrupter(FrameProcessor):
         )
         self._order.line_started(line.number)
         self._gate.line_started(playing)
+        self._fixed_line()
         self._transcript.interruption(line.spec.say, line.number)
         self._event(
             started,

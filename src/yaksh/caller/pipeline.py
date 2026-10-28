@@ -344,7 +344,7 @@ class TurnLimit(FrameProcessor):
     A turn counts when its answer starts to play. When the agent pauses inside its turn, the model
     is asked for an answer that the agent's next words cut before any of it plays; when the
     agent's turn ends, that answer is dropped and uses no turn. A fixed line, such as the idle
-    nudge, is no answer, and keys pressed without words use no turn."""
+    nudge or an interruption line, is no answer, and keys pressed without words use no turn."""
 
     def __init__(self, turns: int, at_limit: Callable[[], Awaitable[None]]) -> None:
         super().__init__()
@@ -362,7 +362,7 @@ class TurnLimit(FrameProcessor):
                 self._asked = False
                 self._answered += 1
         elif isinstance(frame, TTSSpeakFrame) and direction is FrameDirection.DOWNSTREAM:
-            self._asked = False
+            self.fixed_line()
         elif isinstance(frame, LLMContextFrame) and direction is FrameDirection.DOWNSTREAM:
             answers = not frame.speculation
             if self._answered >= self._turns:
@@ -373,6 +373,11 @@ class TurnLimit(FrameProcessor):
             if answers:
                 self._asked = True
         await self.push_frame(frame, direction)
+
+    def fixed_line(self) -> None:
+        """A fixed line plays next: an answer that was asked for and never played uses no turn,
+        and the line's audio does not count as one."""
+        self._asked = False
 
 
 class Stoppable(Protocol):
@@ -560,6 +565,7 @@ class Persona:
                 confidence=VAD_CONFIDENCE, start_secs=VAD_START_S, stop_secs=turns.vad_stop_s
             ),
         )
+        turn_limit = TurnLimit(request.max_turns, self.ending.goodbye)
         interrupters: list[FrameProcessor] = []
         line_gates: list[FrameProcessor] = []
         if lines:
@@ -574,6 +580,7 @@ class Persona:
                 order=order,
                 player=self.player,
                 reply_times=self.reply_times,
+                fixed_line=turn_limit.fixed_line,
                 clock=clock,
                 listening=self.listening,
                 ending=lambda: state.end_reason is not None,
@@ -596,7 +603,7 @@ class Persona:
                 AgentTurnTap(transcript),
                 *([self.gate] if self.gate else []),
                 *line_gates,
-                TurnLimit(request.max_turns, self.ending.goodbye),
+                turn_limit,
                 self.llm,
                 GeneratedTap(transcript),
                 self.tts,

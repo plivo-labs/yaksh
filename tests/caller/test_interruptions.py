@@ -192,6 +192,7 @@ class Call:
             order=self.order,
             player=cast(SoundPlayer, self.player),
             reply_times=cast(ReplyTimes, self.times),
+            fixed_line=lambda: None,
             clock=self.clock,
             listening=lambda: self.listening,
             ending=lambda: False,
