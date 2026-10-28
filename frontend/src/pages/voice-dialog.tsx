@@ -1,10 +1,14 @@
 import { Play, Square } from "lucide-react";
-import { type KeyboardEvent, type SubmitEvent, useState } from "react";
+import { type KeyboardEvent, type SubmitEvent, useRef, useState } from "react";
 
 import { DeleteConfirm, DiscardConfirm } from "@/components/confirm-dialogs";
 import { CopyId } from "@/components/copy-id";
+import { FilterSelect } from "@/components/filter-select";
 import { GenderBadge } from "@/components/gender-badge";
 import { Fact } from "@/components/panel";
+import { SearchInput } from "@/components/search-input";
+import { Segmented } from "@/components/segmented";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -34,6 +38,7 @@ import {
 import { Spinner } from "@/components/ui/spinner";
 import { useCloseGuard } from "@/hooks/use-close-guard";
 import type { VoicePreview } from "@/hooks/use-voice-preview";
+import { counted } from "@/lib/format";
 import { revealErrors } from "@/lib/forms";
 import { APPEAR } from "@/lib/motion";
 import {
@@ -42,27 +47,52 @@ import {
   useEditVoice,
   useLookupVoice,
   useSettings,
+  useVoiceCatalog,
 } from "@/lib/queries";
-import { TTS_PROVIDERS, TTS_UNSPOKEN, hasCredential, ttsProvider } from "@/lib/speech-providers";
+import {
+  TTS_PROVIDERS,
+  defaultSettings,
+  hasCredential,
+  ttsModel,
+  ttsTraits,
+} from "@/lib/speech-providers";
 import {
   LANGUAGE_NAMES,
   type Language,
   type ProviderVoice,
+  type TtsModel,
+  type TtsTraits,
   type Voice,
   type VoiceGender,
   type VoiceProvider,
   type VoiceSettings,
+  type VoiceSource,
 } from "@/lib/types";
 
-const LANGUAGES = Object.keys(LANGUAGE_NAMES) as Language[];
-const GENDERS: { value: VoiceGender | "unset"; label: string }[] = [
-  { value: "unset", label: "Not set" },
+const ALL = "all";
+const GENDER_ITEMS: { value: VoiceGender; label: string }[] = [
   { value: "female", label: "Female" },
   { value: "male", label: "Male" },
   { value: "neutral", label: "Neutral" },
 ];
+const GENDERS: { value: VoiceGender | "unset"; label: string }[] = [
+  { value: "unset", label: "Not set" },
+  ...GENDER_ITEMS,
+];
+const GENDER_FILTERS = [{ value: ALL, label: "All genders" }, ...GENDER_ITEMS];
+
+type Mode = "find" | "id";
+const MODES: { value: Mode; label: string }[] = [
+  { value: "find", label: "Find a voice" },
+  { value: "id", label: "Enter an ID" },
+];
+const SOURCES: { value: VoiceSource; label: string }[] = [
+  { value: "account", label: "Account" },
+  { value: "library", label: "Library" },
+];
 
 const previewKey = (language: Language) => `voice:${language}`;
+const catalogKey = (id: string) => `catalog:${id}`;
 
 const genderOf = (value: string): VoiceGender | null =>
   value === "female" || value === "male" || value === "neutral" ? value : null;
@@ -70,7 +100,7 @@ const genderOf = (value: string): VoiceGender | null =>
 interface Draft {
   name: string;
   languages: Language[];
-  /** Entered by hand for a provider without lookup. */
+  /** Entered by hand for a voice that the provider does not describe. */
   gender: VoiceGender | null;
   accent: string;
 }
@@ -82,19 +112,39 @@ interface Details {
   listed: Language[];
 }
 
+/** The search of the provider's own voices. */
+interface Filters {
+  source: VoiceSource;
+  search: string;
+  language: Language | null;
+  gender: VoiceGender | null;
+}
+
+const NO_FILTERS: Filters = { source: "account", search: "", language: null, gender: null };
+
+/** A voice picked from the provider's voices, with the list it came from. */
+interface Picked {
+  voice: ProviderVoice;
+  source: VoiceSource;
+}
+
 function joined(names: string[]): string {
   return names.length < 2 ? names.join("") : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
 }
 
-/** Add a voice of any text-to-speech provider with a key, or edit one in the list. A provider
- * with lookup fills the details from the voice's ID; for the others they are entered by hand,
- * and the server speaks a line in the voice before it saves it. */
+/** Add a voice of any text-to-speech provider with a key, or edit one in the list. A new voice
+ * gets one of its provider's models, and is picked from the provider's voices or entered by its
+ * ID. A provider with lookup fills the details from the ID; for the others they are entered by
+ * hand. The server speaks a line in the voice and model before it saves it. */
 export function VoiceDialog({
   voice,
+  providers,
   preview,
   onClosed,
 }: {
   voice?: Voice;
+  /** The server's list of text-to-speech providers. */
+  providers: TtsTraits[];
   preview: VoicePreview;
   onClosed: () => void;
 }) {
@@ -105,10 +155,18 @@ export function VoiceDialog({
   const settings = useSettings();
   const save = voice ? edit : add;
 
-  const [provider, setProvider] = useState<VoiceProvider>(voice?.provider ?? "elevenlabs");
-  const traits = ttsProvider(provider);
-  const unspoken = TTS_UNSPOKEN[provider] ?? [];
-  const languages = LANGUAGES.filter((language) => !unspoken.includes(language));
+  const [provider, setProvider] = useState<VoiceProvider>(
+    () =>
+      voice?.provider ??
+      TTS_PROVIDERS.find((item) => hasCredential(item, settings.data?.secrets))?.value ??
+      "elevenlabs",
+  );
+  const traits = ttsTraits(providers, provider);
+  const [modelId, setModelId] = useState(() => (voice ? voice.model : traits.models[0].id));
+  const model = ttsModel(traits, modelId) ?? traits.models[0];
+  const [mode, setMode] = useState<Mode>("find");
+  const [filters, setFilters] = useState<Filters>(NO_FILTERS);
+  const [picked, setPicked] = useState<Picked | null>(null);
   const [typedId, setTypedId] = useState("");
   const [found, setFound] = useState<Details | null>(null);
   const [initial] = useState<Draft>(() => ({
@@ -119,6 +177,8 @@ export function VoiceDialog({
   }));
   const [draft, setDraft] = useState<Draft>(initial);
   const [submitted, setSubmitted] = useState(false);
+  /** The previews this dialog started, so that closing it or changing the voice stops them. */
+  const played = useRef(new Set<string>());
 
   const details: Details | null = voice
     ? {
@@ -127,19 +187,34 @@ export function VoiceDialog({
         accent: voice.accent,
         listed: voice.listed_languages,
       }
-    : traits.lookup
-      ? found && found.providerVoiceId === typedId.trim()
-        ? found
-        : null
-      : typedId.trim()
-        ? {
-            providerVoiceId: typedId.trim(),
-            gender: draft.gender,
-            accent: draft.accent.trim() || null,
-            listed: [],
-          }
-        : null;
-  const dirty = voice ? JSON.stringify(draft) !== JSON.stringify(initial) : typedId.trim() !== "";
+    : mode === "find"
+      ? picked && {
+          providerVoiceId: picked.voice.id,
+          gender: picked.voice.gender,
+          accent: picked.voice.accent,
+          listed: picked.voice.listed_languages,
+        }
+      : traits.lookup
+        ? found && found.providerVoiceId === typedId.trim()
+          ? found
+          : null
+        : typedId.trim()
+          ? {
+              providerVoiceId: typedId.trim(),
+              gender: draft.gender,
+              accent: draft.accent.trim() || null,
+              listed: [],
+            }
+          : null;
+  /** The person enters the gender and accent: no lookup or list describes the voice. */
+  const entered = !voice && mode === "id" && !traits.lookup;
+  /** `details.listed` holds what the provider lists for the voice. */
+  const listedKnown = voice
+    ? traits.lookup || voice.listed_languages.length > 0
+    : mode === "find" || traits.lookup;
+  const dirty = voice
+    ? JSON.stringify(draft) !== JSON.stringify(initial)
+    : picked !== null || typedId.trim() !== "";
   const guard = useCloseGuard(dirty);
 
   const change = (next: (current: Draft) => Partial<Draft>) => {
@@ -147,15 +222,24 @@ export function VoiceDialog({
     setDraft((current) => ({ ...current, ...next(current) }));
   };
 
+  /** The languages of `listed` that the model speaks. */
+  const spokenOf = (listed: Language[], speaker: TtsModel = model) =>
+    speaker.languages.filter((language) => listed.includes(language));
+
   const toggleLanguage = (language: Language, on: boolean) =>
     change((current) => ({
-      languages: languages.filter((item) =>
+      languages: model.languages.filter((item) =>
         item === language ? on : current.languages.includes(item),
       ),
     }));
 
+  const togglePreview = (key: string, spoken: VoiceSettings, language: Language) => {
+    played.current.add(key);
+    preview.toggle(key, spoken, language);
+  };
+
   const stopPreviews = () => {
-    for (const language of LANGUAGES) preview.reset(previewKey(language));
+    for (const key of played.current) preview.reset(key);
   };
 
   const changeId = (value: string) => {
@@ -178,7 +262,7 @@ export function VoiceDialog({
             accent: answer.accent,
             listed: answer.listed_languages,
           });
-          change(() => ({ name: answer.name, languages: answer.listed_languages }));
+          change(() => ({ name: answer.name, languages: spokenOf(answer.listed_languages) }));
         },
       },
     );
@@ -190,6 +274,23 @@ export function VoiceDialog({
     getDetails();
   };
 
+  const filter = (next: Partial<Filters>) => {
+    stopPreviews();
+    setFilters((current) => ({ ...current, ...next }));
+  };
+
+  const pick = (entry: ProviderVoice) => {
+    stopPreviews();
+    setPicked({ voice: entry, source: filters.source });
+    change(() => ({ name: entry.name, languages: spokenOf(entry.listed_languages) }));
+  };
+
+  const unpick = () => {
+    stopPreviews();
+    add.reset();
+    setPicked(null);
+  };
+
   const submit = (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!details) return;
@@ -197,41 +298,67 @@ export function VoiceDialog({
     const valid = Boolean(name) && draft.languages.length > 0;
     if (!revealErrors(event.currentTarget, () => setSubmitted(true), valid)) return;
     const body = { name, languages: draft.languages };
-    if (voice) edit.mutate({ id: voice.id, ...body }, { onSuccess: guard.close });
-    else
-      add.mutate(
-        {
-          ...body,
-          provider,
-          provider_voice_id: details.providerVoiceId,
-          ...(traits.lookup ? {} : { gender: draft.gender, accent: draft.accent.trim() || null }),
-        },
-        { onSuccess: guard.close },
-      );
+    if (voice) {
+      edit.mutate({ id: voice.id, ...body }, { onSuccess: guard.close });
+      return;
+    }
+    const source = picked?.source ?? "account";
+    add.mutate(
+      {
+        ...body,
+        provider,
+        provider_voice_id: details.providerVoiceId,
+        model: modelId,
+        source,
+        ...(traits.lookup && source === "account"
+          ? {}
+          : { gender: details.gender, accent: details.accent, listed_languages: details.listed }),
+      },
+      { onSuccess: guard.close },
+    );
   };
 
   const chooseProvider = (next: VoiceProvider) => {
+    const first = ttsTraits(providers, next).models[0];
     changeId("");
     setFound(null);
+    setPicked(null);
+    setFilters(NO_FILTERS);
     setProvider(next);
-    change((current) => ({
-      languages: current.languages.filter((language) => !TTS_UNSPOKEN[next]?.includes(language)),
-    }));
+    setModelId(first.id);
+    change((current) => ({ languages: spokenOf(current.languages, first) }));
   };
 
-  const spoken: VoiceSettings | null = details
-    ? {
-        provider,
-        id: details.providerVoiceId,
-        speed: 1,
-        stability: provider === "elevenlabs" ? 0.5 : null,
-      }
-    : null;
-  const previewError = LANGUAGES.map((language) => preview.error(previewKey(language))).find(
-    Boolean,
-  );
+  const chooseModel = (next: string) => {
+    const chosen = ttsModel(traits, next);
+    if (!chosen) return;
+    stopPreviews();
+    setModelId(chosen.id);
+    setFilters((current) =>
+      current.language && !chosen.languages.includes(current.language)
+        ? { ...current, language: null }
+        : current,
+    );
+    change((current) => ({ languages: spokenOf(current.languages, chosen) }));
+  };
+
+  /** Each way to find the voice starts over. */
+  const chooseMode = (next: Mode) => {
+    if (next === mode) return;
+    changeId("");
+    setFound(null);
+    setPicked(null);
+    setDraft(initial);
+    setSubmitted(false);
+    setMode(next);
+  };
+
+  const spoken = details ? defaultSettings(provider, details.providerVoiceId, modelId) : null;
+  const previewError = model.languages
+    .map((language) => preview.error(previewKey(language)))
+    .find(Boolean);
   const unlisted =
-    details && traits.lookup
+    details && listedKnown
       ? draft.languages.filter((language) => !details.listed.includes(language))
       : [];
 
@@ -259,80 +386,143 @@ export function VoiceDialog({
           <FieldGroup className="pb-6">
             {voice ? null : (
               <>
-                <Field>
-                  <FieldLabel htmlFor="voice-provider">Provider</FieldLabel>
-                  <Select
-                    items={TTS_PROVIDERS.map((item) => ({ value: item.value, label: item.label }))}
-                    value={provider}
-                    onValueChange={(next) => next && chooseProvider(next)}
-                  >
-                    <SelectTrigger id="voice-provider" className="w-60">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {TTS_PROVIDERS.map((item) => (
-                        <SelectItem
-                          key={item.value}
-                          value={item.value}
-                          disabled={!hasCredential(item, settings.data?.secrets)}
-                        >
-                          {item.label}
-                          {!hasCredential(item, settings.data?.secrets) && " (no key)"}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {!traits.wordTimestamps && (
-                    <FieldDescription className="text-warning-foreground">
-                      Sentence timing: a cut-off reply shows whole sentences, not words.
-                    </FieldDescription>
-                  )}
-                </Field>
-                <Field>
-                  <FieldLabel htmlFor="provider-voice-id">{traits.label} voice ID</FieldLabel>
-                  <div className="flex gap-2">
-                    <Input
-                      id="provider-voice-id"
-                      autoFocus
-                      autoComplete="off"
-                      spellCheck={false}
-                      className="font-mono"
-                      value={typedId}
-                      onChange={(e) => changeId(e.target.value)}
-                      onKeyDown={onIdKey}
-                    />
-                    {traits.lookup && (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        disabled={!typedId.trim() || details !== null || lookup.isPending}
-                        onClick={getDetails}
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Field>
+                    <FieldLabel htmlFor="voice-provider">Provider</FieldLabel>
+                    <Select
+                      items={TTS_PROVIDERS.map((item) => ({
+                        value: item.value,
+                        label: item.label,
+                      }))}
+                      value={provider}
+                      onValueChange={(next) => next && chooseProvider(next)}
+                    >
+                      <SelectTrigger id="voice-provider" className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {TTS_PROVIDERS.map((item) => (
+                          <SelectItem
+                            key={item.value}
+                            value={item.value}
+                            disabled={!hasCredential(item, settings.data?.secrets)}
+                          >
+                            {item.label}
+                            {!hasCredential(item, settings.data?.secrets) && " (no key)"}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {!traits.word_timestamps && (
+                      <FieldDescription className="text-warning-foreground">
+                        Sentence timing: a cut-off reply shows whole sentences, not words.
+                      </FieldDescription>
+                    )}
+                  </Field>
+                  {model.id !== null && (
+                    <Field>
+                      <FieldLabel htmlFor="voice-model">Model</FieldLabel>
+                      <Select
+                        items={traits.models.map((item) => ({ value: item.id, label: item.label }))}
+                        value={model.id}
+                        onValueChange={(next) => next && chooseModel(next)}
                       >
-                        {lookup.isPending && <Spinner />}
-                        Get details
-                      </Button>
+                        <SelectTrigger id="voice-model" className="w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {traits.models.map((item) => (
+                            <SelectItem key={item.id} value={item.id}>
+                              {item.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {model.speed_min === model.speed_max && (
+                        <FieldDescription>This model takes no speed setting.</FieldDescription>
+                      )}
+                    </Field>
+                  )}
+                </div>
+
+                <div className="grid gap-4">
+                  <div className="flex flex-wrap items-end gap-x-6 gap-y-4">
+                    <Segmented label="Voice" value={mode} options={MODES} onChange={chooseMode} />
+                    {mode === "find" && !picked && traits.library && (
+                      <Segmented
+                        label="Source"
+                        value={filters.source}
+                        options={SOURCES}
+                        onChange={(source) => filter({ source })}
+                      />
                     )}
                   </div>
-                  {!traits.lookup && (
-                    <FieldDescription>
-                      {traits.label} has no voice lookup. Enter the details below.
-                    </FieldDescription>
+                  {mode === "id" ? (
+                    <Field>
+                      <FieldLabel htmlFor="provider-voice-id">{traits.label} voice ID</FieldLabel>
+                      <div className="flex gap-2">
+                        <Input
+                          id="provider-voice-id"
+                          autoFocus
+                          autoComplete="off"
+                          spellCheck={false}
+                          className="font-mono"
+                          value={typedId}
+                          onChange={(e) => changeId(e.target.value)}
+                          onKeyDown={onIdKey}
+                        />
+                        {traits.lookup && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            disabled={!typedId.trim() || details !== null || lookup.isPending}
+                            onClick={getDetails}
+                          >
+                            {lookup.isPending && <Spinner />}
+                            Get details
+                          </Button>
+                        )}
+                      </div>
+                      {!traits.lookup && (
+                        <FieldDescription>
+                          {traits.label} has no voice lookup. Enter the details below.
+                        </FieldDescription>
+                      )}
+                      {lookup.error && <FieldError>{lookup.error.message}</FieldError>}
+                    </Field>
+                  ) : picked ? (
+                    <div
+                      className={`flex items-center gap-3 rounded-md border px-3 py-2 ${APPEAR}`}
+                    >
+                      <span className="grid min-w-0 flex-1">
+                        <span className="truncate text-p-500">{picked.voice.name}</span>
+                        <span className="truncate font-mono text-xs-400 text-muted-foreground">
+                          {picked.voice.id}
+                        </span>
+                      </span>
+                      {picked.source === "library" && <Badge>Library</Badge>}
+                      <Button type="button" variant="outline" size="sm" onClick={unpick}>
+                        Change
+                      </Button>
+                    </div>
+                  ) : (
+                    <VoiceFinder
+                      traits={traits}
+                      model={model}
+                      filters={filters}
+                      onFilter={filter}
+                      preview={preview}
+                      onPlay={togglePreview}
+                      onPick={pick}
+                    />
                   )}
-                  {lookup.error && <FieldError>{lookup.error.message}</FieldError>}
-                </Field>
+                </div>
               </>
             )}
 
             {details && (
               <>
-                {voice || traits.lookup ? (
-                  <div className={`flex flex-wrap items-center gap-2 text-p-400 ${APPEAR}`}>
-                    {details.gender && <GenderBadge gender={details.gender} />}
-                    {details.accent && (
-                      <span className="text-muted-foreground capitalize">{details.accent}</span>
-                    )}
-                  </div>
-                ) : (
+                {entered ? (
                   <div className={`grid grid-cols-2 gap-4 ${APPEAR}`}>
                     <Field>
                       <FieldLabel htmlFor="voice-gender">Gender</FieldLabel>
@@ -363,6 +553,13 @@ export function VoiceDialog({
                       />
                     </Field>
                   </div>
+                ) : (
+                  <div className={`flex flex-wrap items-center gap-2 text-p-400 ${APPEAR}`}>
+                    {details.gender && <GenderBadge gender={details.gender} />}
+                    {details.accent && (
+                      <span className="text-muted-foreground capitalize">{details.accent}</span>
+                    )}
+                  </div>
                 )}
                 {voice && (
                   <dl className="flex flex-wrap gap-x-10 gap-y-3">
@@ -376,6 +573,11 @@ export function VoiceDialog({
                         full
                       />
                     </Fact>
+                    {voice.model !== null && (
+                      <Fact label="Model">
+                        {ttsModel(traits, voice.model)?.label ?? voice.model}
+                      </Fact>
+                    )}
                   </dl>
                 )}
 
@@ -395,7 +597,7 @@ export function VoiceDialog({
                 <FieldSet className={APPEAR}>
                   <FieldLegend variant="label">Languages</FieldLegend>
                   <ul className="grid gap-1">
-                    {languages.map((language) => {
+                    {model.languages.map((language) => {
                       const key = previewKey(language);
                       return (
                         <li key={language} className="flex items-center gap-3">
@@ -417,7 +619,7 @@ export function VoiceDialog({
                                 : `Play ${LANGUAGE_NAMES[language]} preview`
                             }
                             aria-busy={preview.isLoading(key)}
-                            onClick={() => spoken && preview.toggle(key, spoken, language)}
+                            onClick={() => spoken && togglePreview(key, spoken, language)}
                           >
                             {preview.isLoading(key) ? (
                               <Spinner />
@@ -452,7 +654,7 @@ export function VoiceDialog({
         )}
 
         <DialogFooter className="items-center border-t px-6 py-4">
-          {!voice && !traits.lookup && (
+          {!voice && (
             <span className="mr-auto text-xs-400 text-muted-foreground">
               Saving speaks a test line in this voice.
             </span>
@@ -479,5 +681,145 @@ export function VoiceDialog({
         <DiscardConfirm subject="voice" {...guard.discard} />
       </DialogContent>
     </Dialog>
+  );
+}
+
+/** A search of the provider's own voices: each plays in the chosen model, and one is picked. */
+function VoiceFinder({
+  traits,
+  model,
+  filters,
+  onFilter,
+  preview,
+  onPlay,
+  onPick,
+}: {
+  traits: TtsTraits;
+  model: TtsModel;
+  filters: Filters;
+  onFilter: (next: Partial<Filters>) => void;
+  preview: VoicePreview;
+  onPlay: (key: string, voice: VoiceSettings, language: Language) => void;
+  onPick: (voice: ProviderVoice) => void;
+}) {
+  const catalog = useVoiceCatalog({ provider: traits.provider, model: model.id, ...filters });
+  const rows = (catalog.data?.pages ?? []).flatMap((page) => page.items);
+  const languageItems = [
+    { value: ALL, label: "All languages" },
+    ...model.languages.map((language) => ({ value: language, label: LANGUAGE_NAMES[language] })),
+  ];
+  return (
+    <div className={`grid gap-3 ${APPEAR}`}>
+      <div className="flex flex-wrap gap-2">
+        <SearchInput
+          value={filters.search}
+          onSearch={(search) => onFilter({ search })}
+          label={`Search ${traits.label} voices`}
+          placeholder="Search by name"
+          className="min-w-48 flex-1"
+        />
+        <FilterSelect
+          label="Filter by language"
+          items={languageItems}
+          value={filters.language ?? ALL}
+          onChange={(value) =>
+            onFilter({ language: model.languages.find((language) => language === value) ?? null })
+          }
+          className="w-36"
+        />
+        <FilterSelect
+          label="Filter by gender"
+          items={GENDER_FILTERS}
+          value={filters.gender ?? ALL}
+          onChange={(value) => onFilter({ gender: genderOf(value) })}
+          className="w-32"
+        />
+      </div>
+
+      {catalog.isPending ? (
+        <p className="flex items-center gap-2 text-p-400 text-muted-foreground">
+          <Spinner />
+          Loading voices
+        </p>
+      ) : catalog.isError ? (
+        <FieldError>{catalog.error.message}</FieldError>
+      ) : rows.length === 0 && !catalog.hasNextPage ? (
+        <p className="text-p-400 text-muted-foreground">
+          {filters.search || filters.language || filters.gender
+            ? "No voices match."
+            : "No voices found."}
+        </p>
+      ) : (
+        <>
+          <ul aria-label={`${traits.label} voices`} className="grid rounded-md border">
+            {rows.map((entry) => {
+              const key = catalogKey(entry.id);
+              const about = [entry.gender, entry.accent].filter(Boolean).join(" · ");
+              const language =
+                filters.language ??
+                model.languages.find((item) => entry.listed_languages.includes(item)) ??
+                model.languages[0];
+              const error = preview.error(key);
+              return (
+                <li
+                  key={entry.id}
+                  className="flex items-center gap-2 border-b px-3 py-2 last:border-b-0"
+                >
+                  <span className="grid min-w-0 flex-1">
+                    <span className="truncate text-p-500">{entry.name}</span>
+                    {about && (
+                      <span className="truncate text-s-400 text-muted-foreground capitalize">
+                        {about}
+                      </span>
+                    )}
+                    {error && <span className="text-xs-400 text-destructive">{error}</span>}
+                  </span>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label={
+                      preview.isPlaying(key) ? `Stop ${entry.name}` : `Play ${entry.name}`
+                    }
+                    aria-busy={preview.isLoading(key)}
+                    onClick={() =>
+                      onPlay(key, defaultSettings(traits.provider, entry.id, model.id), language)
+                    }
+                  >
+                    {preview.isLoading(key) ? (
+                      <Spinner />
+                    ) : preview.isPlaying(key) ? (
+                      <Square />
+                    ) : (
+                      <Play />
+                    )}
+                  </Button>
+                  <Button type="button" variant="outline" size="sm" onClick={() => onPick(entry)}>
+                    Pick
+                  </Button>
+                </li>
+              );
+            })}
+          </ul>
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-s-400 text-muted-foreground tabular-nums">
+              Showing {counted(rows.length, "voice", "voices")}
+            </span>
+            {catalog.hasNextPage && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={catalog.isFetchingNextPage}
+                onClick={() => void catalog.fetchNextPage()}
+              >
+                {catalog.isFetchingNextPage && <Spinner />}
+                Load more
+              </Button>
+            )}
+          </div>
+        </>
+      )}
+    </div>
   );
 }

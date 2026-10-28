@@ -31,8 +31,15 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { useVoicePreview } from "@/hooks/use-voice-preview";
-import { useSettings, useVoices } from "@/lib/queries";
-import { TTS_PROVIDERS, hasCredential, ttsProvider } from "@/lib/speech-providers";
+import { useSettings, useVoiceProviders, useVoices } from "@/lib/queries";
+import {
+  TTS_PROVIDERS,
+  defaultSettings,
+  hasCredential,
+  ttsModel,
+  ttsProvider,
+  ttsTraits,
+} from "@/lib/speech-providers";
 import { LANGUAGE_NAMES, type Voice, type VoiceProvider } from "@/lib/types";
 
 const ALL = "all";
@@ -45,6 +52,7 @@ import { VoiceDialog } from "@/pages/voice-dialog";
 export function VoicesPage() {
   const voices = useVoices();
   const settings = useSettings();
+  const providers = useVoiceProviders();
   const preview = useVoicePreview();
   const [shown, setShown] = useState<VoiceProvider | typeof ALL>(ALL);
   const listed = (voices.data ?? []).filter((item) => shown === ALL || item.provider === shown);
@@ -79,6 +87,12 @@ export function VoicesPage() {
           Add voice
         </Button>
       </div>
+      {providers.isError && (
+        <Alert variant="destructive">
+          <AlertTitle>Could not load the voice models</AlertTitle>
+          <AlertDescription>{providers.error.message}</AlertDescription>
+        </Alert>
+      )}
       {voices.isPending ? (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           <Skeleton className="h-32" />
@@ -110,14 +124,10 @@ export function VoicesPage() {
         <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {listed.map((item) => {
             const provider = ttsProvider(item.provider);
+            const traits = providers.data && ttsTraits(providers.data, item.provider);
             const keyless =
               settings.data !== undefined && !hasCredential(provider, settings.data.secrets);
-            const spoken = {
-              provider: item.provider,
-              id: item.provider_voice_id,
-              speed: 1,
-              stability: item.provider === "elevenlabs" ? 0.5 : null,
-            };
+            const spoken = defaultSettings(item.provider, item.provider_voice_id, item.model);
             return (
               <li key={item.id}>
                 <Card className="relative h-full transition-colors has-[[data-slot=card-link]:focus-visible]:ring-2 has-[[data-slot=card-link]:focus-visible]:ring-ring/50 hover:bg-hv1 has-[[data-slot=card-link]:active]:bg-muted/70">
@@ -137,7 +147,12 @@ export function VoicesPage() {
                       {item.gender && <GenderBadge gender={item.gender} />}
                       {item.builtin && <Badge>Built-in</Badge>}
                       <Badge>{provider.label}</Badge>
-                      {!provider.wordTimestamps && <Badge variant="warning">Sentence timing</Badge>}
+                      {traits && item.model !== null && (
+                        <Badge>{ttsModel(traits, item.model)?.label ?? item.model}</Badge>
+                      )}
+                      {traits && !traits.word_timestamps && (
+                        <Badge variant="warning">Sentence timing</Badge>
+                      )}
                       {keyless && <Badge variant="danger">No key</Badge>}
                     </CardDescription>
                     <CardAction>
@@ -180,8 +195,14 @@ export function VoicesPage() {
         </ul>
       )}
 
-      {editing !== null && (
-        <VoiceDialog key={voice?.id ?? "new"} voice={voice} preview={preview} onClosed={close} />
+      {editing !== null && providers.data && (
+        <VoiceDialog
+          key={voice?.id ?? "new"}
+          voice={voice}
+          providers={providers.data}
+          preview={preview}
+          onClosed={close}
+        />
       )}
     </div>
   );

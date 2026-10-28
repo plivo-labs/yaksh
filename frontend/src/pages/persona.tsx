@@ -44,9 +44,10 @@ import {
   usePersona,
   usePersonaScenarios,
   useSavePersona,
+  useVoiceProviders,
   useVoices,
 } from "@/lib/queries";
-import { ttsProvider } from "@/lib/speech-providers";
+import { modelName, speedRange, ttsTraits } from "@/lib/speech-providers";
 import {
   type Answering,
   LANGUAGE_ITEMS,
@@ -56,6 +57,7 @@ import {
   type PersonaInput,
   QUIET,
   type Surroundings,
+  type TtsTraits,
   type Voice,
   type VoiceProvider,
 } from "@/lib/types";
@@ -68,6 +70,8 @@ interface Draft {
   language: Language;
   provider: VoiceProvider;
   voice_id: string;
+  /** Null for a provider without a model choice. */
+  model: string | null;
   speed: number;
   /** Kept while another provider's voice is chosen; only ElevenLabs takes it. */
   stability: number;
@@ -82,6 +86,7 @@ const EMPTY: Draft = {
   language: "en",
   provider: "elevenlabs",
   voice_id: "",
+  model: null,
   speed: 1,
   stability: 0.5,
   surroundings: QUIET,
@@ -98,6 +103,7 @@ function toDraft(persona: Persona): Draft {
     language: persona.language,
     provider: persona.voice.provider,
     voice_id: persona.voice.id,
+    model: persona.voice.model ?? null,
     speed: persona.voice.speed,
     stability: persona.voice.stability ?? 0.5,
     surroundings: persona.surroundings,
@@ -114,6 +120,7 @@ function toInput(draft: Draft): PersonaInput {
     voice: {
       provider: draft.provider,
       id: draft.voice_id.trim(),
+      model: draft.model,
       speed: draft.speed,
       stability: draft.provider === "elevenlabs" ? draft.stability : null,
     },
@@ -123,13 +130,14 @@ function toInput(draft: Draft): PersonaInput {
   };
 }
 
-/** The draft with a listed voice, its speed brought into the voice provider's range. */
-function withVoice(draft: Draft, voice: Voice): Draft {
-  const [slowest, fastest] = ttsProvider(voice.provider).speed;
+/** The draft with a listed voice, its speed brought into the range of the voice's model. */
+function withVoice(draft: Draft, voice: Voice, traits: TtsTraits): Draft {
+  const [slowest, fastest] = speedRange(traits, voice.model);
   return {
     ...draft,
     provider: voice.provider,
     voice_id: voice.provider_voice_id,
+    model: voice.model,
     speed: Math.min(Math.max(draft.speed, slowest), fastest),
   };
 }
@@ -277,6 +285,7 @@ function PersonaEditor({
   const [submitted, setSubmitted] = useState(false);
   const leaving = useRef(false);
   const voices = useVoices(draft.language);
+  const providers = useVoiceProviders();
   const defaults = useDefaults();
 
   const set = <K extends keyof Draft>(key: K, value: Draft[K]) => {
@@ -284,22 +293,31 @@ function PersonaEditor({
     setDraft((current) => ({ ...current, [key]: value }));
   };
 
-  if (pickVoice && voices.data && !voices.isPlaceholderData) {
+  if (pickVoice && voices.data && !voices.isPlaceholderData && providers.data) {
     const gender = generated?.draft.voice_gender;
     const match = voices.data.find((voice) => voice.gender === gender) ?? voices.data[0];
     setPickVoice(false);
-    if (match) setDraft((current) => withVoice(current, match));
+    if (match) {
+      const traits = ttsTraits(providers.data, match.provider);
+      setDraft((current) => withVoice(current, match, traits));
+    }
   }
 
   const listed = voices.data ?? [];
   const chosen = listed.find(
-    (voice) => voice.provider === draft.provider && voice.provider_voice_id === draft.voice_id,
+    (voice) =>
+      voice.provider === draft.provider &&
+      voice.provider_voice_id === draft.voice_id &&
+      voice.model === draft.model,
   );
   const voiceItems = listed.map((voice) => ({
     value: voice.id,
-    label: `${voiceLabel(voice)} · ${ttsProvider(voice.provider).label}`,
+    label: providers.data
+      ? `${voiceLabel(voice)} · ${modelName(ttsTraits(providers.data, voice.provider), voice.model)}`
+      : voiceLabel(voice),
   }));
-  const [slowest, fastest] = ttsProvider(draft.provider).speed;
+  const speeds =
+    providers.data && speedRange(ttsTraits(providers.data, draft.provider), draft.model);
   const hasVoice = draft.voice_id !== "";
   const input = toInput(draft);
   // What would be saved, so a change the server trims away, such as a trailing space, is none.
@@ -511,11 +529,17 @@ function PersonaEditor({
                     value={chosen ? chosen.id : null}
                     onValueChange={(value) => {
                       const voice = listed.find((item) => item.id === value);
-                      if (!voice) return;
+                      if (!voice || !providers.data) return;
+                      const traits = ttsTraits(providers.data, voice.provider);
                       save.reset();
-                      setDraft((current) => withVoice(current, voice));
+                      setDraft((current) => withVoice(current, voice, traits));
                     }}
-                    disabled={voices.isPending || voices.isPlaceholderData || voices.isError}
+                    disabled={
+                      voices.isPending ||
+                      voices.isPlaceholderData ||
+                      voices.isError ||
+                      !providers.data
+                    }
                   >
                     <SelectTrigger
                       id="voice"
@@ -524,9 +548,9 @@ function PersonaEditor({
                     >
                       <SelectValue
                         placeholder={
-                          voices.isPending
+                          voices.isPending || providers.isPending
                             ? "Loading voices"
-                            : voices.isError
+                            : voices.isError || providers.isError
                               ? "Voices did not load"
                               : draft.voice_id
                                 ? "Voice not in this list"
@@ -548,17 +572,24 @@ function PersonaEditor({
                   {voices.isError && (
                     <FieldError>Could not load voices: {voices.error.message}</FieldError>
                   )}
+                  {providers.isError && (
+                    <FieldError>
+                      Could not load the voice models: {providers.error.message}
+                    </FieldError>
+                  )}
                   {preview.error(VOICE) && <FieldError>{preview.error(VOICE)}</FieldError>}
                 </Field>
                 <div className="grid gap-6 sm:grid-cols-2">
-                  <SliderField
-                    id="speed"
-                    label="Speed"
-                    min={slowest}
-                    max={fastest}
-                    value={draft.speed}
-                    onChange={(value) => set("speed", value)}
-                  />
+                  {speeds && speeds[0] < speeds[1] && (
+                    <SliderField
+                      id="speed"
+                      label="Speed"
+                      min={speeds[0]}
+                      max={speeds[1]}
+                      value={draft.speed}
+                      onChange={(value) => set("speed", value)}
+                    />
+                  )}
                   {draft.provider === "elevenlabs" && (
                     <SliderField
                       id="stability"

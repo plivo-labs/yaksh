@@ -16,6 +16,7 @@ import {
   usePersonas,
   useRemoveNimbleAccount,
   useSaveNimbleAccount,
+  useVoiceProviders,
   useVoices,
 } from "@/lib/queries";
 import {
@@ -46,7 +47,7 @@ import {
 } from "@/pages/settings-keys";
 
 type Fields = { model: string; base_url?: string; url?: string };
-type TtsFields = { model?: string } & Partial<Record<TtsProvider["address"], string>>;
+type TtsFields = Partial<Record<TtsProvider["address"], string>>;
 
 /** The one provider that hears the agent on every call, with its own address, model and key. */
 export function SpeechToTextPanel({
@@ -174,8 +175,11 @@ export function TextToSpeechPanel({
   const [open, setOpen] = useState<VoiceProvider | null>(null);
   const voices = useVoices();
   const personas = usePersonas();
+  const providers = useVoiceProviders();
   const voicesOf = (provider: VoiceProvider) =>
     (voices.data ?? []).filter((voice) => voice.provider === provider).length;
+  const sentenceTiming = (provider: VoiceProvider) =>
+    providers.data?.find((item) => item.provider === provider)?.word_timestamps === false;
   if (open !== null) {
     const provider = ttsProvider(open);
     const users = (personas.data ?? []).filter((persona) => persona.voice.provider === open);
@@ -187,6 +191,7 @@ export function TextToSpeechPanel({
         change={change}
         voices={voicesOf(open)}
         personas={users.length}
+        sentenceTiming={sentenceTiming(open)}
         onBack={() => setOpen(null)}
       />
     );
@@ -195,11 +200,11 @@ export function TextToSpeechPanel({
     <Panel>
       <PanelHeader title="Text to speech" />
       <p className="px-5 py-3 text-s-400 text-muted-foreground">
-        The caller's voice. Each voice uses one provider. Built-in personas use ElevenLabs.
+        The caller's voice. Each voice has its own provider and model. Built-in personas use
+        ElevenLabs.
       </p>
       <ul className="border-t">
         {TTS_PROVIDERS.map((provider) => {
-          const fields = draft[provider.section] as Fields;
           const saved = hasCredential(provider, settings.secrets);
           return (
             <li
@@ -207,12 +212,9 @@ export function TextToSpeechPanel({
               className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b px-5 py-3 last:border-b-0"
             >
               <span className="w-28 text-s-500">{provider.label}</span>
-              <span className="w-40 truncate font-mono text-xs-400 text-muted-foreground">
-                {"model" in fields ? fields.model : ""}
-              </span>
               <span className="flex flex-1 flex-wrap gap-1.5">
                 <Badge variant={saved ? "success" : undefined}>{saved ? "Saved" : "Not set"}</Badge>
-                {!provider.wordTimestamps && <Badge variant="warning">Sentence timing</Badge>}
+                {sentenceTiming(provider.value) && <Badge variant="warning">Sentence timing</Badge>}
               </span>
               <span className="w-20 text-right text-s-400 text-muted-foreground">
                 {voicesOf(provider.value)} {voicesOf(provider.value) === 1 ? "voice" : "voices"}
@@ -238,6 +240,7 @@ function TtsProviderPanel({
   change,
   voices,
   personas,
+  sentenceTiming,
   onBack,
 }: {
   provider: TtsProvider;
@@ -246,6 +249,8 @@ function TtsProviderPanel({
   change: Change;
   voices: number;
   personas: number;
+  /** The provider times whole sentences, not words. */
+  sentenceTiming: boolean;
   onBack: () => void;
 }) {
   const fields = draft[provider.section] as TtsFields;
@@ -280,9 +285,9 @@ function TtsProviderPanel({
         canTest={key}
         edits={JSON.stringify(fields)}
         description={
-          provider.wordTimestamps
-            ? undefined
-            : "Sentence timing: a cut-off reply shows whole sentences, not words."
+          sentenceTiming
+            ? "Sentence timing: a cut-off reply shows whole sentences, not words."
+            : undefined
         }
       >
         <SettingRow
@@ -297,16 +302,6 @@ function TtsProviderPanel({
             onChange={(event) => edit(provider.address, event.target.value.trim())}
           />
         </SettingRow>
-        {"model" in fields && (
-          <SettingRow label="Model" htmlFor="tts-model">
-            <Input
-              id="tts-model"
-              className="max-w-56"
-              value={fields.model}
-              onChange={(event) => edit("model", event.target.value)}
-            />
-          </SettingRow>
-        )}
         {provider.secrets.length === 1 ? (
           <KeyRow
             name={provider.secrets[0]}

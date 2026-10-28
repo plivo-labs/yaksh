@@ -81,12 +81,16 @@ import {
   type SuiteSummary,
   type SuiteUpdate,
   type Surroundings,
+  type TtsTraits,
   type VapiAccount,
   type VapiAssistantPage,
   type Voice,
+  type VoiceCatalogPage,
   type VoiceEdit,
+  type VoiceGender,
   type VoiceInput,
   type VoiceSettings,
+  type VoiceSource,
 } from "@/lib/types";
 
 export const keys = {
@@ -423,6 +427,45 @@ export function useVoices(language?: Language) {
     queryKey: keys.voicesFor(language ?? "all"),
     queryFn: () => all<Voice>("/voices", language ? { language } : {}),
     placeholderData: keepPreviousData,
+  });
+}
+
+/** Each text-to-speech provider with the models a voice can use. They change only with a
+ * release. */
+export function useVoiceProviders() {
+  return useQuery({
+    queryKey: ["voice-providers"],
+    queryFn: ({ signal }) => api<TtsTraits[]>("/voices/providers", { signal }),
+    staleTime: Infinity,
+    gcTime: Infinity,
+  });
+}
+
+export interface VoiceCatalogQuery {
+  provider: VoiceProvider;
+  source: VoiceSource;
+  /** Sarvam's speakers differ by model. */
+  model: string | null;
+  search: string;
+  language: Language | null;
+  gender: VoiceGender | null;
+}
+
+/** A provider's own voices, 30 a page, to pick one to add. Saves nothing. */
+export function useVoiceCatalog(query: VoiceCatalogQuery) {
+  return useInfiniteQuery({
+    queryKey: ["voice-catalog", query] as const,
+    queryFn: ({ pageParam, signal }) => {
+      const params = new URLSearchParams({ provider: query.provider, source: query.source });
+      if (query.model) params.set("model", query.model);
+      if (query.search) params.set("search", query.search);
+      if (query.language) params.set("language", query.language);
+      if (query.gender) params.set("gender", query.gender);
+      if (pageParam) params.set("cursor", pageParam);
+      return api<VoiceCatalogPage>(`/voices/catalog?${params}`, { signal });
+    },
+    initialPageParam: null as string | null,
+    getNextPageParam: (last) => last.next_cursor ?? undefined,
   });
 }
 

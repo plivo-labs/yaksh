@@ -682,14 +682,57 @@ export interface ProviderVoice {
   listed_languages: Language[];
 }
 
+/** Where a provider's voice comes from: the account of the saved key, or the provider's public
+ * voice library. */
+export type VoiceSource = "account" | "library";
+
+/** A page of a provider's own voices. */
+export interface VoiceCatalogPage {
+  items: ProviderVoice[];
+  /** Where the next page starts, or null after the last. */
+  next_cursor: string | null;
+}
+
+/** A text-to-speech model that a voice can use. */
+export interface TtsModel {
+  /** Null for a provider without a model choice. */
+  id: string | null;
+  label: string;
+  /** Equal ends: the model takes no speed setting. */
+  speed_min: number;
+  speed_max: number;
+  /** The languages the model speaks. */
+  languages: Language[];
+}
+
+/** A text-to-speech provider as the server describes it. */
+export interface TtsTraits {
+  provider: VoiceProvider;
+  label: string;
+  /** False: the provider times whole sentences, so a cut-off reply is cut at a sentence. */
+  word_timestamps: boolean;
+  /** It describes a voice of the account by its ID. */
+  lookup: boolean;
+  /** It has a public voice library to search. */
+  library: boolean;
+  /** The first is the one a new voice gets. */
+  models: TtsModel[];
+}
+
 export interface VoiceInput {
   provider: VoiceProvider;
   provider_voice_id: string;
   name: string;
   languages: Language[];
-  /** For a provider without lookup; one with lookup fills these itself. */
+  /** The provider's first model when left out. */
+  model?: string | null;
+  /** A library voice is not on the account, so no lookup describes it. */
+  source?: VoiceSource;
+  /** For a voice that the server does not look up; one it looks up gets these from the
+   * provider. */
   gender?: VoiceGender | null;
   accent?: string | null;
+  listed_languages?: Language[];
 }
 
 export interface VoiceEdit {
