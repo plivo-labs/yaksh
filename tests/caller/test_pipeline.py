@@ -1,10 +1,12 @@
 import asyncio
+from collections.abc import Sequence
 from functools import partial
 from types import SimpleNamespace
 from typing import cast
 
 import pytest
 from pipecat.frames.frames import (
+    BotStartedSpeakingFrame,
     BotStoppedSpeakingFrame,
     Frame,
     FunctionCallResultProperties,
@@ -12,6 +14,7 @@ from pipecat.frames.frames import (
     LLMMessagesAppendFrame,
     OutputDTMFUrgentFrame,
     TranscriptionFrame,
+    TTSSpeakFrame,
     VADUserStartedSpeakingFrame,
     VADUserStoppedSpeakingFrame,
 )
@@ -23,6 +26,7 @@ from pipecat.processors.aggregators.llm_response_universal import (
     LLMUserAggregator,
     LLMUserAggregatorParams,
 )
+from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
 from pipecat.services.llm_service import FunctionCallFromLLM, FunctionCallParams
 from pipecat.tests.utils import SleepFrame, run_test
 from pipecat.turns.user_stop import SpeechTimeoutUserTurnStopStrategy
@@ -268,15 +272,51 @@ async def test_a_quiet_agent_still_gets_a_nudge_after_the_caller_only_presses_ke
     assert nudges == [None]
 
 
-async def test_the_persona_answers_its_most_agent_turns_and_then_the_limit_takes_over() -> None:
-    reached: list[str] = []
+class Speaker(FrameProcessor):
+    """Where the transport stands: each answer and each fixed line that reaches it starts to
+    play, and the transport tells the processors before it so. The answers numbered in `cut`
+    never play: the agent's next words cut them, or the model gave no words."""
+
+    def __init__(self, *, cut: set[int]) -> None:
+        super().__init__()
+        self._cut = cut
+        self._answers = 0
+
+    async def process_frame(self, frame: Frame, direction: FrameDirection) -> None:
+        await super().process_frame(frame, direction)
+        await self.push_frame(frame, direction)
+        plays = isinstance(frame, TTSSpeakFrame)
+        if isinstance(frame, LLMContextFrame) and not frame.speculation:
+            plays = self._answers not in self._cut
+            self._answers += 1
+        if plays:
+            await self.push_frame(BotStartedSpeakingFrame(), FrameDirection.UPSTREAM)
+
+
+def after(*agent_turns: str) -> LLMContext:
+    return LLMContext(messages=[{"role": "user", "content": turn} for turn in agent_turns])
+
+
+def spaced(frames: Sequence[Frame]) -> list[Frame]:
+    """The frames with a pause after each, as the turns of a call come seconds apart."""
+    return [item for frame in frames for item in (frame, SleepFrame(0.02))]
+
+
+async def limited(turns: int, frames: Sequence[Frame], *, cut: set[int]) -> tuple[int, int]:
+    """How many requests for an answer reach the model, and how often the limit takes over."""
+    reached: list[None] = []
 
     async def at_limit() -> None:
-        reached.append("goodbye")
+        reached.append(None)
 
-    def after(*agent_turns: str) -> LLMContext:
-        return LLMContext(messages=[{"role": "user", "content": turn} for turn in agent_turns])
+    down, _ = await run_test(
+        Pipeline([TurnLimit(turns, at_limit), Speaker(cut=cut)]), frames_to_send=spaced(frames)
+    )
+    asked = [f for f in down if isinstance(f, LLMContextFrame) and not f.speculation]
+    return len(asked), len(reached)
 
+
+async def test_the_persona_answers_its_most_agent_turns_and_then_the_limit_takes_over() -> None:
     turns = [
         LLMContextFrame(context=after("Hi.")),
         LLMContextFrame(context=after("Hi.", "Your name?"), speculation=True),
@@ -286,11 +326,33 @@ async def test_the_persona_answers_its_most_agent_turns_and_then_the_limit_takes
         LLMContextFrame(context=after("Hi.", "Your name?", "Age?", "Hello?")),
     ]
 
-    down, _ = await run_test(TurnLimit(2, at_limit), frames_to_send=turns)
+    assert await limited(2, turns, cut=set()) == (2, 1)
 
-    asked = [frame for frame in down if isinstance(frame, LLMContextFrame)]
-    assert [frame.speculation for frame in asked] == [False, True, False]
-    assert reached == ["goodbye"]
+
+async def test_an_answer_that_never_plays_uses_no_turn() -> None:
+    """The agent pauses inside its turn and the persona is asked for an answer, which the agent's
+    next words cut before it plays; the answer to the whole turn counts."""
+    turns = [
+        LLMContextFrame(context=after("This is Alex.")),
+        LLMContextFrame(context=after("This is Alex. Calling about your room.")),
+        LLMContextFrame(context=after("This is Alex. Calling about your room.", "When?")),
+        LLMContextFrame(context=after("This is Alex. Calling about your room.", "When?", "Ok.")),
+    ]
+
+    assert await limited(2, turns, cut={0}) == (3, 1)
+
+
+async def test_the_idle_nudge_is_no_answer() -> None:
+    """The model gives no words, and after the silence the fixed nudge plays: the agent's turn
+    still has no answer."""
+    turns = [
+        LLMContextFrame(context=after("Please hold.")),
+        TTSSpeakFrame("Hello?"),
+        LLMContextFrame(context=after("Please hold.", "Thanks for waiting.")),
+        LLMContextFrame(context=after("Please hold.", "Thanks for waiting.", "Anything else?")),
+    ]
+
+    assert await limited(1, turns, cut={0}) == (2, 1)
 
 
 class Line:
