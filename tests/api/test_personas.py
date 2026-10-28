@@ -1,5 +1,6 @@
 import uuid
 
+import pytest
 from httpx import AsyncClient
 from sqlalchemy import select, text
 
@@ -345,6 +346,7 @@ async def test_a_persona_voice_keeps_its_model_and_changes_it_only_to_a_listed_o
     assert "model" not in stored_voice and stored_model == "eleven_multilingual_v2"
 
 
+@pytest.mark.usefixtures("client")
 async def test_a_built_in_voice_listed_again_in_another_model_does_not_stop_the_seed(
     db: Db,
 ) -> None:
