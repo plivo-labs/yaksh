@@ -52,9 +52,10 @@ async def lookup_voice(
         raise ValidationError(f"{provider.label} has no voice lookup; enter the voice's details")
     found = await client_for(clients, provider).get_voice(provider_voice_id)
     if found is None:
+        library = " A voice of its public library is found and added under Library."
         raise ValidationError(
-            f"voice {provider_voice_id} was not found on the {provider.label} account. "
-            "A Voice Library voice must be added to the account first."
+            f"voice {provider_voice_id} was not found on the {provider.label} account."
+            + (library if provider.traits.library else "")
         )
     return found
 

@@ -49,7 +49,7 @@ async def test_a_lookup_shows_the_provider_details_and_saves_nothing(
         "listed_languages": [],
     }
     assert unknown.status_code == 422
-    assert "must be added to the account first" in unknown.json()["error"]["message"]
+    assert "found and added under Library" in unknown.json()["error"]["message"]
     assert (await voices(client))["total"] == 2
 
     voice_client.down = True
