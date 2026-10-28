@@ -10,12 +10,13 @@ from zoneinfo import ZoneInfo
 
 import pytest
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import func, insert, select, update
+from sqlalchemy import func, insert, select, text, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from tests.conftest import (
     APP_SETTINGS,
+    ENGLISH_VOICE,
     FAST,
     FINAL,
     OUTBOUND_AGENT,
@@ -38,7 +39,13 @@ from tests.conftest import (
     wait_until,
 )
 from yaksh.config import Settings
-from yaksh.db.models import AgentVersion, Conversation, RunningWorker, ScenarioVersion
+from yaksh.db.models import (
+    AgentVersion,
+    Conversation,
+    PersonaVersion,
+    RunningWorker,
+    ScenarioVersion,
+)
 from yaksh.db.session import create_engine, create_sessionmaker
 from yaksh.domain.agents import AgentConfig
 from yaksh.domain.conversations import CallRequest, ConversationStatus
@@ -47,6 +54,7 @@ from yaksh.domain.runs import RunCreate
 from yaksh.domain.surroundings import Layer, NoiseSound, SoundPlan
 from yaksh.simulation import conversations, runs
 from yaksh.simulation.calls import STOP_IGNORED
+from yaksh.simulation.personas import version_config
 from yaksh.simulation.surroundings import NOISE_DBFS, SOUNDS, gain
 from yaksh.worker.worker import FINALIZE_ATTEMPTS, Worker
 
@@ -829,6 +837,51 @@ async def call_request_of(settings: Settings, conversation_id: str) -> CallReque
             )
     finally:
         await engine.dispose()
+
+
+async def test_a_version_written_without_a_model_keeps_the_persona_model_it_was_made_with(
+    client: AsyncClient, settings: Settings, db: Db
+) -> None:
+    await client.post(
+        "/api/v1/voices",
+        json={
+            "provider": "elevenlabs",
+            "provider_voice_id": ENGLISH_VOICE.id,
+            "languages": ["en"],
+            "model": "eleven_multilingual_v2",
+        },
+    )
+    persona = await create_persona(
+        client,
+        voice={"provider": "elevenlabs", "id": ENGLISH_VOICE.id, "model": "eleven_multilingual_v2"},
+    )
+    agent_id = await create_agent_id(client)
+    async with db() as session:
+        await session.execute(
+            text(
+                "INSERT INTO persona_versions (id, persona_id, version, config)"
+                " SELECT gen_random_uuid(), persona_id, 2, config FROM persona_versions"
+                " WHERE persona_id = :id"
+            ),
+            {"id": persona["id"]},
+        )
+        await session.execute(
+            text("UPDATE personas SET current_version = 2 WHERE id = :id"), {"id": persona["id"]}
+        )
+        await session.commit()
+    started = await start(client, agent_id, persona_id=persona["id"])
+
+    before = await call_request_of(settings, started["id"])
+    voice = {"provider": "elevenlabs", "id": ENGLISH_VOICE.id, "model": "eleven_flash_v2_5"}
+    async with db() as session:
+        conversation = await conversations.get_conversation(session, uuid.UUID(started["id"]))
+        loaded = await session.get_one(PersonaVersion, conversation.persona_version_id)
+        changed = await client.patch(f"/api/v1/personas/{persona['id']}", json={"voice": voice})
+        during = await version_config(session, loaded)
+    after = await call_request_of(settings, started["id"])
+
+    assert changed.status_code == 200, changed.text
+    assert before.voice.model == during.voice.model == after.voice.model == "eleven_multilingual_v2"
 
 
 async def test_a_conversation_freezes_its_persona_scenario_and_prompt(

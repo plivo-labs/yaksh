@@ -13,9 +13,15 @@ import {
   useDeletePersona,
   useForkPersona,
   useSavePersona,
+  useVoiceProviders,
   useVoices,
 } from "@/lib/queries";
-import { LANGUAGE_NAMES, type Persona, type PersonaInput } from "@/lib/types";
+import { modelName, ttsTraits } from "@/lib/speech-providers";
+import { LANGUAGE_NAMES, type Persona, type PersonaInput, type VoiceSettings } from "@/lib/types";
+
+/** Whether two voice settings use the same voice: provider, ID and model. */
+const sameVoice = (a: VoiceSettings, b: VoiceSettings) =>
+  a.provider === b.provider && a.id === b.id && (a.model ?? null) === (b.model ?? null);
 
 function changed(label: string, from: string, to: string) {
   return (
@@ -34,8 +40,19 @@ export function PersonaFork({ persona }: { persona: Persona }) {
   const create = useSavePersona();
   const remove = useDeletePersona();
   const voices = useVoices();
-  const voiceName = (id: string) =>
-    voices.data?.find((voice) => voice.provider_voice_id === id)?.name ?? id;
+  const providers = useVoiceProviders();
+  const voiceName = (settings: VoiceSettings) => {
+    const name =
+      voices.data?.find(
+        (voice) =>
+          voice.provider === settings.provider &&
+          voice.provider_voice_id === settings.id &&
+          voice.model === (settings.model ?? null),
+      )?.name ?? settings.id;
+    return providers.data
+      ? `${name} · ${modelName(ttsTraits(providers.data, settings.provider), settings.model)}`
+      : name;
+  };
 
   const forkManually = () =>
     fork.mutate(persona.id, {
@@ -60,8 +77,8 @@ export function PersonaFork({ persona }: { persona: Persona }) {
       lines.push(
         changed("Language", LANGUAGE_NAMES[persona.language], LANGUAGE_NAMES[draft.language]),
       );
-    if (draft.voice.id !== persona.voice.id)
-      lines.push(changed("Voice", voiceName(persona.voice.id), voiceName(draft.voice.id)));
+    if (!sameVoice(draft.voice, persona.voice))
+      lines.push(changed("Voice", voiceName(persona.voice), voiceName(draft.voice)));
     if (draft.voice.speed !== persona.voice.speed)
       lines.push(changed("Speed", String(persona.voice.speed), String(draft.voice.speed)));
     const before = surroundingsLabel(persona.surroundings, true) ?? "Quiet room";

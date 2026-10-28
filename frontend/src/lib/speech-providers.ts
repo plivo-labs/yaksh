@@ -4,7 +4,10 @@ import type {
   SettingsProvider,
   SettingsValues,
   SttProvider,
+  TtsModel,
+  TtsTraits,
   VoiceProvider,
+  VoiceSettings,
 } from "@/lib/types";
 
 type Section = keyof SettingsValues;
@@ -77,18 +80,13 @@ export const STT_LANGUAGES: Record<SttProvider, readonly string[]> = {
   gladia: ["en", "hi", "bn", "gu", "kn", "mr", "ta", "te", "es"],
 };
 
-/** A text-to-speech provider: its settings and key, and how its voices behave. */
+/** A text-to-speech provider's settings and key. How its voices behave, and the models they
+ * use, come from the server's list of providers (`useVoiceProviders`). */
 export interface TtsProvider extends Omit<SpeechProvider<VoiceProvider>, "address" | "secret"> {
   /** Its key, or Nimble's Auth ID and Auth token, which are saved together. */
   secrets: readonly SecretName[];
   /** The section's address field; Azure's is its region. */
   address: "base_url" | "url" | "region";
-  /** False: the provider times whole sentences, so a cut-off reply is cut at a sentence. */
-  wordTimestamps: boolean;
-  /** The range of its speed or pace; 1 is the voice's natural pace. */
-  speed: readonly [number, number];
-  /** It describes a voice by its ID; otherwise the details are entered by hand. */
-  lookup: boolean;
 }
 
 export const TTS_PROVIDERS: TtsProvider[] = [
@@ -99,9 +97,6 @@ export const TTS_PROVIDERS: TtsProvider[] = [
     address: "url",
     secrets: ["elevenlabs_api_key"],
     test: "elevenlabs",
-    wordTimestamps: true,
-    speed: [0.7, 1.2],
-    lookup: true,
   },
   {
     value: "cartesia",
@@ -110,9 +105,6 @@ export const TTS_PROVIDERS: TtsProvider[] = [
     address: "url",
     secrets: ["cartesia_api_key"],
     test: "cartesia",
-    wordTimestamps: true,
-    speed: [0.6, 1.5],
-    lookup: false,
   },
   {
     value: "sarvam",
@@ -121,9 +113,6 @@ export const TTS_PROVIDERS: TtsProvider[] = [
     address: "base_url",
     secrets: ["sarvam_api_key"],
     test: "sarvam_tts",
-    wordTimestamps: false,
-    speed: [0.5, 2],
-    lookup: false,
   },
   {
     value: "azure",
@@ -132,9 +121,6 @@ export const TTS_PROVIDERS: TtsProvider[] = [
     address: "region",
     secrets: ["azure_api_key"],
     test: "azure",
-    wordTimestamps: true,
-    speed: [0.5, 2],
-    lookup: false,
   },
   {
     value: "nimble",
@@ -143,9 +129,6 @@ export const TTS_PROVIDERS: TtsProvider[] = [
     address: "base_url",
     secrets: ["nimble_auth_id", "nimble_auth_token"],
     test: "nimble",
-    wordTimestamps: true,
-    speed: [0.7, 1],
-    lookup: true,
   },
 ];
 
@@ -158,8 +141,53 @@ export const hasCredential = (
 export const ttsProvider = (value: VoiceProvider) =>
   TTS_PROVIDERS.find((provider) => provider.value === value) ?? TTS_PROVIDERS[0];
 
-/** The languages each provider cannot speak; the console leaves them out for its voices. */
-export const TTS_UNSPOKEN: Partial<Record<VoiceProvider, readonly Language[]>> = {
-  sarvam: ["es"],
-  nimble: ["es"],
+/** The tag of a provider without word timestamps, and what it means for a call. */
+export const CUTS_AT_SENTENCES = {
+  label: "Cuts at sentences",
+  tip: "If the agent talks over the caller, the transcript cuts the caller's line at a whole sentence, not at a word. This provider does not report when each word plays.",
 };
+
+export const ttsTraits = (providers: readonly TtsTraits[], value: VoiceProvider) =>
+  providers.find((provider) => provider.provider === value) ?? providers[0];
+
+/** A voice's model; undefined for a model that is not in the provider's list. */
+export const ttsModel = (
+  traits: TtsTraits,
+  model: string | null | undefined,
+): TtsModel | undefined => traits.models.find((item) => item.id === (model ?? null));
+
+/** The languages of `listed` that the model speaks, in the model's order. */
+export const spokenOf = (listed: readonly Language[], model: TtsModel) =>
+  model.languages.filter((language) => listed.includes(language));
+
+/** The speed range of a voice's model. A model that is not in the list takes the widest range
+ * of the provider, as the server does. */
+export function speedRange(traits: TtsTraits, model: string | null | undefined): [number, number] {
+  const found = ttsModel(traits, model);
+  if (found) return [found.speed_min, found.speed_max];
+  return [
+    Math.min(...traits.models.map((item) => item.speed_min)),
+    Math.max(...traits.models.map((item) => item.speed_max)),
+  ];
+}
+
+/** A voice's provider and model, such as "ElevenLabs Flash v2.5"; the provider alone when it
+ * has no model choice. */
+export function modelName(traits: TtsTraits, model: string | null | undefined): string {
+  if (model == null) return traits.label;
+  return `${traits.label} ${ttsModel(traits, model)?.label ?? model}`;
+}
+
+/** A voice at its natural pace, with ElevenLabs' default stability: how a voice that no persona
+ * has set up speaks in a preview. */
+export const defaultSettings = (
+  provider: VoiceProvider,
+  id: string,
+  model: string | null,
+): VoiceSettings => ({
+  provider,
+  id,
+  model,
+  speed: 1,
+  stability: provider === "elevenlabs" ? 0.5 : null,
+});

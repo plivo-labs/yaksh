@@ -10,7 +10,7 @@ from pipecat.services.tts_service import TTSService
 
 from yaksh.domain.languages import AgentLanguage, Language, answer_language
 from yaksh.domain.settings import AppSettings
-from yaksh.domain.voices import ProviderVoice, VoiceSettings
+from yaksh.domain.voices import CatalogPage, CatalogQuery, ProviderVoice, VoiceSettings
 
 
 def answer_code(agent: Sequence[AgentLanguage], caller: Language) -> str:
@@ -41,14 +41,17 @@ class SttVendor:
 
 @dataclass(frozen=True)
 class TtsVendor:
-    model: Callable[[AppSettings], str | None]
-    """None for a provider whose voice names its model."""
     service: TtsBuilder
     """A one-shot service, for speech outside a call, fails a reply that stalls or loses its
     socket instead of ending it short as finished."""
     check_voice: Callable[[AppSettings, str], Awaitable[str]] | None
     """A voice the account has, found with the settings and the key, for the key check; None
     for a provider whose check uses one of Yaksh's built-in voices."""
+    catalog: Callable[[AppSettings, str, CatalogQuery], Awaitable[CatalogPage]]
+    """A page of the provider's own voices, by the settings, the key and the query."""
     lookup: Callable[[AppSettings, str, str], Awaitable[ProviderVoice | None]] | None = None
     """The provider's description of a voice, by the settings, the key and the voice's ID; None
     when the account does not have it. None for a provider without lookup."""
+    available_models: Callable[[AppSettings, str], Awaitable[frozenset[str]]] | None = None
+    """The model IDs the account may speak with, by the settings and the key; None for a
+    provider whose accounts all have every model."""

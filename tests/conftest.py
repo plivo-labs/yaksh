@@ -48,7 +48,14 @@ from yaksh.domain.languages import Language
 from yaksh.domain.numbers import AccountNumber, PlivoApplication
 from yaksh.domain.record_sources import RecordProvider
 from yaksh.domain.settings import AppSettings, Phone, SecretName, Secrets
-from yaksh.domain.voices import ProviderVoice, VoiceGender, VoiceProvider, VoiceSettings
+from yaksh.domain.voices import (
+    CatalogPage,
+    CatalogQuery,
+    ProviderVoice,
+    VoiceGender,
+    VoiceProvider,
+    VoiceSettings,
+)
 from yaksh.evaluation import evaluations
 from yaksh.evaluation.evaluations import Evaluated
 from yaksh.integrations.elevenlabs import ElevenLabsAgentsApi
@@ -56,6 +63,7 @@ from yaksh.integrations.plivo import PlivoApi, PlivoError
 from yaksh.integrations.plivo_signature import signature, signed_text
 from yaksh.integrations.retell import RetellApi
 from yaksh.integrations.speech.audio import as_wav
+from yaksh.integrations.speech.catalog import page_of
 from yaksh.integrations.vapi import VapiApi
 from yaksh.settings import store
 from yaksh.settings.cipher import Cipher
@@ -931,6 +939,8 @@ class FakeVoiceClient:
         self.lookups: list[str] = []
         self.spoken: list[tuple[VoiceSettings, Language, str]] = []
         self.down = False
+        self.offered: frozenset[str] | None = None
+        """The models the account offers; None for every model."""
 
     async def get_voice(self, voice_id: str) -> ProviderVoice | None:
         self._answer()
@@ -944,6 +954,14 @@ class FakeVoiceClient:
             raise UnavailableError(f"voice {voice.id} was not found")
         return SPOKEN
 
+    async def catalog(self, query: CatalogQuery) -> CatalogPage:
+        self._answer()
+        return page_of(list(self.voices.values()), query)
+
+    async def available_models(self) -> frozenset[str] | None:
+        self._answer()
+        return self.offered
+
     def _answer(self) -> None:
         if self.down:
             raise UnavailableError("the voice provider did not answer")
@@ -953,6 +971,7 @@ def listed_voice(voice: ProviderVoice, *languages: Language) -> Voice:
     return Voice(
         provider=VoiceProvider.ELEVENLABS,
         provider_voice_id=voice.id,
+        model=VoiceProvider.ELEVENLABS.traits.models[0].id,
         name=voice.name,
         gender=voice.gender,
         accent=voice.accent,

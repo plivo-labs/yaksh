@@ -50,6 +50,31 @@ def merged(base: Mapping[str, Any], changes: Mapping[str, Any]) -> dict[str, Any
     return out
 
 
+RETIRED = {"elevenlabs": "model", "cartesia": "model", "sarvam_tts": "model"}
+"""Settings that this release no longer reads but keeps in the stored row for one release: a
+process of the release before reads its text-to-speech model there during a rolling deploy.
+Each voice holds its model now (decision 0039); a later release removes these."""
+
+
+def without_retired(values: Mapping[str, Any]) -> dict[str, Any]:
+    return {
+        section: {key: value for key, value in fields.items() if RETIRED.get(section) != key}
+        if isinstance(fields, Mapping)
+        else fields
+        for section, fields in values.items()
+    }
+
+
+def with_retired(values: Mapping[str, Any], stored: Mapping[str, Any]) -> dict[str, Any]:
+    """The values with the retired settings that the stored row holds."""
+    kept = dict(values)
+    for section, key in RETIRED.items():
+        fields = stored.get(section)
+        if isinstance(fields, Mapping) and key in fields:
+            kept[section] = {**kept.get(section, {}), key: fields[key]}
+    return kept
+
+
 def validated(version: int, values: Mapping[str, Any], secrets: Mapping[str, str]) -> AppSettings:
     return AppSettings.model_validate(
         {**values, "version": version, "secrets": Secrets.from_flat(secrets)}
@@ -109,14 +134,15 @@ async def load(session: AsyncSession, cipher: Cipher) -> AppSettings:
     can still open; writes stay strict."""
     row = await session.get_one(StoredSettings, 1, populate_existing=True)
     secrets = {name: cipher.decrypt(name, value) for name, value in row.secrets.items()}
+    stored = without_retired(row.values)
     try:
-        return validated(row.version, row.values, secrets)
+        return validated(row.version, stored, secrets)
     except PydanticValidationError as error:
         refused = {tuple(issue["loc"][:2]) for issue in error.errors()}
         log.warning("stored settings use their defaults for %s", problems(error))
         values = {
             section: {key: value for key, value in fields.items() if (section, key) not in refused}
-            for section, fields in row.values.items()
+            for section, fields in stored.items()
             if section in DEFAULTS
         }
         return validated(row.version, values, secrets)
@@ -159,7 +185,11 @@ async def change(
     await session.execute(
         update(StoredSettings)
         .where(StoredSettings.id == 1)
-        .values(version=candidate.version, values=changed_values(candidate), secrets=stored)
+        .values(
+            version=candidate.version,
+            values=with_retired(changed_values(candidate), row.values),
+            secrets=stored,
+        )
     )
     await session.commit()
     return candidate

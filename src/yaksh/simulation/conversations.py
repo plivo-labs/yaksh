@@ -28,6 +28,7 @@ from yaksh.domain.conversations import (
     ACTIVE_STATUSES,
     LIVE_STATUSES,
     Admission,
+    CallerSettings,
     CallOutcome,
     CallRequest,
     ConversationStatus,
@@ -51,6 +52,7 @@ from yaksh.simulation.answering import answering_plan
 from yaksh.simulation.files import OpenedFile, open_file
 from yaksh.simulation.languages import LANGUAGES
 from yaksh.simulation.numbers import free_numbers, lease_number, release_numbers
+from yaksh.simulation.personas import version_config
 from yaksh.simulation.runs import (
     ENDED,
     get_run,
@@ -374,7 +376,7 @@ async def call_request(
     agent: AgentConfig,
 ) -> CallRequest:
     persona_version = await session.get_one(PersonaVersion, conversation.persona_version_id)
-    persona = PersonaConfig.model_validate(persona_version.config)
+    persona = await version_config(session, persona_version)
     scenario = await played_scenario(session, conversation)
     return CallRequest(
         conversation_id=conversation.id,
@@ -590,6 +592,14 @@ def dump(value: BaseModel | None) -> dict[str, Any] | None:
     return None if value is None else value.model_dump(mode="json")
 
 
+def stored_caller_settings(settings: CallerSettings | None) -> dict[str, Any] | None:
+    """The voice's model is kept as `tts_model`, never in the voice: an older process refuses
+    a voice with a field that it does not know."""
+    if settings is None:
+        return None
+    return settings.model_dump(mode="json", exclude={"voice": {"model"}})
+
+
 def failure_reason(outcome: CallOutcome) -> str | None:
     return FAILURE_TEXT.get(outcome.end_reason, outcome.caller_error)
 
@@ -630,7 +640,7 @@ async def finalize(
                 talk_ms=outcome.talk_ms,
                 transcript=transcript.model_dump(mode="json"),
                 caller_reason=outcome.caller_reason,
-                caller_settings=dump(outcome.caller_settings),
+                caller_settings=stored_caller_settings(outcome.caller_settings),
                 caller_usage=dump(outcome.caller_usage),
                 caller_reply_times=None
                 if outcome.caller_reply_times is None

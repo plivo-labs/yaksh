@@ -353,7 +353,7 @@ class PersonaSource:
         change asked for must be met."""
         own = self.config.voice
         if (language, gender) == (self.config.language, self.config.voice_gender):
-            return VoiceSettings.fitted(own.provider, own.id, speed, own.stability)
+            return VoiceSettings.fitted(own.provider, own.id, own.model, speed, own.stability)
         speaking = [voice for voice in self.voices if language in voice.languages]
         matching = [voice for voice in speaking if gender is None or voice.gender == gender]
         if asked and gender is not None and not matching:
@@ -361,7 +361,9 @@ class PersonaSource:
         voice = next(iter(matching or speaking), None)
         if voice is None:
             raise ValidationError(f"no listed voice speaks {language.value}")
-        return VoiceSettings.fitted(voice.provider, voice.provider_voice_id, speed, own.stability)
+        return VoiceSettings.fitted(
+            voice.provider, voice.provider_voice_id, voice.model, speed, own.stability
+        )
 
 
 async def persona_source(

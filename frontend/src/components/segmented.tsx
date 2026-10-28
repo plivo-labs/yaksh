@@ -7,11 +7,13 @@ export function Segmented<T extends string | number>({
   value,
   options,
   onChange,
+  disabled = false,
 }: {
   label: string;
   value: T;
   options: { value: T; label: string }[];
   onChange: (value: T) => void;
+  disabled?: boolean;
 }) {
   const index = options.findIndex((option) => option.value === value);
   const key = (event: KeyboardEvent<HTMLDivElement>) => {
@@ -33,8 +35,9 @@ export function Segmented<T extends string | number>({
       <div
         role="radiogroup"
         aria-label={label}
+        aria-disabled={disabled || undefined}
         onKeyDown={key}
-        className="relative grid w-fit auto-cols-fr grid-flow-col rounded-md border bg-muted p-[3px]"
+        className="relative grid w-fit auto-cols-fr grid-flow-col rounded-md border bg-muted p-[3px] aria-disabled:opacity-50"
       >
         {index >= 0 && (
           <span
@@ -55,9 +58,10 @@ export function Segmented<T extends string | number>({
               role="radio"
               aria-checked={checked}
               tabIndex={checked ? 0 : -1}
+              disabled={disabled}
               data-value={option.value}
               onClick={() => onChange(option.value)}
-              className={`relative rounded-md px-4 py-1.5 text-s-500 whitespace-nowrap tabular-nums outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-ring/50 ${checked ? "text-foreground" : "text-muted-foreground hover:text-secondary"}`}
+              className={`relative rounded-md px-4 py-1.5 text-s-500 whitespace-nowrap tabular-nums outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-ring/50 disabled:cursor-not-allowed ${checked ? "text-foreground" : "text-muted-foreground not-disabled:hover:text-secondary"}`}
             >
               {option.label}
             </button>
