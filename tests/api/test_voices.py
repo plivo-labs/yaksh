@@ -249,3 +249,67 @@ async def test_a_voice_never_lists_a_language_its_provider_cannot_speak(
     assert spanish.status_code == edited.status_code == 422
     assert "Sarvam Bulbul v4 Flash does not speak Spanish" in spanish.text
     assert "Sarvam Bulbul v4 Flash does not speak Spanish" in edited.text
+
+
+async def test_the_providers_list_their_models_with_speed_and_languages(
+    client: AsyncClient,
+) -> None:
+    providers = {
+        entry["provider"]: entry for entry in (await client.get("/api/v1/voices/providers")).json()
+    }
+
+    elevenlabs = {model["id"]: model for model in providers["elevenlabs"]["models"]}
+    assert providers["elevenlabs"]["models"][0]["id"] == "eleven_flash_v2_5"
+    assert (elevenlabs["eleven_v4"]["speed_min"], elevenlabs["eleven_v4"]["speed_max"]) == (1, 1)
+    assert "mr" in elevenlabs["eleven_v4"]["languages"]
+    assert "es" not in providers["sarvam"]["models"][0]["languages"]
+    assert [model["id"] for model in providers["azure"]["models"]] == [None]
+    assert (providers["elevenlabs"]["library"], providers["cartesia"]["library"]) == (True, False)
+
+
+async def test_the_catalog_searches_the_provider_voices_and_only_elevenlabs_has_a_library(
+    client: AsyncClient, voice_clients: dict[VoiceProvider, FakeVoiceClient]
+) -> None:
+    voice_clients[VoiceProvider.CARTESIA] = FakeVoiceClient()
+    url = "/api/v1/voices/catalog"
+
+    found = await client.get(url, params={"provider": "elevenlabs", "search": HINDI_VOICE.name})
+    library = await client.get(url, params={"provider": "cartesia", "source": "library"})
+    missing = await client.get(url, params={"provider": "azure"})
+
+    assert found.status_code == 200, found.text
+    assert [voice["id"] for voice in found.json()["items"]] == [HINDI_VOICE.id]
+    assert found.json()["next_cursor"] is None
+    assert library.status_code == 422 and "no voice library" in library.text
+    assert missing.status_code == 503
+
+
+async def test_a_library_voice_is_added_from_its_details_once_it_speaks_in_its_model(
+    client: AsyncClient, voice_client: FakeVoiceClient
+) -> None:
+    voice_client.voices["lib1"] = ProviderVoice(id="lib1", name="unused")
+
+    added = await client.post(
+        "/api/v1/voices",
+        json={
+            "provider": "elevenlabs",
+            "provider_voice_id": "lib1",
+            "source": "library",
+            "model": "eleven_v4",
+            "name": "Kavya",
+            "gender": "female",
+            "languages": ["mr"],
+            "listed_languages": ["mr", "hi"],
+        },
+    )
+
+    assert added.status_code == 201, added.text
+    body = added.json()
+    assert (body["name"], body["model"], body["gender"], body["listed_languages"]) == (
+        "Kavya",
+        "eleven_v4",
+        "female",
+        ["hi", "mr"],
+    )
+    assert "lib1" not in voice_client.lookups
+    assert voice_client.spoken[-1][0].model == "eleven_v4"

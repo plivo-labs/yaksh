@@ -48,7 +48,14 @@ from yaksh.domain.languages import Language
 from yaksh.domain.numbers import AccountNumber, PlivoApplication
 from yaksh.domain.record_sources import RecordProvider
 from yaksh.domain.settings import AppSettings, Phone, SecretName, Secrets
-from yaksh.domain.voices import ProviderVoice, VoiceGender, VoiceProvider, VoiceSettings
+from yaksh.domain.voices import (
+    CatalogPage,
+    CatalogQuery,
+    ProviderVoice,
+    VoiceGender,
+    VoiceProvider,
+    VoiceSettings,
+)
 from yaksh.evaluation import evaluations
 from yaksh.evaluation.evaluations import Evaluated
 from yaksh.integrations.elevenlabs import ElevenLabsAgentsApi
@@ -56,6 +63,7 @@ from yaksh.integrations.plivo import PlivoApi, PlivoError
 from yaksh.integrations.plivo_signature import signature, signed_text
 from yaksh.integrations.retell import RetellApi
 from yaksh.integrations.speech.audio import as_wav
+from yaksh.integrations.speech.catalog import page_of
 from yaksh.integrations.vapi import VapiApi
 from yaksh.settings import store
 from yaksh.settings.cipher import Cipher
@@ -943,6 +951,10 @@ class FakeVoiceClient:
         if voice.id not in self.voices:
             raise UnavailableError(f"voice {voice.id} was not found")
         return SPOKEN
+
+    async def catalog(self, query: CatalogQuery) -> CatalogPage:
+        self._answer()
+        return page_of(list(self.voices.values()), query)
 
     def _answer(self) -> None:
         if self.down:

@@ -1,0 +1,266 @@
+# Sarvam's text-to-speech speakers for each model, from its OpenAPI spec
+# (https://docs.sarvam.ai/openapi/apis.json, checked 2026-10-28). Sarvam has no API that lists them,
+# and a speaker of one model is not valid in another. A bulbul:v3 speaker speaks every
+# language of the model; a bulbul:v4-flash speaker lists the languages it is made for.
+models:
+  bulbul:v4-flash:
+    - {speaker: arnab_bn_conversation, gender: null, languages: [bn]}
+    - {speaker: roopa_bn_conversational, gender: female, languages: [bn]}
+    - {speaker: bimal_bn_suspense, gender: null, languages: [bn]}
+    - {speaker: aditi_en_stories, gender: null, languages: [en]}
+    - {speaker: aparna_en_companion, gender: female, languages: [en]}
+    - {speaker: aparna_en_edtech, gender: female, languages: [en]}
+    - {speaker: ashwin_en_sports, gender: null, languages: [en]}
+    - {speaker: ashwin_en_sports_energetic, gender: null, languages: [en]}
+    - {speaker: chandrika_en_stories, gender: null, languages: [en]}
+    - {speaker: dev_en_recovery, gender: male, languages: [en]}
+    - {speaker: dev_en_conversational, gender: male, languages: [en]}
+    - {speaker: deven_en_conversation, gender: null, languages: [en]}
+    - {speaker: ishita_en_customer, gender: female, languages: [en]}
+    - {speaker: ishita_en_medical, gender: female, languages: [en]}
+    - {speaker: ishita_en_numbers, gender: female, languages: [en]}
+    - {speaker: ishita_en_social, gender: female, languages: [en]}
+    - {speaker: ishita_en_stories, gender: female, languages: [en]}
+    - {speaker: kalpit_en_edtech, gender: null, languages: [en]}
+    - {speaker: nachiket_en_ads, gender: null, languages: [en]}
+    - {speaker: neha_en_customer, gender: null, languages: [en]}
+    - {speaker: neha_en_latenight, gender: null, languages: [en]}
+    - {speaker: nupur_en_kids, gender: null, languages: [en]}
+    - {speaker: ojas_en_social, gender: null, languages: [en]}
+    - {speaker: ritu_en_edtech, gender: null, languages: [en]}
+    - {speaker: ritu_en_latenight, gender: null, languages: [en]}
+    - {speaker: ritu_en_medical, gender: null, languages: [en]}
+    - {speaker: ritu_en_reels, gender: null, languages: [en]}
+    - {speaker: rohan_en_recovery, gender: male, languages: [en]}
+    - {speaker: roopa_en_conversational, gender: female, languages: [en]}
+    - {speaker: rustom_en_suspense, gender: null, languages: [en]}
+    - {speaker: sanchita_en_companion, gender: female, languages: [en]}
+    - {speaker: sanchita_en_insurance, gender: female, languages: [en]}
+    - {speaker: sanchita_en_recovery, gender: female, languages: [en]}
+    - {speaker: sanchita_en_market, gender: female, languages: [en]}
+    - {speaker: sanchita_en_social, gender: female, languages: [en]}
+    - {speaker: shabana_en_edtech, gender: null, languages: [en]}
+    - {speaker: shalini_en_companion, gender: female, languages: [en]}
+    - {speaker: shalini_en_customer, gender: female, languages: [en]}
+    - {speaker: shubh_en_narration, gender: male, languages: [en]}
+    - {speaker: shubh_en_numbers, gender: male, languages: [en]}
+    - {speaker: shubh_en_ads, gender: male, languages: [en]}
+    - {speaker: shubh_en_recovery, gender: male, languages: [en]}
+    - {speaker: shubh_en_audiobook, gender: male, languages: [en]}
+    - {speaker: shubh_en_narration_gentle, gender: male, languages: [en]}
+    - {speaker: shubh_en_sports, gender: male, languages: [en]}
+    - {speaker: simran_en_narration, gender: female, languages: [en]}
+    - {speaker: simran_en_automobile, gender: female, languages: [en]}
+    - {speaker: simran_en_conversation, gender: female, languages: [en]}
+    - {speaker: simran_en_customer, gender: female, languages: [en]}
+    - {speaker: simran_en_edtech, gender: female, languages: [en]}
+    - {speaker: simran_en_edtech_bot, gender: female, languages: [en]}
+    - {speaker: simran_en_sales, gender: female, languages: [en]}
+    - {speaker: simran_en_recovery, gender: female, languages: [en]}
+    - {speaker: simran_en_ads, gender: female, languages: [en]}
+    - {speaker: simran_en_therapist, gender: female, languages: [en]}
+    - {speaker: sunny_en_social, gender: male, languages: [en]}
+    - {speaker: varun_en_ads, gender: null, languages: [en]}
+    - {speaker: varun_en_suspense, gender: null, languages: [en]}
+    - {speaker: zarina_en_conversation, gender: female, languages: [en]}
+    - {speaker: amelia_en_conversational, gender: null, languages: [en]}
+    - {speaker: sophia_en_conversational, gender: null, languages: [en]}
+    - {speaker: girish_en_documentary, gender: null, languages: [en]}
+    - {speaker: girish_en_devotional, gender: null, languages: [en]}
+    - {speaker: payal_en_edtech, gender: null, languages: [en]}
+    - {speaker: sarang_en_narration, gender: null, languages: [en]}
+    - {speaker: ishita_enhi_companion, gender: female, languages: [en, hi]}
+    - {speaker: ishita_enhi_customer, gender: female, languages: [en, hi]}
+    - {speaker: ishita_enhi_customer_expressive, gender: female, languages: [en, hi]}
+    - {speaker: sanchita_enhi_companion, gender: female, languages: [en, hi]}
+    - {speaker: shalini_enhi_companion, gender: female, languages: [en, hi]}
+    - {speaker: shalini_enhi_customer, gender: female, languages: [en, hi]}
+    - {speaker: shubh_enhi_companion, gender: male, languages: [en, hi]}
+    - {speaker: shubh_enhi_ads, gender: male, languages: [en, hi]}
+    - {speaker: shubh_enhi_banking, gender: male, languages: [en, hi]}
+    - {speaker: simran_enhi_companion, gender: female, languages: [en, hi]}
+    - {speaker: simran_enhi_customer, gender: female, languages: [en, hi]}
+    - {speaker: simran_enhi_banking_expressive, gender: female, languages: [en, hi]}
+    - {speaker: sunny_enhi_customer, gender: male, languages: [en, hi]}
+    - {speaker: bhavik_gu_conversation, gender: null, languages: [gu]}
+    - {speaker: pooja_gu_conversational, gender: null, languages: [gu]}
+    - {speaker: pooja_gu_customer, gender: null, languages: [gu]}
+    - {speaker: aayan_hi_conversational, gender: null, languages: [hi]}
+    - {speaker: amit_hi_conversational, gender: null, languages: [hi]}
+    - {speaker: ashutosh_hi_conversational, gender: null, languages: [hi]}
+    - {speaker: kabir_hi_conversational, gender: null, languages: [hi]}
+    - {speaker: kavya_hi_conversational, gender: null, languages: [hi]}
+    - {speaker: manan_hi_conversational, gender: null, languages: [hi]}
+    - {speaker: rahul_hi_conversational, gender: null, languages: [hi]}
+    - {speaker: sumit_hi_conversational, gender: null, languages: [hi]}
+    - {speaker: aditya_hi_conversational, gender: null, languages: [hi]}
+    - {speaker: aditya_hi_sales, gender: null, languages: [hi]}
+    - {speaker: anand_hi_documentary, gender: male, languages: [hi]}
+    - {speaker: anand_hi_news, gender: male, languages: [hi]}
+    - {speaker: aparna_hi_customer, gender: female, languages: [hi]}
+    - {speaker: aparna_hi_kyc, gender: female, languages: [hi]}
+    - {speaker: ashok_hi_character, gender: male, languages: [hi]}
+    - {speaker: ashok_hi_news, gender: male, languages: [hi]}
+    - {speaker: chhavi_hi_kids, gender: null, languages: [hi]}
+    - {speaker: ishita_hi_ads, gender: female, languages: [hi]}
+    - {speaker: ishita_hi_edtech, gender: female, languages: [hi]}
+    - {speaker: ishita_hi_banking, gender: female, languages: [hi]}
+    - {speaker: ishita_hi_ads_informal, gender: female, languages: [hi]}
+    - {speaker: ishita_hi_devotional, gender: female, languages: [hi]}
+    - {speaker: ishita_hi_numbers, gender: female, languages: [hi]}
+    - {speaker: ishita_hi_social, gender: female, languages: [hi]}
+    - {speaker: kunal_hi_kids, gender: null, languages: [hi]}
+    - {speaker: mahesh_hi_documentary, gender: null, languages: [hi]}
+    - {speaker: mani_hi_devotional, gender: null, languages: [hi]}
+    - {speaker: mani_hi_conversational, gender: null, languages: [hi]}
+    - {speaker: mohit_hi_conversational, gender: null, languages: [hi]}
+    - {speaker: nachiket_hi_devotional, gender: null, languages: [hi]}
+    - {speaker: priya_hi_recovery, gender: null, languages: [hi]}
+    - {speaker: ratan_hi_latenight, gender: male, languages: [hi]}
+    - {speaker: ratan_hi_customer_expressive, gender: male, languages: [hi]}
+    - {speaker: ratan_hi_documentary, gender: male, languages: [hi]}
+    - {speaker: ratan_hi_devotional, gender: male, languages: [hi]}
+    - {speaker: ratan_hi_recovery, gender: male, languages: [hi]}
+    - {speaker: ratan_hi_social, gender: male, languages: [hi]}
+    - {speaker: ratan_hi_sports, gender: male, languages: [hi]}
+    - {speaker: ratan_hi_latenight_warm, gender: male, languages: [hi]}
+    - {speaker: rehan_hi_social, gender: null, languages: [hi]}
+    - {speaker: ritu_hi_customer_utility, gender: null, languages: [hi]}
+    - {speaker: ritu_hi_kids, gender: null, languages: [hi]}
+    - {speaker: ritu_hi_conversation, gender: null, languages: [hi]}
+    - {speaker: ritu_hi_customer, gender: null, languages: [hi]}
+    - {speaker: ritu_hi_edtech, gender: null, languages: [hi]}
+    - {speaker: ritu_hi_ads_formal, gender: null, languages: [hi]}
+    - {speaker: ritu_hi_banking, gender: null, languages: [hi]}
+    - {speaker: ritu_hi_ads_informal, gender: null, languages: [hi]}
+    - {speaker: ritu_hi_insurance, gender: null, languages: [hi]}
+    - {speaker: ritu_hi_edtech_bot, gender: null, languages: [hi]}
+    - {speaker: ritu_hi_medical, gender: null, languages: [hi]}
+    - {speaker: ritu_hi_sales, gender: null, languages: [hi]}
+    - {speaker: ritu_hi_reels, gender: null, languages: [hi]}
+    - {speaker: ritu_hi_social, gender: null, languages: [hi]}
+    - {speaker: ritu_hi_customer_warm, gender: null, languages: [hi]}
+    - {speaker: ritu_hi_social_lively, gender: null, languages: [hi]}
+    - {speaker: roopa_hi_companion, gender: female, languages: [hi]}
+    - {speaker: roopa_hi_narration, gender: female, languages: [hi]}
+    - {speaker: roopa_hi_recovery, gender: female, languages: [hi]}
+    - {speaker: roopa_hi_market, gender: female, languages: [hi]}
+    - {speaker: roopa_hi_conversational, gender: female, languages: [hi]}
+    - {speaker: sanchita_hi_assistant, gender: female, languages: [hi]}
+    - {speaker: sanchita_hi_edtech, gender: female, languages: [hi]}
+    - {speaker: sanchita_hi_banking, gender: female, languages: [hi]}
+    - {speaker: sanchita_hi_feedback, gender: female, languages: [hi]}
+    - {speaker: sanchita_hi_ads_formal, gender: female, languages: [hi]}
+    - {speaker: sanchita_hi_ads_informal, gender: female, languages: [hi]}
+    - {speaker: sanchita_hi_interview, gender: female, languages: [hi]}
+    - {speaker: sanchita_hi_romantic, gender: female, languages: [hi]}
+    - {speaker: sanchita_hi_market, gender: female, languages: [hi]}
+    - {speaker: sanchita_hi_social, gender: female, languages: [hi]}
+    - {speaker: sanchita_hi_kyc, gender: female, languages: [hi]}
+    - {speaker: sarika_hi_conversation, gender: null, languages: [hi]}
+    - {speaker: shalini_hi_companion, gender: female, languages: [hi]}
+    - {speaker: shalini_hi_social, gender: female, languages: [hi]}
+    - {speaker: shreya_hi_conversational, gender: null, languages: [hi]}
+    - {speaker: shreya_hi_news, gender: null, languages: [hi]}
+    - {speaker: shruti_hi_edtech, gender: null, languages: [hi]}
+    - {speaker: shubh_hi_customer, gender: male, languages: [hi]}
+    - {speaker: shubh_hi_ecomm, gender: male, languages: [hi]}
+    - {speaker: shubh_hi_stories_mixed, gender: male, languages: [hi]}
+    - {speaker: shubh_hi_devotional, gender: male, languages: [hi]}
+    - {speaker: shubh_hi_ads, gender: male, languages: [hi]}
+    - {speaker: shubh_hi_recovery, gender: male, languages: [hi]}
+    - {speaker: shubh_hi_stories_dramatic, gender: male, languages: [hi]}
+    - {speaker: simran_hi_assistant, gender: female, languages: [hi]}
+    - {speaker: simran_hi_narration, gender: female, languages: [hi]}
+    - {speaker: simran_hi_automobile, gender: female, languages: [hi]}
+    - {speaker: simran_hi_conversation, gender: female, languages: [hi]}
+    - {speaker: simran_hi_news_breaking, gender: female, languages: [hi]}
+    - {speaker: simran_hi_social_energetic, gender: female, languages: [hi]}
+    - {speaker: simran_hi_social_excited, gender: female, languages: [hi]}
+    - {speaker: simran_hi_latenight, gender: female, languages: [hi]}
+    - {speaker: simran_hi_news, gender: female, languages: [hi]}
+    - {speaker: simran_hi_recovery, gender: female, languages: [hi]}
+    - {speaker: simran_hi_sales, gender: female, languages: [hi]}
+    - {speaker: suchitra_hi_ecomm, gender: null, languages: [hi]}
+    - {speaker: suhani_hi_social, gender: null, languages: [hi]}
+    - {speaker: sunny_hi_ads, gender: male, languages: [hi]}
+    - {speaker: sunny_hi_reels, gender: male, languages: [hi]}
+    - {speaker: tarun_hi_conversational, gender: null, languages: [hi]}
+    - {speaker: tarun_hi_sales, gender: null, languages: [hi]}
+    - {speaker: chaitra_hi_customer, gender: null, languages: [hi]}
+    - {speaker: shilpa_hi_narration, gender: null, languages: [hi]}
+    - {speaker: tanya_hi_narration, gender: null, languages: [hi]}
+    - {speaker: aarti_hi_customer, gender: female, languages: [hi]}
+    - {speaker: advait_hi_character, gender: null, languages: [hi]}
+    - {speaker: aryaman_hi_ads, gender: null, languages: [hi]}
+    - {speaker: chirag_hi_social, gender: null, languages: [hi]}
+    - {speaker: girish_hi_devotional, gender: null, languages: [hi]}
+    - {speaker: mukul_hi_ads, gender: null, languages: [hi]}
+    - {speaker: mukul_hi_suspense, gender: null, languages: [hi]}
+    - {speaker: suman_hi_companion, gender: null, languages: [hi]}
+    - {speaker: vaibhav_hi_social, gender: null, languages: [hi]}
+    - {speaker: vandana_hi_ecomm, gender: null, languages: [hi]}
+    - {speaker: vipul_hi_social, gender: null, languages: [hi]}
+    - {speaker: chaitra_kn_conversation, gender: null, languages: [kn]}
+    - {speaker: chaitra_kn_narration, gender: null, languages: [kn]}
+    - {speaker: chetan_kn_conversation, gender: null, languages: [kn]}
+    - {speaker: suchitra_kn_narration, gender: null, languages: [kn]}
+    - {speaker: ishita_mr_conversational, gender: female, languages: [mr]}
+    - {speaker: mrunal_mr_narration, gender: null, languages: [mr]}
+    - {speaker: neha_mr_narration, gender: null, languages: [mr]}
+    - {speaker: nilesh_mr_conversation, gender: null, languages: [mr]}
+    - {speaker: ritu_mr_insurance, gender: null, languages: [mr]}
+    - {speaker: ritu_mr_narration, gender: null, languages: [mr]}
+    - {speaker: rupali_mr_stories, gender: null, languages: [mr]}
+    - {speaker: soham_mr_narration, gender: null, languages: [mr]}
+    - {speaker: mukul_mr_stories, gender: null, languages: [mr]}
+    - {speaker: anand_pa_conversation, gender: male, languages: []}
+    - {speaker: anand_pa_customer, gender: male, languages: []}
+    - {speaker: harpreet_pa_narration, gender: null, languages: []}
+    - {speaker: jaspal_pa_banking, gender: null, languages: []}
+    - {speaker: gokul_ta_narration, gender: null, languages: [ta]}
+    - {speaker: aravind_ta_ads, gender: null, languages: [ta]}
+    - {speaker: aravind_ta_suspense, gender: null, languages: [ta]}
+    - {speaker: vijay_ta_narration, gender: null, languages: [ta]}
+    - {speaker: kavitha_te_conversation, gender: null, languages: [te]}
+    - {speaker: kavitha_te_narration, gender: null, languages: [te]}
+    - {speaker: pooja_te_conversation, gender: null, languages: [te]}
+    - {speaker: tarun_te_narration, gender: null, languages: [te]}
+  bulbul:v3:
+    - {speaker: shubh, gender: male}
+    - {speaker: aditya, gender: male}
+    - {speaker: ritu, gender: female}
+    - {speaker: priya, gender: female}
+    - {speaker: neha, gender: female}
+    - {speaker: rahul, gender: male}
+    - {speaker: pooja, gender: female}
+    - {speaker: rohan, gender: male}
+    - {speaker: simran, gender: female}
+    - {speaker: kavya, gender: female}
+    - {speaker: amit, gender: male}
+    - {speaker: dev, gender: male}
+    - {speaker: ishita, gender: female}
+    - {speaker: shreya, gender: female}
+    - {speaker: ratan, gender: male}
+    - {speaker: varun, gender: male}
+    - {speaker: manan, gender: male}
+    - {speaker: sumit, gender: male}
+    - {speaker: roopa, gender: female}
+    - {speaker: kabir, gender: male}
+    - {speaker: aayan, gender: male}
+    - {speaker: ashutosh, gender: male}
+    - {speaker: advait, gender: male}
+    - {speaker: anand, gender: male}
+    - {speaker: tanya, gender: female}
+    - {speaker: tarun, gender: male}
+    - {speaker: sunny, gender: male}
+    - {speaker: mani, gender: male}
+    - {speaker: gokul, gender: male}
+    - {speaker: vijay, gender: male}
+    - {speaker: shruti, gender: female}
+    - {speaker: suhani, gender: female}
+    - {speaker: mohit, gender: male}
+    - {speaker: kavitha, gender: female}
+    - {speaker: rehan, gender: male}
+    - {speaker: soham, gender: male}
+    - {speaker: rupali, gender: female}

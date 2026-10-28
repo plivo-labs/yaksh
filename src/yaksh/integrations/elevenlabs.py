@@ -12,7 +12,14 @@ from yaksh.diagnostics import describe_exception
 from yaksh.domain.agent_import import ElevenLabsRegion
 from yaksh.domain.errors import ProviderCallError, UnavailableError
 from yaksh.domain.languages import Language
-from yaksh.domain.voices import ProviderVoice, VoiceGender
+from yaksh.domain.voices import (
+    CatalogPage,
+    CatalogQuery,
+    CatalogSource,
+    ProviderVoice,
+    VoiceGender,
+)
+from yaksh.integrations.speech.catalog import PAGE_SIZE, get_json
 
 ELEVENLABS_API = "https://api.elevenlabs.io"
 REGION_APIS: dict[ElevenLabsRegion, str] = {
@@ -65,6 +72,34 @@ class ElevenLabsClient:
                 f"ElevenLabs refused the voice lookup with {status}: {excerpt(text)}"
             )
         return provider_voice(parsed(text))
+
+    async def voices(self, query: CatalogQuery) -> CatalogPage:
+        """The account's voices, or with `source=library` the public library's, which a key can
+        speak with without adding them to the account."""
+        library = query.source is CatalogSource.LIBRARY
+        page = int(query.cursor) if library and query.cursor and query.cursor.isdigit() else 0
+        params = {"page_size": str(PAGE_SIZE)}
+        if query.search:
+            params["search"] = query.search
+        if query.gender:
+            params["gender"] = query.gender.value
+        if query.language:
+            params["language"] = LANGUAGE_CODES[query.language]
+        if library:
+            params["page"] = str(page)
+        elif query.cursor:
+            params["next_page_token"] = query.cursor
+        path = "/v1/shared-voices" if library else "/v2/voices"
+        body = await get_json("ElevenLabs", f"{self.base_url}{path}", params, self._headers)
+        if not isinstance(body, dict):
+            raise UnavailableError("ElevenLabs sent a voice list in an unknown shape")
+        describe = library_voice if library else provider_voice
+        items = [describe(entry) for entry in body.get("voices") or []]
+        if not body.get("has_more"):
+            return CatalogPage(items=items, next_cursor=None)
+        return CatalogPage(
+            items=items, next_cursor=str(page + 1) if library else body.get("next_page_token")
+        )
 
 
 class ElevenLabsError(ProviderCallError):
@@ -143,6 +178,27 @@ def voice_not_found(text: str) -> bool:
     except ValueError, AttributeError:
         return False
     return isinstance(detail, dict) and detail.get("code") == "voice_not_found"
+
+
+def library_voice(entry: Any) -> ProviderVoice:
+    """A voice of the public library, which gives its gender and accent itself, not as labels."""
+    try:
+        gender = str(entry.get("gender") or "").lower()
+        verified = {item.get("language") for item in entry.get("verified_languages") or []}
+        codes = verified | {entry.get("language")}
+        return ProviderVoice(
+            id=entry["voice_id"],
+            name=entry["name"],
+            gender=VoiceGender(gender) if gender in VoiceGender else None,
+            accent=entry.get("accent"),
+            listed_languages=tuple(
+                language for language, code in LANGUAGE_CODES.items() if code in codes
+            ),
+        )
+    except (AttributeError, KeyError, TypeError, pydantic.ValidationError) as error:
+        raise UnavailableError(
+            f"ElevenLabs described a voice in an unknown shape: {excerpt(repr(entry))}"
+        ) from error
 
 
 def provider_voice(entry: Any) -> ProviderVoice:

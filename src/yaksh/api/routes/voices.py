@@ -7,10 +7,11 @@ from yaksh.api.auth import require_token
 from yaksh.api.deps import SessionDep, VoiceClientsDep
 from yaksh.api.errors import UNAVAILABLE
 from yaksh.api.pagination import Page, PageDep
-from yaksh.api.schemas.voices import VoiceRead
+from yaksh.api.schemas.voices import CatalogParams, TtsProviderRead, VoiceRead
 from yaksh.domain.languages import Language
 from yaksh.domain.voices import (
     PROVIDER_VOICE_ID,
+    CatalogPage,
     ProviderVoice,
     VoiceCreate,
     VoicePreview,
@@ -30,6 +31,22 @@ async def list_voices(
         session, offset=page.offset, limit=page.page_size, language=language
     )
     return Page.of([VoiceRead.model_validate(row) for row in rows], total, page)
+
+
+@router.get("/providers")
+async def voice_providers() -> list[TtsProviderRead]:
+    """Each text-to-speech provider with the models a voice can use: their speed ranges and
+    the languages they speak."""
+    return [TtsProviderRead.of(provider) for provider in VoiceProvider]
+
+
+@router.get("/catalog", responses=UNAVAILABLE)
+async def voice_catalog(
+    params: Annotated[CatalogParams, Query()], clients: VoiceClientsDep
+) -> CatalogPage:
+    """A page of the provider's own voices, to pick one to add; `source=library` searches
+    ElevenLabs' public library. Saves nothing."""
+    return await voices.search_catalog(clients, params.provider, params.query())
 
 
 @router.get("/lookup", responses=UNAVAILABLE)

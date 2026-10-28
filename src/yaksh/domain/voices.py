@@ -58,6 +58,8 @@ class TtsTraits:
     """The provider describes a voice by its ID; otherwise the person enters the details."""
     models: tuple[TtsModel, ...]
     """The models a voice can use; a new voice gets the first."""
+    library: bool = False
+    """The provider has a public voice library that a key can speak with."""
 
     @property
     def speed(self) -> tuple[float, float]:
@@ -92,6 +94,7 @@ TTS = {
         "ElevenLabs",
         word_timestamps=True,
         lookup=True,
+        library=True,
         models=(
             TtsModel("eleven_flash_v2_5", "Flash v2.5", (0.7, 1.2), INDIAN_ENGLISH_AND_SPANISH),
             TtsModel(
@@ -235,6 +238,33 @@ class ProviderVoice(BaseModel):
     listed_languages: tuple[Language, ...] = ()
 
 
+class CatalogSource(StrEnum):
+    ACCOUNT = "account"
+    LIBRARY = "library"
+    """ElevenLabs' public voice library; no other provider has one."""
+
+
+class CatalogQuery(BaseModel):
+    """A search of a provider's own voices."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    source: CatalogSource = CatalogSource.ACCOUNT
+    model: str | None = None
+    """For a provider whose voices depend on the model; the first model when left out."""
+    search: str | None = Field(default=None, min_length=1, max_length=100)
+    language: Language | None = None
+    gender: VoiceGender | None = None
+    cursor: str | None = Field(default=None, max_length=1000)
+    """The `next_cursor` of the page before."""
+
+
+class CatalogPage(BaseModel):
+    items: list[ProviderVoice]
+    next_cursor: str | None
+    """None on the last page."""
+
+
 class VoiceCreate(BaseModel):
     """A voice to add. A provider with lookup fills the details it has; for any other, the
     name is required and the gender and accent come from here."""
@@ -249,13 +279,27 @@ class VoiceCreate(BaseModel):
     accent: str | None = Field(default=None, min_length=1, max_length=80)
     model: str | None = None
     """The provider's first model when left out."""
+    source: CatalogSource = CatalogSource.ACCOUNT
+    """A library voice is not on the account, so no lookup describes it: its details come
+    with it, as the catalog gave them."""
+    listed_languages: frozenset[Language] = frozenset()
+    """The languages the provider lists for a voice whose details come with it."""
 
     @model_validator(mode="after")
     def provider_rules(self) -> Self:
-        if not self.provider.traits.lookup and self.name is None:
-            raise ValueError(f"{self.provider.label} has no voice lookup: give the voice a name")
+        traits = self.provider.traits
+        if self.source is CatalogSource.LIBRARY and not traits.library:
+            raise ValueError(f"{traits.label} has no voice library")
+        if not self.looked_up and self.name is None:
+            raise ValueError("give the voice a name: no lookup describes it")
         check_spoken(self.provider, self.model_in_use, self.languages)
         return self
+
+    @property
+    def looked_up(self) -> bool:
+        """Whether the provider describes the voice: an account voice of a provider with
+        lookup."""
+        return self.provider.traits.lookup and self.source is CatalogSource.ACCOUNT
 
     @property
     def model_in_use(self) -> TtsModel:
@@ -307,4 +351,9 @@ class VoiceClient(Protocol):
     async def speak(self, voice: VoiceSettings, language: Language, text: str) -> bytes:
         """The text spoken through the same text-to-speech as a call, in its 8 kHz format, as
         WAV. Raises UnavailableError with the provider's reason, such as an unknown voice."""
+        ...
+
+    async def catalog(self, query: CatalogQuery) -> CatalogPage:
+        """A page of the provider's voices. Raises UnavailableError with the provider's
+        reason, such as a key that may not list voices."""
         ...

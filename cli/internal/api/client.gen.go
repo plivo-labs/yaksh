@@ -142,6 +142,24 @@ func (e AnsweredBy) Valid() bool {
 	}
 }
 
+// Defines values for CatalogSource.
+const (
+	Account CatalogSource = "account"
+	Library CatalogSource = "library"
+)
+
+// Valid indicates whether the value is a known member of the CatalogSource enum.
+func (e CatalogSource) Valid() bool {
+	switch e {
+	case Account:
+		return true
+	case Library:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for Category.
 const (
 	EdgeCase   Category = "edge_case"
@@ -1771,6 +1789,15 @@ type Cartesia struct {
 	Url *string `json:"url,omitempty"`
 }
 
+// CatalogPage defines model for CatalogPage.
+type CatalogPage struct {
+	Items      []ProviderVoice `json:"items"`
+	NextCursor *string         `json:"next_cursor"`
+}
+
+// CatalogSource defines model for CatalogSource.
+type CatalogSource string
+
 // Category What kind of situation a scenario tests. How the caller talks comes from the persona.
 type Category string
 
@@ -2542,7 +2569,8 @@ type PersonaConfig struct {
 	Surroundings *Surroundings `json:"surroundings,omitempty"`
 
 	// Voice A voice of one text-to-speech provider and how it speaks; the id means nothing
-	// outside that provider. The id goes into provider URLs, so dots and slashes are refused.
+	// outside that provider. The id goes into provider URLs, so dots and slashes are refused; a
+	// colon is allowed, as in Azure's HD voice names.
 	Voice       VoiceSettings `json:"voice"`
 	VoiceGender *VoiceGender  `json:"voice_gender,omitempty"`
 }
@@ -2563,7 +2591,8 @@ type PersonaCreate struct {
 	Surroundings *Surroundings `json:"surroundings,omitempty"`
 
 	// Voice A voice of one text-to-speech provider and how it speaks; the id means nothing
-	// outside that provider. The id goes into provider URLs, so dots and slashes are refused.
+	// outside that provider. The id goes into provider URLs, so dots and slashes are refused; a
+	// colon is allowed, as in Azure's HD voice names.
 	Voice VoiceSettings `json:"voice"`
 }
 
@@ -2608,7 +2637,8 @@ type PersonaRead struct {
 	UpdatedAt    time.Time    `json:"updated_at"`
 
 	// Voice A voice of one text-to-speech provider and how it speaks; the id means nothing
-	// outside that provider. The id goes into provider URLs, so dots and slashes are refused.
+	// outside that provider. The id goes into provider URLs, so dots and slashes are refused; a
+	// colon is allowed, as in Azure's HD voice names.
 	Voice       VoiceSettings `json:"voice"`
 	VoiceGender *VoiceGender  `json:"voice_gender"`
 }
@@ -3578,6 +3608,27 @@ type Trigger struct {
 // TriggerMethod defines model for TriggerMethod.
 type TriggerMethod string
 
+// TtsModelRead defines model for TtsModelRead.
+type TtsModelRead struct {
+	Id        *string    `json:"id"`
+	Label     string     `json:"label"`
+	Languages []Language `json:"languages"`
+	SpeedMax  float32    `json:"speed_max"`
+	SpeedMin  float32    `json:"speed_min"`
+}
+
+// TtsProviderRead defines model for TtsProviderRead.
+type TtsProviderRead struct {
+	Label   string         `json:"label"`
+	Library bool           `json:"library"`
+	Lookup  bool           `json:"lookup"`
+	Models  []TtsModelRead `json:"models"`
+
+	// Provider A text-to-speech provider that voices personas.
+	Provider       VoiceProvider `json:"provider"`
+	WordTimestamps bool          `json:"word_timestamps"`
+}
+
 // TurnRead defines model for TurnRead.
 type TurnRead struct {
 	AudioIndex  *int             `json:"audio_index,omitempty"`
@@ -3670,15 +3721,17 @@ type VersionAgreement struct {
 // VoiceCreate A voice to add. A provider with lookup fills the details it has; for any other, the
 // name is required and the gender and accent come from here.
 type VoiceCreate struct {
-	Accent    *string      `json:"accent,omitempty"`
-	Gender    *VoiceGender `json:"gender,omitempty"`
-	Languages []Language   `json:"languages"`
-	Model     *string      `json:"model,omitempty"`
-	Name      *string      `json:"name,omitempty"`
+	Accent          *string      `json:"accent,omitempty"`
+	Gender          *VoiceGender `json:"gender,omitempty"`
+	Languages       []Language   `json:"languages"`
+	ListedLanguages *[]Language  `json:"listed_languages,omitempty"`
+	Model           *string      `json:"model,omitempty"`
+	Name            *string      `json:"name,omitempty"`
 
 	// Provider A text-to-speech provider that voices personas.
-	Provider        VoiceProvider `json:"provider"`
-	ProviderVoiceId string        `json:"provider_voice_id"`
+	Provider        VoiceProvider  `json:"provider"`
+	ProviderVoiceId string         `json:"provider_voice_id"`
+	Source          *CatalogSource `json:"source,omitempty"`
 }
 
 // VoiceGender defines model for VoiceGender.
@@ -3691,7 +3744,8 @@ type VoicePreview struct {
 	SampleLine *string  `json:"sample_line,omitempty"`
 
 	// Voice A voice of one text-to-speech provider and how it speaks; the id means nothing
-	// outside that provider. The id goes into provider URLs, so dots and slashes are refused.
+	// outside that provider. The id goes into provider URLs, so dots and slashes are refused; a
+	// colon is allowed, as in Azure's HD voice names.
 	Voice VoiceSettings `json:"voice"`
 }
 
@@ -3717,7 +3771,8 @@ type VoiceRead struct {
 }
 
 // VoiceSettings A voice of one text-to-speech provider and how it speaks; the id means nothing
-// outside that provider. The id goes into provider URLs, so dots and slashes are refused.
+// outside that provider. The id goes into provider URLs, so dots and slashes are refused; a
+// colon is allowed, as in Azure's HD voice names.
 type VoiceSettings struct {
 	Id    string  `json:"id"`
 	Model *string `json:"model,omitempty"`
@@ -3870,6 +3925,17 @@ type ListVoicesApiV1VoicesGetParams struct {
 	Language *Language `form:"language,omitempty" json:"language,omitempty"`
 	Page     *int      `form:"page,omitempty" json:"page,omitempty"`
 	PageSize *int      `form:"page_size,omitempty" json:"page_size,omitempty"`
+}
+
+// VoiceCatalogApiV1VoicesCatalogGetParams defines parameters for VoiceCatalogApiV1VoicesCatalogGet.
+type VoiceCatalogApiV1VoicesCatalogGetParams struct {
+	Source   *CatalogSource `form:"source,omitempty" json:"source,omitempty"`
+	Model    *string        `form:"model,omitempty" json:"model,omitempty"`
+	Search   *string        `form:"search,omitempty" json:"search,omitempty"`
+	Language *Language      `form:"language,omitempty" json:"language,omitempty"`
+	Gender   *VoiceGender   `form:"gender,omitempty" json:"gender,omitempty"`
+	Cursor   *string        `form:"cursor,omitempty" json:"cursor,omitempty"`
+	Provider VoiceProvider  `form:"provider" json:"provider"`
 }
 
 // LookupVoiceApiV1VoicesLookupGetParams defines parameters for LookupVoiceApiV1VoicesLookupGet.
@@ -5850,6 +5916,14 @@ type ClientInterface interface {
 	// Corresponds with POST /api/v1/voices (the `CreateVoiceApiV1VoicesPost` operationId).
 	CreateVoiceApiV1VoicesPost(ctx context.Context, body CreateVoiceApiV1VoicesPostJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// VoiceCatalogApiV1VoicesCatalogGet Voice Catalog
+	//
+	// A page of the provider's own voices, to pick one to add; `source=library` searches
+	// ElevenLabs' public library. Saves nothing.
+	//
+	// Corresponds with GET /api/v1/voices/catalog (the `VoiceCatalogApiV1VoicesCatalogGet` operationId).
+	VoiceCatalogApiV1VoicesCatalogGet(ctx context.Context, params *VoiceCatalogApiV1VoicesCatalogGetParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// LookupVoiceApiV1VoicesLookupGet Lookup Voice
 	//
 	// What the provider says about a voice on the account. Saves nothing.
@@ -5870,6 +5944,14 @@ type ClientInterface interface {
 	//
 	// Corresponds with POST /api/v1/voices/preview (the `PreviewVoiceApiV1VoicesPreviewPost` operationId).
 	PreviewVoiceApiV1VoicesPreviewPost(ctx context.Context, body PreviewVoiceApiV1VoicesPreviewPostJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// VoiceProvidersApiV1VoicesProvidersGet Voice Providers
+	//
+	// Each text-to-speech provider with the models a voice can use: their speed ranges and
+	// the languages they speak.
+	//
+	// Corresponds with GET /api/v1/voices/providers (the `VoiceProvidersApiV1VoicesProvidersGet` operationId).
+	VoiceProvidersApiV1VoicesProvidersGet(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// DeleteVoiceApiV1VoicesVoiceIdDelete Delete Voice
 	//
@@ -8610,6 +8692,24 @@ func (c *Client) CreateVoiceApiV1VoicesPost(ctx context.Context, body CreateVoic
 	return c.Client.Do(req)
 }
 
+// VoiceCatalogApiV1VoicesCatalogGet Voice Catalog
+//
+// A page of the provider's own voices, to pick one to add; `source=library` searches
+// ElevenLabs' public library. Saves nothing.
+//
+// Corresponds with GET /api/v1/voices/catalog (the `VoiceCatalogApiV1VoicesCatalogGet` operationId).
+func (c *Client) VoiceCatalogApiV1VoicesCatalogGet(ctx context.Context, params *VoiceCatalogApiV1VoicesCatalogGetParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewVoiceCatalogApiV1VoicesCatalogGetRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // LookupVoiceApiV1VoicesLookupGet Lookup Voice
 //
 // What the provider says about a voice on the account. Saves nothing.
@@ -8651,6 +8751,24 @@ func (c *Client) PreviewVoiceApiV1VoicesPreviewPostWithBody(ctx context.Context,
 // Corresponds with POST /api/v1/voices/preview (the `PreviewVoiceApiV1VoicesPreviewPost` operationId).
 func (c *Client) PreviewVoiceApiV1VoicesPreviewPost(ctx context.Context, body PreviewVoiceApiV1VoicesPreviewPostJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewPreviewVoiceApiV1VoicesPreviewPostRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// VoiceProvidersApiV1VoicesProvidersGet Voice Providers
+//
+// Each text-to-speech provider with the models a voice can use: their speed ranges and
+// the languages they speak.
+//
+// Corresponds with GET /api/v1/voices/providers (the `VoiceProvidersApiV1VoicesProvidersGet` operationId).
+func (c *Client) VoiceProvidersApiV1VoicesProvidersGet(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewVoiceProvidersApiV1VoicesProvidersGetRequest(c.Server)
 	if err != nil {
 		return nil, err
 	}
@@ -13549,6 +13667,128 @@ func NewCreateVoiceApiV1VoicesPostRequestWithBody(server string, contentType str
 	return req, nil
 }
 
+// NewVoiceCatalogApiV1VoicesCatalogGetRequest constructs an http.Request for the VoiceCatalogApiV1VoicesCatalogGet method
+func NewVoiceCatalogApiV1VoicesCatalogGetRequest(server string, params *VoiceCatalogApiV1VoicesCatalogGetParams) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/voices/catalog")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Source != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "source", *params.Source, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Model != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "model", *params.Model, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Search != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "search", *params.Search, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Language != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "language", *params.Language, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Gender != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "gender", *params.Gender, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Cursor != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "cursor", *params.Cursor, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if queryFrag, err := runtime.StyleParamWithOptions("form", true, "provider", params.Provider, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+			return nil, err
+		} else {
+			for _, qp := range strings.Split(queryFrag, "&") {
+				rawQueryFragments = append(rawQueryFragments, qp)
+			}
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewLookupVoiceApiV1VoicesLookupGetRequest constructs an http.Request for the LookupVoiceApiV1VoicesLookupGet method
 func NewLookupVoiceApiV1VoicesLookupGetRequest(server string, params *LookupVoiceApiV1VoicesLookupGetParams) (*http.Request, error) {
 	var err error
@@ -13643,6 +13883,33 @@ func NewPreviewVoiceApiV1VoicesPreviewPostRequestWithBody(server string, content
 	}
 
 	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewVoiceProvidersApiV1VoicesProvidersGetRequest constructs an http.Request for the VoiceProvidersApiV1VoicesProvidersGet method
+func NewVoiceProvidersApiV1VoicesProvidersGetRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/voices/providers")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
 
 	return req, nil
 }
@@ -15097,6 +15364,16 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with POST /api/v1/voices (the `CreateVoiceApiV1VoicesPost` operationId).
 	CreateVoiceApiV1VoicesPostWithResponse(ctx context.Context, body CreateVoiceApiV1VoicesPostJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateVoiceApiV1VoicesPostResponse, error)
 
+	// VoiceCatalogApiV1VoicesCatalogGetWithResponse Voice Catalog
+	//
+	// A page of the provider's own voices, to pick one to add; `source=library` searches
+	// ElevenLabs' public library. Saves nothing.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/voices/catalog (the `VoiceCatalogApiV1VoicesCatalogGet` operationId).
+	VoiceCatalogApiV1VoicesCatalogGetWithResponse(ctx context.Context, params *VoiceCatalogApiV1VoicesCatalogGetParams, reqEditors ...RequestEditorFn) (*VoiceCatalogApiV1VoicesCatalogGetResponse, error)
+
 	// LookupVoiceApiV1VoicesLookupGetWithResponse Lookup Voice
 	//
 	// What the provider says about a voice on the account. Saves nothing.
@@ -15119,6 +15396,16 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with POST /api/v1/voices/preview (the `PreviewVoiceApiV1VoicesPreviewPost` operationId).
 	PreviewVoiceApiV1VoicesPreviewPostWithResponse(ctx context.Context, body PreviewVoiceApiV1VoicesPreviewPostJSONRequestBody, reqEditors ...RequestEditorFn) (*PreviewVoiceApiV1VoicesPreviewPostResponse, error)
+
+	// VoiceProvidersApiV1VoicesProvidersGetWithResponse Voice Providers
+	//
+	// Each text-to-speech provider with the models a voice can use: their speed ranges and
+	// the languages they speak.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/voices/providers (the `VoiceProvidersApiV1VoicesProvidersGet` operationId).
+	VoiceProvidersApiV1VoicesProvidersGetWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*VoiceProvidersApiV1VoicesProvidersGetResponse, error)
 
 	// DeleteVoiceApiV1VoicesVoiceIdDeleteWithResponse Delete Voice
 	//
@@ -20649,6 +20936,61 @@ func (r CreateVoiceApiV1VoicesPostResponse) ContentType() string {
 	return ""
 }
 
+type VoiceCatalogApiV1VoicesCatalogGetResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *CatalogPage
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *ErrorResponse
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r VoiceCatalogApiV1VoicesCatalogGetResponse) GetJSON200() *CatalogPage {
+	return r.JSON200
+}
+
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r VoiceCatalogApiV1VoicesCatalogGetResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r VoiceCatalogApiV1VoicesCatalogGetResponse) GetJSON503() *ErrorResponse {
+	return r.JSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r VoiceCatalogApiV1VoicesCatalogGetResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r VoiceCatalogApiV1VoicesCatalogGetResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r VoiceCatalogApiV1VoicesCatalogGetResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r VoiceCatalogApiV1VoicesCatalogGetResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type LookupVoiceApiV1VoicesLookupGetResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -20746,6 +21088,54 @@ func (r PreviewVoiceApiV1VoicesPreviewPostResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r PreviewVoiceApiV1VoicesPreviewPostResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type VoiceProvidersApiV1VoicesProvidersGetResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *[]TtsProviderRead
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r VoiceProvidersApiV1VoicesProvidersGetResponse) GetJSON200() *[]TtsProviderRead {
+	return r.JSON200
+}
+
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r VoiceProvidersApiV1VoicesProvidersGetResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
+}
+
+// GetBody returns the raw response body bytes
+func (r VoiceProvidersApiV1VoicesProvidersGetResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r VoiceProvidersApiV1VoicesProvidersGetResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r VoiceProvidersApiV1VoicesProvidersGetResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r VoiceProvidersApiV1VoicesProvidersGetResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -23090,6 +23480,22 @@ func (c *ClientWithResponses) CreateVoiceApiV1VoicesPostWithResponse(ctx context
 	return ParseCreateVoiceApiV1VoicesPostResponse(rsp)
 }
 
+// VoiceCatalogApiV1VoicesCatalogGetWithResponse Voice Catalog
+//
+// A page of the provider's own voices, to pick one to add; `source=library` searches
+// ElevenLabs' public library. Saves nothing.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/voices/catalog (the `VoiceCatalogApiV1VoicesCatalogGet` operationId).
+func (c *ClientWithResponses) VoiceCatalogApiV1VoicesCatalogGetWithResponse(ctx context.Context, params *VoiceCatalogApiV1VoicesCatalogGetParams, reqEditors ...RequestEditorFn) (*VoiceCatalogApiV1VoicesCatalogGetResponse, error) {
+	rsp, err := c.VoiceCatalogApiV1VoicesCatalogGet(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseVoiceCatalogApiV1VoicesCatalogGetResponse(rsp)
+}
+
 // LookupVoiceApiV1VoicesLookupGetWithResponse Lookup Voice
 //
 // What the provider says about a voice on the account. Saves nothing.
@@ -23129,6 +23535,22 @@ func (c *ClientWithResponses) PreviewVoiceApiV1VoicesPreviewPostWithResponse(ctx
 		return nil, err
 	}
 	return ParsePreviewVoiceApiV1VoicesPreviewPostResponse(rsp)
+}
+
+// VoiceProvidersApiV1VoicesProvidersGetWithResponse Voice Providers
+//
+// Each text-to-speech provider with the models a voice can use: their speed ranges and
+// the languages they speak.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/voices/providers (the `VoiceProvidersApiV1VoicesProvidersGet` operationId).
+func (c *ClientWithResponses) VoiceProvidersApiV1VoicesProvidersGetWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*VoiceProvidersApiV1VoicesProvidersGetResponse, error) {
+	rsp, err := c.VoiceProvidersApiV1VoicesProvidersGet(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseVoiceProvidersApiV1VoicesProvidersGetResponse(rsp)
 }
 
 // DeleteVoiceApiV1VoicesVoiceIdDeleteWithResponse Delete Voice
@@ -27000,6 +27422,46 @@ func ParseCreateVoiceApiV1VoicesPostResponse(rsp *http.Response) (*CreateVoiceAp
 	return response, nil
 }
 
+// ParseVoiceCatalogApiV1VoicesCatalogGetResponse parses an HTTP response from a VoiceCatalogApiV1VoicesCatalogGetWithResponse call
+func ParseVoiceCatalogApiV1VoicesCatalogGetResponse(rsp *http.Response) (*VoiceCatalogApiV1VoicesCatalogGetResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &VoiceCatalogApiV1VoicesCatalogGetResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest CatalogPage
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseLookupVoiceApiV1VoicesLookupGetResponse parses an HTTP response from a LookupVoiceApiV1VoicesLookupGetWithResponse call
 func ParseLookupVoiceApiV1VoicesLookupGetResponse(rsp *http.Response) (*LookupVoiceApiV1VoicesLookupGetResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -27067,6 +27529,39 @@ func ParsePreviewVoiceApiV1VoicesPreviewPostResponse(rsp *http.Response) (*Previ
 			return nil, err
 		}
 		response.JSON503 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseVoiceProvidersApiV1VoicesProvidersGetResponse parses an HTTP response from a VoiceProvidersApiV1VoicesProvidersGetWithResponse call
+func ParseVoiceProvidersApiV1VoicesProvidersGetResponse(rsp *http.Response) (*VoiceProvidersApiV1VoicesProvidersGetResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &VoiceProvidersApiV1VoicesProvidersGetResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest []TtsProviderRead
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
 
 	}
 

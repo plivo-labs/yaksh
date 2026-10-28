@@ -6245,6 +6245,196 @@
         }
       }
     },
+    "/api/v1/voices/providers": {
+      "get": {
+        "tags": [
+          "voices"
+        ],
+        "summary": "Voice Providers",
+        "description": "Each text-to-speech provider with the models a voice can use: their speed ranges and\nthe languages they speak.",
+        "operationId": "voice_providers_api_v1_voices_providers_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TtsProviderRead"
+                  },
+                  "type": "array",
+                  "title": "Response Voice Providers Api V1 Voices Providers Get"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "The request failed. The error tells why.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/voices/catalog": {
+      "get": {
+        "tags": [
+          "voices"
+        ],
+        "summary": "Voice Catalog",
+        "description": "A page of the provider's own voices, to pick one to add; `source=library` searches\nElevenLabs' public library. Saves nothing.",
+        "operationId": "voice_catalog_api_v1_voices_catalog_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "source",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/CatalogSource",
+              "default": "account"
+            }
+          },
+          {
+            "name": "model",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Model"
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Search"
+            }
+          },
+          {
+            "name": "language",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/Language"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Language"
+            }
+          },
+          {
+            "name": "gender",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/VoiceGender"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Gender"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 1000
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "name": "provider",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/VoiceProvider"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogPage"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "The request failed. The error tells why.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "An outside service is not set up, or it did not answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/voices/lookup": {
       "get": {
         "tags": [
@@ -6273,7 +6463,7 @@
             "required": true,
             "schema": {
               "type": "string",
-              "pattern": "^[A-Za-z0-9_-]+$",
+              "pattern": "^[A-Za-z0-9_:-]+$",
               "title": "Provider Voice Id"
             }
           }
@@ -8012,6 +8202,42 @@
         "additionalProperties": false,
         "type": "object",
         "title": "Cartesia"
+      },
+      "CatalogPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ProviderVoice"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "title": "CatalogPage"
+      },
+      "CatalogSource": {
+        "type": "string",
+        "enum": [
+          "account",
+          "library"
+        ],
+        "title": "CatalogSource"
       },
       "Category": {
         "type": "string",
@@ -16443,6 +16669,89 @@
         ],
         "title": "TriggerMethod"
       },
+      "TtsModelRead": {
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "speed_min": {
+            "type": "number",
+            "title": "Speed Min"
+          },
+          "speed_max": {
+            "type": "number",
+            "title": "Speed Max"
+          },
+          "languages": {
+            "items": {
+              "$ref": "#/components/schemas/Language"
+            },
+            "type": "array",
+            "title": "Languages"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "label",
+          "speed_min",
+          "speed_max",
+          "languages"
+        ],
+        "title": "TtsModelRead"
+      },
+      "TtsProviderRead": {
+        "properties": {
+          "provider": {
+            "$ref": "#/components/schemas/VoiceProvider"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "word_timestamps": {
+            "type": "boolean",
+            "title": "Word Timestamps"
+          },
+          "lookup": {
+            "type": "boolean",
+            "title": "Lookup"
+          },
+          "library": {
+            "type": "boolean",
+            "title": "Library"
+          },
+          "models": {
+            "items": {
+              "$ref": "#/components/schemas/TtsModelRead"
+            },
+            "type": "array",
+            "title": "Models"
+          }
+        },
+        "type": "object",
+        "required": [
+          "provider",
+          "label",
+          "word_timestamps",
+          "lookup",
+          "library",
+          "models"
+        ],
+        "title": "TtsProviderRead"
+      },
       "TurnRead": {
         "properties": {
           "role": {
@@ -16818,7 +17127,7 @@
           },
           "provider_voice_id": {
             "type": "string",
-            "pattern": "^[A-Za-z0-9_-]+$",
+            "pattern": "^[A-Za-z0-9_:-]+$",
             "title": "Provider Voice Id"
           },
           "languages": {
@@ -16876,6 +17185,19 @@
               }
             ],
             "title": "Model"
+          },
+          "source": {
+            "$ref": "#/components/schemas/CatalogSource",
+            "default": "account"
+          },
+          "listed_languages": {
+            "items": {
+              "$ref": "#/components/schemas/Language"
+            },
+            "type": "array",
+            "uniqueItems": true,
+            "title": "Listed Languages",
+            "default": []
           }
         },
         "additionalProperties": false,
@@ -17042,7 +17364,7 @@
           },
           "id": {
             "type": "string",
-            "pattern": "^[A-Za-z0-9_-]+$",
+            "pattern": "^[A-Za-z0-9_:-]+$",
             "title": "Id"
           },
           "speed": {
@@ -17082,7 +17404,7 @@
           "id"
         ],
         "title": "VoiceSettings",
-        "description": "A voice of one text-to-speech provider and how it speaks; the id means nothing\noutside that provider. The id goes into provider URLs, so dots and slashes are refused."
+        "description": "A voice of one text-to-speech provider and how it speaks; the id means nothing\noutside that provider. The id goes into provider URLs, so dots and slashes are refused; a\ncolon is allowed, as in Azure's HD voice names."
       },
       "VoiceUpdate": {
         "properties": {

@@ -15,6 +15,9 @@ from yaksh.domain.errors import ConflictError, NotFoundError, UnavailableError, 
 from yaksh.domain.languages import Language
 from yaksh.domain.voices import (
     PROVIDER_VOICE_ID,
+    CatalogPage,
+    CatalogQuery,
+    CatalogSource,
     ProviderVoice,
     VoiceClient,
     VoiceCreate,
@@ -56,6 +59,19 @@ async def lookup_voice(
     return found
 
 
+async def search_catalog(
+    clients: VoiceClients, provider: VoiceProvider, query: CatalogQuery
+) -> CatalogPage:
+    """A page of the provider's own voices, to pick one to add."""
+    if query.source is CatalogSource.LIBRARY and not provider.traits.library:
+        raise ValidationError(f"{provider.label} has no voice library")
+    try:
+        provider.traits.chosen(query.model)
+    except ValueError as error:
+        raise ValidationError(str(error)) from None
+    return await client_for(clients, provider).catalog(query)
+
+
 async def preview_voice(
     clients: VoiceClients,
     voice: VoiceSettings,
@@ -91,7 +107,7 @@ async def create_voice(session: AsyncSession, clients: VoiceClients, command: Vo
     Every voice must then speak a line in its model, so a voice that the provider does not know,
     or that its model cannot speak, is never listed."""
     model = command.model_in_use.id
-    if command.provider.traits.lookup:
+    if command.looked_up:
         found = await lookup_voice(clients, command.provider, command.provider_voice_id)
     else:
         found = ProviderVoice(
@@ -99,6 +115,7 @@ async def create_voice(session: AsyncSession, clients: VoiceClients, command: Vo
             name=command.name or command.provider_voice_id,
             gender=command.gender,
             accent=command.accent,
+            listed_languages=tuple(command.listed_languages),
         )
     language = ordered(command.languages)[0]
     try:

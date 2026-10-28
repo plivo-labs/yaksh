@@ -2,13 +2,13 @@ from collections.abc import AsyncIterator
 from typing import Any
 
 import pytest
-from fastapi import FastAPI, Response
+from fastapi import FastAPI, Request, Response
 from fastapi.responses import JSONResponse, RedirectResponse
 
 from yaksh.caller.plivo_server import PlivoServer
 from yaksh.domain.errors import UnavailableError
 from yaksh.domain.languages import Language
-from yaksh.domain.voices import VoiceGender
+from yaksh.domain.voices import CatalogQuery, CatalogSource, VoiceGender
 from yaksh.integrations.elevenlabs import ElevenLabsClient
 
 API_KEY = "el-key"
@@ -48,6 +48,27 @@ async def elevenlabs() -> AsyncIterator[tuple[str, list[dict[str, Any]]]]:
         if voice_id == "loop":
             return RedirectResponse("/v1/voices/loop")
         return Response('{"detail": {"code": "voice_not_found"}}', status_code=400)
+
+    @app.get("/v2/voices")
+    async def account_voices(request: Request) -> Response:
+        seen.append({"account": dict(request.query_params)})
+        first = "next_page_token" not in request.query_params
+        return JSONResponse(
+            {"voices": [VOICE] if first else [], "has_more": first, "next_page_token": "token-2"}
+        )
+
+    @app.get("/v1/shared-voices")
+    async def library_voices(request: Request) -> Response:
+        seen.append({"library": dict(request.query_params)})
+        shared = {
+            "voice_id": "lib1",
+            "name": "Kavya",
+            "gender": "female",
+            "accent": "indian",
+            "language": "mr",
+            "verified_languages": [{"language": "hi", "model_id": "eleven_v4"}],
+        }
+        return JSONResponse({"voices": [shared], "has_more": True})
 
     server = PlivoServer(app, port=0)
     await server.start()
@@ -94,3 +115,28 @@ async def test_a_broken_answer_is_unavailable_with_its_status_and_never_the_key(
     with pytest.raises(UnavailableError, match="TooManyRedirects") as looped:
         await client.get_voice("loop")
     assert API_KEY not in str(looped.value)
+
+
+async def test_the_voice_list_pages_the_account_and_the_public_library(
+    elevenlabs: tuple[str, list[dict[str, Any]]],
+) -> None:
+    base_url, seen = elevenlabs
+    client = ElevenLabsClient(API_KEY, base_url=base_url)
+
+    account = await client.voices(CatalogQuery(search="chris", language=Language.HI))
+    following = await client.voices(CatalogQuery(cursor=account.next_cursor))
+    library = await client.voices(
+        CatalogQuery(source=CatalogSource.LIBRARY, gender=VoiceGender.FEMALE)
+    )
+
+    assert ([voice.id for voice in account.items], account.next_cursor) == (["v1"], "token-2")
+    assert following.next_cursor is None
+    assert [(voice.id, voice.gender, voice.listed_languages) for voice in library.items] == [
+        ("lib1", VoiceGender.FEMALE, (Language.HI, Language.MR))
+    ]
+    assert library.next_cursor == "1"
+    assert seen[-3:] == [
+        {"account": {"page_size": "30", "search": "chris", "language": "hi"}},
+        {"account": {"page_size": "30", "next_page_token": "token-2"}},
+        {"library": {"page_size": "30", "gender": "female", "page": "0"}},
+    ]

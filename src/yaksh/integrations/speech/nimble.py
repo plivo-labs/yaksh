@@ -25,8 +25,16 @@ from yaksh.diagnostics import describe_exception
 from yaksh.domain.errors import UnavailableError
 from yaksh.domain.languages import Language
 from yaksh.domain.settings import AppSettings
-from yaksh.domain.voices import ProviderVoice, VoiceGender, VoiceProvider, VoiceSettings
+from yaksh.domain.voices import (
+    CatalogPage,
+    CatalogQuery,
+    ProviderVoice,
+    VoiceGender,
+    VoiceProvider,
+    VoiceSettings,
+)
 from yaksh.integrations.speech.audio import SAMPLE_RATE, quiet_s
+from yaksh.integrations.speech.catalog import page_of
 from yaksh.integrations.speech.vendor import TtsVendor
 
 LANGUAGES = VoiceProvider.NIMBLE.traits.languages
@@ -373,4 +381,8 @@ async def check_voice(settings: AppSettings, key: str) -> str:
     return listed[0].id
 
 
-TTS = TtsVendor(service=tts, check_voice=check_voice, lookup=lookup)
+async def catalog(settings: AppSettings, key: str, query: CatalogQuery) -> CatalogPage:
+    return page_of(await voices(settings, key), query)
+
+
+TTS = TtsVendor(service=tts, check_voice=check_voice, catalog=catalog, lookup=lookup)

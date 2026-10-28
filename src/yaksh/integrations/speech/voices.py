@@ -4,7 +4,13 @@ the same Pipecat service a call uses."""
 from yaksh.domain.errors import UnavailableError
 from yaksh.domain.languages import Language
 from yaksh.domain.settings import AppSettings
-from yaksh.domain.voices import ProviderVoice, VoiceProvider, VoiceSettings
+from yaksh.domain.voices import (
+    CatalogPage,
+    CatalogQuery,
+    ProviderVoice,
+    VoiceProvider,
+    VoiceSettings,
+)
 from yaksh.integrations.speech.audio import as_wav, speak_once
 from yaksh.integrations.speech.tts import VENDORS, tts_service
 
@@ -23,6 +29,9 @@ class SpeechVoiceClient:
         lookup = VENDORS[self._provider].lookup
         assert lookup is not None
         return await lookup(self._settings, self._credential, voice_id)
+
+    async def catalog(self, query: CatalogQuery) -> CatalogPage:
+        return await VENDORS[self._provider].catalog(self._settings, self._credential, query)
 
     async def speak(self, voice: VoiceSettings, language: Language, text: str) -> bytes:
         """A setting the provider's service refuses, such as an unknown model, fails the speech
