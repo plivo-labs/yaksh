@@ -10,7 +10,7 @@ from zoneinfo import ZoneInfo
 
 import pytest
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import func, insert, select, update
+from sqlalchemy import func, insert, select, text, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import create_async_engine
 
@@ -829,6 +829,32 @@ async def call_request_of(settings: Settings, conversation_id: str) -> CallReque
             )
     finally:
         await engine.dispose()
+
+
+async def test_a_persona_version_saved_with_a_voice_model_still_makes_a_call(
+    client: AsyncClient, settings: Settings, db: Db
+) -> None:
+    agent_id = await create_agent_id(client)
+    persona = await create_persona(client)
+    started = await start(client, agent_id, persona_id=persona["id"])
+    async with db() as session:
+        saved_voice = await session.scalar(
+            text("SELECT config->'voice' FROM persona_versions WHERE persona_id = :id"),
+            {"id": persona["id"]},
+        )
+        await session.execute(
+            text(
+                "UPDATE persona_versions SET config = jsonb_set(config, '{voice,model}', "
+                "'\"eleven_v4_turbo\"') WHERE persona_id = :id"
+            ),
+            {"id": persona["id"]},
+        )
+        await session.commit()
+
+    request = await call_request_of(settings, started["id"])
+
+    assert "model" not in saved_voice
+    assert request.voice.model == "eleven_v4_turbo"
 
 
 async def test_a_conversation_freezes_its_persona_scenario_and_prompt(

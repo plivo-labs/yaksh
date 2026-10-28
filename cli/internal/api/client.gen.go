@@ -3720,7 +3720,8 @@ type VoiceRead struct {
 // VoiceSettings A voice of one text-to-speech provider and how it speaks; the id means nothing
 // outside that provider. The id goes into provider URLs, so dots and slashes are refused.
 type VoiceSettings struct {
-	Id string `json:"id"`
+	Id    string  `json:"id"`
+	Model *string `json:"model,omitempty"`
 
 	// Provider A text-to-speech provider that voices personas.
 	Provider  VoiceProvider `json:"provider"`

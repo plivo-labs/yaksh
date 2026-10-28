@@ -97,6 +97,9 @@ class VoiceSettings(BaseModel):
     """The provider's speed or pace, within its range."""
     stability: float | None = Field(default=None, ge=0.0, le=1.0)
     """ElevenLabs only, where it defaults to 0.5."""
+    model: str | None = Field(default=None, exclude_if=lambda model: model is None)
+    """Not used yet. A later release sets it, and this release must read the voices that release
+    saves. It stays out of the JSON while unset, so an older process reads the voice too."""
 
     @model_validator(mode="before")
     @classmethod

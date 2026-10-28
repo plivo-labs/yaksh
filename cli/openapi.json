@@ -17063,6 +17063,17 @@
               }
             ],
             "title": "Stability"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
           }
         },
         "additionalProperties": false,
