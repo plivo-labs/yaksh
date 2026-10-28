@@ -44,7 +44,7 @@ Only a reply that the model of the caller speaks gets a value. These replies get
 
 | Part | Log field | Time |
 |---|---|---|
-| VAD endpointing | `endpointing_wait_ms` | The silence that the VAD waits for before it ends the turn of the agent: its `stop_secs`, 0.6 seconds. |
+| VAD endpointing | `endpointing_wait_ms` | The silence that the VAD waits for before it reports that the agent stopped speaking: its `stop_secs`, 0.6 seconds. |
 | STT after VAD stop | `transcription_ms` | From the VAD stop to the final STT transcript of the agent turn. 0 when the transcript was final before the VAD stop. |
 | Turn detection | `turn_detection_ms` | From the transcript to the request to the caller LLM: the smart-turn model decides that the turn of the agent is complete. It is long when the model finds the turn incomplete. |
 | LLM TTFT | `llm_inference_ms` | From the request to the caller LLM to the first text token of the answer. Reasoning is part of this time. |
@@ -57,7 +57,7 @@ Only a reply that the model of the caller speaks gets a value. These replies get
 
 The STT can give the final transcript before the VAD stop. Then the STT after VAD stop is 0, and the turn detection starts at the VAD stop. Pipecat does not name this time ([pipecat-ai/pipecat#5921](https://github.com/pipecat-ai/pipecat/issues/5921)), so Yaksh names it.
 
-Yaksh also records the **STT TTFS** of each reply (`stt_ttfs_ms`): the time from the end of the speech of the agent to the last final STT transcript before the caller LLM gets the request. The end of the speech is the VAD stop less its `stop_secs`. The value is less than 0 when the STT gave the transcript before that point. The STT TTFS overlaps the VAD endpointing, so it is not one of the parts that add up to the reply time. It adds time to the reply only when it is longer than the VAD endpointing. It shows if the STT is fast enough for a shorter `stop_secs`.
+Yaksh also records the **STT TTFS** of each reply (`stt_ttfs_ms`): the time from the end of the speech of the agent to the last final STT transcript before the caller LLM gets the request. The end of the speech is the VAD stop less its `stop_secs`. The value is less than 0 when the STT gave the transcript before that point. Rarely, the value comes from the earlier speech of the agent: the agent speaks again soon after a VAD stop, the new speech gives no final transcript, and the STT's late final transcript for the earlier speech counts. The STT TTFS overlaps the VAD endpointing, so it is not one of the parts that add up to the reply time. It adds time to the reply only when it is longer than the VAD endpointing. For an STT that finalizes on its own endpointing, such as Deepgram, it shows if the STT is fast enough for a shorter `stop_secs`. An STT that sends its final transcript only when the VAD stops, such as Soniox, always has a TTFS longer than the `stop_secs`.
 
 The STT TTFB metric of Pipecat is a different value. With Deepgram, it stops at the answer to the finalize request that Pipecat sends at the VAD stop, so it always includes the `stop_secs`.
 
