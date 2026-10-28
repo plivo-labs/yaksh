@@ -473,13 +473,10 @@ class Persona:
         )
         metrics = ServiceMetricsObserver()
         self.usage = UsageMeter(metrics)
-        self.stt = stt_service(settings, hearer, keys.stt, hearing)
         self.reply_times = ReplyTimes(
-            request.conversation_id,
-            self.settings,
-            urlsplit(str(settings.llm.base_url)).hostname,
-            stt=self.stt.name,
+            request.conversation_id, self.settings, urlsplit(str(settings.llm.base_url)).hostname
         )
+        self.stt = stt_service(settings, hearer, keys.stt, hearing)
         self.tts = tts_service(settings, request.voice, request.caller_language, keys.tts)
 
         self.ending = Ending(request, state, transcript, observer, clock, self.say)

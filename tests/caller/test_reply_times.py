@@ -34,7 +34,6 @@ from yaksh.domain.speech import SttProvider
 from yaksh.domain.voices import VoiceProvider, VoiceSettings
 
 SOURCE = SimpleNamespace(name="Caller#0")
-STT = SimpleNamespace(name="DeepgramSTTService#0")
 CONVERSATION = uuid.UUID("01a17ea2-9d59-7ac1-92ef-2bafb49e6dfe")
 AUDIO = b"\0\0" * 160
 
@@ -54,15 +53,14 @@ class Call:
                 voice=VoiceSettings(provider=VoiceProvider.NIMBLE, id="t4"),
             ),
             "llm.example.com",
-            stt=STT.name,
             now=lambda: self.now,
         )
 
-    async def push(self, at: float, frame: Frame, source: SimpleNamespace = SOURCE) -> None:
+    async def push(self, at: float, frame: Frame) -> None:
         self.now = at
         await self.timer.on_push_frame(
             FramePushed(
-                source=cast(Any, source),
+                source=cast(Any, SOURCE),
                 destination=cast(Any, SOURCE),
                 frame=frame,
                 direction=FrameDirection.DOWNSTREAM,
@@ -78,8 +76,8 @@ class Call:
         )
 
     async def model_reply(self, at: float) -> None:
-        """The STT's transcript, then the model asked 0.15 s later."""
-        await self.push(at, TranscriptionFrame("yes", "agent", "now"), source=STT)
+        """The transcript, then the model asked 0.15 s later."""
+        await self.push(at, TranscriptionFrame("yes", "agent", "now"))
         await self.answer(at + 0.15)
 
     async def answer(self, at: float) -> None:
@@ -206,23 +204,21 @@ async def test_a_reply_whose_breakdown_runs_past_its_own_audio_start_keeps_that_
 
 
 async def test_the_stt_ttfs_is_to_the_last_final_transcript_before_the_model_was_asked() -> None:
-    """From the end of the agent's speech, at the STT's own push: an earlier piece of the speech,
-    a later hop of the frame and a transcript after the model was asked are not the one the
-    reply answers. Below 0 when the transcript came before the end of the speech."""
+    """From the end of the agent's speech: an earlier piece of the speech and a transcript after
+    the model was asked are not the one the reply answers. Below 0 when the transcript came
+    before the end of the speech."""
     call = Call()
     await call.push(0.0, VADUserStartedSpeakingFrame())
-    await call.push(1.0, TranscriptionFrame("I can", "agent", "now"), source=STT)
-    transcript = TranscriptionFrame("help you", "agent", "now")
-    await call.push(2.3, transcript, source=STT)
-    await call.push(2.4, transcript)
+    await call.push(1.0, TranscriptionFrame("I can", "agent", "now"))
+    await call.push(2.3, TranscriptionFrame("help you", "agent", "now"))
     await call.push(2.6, VADUserStoppedSpeakingFrame(stop_secs=0.6, timestamp=2.6))
     await call.push(2.8, LLMFullResponseStartFrame())
-    await call.push(3.0, TranscriptionFrame("thanks", "agent", "now"), source=STT)
+    await call.push(3.0, TranscriptionFrame("thanks", "agent", "now"))
     await call.push(3.5, LLMTextFrame("Yes."))
     await call.push(3.8, TTSAudioRawFrame(AUDIO, 8000, 1))
     await call.push(3.9, BotStartedSpeakingFrame())
     await call.push(6.0, VADUserStartedSpeakingFrame())
-    await call.push(7.9, TranscriptionFrame("now", "agent", "now"), source=STT)
+    await call.push(7.9, TranscriptionFrame("now", "agent", "now"))
     await call.push(8.6, VADUserStoppedSpeakingFrame(stop_secs=0.6, timestamp=8.6))
     await call.answer(8.8)
 

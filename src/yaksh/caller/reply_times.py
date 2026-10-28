@@ -93,20 +93,19 @@ class ReplyTimes(UserBotLatencyObserver):
     Times come from `now`, the observer's own clock.
 
     A reply also keeps the STT's TTFS: from the end of the agent's speech to the last final
-    transcript before the caller's model started. Pipecat's STT TTFB is no measure of it: with
-    Deepgram it stops at the answer to the finalize request sent at the VAD stop, so it always
-    holds the stop_secs."""
+    transcript before the caller's model started. Pipecat tells this observer of a frame once, at
+    its first push, so a transcript's time is when the STT pushed it. Pipecat's STT TTFB is no
+    measure of it: with Deepgram it stops at the answer to the finalize request sent at the VAD
+    stop, so it always holds the stop_secs."""
 
     def __init__(
         self,
         conversation_id: uuid.UUID,
         settings: CallerSettings,
         llm_host: str | None,
-        stt: str,
         now: Callable[[], float] = time.time,
     ) -> None:
-        """`llm_host` is the host of the LLM base URL, for the log line: never its path or a key.
-        `stt` is the name of the call's STT processor."""
+        """`llm_host` is the host of the LLM base URL, for the log line: never its path or a key."""
         super().__init__(time_source=now)
         self._log_fields = {
             "conversation_id": str(conversation_id),
@@ -121,7 +120,6 @@ class ReplyTimes(UserBotLatencyObserver):
             "version": __version__,
         }
         self._time = now
-        self._stt = stt
         self._transcribed: float | None = None
         """When the STT pushed the latest final transcript of the agent's speech."""
         self._sources: list[Heard] = []
@@ -147,7 +145,7 @@ class ReplyTimes(UserBotLatencyObserver):
                 self._sources.append(Heard(self._time(), source, self._transcribed))
             elif isinstance(data.frame, VADUserStartedSpeakingFrame):
                 self._transcribed = None
-            elif isinstance(data.frame, TranscriptionFrame) and data.source.name == self._stt:
+            elif isinstance(data.frame, TranscriptionFrame):
                 self._transcribed = self._time()
         await super().on_push_frame(data)
 
