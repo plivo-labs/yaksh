@@ -30,6 +30,8 @@ from yaksh.caller.reply_times import ReplyTimes, steps_within
 from yaksh.domain.answering import MachineLine
 from yaksh.domain.conversations import CallerSettings
 from yaksh.domain.latency import STEP_KEYS, CallerReplyTime
+from yaksh.domain.speech import SttProvider
+from yaksh.domain.voices import VoiceProvider, VoiceSettings
 
 SOURCE = SimpleNamespace(name="Caller#0")
 CONVERSATION = uuid.UUID("01a17ea2-9d59-7ac1-92ef-2bafb49e6dfe")
@@ -43,7 +45,13 @@ class Call:
         self.now = 0.0
         self.timer = ReplyTimes(
             CONVERSATION,
-            CallerSettings(llm_model="caller-model", reasoning_effort="low", stt_language="en-US"),
+            CallerSettings(
+                llm_model="caller-model",
+                reasoning_effort="low",
+                stt_provider=SttProvider.SARVAM,
+                stt_language="en-US",
+                voice=VoiceSettings(provider=VoiceProvider.NIMBLE, id="t4"),
+            ),
             "llm.example.com",
             now=lambda: self.now,
         )
@@ -209,6 +217,7 @@ async def test_each_reply_is_logged_on_one_line_with_every_part(
         "llm.example.com",
         "en-US",
     )
+    assert (fields["stt_provider"], fields["tts_provider"]) == ("sarvam", "nimble")
     assert fields["reply"] == 0
     assert fields["total_ms"] == 1900
     assert fields["llm_inference_ms"] == 700

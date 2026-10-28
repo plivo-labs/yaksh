@@ -72,11 +72,12 @@ On the transcript, each reply of the model that went out on the line shows its r
 The worker writes one log line at the INFO level for each reply, from the logger `yaksh.caller.reply_times`:
 
 ```text
-caller_reply_time {"conversation_id":"…","caller_model":"…","reasoning_effort":"low","llm_host":"…","stt_model":"nova-3","tts_model":"eleven_flash_v2_5","language":"en-US","version":"0.8.0","reply":3,"total_ms":2054,"endpointing_wait_ms":600,"transcription_ms":53,"turn_detection_ms":36,"llm_inference_ms":808,…,"pipeline_ms":0}
+caller_reply_time {"conversation_id":"…","caller_model":"…","reasoning_effort":"low","llm_host":"…","stt_provider":"deepgram","stt_model":"nova-3","tts_provider":"elevenlabs","tts_model":"eleven_flash_v2_5","language":"en-US","version":"0.8.0","reply":3,"total_ms":2054,"endpointing_wait_ms":600,"transcription_ms":53,"turn_detection_ms":36,"llm_inference_ms":808,…,"pipeline_ms":0}
 ```
 
 - `reply` is the number of the caller audio start in the call, from 0.
 - `llm_host` is the host of the LLM base URL. The line has no path and no key.
+- `stt_provider` and `tts_provider` name the speech providers of the call. `tts_model` is `null` for a text-to-speech provider that has no model setting, such as Azure or Nimble.
 - Each part is a field, as in the table of parts. A part that the reply did not have is 0, so all replies count each part the same way. The line also has `first_request_ms`, `turn_completion_ms`, `waiting_for_user_ms` and `awaiting_speakable_text_ms`. These are parts of Pipecat that the caller of Yaksh does not use, so they are always 0.
 - `version` is the version of Yaksh. A Pipecat update can change the time that a part covers.
 
