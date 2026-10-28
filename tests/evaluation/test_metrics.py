@@ -194,26 +194,31 @@ def test_connect_timing_runs_from_the_first_event_of_each_kind() -> None:
 
 
 def test_the_callers_reply_time_and_each_part_are_percentiles_over_the_same_replies() -> None:
-    def reply(total: int, **steps: int) -> CallerReplyTime:
-        return CallerReplyTime(audio_index=0, total_ms=total, steps=steps)
+    def reply(total: int, stt: int | None = None, **steps: int) -> CallerReplyTime:
+        return CallerReplyTime(audio_index=0, total_ms=total, steps=steps, stt_ttfs_ms=stt)
 
     found = metrics.caller_reply_time(
         [
-            reply(1_900, endpointing_wait=600, llm_inference=1_300),
+            reply(1_900, stt=280, endpointing_wait=600, llm_inference=1_300),
             reply(2_400, endpointing_wait=600, llm_inference=1_500, function_handler=300),
-            reply(1_700, endpointing_wait=600, llm_inference=1_100, pipeline=1),
+            reply(1_700, stt=310, endpointing_wait=600, llm_inference=1_100, pipeline=1),
         ]
     )
 
+    # The core parts are listed even at 0 ms; another part only from PART_MS at its p90.
     assert found.value == {
         "replies": 3,
         "p50_ms": 1_900,
         "p90_ms": 2_400,
         "steps": [
             {"key": "endpointing_wait", "p50_ms": 600, "p90_ms": 600},
+            {"key": "transcription", "p50_ms": 0, "p90_ms": 0},
+            {"key": "turn_detection", "p50_ms": 0, "p90_ms": 0},
             {"key": "llm_inference", "p50_ms": 1_300, "p90_ms": 1_500},
             {"key": "function_handler", "p50_ms": 0, "p90_ms": 300},
+            {"key": "speech_synthesis", "p50_ms": 0, "p90_ms": 0},
         ],
+        "stt_ttfs": {"replies": 2, "p50_ms": 280, "p90_ms": 310},
     }
 
 

@@ -14,8 +14,10 @@ from pipecat.frames.frames import (
     BotStartedSpeakingFrame,
     Frame,
     LLMFullResponseStartFrame,
+    TranscriptionFrame,
     TTSSpeakFrame,
     TTSStartedFrame,
+    VADUserStartedSpeakingFrame,
 )
 from pipecat.observers.base_observer import FramePushed
 from pipecat.observers.user_bot_latency_observer import (
@@ -58,6 +60,15 @@ def source_of(frame: Frame) -> Source | None:
     return None
 
 
+class Heard(NamedTuple):
+    """Something that made the caller speak: when this observer saw it, and when the STT pushed
+    the agent's latest final transcript before it."""
+
+    at: float
+    source: Source
+    transcribed: float | None
+
+
 class AudioStart(NamedTuple):
     """The caller audio start that closed a breakdown: its place in the call, and when this
     observer saw it."""
@@ -79,7 +90,13 @@ class ReplyTimes(UserBotLatencyObserver):
 
     Pipecat runs the breakdown's handler in a task of its own, which can run after later frames,
     so the handler takes the audio start that closed it from its context, never the latest one.
-    Times come from `now`, the observer's own clock."""
+    Times come from `now`, the observer's own clock.
+
+    A reply also keeps the STT's TTFS: from the end of the agent's speech to the last final
+    transcript before the caller's model started. Pipecat tells this observer of a frame once, at
+    its first push, so a transcript's time is when the STT pushed it. Pipecat's STT TTFB is no
+    measure of it: with Deepgram it stops at the answer to the finalize request sent at the VAD
+    stop, so it always holds the stop_secs."""
 
     def __init__(
         self,
@@ -103,7 +120,9 @@ class ReplyTimes(UserBotLatencyObserver):
             "version": __version__,
         }
         self._time = now
-        self._sources: list[tuple[float, Source]] = []
+        self._transcribed: float | None = None
+        """When the STT pushed the latest final transcript of the agent's speech."""
+        self._sources: list[Heard] = []
         self._audio_starts = 0
         self._replies: list[CallerReplyTime] = []
         self.add_event_handler("on_latency_breakdown", self._measured)
@@ -123,7 +142,11 @@ class ReplyTimes(UserBotLatencyObserver):
                     CLOSING.reset(token)
                 return
             if (source := source_of(data.frame)) is not None:
-                self._sources.append((self._time(), source))
+                self._sources.append(Heard(self._time(), source, self._transcribed))
+            elif isinstance(data.frame, VADUserStartedSpeakingFrame):
+                self._transcribed = None
+            elif isinstance(data.frame, TranscriptionFrame):
+                self._transcribed = self._time()
         await super().on_push_frame(data)
 
     async def _measured(self, _observer: Any, breakdown: LatencyBreakdown) -> None:
@@ -135,14 +158,18 @@ class ReplyTimes(UserBotLatencyObserver):
             or start is None
         ):
             return
-        heard = [(at, source) for at, source in self._sources if start <= at <= closing.at]
-        if {source for _, source in heard} != {Source.MODEL}:
+        heard = [seen for seen in self._sources if start <= seen.at <= closing.at]
+        if {seen.source for seen in heard} != {Source.MODEL}:
             return
-        parts = with_turn_detection(breakdown.contributions, asked=min(at for at, _ in heard))
+        asked = heard[0]
+        parts = with_turn_detection(breakdown.contributions, asked=asked.at)
         reply = CallerReplyTime(
             audio_index=closing.index,
             total_ms=round((closing.at - start) * 1000),
             steps=steps_within(parts, start, closing.at),
+            stt_ttfs_ms=None
+            if asked.transcribed is None
+            else round((asked.transcribed - start) * 1000),
         )
         self._replies.append(reply)
         fields = {
@@ -150,6 +177,7 @@ class ReplyTimes(UserBotLatencyObserver):
             "reply": reply.audio_index,
             "total_ms": reply.total_ms,
             **{f"{key}_ms": ms for key, ms in reply.step_times().items()},
+            "stt_ttfs_ms": reply.stt_ttfs_ms,
         }
         log.info("caller_reply_time %s", json.dumps(fields, separators=(",", ":")))
 

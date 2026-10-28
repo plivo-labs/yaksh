@@ -1775,6 +1775,7 @@ type CallerModel struct {
 type CallerReplyTime struct {
 	AudioIndex int            `json:"audio_index"`
 	Steps      map[string]int `json:"steps"`
+	SttTtfsMs  *int           `json:"stt_ttfs_ms,omitempty"`
 	TotalMs    int            `json:"total_ms"`
 }
 

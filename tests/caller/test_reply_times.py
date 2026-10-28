@@ -76,16 +76,20 @@ class Call:
         )
 
     async def model_reply(self, at: float) -> None:
-        """The transcript, then the model: first text 0.7 s after the request, audio 0.3 s
-        later, on the line 0.1 s after that."""
+        """The transcript, then the model asked 0.15 s later."""
         await self.push(at, TranscriptionFrame("yes", "agent", "now"))
-        await self.push(at + 0.15, LLMFullResponseStartFrame())
+        await self.answer(at + 0.15)
+
+    async def answer(self, at: float) -> None:
+        """The model asked: first text 0.7 s later, audio 0.3 s after that, on the line 0.1 s
+        after that."""
+        await self.push(at, LLMFullResponseStartFrame())
         await self.push(
-            at + 0.85, MetricsFrame(data=[TTFBMetricsData(processor="Caller#0", value=0.7)])
+            at + 0.7, MetricsFrame(data=[TTFBMetricsData(processor="Caller#0", value=0.7)])
         )
-        await self.push(at + 0.85, LLMTextFrame("Yes."))
-        await self.push(at + 1.15, TTSAudioRawFrame(AUDIO, 8000, 1))
-        await self.push(at + 1.25, BotStartedSpeakingFrame())
+        await self.push(at + 0.7, LLMTextFrame("Yes."))
+        await self.push(at + 1.0, TTSAudioRawFrame(AUDIO, 8000, 1))
+        await self.push(at + 1.1, BotStartedSpeakingFrame())
 
 
 async def settled(call: Call) -> list[CallerReplyTime]:
@@ -110,6 +114,7 @@ async def test_a_model_reply_is_kept_with_where_its_time_went() -> None:
                 "speech_synthesis": 300,
                 "output_transport": 100,
             },
+            stt_ttfs_ms=650,
         )
     ]
 
@@ -198,6 +203,39 @@ async def test_a_reply_whose_breakdown_runs_past_its_own_audio_start_keeps_that_
     assert "pipeline" not in reply.steps
 
 
+async def test_the_stt_ttfs_is_to_the_last_final_transcript_before_the_model_was_asked() -> None:
+    """From the end of the agent's speech: an earlier piece of the speech and a transcript after
+    the model was asked are not the one the reply answers. Below 0 when the transcript came
+    before the end of the speech."""
+    call = Call()
+    await call.push(0.0, VADUserStartedSpeakingFrame())
+    await call.push(1.0, TranscriptionFrame("I can", "agent", "now"))
+    await call.push(2.3, TranscriptionFrame("help you", "agent", "now"))
+    await call.push(2.6, VADUserStoppedSpeakingFrame(stop_secs=0.6, timestamp=2.6))
+    await call.push(2.8, LLMFullResponseStartFrame())
+    await call.push(3.0, TranscriptionFrame("thanks", "agent", "now"))
+    await call.push(3.5, LLMTextFrame("Yes."))
+    await call.push(3.8, TTSAudioRawFrame(AUDIO, 8000, 1))
+    await call.push(3.9, BotStartedSpeakingFrame())
+    await call.push(6.0, VADUserStartedSpeakingFrame())
+    await call.push(7.9, TranscriptionFrame("now", "agent", "now"))
+    await call.push(8.6, VADUserStoppedSpeakingFrame(stop_secs=0.6, timestamp=8.6))
+    await call.answer(8.8)
+
+    assert [reply.stt_ttfs_ms for reply in await settled(call)] == [300, -100]
+
+
+async def test_a_reply_to_speech_with_no_final_transcript_has_no_stt_ttfs() -> None:
+    """The transcript of the agent's earlier speech is not reused."""
+    call = Call()
+    await call.agent_turn(0.0, 2.0)
+    await call.model_reply(2.65)
+    await call.agent_turn(6.0, 8.0)
+    await call.answer(8.8)
+
+    assert [reply.stt_ttfs_ms for reply in await settled(call)] == [650, None]
+
+
 async def test_each_reply_is_logged_on_one_line_with_every_part(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
@@ -222,6 +260,7 @@ async def test_each_reply_is_logged_on_one_line_with_every_part(
     assert fields["total_ms"] == 1900
     assert fields["llm_inference_ms"] == 700
     assert fields["pipeline_ms"] == 0
+    assert fields["stt_ttfs_ms"] == 650
     assert {f"{key}_ms" for key in STEP_KEYS} <= fields.keys()
 
 

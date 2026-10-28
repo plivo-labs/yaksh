@@ -1,3 +1,14 @@
+## v0.9.1 (2026-10-28)
+
+### Feat
+
+- **caller**: STT TTFS per caller reply and Voice AI part names with tooltips (#27)
+  - Each reply of the caller's model now also records its STT TTFS: the time from the end of the agent's speech to the last final STT transcript before the caller's LLM got the request. The `caller_reply_time` log line has it as `stt_ttfs_ms`, the **Caller** card on the **Metrics** tab shows its p50 and p90 under the parts, and the reply time on the transcript shows it on hover.
+  - The STT TTFS overlaps the VAD endpointing, so it does not add up with the parts. For an STT that finalizes on its own endpointing, such as Deepgram, it shows if the STT is fast enough for a shorter `stop_secs`. Soniox sends its final transcript only when the VAD stops, so its STT TTFS always includes the `stop_secs`.
+  - The parts now have their Voice AI names: VAD endpointing, STT after VAD stop, turn detection, LLM TTFT, sentence aggregation, TTS TTFB and output transport. Point to the name of a part, or move the focus to it, to see what it measures.
+  - The **Caller** card always shows VAD endpointing, STT after VAD stop, turn detection, LLM TTFT and TTS TTFB, also at 0 ms.
+  - The other fields of the `caller_reply_time` log line do not change. Calls from before this version have no STT TTFS.
+
 ## v0.9.0 (2026-10-28)
 
 ### Feat
