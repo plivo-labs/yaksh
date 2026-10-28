@@ -81,6 +81,7 @@ import {
   type SuiteSummary,
   type SuiteUpdate,
   type Surroundings,
+  type TtsModel,
   type TtsTraits,
   type VapiAccount,
   type VapiAssistantPage,
@@ -90,7 +91,6 @@ import {
   type VoiceGender,
   type VoiceInput,
   type VoiceSettings,
-  type VoiceSource,
 } from "@/lib/types";
 
 export const keys = {
@@ -114,6 +114,7 @@ export const keys = {
   generations: (agentId: string) => ["agents", agentId, "generations"] as const,
   voices: ["voices"] as const,
   voicesFor: (language: Language | "all") => ["voices", language] as const,
+  voiceModels: ["voice-models"] as const,
   phoneNumbers: ["phone-numbers"] as const,
   phoneAccount: ["phone-account"] as const,
   applications: ["phone-account", "applications"] as const,
@@ -441,9 +442,20 @@ export function useVoiceProviders() {
   });
 }
 
+/** The provider's models that the saved key's account may speak with; the first is the default
+ * for a new voice. The server asks the provider for them, so they are kept for a few minutes. */
+export function useVoiceModels(provider: VoiceProvider, enabled: boolean) {
+  return useQuery({
+    queryKey: [...keys.voiceModels, provider],
+    queryFn: ({ signal }) =>
+      api<TtsModel[]>(`/voices/models?${new URLSearchParams({ provider })}`, { signal }),
+    enabled,
+    staleTime: 5 * 60_000,
+  });
+}
+
 export interface VoiceCatalogQuery {
   provider: VoiceProvider;
-  source: VoiceSource;
   /** Sarvam's speakers differ by model. */
   model: string | null;
   search: string;
@@ -456,7 +468,7 @@ export function useVoiceCatalog(query: VoiceCatalogQuery) {
   return useInfiniteQuery({
     queryKey: ["voice-catalog", query] as const,
     queryFn: ({ pageParam, signal }) => {
-      const params = new URLSearchParams({ provider: query.provider, source: query.source });
+      const params = new URLSearchParams({ provider: query.provider });
       if (query.model) params.set("model", query.model);
       if (query.search) params.set("search", query.search);
       if (query.language) params.set("language", query.language);
@@ -1348,8 +1360,9 @@ export function useCallerReplyTimes() {
 /** After a change of the settings: what the server reads from them may change too. */
 function settingsChanged(client: QueryClient, settings: AppSettings) {
   client.setQueryData(settingsKey, settings);
-  // A new key or base URL can change the provider's models and what each takes.
+  // A new key or address can change the provider's models and what each takes.
   void client.invalidateQueries({ queryKey: [...settingsKey, "models"] });
+  void client.invalidateQueries({ queryKey: keys.voiceModels });
   // Which model and effort are in use follows the caller settings.
   void client.invalidateQueries({ queryKey: [...settingsKey, "caller-reply-times"] });
   void client.invalidateQueries({ queryKey: [...settingsKey, "efforts"] });

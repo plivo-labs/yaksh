@@ -1,20 +1,15 @@
-import type { KeyboardEvent, ReactNode } from "react";
-
-import { Explained } from "@/components/verdict-ui";
+import type { KeyboardEvent } from "react";
 
 /** A row of mutually exclusive options, all visible at once. Arrow keys move the choice, as in
  * any radio group. The segments share one width so a single thumb can slide between them. */
 export function Segmented<T extends string | number>({
   label,
-  hint,
   value,
   options,
   onChange,
   disabled = false,
 }: {
   label: string;
-  /** Explains the choice when the label is hovered or focused. */
-  hint?: ReactNode;
   value: T;
   options: { value: T; label: string }[];
   onChange: (value: T) => void;
@@ -36,9 +31,7 @@ export function Segmented<T extends string | number>({
   };
   return (
     <div className="grid gap-1.5">
-      <span className="text-s-500">
-        {hint ? <Explained hint={hint}>{label}</Explained> : label}
-      </span>
+      <span className="text-s-500">{label}</span>
       <div
         role="radiogroup"
         aria-label={label}

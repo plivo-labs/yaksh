@@ -682,10 +682,6 @@ export interface ProviderVoice {
   listed_languages: Language[];
 }
 
-/** Where a provider's voice comes from: the account of the saved key, or the provider's public
- * voice library. */
-export type VoiceSource = "account" | "library";
-
 /** A page of a provider's own voices. */
 export interface VoiceCatalogPage {
   items: ProviderVoice[];
@@ -713,9 +709,8 @@ export interface TtsTraits {
   word_timestamps: boolean;
   /** It describes a voice of the account by its ID. */
   lookup: boolean;
-  /** It has a public voice library to search. */
-  library: boolean;
-  /** The first is the one a new voice gets. */
+  /** All of the provider's models, also the ones that the account does not have. A new voice
+   * gets one of the account's models (`useVoiceModels`). */
   models: TtsModel[];
 }
 
@@ -726,8 +721,6 @@ export interface VoiceInput {
   languages: Language[];
   /** The provider's first model when left out. */
   model?: string | null;
-  /** A library voice is not on the account, so no lookup describes it. */
-  source?: VoiceSource;
   /** For a voice that the server does not look up; one it looks up gets these from the
    * provider. */
   gender?: VoiceGender | null;
