@@ -40,7 +40,7 @@ A wait starts each time the agent says the phrase. With no phrase, a wait starts
 
 - A phrase matches whole words only: "fee" does not match "coffee", although a phrase rule finds it there.
 - As in a phrase rule, numbers, dates and times match in words or in digits. Number words match their digits: "first visit" also matches "1st visit" and "one visit". Digits do not join across punctuation: "five five five, oh one four two" does not match "5550142".
-- A wait starts when the speech-to-text gives the phrase, a short time after the agent says it. The speech-to-text can still add to a number at the end of the words. Thus a phrase that ends with a number matches when a word or a punctuation mark comes after the number.
+- A wait starts when the speech-to-text gives the phrase, a short time after the agent says it. A phrase at the end of an agent turn can come after the turn ended. Then no wait starts. A short VAD stop in Settings ends the agent's turns sooner, so this happens more often. The speech-to-text can still add to a number at the end of the words. Thus a phrase that ends with a number matches when a word or a punctuation mark comes after the number.
 - A phrase needs the words of the agent while it speaks. Deepgram, AssemblyAI and Soniox give partial words. Gladia gives words only at short pauses, at most 5 s apart, so its waits can start later. Sarvam gives the words only after the agent stops, so a run start refuses a scenario with a phrase when Settings use Sarvam. A line with no phrase works with all providers.
 
 Yaksh makes the speech of each line with the voice of the persona when the call starts. A line whose speech failed does not play.
@@ -49,11 +49,11 @@ Yaksh makes the speech of each line with the voice of the persona when the call 
 
 The model of the caller learns that it said the line, after the agent turn that the line interrupted. An agent turn that starts while the line plays is part of the speech that the line interrupted. When the line has played and no agent turn is open, the caller acts:
 
-- The agent stopped within 2 s of the first sound of the line and did not speak again in that speech: the caller waits for the agent. It replies to the next agent turn in which the agent speaks. If 3 s pass with no agent turn open, the caller continues the call. Late words of the speech that the line cut are no answer.
-- The agent stopped and then spoke again in that speech: the caller replies to it.
+- The agent stopped within 2 s of the first sound of the line and stayed quiet: the caller waits for the agent. It replies to the next agent turn in which the agent speaks. If 3 s pass with no agent turn open, the caller continues the call. Late words of the speech that the line cut are no answer.
+- The agent stopped within those 2 s and spoke again after the line had played: the caller replies to it.
 - In all other cases, for example when the agent talked over the line, the caller replies to the speech as usual.
 
-The agent stopped when its voice was quiet for at least 0.6 s. A quiet at the end of its last turn becomes a stop when it lasts 0.6 s. A shorter pause, such as a pause between two sentences, is not a stop. This is also true when the VAD stop in Settings is shorter.
+The agent stopped when its voice was quiet for at least 0.6 s. A quiet at the end of its last turn becomes a stop when it lasts 0.6 s. A shorter pause, such as a pause between two sentences, is not a stop. This is also true when the VAD stop in Settings is shorter. When the agent speaks again while the line still plays, that speech is part of the speech that the line interrupted. Then the quiet after it counts.
 
 The caller keeps to its known facts. A line can give a value that differs from them, such as a new age. That line does not change the facts, and the caller can take the value back later. Write lines that ask something or that ask the agent to wait.
 
@@ -63,8 +63,8 @@ Backchannel lines, such as "Mm-hmm.", are not supported yet. Yaksh handles them 
 
 ## Results
 
-- The transcript shows each line as a caller turn with the badge **Fixed line**. The first words, the question when the agent is silent and the goodbyes have the same badge. In the API, the turn of a line has `interruption`: the number of the interruption. The line comes after the agent turn that it interrupted, because that turn stays whole.
-- The judges see where each line came. After the turn of the line, a note in parentheses tells them where the caller spoke: how far into which agent turn, and after which words of the agent. The part of their view about the caller's test also lists the lines that played. Thus the check of the caller counts them as part of its test. The judges judge the call as they judge all other calls.
+- The transcript shows each line as a caller turn with the badge **Fixed line**. The first words, the question to a silent agent and the goodbyes have the same badge. In the API, the turn of a line has `interruption`: the number of the interruption. The line comes after the agent turn that it interrupted, because that turn stays whole.
+- The judges see where each line came. After the turn of the line, a note in parentheses tells them where the caller spoke. The note gives how far into which agent turn, and after which words of the agent. The part of their view about the caller's test also lists the lines that played. Thus the check of the caller counts them as part of its test. The judges judge the call as they judge all other calls.
 - Nothing checks yet how fast the agent stopped. To check what the agent did after a line, write a criterion with the value that you expect. An example is "The agent says that a new patient visit costs $95." Refer to [Writing criteria](/docs/writing-criteria).
 - The recording in the **Audio** card of the call has the two sides, the agent on the left and the caller on the right. Listen to it to hear how the agent stopped.
 - The lines count in the speech of the caller (**Agent's share of the speech**). They do not count in **Agent response time**, **Longest wait** or **Spoke over the caller**, because the caller said them over the agent. Thus **Spoke over the caller** does not show an agent that talked over a line.

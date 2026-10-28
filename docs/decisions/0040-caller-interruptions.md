@@ -16,10 +16,10 @@ A scenario can hold up to 3 interruptions. Each one is a fixed line that Yaksh's
   - The `LineGate`, after the stored agent turns, drops the agent's cut while a line plays. It also drops the persona's context frames until the speech that the lines interrupted is decided. That speech is each agent turn that starts before the latest line has played.
   - The `TurnOrder` keeps the transcript's turns in start order around a line.
 - Each line gets its note in the persona's context after the turn that it interrupted. When the latest line has played and no agent turn is open, the last line decides what the persona does next:
-  - The agent stopped within 2 s of the line's first sound and said nothing more in that speech: the persona waits for the agent. The next agent turn in which the agent speaks gets the reply. When 3 s pass with no agent turn open, the persona continues the call.
-  - The agent stopped and then spoke again in that speech: the persona answers it.
+  - The agent stopped within 2 s of the line's first sound and stayed quiet: the persona waits for the agent. The next agent turn in which the agent speaks gets the reply. When 3 s pass with no agent turn open, the persona continues the call.
+  - The agent stopped within those 2 s, and its voice came back after the line had played: the persona answers it.
   - Every other case: the persona answers the speech as usual.
-- A stop is a quiet of the agent's voice of at least 0.6 s, the VAD stop of the measurement after the call. A quiet at the end of the agent's last turn becomes a stop when it lasts 0.6 s, and the gate waits for that.
+- A stop is a quiet of the agent's voice of at least 0.6 s, the VAD stop of the measurement after the call. A quiet at the end of the agent's last turn becomes a stop when it lasts 0.6 s. The gate waits for that, and 0.1 s more, in which the voice detector reports a voice that came back. A voice that comes back while the line plays is part of the interrupted speech, so the quiet after it counts.
 - A line plays only after each cut of the agent's that passed the gate before it has reached the end of the pipeline. After 1 s, it plays anyway.
 - Each try is a wire event of the kind `interruption`, with a typed field. A played line's try is saved when the line starts. It keeps the agent's words before the line, the start of its turn and the end of its 2 s window.
 - The judges' view adds a sentence in parentheses after each interruption line: how far into which agent turn the caller spoke, and after which words. The CALLER part of the view lists the lines that played, as part of the caller's test.
@@ -36,6 +36,7 @@ A scenario can hold up to 3 interruptions. Each one is a fixed line that Yaksh's
 - With a VAD stop of 0.3 s, the agent's speech before it reacts to a line is often two turns. An example is the end of a sentence and the start of the next one. A decision at the end of the first turn made the persona answer the second turn while the agent prepared its answer to the line.
 - A stop of 0.6 s keeps the meaning of a stop when the live VAD stop changes. A later measurement from the recording uses the same stop.
 - Turn detection can end a turn in a pause of 0.4 s between two sentences. A decision at that moment told the persona that the agent stopped. The gate now waits until the quiet lasts 0.6 s.
+- A voice that comes back while the line still plays is speech from before the agent reacted, such as the rest of its sentence. Counted as an answer, it made the persona reply while the agent prepared its real answer.
 - A persona that waits answers only the agent's voice. Late words of the cut speech made the persona reply, and the agent's real answer then got a second reply.
 - On real calls, a cut from an agent turn that started 0.2 s before a line was still on its way when the line started. It took the line's words in the transcript, so the line showed twice. Such a cut can also drop the line's audio.
 - The caller check judges the caller against its test. A caller that follows a line can break its known facts, and the check then blocks criteria that the agent failed. In replays of the caller check on one such call, it blocked them in 4 of 16 runs with no list. It blocked them in 0 of 16 runs with the list.
