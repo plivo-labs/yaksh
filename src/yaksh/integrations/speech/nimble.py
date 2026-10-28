@@ -19,6 +19,7 @@ from loguru import logger
 from pipecat.frames.frames import ErrorFrame, TTSAudioRawFrame, TTSStoppedFrame
 from pipecat.services.settings import TTSSettings
 from pipecat.services.tts_service import WebsocketTTSService
+from websockets.exceptions import InvalidStatus
 from websockets.protocol import State
 
 from yaksh.diagnostics import describe_exception
@@ -44,6 +45,20 @@ RETRYABLE = frozenset(
 )
 """Errors the gateway may not give again: a reply that has no audio yet is tried once more."""
 TIMEOUT = aiohttp.ClientTimeout(total=10)
+
+
+def refusal(error: Exception) -> str:
+    """The gateway's own reason for a refused handshake, such as no speech node it can reach;
+    its JSON error body names it."""
+    if not isinstance(error, InvalidStatus):
+        return str(error)
+    response = error.response
+    try:
+        body = json.loads(response.body)
+        detail = f"{body['code']}: {body['message']}"
+    except ValueError, KeyError, TypeError:
+        detail = response.body.decode(errors="replace")[:200]
+    return f"HTTP {response.status_code}: {detail}"
 
 
 def websocket_of(base_url: str) -> str:
@@ -129,9 +144,10 @@ class NimbleTTSService(WebsocketTTSService):
             )
             await self._call_event_handler("on_connected")
         except Exception as error:
-            await self.push_error(error_msg=f"Nimble refused the socket: {error}", exception=error)
+            reason = refusal(error)
+            await self.push_error(error_msg=f"Nimble refused the socket: {reason}", exception=error)
             self._websocket = None
-            await self._call_event_handler("on_connection_error", f"{error}")
+            await self._call_event_handler("on_connection_error", reason)
 
     async def _disconnect_websocket(self) -> None:
         try:
