@@ -22,6 +22,8 @@ Status: accepted. Changes 0037 (one model for each provider, in Settings).
 ## Consequences
 
 - Migration 0007 gives each voice and persona the model that its provider had in Settings. A stored model outside the list becomes the first.
+- The three old model settings stay in the stored row for one release, unread: a process of the previous release keeps its model there during the deploy. A later release removes them.
+- Before a persona's voice changes, each of its versions without a model gets the model it speaks with now, so a queued call speaks as before.
 - A persona version that an older process writes during a rollout has no model. Its voice keeps the persona's model.
 - Change no voice, persona voice or Settings until every process runs this version.
 
