@@ -99,6 +99,13 @@ criteria:
 - An `llm` rule needs `applies_when`, `pass_when` and `fail_when`, and can have `not_a_failure`. It is `not_applicable` when the agent did not speak, unless it has `gate: always`.
 - A `phrase` rule needs `expects` (`required` or `forbidden`) and `value`. `where: first_agent_turn` checks only the first agent turn, which a pause can split on a call.
 
+### Interruptions
+
+- On a phone run, `interruptions` (up to 3) make the caller say a fixed line while the agent speaks: `say`, and `agent_says` (a phrase) or none, `after_s` and `from_answer`. A line with a phrase plays when the agent says the phrase and still speaks `after_s` later. A line with no phrase plays `after_s` (default 2) into each answer of the agent from `from_answer` on (default 2, which skips the greeting).
+- Nothing checks yet how fast the agent stops. Write a criterion for what the agent must do after the line, such as answer the question in it. The judges see where each line came.
+- Write lines that ask something, or that ask the agent to wait. Backchannel lines such as "Mm-hmm." are not supported.
+- A phrase needs a speech-to-text provider that gives the agent's words while it speaks: not Sarvam.
+
 ### Add them
 
 - `yaksh scenario create --agent <agent-id> -f <file>` adds a scenario. `yaksh persona list` shows the personas for its `persona_id`. When none fits, ask the user to add one in the console.
