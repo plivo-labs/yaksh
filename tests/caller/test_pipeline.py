@@ -166,12 +166,9 @@ async def test_an_empty_message_is_the_caller_saying_nothing_and_any_other_empty
     assert [error.split()[2] for error in errors] == ["refused", "thought"]
 
 
-LATER: LLMContextMessage = {"role": "user", "content": "Are you still there?"}
-
-
-@pytest.mark.parametrize(("reasoning_ids", "later"), [(["rs_a", "rs_b"], [LATER]), ([], [])])
+@pytest.mark.parametrize("reasoning_ids", [["rs_a", "rs_b"], []])
 async def test_a_reply_with_no_words_leaves_none_of_its_reasoning_in_the_context(
-    reasoning_ids: list[str], later: list[LLMContextMessage]
+    reasoning_ids: list[str],
 ) -> None:
     settings = model_settings("http://127.0.0.1:9", "gpt-6-luna", None)
     llm = llm_service(settings, settings.caller, CallerKeys("test", "", ""), "Be a caller.")
@@ -188,13 +185,13 @@ async def test_a_reply_with_no_words_leaves_none_of_its_reasoning_in_the_context
         ]
     )
     empty = {"type": "message", "content": [{"type": "output_text", "text": ""}]}
+    later: LLMContextMessage = {"role": "user", "content": "Are you still there?"}
 
     async def says_nothing() -> None:
         await asyncio.sleep(0.05)
         for item_id in reasoning_ids:
             await llm._append_reasoning_message(item_id, [], "e")
-        if later:
-            await llm.push_frame(LLMMessagesAppendFrame(later))
+        await llm.push_frame(LLMMessagesAppendFrame([later]))
         reasoning = [{"type": "reasoning", "id": item_id} for item_id in reasoning_ids]
         await llm._report_empty_response("silent", [*reasoning, empty])
 
@@ -208,7 +205,7 @@ async def test_a_reply_with_no_words_leaves_none_of_its_reasoning_in_the_context
         earlier,
         {"role": "assistant", "content": "Yes, speaking."},
         {"role": "user", "content": "Let me pull up your file."},
-        *later,
+        later,
     ]
 
 
