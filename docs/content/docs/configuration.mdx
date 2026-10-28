@@ -24,6 +24,7 @@ Yaksh keeps its configuration in two places:
 | `YAKSH_ENCRYPTION_KEY` | The key that encrypts the keys on the Settings page. It must have 32 characters or more. Yaksh does not start without it, or when the key cannot decrypt the saved keys. |
 | `YAKSH_PUBLIC_URL` | The public `https://` URL that goes to port 8770 of the worker. The API and the worker read it. Yaksh cannot make phone calls without it. |
 | `YAKSH_ALLOW_PRIVATE_HOSTS` | This variable is optional. It lets trigger URLs and text agent URLs use `http` and private addresses, for agents on your own network. The default is off. |
+| `YAKSH_CALL_PROCESSES` | This variable is optional. The worker reads it when it starts. Set it to `true` to run each phone call in a process of its own. Then the calls use all CPUs of the server, and one worker can hold more calls at the same time. Each call needs more memory. Refer to [Size of the server](/docs/self-hosting#size-of-the-server). The default is off: all calls run in the worker process. |
 | `PORT` | This variable is optional. It sets the port that the process listens on. The default is 8000 for the API and 8770 for the worker. Hosting platforms such as Railway, Render, Fly and Cloud Run set it for each service. `yaksh-server api --port` overrides it. Do not set it in `docker/.env`: the API and the worker read the same file, and the Compose port mappings stay at 8000 and 8770. |
 
 After you change `docker/.env`, make the containers again. Use these commands from the root of the repository:

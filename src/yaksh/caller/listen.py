@@ -16,7 +16,7 @@ from pipecat.observers.base_observer import BaseObserver, FramePushed
 from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
 
 from yaksh.db.session import notify_connection
-from yaksh.domain.listen import AGENT, CALLER, WANT_S, channels, encode
+from yaksh.domain.listen import AGENT, CALLER, KEEPALIVE_S, WANT_S, channels, encode
 
 log = logging.getLogger(__name__)
 
@@ -31,13 +31,14 @@ PAYLOAD_LIMIT = 7000
 class LiveAudio:
     """One call's audio for listeners, sent with NOTIFY on the call's audio channel while the
     API asks for it: the API sends a NOTIFY on the call's want channel every few seconds while a
-    listener stays. put never waits, and a Postgres error stops the listening, not the call. An
-    empty NOTIFY marks the end of the call."""
+    listener stays. A new LiveAudio sends for one such interval at once, because a listener who
+    asked before it existed asks again only then. put never waits, and a Postgres error stops
+    the listening, not the call. An empty NOTIFY marks the end of the call."""
 
     def __init__(self, database_url: str, conversation_id: uuid.UUID) -> None:
         self._audio, self._want = channels(conversation_id)
         self._queue: deque[bytes] = deque(maxlen=QUEUE_LIMIT)
-        self._wanted_until = 0.0
+        self._wanted_until = time.monotonic() + KEEPALIVE_S
         self._task = asyncio.create_task(self._send(database_url))
 
     def put(self, side: int, at_ms: float, pcm: bytes) -> None:

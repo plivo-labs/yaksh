@@ -1,7 +1,7 @@
 name: yaksh
 
 x-yaksh: &yaksh
-  image: ghcr.io/plivo-labs/yaksh:${YAKSH_VERSION:-0.8.1}
+  image: ghcr.io/plivo-labs/yaksh:${YAKSH_VERSION:-0.9.0}
   env_file:
     - path: .env
       required: false
@@ -27,6 +27,8 @@ services:
 
   worker:
     <<: *yaksh
+    # An init process reaps call processes that lose their parent (YAKSH_CALL_PROCESSES).
+    init: true
     command:
       - yaksh-server
       - worker

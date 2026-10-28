@@ -3,6 +3,7 @@ import logging
 import os
 import signal
 from functools import partial
+from typing import TYPE_CHECKING
 
 import typer
 import uvicorn
@@ -24,6 +25,9 @@ from yaksh.storage import file_store
 from yaksh.timings import TIMINGS, Timings
 from yaksh.worker.phone_account import PhoneAccount
 from yaksh.worker.worker import Worker
+
+if TYPE_CHECKING:
+    from yaksh.caller.children import ChildConversations
 
 cli = typer.Typer(no_args_is_help=True, add_completion=False)
 
@@ -60,7 +64,8 @@ def worker() -> None:
     settings = Settings()
     upgrade_to_head(str(settings.database_url))
     registry = StreamRegistry()
-    asyncio.run(run_worker(settings, caller_of(settings, registry), registry))
+    pool = call_processes(settings)
+    asyncio.run(run_worker(settings, caller_of(settings, registry, pool), registry, pool=pool))
 
 
 @cli.command()
@@ -134,7 +139,19 @@ class TransportCaller:
         return await caller.run(request, observer, stop)
 
 
-def caller_of(settings: Settings, registry: StreamRegistry) -> Caller:
+def call_processes(settings: Settings) -> ChildConversations | None:
+    """The pool that holds each phone call in a process of its own, when the worker makes
+    phone calls and YAKSH_CALL_PROCESSES asks for it."""
+    if not settings.call_processes or settings.public_url is None:
+        return None
+    from yaksh.caller.children import ChildConversations
+
+    return ChildConversations(str(settings.database_url))
+
+
+def caller_of(
+    settings: Settings, registry: StreamRegistry, pool: ChildConversations | None = None
+) -> Caller:
     from yaksh.caller.phone import PhoneCaller
     from yaksh.caller.text import TextCaller
 
@@ -143,7 +160,7 @@ def caller_of(settings: Settings, registry: StreamRegistry) -> Caller:
         reason = "phone calls are off: set YAKSH_PUBLIC_URL to the address Plivo can reach"
         logging.warning(reason)
         return TransportCaller(UnavailableCaller(reason), text)
-    return TransportCaller(PhoneCaller(settings, registry), text)
+    return TransportCaller(PhoneCaller(settings, registry, conversations=pool), text)
 
 
 def plivo_auth_token(source: SettingsSource) -> str | None:
@@ -154,8 +171,13 @@ def plivo_auth_token(source: SettingsSource) -> str | None:
 
 
 async def run_worker(
-    settings: Settings, caller: Caller, registry: StreamRegistry, timings: Timings = TIMINGS
+    settings: Settings,
+    caller: Caller,
+    registry: StreamRegistry,
+    timings: Timings = TIMINGS,
+    pool: ChildConversations | None = None,
 ) -> None:
+    """`pool` holds the phone calls in processes of their own; it is closed at the end."""
     engine = create_engine(str(settings.database_url))
     sessionmaker = create_sessionmaker(engine)
     source = await settings_source(settings, engine)
@@ -175,6 +197,8 @@ async def run_worker(
         8770 if settings.port is None else settings.port,
     )
     await server.start()
+    if pool is not None:
+        pool.warm()
     stop = asyncio.Event()
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGINT, signal.SIGTERM):
@@ -184,8 +208,12 @@ async def run_worker(
     finally:
         await server.stop(timings.end_timeout_s)
         await store.close()
-        if worker.fatal.is_set() or not await bounded_dispose(engine, timings.end_timeout_s):
-            # A leaked task would keep asyncio.run's teardown waiting forever.
+        if (
+            worker.fatal.is_set()
+            or (pool is not None and not await pool.close())
+            or not await bounded_dispose(engine, timings.end_timeout_s)
+        ):
+            # A leaked task or a call process left behind would keep the exit waiting forever.
             logging.shutdown()
             os._exit(1)
 

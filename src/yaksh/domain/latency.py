@@ -64,8 +64,10 @@ class CallerReplyWindow(BaseModel):
 
 
 class LoopLag(BaseModel):
-    """How late the worker's event loop woke up while a call was live, in ms: a lag here also
-    delays the call's audio."""
+    """How late the event loop that carried a call woke up while the call was live, in ms: a lag
+    here also delays the call's audio. A call in a process of its own has two loops, its own and
+    the worker's, which relays its audio; then the stall and the 99th percentile are the worse of
+    the two, and the samples are those of the call's process."""
 
     model_config = ConfigDict(frozen=True)
 

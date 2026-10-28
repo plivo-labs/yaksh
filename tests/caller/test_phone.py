@@ -31,13 +31,16 @@ from tests.conftest import (
     plivo_signed,
     refuse_calls,
 )
-from yaksh.caller import phone
+from yaksh.caller import conversation, phone
 from yaksh.caller.audio import PLAYOUT, Clock, Playout
-from yaksh.caller.phone import Connected, Dialer, PhoneCaller, Receiver
-from yaksh.caller.pipeline import CallState
+from yaksh.caller.conversation import Connected, Conversation, ConversationStart, Ended, Heard
+from yaksh.caller.phone import Dialer, PhoneCaller, Receiver
+from yaksh.caller.pipeline import CallerKeys, CallState
 from yaksh.caller.plivo_server import PendingStream, PlivoServer, StreamRegistry, create_app
 from yaksh.domain.agents import AgentConfig, Transport
 from yaksh.domain.conversations import (
+    CallerSettings,
+    CallerUsage,
     CallOutcome,
     CallRequest,
     EndReason,
@@ -382,6 +385,155 @@ async def test_a_hang_up_survives_the_cancelled_call_that_started_it() -> None:
     assert first.cancelled() and done == ["call-11"]
 
 
+class Scripted:
+    """A conversation the test drives: it ends when `finish` is set, and as worker_stopped when
+    it is cancelled. What happens to it goes into `log`."""
+
+    def __init__(self, log: list[str]) -> None:
+        self.log = log
+        self.waiting = asyncio.Event()
+        self.finish = asyncio.Event()
+        self.reason = EndReason.AGENT_HANGUP
+        self.lost: Exception | None = None
+
+    async def ended(self) -> Ended:
+        self.waiting.set()
+        await self.finish.wait()
+        return Ended(at_ms=9_000, started_ms=1_000)
+
+    def cancel(self) -> None:
+        self.log.append("cancel")
+        self.reason = EndReason.WORKER_STOPPED
+        self.finish.set()
+
+    async def heard(self) -> Heard:
+        if self.lost is not None:
+            raise self.lost
+        return Heard(
+            end_reason=self.reason,
+            error=None,
+            caller_reason=None,
+            serializer_failure=None,
+            recording=b"wav",
+            agent_media=None,
+            caller_replies=[],
+            caller_voice=None,
+            caller_settings=CallerSettings(llm_model="model", reasoning_effort=None),
+            caller_usage=CallerUsage(),
+            caller_reply_times=[],
+            loop_lag=None,
+        )
+
+    async def close(self) -> None:
+        self.log.append("close")
+
+
+class OneSeat:
+    def __init__(self, conversation: Conversation | BaseException) -> None:
+        self._conversation = conversation
+
+    async def start(self, start: ConversationStart) -> Conversation:
+        if isinstance(self._conversation, BaseException):
+            raise self._conversation
+        return self._conversation
+
+    async def release(self) -> None:
+        return None
+
+
+class Hanging:
+    """A line whose hang-up waits for `release` when the test gives one."""
+
+    def __init__(self, log: list[str], release: asyncio.Event | None = None) -> None:
+        self.asked = asyncio.Event()
+        self.done = asyncio.Event()
+
+        async def hang_up(_call_uuid: str) -> None:
+            self.asked.set()
+            if release is not None:
+                await release.wait()
+            log.append("hang up")
+            self.done.set()
+
+        self.line = phone.Line("call-1", asyncio.Queue(), hang_up)
+
+
+def started(observer: Observer) -> ConversationStart:
+    socket = cast(WebSocket, None)
+    return ConversationStart(
+        request(),
+        cast(CallerKeys, None),
+        observer,
+        asyncio.Event(),
+        Clock(),
+        Connected(socket, "stream-1", "call-1", "audio/x-l16"),
+        None,
+        connected_ms=1_200,
+    )
+
+
+async def test_a_conversation_leaves_the_outcome_and_the_line_hangs_up_before_it_closes() -> None:
+    log: list[str] = []
+    conversation, observer, hanging = Scripted(log), Observer(), Hanging(log)
+    conversation.finish.set()
+
+    outcome = await phone.talk(started(observer), OneSeat(conversation), hanging.line)
+
+    assert outcome.end_reason is EndReason.AGENT_HANGUP
+    assert (outcome.talk_ms, outcome.recording, outcome.recording_start_ms) == (
+        8_000,
+        b"wav",
+        1_000,
+    )
+    assert log == ["hang up", "close"]
+    assert [event.at_ms for event in observer.events if event.kind is WireEventKind.CONNECTED] == [
+        1_200,
+        1_000,
+    ]
+
+
+async def test_a_cancelled_call_keeps_what_its_conversation_left() -> None:
+    log: list[str] = []
+    conversation, hanging = Scripted(log), Hanging(log)
+    call = asyncio.create_task(phone.talk(started(Observer()), OneSeat(conversation), hanging.line))
+    await conversation.waiting.wait()
+
+    call.cancel()
+    outcome = await call
+
+    assert outcome.end_reason is EndReason.WORKER_STOPPED and outcome.recording == b"wav"
+    assert log == ["cancel", "hang up", "close"]
+
+
+async def test_a_conversation_that_cannot_start_still_hangs_up_the_line() -> None:
+    log: list[str] = []
+    hanging = Hanging(log)
+
+    with pytest.raises(RuntimeError, match="no seat"):
+        await phone.talk(started(Observer()), OneSeat(RuntimeError("no seat")), hanging.line)
+
+    assert log == ["hang up"]
+
+
+async def test_a_cancel_during_the_hang_up_still_closes_the_conversation() -> None:
+    log: list[str] = []
+    release = asyncio.Event()
+    conversation, hanging = Scripted(log), Hanging(log, release)
+    conversation.lost = RuntimeError("the call process stopped")
+    conversation.finish.set()
+    call = asyncio.create_task(phone.talk(started(Observer()), OneSeat(conversation), hanging.line))
+    await hanging.asked.wait()
+
+    call.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await call
+    assert log == ["close"]
+
+    release.set()
+    await hanging.done.wait()
+    assert log == ["close", "hang up"]
+
+
 async def test_the_phone_caller_reports_an_unanswered_call_and_frees_its_stream_entry(
     rig: Rig, tmp_path: Path
 ) -> None:
@@ -582,7 +734,7 @@ async def test_a_reply_keeps_its_playout_even_when_a_barge_in_cuts_it_off() -> N
 
     stopped = TTSStoppedFrame()
     stopped.metadata[PLAYOUT] = whole
-    marks = phone.AudioMarks(Clock(), Observer())
+    marks = conversation.AudioMarks(Clock(), Observer())
 
     await run_test(
         marks,
@@ -611,7 +763,7 @@ async def test_each_reply_learns_which_caller_audio_start_played_it() -> None:
         frame.metadata[PLAYOUT] = playout
         return frame
 
-    marks = phone.AudioMarks(Clock(), Observer())
+    marks = conversation.AudioMarks(Clock(), Observer())
 
     await run_test(
         marks,

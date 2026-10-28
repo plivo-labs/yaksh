@@ -1,66 +1,32 @@
 """The phone caller: dial the agent through Plivo, then talk over the stream Plivo opens."""
 
 import asyncio
-import base64
 import json
 import logging
 from collections.abc import Awaitable, Callable, Mapping
-from dataclasses import dataclass
 from datetime import UTC, datetime
 from functools import partial
 from typing import Any
 
-import audioop
 from fastapi import WebSocket, WebSocketDisconnect
-from pipecat.frames.frames import (
-    AudioRawFrame,
-    BotStartedSpeakingFrame,
-    BotStoppedSpeakingFrame,
-    Frame,
-    InputAudioRawFrame,
-    InterruptionFrame,
-    OutputDTMFUrgentFrame,
-    OutputTransportMessageFrame,
-    OutputTransportMessageUrgentFrame,
-    TTSAudioRawFrame,
-    TTSStartedFrame,
-    TTSStoppedFrame,
-    TTSTextFrame,
-)
-from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
-from pipecat.serializers.base_serializer import FrameSerializer
-from pipecat.transports.websocket.fastapi import FastAPIWebsocketParams, FastAPIWebsocketTransport
 
-from yaksh.caller.answering import AnsweringScript, own_greeting
-from yaksh.caller.audio import (
-    GAP_BYTES,
-    LOUD_PEAK,
-    PLAYOUT,
-    SAMPLE_RATE,
-    CallerReply,
-    CallRecording,
-    Clock,
-    PlanMixer,
-    Playout,
-    Stamper,
-    caller_voice,
+from yaksh.caller.answering import own_greeting
+from yaksh.caller.audio import Clock
+from yaksh.caller.conversation import (
+    Connected,
+    Conversation,
+    Conversations,
+    ConversationStart,
+    LocalConversations,
+    Seat,
 )
-from yaksh.caller.lag import LagSampler
-from yaksh.caller.listen import AudioTap, LiveAudio
-from yaksh.caller.pipeline import (
-    CallerKeys,
-    CallState,
-    Persona,
-    caller_keys,
-    converse,
-)
+from yaksh.caller.pipeline import CallState, caller_keys
 from yaksh.caller.plivo_server import (
     CALLBACK_RETRIES,
     TIME_LIMIT_MARGIN_S,
     PendingStream,
     StreamRegistry,
 )
-from yaksh.caller.transcript import TranscriptBuilder, WireTap
 from yaksh.caller.turn_models import TurnModels
 from yaksh.config import Settings
 from yaksh.domain.conversations import (
@@ -90,20 +56,8 @@ HANGUP_EVENT = "Hangup"
 CALLED_SIDE = "Callee"
 CALLING_SIDE = "Caller"
 HANGUP_REPORT_WAIT_S = 2.0
-ACK_GRACE_S = 0.2
 HANGUP_TIMEOUT_S = 2.0
-CHUNK_BYTES = SAMPLE_RATE * 2 // 2
 CALL_NEVER_COMES = frozenset({TriggerResult.REJECTED, TriggerResult.NOT_SENT})
-LINEAR = "audio/x-l16"
-MULAW = "audio/x-mulaw"
-
-
-@dataclass
-class Connected:
-    socket: WebSocket
-    stream_id: str
-    call_uuid: str
-    encoding: str
 
 
 class Dialer:
@@ -295,17 +249,6 @@ def line_facts(report: Mapping[str, str]) -> LineFacts:
     )
 
 
-@dataclass(frozen=True)
-class Spoken:
-    """What a finished conversation leaves for the work after it."""
-
-    state: CallState
-    persona: Persona
-    recording: CallRecording
-    marks: AudioMarks
-    serializer: StreamSerializer
-
-
 class Line:
     """The phone leg of a connected call. It is hung up once, as soon as the conversation is
     over, and its one hangup report is read after that."""
@@ -341,239 +284,6 @@ async def give_back(report: asyncio.Future[dict[str, str]], callbacks: asyncio.Q
     await asyncio.gather(report, return_exceptions=True)
     if not report.cancelled():
         callbacks.put_nowait(report.result())
-
-
-class Checkpoints(FrameProcessor):
-    """Before the transport output: stamps each reply's playout and, after every chunk of its
-    audio, asks Plivo to report once the audio queued so far has played; each report moves the
-    reply's sent mark, so provenance follows what the agent has actually heard."""
-
-    def __init__(self, stream_id: str, transcript: TranscriptBuilder) -> None:
-        super().__init__(enable_direct_mode=True)
-        self._stream_id = stream_id
-        self._transcript = transcript
-        self._stamper = Stamper()
-        self._reply = 0
-        self._pending: dict[str, tuple[Playout, int]] = {}
-
-    async def process_frame(self, frame: Frame, direction: FrameDirection) -> None:
-        await super().process_frame(frame, direction)
-        if direction is not FrameDirection.DOWNSTREAM:
-            await self.push_frame(frame, direction)
-            return
-        if isinstance(frame, TTSStartedFrame):
-            self._reply += 1
-            self._pending.clear()
-        if isinstance(frame, TTSAudioRawFrame):
-            for piece in pieces(frame):
-                self._stamper.stamp(piece, self.get_clock().get_time())
-                await self.push_frame(piece, direction)
-                await self._mark()
-            return
-        self._stamper.stamp(frame, self.get_clock().get_time())
-        await self.push_frame(frame, direction)
-        if isinstance(frame, TTSStoppedFrame):
-            await self._mark()
-
-    async def _mark(self) -> None:
-        playout = self._stamper.arriving
-        if playout is None or playout.arrived == 0:
-            return
-        name = f"{self._reply}:{playout.arrived}"
-        if name in self._pending:
-            return
-        self._pending[name] = (playout, playout.arrived)
-        await self.push_frame(
-            OutputTransportMessageFrame(
-                {"event": "checkpoint", "streamId": self._stream_id, "name": name}
-            )
-        )
-
-    def played(self, name: str) -> None:
-        pending = self._pending.pop(name, None)
-        if pending is None:
-            return
-        playout, through = pending
-        playout.played(through)
-        self._transcript.audio_progressed()
-
-
-class KeyPresses(FrameProcessor):
-    """Before the transport output: sends the persona's key presses to Plivo as sendDTMF
-    messages. The websocket transport has no DTMF of its own and would play them as tones."""
-
-    def __init__(self) -> None:
-        super().__init__(enable_direct_mode=True)
-
-    async def process_frame(self, frame: Frame, direction: FrameDirection) -> None:
-        await super().process_frame(frame, direction)
-        if direction is FrameDirection.DOWNSTREAM and isinstance(frame, OutputDTMFUrgentFrame):
-            frame = OutputTransportMessageUrgentFrame(
-                {"event": "sendDTMF", "dtmf": frame.to_string()}
-            )
-        await self.push_frame(frame, direction)
-
-
-def pieces(frame: TTSAudioRawFrame) -> list[TTSAudioRawFrame]:
-    """A reply's audio in slices short enough for a checkpoint after each."""
-    if len(frame.audio) <= CHUNK_BYTES:
-        return [frame]
-    return [
-        TTSAudioRawFrame(
-            audio=frame.audio[start : start + CHUNK_BYTES],
-            sample_rate=frame.sample_rate,
-            num_channels=frame.num_channels,
-            context_id=frame.context_id,
-        )
-        for start in range(0, len(frame.audio), CHUNK_BYTES)
-    ]
-
-
-def plivo_ms(timestamp: Any) -> int | None:
-    """Plivo's media timestamp: Unix milliseconds, sent as a string."""
-    try:
-        return int(timestamp)
-    except TypeError, ValueError:
-        return None
-
-
-class StreamSerializer(FrameSerializer):
-    """Plivo's stream protocol in the encoding the stream opened with, plus the reports Yaksh
-    listens for."""
-
-    def __init__(
-        self,
-        stream_id: str,
-        encoding: str,
-        clock: Clock,
-        observer: CallObserver,
-        checkpoints: Checkpoints,
-        recording: CallRecording,
-    ) -> None:
-        super().__init__()
-        self._stream_id = stream_id
-        self._linear = encoding.split(";")[0].strip() == LINEAR
-        self._clock = clock
-        self._observer = observer
-        self._checkpoints = checkpoints
-        self._recording = recording
-        self._quiet = GAP_BYTES
-        self.stopped = asyncio.Event()
-        self.failed = asyncio.Event()
-        self.failure: str | None = None
-
-    async def serialize(self, frame: Frame) -> str | bytes | None:
-        if isinstance(frame, InterruptionFrame):
-            self._event(WireEventKind.CLEAR_AUDIO)
-            return json.dumps({"event": "clearAudio", "streamId": self._stream_id})
-        if isinstance(frame, AudioRawFrame):
-            if not frame.audio:
-                return None
-            self._recording.caller(frame.audio, self._clock.ms())
-            audio = frame.audio if self._linear else audioop.lin2ulaw(frame.audio, 2)
-            media = {
-                "contentType": LINEAR if self._linear else MULAW,
-                "sampleRate": SAMPLE_RATE,
-                "payload": base64.b64encode(audio).decode(),
-            }
-            return json.dumps({"event": "playAudio", "media": media})
-        if isinstance(frame, OutputTransportMessageFrame | OutputTransportMessageUrgentFrame):
-            return None if self.should_ignore_frame(frame) else json.dumps(frame.message)
-        return None
-
-    async def deserialize(self, data: str | bytes) -> Frame | None:
-        try:
-            message = json.loads(data)
-        except json.JSONDecodeError, TypeError:
-            return None
-        if not isinstance(message, dict):
-            return None
-        match message.get("event"):
-            case "media":
-                media = message.get("media") or {}
-                payload = media.get("payload")
-                if not payload:
-                    return None
-                raw = base64.b64decode(payload)
-                pcm = raw if self._linear else audioop.ulaw2lin(raw, 2)
-                self._heard(pcm)
-                self._recording.agent(pcm, self._clock.ms(), plivo_ms(media.get("timestamp")))
-                return InputAudioRawFrame(audio=pcm, sample_rate=SAMPLE_RATE, num_channels=1)
-            case "playedStream":
-                self._checkpoints.played(str(message.get("name")))
-            case "stop":
-                self._event(WireEventKind.STOP)
-                self.stopped.set()
-            case "playFailed" if not self.stopped.is_set():
-                self._event(WireEventKind.CALLER_ERROR)
-                log.warning("plivo could not play audio: %s", message.get("reason"))
-                self.failure = (
-                    self.failure or f"plivo could not play audio: {message.get('reason')}"
-                )
-            case "error":
-                self._event(WireEventKind.CALLER_ERROR)
-                fatal = f"plivo reported an error: {message.get('reason')}"
-                self.failure = (
-                    fatal if self.failure is None else f"{fatal}; before it, {self.failure}"
-                )
-                self.failed.set()
-        return None
-
-    def _heard(self, pcm: bytes) -> None:
-        """The first packet louder than LOUD_PEAK after a quiet stretch: sound from the agent's
-        side started, which may be speech, music, a beep or line noise."""
-        if audioop.max(pcm, 2) > LOUD_PEAK:
-            if self._quiet >= GAP_BYTES:
-                self._event(WireEventKind.AGENT_AUDIO)
-            self._quiet = 0
-        else:
-            self._quiet += len(pcm)
-
-    def _event(self, kind: WireEventKind) -> None:
-        self._observer.wire_event(WireEvent(kind=kind, at_ms=self._clock.ms()))
-
-
-class AudioMarks(FrameProcessor):
-    """After the transport output: when the persona's audio starts and stops going out. It
-    keeps each reply with its playout, which its spoken words carry. A reply that the TTS
-    finished stops when the output handles its TTSStoppedFrame, which then follows the stop at
-    once. A reply that the call or a barge-in cut off has no such frame."""
-
-    def __init__(self, clock: Clock, observer: CallObserver) -> None:
-        super().__init__(enable_direct_mode=True)
-        self._clock = clock
-        self._observer = observer
-        self._just_stopped = False
-        self._starting: Playout | None = None
-        """The playout of the latest reply that the TTS started."""
-        self.replies: list[CallerReply] = []
-
-    async def process_frame(self, frame: Frame, direction: FrameDirection) -> None:
-        await super().process_frame(frame, direction)
-        if direction is FrameDirection.DOWNSTREAM:
-            just_stopped, self._just_stopped = self._just_stopped, False
-            if isinstance(frame, TTSStartedFrame):
-                self._starting = frame.metadata.get(PLAYOUT)
-            elif isinstance(frame, BotStartedSpeakingFrame):
-                if self._starting is not None and self._starting.audio_index is None:
-                    self._starting.audio_index = len(self.replies)
-                self.replies.append(CallerReply(self._mark(WireEventKind.CALLER_AUDIO_START)))
-            elif isinstance(frame, BotStoppedSpeakingFrame):
-                ended = self._mark(WireEventKind.CALLER_AUDIO_END)
-                if self.replies and self.replies[-1].end_ms is None:
-                    self.replies[-1].end_ms = ended
-                    self._just_stopped = True
-            elif isinstance(frame, TTSTextFrame) and self.replies and not self.replies[-1].playout:
-                self.replies[-1].playout = frame.metadata.get(PLAYOUT)
-            elif isinstance(frame, TTSStoppedFrame) and just_stopped:
-                self.replies[-1].playout = frame.metadata.get(PLAYOUT)
-                self.replies[-1].finished = True
-        await self.push_frame(frame, direction)
-
-    def _mark(self, kind: WireEventKind) -> int:
-        at = self._clock.ms()
-        self._observer.wire_event(WireEvent(kind=kind, at_ms=at))
-        return at
 
 
 class Receiver:
@@ -680,11 +390,6 @@ async def accept_stream(socket: WebSocket, call_uuid: str | None) -> Connected |
     return Connected(socket, stream_id, call_id, encoding)
 
 
-async def settled() -> None:
-    """Reports for audio that played just before a cut are still in flight; give them a moment."""
-    await asyncio.sleep(ACK_GRACE_S)
-
-
 async def handshake(socket: WebSocket) -> tuple[str, str, str]:
     """Plivo opens a stream with its start event: the stream and call ids and the encoding."""
     try:
@@ -704,14 +409,15 @@ async def handshake(socket: WebSocket) -> tuple[str, str, str]:
 
 class PhoneCaller:
     """Dials the agent and talks over the stream Plivo opens. A stream that dies without a close
-    frame ends with the conversation's duration limit. All its calls hear the agent with the turn
-    models that it loads when it is made."""
+    frame ends with the conversation's duration limit. Each conversation runs where
+    `conversations` holds it: by default in this process, with turn models loaded once."""
 
     def __init__(
         self,
         settings: Settings,
         registry: StreamRegistry,
         plivo_api: Callable[[str, str], PlivoApi] = PlivoApi,
+        conversations: Conversations | None = None,
     ) -> None:
         """plivo_api makes the Plivo client from the Auth ID and Auth token of a call's
         settings."""
@@ -722,7 +428,9 @@ class PhoneCaller:
         self._registry = registry
         self._plivo_api = plivo_api
         self._receiver = Receiver()
-        self._turn_models = TurnModels()
+        self._conversations = conversations or LocalConversations(
+            TurnModels(), str(settings.database_url)
+        )
 
     async def run(
         self, request: CallRequest, observer: CallObserver, stop: asyncio.Event
@@ -744,8 +452,9 @@ class PhoneCaller:
         observer.wire_event(WireEvent(kind=WireEventKind.CONNECT_STARTED, at_ms=clock.ms()))
         entry = self._registry.expect(request.conversation_id)
         trigger: asyncio.Future[TriggerOutcome] | None = None
-        live = LiveAudio(str(self._settings.database_url), request.conversation_id)
+        seat: Seat | None = None
         try:
+            seat = self._conversations.reserve()
             if request.agent.outbound is None:
                 dialer = Dialer(api, self._public_url, request.app_settings.phone.ring_timeout_s)
                 dialed = await dialer.dial(request, entry, observer, clock.ms, stop)
@@ -758,13 +467,8 @@ class PhoneCaller:
                     await hang_up(dialed.call_uuid)
             if isinstance(dialed, CallOutcome):
                 return dialed
-            line = Line(dialed.call_uuid, entry.callbacks, hang_up)
-            try:
-                outcome = await self._talk(
-                    request, keys, observer, stop, clock, dialed, line, live, own
-                )
-            finally:
-                await line.hang_up()
+            start = ConversationStart(request, keys, observer, stop, clock, dialed, own, clock.ms())
+            outcome = await talk(start, seat, Line(dialed.call_uuid, entry.callbacks, hang_up))
             return outcome.model_copy(
                 update={
                     "trigger_response": delivered_body(trigger),
@@ -772,14 +476,17 @@ class PhoneCaller:
                 }
             )
         finally:
-            if own is not None:
-                own.cancel()
-                await asyncio.gather(own, return_exceptions=True)
-            await live.close()
-            self._registry.forget(request.conversation_id)
-            if trigger is not None:
-                trigger.cancel()
-                await asyncio.gather(trigger, return_exceptions=True)
+            try:
+                if own is not None:
+                    own.cancel()
+                    await asyncio.gather(own, return_exceptions=True)
+                self._registry.forget(request.conversation_id)
+                if trigger is not None:
+                    trigger.cancel()
+                    await asyncio.gather(trigger, return_exceptions=True)
+            finally:
+                if seat is not None:
+                    await seat.release()
 
     async def _send_trigger(
         self, request: CallRequest, observer: CallObserver, clock: Clock
@@ -812,166 +519,70 @@ class PhoneCaller:
         )
         return outcome
 
-    async def _talk(
-        self,
-        request: CallRequest,
-        keys: CallerKeys,
-        observer: CallObserver,
-        stop: asyncio.Event,
-        clock: Clock,
-        dialed: Connected,
-        line: Line,
-        live: LiveAudio,
-        own: asyncio.Future[bytes] | None,
-    ) -> CallOutcome:
-        """own is the persona's own voicemail greeting, being spoken."""
-        connected_ms = clock.ms()
-        observer.wire_event(WireEvent(kind=WireEventKind.CONNECTED, at_ms=connected_ms))
-        lag = LagSampler(clock.ms)
-        try:
-            spoken = await self._converse(request, keys, observer, stop, clock, dialed, live, own)
-        finally:
-            loop_lag = lag.stop()
-        ended_ms = clock.ms()
-        # The line hangs up now; its report comes while the call's audio is built. A
-        # stopped call has a deadline to finish, so it takes the report only if it already came.
-        ending = asyncio.ensure_future(line.end(0 if stop.is_set() else HANGUP_REPORT_WAIT_S))
-        await live.close()
-        try:
-            started_ms = spoken.recording.start_ms(connected_ms)
-            if started_ms < connected_ms:
-                observer.wire_event(WireEvent(kind=WireEventKind.CONNECTED, at_ms=started_ms))
-            talk_ms = ended_ms - started_ms
-            recording = await asyncio.to_thread(spoken.recording.to_wav, started_ms)
-            voice, caller_replies = await asyncio.to_thread(caller_voice, spoken.marks.replies)
-            report = await ending
-        finally:
-            ending.cancel()
-        agent_side = CALLED_SIDE if request.agent.outbound is None else CALLING_SIDE
-        resolve_stream_end(spoken.state, report, agent_side)
-        spoken.state.blame(spoken.serializer.failure)
-        return CallOutcome(
-            connected=True,
-            end_reason=spoken.state.end_reason or EndReason.ERROR,
-            caller_error=spoken.state.error,
-            caller_reason=spoken.state.caller_reason,
-            talk_ms=talk_ms,
-            recording=recording,
-            stream_opened_ms=connected_ms,
-            recording_start_ms=started_ms,
-            agent_media=spoken.recording.agent_media(started_ms),
-            caller_replies=caller_replies,
-            caller_voice=voice,
-            caller_settings=spoken.persona.settings,
-            caller_usage=spoken.persona.usage.usage(),
-            caller_reply_times=spoken.persona.reply_times.replies,
-            line_facts=line_facts(report) if report else None,
-            loop_lag=loop_lag,
-            call_uuid=dialed.call_uuid,
-        )
-
-    async def _converse(
-        self,
-        request: CallRequest,
-        keys: CallerKeys,
-        observer: CallObserver,
-        stop: asyncio.Event,
-        clock: Clock,
-        dialed: Connected,
-        live: LiveAudio,
-        own: asyncio.Future[bytes] | None,
-    ) -> Spoken:
-        """Build the caller around the stream and hold the conversation until it ends. When the
-        persona's voicemail or call screener answers, it starts at connect in place of the
-        persona."""
-        log.info(
-            "stream %s for conversation %s, call %s, %s",
-            dialed.stream_id,
-            request.conversation_id,
-            dialed.call_uuid,
-            dialed.encoding,
-        )
-        transcript = TranscriptBuilder(clock, observer)
-        checkpoints = Checkpoints(dialed.stream_id, transcript)
-        recording = CallRecording()
-        marks = AudioMarks(clock, observer)
-        serializer = StreamSerializer(
-            dialed.stream_id, dialed.encoding, clock, observer, checkpoints, recording
-        )
-        transport = FastAPIWebsocketTransport(
-            dialed.socket,
-            FastAPIWebsocketParams(
-                serializer=serializer,
-                add_wav_header=False,
-                audio_in_enabled=True,
-                audio_out_enabled=True,
-                audio_in_sample_rate=SAMPLE_RATE,
-                audio_out_sample_rate=SAMPLE_RATE,
-                audio_out_10ms_chunks=2,
-                audio_out_end_silence_secs=0,
-                audio_out_mixer=PlanMixer(request.sound_plan)
-                if request.sound_plan.layers
-                else None,
-            ),
-        )
-        state = CallState()
-        disconnected = asyncio.Event()
-        persona = Persona(
-            keys,
-            request,
-            clock,
-            observer,
-            transcript,
-            transport_input=transport.input(),
-            transport_output=transport.output(),
-            before_output=[checkpoints, KeyPresses()],
-            after_output=[marks, WireTap(transcript, settled)],
-            state=state,
-            turn_models=self._turn_models,
-            observers=[AudioTap(transport.input(), transport.output(), live)],
-        )
-
-        machine: asyncio.Task[None] | None = None
-
-        @transport.event_handler("on_client_connected")
-        async def on_connected(_transport: Any, _socket: Any) -> None:
-            nonlocal machine
-            if request.answering is not None:
-                script = AnsweringScript(
-                    request.answering, persona, state, transcript, observer, clock, own
-                )
-                machine = asyncio.create_task(script.run())
-            elif not request.agent.agent_speaks_first:
-                await persona.speak_first()
-
-        @transport.event_handler("on_client_disconnected")
-        async def on_disconnected(_transport: Any, _socket: Any) -> None:
-            disconnected.set()
-
-        greeting = None
-        if request.agent.agent_speaks_first and request.answering is None:
-            greeting = asyncio.create_task(persona.greet_if_silent())
-        try:
-            await converse(
-                persona,
-                state,
-                stop,
-                {
-                    serializer.stopped: EndReason.STREAM_ENDED,
-                    disconnected: EndReason.STREAM_ENDED,
-                    serializer.failed: EndReason.ERROR,
-                },
-            )
-        finally:
-            for task in (greeting, machine):
-                if task is not None:
-                    task.cancel()
-                    await asyncio.gather(task, return_exceptions=True)
-        return Spoken(state, persona, recording, marks, serializer)
-
     @staticmethod
     async def _hang_up(api: PlivoApi, call_id: str) -> None:
         try:
             await asyncio.wait_for(api.hang_up(call_id), HANGUP_TIMEOUT_S)
         except (PlivoError, TimeoutError) as error:
             log.warning("could not hang up call %s: %r", call_id, error)
+
+
+async def talk(start: ConversationStart, seat: Seat, line: Line) -> CallOutcome:
+    """Hold the conversation in its seat and make the call's outcome from what it left. The line
+    hangs up once the conversation is over, and in every other case on the way out; the
+    conversation is closed after that, even when the hang-up is cancelled."""
+    connected_ms = start.connected_ms
+    start.observer.wire_event(WireEvent(kind=WireEventKind.CONNECTED, at_ms=connected_ms))
+    conversation: Conversation | None = None
+    try:
+        conversation = await seat.start(start)
+        try:
+            ended = await conversation.ended()
+        except asyncio.CancelledError:
+            # A stopped worker still keeps what the call recorded: the conversation ends as
+            # worker_stopped and leaves its result.
+            conversation.cancel()
+            ended = await conversation.ended()
+        if ended.started_ms < connected_ms:
+            start.observer.wire_event(
+                WireEvent(kind=WireEventKind.CONNECTED, at_ms=ended.started_ms)
+            )
+        # The line hangs up now; its report comes while the call's audio is built. A stopped call
+        # has a deadline to finish, so it takes the report only if it already came.
+        ending = asyncio.ensure_future(line.end(0 if start.stop.is_set() else HANGUP_REPORT_WAIT_S))
+        try:
+            heard = await conversation.heard()
+            report = await ending
+        finally:
+            ending.cancel()
+    finally:
+        try:
+            await line.hang_up()
+        finally:
+            if conversation is not None:
+                await conversation.close()
+    state = CallState(
+        end_reason=heard.end_reason, error=heard.error, caller_reason=heard.caller_reason
+    )
+    agent_side = CALLED_SIDE if start.request.agent.outbound is None else CALLING_SIDE
+    resolve_stream_end(state, report, agent_side)
+    state.blame(heard.serializer_failure)
+    return CallOutcome(
+        connected=True,
+        end_reason=state.end_reason or EndReason.ERROR,
+        caller_error=state.error,
+        caller_reason=state.caller_reason,
+        talk_ms=ended.at_ms - ended.started_ms,
+        recording=heard.recording,
+        stream_opened_ms=connected_ms,
+        recording_start_ms=ended.started_ms,
+        agent_media=heard.agent_media,
+        caller_replies=heard.caller_replies,
+        caller_voice=heard.caller_voice,
+        caller_settings=heard.caller_settings,
+        caller_usage=heard.caller_usage,
+        caller_reply_times=heard.caller_reply_times,
+        line_facts=line_facts(report) if report else None,
+        loop_lag=heard.loop_lag,
+        call_uuid=start.dialed.call_uuid,
+    )
