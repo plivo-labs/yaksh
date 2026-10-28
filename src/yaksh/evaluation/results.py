@@ -5,18 +5,26 @@ import uuid
 from collections import defaultdict
 from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
+from datetime import timedelta
 from typing import Any, NamedTuple
 
-from sqlalchemy import ColumnElement, and_, case, select
+from sqlalchemy import ColumnElement, and_, case, column, distinct, func, select, true
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from yaksh.db.models import Conversation, Evaluation, EvaluationItem, MetricValue, Scenario
-from yaksh.domain.conversations import OutcomeGroup, WireEventKind, outcome_group
+from yaksh.domain.conversations import (
+    ConversationStatus,
+    OutcomeGroup,
+    WireEventKind,
+    outcome_group,
+)
 from yaksh.domain.evaluations import (
     CategoryNumbers,
     EvaluationState,
     Metric,
     MetricKey,
+    ModelReplyTime,
     RunMetrics,
     RunNumbers,
     Share,
@@ -233,3 +241,55 @@ def numbers(calls: Sequence[CallFacts]) -> RunNumbers:
 
 UNENDED = frozenset({OutcomeGroup.WAITING, OutcomeGroup.IN_PROGRESS})
 PENDING = frozenset({None, EvaluationState.QUEUED, EvaluationState.RUNNING})
+
+
+REPLY_TIME_WINDOW = timedelta(days=7)
+
+
+async def reply_time_by_model(session: AsyncSession) -> list[ModelReplyTime]:
+    """The caller's reply time by caller model and effort, over the phone calls that ran in the
+    last REPLY_TIME_WINDOW, most replies first. A call counts by when it ran, not by when its
+    run was made. An invalid call is left out: a fault on Yaksh's side, such as a dropped
+    stream, can make its replies wait for nothing."""
+    reply = (
+        func.jsonb_array_elements(Conversation.caller_reply_times)
+        .table_valued(column("value", JSONB), joins_implicitly=True)
+        .alias("reply")
+    )
+    total = reply.c.value["total_ms"].as_integer()
+    llm = func.coalesce(reply.c.value[("steps", "llm_inference")].as_integer(), 0)
+    model = Conversation.caller_settings["llm_model"].as_string()
+    effort = Conversation.caller_settings["reasoning_effort"].as_string()
+    rows = await session.execute(
+        select(
+            model,
+            effort,
+            func.count(distinct(Conversation.id)),
+            func.count(),
+            func.percentile_disc(0.5).within_group(total),
+            func.percentile_disc(0.9).within_group(total),
+            func.percentile_disc(0.5).within_group(llm),
+        )
+        .select_from(Conversation)
+        .join(reply, true())
+        .where(
+            Conversation.started_at >= func.now() - REPLY_TIME_WINDOW,
+            Conversation.caller_reply_times.is_not(None),
+            Conversation.status != ConversationStatus.INVALID,
+            model.is_not(None),
+        )
+        .group_by(model, effort)
+        .order_by(func.count().desc(), model, effort)
+    )
+    return [
+        ModelReplyTime(
+            model=model,
+            reasoning_effort=effort,
+            calls=calls,
+            replies=replies,
+            p50_ms=p50,
+            p90_ms=p90,
+            llm_p50_ms=llm_p50,
+        )
+        for model, effort, calls, replies, p50, p90, llm_p50 in rows
+    ]

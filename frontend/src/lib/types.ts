@@ -855,6 +855,17 @@ export interface Turn {
   response_ms?: number | null;
   /** On an agent turn that starts a reply: the agent began before the caller finished. */
   talked_over?: boolean;
+  /** On a caller turn that the caller's model spoke on a phone call: where the time of its
+   * reply went. Turns that arrive live during the call do not have it. */
+  caller_reply?: CallerReplyTime | null;
+}
+
+/** Where the time of one caller reply went, from the end of the agent's speech to the caller's
+ * first audio: ms by part, a part that did not happen absent. */
+export interface CallerReplyTime {
+  audio_index: number;
+  total_ms: number;
+  steps: Record<string, number>;
 }
 
 /** The agent's response times in one call; null on a call that was not measured. */
@@ -1323,6 +1334,41 @@ export interface EvaluationItem {
   jev_probabilities: Record<string, number> | null;
 }
 
+/** The agent's response time in one call: each reply, and nearest-rank percentiles over the
+ * replies it answered. */
+export interface ResponseTimeMetric {
+  replies: Reply[];
+  p50_ms: number | null;
+  p90_ms: number | null;
+}
+
+/** The caller's reply time in one call, and the same for each part, over the replies that its
+ * model spoke. */
+export interface CallerReplyTimeMetric {
+  replies: number;
+  p50_ms: number;
+  p90_ms: number;
+  steps: { key: string; p50_ms: number; p90_ms: number }[];
+}
+
+/** The caller's reply time with one model and effort over the phone calls of the last days. */
+export interface ModelReplyTime {
+  model: string;
+  reasoning_effort: string | null;
+  calls: number;
+  replies: number;
+  p50_ms: number;
+  p90_ms: number;
+  llm_p50_ms: number;
+  /** The model and effort a call starts with now, unless its scenario sets its own. */
+  in_use: boolean;
+}
+
+export interface CallerReplyTimes {
+  days: number;
+  rows: ModelReplyTime[];
+}
+
 export interface ConversationEvaluation {
   evaluation: EvaluationState | null;
   /** Why the last attempt failed. */
@@ -1331,7 +1377,8 @@ export interface ConversationEvaluation {
    * facts support. */
   metrics: Partial<{
     speech: Metric<Record<"agent" | "caller", { start_ms: number; end_ms: number }[]>>;
-    response_time: Metric<Record<string, unknown>>;
+    response_time: Metric<ResponseTimeMetric>;
+    caller_reply_time: Metric<CallerReplyTimeMetric>;
     turn_taking: Metric<TurnTaking>;
     speaking: Metric<Speaking>;
     agent_repetition: Metric<AgentRepetition>;

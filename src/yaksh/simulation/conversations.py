@@ -632,6 +632,9 @@ async def finalize(
                 caller_reason=outcome.caller_reason,
                 caller_settings=dump(outcome.caller_settings),
                 caller_usage=dump(outcome.caller_usage),
+                caller_reply_times=None
+                if outcome.caller_reply_times is None
+                else [reply.model_dump(mode="json") for reply in outcome.caller_reply_times],
                 line_facts=dump(outcome.line_facts),
                 recording_key=audio.recording_key,
                 caller_voice_key=audio.caller_voice_key,

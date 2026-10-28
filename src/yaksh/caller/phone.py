@@ -544,13 +544,19 @@ class AudioMarks(FrameProcessor):
         self._clock = clock
         self._observer = observer
         self._just_stopped = False
+        self._starting: Playout | None = None
+        """The playout of the latest reply that the TTS started."""
         self.replies: list[CallerReply] = []
 
     async def process_frame(self, frame: Frame, direction: FrameDirection) -> None:
         await super().process_frame(frame, direction)
         if direction is FrameDirection.DOWNSTREAM:
             just_stopped, self._just_stopped = self._just_stopped, False
-            if isinstance(frame, BotStartedSpeakingFrame):
+            if isinstance(frame, TTSStartedFrame):
+                self._starting = frame.metadata.get(PLAYOUT)
+            elif isinstance(frame, BotStartedSpeakingFrame):
+                if self._starting is not None and self._starting.audio_index is None:
+                    self._starting.audio_index = len(self.replies)
                 self.replies.append(CallerReply(self._mark(WireEventKind.CALLER_AUDIO_START)))
             elif isinstance(frame, BotStoppedSpeakingFrame):
                 ended = self._mark(WireEventKind.CALLER_AUDIO_END)
@@ -858,6 +864,7 @@ class PhoneCaller:
             caller_voice=voice,
             caller_settings=spoken.persona.settings,
             caller_usage=spoken.persona.usage.usage(),
+            caller_reply_times=spoken.persona.reply_times.replies,
             line_facts=line_facts(report) if report else None,
             loop_lag=loop_lag,
             call_uuid=dialed.call_uuid,

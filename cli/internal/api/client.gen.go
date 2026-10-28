@@ -1752,6 +1752,20 @@ type CallerModel struct {
 	ReasoningEffort *string `json:"reasoning_effort,omitempty"`
 }
 
+// CallerReplyTime Where the time of one caller reply went, from the end of the agent's speech to the
+// caller's first audio, as Pipecat's latency breakdown split it.
+type CallerReplyTime struct {
+	AudioIndex int            `json:"audio_index"`
+	Steps      map[string]int `json:"steps"`
+	TotalMs    int            `json:"total_ms"`
+}
+
+// CallerReplyTimes defines model for CallerReplyTimes.
+type CallerReplyTimes struct {
+	Days int                  `json:"days"`
+	Rows []ModelReplyTimeRead `json:"rows"`
+}
+
 // Cartesia defines model for Cartesia.
 type Cartesia struct {
 	Model *string `json:"model,omitempty"`
@@ -2357,6 +2371,18 @@ type MachineLine string
 type Metric struct {
 	Flags *[]string              `json:"flags,omitempty"`
 	Value map[string]interface{} `json:"value"`
+}
+
+// ModelReplyTimeRead defines model for ModelReplyTimeRead.
+type ModelReplyTimeRead struct {
+	Calls           int     `json:"calls"`
+	InUse           bool    `json:"in_use"`
+	LlmP50Ms        int     `json:"llm_p50_ms"`
+	Model           string  `json:"model"`
+	P50Ms           int     `json:"p50_ms"`
+	P90Ms           int     `json:"p90_ms"`
+	ReasoningEffort *string `json:"reasoning_effort"`
+	Replies         int     `json:"replies"`
 }
 
 // Models defines model for Models.
@@ -3557,17 +3583,19 @@ type TriggerMethod string
 
 // TurnRead defines model for TurnRead.
 type TurnRead struct {
-	Dtmf        *bool        `json:"dtmf,omitempty"`
-	EndedAtMs   int          `json:"ended_at_ms"`
-	Machine     *MachineLine `json:"machine,omitempty"`
-	Provenance  *Provenance  `json:"provenance,omitempty"`
-	ResponseMs  *int         `json:"response_ms,omitempty"`
-	Role        Role         `json:"role"`
-	Scripted    *bool        `json:"scripted,omitempty"`
-	StartedAtMs int          `json:"started_at_ms"`
-	TalkedOver  *bool        `json:"talked_over,omitempty"`
-	Text        string       `json:"text"`
-	Tools       *[]ToolItem  `json:"tools,omitempty"`
+	AudioIndex  *int             `json:"audio_index,omitempty"`
+	CallerReply *CallerReplyTime `json:"caller_reply,omitempty"`
+	Dtmf        *bool            `json:"dtmf,omitempty"`
+	EndedAtMs   int              `json:"ended_at_ms"`
+	Machine     *MachineLine     `json:"machine,omitempty"`
+	Provenance  *Provenance      `json:"provenance,omitempty"`
+	ResponseMs  *int             `json:"response_ms,omitempty"`
+	Role        Role             `json:"role"`
+	Scripted    *bool            `json:"scripted,omitempty"`
+	StartedAtMs int              `json:"started_at_ms"`
+	TalkedOver  *bool            `json:"talked_over,omitempty"`
+	Text        string           `json:"text"`
+	Tools       *[]ToolItem      `json:"tools,omitempty"`
 }
 
 // UnplayedCallVerdict A judged call that the persona never talked on: its voicemail or call screener answered,
@@ -5522,6 +5550,14 @@ type ClientInterface interface {
 	//
 	// Corresponds with GET /api/v1/settings (the `GetSettingsApiV1SettingsGet` operationId).
 	GetSettingsApiV1SettingsGet(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CallerReplyTimesApiV1SettingsCallerReplyTimesGet Caller Reply Times
+	//
+	// How long the caller took to reply with each model and effort, for choosing the caller's
+	// model.
+	//
+	// Corresponds with GET /api/v1/settings/caller-reply-times (the `CallerReplyTimesApiV1SettingsCallerReplyTimesGet` operationId).
+	CallerReplyTimesApiV1SettingsCallerReplyTimesGet(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ExportSettingsApiV1SettingsExportGet Export Settings
 	//
@@ -7875,6 +7911,24 @@ func (c *Client) GetVersionApiV1ScenariosScenarioIdVersionsVersionGet(ctx contex
 // Corresponds with GET /api/v1/settings (the `GetSettingsApiV1SettingsGet` operationId).
 func (c *Client) GetSettingsApiV1SettingsGet(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetSettingsApiV1SettingsGetRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CallerReplyTimesApiV1SettingsCallerReplyTimesGet Caller Reply Times
+//
+// How long the caller took to reply with each model and effort, for choosing the caller's
+// model.
+//
+// Corresponds with GET /api/v1/settings/caller-reply-times (the `CallerReplyTimesApiV1SettingsCallerReplyTimesGet` operationId).
+func (c *Client) CallerReplyTimesApiV1SettingsCallerReplyTimesGet(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCallerReplyTimesApiV1SettingsCallerReplyTimesGetRequest(c.Server)
 	if err != nil {
 		return nil, err
 	}
@@ -12340,6 +12394,33 @@ func NewGetSettingsApiV1SettingsGetRequest(server string) (*http.Request, error)
 	return req, nil
 }
 
+// NewCallerReplyTimesApiV1SettingsCallerReplyTimesGetRequest constructs an http.Request for the CallerReplyTimesApiV1SettingsCallerReplyTimesGet method
+func NewCallerReplyTimesApiV1SettingsCallerReplyTimesGetRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/settings/caller-reply-times")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewExportSettingsApiV1SettingsExportGetRequest constructs an http.Request for the ExportSettingsApiV1SettingsExportGet method
 func NewExportSettingsApiV1SettingsExportGetRequest(server string) (*http.Request, error) {
 	var err error
@@ -14678,6 +14759,16 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with GET /api/v1/settings (the `GetSettingsApiV1SettingsGet` operationId).
 	GetSettingsApiV1SettingsGetWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetSettingsApiV1SettingsGetResponse, error)
+
+	// CallerReplyTimesApiV1SettingsCallerReplyTimesGetWithResponse Caller Reply Times
+	//
+	// How long the caller took to reply with each model and effort, for choosing the caller's
+	// model.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/settings/caller-reply-times (the `CallerReplyTimesApiV1SettingsCallerReplyTimesGet` operationId).
+	CallerReplyTimesApiV1SettingsCallerReplyTimesGetWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*CallerReplyTimesApiV1SettingsCallerReplyTimesGetResponse, error)
 
 	// ExportSettingsApiV1SettingsExportGetWithResponse Export Settings
 	//
@@ -19159,6 +19250,54 @@ func (r GetSettingsApiV1SettingsGetResponse) ContentType() string {
 	return ""
 }
 
+type CallerReplyTimesApiV1SettingsCallerReplyTimesGetResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *CallerReplyTimes
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r CallerReplyTimesApiV1SettingsCallerReplyTimesGetResponse) GetJSON200() *CallerReplyTimes {
+	return r.JSON200
+}
+
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r CallerReplyTimesApiV1SettingsCallerReplyTimesGetResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
+}
+
+// GetBody returns the raw response body bytes
+func (r CallerReplyTimesApiV1SettingsCallerReplyTimesGetResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r CallerReplyTimesApiV1SettingsCallerReplyTimesGetResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CallerReplyTimesApiV1SettingsCallerReplyTimesGetResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r CallerReplyTimesApiV1SettingsCallerReplyTimesGetResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type ExportSettingsApiV1SettingsExportGetResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -22378,6 +22517,22 @@ func (c *ClientWithResponses) GetSettingsApiV1SettingsGetWithResponse(ctx contex
 		return nil, err
 	}
 	return ParseGetSettingsApiV1SettingsGetResponse(rsp)
+}
+
+// CallerReplyTimesApiV1SettingsCallerReplyTimesGetWithResponse Caller Reply Times
+//
+// How long the caller took to reply with each model and effort, for choosing the caller's
+// model.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/settings/caller-reply-times (the `CallerReplyTimesApiV1SettingsCallerReplyTimesGet` operationId).
+func (c *ClientWithResponses) CallerReplyTimesApiV1SettingsCallerReplyTimesGetWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*CallerReplyTimesApiV1SettingsCallerReplyTimesGetResponse, error) {
+	rsp, err := c.CallerReplyTimesApiV1SettingsCallerReplyTimesGet(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCallerReplyTimesApiV1SettingsCallerReplyTimesGetResponse(rsp)
 }
 
 // ExportSettingsApiV1SettingsExportGetWithResponse Export Settings
@@ -25861,6 +26016,39 @@ func ParseGetSettingsApiV1SettingsGetResponse(rsp *http.Response) (*GetSettingsA
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest SettingsRead
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseCallerReplyTimesApiV1SettingsCallerReplyTimesGetResponse parses an HTTP response from a CallerReplyTimesApiV1SettingsCallerReplyTimesGetWithResponse call
+func ParseCallerReplyTimesApiV1SettingsCallerReplyTimesGetResponse(rsp *http.Response) (*CallerReplyTimesApiV1SettingsCallerReplyTimesGetResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CallerReplyTimesApiV1SettingsCallerReplyTimesGetResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest CallerReplyTimes
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}

@@ -1,4 +1,4 @@
-# 0035 Speech providers are chosen on the Settings page and run through Pipecat
+# 0037 Speech providers are chosen on the Settings page and run through Pipecat
 
 Date: 2026-10-27
 Status: accepted. Changes 0005 (voices of any text-to-speech provider) and 0027 (more keys and addresses).

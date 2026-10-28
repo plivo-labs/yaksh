@@ -61,6 +61,9 @@ class Playout:
         self._words = 0
         self.machine: MachineLine | None = None
         """The machine line the reply plays; None for the persona's own words."""
+        self.audio_index: int | None = None
+        """Which caller audio start of the call played it: its window in the transcript's
+        caller replies. None until its audio starts."""
 
     @property
     def arrived(self) -> int:

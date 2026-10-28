@@ -8,7 +8,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { LiveWaveform } from "@/components/waveform";
 import { useLiveListen } from "@/hooks/use-live-listen";
 import { machineBand, machineSpeaker, soundMs } from "@/lib/answering";
-import { BAND_TEXT, BAND_WASH, clock, responseBand, seconds } from "@/lib/format";
+import { BAND_TEXT, BAND_WASH, clock, latency, responseBand } from "@/lib/format";
 import type { LiveView } from "@/lib/listen";
 import { connectedAt } from "@/lib/turns";
 import { cn } from "@/lib/utils";
@@ -23,7 +23,7 @@ function replyMark(reply: Reply, connectedMs: number): Mark {
       from,
       to,
       label: "talked over",
-      title: `Agent started ${seconds(reply.start_ms - reply.speech_ms)} before the caller finished`,
+      title: `Agent started ${latency(reply.start_ms - reply.speech_ms)} before the caller finished`,
       fill: "bg-foreground/10",
       text: "text-muted-foreground",
     };
@@ -33,8 +33,8 @@ function replyMark(reply: Reply, connectedMs: number): Mark {
   return {
     from,
     to,
-    label: seconds(wait),
-    title: `Agent answered after ${seconds(wait)}`,
+    label: latency(wait),
+    title: `Agent answered after ${latency(wait)}`,
     fill: BAND_WASH[band],
     text: BAND_TEXT[band],
   };

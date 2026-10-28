@@ -1,5 +1,6 @@
 from pydantic import BaseModel, Field, SecretStr
 
+from yaksh.domain.evaluations import ModelReplyTime
 from yaksh.domain.settings import AppSettings, SecretName, SettingsValues
 from yaksh.settings.service import Provider
 
@@ -87,6 +88,18 @@ class Efforts(BaseModel):
     model: str
     efforts: list[str]
     """The reasoning efforts the model takes; empty for a model without reasoning."""
+
+
+class ModelReplyTimeRead(ModelReplyTime):
+    in_use: bool
+    """The model and effort a call starts with now, unless its scenario sets its own."""
+
+
+class CallerReplyTimes(BaseModel):
+    days: int
+    rows: list[ModelReplyTimeRead]
+    """By caller model and effort, most replies first: nearest-rank percentiles over the
+    measured replies of the phone calls that ran in the last `days`."""
 
 
 class SettingsImport(BaseModel):

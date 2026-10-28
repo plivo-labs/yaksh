@@ -368,6 +368,11 @@ class Conversation(Base):
     """The models and voice the caller ran (`CallerSettings`); None before a call connects."""
     caller_usage: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     """What the caller's services consumed (`CallerUsage`)."""
+    caller_reply_times: Mapped[list[dict[str, Any]] | None] = mapped_column(
+        JSONB(none_as_null=True)
+    )
+    """Where the time of each measured caller reply went (`CallerReplyTime`). None is SQL NULL,
+    not JSON null, so the column's arrays can be expanded without a check for each row."""
     line_facts: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     """Plivo's hangup report for a connected call (`LineFacts`): who hung up."""
     claimed_by: Mapped[str | None] = mapped_column(Text)
@@ -414,6 +419,7 @@ class Conversation(Base):
         Index("ix_conversations_status_created", "status", "created_at"),
         Index("ix_conversations_run_status", "run_id", "status"),
         Index("ix_conversations_run_started", "run_id", "started_at"),
+        Index("ix_conversations_started", "started_at"),
         Index("ix_conversations_retry_of", "retry_of"),
     )
 

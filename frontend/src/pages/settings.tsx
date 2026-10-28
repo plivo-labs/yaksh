@@ -3,6 +3,7 @@ import { type ReactNode, useEffect, useState } from "react";
 import { useSearchParams } from "react-router";
 import { toast } from "sonner";
 
+import { CallerModelTimes } from "@/components/caller-model-times";
 import { EffortSelect } from "@/components/effort-select";
 import { ModelCombobox } from "@/components/model-combobox";
 import { Panel, PanelHeader } from "@/components/panel";
@@ -206,6 +207,7 @@ function Form({
               />
             </SettingRow>
           </Panel>
+          <CallerModelTimes />
           <Panel>
             <PanelHeader title="Scenario writing" />
             <SettingRow label="Model" htmlFor="generation-model">

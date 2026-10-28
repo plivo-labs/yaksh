@@ -41,6 +41,7 @@ from yaksh.domain.evaluations import Metric, MetricKey
 from yaksh.domain.languages import Language
 from yaksh.domain.latency import (
     AgentMedia,
+    CallerReplyTime,
     CallerReplyWindow,
     Latency,
     LoopLag,
@@ -524,12 +525,14 @@ async def test_a_finished_call_keeps_the_facts_its_call_captured(
     )
     usage = CallerUsage(llm_prompt_tokens=900, tts_characters=140)
     line = LineFacts(hangup_source="Callee", hangup_cause="Normal Hangup", duration_s=46)
+    reply_times = [CallerReplyTime(audio_index=0, total_ms=1_900, steps={"llm_inference": 700})]
     outcome = CallOutcome(
         connected=True,
         end_reason=EndReason.AGENT_HANGUP,
         stream_opened_ms=120,
         caller_settings=settings,
         caller_usage=usage,
+        caller_reply_times=reply_times,
         line_facts=line,
         loop_lag=LoopLag(max_ms=31, max_at_ms=900, p99_ms=12, samples=2_400),
         recording_start_ms=100,
@@ -551,6 +554,9 @@ async def test_a_finished_call_keeps_the_facts_its_call_captured(
     )
     assert CallerSettings.model_validate(row.caller_settings) == settings
     assert CallerUsage.model_validate(row.caller_usage) == usage
+    assert [CallerReplyTime.model_validate(item) for item in row.caller_reply_times or []] == (
+        reply_times
+    )
     assert LineFacts.model_validate(row.line_facts) == line
 
 

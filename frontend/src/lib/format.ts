@@ -134,6 +134,12 @@ export function seconds(ms: number): string {
   return `${(ms / 1000).toFixed(1)}s`;
 }
 
+/** A latency in ms below a second, else in seconds with one decimal: 820ms, 2.1s. */
+export function latency(ms: number): string {
+  const whole = Math.round(ms);
+  return whole < 1000 ? `${whole}ms` : seconds(whole);
+}
+
 export type ResponseBand = "good" | "slow" | "bad";
 
 /** A band's color as text on the canvas. */
@@ -148,6 +154,13 @@ export const BAND_TAG: Record<ResponseBand, string> = {
   good: "bg-success-tag text-success-tag-foreground",
   slow: "bg-warning text-warning-foreground",
   bad: "bg-danger text-danger-foreground",
+};
+
+/** A band as a bar in a chart. */
+export const BAND_FILL: Record<ResponseBand, string> = {
+  good: "bg-chart-success",
+  slow: "bg-chart-warning",
+  bad: "bg-chart-negative",
 };
 
 /** A band as a see-through wash over the waveform. */

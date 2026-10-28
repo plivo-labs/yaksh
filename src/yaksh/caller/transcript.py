@@ -309,7 +309,14 @@ class TranscriptBuilder:
         heard = reply.heard()
         text = ("" if reply.self_spaced else " ").join(heard).strip()
         if text:
-            self._caller_turn(queued, text, reply.started_ms, now, Provenance.TRANSMITTED)
+            self._caller_turn(
+                queued,
+                text,
+                reply.started_ms,
+                now,
+                Provenance.TRANSMITTED,
+                audio_index=reply.playout.audio_index if reply.playout else None,
+            )
         if cut or len(heard) < len(reply.words) or not text:
             rest = remainder(queued.text, text) if queued.text else None
             if rest is None:
@@ -322,7 +329,14 @@ class TranscriptBuilder:
                 self._caller_turn(self._generated.popleft(), None, now, now, Provenance.CUT)
 
     def _caller_turn(
-        self, queued: Queued, text: str | None, started: int, ended: int, provenance: Provenance
+        self,
+        queued: Queued,
+        text: str | None,
+        started: int,
+        ended: int,
+        provenance: Provenance,
+        *,
+        audio_index: int | None = None,
     ) -> None:
         """text is the part of the queued text that the turn holds; None holds all of it."""
         self._observer.turn(
@@ -334,6 +348,7 @@ class TranscriptBuilder:
                 provenance=provenance,
                 scripted=queued.scripted,
                 machine=queued.machine,
+                audio_index=audio_index,
             )
         )
 

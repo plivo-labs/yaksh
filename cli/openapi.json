@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Yaksh",
-    "version": "0.7.1"
+    "version": "0.8.0"
   },
   "paths": {
     "/api/v1/health": {
@@ -5410,6 +5410,43 @@
         }
       }
     },
+    "/api/v1/settings/caller-reply-times": {
+      "get": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Caller Reply Times",
+        "description": "How long the caller took to reply with each model and effort, for choosing the caller's\nmodel.",
+        "operationId": "caller_reply_times_api_v1_settings_caller_reply_times_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CallerReplyTimes"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "The request failed. The error tells why.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/settings/export": {
       "get": {
         "tags": [
@@ -7914,6 +7951,54 @@
         "additionalProperties": false,
         "type": "object",
         "title": "CallerModel"
+      },
+      "CallerReplyTime": {
+        "properties": {
+          "audio_index": {
+            "type": "integer",
+            "title": "Audio Index"
+          },
+          "total_ms": {
+            "type": "integer",
+            "title": "Total Ms"
+          },
+          "steps": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Steps"
+          }
+        },
+        "type": "object",
+        "required": [
+          "audio_index",
+          "total_ms",
+          "steps"
+        ],
+        "title": "CallerReplyTime",
+        "description": "Where the time of one caller reply went, from the end of the agent's speech to the\ncaller's first audio, as Pipecat's latency breakdown split it."
+      },
+      "CallerReplyTimes": {
+        "properties": {
+          "days": {
+            "type": "integer",
+            "title": "Days"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/ModelReplyTimeRead"
+            },
+            "type": "array",
+            "title": "Rows"
+          }
+        },
+        "type": "object",
+        "required": [
+          "days",
+          "rows"
+        ],
+        "title": "CallerReplyTimes"
       },
       "Cartesia": {
         "properties": {
@@ -10710,6 +10795,61 @@
         ],
         "title": "Metric",
         "description": "One metric's value and the flags it raised."
+      },
+      "ModelReplyTimeRead": {
+        "properties": {
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "reasoning_effort": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning Effort"
+          },
+          "calls": {
+            "type": "integer",
+            "title": "Calls"
+          },
+          "replies": {
+            "type": "integer",
+            "title": "Replies"
+          },
+          "p50_ms": {
+            "type": "integer",
+            "title": "P50 Ms"
+          },
+          "p90_ms": {
+            "type": "integer",
+            "title": "P90 Ms"
+          },
+          "llm_p50_ms": {
+            "type": "integer",
+            "title": "Llm P50 Ms"
+          },
+          "in_use": {
+            "type": "boolean",
+            "title": "In Use"
+          }
+        },
+        "type": "object",
+        "required": [
+          "model",
+          "reasoning_effort",
+          "calls",
+          "replies",
+          "p50_ms",
+          "p90_ms",
+          "llm_p50_ms",
+          "in_use"
+        ],
+        "title": "ModelReplyTimeRead"
       },
       "Models": {
         "properties": {
@@ -16381,6 +16521,17 @@
             "type": "array",
             "title": "Tools"
           },
+          "audio_index": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Audio Index"
+          },
           "response_ms": {
             "anyOf": [
               {
@@ -16396,6 +16547,16 @@
             "type": "boolean",
             "title": "Talked Over",
             "default": false
+          },
+          "caller_reply": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CallerReplyTime"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",

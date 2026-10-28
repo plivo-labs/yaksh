@@ -1,6 +1,16 @@
 from collections.abc import Sequence
 
-from yaksh.domain.latency import Latency, Reply, Span, Wait, nearest_rank, place, waits
+from yaksh.domain.latency import (
+    STEP_KEYS,
+    CallerReplyTime,
+    Latency,
+    Reply,
+    Span,
+    Wait,
+    nearest_rank,
+    place,
+    waits,
+)
 
 
 def spoke(*starts: int, ms: int = 300) -> list[Span]:
@@ -121,3 +131,15 @@ def test_a_media_gap_cuts_a_wait_short_and_an_opening_by_the_caller_expects_noth
     assert [w.wait_ms for w in found] == [1_000, 500, 20_600]
     assert not any(w.unanswered for w in found)
     assert Latency.answered(found).replies == []
+
+
+def test_every_reply_counts_every_part_with_a_missing_part_as_zero() -> None:
+    reply = CallerReplyTime(
+        audio_index=0, total_ms=900, steps={"llm_inference": 700, "endpointing_wait": 600, "x": 5}
+    )
+
+    times = reply.step_times()
+
+    assert list(times) == [*STEP_KEYS, "x"]
+    assert times["llm_inference"] == 700
+    assert times["transcription"] == 0

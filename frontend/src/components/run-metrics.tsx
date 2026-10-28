@@ -15,7 +15,7 @@ import {
   counted,
   percent,
   responseBand,
-  seconds,
+  latency,
   surroundingsLabel,
 } from "@/lib/format";
 import { useRunMetrics } from "@/lib/queries";
@@ -101,7 +101,7 @@ export function RunMetricsPanel({
                 "None yet"
               ) : (
                 <span className={BAND_TEXT[responseBand(overall.response_p50_ms)]}>
-                  {seconds(overall.response_p50_ms)}
+                  {latency(overall.response_p50_ms)}
                 </span>
               )
             }
@@ -115,7 +115,7 @@ export function RunMetricsPanel({
                   <span
                     className={cn("font-medium", BAND_TEXT[responseBand(overall.response_p90_ms)])}
                   >
-                    {seconds(overall.response_p90_ms)}
+                    {latency(overall.response_p90_ms)}
                   </span>
                   .
                 </>
@@ -280,7 +280,7 @@ function Breakdown({
                   <span className="text-muted-foreground">None yet</span>
                 ) : (
                   <span className={BAND_TEXT[responseBand(numbers.response_p90_ms)]}>
-                    {seconds(numbers.response_p90_ms)}
+                    {latency(numbers.response_p90_ms)}
                   </span>
                 )}
               </TableCell>

@@ -21,6 +21,7 @@ import {
   type AgentSource,
   type AgentSummary,
   type AppSettings,
+  type CallerReplyTimes,
   type Conversation,
   type ConversationEvaluation,
   type ConversationSummary,
@@ -1243,11 +1244,21 @@ export function useSettings() {
   return useQuery({ queryKey: settingsKey, queryFn: () => api<AppSettings>("/settings") });
 }
 
+/** The caller's reply time by caller model and effort over the recent phone calls. */
+export function useCallerReplyTimes() {
+  return useQuery({
+    queryKey: [...settingsKey, "caller-reply-times"],
+    queryFn: ({ signal }) => api<CallerReplyTimes>("/settings/caller-reply-times", { signal }),
+  });
+}
+
 /** After a change of the settings: what the server reads from them may change too. */
 function settingsChanged(client: QueryClient, settings: AppSettings) {
   client.setQueryData(settingsKey, settings);
   // A new key or base URL can change the provider's models and what each takes.
   void client.invalidateQueries({ queryKey: [...settingsKey, "models"] });
+  // Which model and effort are in use follows the caller settings.
+  void client.invalidateQueries({ queryKey: [...settingsKey, "caller-reply-times"] });
   void client.invalidateQueries({ queryKey: [...settingsKey, "efforts"] });
   void client.invalidateQueries({ queryKey: ["defaults"] });
   void client.invalidateQueries({ queryKey: keys.phoneNumbers });
