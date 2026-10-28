@@ -14,7 +14,7 @@ from pydantic import SecretStr
 
 from tests.conftest import APP_SETTINGS, CALLER, Observer, make_settings
 from yaksh.caller.plivo_server import PlivoServer
-from yaksh.caller.text import TextCaller, TextConversation
+from yaksh.caller.text import NO_WORDS, TextCaller, TextConversation
 from yaksh.domain.agents import AgentConfig, Transport
 from yaksh.domain.conversations import CallOutcome, CallRequest, EndReason, Role, WireEventKind
 from yaksh.domain.scenarios import Fact
@@ -241,6 +241,26 @@ async def test_a_silent_agent_gets_two_nudges_then_the_call_ends(agent: FakeAgen
     assert len(nudges) == 2 and all(turn.scripted for turn in nudges)
     assert outcome.end_reason is EndReason.AGENT_SILENT
     assert agent.closes[0]["reason"] == "agent_silent"
+
+
+async def test_a_reply_with_no_words_is_asked_once_more_and_then_fails(agent: FakeAgent) -> None:
+    agent.replies = [
+        said("Hello.", sessionId="s-1"),
+        said("We will call you. Bye.", status="ended"),
+    ]
+    model = FakeModel(("", None), ("Okay, thanks.", None))
+
+    outcome, _ = await converse(agent, model)
+
+    assert model.inputs[1][-1] == {"role": "developer", "content": NO_WORDS}
+    assert agent.turns[-1]["message"] == "Okay, thanks."
+    assert outcome.end_reason is EndReason.AGENT_HANGUP
+
+    agent.replies = [said("Hello.", sessionId="s-2")]
+    silent, _ = await converse(agent, FakeModel(("", None), ("", None)))
+
+    assert silent.caller_error is not None
+    assert "no words and no tool call" in silent.caller_error
 
 
 async def test_at_the_turn_limit_the_caller_says_goodbye(agent: FakeAgent) -> None:

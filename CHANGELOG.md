@@ -1,3 +1,12 @@
+## v0.9.6 (2026-10-28)
+
+### Fix
+
+- **caller**: ask the text caller again when its reply has no words (#34)
+  - A text test no longer fails when the caller's model replies with no words. Before, such a reply stopped the conversation with the error "the caller's model answered with no words and no tool call".
+  - When the agent's turn asks the caller nothing, the caller now writes a few words, such as "Okay". If a reply still has no words, Yaksh asks the model once more. A second reply with no words fails as before.
+  - Phone calls do not change.
+
 ## v0.9.5 (2026-10-28)
 
 ### Feat
