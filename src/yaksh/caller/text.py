@@ -51,6 +51,10 @@ CLOSE_REASONS: dict[EndReason | None, str] = {
     EndReason.AGENT_SILENT: "agent_silent",
     EndReason.USER_REQUEST: "stopped",
 }
+NO_WORDS = (
+    "Your last reply had no words, and the agent waits for your message. Reply to its last "
+    "message in a few words, such as 'Okay.'"
+)
 END_CALL_TOOL = FunctionToolParam(
     type="function",
     name=END_CALL.name,
@@ -281,32 +285,40 @@ class TextConversation:
 
     async def _caller_line(self) -> Line:
         """The caller's next line from its model, with the model's reason when the line ends the
-        call. A model that ends the call without a word gets one more reply to speak in; after
-        that, Yaksh says the goodbye itself."""
-        retried = False
+        call. A text chat has no silence, so a reply with no words gets one more reply, with a
+        note on what it lacked. After that, an end of the call with no words gets Yaksh's
+        goodbye, and a reply with no words and no end is an error."""
+        note: str | None = None
         while True:
             started = self._clock.ms()
-            response = await until_stop(self._stop, self._ask(retried))
+            response = await until_stop(self._stop, self._ask(note))
             words = response.output_text.strip()
             ended = next((item for item in response.output if item.type == "function_call"), None)
+            if not words and note is None:
+                if ended is None:
+                    note = NO_WORDS
+                    log.info(
+                        "caller answered conversation %s with no words",
+                        self._request.conversation_id,
+                    )
+                else:
+                    note = SILENT_END
+                    log.info(
+                        "caller tried to end conversation %s without a word",
+                        self._request.conversation_id,
+                    )
+                continue
             if ended is None:
                 if words:
                     return Line(words, started)
                 raise RuntimeError("the caller's model answered with no words and no tool call")
-            if not words and not retried:
-                retried = True
-                log.info(
-                    "caller tried to end conversation %s without a word",
-                    self._request.conversation_id,
-                )
-                continue
             reason = str(json.loads(ended.arguments or "{}").get("reason") or "")
             if words:
                 return Line(words, started, ends=reason)
             return Line(self._request.goodbye, self._clock.ms(), scripted=True, ends=reason)
 
-    async def _ask(self, silent_end: bool) -> Response:
-        extra = [EasyInputMessageParam(role="developer", content=SILENT_END)] if silent_end else []
+    async def _ask(self, note: str | None) -> Response:
+        extra = [] if note is None else [EasyInputMessageParam(role="developer", content=note)]
         response = await retry_rate_limits(
             lambda: self._model.responses.create(
                 model=self._request.caller.model,
