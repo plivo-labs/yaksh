@@ -1803,6 +1803,7 @@ export interface SettingsValues {
   azure: { region: string };
   nimble: { base_url: string };
   caller: CallerModel;
+  turn_taking: { vad_stop_s: number; turn_max_wait_s: number };
   generation: { model: string | null; reasoning_effort: string | null; timeout_s: number };
   brief: { model: string; reasoning_effort: string | null; timeout_s: number };
   judges: {

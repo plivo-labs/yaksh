@@ -206,6 +206,28 @@ function Form({
                 unset="default"
               />
             </SettingRow>
+            <NumberRow
+              id="caller-vad-stop"
+              label="VAD stop"
+              help="Silence after the agent speaks before turn detection runs."
+              unit="s"
+              step={0.05}
+              min={0.1}
+              max={2}
+              value={draft.turn_taking.vad_stop_s}
+              onValueChange={(value) => change("turn_taking", "vad_stop_s", value)}
+            />
+            <NumberRow
+              id="caller-turn-wait"
+              label="Turn detection max wait"
+              help="More silence the caller waits for when the agent seems unfinished."
+              unit="s"
+              step={0.1}
+              min={0.5}
+              max={4}
+              value={draft.turn_taking.turn_max_wait_s}
+              onValueChange={(value) => change("turn_taking", "turn_max_wait_s", value)}
+            />
           </Panel>
           <CallerModelTimes />
           <Panel>

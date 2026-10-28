@@ -7,21 +7,25 @@ from typing import Any
 import numpy as np
 import onnxruntime
 import pytest
-from pipecat.audio.turn.base_turn_analyzer import BaseTurnAnalyzer
+from pipecat.audio.turn.base_turn_analyzer import BaseTurnAnalyzer, EndOfTurnState
 from pipecat.audio.turn.smart_turn import base_smart_turn
+from pipecat.audio.turn.smart_turn.base_smart_turn import SmartTurnParams
 from pipecat.audio.turn.smart_turn.local_smart_turn_v3 import LocalSmartTurnAnalyzerV3
 from pipecat.audio.vad.silero import SileroVADAnalyzer
-from pipecat.audio.vad.vad_analyzer import VADAnalyzer, VADState
+from pipecat.audio.vad.vad_analyzer import VADAnalyzer, VADParams, VADState
 from pipecat.metrics.metrics import TurnMetricsData
 
 from yaksh.caller.audio import SAMPLE_RATE
-from yaksh.caller.pipeline import VAD
 from yaksh.caller.turn_models import TurnModels
+from yaksh.domain.latency import VAD_CONFIDENCE, VAD_START_S
+from yaksh.domain.settings import TurnTaking
 
 FRAME_S = 0.02
 FRAME_BYTES = int(SAMPLE_RATE * FRAME_S) * 2
 AUDIO_TIME: ContextVar[float] = ContextVar("audio_time")
 VOWELS = ((700, 1220, 2600), (300, 2300, 3000), (450, 900, 2400), (400, 1900, 2550))
+TURNS = TurnTaking()
+VAD = VADParams(confidence=VAD_CONFIDENCE, start_secs=VAD_START_S, stop_secs=TURNS.vad_stop_s)
 
 
 def syllable(rng: np.random.Generator) -> np.ndarray:
@@ -85,14 +89,22 @@ async def hear(
 async def test_calls_that_share_the_sessions_hear_what_pipecats_own_analyzers_hear() -> None:
     tracks = [speech(seed) for seed in (1, 2)]
     expected = [
-        await hear(SileroVADAnalyzer(params=VAD), LocalSmartTurnAnalyzerV3(), frames)
+        await hear(
+            SileroVADAnalyzer(params=VAD),
+            LocalSmartTurnAnalyzerV3(params=SmartTurnParams(stop_secs=TURNS.turn_max_wait_s)),
+            frames,
+        )
         for frames in tracks
     ]
     models = TurnModels()
 
     heard = await asyncio.gather(
         *(
-            hear(models.vad(sample_rate=SAMPLE_RATE, params=VAD), models.end_of_turn(), frames)
+            hear(
+                models.vad(sample_rate=SAMPLE_RATE, params=VAD),
+                models.end_of_turn(max_wait_s=TURNS.turn_max_wait_s),
+                frames,
+            )
             for frames in tracks
         )
     )
@@ -107,6 +119,21 @@ def test_a_calls_analyzers_load_no_model(monkeypatch: pytest.MonkeyPatch) -> Non
     monkeypatch.setattr(onnxruntime, "InferenceSession", lambda *args, **_: loads.append(args))
 
     models.vad(sample_rate=SAMPLE_RATE, params=VAD)
-    models.end_of_turn()
+    models.end_of_turn(max_wait_s=TURNS.turn_max_wait_s)
 
     assert loads == []
+
+
+@pytest.mark.parametrize("max_wait_s", [1.0, 2.5])
+def test_an_unfinished_turn_ends_after_the_max_wait_of_silence(max_wait_s: float) -> None:
+    turn = TurnModels().end_of_turn(max_wait_s=max_wait_s)
+    turn.set_sample_rate(SAMPLE_RATE)
+    frame = bytes(FRAME_BYTES)
+    for _ in range(25):
+        turn.append_audio(frame, is_speech=True)
+
+    quiet = 1
+    while turn.append_audio(frame, is_speech=False) is EndOfTurnState.INCOMPLETE and quiet < 1000:
+        quiet += 1
+
+    assert quiet * FRAME_S == pytest.approx(max_wait_s)
