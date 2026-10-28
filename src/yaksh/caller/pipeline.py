@@ -24,6 +24,7 @@ from pipecat.frames.frames import (
     FunctionCallResultFrame,
     FunctionCallResultProperties,
     LLMContextFrame,
+    LLMMessagesTransformFrame,
     OutputDTMFUrgentFrame,
     TTSSpeakFrame,
 )
@@ -31,7 +32,11 @@ from pipecat.observers.base_observer import BaseObserver
 from pipecat.observers.service_metrics_observer import ServiceMetricsObserver
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.worker import PipelineParams, PipelineWorker
-from pipecat.processors.aggregators.llm_context import LLMContext
+from pipecat.processors.aggregators.llm_context import (
+    LLMContext,
+    LLMContextMessage,
+    LLMSpecificMessage,
+)
 from pipecat.processors.aggregators.llm_response_universal import (
     LLMContextAggregatorPair,
     LLMUserAggregator,
@@ -107,6 +112,8 @@ SILENT_END = (
     "The call did not end, because you said nothing. Answer the agent's latest turn aloud. To "
     "end the call, say a short goodbye in the same reply that calls end_call."
 )
+SAID_NOTHING = "No spoken words were sent in your last reply."
+"""Stands in the context for a reply with no words, in place of that reply's reasoning."""
 PRESS_KEYS = FunctionSchema(
     name="press_keys",
     description=(
@@ -199,8 +206,17 @@ class PersonaLLM(OpenAIResponsesHttpLLMService):
     ) -> None:
         """A response with only empty messages is the caller saying nothing, as its prompt asks
         when the agent only asks it to wait. Any other response with no text and no tool call
-        is still an error."""
+        is still an error.
+
+        Pipecat has already queued the response's reasoning for the context. With no message
+        after it, the model reads that reasoning on later turns as a reply it gave, and keeps
+        quiet when the agent asks again. So the reasoning goes out of the context, and a note
+        that says no words were sent takes its place."""
         if silent(output):
+            reasoning = {
+                item["id"] for item in output if item.get("type") == "reasoning" and item.get("id")
+            }
+            await self.push_frame(LLMMessagesTransformFrame(partial(said_nothing, reasoning)))
             if self.on_silence is not None:
                 await self.on_silence()
             return
@@ -218,6 +234,25 @@ def silent(output: list[dict]) -> bool:
         )
         for item in said
     )
+
+
+def said_nothing(reasoning: set[str], messages: list[LLMContextMessage]) -> list[LLMContextMessage]:
+    """The context with the reasoning of a reply that had no words replaced by one note that says
+    so: at the place of that reasoning, or at the end when the reply had none."""
+    kept: list[LLMContextMessage] = []
+    at: int | None = None
+    for message in messages:
+        if (
+            isinstance(message, LLMSpecificMessage)
+            and isinstance(message.message, dict)
+            and message.message.get("type") == "reasoning"
+            and message.message.get("id") in reasoning
+        ):
+            at = len(kept) if at is None else at
+            continue
+        kept.append(message)
+    kept.insert(len(kept) if at is None else at, {"role": "developer", "content": SAID_NOTHING})
+    return kept
 
 
 async def wait_for_agent(user: LLMUserAggregator) -> None:
