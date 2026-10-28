@@ -105,10 +105,12 @@ Phrase = Annotated[Line, AfterValidator(can_match)]
 
 class Interruption(BaseModel):
     """A fixed line the caller says while the agent is still speaking, on phone calls. A start
-    is each new match of `agent_says` in the agent's words or, with no phrase, the agent's first
-    speech in a turn; starts count from answer `from_answer` on. Each start opens one wait of
-    `after_s`, and the line plays when a wait ends with the agent still speaking in that turn,
-    at most once."""
+    is each new match of `agent_says` in the agent's words or, with no phrase, the start of each
+    answer of the agent, from answer `from_answer` on. Each start opens one wait of `after_s`.
+    The line plays when a wait ends with the agent speaking: in the turn of the match, or, with
+    no phrase, in the agent turn of that answer that is open then, also after a pause in it. A
+    line plays at most once. With a phrase, `after_s` and `from_answer` are 0 and 1 unless they
+    are set; with no phrase, they are 2 and 2."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 

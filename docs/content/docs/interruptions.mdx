@@ -3,50 +3,82 @@ title: Interruptions
 description: The caller says a fixed line while the agent speaks.
 ---
 
-A scenario can make Yaksh's caller interrupt the agent: the caller says a fixed line while the agent still speaks. Use interruptions to test whether the agent stops when a caller talks over it, and what it says next. Interruptions play on phone calls only, while the persona is on the line. A text run, a call that the persona's voicemail answers, and the time before a call screener hands the call over have none.
+A scenario can make Yaksh's caller interrupt the agent: the caller says a fixed line while the agent still speaks. Use interruptions to test if the agent stops when a caller talks over it, and what it says next.
 
-A scenario has up to 3 interruptions:
+Interruptions play on phone calls only, while the persona is on the call. A text run has no interruptions. A call that the persona's voicemail answers has none. The time before the persona picks up after its call screener has none.
+
+## Write interruptions
+
+A scenario has up to 3 interruptions. Write them in the file of `yaksh scenario create` or `yaksh scenario update` (refer to [CLI](/docs/cli)), or send them with the API. The console does not show them yet. A scenario that you save in the console keeps its interruptions.
 
 ```yaml
 interruptions:
-  - agent_says: first visit
-    say: "Sorry, is there a fee for that?"
+  - agent_says: new patient
+    say: "Sorry, how much does that visit cost?"
   - after_s: 3
     say: "Hold on, can you say that again?"
 ```
 
 | Field | Meaning |
 | --- | --- |
-| `say` | The caller's words, 1 to 200 characters. A `{{Fact name}}` placeholder takes the data set's value. |
-| `agent_says` | A phrase. Each time the agent says it, a wait of `after_s` starts. Without a phrase, a wait starts when the agent starts to speak in each of its answers. |
-| `after_s` | The wait in seconds, from 0 to 30. The default is 0 with a phrase, and 2 without one. |
-| `from_answer` | The first answer of the agent that can start a wait. Answer 1 is the agent's first speech, often its greeting. The agent's next answer starts after the caller replies or presses keys. The default is 1 with a phrase, and 2 without one, which skips the greeting. |
+| `say` | The caller's words, 1 to 200 characters. A `{{Fact name}}` placeholder takes the value of the data set. The limit applies after the data set fills in the placeholders. |
+| `agent_says` | A phrase of 1 to 200 characters, with at least one word or number. It can have `{{Fact name}}` placeholders. |
+| `after_s` | The wait in seconds, from 0 to 30. The default is 0 with a phrase, and 2 with no phrase. |
+| `from_answer` | The first answer of the agent that can start a wait, from 1 to 100. The default is 1 with a phrase, and 2 with no phrase, which skips the greeting. |
+
+A wait starts each time the agent says the phrase. With no phrase, a wait starts when each answer of the agent starts. Answer 1 is the first speech of the agent, often its greeting. The next answer starts after the caller replies or presses keys. An interruption line does not start an answer.
 
 ## When a line plays
 
-- The line plays when a wait ends and the agent still speaks in the same turn. The agent cannot cut the line.
-- When the wait of a line with no phrase ends while the agent pauses, the line plays when the agent speaks again in the same turn. A line with a phrase does not wait for that.
-- A wait is used up, and the line waits for its next start, when the agent's turn ends first, when the caller is speaking, when the caller pressed keys in that turn, or when another line plays or its window is open. The window of a line is 2 s from its first sound.
-- Each line plays at most once, and one line plays at a time.
-- A phrase matches whole words only: "fee" does not match "coffee", although a phrase rule finds it there. As in a phrase rule, numbers, dates and times match in words or in digits. But digits do not join across punctuation: "five five five, oh one four two" does not match "5550142".
-- A phrase needs the agent's words while it still speaks. Deepgram, AssemblyAI, Soniox and Gladia give them. Sarvam gives them only after the agent stops, so a run start refuses a scenario with a phrase when Settings use Sarvam. A line with no phrase works with every provider.
-- Yaksh makes the speech of each line with the persona's voice when the call starts. A line whose speech failed does not play.
+- A line with a phrase plays when its wait ends and the agent still speaks in the turn in which it said the phrase.
+- A line with no phrase plays in the agent turn of the same answer that is open when its wait ends. This can be a later turn of the answer. If the agent pauses at that time, the line plays when the agent speaks again in that turn.
+- The agent cannot cut the line.
+- Each line plays one time at most, and one line plays at a time.
+- A wait that does not play its line is a try with a reason. The line can play at a later wait. The reasons are in the table in [Results](#results).
+
+## Phrases
+
+- A phrase matches whole words only: "fee" does not match "coffee", although a phrase rule finds it there.
+- As in a phrase rule, numbers, dates and times match in words or in digits. Number words match their digits: "first visit" also matches "1st visit" and "one visit". Digits do not join across punctuation: "five five five, oh one four two" does not match "5550142".
+- A wait starts when the speech-to-text gives the phrase, a short time after the agent says it. A phrase that ends with a number matches when a word or a punctuation mark comes after the number, because the speech-to-text can still add to the number.
+- A phrase needs the words of the agent while it speaks. Deepgram, AssemblyAI and Soniox give partial words. Gladia gives words only at short pauses, at most 5 s apart, so its waits can start later. Sarvam gives the words only after the agent stops, so a run start refuses a scenario with a phrase when Settings use Sarvam. A line with no phrase works with all providers.
+
+Yaksh makes the speech of each line with the voice of the persona when the call starts. A line whose speech failed does not play.
 
 ## What the caller does next
 
-When the agent turn that a line interrupted ends, the caller's model learns that it said the line. Then:
+When the agent turn that a line interrupted ends, the model of the caller learns that it said the line. Then:
 
-- If the agent stopped for the line within 2 s of its first sound and said nothing more in that turn, the caller waits for the agent's answer. If the agent then says nothing for 3 s, the caller goes on with the call.
-- If the agent stopped and then answered in the same turn, the caller replies to the answer.
+- If the agent stopped within 2 s of the first sound of the line and did not speak again in that turn, the caller waits for the agent. It replies to the next agent turn that has words. If 3 s pass with no agent turn open, the caller continues the call.
+- If the agent stopped and then spoke again in the same turn, the caller replies to that turn.
 - In all other cases, for example when the agent talked over the line, the caller replies to the turn as usual.
 
-A line that asks the agent to wait, such as "Sorry, one moment.", works: when the agent says that it will wait, the caller says that it is back and goes on. Backchannel lines, such as "Mm-hmm.", are not supported yet. The caller treats them as lines that the agent stops for.
+The agent stopped when its voice was quiet for at least 0.6 s, or when its turn ended in the quiet. A shorter pause, such as a pause between two sentences, is not a stop, also when the VAD stop in Settings is shorter.
+
+A line that asks the agent to wait, such as "Sorry, one moment.", works when the agent stops for it. When the agent then says that it will wait, the caller says that it is back and continues. If the agent talks over the line and says later that it will wait, the caller can wait too, until it asks the agent a question after 15 s of silence.
+
+Backchannel lines, such as "Mm-hmm.", are not supported yet. Yaksh handles them as other lines: when the agent stops for one and says nothing more, the caller waits 3 s before it continues.
 
 ## Results
 
-- The transcript shows each line as a caller turn with the label "Yaksh's fixed line". The line comes after the agent turn that it interrupted, because that turn is kept whole.
-- The judges see where each line came. After the line's turn, one more line tells them how far into which agent turn the caller spoke, and after which words of the agent. The judges judge the call as they judge any other call.
-- Nothing checks yet how fast the agent stopped. To check what the agent did after a line, write a criterion, such as "The agent tells the caller the fee for a first visit." Refer to [Writing criteria](/docs/writing-criteria).
-- The recording in the **Audio** card of the call has both sides, the agent on the left and the caller on the right, so you can hear how the agent stopped.
-- The lines count in the caller's speech, but not in the agent's response time, because the caller said them over the agent.
-- Each start of an interruption is saved with the conversation, with its outcome: played, or why it did not play, such as "turn_ended". The API returns them in the conversation's `wire_events`, with the kind `interruption`.
+- The transcript shows each line as a caller turn with the badge **Fixed line**. The first words, the question when the agent is silent and the goodbyes have the same badge. In the API, the turn of a line has `interruption`: the number of the interruption. The line comes after the agent turn that it interrupted, because that turn stays whole.
+- The judges see where each line came. After the turn of the line, a note in parentheses tells them how far into which agent turn the caller spoke, and after which words of the agent. The part of their view about the caller's test also lists the lines that played. Thus a caller that follows a line, for example with a new day that the line asked for, does not break its test. The judges judge the call as they judge all other calls.
+- Nothing checks yet how fast the agent stopped. To check what the agent did after a line, write a criterion with the value that you expect, such as "The agent says that a new patient visit costs $95." Refer to [Writing criteria](/docs/writing-criteria).
+- The recording in the **Audio** card of the call has the two sides, the agent on the left and the caller on the right. Listen to it to hear how the agent stopped.
+- The lines count in the speech of the caller (**Agent's share of the speech**). They do not count in **Agent response time**, **Longest wait** or **Spoke over the caller**, because the caller said them over the agent. Thus **Spoke over the caller** does not show an agent that talked over a line.
+- Yaksh saves each try with the conversation. A try is a wait that ended while the line could still play, or a line that can never play. The API returns the tries in the conversation's `wire_events`, with the kind `interruption` and the try in the field `interruption`. The **Events** card of the call shows each try with its line number and its outcome.
+
+A try that played has no `reason`. Each other try has one of these reasons:
+
+| Reason | Why the line did not play |
+| --- | --- |
+| `turn_ended` | The agent's turn ended before the wait ended. With no phrase: no agent turn of the answer was open when the wait ended. |
+| `agent_quiet` | With a phrase: the agent was quiet when the wait ended. With no phrase: the agent's turn ended before the agent spoke again. |
+| `caller_speaking` | The caller was speaking. |
+| `key_press` | The caller pressed keys in this agent turn. |
+| `other_line` | Another line was playing, or its 2 s window was open. |
+| `reply_owed` | The caller still had to reply to an earlier line. |
+| `call_ending` | The call was ending, or it ended during the wait. |
+| `audio_not_ready` | The speech of the line was not ready yet. |
+| `audio_failed` | Yaksh could not make the speech of the line, and the `detail` of the try tells why. The line never plays. |
+| `no_words_while_speaking` | The speech-to-text in Settings gives no words while the agent speaks, so the phrase can never start a wait. |
