@@ -35,13 +35,6 @@ LANGUAGE_CODES: dict[Language, str] = {
     Language.ES: "es",
 }
 """ElevenLabs' code for each language, as a voice lists the languages it is verified in."""
-PINNED_LANGUAGES = frozenset({Language.EN, Language.HI, Language.TA, Language.ES})
-"""The languages that the model takes as a language_code; it refuses a code it does not take, and
-reads any other language from the text."""
-
-
-def language_pin(language: Language) -> str | None:
-    return LANGUAGE_CODES[language] if language in PINNED_LANGUAGES else None
 
 
 class ElevenLabsClient:

@@ -8007,13 +8007,6 @@
             "pattern": "^(https?|wss?)://\\S+$",
             "title": "Url",
             "default": "wss://api.cartesia.ai/tts/websocket"
-          },
-          "model": {
-            "type": "string",
-            "maxLength": 200,
-            "minLength": 1,
-            "title": "Model",
-            "default": "sonic-3.6"
           }
         },
         "additionalProperties": false,
@@ -9237,13 +9230,6 @@
             "pattern": "^(https?|wss?)://\\S+$",
             "title": "Url",
             "default": "wss://api.elevenlabs.io"
-          },
-          "model": {
-            "type": "string",
-            "maxLength": 200,
-            "minLength": 1,
-            "title": "Model",
-            "default": "eleven_flash_v2_5"
           }
         },
         "additionalProperties": false,
@@ -14342,13 +14328,6 @@
             "pattern": "^(https?|wss?)://\\S+$",
             "title": "Base Url",
             "default": "https://api.sarvam.ai"
-          },
-          "model": {
-            "type": "string",
-            "maxLength": 200,
-            "minLength": 1,
-            "title": "Model",
-            "default": "bulbul:v4-flash"
           }
         },
         "additionalProperties": false,
@@ -15196,22 +15175,19 @@
           "elevenlabs": {
             "$ref": "#/components/schemas/ElevenLabs",
             "default": {
-              "url": "wss://api.elevenlabs.io",
-              "model": "eleven_flash_v2_5"
+              "url": "wss://api.elevenlabs.io"
             }
           },
           "cartesia": {
             "$ref": "#/components/schemas/Cartesia",
             "default": {
-              "url": "wss://api.cartesia.ai/tts/websocket",
-              "model": "sonic-3.6"
+              "url": "wss://api.cartesia.ai/tts/websocket"
             }
           },
           "sarvam_tts": {
             "$ref": "#/components/schemas/SarvamTts",
             "default": {
-              "base_url": "https://api.sarvam.ai",
-              "model": "bulbul:v4-flash"
+              "base_url": "https://api.sarvam.ai"
             }
           },
           "azure": {
@@ -16889,6 +16865,17 @@
               }
             ],
             "title": "Accent"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
           }
         },
         "additionalProperties": false,
@@ -16966,6 +16953,17 @@
             "type": "string",
             "title": "Provider Voice Id"
           },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
           "name": {
             "type": "string",
             "title": "Name"
@@ -17025,6 +17023,7 @@
           "id",
           "provider",
           "provider_voice_id",
+          "model",
           "name",
           "gender",
           "accent",
@@ -17063,6 +17062,17 @@
               }
             ],
             "title": "Stability"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
           }
         },
         "additionalProperties": false,

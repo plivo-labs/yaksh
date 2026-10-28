@@ -17,10 +17,6 @@ VENDORS: dict[VoiceProvider, TtsVendor] = {
 }
 
 
-def tts_model(settings: AppSettings, provider: VoiceProvider) -> str | None:
-    return VENDORS[provider].model(settings)
-
-
 def tts_service(
     settings: AppSettings,
     voice: VoiceSettings,

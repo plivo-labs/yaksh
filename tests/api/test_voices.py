@@ -170,6 +170,36 @@ async def test_a_preview_speaks_the_sample_line_or_the_language_sample_with_the_
     assert down.status_code == 422 and "did not answer" in down.text
 
 
+async def test_a_preview_in_a_model_outside_the_list_is_refused_before_the_provider_speaks(
+    client: AsyncClient, voice_client: FakeVoiceClient
+) -> None:
+    voice = {"provider": "elevenlabs", "id": HINDI_VOICE.id, "model": "eleven_turbo_v2"}
+
+    refused = await client.post("/api/v1/voices/preview", json={"voice": voice, "language": "hi"})
+
+    assert refused.status_code == 422
+    assert "ElevenLabs has no model eleven_turbo_v2" in refused.text
+    assert voice_client.spoken == []
+
+
+async def test_one_voice_is_listed_once_for_each_model(client: AsyncClient) -> None:
+    flash = await client.post("/api/v1/voices", json={**NEW_VOICE, "languages": ["en"]})
+    multilingual = await client.post(
+        "/api/v1/voices",
+        json={**NEW_VOICE, "languages": ["en"], "model": "eleven_multilingual_v2"},
+    )
+    again = await client.post(
+        "/api/v1/voices",
+        json={**NEW_VOICE, "languages": ["en"], "model": "eleven_multilingual_v2"},
+    )
+
+    assert (flash.json()["model"], multilingual.json()["model"]) == (
+        "eleven_flash_v2_5",
+        "eleven_multilingual_v2",
+    )
+    assert again.status_code == 409
+
+
 async def test_a_voice_of_a_provider_without_lookup_is_saved_once_it_speaks_a_line(
     client: AsyncClient, voice_clients: dict[VoiceProvider, FakeVoiceClient]
 ) -> None:
@@ -217,5 +247,5 @@ async def test_a_voice_never_lists_a_language_its_provider_cannot_speak(
     edited = await client.patch(f"/api/v1/voices/{saved.json()['id']}", json={"languages": ["es"]})
 
     assert spanish.status_code == edited.status_code == 422
-    assert "Sarvam does not speak Spanish" in spanish.text
-    assert "Sarvam does not speak Spanish" in edited.text
+    assert "Sarvam Bulbul v4 Flash does not speak Spanish" in spanish.text
+    assert "Sarvam Bulbul v4 Flash does not speak Spanish" in edited.text

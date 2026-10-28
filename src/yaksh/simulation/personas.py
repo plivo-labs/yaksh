@@ -31,6 +31,7 @@ def config_of(persona: Persona) -> PersonaConfig:
         voice=VoiceSettings(
             provider=persona.voice_provider,
             id=persona.voice_id,
+            model=persona.voice_model,
             speed=persona.voice_speed,
             stability=persona.voice_stability,
         ),
@@ -47,6 +48,7 @@ def config_columns(config: PersonaConfig) -> dict[str, Any]:
         "language": config.language,
         "voice_provider": config.voice.provider,
         "voice_id": config.voice.id,
+        "voice_model": config.voice.model,
         "voice_speed": config.voice.speed,
         "voice_stability": config.voice.stability,
         "voice_gender": config.voice_gender,
@@ -54,6 +56,30 @@ def config_columns(config: PersonaConfig) -> dict[str, Any]:
         "sample_line": config.sample_line,
         "answering": config.answering.model_dump(mode="json"),
     }
+
+
+def version_row(persona_id: uuid.UUID, version: int, config: PersonaConfig) -> PersonaVersion:
+    """A version as stored: the voice's model has its own column, because an older process
+    refuses a voice with a field that it does not know."""
+    return PersonaVersion(
+        persona_id=persona_id,
+        version=version,
+        config=config.model_dump(mode="json", exclude={"voice": {"model"}}),
+        voice_model=config.voice.model,
+    )
+
+
+def version_config(version: PersonaVersion) -> PersonaConfig:
+    """A stored version's config, with its voice's model from its column."""
+    config = PersonaConfig.model_validate(version.config)
+    voice = config.voice.model_copy(update={"model": version.voice_model})
+    return config.model_copy(update={"voice": voice})
+
+
+def with_listed_voice(settings: dict[str, Any], voice: Voice) -> dict[str, Any]:
+    """The settings with the model of the voice's row and its gender from the voices list."""
+    listed = {**settings["voice"], "model": voice.model}
+    return {**settings, "voice": listed, "voice_gender": voice.gender}
 
 
 def apply_config(persona: Persona, config: PersonaConfig) -> None:
@@ -115,16 +141,14 @@ async def live_personas(
 async def create_persona(session: AsyncSession, command: PersonaCreate) -> Persona:
     settings = command.settings()
     voice = await live_voice(session, settings.voice)
-    config = PersonaConfig.model_validate({**settings.model_dump(), "voice_gender": voice.gender})
+    config = validate_config(with_listed_voice(settings.model_dump(), voice))
     if command.forked_from_id is not None:
         await existing_persona(session, command.forked_from_id)
     persona = Persona(name=command.name, current_version=1, forked_from_id=command.forked_from_id)
     apply_config(persona, config)
     session.add(persona)
     await flush(session)
-    session.add(
-        PersonaVersion(persona_id=persona.id, version=1, config=config.model_dump(mode="json"))
-    )
+    session.add(version_row(persona.id, 1, config))
     await session.commit()
     return persona
 
@@ -186,22 +210,17 @@ async def update_persona(
         current = config_of(persona)
         merged = {**current.model_dump(), **changes}
         voice = update.voice
-        if voice is not None and (voice.provider, voice.id) != (
-            current.voice.provider,
-            current.voice.id,
-        ):
-            merged["voice_gender"] = (await live_voice(session, voice)).gender
+        if voice is not None:
+            same_voice = (voice.provider, voice.id) == (current.voice.provider, current.voice.id)
+            if same_voice and voice.model in (None, current.voice.model):
+                merged["voice"] = {**merged["voice"], "model": current.voice.model}
+            else:
+                merged = with_listed_voice(merged, await live_voice(session, voice))
         new = validate_config(merged)
         if new != current:
             apply_config(persona, new)
             persona.current_version += 1
-            session.add(
-                PersonaVersion(
-                    persona_id=persona.id,
-                    version=persona.current_version,
-                    config=new.model_dump(mode="json"),
-                )
-            )
+            session.add(version_row(persona.id, persona.current_version, new))
     await flush(session)
     await session.refresh(persona)
     await session.commit()
@@ -304,9 +323,7 @@ async def seed_builtin_personas(session: AsyncSession) -> list[str]:
         )
         if voice is None:
             raise RuntimeError(f"seed the built-in voices before built-in persona {key}")
-        config = PersonaConfig.model_validate(
-            {**builtin.model_dump(exclude={"name"}), "voice_gender": voice.gender}
-        )
+        config = validate_config(with_listed_voice(builtin.model_dump(exclude={"name"}), voice))
         persona_id = await session.scalar(
             insert(Persona)
             .values(name=builtin.name, builtin_key=key, current_version=1, **config_columns(config))
@@ -314,11 +331,7 @@ async def seed_builtin_personas(session: AsyncSession) -> list[str]:
             .returning(Persona.id)
         )
         if persona_id is not None:
-            session.add(
-                PersonaVersion(
-                    persona_id=persona_id, version=1, config=config.model_dump(mode="json")
-                )
-            )
+            session.add(version_row(persona_id, 1, config))
             seeded.append(key)
     await session.commit()
     return seeded

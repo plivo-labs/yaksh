@@ -635,6 +635,7 @@ class Persona(Base):
     language: Mapped[Language] = mapped_column(pg_enum(Language, "language"))
     voice_provider: Mapped[VoiceProvider] = mapped_column(pg_enum(VoiceProvider, "voice_provider"))
     voice_id: Mapped[str] = mapped_column(Text)
+    voice_model: Mapped[str | None] = mapped_column(Text)
     voice_speed: Mapped[float] = mapped_column(Float)
     voice_stability: Mapped[float | None] = mapped_column(Float)
     """ElevenLabs only."""
@@ -671,6 +672,9 @@ class PersonaVersion(Base):
     persona_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("personas.id"))
     version: Mapped[int] = mapped_column(Integer)
     config: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    voice_model: Mapped[str | None] = mapped_column(Text)
+    """The voice's model, kept out of `config`: an older process refuses a voice with a field
+    that it does not know."""
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     __table_args__ = (
@@ -688,6 +692,8 @@ class Voice(Base):
     id: Mapped[uuid.UUID] = uuid_primary_key()
     provider: Mapped[VoiceProvider] = mapped_column(pg_enum(VoiceProvider, "voice_provider"))
     provider_voice_id: Mapped[str] = mapped_column(Text)
+    model: Mapped[str | None] = mapped_column(Text)
+    """None for a provider without a model choice."""
     name: Mapped[str] = mapped_column(Text)
     gender: Mapped[VoiceGender | None] = mapped_column(pg_enum(VoiceGender, "voice_gender"))
     accent: Mapped[str | None] = mapped_column(Text)
@@ -705,8 +711,10 @@ class Voice(Base):
             "ix_voices_provider_voice_live",
             "provider",
             "provider_voice_id",
+            "model",
             unique=True,
             postgresql_where=text("deleted_at IS NULL"),
+            postgresql_nulls_not_distinct=True,
         ),
         CheckConstraint("cardinality(languages) > 0", name="languages_not_empty"),
     )

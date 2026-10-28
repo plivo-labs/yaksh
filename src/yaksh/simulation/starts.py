@@ -21,7 +21,7 @@ from yaksh.domain.scenarios import DataSet
 from yaksh.domain.settings import AppSettings
 from yaksh.domain.speech import SttProvider
 from yaksh.domain.triggers import check_agent_data
-from yaksh.domain.voices import VoiceProvider
+from yaksh.domain.voices import VoiceSettings
 from yaksh.simulation.agents import config_of as agent_config_of
 from yaksh.simulation.languages import LANGUAGES
 from yaksh.simulation.numbers import inbound_problem, outbound_problem, phone_problem
@@ -151,7 +151,7 @@ async def snapshot(
         config = persona_config_of(persona)
         if transport is Transport.PHONE:
             check_heard(app.speech.stt, current.languages, config.language, persona.name)
-            check_persona_voice(app, config.voice.provider, config.language, persona.name)
+            check_persona_voice(app, config.voice, config.language, persona.name)
         wants = scenario_config_of(scenario)
         if trigger is not None:
             check_agent_data(trigger, wants, scenario.name)
@@ -202,19 +202,24 @@ def check_heard(
 
 
 def check_persona_voice(
-    app: AppSettings, provider: VoiceProvider, language: Language, persona: str
+    app: AppSettings, voice: VoiceSettings, language: Language, persona: str
 ) -> None:
-    """Refuse a phone call whose persona speaks with a provider that has no key, or that does
-    not speak the persona's language."""
+    """Refuse a phone call whose persona speaks with a provider that has no key, or with a
+    model that is not in Yaksh's list or does not speak the persona's language."""
+    provider = voice.provider
     if app.tts_credential(provider) is None:
         raise ValidationError(
             f'phone calls are off: the persona "{persona}" uses a {provider.label} voice; add '
             f"the {provider.label} key in Settings"
         )
-    if language not in provider.traits.languages:
+    try:
+        model = voice.model_in_use
+    except ValueError as error:
+        raise ValidationError(f'the persona "{persona}": {error}; choose another voice') from None
+    if language not in model.languages:
         raise ValidationError(
-            f"text to speech ({provider.label}) doesn't speak {language.label}, the language of "
-            f'the persona "{persona}"; choose a voice of another provider'
+            f"text to speech ({provider.traits.name_of(model)}) doesn't speak "
+            f'{language.label}, the language of the persona "{persona}"; choose another voice'
         )
 
 

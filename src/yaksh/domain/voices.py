@@ -36,45 +36,101 @@ class VoiceProvider(StrEnum):
 
 
 @dataclass(frozen=True)
-class TtsTraits:
+class TtsModel:
+    """A text-to-speech model that a voice can use."""
+
+    id: str | None
+    """None for a provider without a model choice: Azure's voice name carries its model, and
+    Nimble has one."""
     label: str
     speed: tuple[float, float]
-    """The range of the provider's speed or pace; 1.0 is the voice's natural pace."""
+    """The range of the speed or pace; 1.0 is the voice's natural pace."""
+    languages: frozenset[Language]
+    """The languages of Yaksh's that the model can speak."""
+
+
+@dataclass(frozen=True)
+class TtsTraits:
+    label: str
     word_timestamps: bool
     """False: the provider times whole sentences, so a cut-off reply is cut at a sentence."""
     lookup: bool
     """The provider describes a voice by its ID; otherwise the person enters the details."""
-    languages: frozenset[Language]
-    """The languages of Yaksh's that the provider can speak."""
+    models: tuple[TtsModel, ...]
+    """The models a voice can use; a new voice gets the first."""
+
+    @property
+    def speed(self) -> tuple[float, float]:
+        """The widest speed any model takes, for a voice whose model is not known here."""
+        return min(model.speed[0] for model in self.models), max(m.speed[1] for m in self.models)
+
+    @property
+    def languages(self) -> frozenset[Language]:
+        return frozenset().union(*(model.languages for model in self.models))
+
+    def chosen(self, model_id: str | None) -> TtsModel:
+        """The model, or the first for none. Raises ValueError for a model that is not in
+        Yaksh's list for the provider."""
+        if model_id is None:
+            return self.models[0]
+        found = next((model for model in self.models if model.id == model_id), None)
+        if found is None:
+            names = ", ".join(model.id for model in self.models if model.id is not None)
+            raise ValueError(
+                f"{self.label} has no model {model_id}" + (f"; use one of {names}" if names else "")
+            )
+        return found
+
+    def name_of(self, model: TtsModel) -> str:
+        return f"{self.label} {model.label}" if model.id is not None else self.label
 
 
 TTS = {
     VoiceProvider.ELEVENLABS: TtsTraits(
         "ElevenLabs",
-        (0.7, 1.2),
         word_timestamps=True,
         lookup=True,
-        languages=INDIAN_ENGLISH_AND_SPANISH,
+        models=tuple(
+            TtsModel(model_id, label, (0.7, 1.2), INDIAN_ENGLISH_AND_SPANISH)
+            for model_id, label in (
+                ("eleven_flash_v2_5", "Flash v2.5"),
+                ("eleven_multilingual_v2", "Multilingual v2"),
+            )
+        ),
     ),
     VoiceProvider.CARTESIA: TtsTraits(
         "Cartesia",
-        (0.6, 1.5),
         word_timestamps=True,
         lookup=False,
-        languages=INDIAN_ENGLISH_AND_SPANISH,
+        models=tuple(
+            TtsModel(model_id, label, (0.6, 1.5), INDIAN_ENGLISH_AND_SPANISH)
+            for model_id, label in (
+                ("sonic-3.6", "Sonic 3.6"),
+                ("sonic-3.5", "Sonic 3.5"),
+                ("sonic-3", "Sonic 3"),
+            )
+        ),
     ),
     VoiceProvider.SARVAM: TtsTraits(
-        "Sarvam", (0.5, 2.0), word_timestamps=False, lookup=False, languages=INDIAN_AND_ENGLISH
+        "Sarvam",
+        word_timestamps=False,
+        lookup=False,
+        models=(
+            TtsModel("bulbul:v4-flash", "Bulbul v4 Flash", (0.5, 2.0), INDIAN_AND_ENGLISH),
+            TtsModel("bulbul:v3", "Bulbul v3", (0.5, 2.0), INDIAN_AND_ENGLISH),
+        ),
     ),
     VoiceProvider.AZURE: TtsTraits(
         "Azure",
-        (0.5, 2.0),
         word_timestamps=True,
         lookup=False,
-        languages=INDIAN_ENGLISH_AND_SPANISH,
+        models=(TtsModel(None, "Azure", (0.5, 2.0), INDIAN_ENGLISH_AND_SPANISH),),
     ),
     VoiceProvider.NIMBLE: TtsTraits(
-        "Nimble", (0.7, 1.0), word_timestamps=True, lookup=True, languages=INDIAN_AND_ENGLISH
+        "Nimble",
+        word_timestamps=True,
+        lookup=True,
+        models=(TtsModel(None, "Nimble", (0.7, 1.0), INDIAN_AND_ENGLISH),),
     ),
 }
 
@@ -97,6 +153,10 @@ class VoiceSettings(BaseModel):
     """The provider's speed or pace, within its range."""
     stability: float | None = Field(default=None, ge=0.0, le=1.0)
     """ElevenLabs only, where it defaults to 0.5."""
+    model: str | None = None
+    """The provider's model; None for a provider without a model choice, and for a voice read
+    from stored JSON, which never holds it: an older process refuses an unknown field, so the
+    model lives in its own columns."""
 
     @model_validator(mode="before")
     @classmethod
@@ -111,23 +171,41 @@ class VoiceSettings(BaseModel):
 
     @classmethod
     def fitted(
-        cls, provider: VoiceProvider, voice_id: str, speed: float, stability: float | None
+        cls,
+        provider: VoiceProvider,
+        voice_id: str,
+        model: str | None,
+        speed: float,
+        stability: float | None,
     ) -> VoiceSettings:
-        """A voice with the speed brought into the provider's range, and the stability only
-        where the provider has it: for a voice that changes provider."""
-        low, high = provider.traits.speed
+        """A voice with the speed brought into its model's range, and the stability only where
+        the provider has it: for a voice that changes provider or model."""
+        low, high = provider.traits.chosen(model).speed
         return cls(
             provider=provider,
             id=voice_id,
+            model=model,
             speed=min(max(speed, low), high),
             stability=stability if provider is VoiceProvider.ELEVENLABS else None,
         )
 
+    @property
+    def model_in_use(self) -> TtsModel:
+        """The voice's model, or the provider's first for a voice without one. Raises
+        ValueError for a model that is not in Yaksh's list."""
+        return self.provider.traits.chosen(self.model)
+
     @model_validator(mode="after")
     def provider_settings(self) -> Self:
-        low, high = self.provider.traits.speed
+        """The speed must fit the model. A model outside Yaksh's list is refused only where a
+        voice is chosen, so a stored voice still reads after a later release drops its model;
+        until then its speed is held to the widest range of the provider."""
+        traits = self.provider.traits
+        model = next((m for m in traits.models if self.model and m.id == self.model), None)
+        low, high = model.speed if model else traits.speed
         if not low <= self.speed <= high:
-            raise ValueError(f"{self.provider.label} takes a speed from {low} to {high}")
+            allowed = f"only speed {low:g}" if low == high else f"a speed from {low:g} to {high:g}"
+            raise ValueError(f"{traits.name_of(model) if model else traits.label} takes {allowed}")
         if self.provider is not VoiceProvider.ELEVENLABS and self.stability is not None:
             raise ValueError(f"{self.provider.label} has no stability setting")
         return self
@@ -158,20 +236,26 @@ class VoiceCreate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=80)
     gender: VoiceGender | None = None
     accent: str | None = Field(default=None, min_length=1, max_length=80)
+    model: str | None = None
+    """The provider's first model when left out."""
 
     @model_validator(mode="after")
     def provider_rules(self) -> Self:
         if not self.provider.traits.lookup and self.name is None:
             raise ValueError(f"{self.provider.label} has no voice lookup: give the voice a name")
-        check_spoken(self.provider, self.languages)
+        check_spoken(self.provider, self.model_in_use, self.languages)
         return self
 
+    @property
+    def model_in_use(self) -> TtsModel:
+        return self.provider.traits.chosen(self.model)
 
-def check_spoken(provider: VoiceProvider, languages: frozenset[Language]) -> None:
-    unspoken = sorted(languages - provider.traits.languages)
+
+def check_spoken(provider: VoiceProvider, model: TtsModel, languages: frozenset[Language]) -> None:
+    unspoken = sorted(languages - model.languages)
     if unspoken:
         names = ", ".join(language.label for language in unspoken)
-        raise ValueError(f"{provider.label} does not speak {names}")
+        raise ValueError(f"{provider.traits.name_of(model)} does not speak {names}")
 
 
 class VoiceUpdate(BaseModel):

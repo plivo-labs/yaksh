@@ -71,18 +71,14 @@ class ElevenLabs(Section):
     url: Address = "wss://api.elevenlabs.io"
     """A data residency address, such as wss://api.eu.residency.elevenlabs.io, keeps the speech
     in that region."""
-    model: ModelName = "eleven_flash_v2_5"
 
 
 class Cartesia(Section):
     url: Address = "wss://api.cartesia.ai/tts/websocket"
-    model: ModelName = "sonic-3.6"
 
 
 class SarvamTts(Section):
     base_url: Address = "https://api.sarvam.ai"
-    model: ModelName = "bulbul:v4-flash"
-    """bulbul:v4-flash and bulbul:v3 name their speakers differently."""
 
 
 class Nimble(Section):

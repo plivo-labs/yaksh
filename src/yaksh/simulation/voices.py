@@ -65,6 +65,10 @@ async def preview_voice(
     """The sample line, else the language's sample sentence, spoken through the same
     text-to-speech, voice settings and 8 kHz format as a call. A provider that cannot speak it,
     as with a voice it does not know, gives its reason."""
+    try:
+        voice.provider.traits.chosen(voice.model)
+    except ValueError as error:
+        raise ValidationError(str(error)) from None
     client = client_for(clients, voice.provider)
     try:
         return await client.speak(voice, language, sample_line or LANGUAGES[language].sample)
@@ -83,29 +87,32 @@ async def flush(session: AsyncSession) -> None:
 
 
 async def create_voice(session: AsyncSession, clients: VoiceClients, command: VoiceCreate) -> Voice:
-    """A provider with lookup describes the voice; any other must speak a line in it first, so
-    a voice ID the provider does not know is never listed."""
+    """A provider with lookup describes the voice; for any other, the details come with it.
+    Every voice must then speak a line in its model, so a voice that the provider does not know,
+    or that its model cannot speak, is never listed."""
+    model = command.model_in_use.id
     if command.provider.traits.lookup:
         found = await lookup_voice(clients, command.provider, command.provider_voice_id)
     else:
-        language = ordered(command.languages)[0]
-        try:
-            await client_for(clients, command.provider).speak(
-                VoiceSettings(provider=command.provider, id=command.provider_voice_id),
-                language,
-                LANGUAGES[language].sample,
-            )
-        except UnavailableError as error:
-            raise ValidationError(f"not saved: {error}") from None
         found = ProviderVoice(
             id=command.provider_voice_id,
             name=command.name or command.provider_voice_id,
             gender=command.gender,
             accent=command.accent,
         )
+    language = ordered(command.languages)[0]
+    try:
+        await client_for(clients, command.provider).speak(
+            VoiceSettings(provider=command.provider, id=command.provider_voice_id, model=model),
+            language,
+            LANGUAGES[language].sample,
+        )
+    except UnavailableError as error:
+        raise ValidationError(f"not saved: {error}") from None
     voice = Voice(
         provider=command.provider,
         provider_voice_id=command.provider_voice_id,
+        model=model,
         name=command.name or found.name,
         gender=found.gender,
         accent=found.accent,
@@ -127,17 +134,24 @@ async def get_voice(session: AsyncSession, voice_id: uuid.UUID, *, lock: bool = 
 
 
 async def live_voice(session: AsyncSession, settings: VoiceSettings) -> Voice:
-    """The live row for the voice a persona uses; a persona can only use a listed voice."""
-    voice = await session.scalar(
-        select(Voice).where(
-            Voice.provider == settings.provider,
-            Voice.provider_voice_id == settings.id,
-            Voice.deleted_at.is_(None),
-        )
+    """The live row for the voice a persona uses; a persona can only use a listed voice. A
+    voice without a model takes the model of its only listed row."""
+    query = select(Voice).where(
+        Voice.provider == settings.provider,
+        Voice.provider_voice_id == settings.id,
+        Voice.deleted_at.is_(None),
     )
-    if voice is None:
-        raise ValidationError(f"voice {settings.id} is not in the voices list")
-    return voice
+    if settings.model is not None:
+        query = query.where(Voice.model == settings.model)
+    rows = list(await session.scalars(query))
+    if not rows:
+        model = f" with model {settings.model}" if settings.model is not None else ""
+        raise ValidationError(f"voice {settings.id}{model} is not in the voices list")
+    if len(rows) > 1:
+        raise ValidationError(
+            f"voice {settings.id} is in the voices list with several models; give one"
+        )
+    return rows[0]
 
 
 async def list_voices(
@@ -158,7 +172,8 @@ async def update_voice(session: AsyncSession, voice_id: uuid.UUID, update: Voice
         voice.name = changes["name"]
     if "languages" in changes:
         try:
-            check_spoken(voice.provider, changes["languages"])
+            model = voice.provider.traits.chosen(voice.model)
+            check_spoken(voice.provider, model, changes["languages"])
         except ValueError as error:
             raise ValidationError(str(error)) from None
         voice.languages = ordered(changes["languages"])
@@ -187,6 +202,8 @@ class BuiltinVoice(BaseModel):
     accent: str | None
     languages: frozenset[Language] = Field(min_length=1)
     listed_languages: frozenset[Language]
+    model: str | None = None
+    """The provider's first model when left out."""
 
 
 def builtin_voices() -> list[BuiltinVoice]:
@@ -214,6 +231,7 @@ async def seed_builtin_voices(session: AsyncSession) -> list[str]:
             .values(
                 provider=builtin.provider,
                 provider_voice_id=builtin.provider_voice_id,
+                model=builtin.provider.traits.chosen(builtin.model).id,
                 name=builtin.name,
                 gender=builtin.gender,
                 accent=builtin.accent,

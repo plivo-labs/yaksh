@@ -654,12 +654,16 @@ export interface VoiceSettings {
   speed: number;
   /** ElevenLabs only; null for the other providers. */
   stability: number | null;
+  /** The provider's model; left out for a provider without a model choice. */
+  model?: string | null;
 }
 
 export interface Voice {
   id: string;
   provider: VoiceProvider;
   provider_voice_id: string;
+  /** Null for a provider without a model choice. */
+  model: string | null;
   name: string;
   gender: VoiceGender | null;
   accent: string | null;
@@ -1743,9 +1747,9 @@ export interface SettingsValues {
   assemblyai: { url: string; model: string };
   soniox: { url: string; model: string };
   gladia: { url: string; model: string };
-  elevenlabs: { url: string; model: string };
-  cartesia: { url: string; model: string };
-  sarvam_tts: { base_url: string; model: string };
+  elevenlabs: { url: string };
+  cartesia: { url: string };
+  sarvam_tts: { base_url: string };
   azure: { region: string };
   nimble: { base_url: string };
   caller: CallerModel;

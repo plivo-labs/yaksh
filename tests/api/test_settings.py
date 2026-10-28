@@ -526,6 +526,7 @@ async def test_a_phone_run_cannot_start_while_a_persona_voice_has_no_key(
         "id": "shubh",
         "speed": 1.5,
         "stability": None,
+        "model": "bulbul:v4-flash",
     }
     assert refused.status_code == 422
     assert refused.json()["error"]["message"] == (
@@ -553,8 +554,29 @@ async def test_a_phone_run_cannot_start_when_the_persona_voice_does_not_speak_it
     assert added.status_code == 201, added.text
     assert refused.status_code == 422
     assert refused.json()["error"]["message"] == (
-        "text to speech (Sarvam) doesn't speak Spanish, the language of the persona "
-        '"Sarvam caller"; choose a voice of another provider'
+        "text to speech (Sarvam Bulbul v4 Flash) doesn't speak Spanish, the language of the "
+        'persona "Sarvam caller"; choose another voice'
+    )
+
+
+async def test_a_phone_run_cannot_start_when_the_persona_voice_model_left_the_list(
+    client: AsyncClient, db: Db
+) -> None:
+    persona = await create_persona(client, name="Old model caller")
+    agent_id = await create_agent_id(client)
+    scenario = await create_scenario(client, agent_id, persona_id=persona["id"])
+    async with db() as session:
+        await session.execute(
+            text("UPDATE personas SET voice_model = 'eleven_turbo_v2' WHERE id = :id"),
+            {"id": persona["id"]},
+        )
+        await session.commit()
+
+    refused = await start_run(client, agent_id, [scenario["id"]])
+
+    assert refused.status_code == 422
+    assert refused.json()["error"]["message"].startswith(
+        'the persona "Old model caller": ElevenLabs has no model eleven_turbo_v2'
     )
 
 

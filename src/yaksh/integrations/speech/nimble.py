@@ -373,4 +373,4 @@ async def check_voice(settings: AppSettings, key: str) -> str:
     return listed[0].id
 
 
-TTS = TtsVendor(service=tts, model=lambda _settings: None, check_voice=check_voice, lookup=lookup)
+TTS = TtsVendor(service=tts, check_voice=check_voice, lookup=lookup)

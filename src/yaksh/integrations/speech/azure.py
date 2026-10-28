@@ -37,4 +37,4 @@ async def check_voice(_settings: AppSettings, _key: str) -> str:
     return CHECK_VOICE
 
 
-TTS = TtsVendor(model=lambda _settings: None, service=tts, check_voice=check_voice)
+TTS = TtsVendor(service=tts, check_voice=check_voice)

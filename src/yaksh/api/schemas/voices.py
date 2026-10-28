@@ -13,6 +13,7 @@ class VoiceRead(BaseModel):
     id: uuid.UUID
     provider: VoiceProvider
     provider_voice_id: str
+    model: str | None
     name: str
     gender: VoiceGender | None
     accent: str | None

@@ -953,6 +953,7 @@ def listed_voice(voice: ProviderVoice, *languages: Language) -> Voice:
     return Voice(
         provider=VoiceProvider.ELEVENLABS,
         provider_voice_id=voice.id,
+        model=VoiceProvider.ELEVENLABS.traits.models[0].id,
         name=voice.name,
         gender=voice.gender,
         accent=voice.accent,

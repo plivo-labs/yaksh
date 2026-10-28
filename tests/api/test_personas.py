@@ -1,12 +1,14 @@
 import uuid
 
 from httpx import AsyncClient
+from sqlalchemy import text
 
 from tests.conftest import (
     ENGLISH_VOICE,
     HINDI_VOICE,
     PERSONA,
     UNLISTED_VOICE,
+    Db,
     FakeVoiceClient,
     create_agent_id,
     create_persona,
@@ -26,6 +28,7 @@ async def test_changing_config_creates_a_version_but_renaming_does_not(
         "id": ENGLISH_VOICE.id,
         "speed": 1.0,
         "stability": 0.5,
+        "model": "eleven_flash_v2_5",
     }
 
     renamed = await client.patch(url, json={"name": "Hurried caller"})
@@ -295,3 +298,43 @@ async def test_a_persona_keeps_its_voicemail_and_screener_and_a_change_makes_a_v
     assert long.status_code == 422
     assert fork.json()["answering"] == changed.json()["answering"]
     assert [v["config"]["answering"]["voicemail"] for v in versions] == ["mailbox_full", "carrier"]
+
+
+async def test_a_persona_voice_keeps_its_model_and_changes_it_only_to_a_listed_one(
+    client: AsyncClient, db: Db
+) -> None:
+    persona = await create_persona(client)
+    url = f"/api/v1/personas/{persona['id']}"
+    other_model = {**persona["voice"], "model": "eleven_multilingual_v2"}
+
+    unlisted = await client.patch(url, json={"voice": other_model})
+    await client.post(
+        "/api/v1/voices",
+        json={
+            "provider": "elevenlabs",
+            "provider_voice_id": ENGLISH_VOICE.id,
+            "languages": ["en"],
+            "model": "eleven_multilingual_v2",
+        },
+    )
+    listed = await client.patch(url, json={"voice": other_model})
+    no_model = {key: value for key, value in other_model.items() if key != "model"}
+    kept = await client.patch(url, json={"voice": {**no_model, "speed": 1.1}})
+    async with db() as session:
+        stored_voice, stored_model = (
+            await session.execute(
+                text(
+                    "SELECT config -> 'voice', voice_model FROM persona_versions"
+                    " WHERE persona_id = :id ORDER BY version DESC LIMIT 1"
+                ),
+                {"id": persona["id"]},
+            )
+        ).one()
+
+    assert unlisted.status_code == 422
+    assert listed.json()["voice"]["model"] == "eleven_multilingual_v2"
+    assert (kept.json()["voice"]["model"], kept.json()["voice"]["speed"]) == (
+        "eleven_multilingual_v2",
+        1.1,
+    )
+    assert "model" not in stored_voice and stored_model == "eleven_multilingual_v2"

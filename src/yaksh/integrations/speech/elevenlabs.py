@@ -2,11 +2,12 @@
 the speech in its region."""
 
 from pipecat.services.elevenlabs.tts import ElevenLabsTTSService
+from pipecat.transcriptions.language import Language as PipecatLanguage
 
 from yaksh.domain.languages import Language
 from yaksh.domain.settings import AppSettings
 from yaksh.domain.voices import ProviderVoice, VoiceSettings
-from yaksh.integrations.elevenlabs import ElevenLabsClient, language_pin
+from yaksh.integrations.elevenlabs import ElevenLabsClient
 from yaksh.integrations.speech.audio import SAMPLE_RATE, quiet_s
 from yaksh.integrations.speech.vendor import TtsVendor
 
@@ -15,17 +16,18 @@ def tts(
     settings: AppSettings, voice: VoiceSettings, language: Language, key: str, *, one_shot: bool
 ) -> ElevenLabsTTSService:
     """A one-shot service does not reconnect: a dropped socket fails the speech instead of
-    ending it short as finished."""
+    ending it short as finished. Pipecat sends the language only to a model that takes it;
+    any other reads the language from the text."""
     return ElevenLabsTTSService(
         api_key=key,
         url=settings.elevenlabs.url,
         sample_rate=SAMPLE_RATE,
         settings=ElevenLabsTTSService.Settings(
-            model=settings.elevenlabs.model,
+            model=voice.model_in_use.id,
             voice=voice.id,
             speed=voice.speed,
             stability=voice.stability,
-            language=language_pin(language),
+            language=PipecatLanguage(language.value),
         ),
         stop_frame_timeout_s=quiet_s(one_shot),
         reconnect_on_error=not one_shot,
@@ -44,6 +46,4 @@ async def lookup(settings: AppSettings, key: str, voice_id: str) -> ProviderVoic
     )
 
 
-TTS = TtsVendor(
-    model=lambda settings: settings.elevenlabs.model, service=tts, check_voice=None, lookup=lookup
-)
+TTS = TtsVendor(service=tts, check_voice=None, lookup=lookup)

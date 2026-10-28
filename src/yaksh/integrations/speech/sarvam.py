@@ -11,7 +11,7 @@ from pipecat.transcriptions.language import Language as PipecatLanguage
 
 from yaksh.domain.languages import Language
 from yaksh.domain.settings import AppSettings
-from yaksh.domain.voices import VoiceSettings
+from yaksh.domain.voices import VoiceProvider, VoiceSettings
 from yaksh.integrations.speech.audio import SAMPLE_RATE, quiet_s
 from yaksh.integrations.speech.vendor import SttVendor, TtsVendor
 
@@ -50,7 +50,7 @@ def tts(
         base_url=settings.sarvam_tts.base_url,
         sample_rate=SAMPLE_RATE,
         settings=SarvamHttpTTSService.Settings(
-            model=settings.sarvam_tts.model,
+            model=voice.model_in_use.id,
             voice=voice.id,
             language=PipecatLanguage(language.value),
             pace=voice.speed,
@@ -59,14 +59,11 @@ def tts(
     )
 
 
-async def check_voice(settings: AppSettings, _key: str) -> str:
-    """The speaker Pipecat uses for the model: bulbul:v3 and bulbul:v4-flash name their
-    speakers differently."""
-    model = settings.sarvam_tts.model
-    return TTS_MODEL_CONFIGS.get(model, TTS_MODEL_CONFIGS["bulbul:v4-flash"]).default_speaker
+async def check_voice(_settings: AppSettings, _key: str) -> str:
+    """The speaker Pipecat uses for the first model, the one the key check speaks with:
+    bulbul:v3 and bulbul:v4-flash name their speakers differently."""
+    return TTS_MODEL_CONFIGS[VoiceProvider.SARVAM.traits.models[0].id or ""].default_speaker
 
 
 STT = SttVendor(model=lambda settings: settings.sarvam_stt.model, service=stt)
-TTS = TtsVendor(
-    model=lambda settings: settings.sarvam_tts.model, service=tts, check_voice=check_voice
-)
+TTS = TtsVendor(service=tts, check_voice=check_voice)

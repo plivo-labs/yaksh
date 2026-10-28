@@ -23,7 +23,7 @@ def tts(
         url=settings.cartesia.url,
         sample_rate=SAMPLE_RATE,
         settings=CartesiaTTSService.Settings(
-            model=settings.cartesia.model,
+            model=voice.model_in_use.id,
             voice=voice.id,
             language=PipecatLanguage(language.value),
             generation_config=GenerationConfig(speed=voice.speed),
@@ -37,6 +37,4 @@ async def check_voice(_settings: AppSettings, _key: str) -> str:
     return CHECK_VOICE
 
 
-TTS = TtsVendor(
-    model=lambda settings: settings.cartesia.model, service=tts, check_voice=check_voice
-)
+TTS = TtsVendor(service=tts, check_voice=check_voice)

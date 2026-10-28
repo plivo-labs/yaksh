@@ -41,8 +41,6 @@ class SttVendor:
 
 @dataclass(frozen=True)
 class TtsVendor:
-    model: Callable[[AppSettings], str | None]
-    """None for a provider whose voice names its model."""
     service: TtsBuilder
     """A one-shot service, for speech outside a call, fails a reply that stalls or loses its
     socket instead of ending it short as finished."""

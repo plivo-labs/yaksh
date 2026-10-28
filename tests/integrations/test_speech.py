@@ -1,5 +1,6 @@
 import asyncio
 from typing import cast
+from urllib.parse import parse_qsl, urlsplit
 
 import pytest
 from pipecat.frames.frames import (
@@ -22,7 +23,7 @@ from pipecat.transcriptions.language import Language as PipecatLanguage
 
 from yaksh.domain.errors import UnavailableError
 from yaksh.domain.languages import AgentLanguage, Language
-from yaksh.domain.settings import AppSettings, SarvamStt, SarvamTts
+from yaksh.domain.settings import AppSettings, SarvamStt
 from yaksh.domain.speech import SttProvider
 from yaksh.domain.voices import VoiceProvider, VoiceSettings
 from yaksh.integrations import provider_checks
@@ -124,23 +125,27 @@ async def test_the_check_fails_when_the_provider_refuses_the_key(
 
 
 @pytest.mark.parametrize(
-    ("language", "pin"), [(Language.HI, "hi"), (Language.MR, None), (Language.ES, "es")]
+    ("model", "language", "code"),
+    [
+        ("eleven_flash_v2_5", Language.HI, "hi"),
+        ("eleven_flash_v2_5", Language.MR, None),
+        ("eleven_flash_v2_5", Language.ES, "es"),
+        ("eleven_multilingual_v2", Language.HI, None),
+    ],
 )
-def test_elevenlabs_speaks_with_the_voice_settings_and_pins_only_a_language_its_model_takes(
-    language: Language, pin: str | None
+def test_elevenlabs_speaks_with_the_voice_model_and_sends_a_language_only_where_it_is_taken(
+    model: str, language: Language, code: str | None
 ) -> None:
-    voice = VoiceSettings(provider=VoiceProvider.ELEVENLABS, id="v1", speed=0.8, stability=0.3)
+    voice = VoiceSettings(
+        provider=VoiceProvider.ELEVENLABS, id="v1", model=model, speed=0.8, stability=0.3
+    )
 
-    service = tts_service(AppSettings(), voice, language, "key")
+    service = cast(ElevenLabsTTSService, tts_service(AppSettings(), voice, language, "key"))
 
     settings = cast(ElevenLabsTTSService.Settings, service._settings)
-    assert (settings.voice, settings.speed, settings.stability, settings.language) == (
-        "v1",
-        0.8,
-        0.3,
-        pin,
-    )
-    assert settings.model == "eleven_flash_v2_5"
+    sent = dict(parse_qsl(urlsplit(service._build_websocket_url()).query))
+    assert (settings.voice, settings.speed, settings.stability) == ("v1", 0.8, 0.3)
+    assert (sent["model_id"], sent.get("language_code")) == (model, code)
 
 
 async def test_speech_at_another_rate_reaches_the_call_at_8_khz() -> None:
@@ -251,10 +256,3 @@ async def test_a_model_the_provider_does_not_know_fails_the_check() -> None:
 
     with pytest.raises(ProviderCheckError, match="Sarvam"):
         await provider_checks.check_stt(settings, SttProvider.SARVAM, "key", check_clip())
-
-
-async def test_a_speech_model_the_provider_does_not_know_fails_the_check() -> None:
-    settings = AppSettings(sarvam_tts=SarvamTts(model="bulbul:v0"))
-
-    with pytest.raises(ProviderCheckError, match="Sarvam: Sarvam has no speech model bulbul:v0"):
-        await provider_checks.check_tts(settings, VoiceProvider.SARVAM, "key", "shubh")

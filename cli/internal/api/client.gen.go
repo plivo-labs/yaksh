@@ -1768,8 +1768,7 @@ type CallerReplyTimes struct {
 
 // Cartesia defines model for Cartesia.
 type Cartesia struct {
-	Model *string `json:"model,omitempty"`
-	Url   *string `json:"url,omitempty"`
+	Url *string `json:"url,omitempty"`
 }
 
 // Category What kind of situation a scenario tests. How the caller talks comes from the persona.
@@ -1995,8 +1994,7 @@ type Efforts struct {
 
 // ElevenLabs defines model for ElevenLabs.
 type ElevenLabs struct {
-	Model *string `json:"model,omitempty"`
-	Url   *string `json:"url,omitempty"`
+	Url *string `json:"url,omitempty"`
 }
 
 // ElevenLabsAgent defines model for ElevenLabsAgent.
@@ -3129,7 +3127,6 @@ type SarvamStt struct {
 // SarvamTts defines model for SarvamTts.
 type SarvamTts struct {
 	BaseUrl *string `json:"base_url,omitempty"`
-	Model   *string `json:"model,omitempty"`
 }
 
 // SavedValue defines model for SavedValue.
@@ -3676,6 +3673,7 @@ type VoiceCreate struct {
 	Accent    *string      `json:"accent,omitempty"`
 	Gender    *VoiceGender `json:"gender,omitempty"`
 	Languages []Language   `json:"languages"`
+	Model     *string      `json:"model,omitempty"`
 	Name      *string      `json:"name,omitempty"`
 
 	// Provider A text-to-speech provider that voices personas.
@@ -3709,6 +3707,7 @@ type VoiceRead struct {
 	Id              openapi_types.UUID `json:"id"`
 	Languages       []Language         `json:"languages"`
 	ListedLanguages []Language         `json:"listed_languages"`
+	Model           *string            `json:"model"`
 	Name            string             `json:"name"`
 
 	// Provider A text-to-speech provider that voices personas.
@@ -3720,7 +3719,8 @@ type VoiceRead struct {
 // VoiceSettings A voice of one text-to-speech provider and how it speaks; the id means nothing
 // outside that provider. The id goes into provider URLs, so dots and slashes are refused.
 type VoiceSettings struct {
-	Id string `json:"id"`
+	Id    string  `json:"id"`
+	Model *string `json:"model,omitempty"`
 
 	// Provider A text-to-speech provider that voices personas.
 	Provider  VoiceProvider `json:"provider"`
