@@ -43,6 +43,7 @@ from yaksh.caller.audio import (
     Stamper,
     caller_voice,
 )
+from yaksh.caller.interruptions import TurnOrder
 from yaksh.caller.lag import LagTicker
 from yaksh.caller.listen import AudioTap, LiveAudio
 from yaksh.caller.pipeline import CallerKeys, CallState, Persona, converse
@@ -408,7 +409,8 @@ async def hold_conversation(start: ConversationStart, live: LiveAudio, turns: Tu
         dialed.call_uuid,
         dialed.encoding,
     )
-    transcript = TranscriptBuilder(clock, observer)
+    order = TurnOrder(observer)
+    transcript = TranscriptBuilder(clock, order)
     checkpoints = Checkpoints(dialed.stream_id, transcript)
     recording = CallRecording()
     marks = AudioMarks(clock, observer)
@@ -444,6 +446,8 @@ async def hold_conversation(start: ConversationStart, live: LiveAudio, turns: Tu
         state=state,
         turn_models=turns,
         observers=[AudioTap(transport.input(), transport.output(), live)],
+        prepared=start.prepared,
+        order=order,
     )
 
     machine: asyncio.Task[None] | None = None
@@ -482,6 +486,7 @@ async def hold_conversation(start: ConversationStart, live: LiveAudio, turns: Tu
             if task is not None:
                 task.cancel()
                 await asyncio.gather(task, return_exceptions=True)
+        order.flush()
     return Spoken(state, persona, recording, marks, serializer)
 
 

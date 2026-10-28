@@ -15,6 +15,7 @@ from pydantic import (
     model_validator,
 )
 
+from yaksh.domain.canonical import canonical
 from yaksh.domain.errors import ValidationError
 from yaksh.domain.settings import MAX_DATA_SETS, CallerModel
 
@@ -92,8 +93,9 @@ MAX_INTERRUPTIONS = 3
 
 
 def can_match(phrase: str) -> str:
-    """A phrase needs a word or a number, or it would match every turn."""
-    if not any(char.isalnum() for char in phrase):
+    """A phrase needs a word or a number in the form that the match reads, or it would match
+    every turn: "½" has a letter for `isalnum` but nothing in canonical form."""
+    if not canonical(phrase):
         raise ValueError("a phrase needs at least one word or number")
     return phrase
 

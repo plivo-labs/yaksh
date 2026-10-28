@@ -362,6 +362,7 @@ async def test_interruptions_are_checked_like_the_rest_of_the_scenario(
     unknown_fact = await refused({"say": "My name is {{Full name}}."})
     unknown_in_phrase = await refused({"say": "Wait.", "agent_says": "{{Card}}"})
     no_word = await refused({"say": "Wait.", "agent_says": "..."})
+    no_canonical_word = await refused({"say": "Wait.", "agent_says": "½"})
     long_line = await refused({"say": "x" * 190 + " {{Name}}"})
     long_phrase = await refused({"say": "Wait.", "agent_says": "x" * 190 + " {{Name}}"})
     second_set_long = await refused(
@@ -382,6 +383,7 @@ async def test_interruptions_are_checked_like_the_rest_of_the_scenario(
     assert "{{Full name}} names no known fact" in unknown_fact
     assert "{{Card}} names no known fact" in unknown_in_phrase
     assert "a phrase needs at least one word or number" in no_word
+    assert "a phrase needs at least one word or number" in no_canonical_word
     too_long = "of interruption 1 is longer than 200 characters with the facts of the data set"
     assert f'the line {too_long} "Data set 1"' in long_line
     assert f'the phrase {too_long} "Data set 1"' in long_phrase

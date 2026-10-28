@@ -17,7 +17,7 @@ class TurnModels:
         self._vad = SileroVADAnalyzer()._model.session
         self._end_of_turn = LocalSmartTurnAnalyzerV3()._session
 
-    def vad(self, *, sample_rate: int, params: VADParams) -> SileroVADAnalyzer:
+    def vad(self, *, sample_rate: int, params: VADParams) -> SharedSileroVAD:
         return SharedSileroVAD(self._vad, sample_rate=sample_rate, params=params)
 
     def end_of_turn(self) -> LocalSmartTurnAnalyzerV3:
@@ -40,12 +40,16 @@ class SharedSileroVAD(SileroVADAnalyzer):
         self._model = SharedSileroModel(session)
         self._windows_since_reset = 0
         self._low_confidence_windows = 0
+        self.state = VADState.QUIET
+        """The state after the latest complete window: STARTING or STOPPING while the detector
+        waits for more windows to decide, SPEAKING or QUIET once it has decided."""
 
     async def analyze_audio(self, buffer: bytes) -> VADState:
         if len(self._vad_buffer) + len(buffer) < self._vad_frames_num_bytes:
             self._vad_buffer += buffer
             return self._vad_state
-        return await super().analyze_audio(buffer)
+        self.state = await super().analyze_audio(buffer)
+        return self.state
 
 
 class SharedSmartTurn(LocalSmartTurnAnalyzerV3):

@@ -69,6 +69,26 @@ def test_an_untimed_sentence_cut_before_its_audio_played_is_all_cut() -> None:
     ]
 
 
+def test_an_untimed_sentence_starts_its_turn_when_its_audio_started() -> None:
+    clock, observer = FixedClock(), Observer()
+    builder = TranscriptBuilder(clock, observer)
+    builder.interruption("Sorry, is there a fee for that?", 1)
+    playout = played(arrived=16_000, sent=16_000)
+    clock.now = 3_000
+    builder.caller_started(playout)
+    clock.now = 3_100
+    builder.audio_sent()
+    clock.now = 4_100
+    builder.transmitted(
+        "Sorry, is there a fee for that?", 16_000, playout, self_spaced=False, untimed=True
+    )
+    builder.reply_ended(playout)
+
+    turn = observer.turns[0]
+    assert (turn.started_at_ms, turn.ended_at_ms) == (3_100, 4_100)
+    assert (turn.interruption, turn.scripted, turn.provenance) == (1, True, Provenance.TRANSMITTED)
+
+
 def test_the_heard_turn_keeps_the_audio_start_that_played_it_and_the_cut_rest_has_none() -> None:
     observer = Observer()
     builder = TranscriptBuilder(Clock(), observer)

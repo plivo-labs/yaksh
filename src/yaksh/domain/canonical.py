@@ -148,6 +148,34 @@ def compact(text: str) -> str:
     return re.sub(r"(?<=\d) (?=\d)", "", canonical(text))
 
 
+def count(text: str, part: str) -> int:
+    """How many times part is in text as whole words, not overlapping: as written, or with
+    numbers, dates and times in one form, whichever finds more. Digits are not joined across
+    punctuation, so "fifty. Five" holds no 505, but words are: "Okay, so your total" holds
+    "okay so your total". `contains` also finds part inside a longer word, as phrase rules do."""
+    written = len(re.findall(whole(part.casefold()), text.casefold()))
+    one_form = compact(part)
+    if not one_form:
+        return written
+    pieces = re.split(r"[.,;!?](?=\s|$)", text)
+    joined = " ".join(piece for piece in map(compact, pieces) if piece)
+    return max(written, len(re.findall(whole(one_form), joined)))
+
+
+def settled(text: str) -> str:
+    """The text without the number at its end: the speech to text can still add to it, as
+    "fifty" becomes "fifty five"."""
+    words = text.split()
+    while words and (words[-1][-1].isdigit() or words[-1].casefold() in NUMBER_WORDS):
+        words.pop()
+    return " ".join(words)
+
+
+def whole(part: str) -> str:
+    """A pattern for part with no letter or digit just before or after it."""
+    return rf"(?<![^\W_]){re.escape(part)}(?![^\W_])"
+
+
 def contains(text: str, part: str) -> bool:
     """Whether part is in text: as written, or with numbers, dates and times in one form. The
     written compare comes first, so a quote that stops inside a spoken number, such as "twenty"

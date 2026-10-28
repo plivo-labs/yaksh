@@ -48,6 +48,9 @@ class Source(Enum):
     """Fixed text that Yaksh says for the caller: the first words, a nudge, a goodbye."""
     MACHINE = auto()
     """A line of the persona's voicemail or call screener."""
+    INTERRUPTION = auto()
+    """A line of the scenario's interruption, counted once it has played: a reply after it is
+    then not measured with the rest of the line in its time."""
 
 
 def source_of(frame: Frame) -> Source | None:
@@ -126,6 +129,10 @@ class ReplyTimes(UserBotLatencyObserver):
         self._audio_starts = 0
         self._replies: list[CallerReplyTime] = []
         self.add_event_handler("on_latency_breakdown", self._measured)
+
+    def line_played(self) -> None:
+        """An interruption line finished playing."""
+        self._sources.append(Heard(self._time(), Source.INTERRUPTION, self._transcribed))
 
     @property
     def replies(self) -> list[CallerReplyTime]:

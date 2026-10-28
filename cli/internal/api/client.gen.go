@@ -1228,6 +1228,48 @@ func (e TriggerMethod) Valid() bool {
 	}
 }
 
+// Defines values for TryReason.
+const (
+	AgentQuiet           TryReason = "agent_quiet"
+	AudioFailed          TryReason = "audio_failed"
+	AudioNotReady        TryReason = "audio_not_ready"
+	CallEnding           TryReason = "call_ending"
+	CallerSpeaking       TryReason = "caller_speaking"
+	KeyPress             TryReason = "key_press"
+	NoWordsWhileSpeaking TryReason = "no_words_while_speaking"
+	OtherLine            TryReason = "other_line"
+	ReplyOwed            TryReason = "reply_owed"
+	TurnEnded            TryReason = "turn_ended"
+)
+
+// Valid indicates whether the value is a known member of the TryReason enum.
+func (e TryReason) Valid() bool {
+	switch e {
+	case AgentQuiet:
+		return true
+	case AudioFailed:
+		return true
+	case AudioNotReady:
+		return true
+	case CallEnding:
+		return true
+	case CallerSpeaking:
+		return true
+	case KeyPress:
+		return true
+	case NoWordsWhileSpeaking:
+		return true
+	case OtherLine:
+		return true
+	case ReplyOwed:
+		return true
+	case TurnEnded:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for UnsureKind.
 const (
 	UnsureKindHiddenAction       UnsureKind = "hidden_action"
@@ -1398,6 +1440,7 @@ const (
 	WireEventKindEndCall          WireEventKind = "end_call"
 	WireEventKindHandover         WireEventKind = "handover"
 	WireEventKindHoldStarted      WireEventKind = "hold_started"
+	WireEventKindInterruption     WireEventKind = "interruption"
 	WireEventKindRinging          WireEventKind = "ringing"
 	WireEventKindSilenceGreeting  WireEventKind = "silence_greeting"
 	WireEventKindStop             WireEventKind = "stop"
@@ -1432,6 +1475,8 @@ func (e WireEventKind) Valid() bool {
 	case WireEventKindHandover:
 		return true
 	case WireEventKindHoldStarted:
+		return true
+	case WireEventKindInterruption:
 		return true
 	case WireEventKindRinging:
 		return true
@@ -2188,6 +2233,18 @@ type Interruption struct {
 	AgentSays  *string  `json:"agent_says,omitempty"`
 	FromAnswer *int     `json:"from_answer,omitempty"`
 	Say        string   `json:"say"`
+}
+
+// InterruptionTry One try of an interruption: a start whose wait ended, or a miss at once.
+type InterruptionTry struct {
+	Answer        *int       `json:"answer,omitempty"`
+	Detail        *string    `json:"detail,omitempty"`
+	Number        int        `json:"number"`
+	Reason        *TryReason `json:"reason,omitempty"`
+	TurnStartedMs *int       `json:"turn_started_ms,omitempty"`
+	TurnWords     *bool      `json:"turn_words,omitempty"`
+	WindowEndMs   *int       `json:"window_end_ms,omitempty"`
+	Words         *string    `json:"words,omitempty"`
 }
 
 // ItemRead defines model for ItemRead.
@@ -3599,21 +3656,25 @@ type Trigger struct {
 // TriggerMethod defines model for TriggerMethod.
 type TriggerMethod string
 
+// TryReason Why a start of an interruption did not play its line, or why it is missed at once.
+type TryReason string
+
 // TurnRead defines model for TurnRead.
 type TurnRead struct {
-	AudioIndex  *int             `json:"audio_index,omitempty"`
-	CallerReply *CallerReplyTime `json:"caller_reply,omitempty"`
-	Dtmf        *bool            `json:"dtmf,omitempty"`
-	EndedAtMs   int              `json:"ended_at_ms"`
-	Machine     *MachineLine     `json:"machine,omitempty"`
-	Provenance  *Provenance      `json:"provenance,omitempty"`
-	ResponseMs  *int             `json:"response_ms,omitempty"`
-	Role        Role             `json:"role"`
-	Scripted    *bool            `json:"scripted,omitempty"`
-	StartedAtMs int              `json:"started_at_ms"`
-	TalkedOver  *bool            `json:"talked_over,omitempty"`
-	Text        string           `json:"text"`
-	Tools       *[]ToolItem      `json:"tools,omitempty"`
+	AudioIndex   *int             `json:"audio_index,omitempty"`
+	CallerReply  *CallerReplyTime `json:"caller_reply,omitempty"`
+	Dtmf         *bool            `json:"dtmf,omitempty"`
+	EndedAtMs    int              `json:"ended_at_ms"`
+	Interruption *int             `json:"interruption,omitempty"`
+	Machine      *MachineLine     `json:"machine,omitempty"`
+	Provenance   *Provenance      `json:"provenance,omitempty"`
+	ResponseMs   *int             `json:"response_ms,omitempty"`
+	Role         Role             `json:"role"`
+	Scripted     *bool            `json:"scripted,omitempty"`
+	StartedAtMs  int              `json:"started_at_ms"`
+	TalkedOver   *bool            `json:"talked_over,omitempty"`
+	Text         string           `json:"text"`
+	Tools        *[]ToolItem      `json:"tools,omitempty"`
 }
 
 // UnplayedCallVerdict A judged call that the persona never talked on: its voicemail or call screener answered,
@@ -3761,9 +3822,10 @@ type WaitingReason string
 
 // WireEvent defines model for WireEvent.
 type WireEvent struct {
-	AtMs   int           `json:"at_ms"`
-	Detail *string       `json:"detail,omitempty"`
-	Kind   WireEventKind `json:"kind"`
+	AtMs         int              `json:"at_ms"`
+	Detail       *string          `json:"detail,omitempty"`
+	Interruption *InterruptionTry `json:"interruption,omitempty"`
+	Kind         WireEventKind    `json:"kind"`
 }
 
 // WireEventKind defines model for WireEventKind.

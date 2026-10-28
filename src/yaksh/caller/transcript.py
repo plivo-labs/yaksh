@@ -34,11 +34,13 @@ from yaksh.domain.conversations import CallObserver, Provenance, Role, Turn
 
 @dataclass(frozen=True)
 class Queued:
-    """Text that a reply about to be spoken carries: generated, fixed, or a machine's line."""
+    """Text that a reply about to be spoken carries: generated, fixed, a machine's line, or an
+    interruption line."""
 
     text: str
     scripted: bool = False
     machine: MachineLine | None = None
+    interruption: int | None = None
 
 
 @dataclass
@@ -49,6 +51,8 @@ class Reply:
     its audio, at the byte where that audio ends."""
 
     playout: Playout | None
+    opened_ms: int | None = None
+    """When the reply's first audio went out on the line."""
     words: list[tuple[str, int, Playout | None, bool]] = field(default_factory=list)
     started_ms: int = 0
     self_spaced: bool = False
@@ -65,7 +69,8 @@ class Reply:
         untimed: bool,
     ) -> None:
         if not self.words:
-            self.started_ms = now_ms
+            # An untimed sentence arrives after its audio: the turn started with the audio.
+            self.started_ms = self.opened_ms if untimed and self.opened_ms is not None else now_ms
             self.self_spaced = self_spaced
         self.words.append((word, offset, playout, untimed))
 
@@ -138,6 +143,10 @@ class TranscriptBuilder:
         """When the voice detector last heard the agent stop."""
         self._generated_words = False
         self._called_after_words: dict[str, bool] = {}
+        self.replies_out = 0
+        """Replies of the persona whose audio went out on the line, not counting interruption
+        lines: a new answer of the agent starts after one."""
+        self.keys_pressed = 0
 
     @property
     def caller_quiet(self) -> bool:
@@ -178,6 +187,11 @@ class TranscriptBuilder:
         self.agent_voice = False
         self._voice_stopped = self.agent_voice_ended_ms = self._clock.ms() - round(stop_secs * 1000)
 
+    @property
+    def agent_turn_started_ms(self) -> int | None:
+        """When the agent turn in progress started, as its stored turn will say."""
+        return self._voice_started if self._voice_started is not None else self._agent_started
+
     def agent_turn_ended_since(self, ms: int) -> bool:
         """An agent turn ended at or after ms, timed by its voice when the detector heard it."""
         return self._agent_turn_ended_ms is not None and self._agent_turn_ended_ms >= ms
@@ -209,9 +223,14 @@ class TranscriptBuilder:
         """A recorded line of the persona's phone about to play."""
         self._generated.append(Queued(text, machine=line))
 
+    def interruption(self, text: str, number: int) -> None:
+        """The line of the scenario's interruption with this number, about to play."""
+        self._generated.append(Queued(text, scripted=True, interruption=number))
+
     def pressed(self, keys: str) -> None:
         """Keys the caller pressed on its keypad: a turn now, with no audio to wait for."""
         now = self._clock.ms()
+        self.keys_pressed += 1
         self._observer.turn(
             Turn(role=Role.CALLER, text=keys, started_at_ms=now, ended_at_ms=now, dtmf=True)
         )
@@ -278,6 +297,16 @@ class TranscriptBuilder:
         if self._reply is None or (playout is not None and playout is not self._reply.playout):
             return
         self._reply.ended = True
+        self.audio_progressed()
+
+    def audio_sent(self) -> None:
+        """A frame of the reply's audio went out on the line. A TTS opens a reply before its
+        first audio, so the reply counts as said from here, not from its start."""
+        reply = self._reply
+        if reply is not None and reply.opened_ms is None:
+            reply.opened_ms = self._clock.ms()
+            if reply.playout is None or reply.playout.interruption is None:
+                self.replies_out += 1
         self.audio_progressed()
 
     def audio_progressed(self) -> None:
@@ -349,6 +378,7 @@ class TranscriptBuilder:
                 scripted=queued.scripted,
                 machine=queued.machine,
                 audio_index=audio_index,
+                interruption=queued.interruption,
             )
         )
 
@@ -440,7 +470,7 @@ class WireTap(FrameProcessor):
                     untimed=frame.pts is None,
                 )
             elif isinstance(frame, TTSAudioRawFrame):
-                self._transcript.audio_progressed()
+                self._transcript.audio_sent()
             elif isinstance(frame, LLMFullResponseEndFrame | TTSStoppedFrame):
                 self._transcript.reply_ended(frame.metadata.get(PLAYOUT))
             elif isinstance(frame, EndFrame):
