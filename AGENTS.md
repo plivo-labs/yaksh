@@ -39,7 +39,7 @@ Imported call:    api -> queued evaluation -> evaluator -> evaluation -> saved m
 
 ## Rules
 
-- `domain/` imports nothing from the other packages. `simulation/` and `evaluation/` depend on the interfaces in `domain/`, never on `caller/`.
+- `domain/` imports nothing from the other packages. `simulation/` and `evaluation/` depend on the interfaces in `domain/`, never on `caller/`, and `caller/` never imports `simulation/` or `evaluation/`.
 - Business logic lives in `simulation/` and `evaluation/`; `worker/` and `api/` only call it. Evaluation never depends on simulation; evaluator execution errors may retry evaluation, never the call. A valid failing verdict or low score is a result, not a retryable error.
 - The database is the store; files are the interchange format for scenarios, personas and rubrics.
 - Default prompts and starter personas ship inside the package. User edits live in the database and are never overwritten by upgrades.

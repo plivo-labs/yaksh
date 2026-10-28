@@ -4,8 +4,8 @@ something never happened covers the turns it must."""
 from collections.abc import Sequence
 from typing import Any
 
+from yaksh.domain.canonical import canonical, contains
 from yaksh.domain.conversations import Turn
-from yaksh.evaluation.canonical import canonical, contains
 from yaksh.evaluation.evidence import speaker, turn_evidence
 
 

@@ -1,6 +1,6 @@
 import pytest
 
-from yaksh.evaluation.canonical import canonical, contains
+from yaksh.domain.canonical import canonical, contains
 
 
 @pytest.mark.parametrize(

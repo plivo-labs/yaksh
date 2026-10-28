@@ -135,6 +135,12 @@ source_modules = ["yaksh.simulation", "yaksh.evaluation"]
 forbidden_modules = ["yaksh.caller", "yaksh.integrations"]
 
 [[tool.importlinter.contracts]]
+name = "the caller never imports simulation or evaluation"
+type = "forbidden"
+source_modules = ["yaksh.caller"]
+forbidden_modules = ["yaksh.simulation", "yaksh.evaluation"]
+
+[[tool.importlinter.contracts]]
 name = "evaluation never imports simulation"
 type = "forbidden"
 source_modules = ["yaksh.evaluation"]

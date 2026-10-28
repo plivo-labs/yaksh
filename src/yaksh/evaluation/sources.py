@@ -9,10 +9,10 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any
 
+from yaksh.domain.canonical import contains
 from yaksh.domain.conversations import Role, Turn
 from yaksh.domain.evaluations import DecidedBy, ItemRole, Outcome
 from yaksh.domain.language_models import JsonModel
-from yaksh.evaluation.canonical import contains
 from yaksh.evaluation.criteria import schema
 from yaksh.evaluation.evidence import AGENT_HEARD, AGENT_SAID, with_item
 from yaksh.evaluation.judging import Check, ItemResult, JudgeSpec, ask, prompt
