@@ -942,6 +942,7 @@ export interface Reply {
 interface InterruptionTry {
   number: number;
   reason: string | null;
+  detail: string | null;
 }
 
 export interface WireEvent {

@@ -1017,6 +1017,7 @@ function WireEvents({
                   <p className="text-muted-foreground">
                     Line {event.interruption.number}:{" "}
                     {event.interruption.reason ? words(event.interruption.reason) : "played"}
+                    {event.interruption.detail && ` (${event.interruption.detail})`}
                   </p>
                 )}
                 {event.detail && <p className="break-all text-muted-foreground">{event.detail}</p>}
