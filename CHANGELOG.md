@@ -1,3 +1,15 @@
+## v0.9.0 (2026-10-28)
+
+### Feat
+
+- **caller**: run each phone call in its own process (#26)
+  - A new start setting, `YAKSH_CALL_PROCESSES=true`, runs each phone call in a process of its own. Then the calls of one worker use all CPUs of the server. The default is off: all calls run in the worker process, as before.
+  - In this mode, a call that stops or stalls fails alone, and the worker stays up. A call that never starts, for example when the dial fails, gives its process to the next call.
+  - Each call needs more memory and CPU in this mode. At rest the worker uses about 660 MB, and each call adds about 100 MB. A call uses 1.5 to 2 times the CPU that it uses in one process. Raise **Phone calls at once** in steps, as the self-hosting guide tells.
+  - Use Linux for many calls, and run the worker under an init process, as `docker/compose.yaml` does.
+  - In process mode, the **worker stall** fault of a call counts the stalls of its own process and of the worker, which relays its audio.
+  - In both modes, the turn model now uses one CPU thread. It uses about a tenth of the CPU for each call that it used before.
+
 ## v0.8.1 (2026-10-28)
 
 ### Feat
