@@ -1,3 +1,10 @@
+## v0.10.2 (2026-10-29)
+
+### Feat
+
+- **scenarios**: allow instructions of up to 16,000 characters (#38)
+- **cli**: pick the personas of a run with --persona (#37)
+
 ## v0.10.1 (2026-10-29)
 
 ### Feat
