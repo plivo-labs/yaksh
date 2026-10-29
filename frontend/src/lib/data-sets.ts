@@ -46,6 +46,14 @@ export function pieces(text: string, facts: Fact[]): Piece[] {
   return result;
 }
 
+/** The text as a data set plays it: each placeholder takes the value of the fact it names. A
+ * placeholder that names no fact stays. */
+export function filledText(text: string, facts: Fact[]): string {
+  return pieces(text, facts)
+    .map((piece) => ("text" in piece ? piece.text : (piece.value ?? `{{${piece.fact}}}`)))
+    .join("");
+}
+
 /** The placeholders in the text that name no known fact. */
 export function unknownPlaceholders(text: string, factNames: string[]): string[] {
   const known = new Set(factNames.map(normalized));
