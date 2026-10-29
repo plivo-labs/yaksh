@@ -22,6 +22,7 @@ import { CallResults } from "@/components/call-results";
 import { CallSounds } from "@/components/call-sounds";
 import { EndCallDialog } from "@/components/confirm-dialogs";
 import { CopyId } from "@/components/copy-id";
+import { InterruptionStart } from "@/components/interruption-start";
 import { Fact } from "@/components/panel";
 import type { PlayerHandle } from "@/components/recording-player";
 import { ResponseTime } from "@/components/response-time";
@@ -38,7 +39,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Message, MessageContent, MessageHeader } from "@/components/ui/message";
+import { Message, MessageContent, MessageFooter, MessageHeader } from "@/components/ui/message";
 import {
   MessageScroller,
   MessageScrollerButton,
@@ -66,6 +67,7 @@ import {
 import { playedDataSet } from "@/lib/data-sets";
 import { copyText } from "@/lib/clipboard";
 import { clock, duration, surroundingsLabel, phone, when, words } from "@/lib/format";
+import { lineNotes, noLines } from "@/lib/interruptions";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useStoredBoolean } from "@/hooks/use-stored-boolean";
 import { APPEAR, REVEAL, RISE } from "@/lib/motion";
@@ -246,6 +248,7 @@ function ConversationView({ id }: { id: string }) {
                     name={data.scenario_name}
                     scenario={data.scenario}
                     dataSet={playedDataSet(data)}
+                    unplayed={noLines(data)}
                   />
                 </TabsContent>
                 <TabsContent value="caller">
@@ -483,6 +486,10 @@ export function CallPane({
     () => (connectedMs === undefined ? [] : callMoments(conversation, connectedMs)),
     [conversation, connectedMs],
   );
+  const lines = useMemo(
+    () => lineNotes(conversation.transcript, conversation.wire_events, connectedMs ?? 0),
+    [conversation, connectedMs],
+  );
   return (
     <div className="flex h-full flex-col gap-6 p-px pr-3">
       {!overText && (
@@ -499,6 +506,7 @@ export function CallPane({
         cardRef={transcript}
         turns={conversation.transcript}
         moments={moments}
+        lines={lines}
         active={ACTIVE_STATUSES.includes(conversation.status)}
         waiting={waitingText(conversation)}
         connectedMs={connectedMs ?? 0}
@@ -553,11 +561,14 @@ export function ScenarioCard({
   name,
   scenario,
   dataSet,
+  unplayed,
 }: {
   name: string;
   scenario: PlayedScenario;
   /** The data set's name, when the scenario version held more than one. */
   dataSet: string | null;
+  /** Why no interruption line could play on this conversation; null when lines could play. */
+  unplayed: string | null;
 }) {
   return (
     <Card>
@@ -597,6 +608,24 @@ export function ScenarioCard({
               </ul>
             </dd>
           </div>
+          {scenario.interruptions.length > 0 && (
+            <div className="grid gap-1">
+              <dt className="text-xs-400 text-muted-foreground">Interruptions</dt>
+              <dd className="grid gap-1">
+                <ol className="grid list-decimal gap-1 pl-4 marker:text-muted-foreground">
+                  {scenario.interruptions.map((line, index) => (
+                    <li key={index}>
+                      {line.say}
+                      <span className="block text-xs-400 text-muted-foreground">
+                        <InterruptionStart line={line} phrase={line.agent_says} />
+                      </span>
+                    </li>
+                  ))}
+                </ol>
+                {unplayed && <p className="text-xs-400 text-muted-foreground">{unplayed}</p>}
+              </dd>
+            </div>
+          )}
         </dl>
       </CardContent>
     </Card>
@@ -771,6 +800,7 @@ function ShowTurn({ shown }: { shown: ShownTurn | null }) {
 const Transcript = memo(function Transcript({
   turns,
   moments,
+  lines,
   active,
   waiting,
   connectedMs,
@@ -782,6 +812,8 @@ const Transcript = memo(function Transcript({
   turns: Turn[];
   /** Lines between the turns, by time. */
   moments: CallMoment[];
+  /** Where each interruption line played, by the index of its turn. */
+  lines: Map<number, string>;
   active: boolean;
   waiting: string;
   /** Turn times count from the dial; they show from the connect, as the recording does. */
@@ -838,6 +870,7 @@ const Transcript = memo(function Transcript({
                       );
                     }
                     const { turn, index } = line;
+                    const note = lines.get(index);
                     const at = Math.max(0, turn.started_at_ms - connectedMs);
                     return (
                       <MessageScrollerItem
@@ -863,7 +896,11 @@ const Transcript = memo(function Transcript({
                               )}
                               {turn.caller_reply && <CallerReplyBadge reply={turn.caller_reply} />}
                               {turn.talked_over && <Badge>Talked over</Badge>}
-                              {turn.scripted && <Badge>Fixed line</Badge>}
+                              {turn.interruption ? (
+                                <Badge>Interruption {turn.interruption}</Badge>
+                              ) : (
+                                turn.scripted && <Badge>Fixed line</Badge>
+                              )}
                               {turn.dtmf && <Badge>DTMF</Badge>}
                               {turn.provenance === "cut" && <Badge>Cut off</Badge>}
                               {turn.provenance === "unconfirmed" && (
@@ -902,6 +939,7 @@ const Transcript = memo(function Transcript({
                                 {turn.text}
                               </BubbleContent>
                             </Bubble>
+                            {note && <MessageFooter>{note}</MessageFooter>}
                             {turn.tools?.length > 0 && <ToolCalls tools={turn.tools} />}
                           </MessageContent>
                         </Message>

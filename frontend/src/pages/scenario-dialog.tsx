@@ -40,6 +40,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { useCloseGuard } from "@/hooks/use-close-guard";
 import { revealErrors } from "@/lib/forms";
+import { ANSWER_START, lineProblems, lineSaves, PHRASE_START } from "@/lib/interruptions";
 import {
   useDefaults,
   useDeleteScenario,
@@ -61,7 +62,10 @@ import {
   CATEGORY_ITEMS,
   type CallerModel,
   type Category,
+  type Interruption,
   MAX_DATA_SETS,
+  MAX_INTERRUPTIONS,
+  MAX_LINE_CHARS,
   type Scenario,
   type ScenarioInput,
 } from "@/lib/types";
@@ -79,6 +83,7 @@ const EMPTY: ScenarioInput = {
   data_sets: [{ name: defaultDataSetName(1), known_facts: [], agent_data: [] }],
   first_words: null,
   caller: null,
+  interruptions: [],
 };
 
 function toDraft(scenario: Scenario): ScenarioInput {
@@ -93,6 +98,7 @@ function toDraft(scenario: Scenario): ScenarioInput {
     data_sets: scenario.data_sets,
     first_words: scenario.first_words,
     caller: scenario.caller,
+    interruptions: scenario.interruptions,
   };
 }
 
@@ -109,6 +115,11 @@ function toInput(draft: ScenarioInput): ScenarioInput {
     data_sets: trimmedDataSets(draft.data_sets),
     first_words: draft.first_words?.trim() || null,
     caller: draft.caller,
+    interruptions: draft.interruptions.map((line) => ({
+      ...line,
+      say: line.say.trim(),
+      agent_says: line.agent_says === null ? null : line.agent_says.trim(),
+    })),
   };
 }
 
@@ -184,9 +195,11 @@ export function ScenarioDialog({
   const problem = dataSetsProblem(input.data_sets);
   const factNames = input.data_sets[0].known_facts.map((fact) => fact.name);
   const unknownIn = (text: string) => unknownPlaceholders(text, factNames);
-  const badPlaceholders = [input.instructions, ...input.criteria].some(
-    (text) => unknownIn(text).length > 0,
-  );
+  const badPlaceholders = [
+    input.instructions,
+    ...input.criteria,
+    ...input.interruptions.flatMap((line) => [line.say, line.agent_says ?? ""]),
+  ].some((text) => unknownIn(text).length > 0);
 
   const submit = (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -195,6 +208,7 @@ export function ScenarioDialog({
       Boolean(input.persona_id) &&
       Boolean(input.instructions) &&
       input.criteria.length > 0 &&
+      input.interruptions.every((line) => lineSaves(line, input.data_sets)) &&
       problem === null &&
       !badPlaceholders;
     if (!revealErrors(event.currentTarget, () => setSubmitted(true), valid)) return;
@@ -454,6 +468,15 @@ export function ScenarioDialog({
               </AddRow>
             </FieldSet>
 
+            <InterruptionsField
+              lines={draft.interruptions}
+              submitted={submitted}
+              factNames={factNames}
+              unknownIn={unknownIn}
+              dataSets={input.data_sets}
+              onChange={(interruptions) => change(() => ({ interruptions }))}
+            />
+
             <CallerModelField
               value={draft.caller}
               onChange={(caller) => change(() => ({ caller }))}
@@ -536,6 +559,196 @@ function TextChecks({
         </p>
       ))}
     </>
+  );
+}
+
+/** The wait and first answer of each start, as the API sets them when a line leaves them out. */
+const START_DEFAULTS = {
+  phrase: { agent_says: "", after_s: 0, from_answer: 1 },
+  answer: { agent_says: null, after_s: 2, from_answer: 2 },
+} satisfies Record<string, Omit<Interruption, "say">>;
+
+type Start = keyof typeof START_DEFAULTS;
+
+const STARTS: { value: Start; label: string }[] = [
+  { value: "phrase", label: PHRASE_START },
+  { value: "answer", label: ANSWER_START },
+];
+
+/** A new line plays 2 s into an answer, from answer 2, which skips the greeting. */
+const NEW_LINE: Interruption = { say: "", ...START_DEFAULTS.answer };
+
+/** Fixed lines that the caller says while the agent still speaks. A new start sets the line's
+ * wait and first answer to that start's defaults. */
+function InterruptionsField({
+  lines,
+  submitted,
+  factNames,
+  unknownIn,
+  dataSets,
+  onChange,
+}: {
+  lines: Interruption[];
+  submitted: boolean;
+  factNames: string[];
+  unknownIn: (text: string) => string[];
+  dataSets: ScenarioInput["data_sets"];
+  onChange: (lines: Interruption[]) => void;
+}) {
+  const set = (index: number, next: Partial<Interruption>) =>
+    onChange(lines.map((line, at) => (at === index ? { ...line, ...next } : line)));
+  return (
+    <FieldSet>
+      <div className="flex items-baseline justify-between">
+        <FieldLegend variant="label">Interruptions</FieldLegend>
+        <span className="text-xs-400 text-muted-foreground">Phone runs only</span>
+      </div>
+      <FieldDescription>
+        The caller says a line while the agent is still talking, and the agent cannot cut it off.
+        The judges see where each line played.
+      </FieldDescription>
+      {lines.map((line, index) => {
+        const n = index + 1;
+        const phrase = line.agent_says;
+        const start: Start = phrase === null ? "answer" : "phrase";
+        const problems = submitted ? lineProblems(line, dataSets) : null;
+        return (
+          <div key={index} className="grid gap-3 rounded-sm border p-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs-500 text-muted-foreground">Interruption {n}</span>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                aria-label={`Remove interruption ${n}`}
+                onClick={() => onChange(lines.filter((_, at) => at !== index))}
+              >
+                <X />
+              </Button>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-[13rem_minmax(0,1fr)_auto_auto] sm:items-end">
+              <Field>
+                <FieldLabel htmlFor={`interruption-${n}-start`}>Start</FieldLabel>
+                <Select
+                  items={STARTS}
+                  value={start}
+                  onValueChange={(value) =>
+                    value && value !== start && set(index, START_DEFAULTS[value as Start])
+                  }
+                >
+                  <SelectTrigger id={`interruption-${n}-start`} className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      {STARTS.map((item) => (
+                        <SelectItem key={item.value} value={item.value}>
+                          {item.label}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              </Field>
+              {phrase !== null && (
+                <Field>
+                  <FieldLabel htmlFor={`interruption-${n}-phrase`}>Phrase</FieldLabel>
+                  <Input
+                    id={`interruption-${n}-phrase`}
+                    maxLength={MAX_LINE_CHARS}
+                    placeholder="first visit"
+                    aria-invalid={Boolean(problems?.phrase)}
+                    value={phrase}
+                    onChange={(e) => set(index, { agent_says: e.target.value })}
+                  />
+                </Field>
+              )}
+              <Field className={cn(phrase === null && "sm:col-start-3")}>
+                <FieldLabel htmlFor={`interruption-${n}-wait`}>Wait</FieldLabel>
+                <div className="flex items-center gap-2">
+                  <Input
+                    id={`interruption-${n}-wait`}
+                    type="number"
+                    step={0.5}
+                    min={0}
+                    max={30}
+                    className="w-20 tabular-nums"
+                    aria-invalid={Boolean(problems?.wait)}
+                    value={Number.isFinite(line.after_s) ? line.after_s : ""}
+                    onChange={(e) => set(index, { after_s: e.target.valueAsNumber })}
+                  />
+                  <span className="text-s-400 text-muted-foreground">s</span>
+                </div>
+              </Field>
+              <Field>
+                <FieldLabel htmlFor={`interruption-${n}-answer`}>From answer</FieldLabel>
+                <Input
+                  id={`interruption-${n}-answer`}
+                  type="number"
+                  inputMode="numeric"
+                  min={1}
+                  max={100}
+                  className="w-20 tabular-nums"
+                  aria-invalid={Boolean(problems?.answer)}
+                  value={Number.isFinite(line.from_answer) ? line.from_answer : ""}
+                  onChange={(e) => set(index, { from_answer: e.target.valueAsNumber })}
+                />
+              </Field>
+            </div>
+            {[problems?.phrase, problems?.wait, problems?.answer].filter(Boolean).map((problem) => (
+              <FieldError key={problem}>{problem}</FieldError>
+            ))}
+            {phrase !== null && (
+              <TextChecks
+                unknown={unknownIn(phrase)}
+                factNames={factNames}
+                fixed={fixedValues(phrase, dataSets)}
+                onReplace={(value, fact) =>
+                  set(index, { agent_says: withPlaceholder(phrase, value, fact) })
+                }
+              />
+            )}
+            <FieldDescription>
+              {phrase === null
+                ? "Plays when the agent still talks this long into an answer, from this answer on. Answer 1 is often the greeting."
+                : "Plays when the agent says this, from this answer on, and still talks when the wait ends. Pick words in the middle of a long sentence."}
+            </FieldDescription>
+            <Field>
+              <FieldLabel htmlFor={`interruption-${n}-say`}>The caller says</FieldLabel>
+              <Input
+                id={`interruption-${n}-say`}
+                maxLength={MAX_LINE_CHARS}
+                placeholder="Sorry, is there a fee for that?"
+                aria-invalid={Boolean(problems?.say)}
+                value={line.say}
+                onChange={(e) => set(index, { say: e.target.value })}
+              />
+              {problems?.say && <FieldError>{problems.say}</FieldError>}
+              <TextChecks
+                unknown={unknownIn(line.say)}
+                factNames={factNames}
+                fixed={fixedValues(line.say, dataSets)}
+                onReplace={(value, fact) =>
+                  set(index, { say: withPlaceholder(line.say, value, fact) })
+                }
+              />
+            </Field>
+          </div>
+        );
+      })}
+      {lines.length > 0 && (
+        <FieldDescription>
+          Each interruption plays at most once, and only one plays at a time.
+        </FieldDescription>
+      )}
+      <AddRow
+        count={lines.length}
+        limit={MAX_INTERRUPTIONS}
+        onAdd={() => onChange([...lines, NEW_LINE])}
+      >
+        Add interruption
+      </AddRow>
+    </FieldSet>
   );
 }
 

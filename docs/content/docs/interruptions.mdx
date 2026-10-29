@@ -9,7 +9,7 @@ Interruptions play on phone calls only, while the persona is on the call. A text
 
 ## Write interruptions
 
-A scenario has up to 3 interruptions. Write them in the file of `yaksh scenario create` or `yaksh scenario update` (refer to [CLI](/docs/cli)), or send them with the API. The console does not show them yet. A scenario that you save in the console keeps its interruptions.
+A scenario has up to 3 interruptions. In the console, add them in the **Interruptions** section of the scenario. You can also write them in the file of `yaksh scenario create` or `yaksh scenario update` (refer to [CLI](/docs/cli)), or send them with the API.
 
 ```yaml
 interruptions:
@@ -19,12 +19,16 @@ interruptions:
     say: "Hold on, can you say that again?"
 ```
 
-| Field | Meaning |
-| --- | --- |
-| `say` | The caller's words, 1 to 200 characters. A `{{Fact name}}` placeholder takes the value of the data set. The limit applies before and after the data set fills in the placeholders. |
-| `agent_says` | A phrase of 1 to 200 characters, with at least one word or number. It can have `{{Fact name}}` placeholders. |
-| `after_s` | The wait in seconds, from 0 to 30. The default is 0 with a phrase, and 2 with no phrase. |
-| `from_answer` | The first answer of the agent that can start a wait, from 1 to 100. The default is 1 with a phrase, and 2 with no phrase, which skips the greeting. |
+| Field | Console | Meaning |
+| --- | --- | --- |
+| `say` | **The caller says** | The caller's words, 1 to 200 characters. A `{{Fact name}}` placeholder takes the value of the data set. The limit applies before and after the data set fills in the placeholders. |
+| `agent_says` | **Phrase**, when **Start** is **When the agent says** | A phrase of 1 to 200 characters, with at least one word or number. It can have `{{Fact name}}` placeholders. When **Start** is **When an answer starts**, the line has no phrase. |
+| `after_s` | **Wait** | The wait in seconds, from 0 to 30. The default is 0 with a phrase, and 2 with no phrase. |
+| `from_answer` | **From answer** | The first answer of the agent that can start a wait, from 1 to 100. The default is 1 with a phrase, and 2 with no phrase, which skips the greeting. |
+
+When you change **Start** in the console, **Wait** and **From answer** change to the defaults of the new start.
+
+The page of a scenario shows its interruptions. The **Scenario** tab of a conversation shows them with the values of the data set.
 
 A wait starts each time the agent says the phrase. With no phrase, a wait starts when each answer of the agent starts. Answer 1 is the first speech of the agent, often its greeting. The next answer starts after the caller replies or presses keys. An interruption line does not start an answer.
 
@@ -63,8 +67,9 @@ Backchannel lines, such as "Mm-hmm.", are not supported yet. Yaksh handles them 
 
 ## Results
 
-- The transcript shows each line as a caller turn with the badge **Fixed line**. The first words, the question to a silent agent and the goodbyes have the same badge. In the API, the turn of a line has `interruption`: the number of the interruption. The line comes after the agent turn that it interrupted, because that turn stays whole.
-- The judges see where each line came. After the turn of the line, a note in parentheses tells them where the caller spoke. The note gives how far into which agent turn, and after which words of the agent. The part of their view about the caller's test also lists the lines that played. Thus the check of the caller counts them as part of its test. The judges judge the call as they judge all other calls.
+- The transcript shows each line as a caller turn with the badge of its number, such as **Interruption 1**. Other fixed lines, such as the first words, have the badge **Fixed line**. In the API, the turn of a line has `interruption`: the number of the interruption. The line comes after the agent turn that it interrupted, because that turn stays whole.
+- Under the line, a note tells where the caller spoke, such as "3.1 s into the agent's turn at 0:27.0". When no agent turn of the transcript holds the line, the note quotes the last words of the agent before the line. A line over sound with no words from the agent has the note "Over sound with no words from the agent".
+- The judges see where each line played. After the turn of the line, a note in parentheses tells them where the caller spoke. The note gives how far into which agent turn, and after which words of the agent. The part of their view about the caller's test also lists the lines that played. Thus the check of the caller counts them as part of its test. The judges judge the call as they judge all other calls.
 - Nothing checks yet how fast the agent stopped. To check what the agent did after a line, write a criterion with the value that you expect. An example is "The agent says that a new patient visit costs $95." Refer to [Writing criteria](/docs/writing-criteria).
 - The recording in the **Audio** card of the call has the two sides, the agent on the left and the caller on the right. Listen to it to hear how the agent stopped.
 - The lines count in the speech of the caller (**Agent's share of the speech**). They do not count in **Agent response time**, **Longest wait** or **Spoke over the caller**, because the caller said them over the agent. Thus **Spoke over the caller** does not show an agent that talked over a line.

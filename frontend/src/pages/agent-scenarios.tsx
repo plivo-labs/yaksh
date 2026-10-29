@@ -9,6 +9,7 @@ import { DeleteConfirm, DeleteDialog } from "@/components/confirm-dialogs";
 import { CopyId } from "@/components/copy-id";
 import { FilterSelect } from "@/components/filter-select";
 import { ForkedFrom } from "@/components/forked-from";
+import { InterruptionStart } from "@/components/interruption-start";
 import { Panel } from "@/components/panel";
 import { SearchInput } from "@/components/search-input";
 import { Badge } from "@/components/ui/badge";
@@ -715,6 +716,35 @@ function ScenarioDetail({
                 <span className="text-muted-foreground">None</span>
               )}
             </Section>
+            {scenario.interruptions.length > 0 && (
+              <Section label="Interruptions" wide>
+                <ol className="divide-y rounded-md border">
+                  {scenario.interruptions.map((line, index) => (
+                    <li
+                      key={index}
+                      className="grid grid-cols-[1.5rem_minmax(0,1fr)] gap-2 px-3 py-2.5 text-s-400"
+                    >
+                      <span className="text-muted-foreground tabular-nums">{index + 1}</span>
+                      <span className="grid gap-1">
+                        <span>
+                          <Filled text={line.say} facts={selected.known_facts} />
+                        </span>
+                        <span className="text-muted-foreground">
+                          <InterruptionStart
+                            line={line}
+                            phrase={
+                              line.agent_says && (
+                                <Filled text={line.agent_says} facts={selected.known_facts} />
+                              )
+                            }
+                          />
+                        </span>
+                      </span>
+                    </li>
+                  ))}
+                </ol>
+              </Section>
+            )}
           </dl>
         </DataSetPanel>
       </DataSetTabs>

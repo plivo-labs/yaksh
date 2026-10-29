@@ -824,7 +824,25 @@ export interface ScenarioConfig {
   first_words: string | null;
   /** The caller's model for this scenario; null uses the settings' model. */
   caller: CallerModel | null;
+  /** Fixed lines that the caller says while the agent still speaks, on phone calls. */
+  interruptions: Interruption[];
 }
+
+/** A fixed line that the caller says while the agent still speaks. A wait of `after_s` starts
+ * each time the agent says `agent_says`, or, with no phrase, when each answer of the agent
+ * starts; only the answers from `from_answer` on start waits. The line plays when a wait ends
+ * with the agent still speaking. */
+export interface Interruption {
+  say: string;
+  agent_says: string | null;
+  after_s: number;
+  from_answer: number;
+}
+
+export const MAX_INTERRUPTIONS = 3;
+
+/** The most characters of a fixed line or a phrase, also after a data set fills it. */
+export const MAX_LINE_CHARS = 200;
 
 /** A scenario version as one data set played it, its placeholders filled in. */
 export interface PlayedScenario {
@@ -837,6 +855,7 @@ export interface PlayedScenario {
   agent_data: Fact[];
   first_words: string | null;
   caller: CallerModel | null;
+  interruptions: Interruption[];
 }
 
 export interface CallerModel {
@@ -911,6 +930,8 @@ export interface Turn {
   /** On a caller turn that the caller's model spoke on a phone call: where the time of its
    * reply went. Turns that arrive live during the call do not have it. */
   caller_reply?: CallerReplyTime | null;
+  /** A line of the scenario's interruption with this number, from 1. */
+  interruption?: number | null;
 }
 
 /** Where the time of one caller reply went, from the end of the agent's speech to the caller's
@@ -939,10 +960,14 @@ export interface Reply {
 }
 
 /** One try of an interruption; `reason` is null when its line played. */
-interface InterruptionTry {
+export interface InterruptionTry {
   number: number;
   reason: string | null;
   detail: string | null;
+  /** When the agent's turn of the start began, on the call clock. */
+  turn_started_ms: number | null;
+  /** For a line that played: the agent's words in its turn up to the line's start. */
+  words: string | null;
 }
 
 export interface WireEvent {
