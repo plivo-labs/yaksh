@@ -841,6 +841,8 @@ export interface Interruption {
 
 export const MAX_INTERRUPTIONS = 3;
 
+export const MAX_INSTRUCTIONS_CHARS = 16000;
+
 /** The most characters of a fixed line or a phrase, also after a data set fills it. */
 export const MAX_LINE_CHARS = 200;
 

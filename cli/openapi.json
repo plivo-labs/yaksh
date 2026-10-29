@@ -14768,7 +14768,7 @@
         "properties": {
           "instructions": {
             "type": "string",
-            "maxLength": 4000,
+            "maxLength": 16000,
             "minLength": 1,
             "title": "Instructions"
           },
@@ -14848,7 +14848,7 @@
         "properties": {
           "instructions": {
             "type": "string",
-            "maxLength": 4000,
+            "maxLength": 16000,
             "minLength": 1,
             "title": "Instructions"
           },
@@ -15252,7 +15252,7 @@
             "anyOf": [
               {
                 "type": "string",
-                "maxLength": 4000,
+                "maxLength": 16000,
                 "minLength": 1
               },
               {

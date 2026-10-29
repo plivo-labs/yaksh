@@ -19,8 +19,10 @@ from yaksh.domain.canonical import canonical
 from yaksh.domain.errors import ValidationError
 from yaksh.domain.settings import MAX_DATA_SETS, CallerModel
 
+MAX_INSTRUCTIONS_CHARS = 16000
 Instructions = Annotated[
-    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=4000)
+    str,
+    StringConstraints(strip_whitespace=True, min_length=1, max_length=MAX_INSTRUCTIONS_CHARS),
 ]
 MAX_FACT_NAME_CHARS = 80
 MAX_FACTS = 30
