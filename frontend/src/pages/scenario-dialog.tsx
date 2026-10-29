@@ -64,6 +64,7 @@ import {
   type Category,
   type Interruption,
   MAX_DATA_SETS,
+  MAX_INSTRUCTIONS_CHARS,
   MAX_INTERRUPTIONS,
   MAX_LINE_CHARS,
   type Scenario,
@@ -328,7 +329,7 @@ export function ScenarioDialog({
                 required
                 aria-invalid={submitted && !input.instructions}
                 rows={6}
-                maxLength={4000}
+                maxLength={MAX_INSTRUCTIONS_CHARS}
                 placeholder="You want to move your cleaning to an evening next week. When the agent asks for your details, give your name and date of birth. If no evening is free, keep your current appointment. Once the agent confirms, say goodbye."
                 value={draft.instructions}
                 onChange={(e) => change(() => ({ instructions: e.target.value }))}
