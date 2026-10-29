@@ -1,3 +1,12 @@
+## v0.10.1 (2026-10-29)
+
+### Feat
+
+- **console**: edit interruptions and show where each line played (#36)
+  - The scenario dialog has an Interruptions section. Add up to 3 lines there, each with its start (a phrase of the agent, or the start of an answer), its wait, the first answer that can start it, and the words of the caller. Errors show under their fields, as the API checks them.
+  - The scenario page and the Scenario tab of a conversation list the lines. On a text run, or a call on which no caller talked, the tab says why no line played.
+  - In the transcript, the turn of a line has the badge "Interruption N", and a note under it tells how far into which agent turn the caller spoke.
+
 ## v0.10.0 (2026-10-29)
 
 ### Feat
