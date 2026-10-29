@@ -77,6 +77,12 @@ To do a test of how an outbound agent handles a voicemail or a call screener, ad
 yaksh run start --agent <agent id> --all --answer voicemail --answer screener --wait
 ```
 
+To run the scenarios with other personas than their own, add `--persona`. Each persona is a different conversation of each scenario. `yaksh persona list` shows the IDs of the personas. Refer to [Writing personas](/docs/writing-personas).
+
+```sh
+yaksh run start --agent <agent id> --all --persona <persona id> --persona <persona id> --wait
+```
+
 If the judges failed a call, these commands show why:
 
 - `yaksh run metrics <run id>` shows the pass rate, the coverage, the calls of each scenario with their verdicts, and the counts of each criterion. A call with a null verdict is a call whose evaluation failed. `unplayed` lists the calls where no caller talked, with their verdicts from the agent rules.
