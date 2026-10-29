@@ -111,7 +111,7 @@ criteria:
 
 ### Add them
 
-- `yaksh scenario create --agent <agent-id> -f <file>` adds a scenario. `yaksh persona list` shows the personas for its `persona_id`. When none fits, ask the user to add one in the console.
+- `yaksh scenario create --agent <agent-id> -f <file>` adds a scenario. `yaksh persona list` shows the personas for its `persona_id`. A persona is a person, not one agent's caller: pick it by how it talks, and keep the role and the values in the scenario and its data sets. When none fits, ask the user to add one in the console.
 - In YAML, quote a value that holds `: ` or ` #`, and in a `{name: ..., value: ...}` line, a value with a comma.
 - Write the scenarios yourself: `yaksh scenario generate` saves each scenario before you can read it, and the CLI cannot delete a scenario.
 - `yaksh scenario update <scenario-id> -f <file>` changes a scenario: a list in the file replaces the whole list. The server refuses the read-only fields of `yaksh scenario view`, such as the scenario's `id`. Keep the `id` of each data set that stays.
@@ -121,7 +121,7 @@ criteria:
 
 When the agent has both transports, use `--transport text` with `--repeats 3`: text costs less and needs no test number. Use phone when the user asks, or to test speech, interruptions, response time, noise, voicemail or call screening.
 
-1. Count the conversations: one for each scenario, each of its `data_sets` (in `yaksh scenario list`), each `--answer` and each repeat. Run the fewest scenarios that test the change, and tell the user the count. If the user did not ask for the run, ask before a run of more than 10 phone or 50 text conversations.
+1. Count the conversations: one for each scenario, each of its `data_sets` (in `yaksh scenario list`), each `--persona`, each `--answer` and each repeat. `--persona <id>` runs every scenario with that persona in place of its own. Run the fewest scenarios that test the change, and tell the user the count. If the user did not ask for the run, ask before a run of more than 10 phone or 50 text conversations.
 2. `yaksh run start --agent <agent-id> --scenario <id> --wait --timeout <limit>` starts a run, waits for its conversations, and then for the judges ("judging: N calls pending").
    - Exit 0: each conversation completed and each verdict passed, or no judge ran ("judges: off" on stderr: tell the user).
    - When the wait ends first, do not start the run again.

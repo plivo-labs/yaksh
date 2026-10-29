@@ -1,0 +1,37 @@
+---
+title: Writing personas
+description: How to write a persona that any agent can use.
+---
+
+A persona is the person that Yaksh's caller plays: how they talk and how they sound. A scenario and its data sets give the caller a goal and values for one agent. The persona gives the caller a manner that works with every agent, so one scenario can run with many personas.
+
+## What goes where
+
+| Put this | In |
+|---|---|
+| Temperament and way of speaking | The persona's prompt |
+| The language of the call | The persona's language |
+| The voice and its accent, the noise around the caller and how the phone answers | The persona's voice, surroundings and answering |
+| The caller's role in the test, such as "You are the patient" | The scenario's instructions |
+| Names, dates, account numbers and other values | The facts of the data set |
+| How any caller acts on a call | Yaksh itself |
+
+Yaksh tells every caller how to act on a call: answer one thing at a time, wait while the agent works, and end the call with a short goodbye only when its task is done or its instructions say to end; else the agent ends it.
+
+## Guidelines
+
+- **Write about the person, not the agent.** A persona never names an agent or a company, and never says how an agent works, such as "the agent asks who picked up before its greeting". A real caller does not know how the agent is built.
+- **Leave out call rules.** A rule such as "never say goodbye first" or "the agent ends the call" changes every scenario that uses the persona, and conflicts with Yaksh's own rules.
+- **Leave out roles and values.** "You are a patient", a name and a date of birth go in the scenario and its data set. The same persona can then be a patient in one test and a sales lead in the next.
+- **Write steady traits, not counted events.** Write "You often switch to English for nouns", not "Once, a friend talks to you". A count makes the caller plan when to act, and the caller can say that planning aloud.
+- **Name the persona by how it talks, or with a person's name,** such as "Rushed caller" or "Priya Raman". Never with the name of an agent or a company.
+
+## How a run picks personas
+
+Each scenario has its own persona. A run uses that persona unless the run picks others for the scenario:
+
+- In the console, each scenario card of the run dialog lists its personas. Change them there, or use **Mix personas**: each scenario then gets its own persona and others of one language, in place of its list.
+- With the API, send `persona_ids` for each scenario. Refer to [Runs](/docs/runs).
+- With the CLI, `yaksh run start --persona <persona id>` gives the persona to every scenario of the run. Give the flag more than one time for more personas.
+
+Each persona is a different conversation of the scenario.

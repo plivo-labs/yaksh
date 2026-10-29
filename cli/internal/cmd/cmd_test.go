@@ -299,6 +299,8 @@ func TestErrorsSayTheNextStep(t *testing.T) {
 		{"bad agent ID", against(missing), []string{"agent", "view", "support-line"}, `"support-line" is not an agent ID: find it with "yaksh agent list"`},
 		{"bad document ID", against(missing), []string{"scenario", "generate", "--agent", agentID, "--persona", personaID, "--document", "faq.pdf"}, `"faq.pdf" is not a document ID: find it under knowledge_base in "yaksh agent view <agent-id>"`},
 		{"bad answer", against(missing), []string{"run", "start", "--agent", agentID, "--all", "--answer", "machine"}, `"machine" is not an answer: use caller, voicemail or screener`},
+		{"bad persona ID", against(missing), []string{"run", "start", "--agent", agentID, "--all", "--persona", "Cooperative caller"}, `"Cooperative caller" is not a persona ID: find it with "yaksh persona list"`},
+		{"empty persona", against(missing), []string{"run", "start", "--agent", agentID, "--all", "--persona", ""}, "--persona gives no persona ID\nnext: yaksh persona list"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -332,6 +334,28 @@ func TestRunStartSendsOnlyTheFieldsThatWereSet(t *testing.T) {
 	}
 	if key := req.header.Get("Idempotency-Key"); key != "ci-41" {
 		t.Fatalf("Idempotency-Key = %q", key)
+	}
+}
+
+func TestRunStartGivesEveryScenarioThePersonas(t *testing.T) {
+	const otherPersona = "8d9e0000-0000-4000-8000-00000000000e"
+	f := newFakeAPI(t, map[string]http.HandlerFunc{
+		"POST /api/v1/runs": reply(202, runJSON("queued", `"waiting":4`)),
+	})
+	code, _, stderr := run(t, context.Background(), against(f), "",
+		"run", "start", "--agent", agentID, "--scenario", scenA+","+scenB,
+		"--persona", personaID+","+otherPersona, "--answer", "voicemail")
+
+	if code != 0 {
+		t.Fatalf("code = %d, stderr = %q", code, stderr)
+	}
+	var body map[string]any
+	if err := json.Unmarshal(f.requests("POST", "/api/v1/runs")[0].body, &body); err != nil {
+		t.Fatal(err)
+	}
+	want := fmt.Sprintf(`[{"answered_by":["voicemail"],"persona_ids":["%[1]s","%[2]s"],"scenario_id":"%[3]s"},{"answered_by":["voicemail"],"persona_ids":["%[1]s","%[2]s"],"scenario_id":"%[4]s"}]`, personaID, otherPersona, scenA, scenB)
+	if got, _ := json.Marshal(body["scenarios"]); string(got) != want {
+		t.Fatalf("scenarios = %s, want %s", got, want)
 	}
 }
 
