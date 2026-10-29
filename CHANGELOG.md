@@ -1,3 +1,14 @@
+## v0.10.0 (2026-10-29)
+
+### Feat
+
+- let the caller interrupt the agent with fixed lines (#30)
+  - A scenario can hold up to 3 interruptions: fixed lines that Yaksh's caller says while the agent still speaks, on phone calls. A line plays a set time into an answer of the agent, or when the agent says a phrase. Use them to test if the agent stops when a caller talks over it, and what it says next.
+  - The agent cannot cut a line. When the agent stops for a line, the caller waits for its answer, and continues the call after 3 s of silence. When the agent talks over the line, the caller replies as usual.
+  - The judges see where each line came, and they judge the call as any other call. Nothing measures yet how fast the agent stopped: write a criterion for what the agent must do after the line.
+  - Write interruptions in the scenario file of the CLI or with the API. The console does not show them yet, and its Events card shows each try of a line. The docs have a new Interruptions page.
+  - Add interruptions to a scenario only after every Yaksh process runs this version. An older process refuses a scenario that has them.
+
 ## v0.9.7 (2026-10-28)
 
 ### Fix
