@@ -52,7 +52,9 @@ from pipecat.turns.user_turn_strategies import UserTurnStrategies
 from pipecat.workers.runner import WorkerRunner
 
 from yaksh.caller.audio import SAMPLE_RATE, Clock
+from yaksh.caller.interruptions import Interrupter, LineGate, TurnOrder
 from yaksh.caller.machines import MachineGate, SoundPlayer
+from yaksh.caller.prepared import Prepared
 from yaksh.caller.reply_times import ReplyTimes
 from yaksh.caller.transcript import (
     AgentTurnTap,
@@ -342,7 +344,7 @@ class TurnLimit(FrameProcessor):
     A turn counts when its answer starts to play. When the agent pauses inside its turn, the model
     is asked for an answer that the agent's next words cut before any of it plays; when the
     agent's turn ends, that answer is dropped and uses no turn. A fixed line, such as the idle
-    nudge, is no answer, and keys pressed without words use no turn."""
+    nudge or an interruption line, is no answer, and keys pressed without words use no turn."""
 
     def __init__(self, turns: int, at_limit: Callable[[], Awaitable[None]]) -> None:
         super().__init__()
@@ -360,7 +362,7 @@ class TurnLimit(FrameProcessor):
                 self._asked = False
                 self._answered += 1
         elif isinstance(frame, TTSSpeakFrame) and direction is FrameDirection.DOWNSTREAM:
-            self._asked = False
+            self.fixed_line()
         elif isinstance(frame, LLMContextFrame) and direction is FrameDirection.DOWNSTREAM:
             answers = not frame.speculation
             if self._answered >= self._turns:
@@ -371,6 +373,11 @@ class TurnLimit(FrameProcessor):
             if answers:
                 self._asked = True
         await self.push_frame(frame, direction)
+
+    def fixed_line(self) -> None:
+        """A fixed line plays next: an answer that was asked for and never played uses no turn,
+        and the line's audio does not count as one."""
+        self._asked = False
 
 
 class Stoppable(Protocol):
@@ -497,9 +504,13 @@ class Persona:
         after_output: Sequence[FrameProcessor],
         state: CallState,
         turn_models: TurnModels,
+        prepared: Prepared,
+        order: TurnOrder,
         before_output: Sequence[FrameProcessor] = (),
         observers: Sequence[BaseObserver] = (),
     ) -> None:
+        """`prepared` and `order` play the scenario's interruptions: the lines' speech, and the
+        observer that keeps the transcript's turns in order around a line."""
         settings = request.app_settings
         turns = settings.turn_taking
         self.llm = llm_service(settings, request.caller, keys, request.instructions)
@@ -542,28 +553,58 @@ class Persona:
                 ),
             ),
         )
-        self.llm.on_silence = partial(wait_for_agent, aggregators.user())
+        user = aggregators.user()
+        self.llm.on_silence = partial(wait_for_agent, user)
         self.gate = MachineGate() if request.answering else None
         """Closed while the persona's voicemail or call screener answers."""
-        self.player = SoundPlayer() if request.answering else None
+        lines = request.interruptions
+        self.player = SoundPlayer() if request.answering or lines else None
+        vad = turn_models.vad(
+            sample_rate=SAMPLE_RATE,
+            params=VADParams(
+                confidence=VAD_CONFIDENCE, start_secs=VAD_START_S, stop_secs=turns.vad_stop_s
+            ),
+        )
+        turn_limit = TurnLimit(request.max_turns, self.ending.goodbye)
+        interrupters: list[FrameProcessor] = []
+        line_gates: list[FrameProcessor] = []
+        if lines:
+            assert self.player is not None
+            line_gate = LineGate(
+                user.context, clock, partial(wait_for_agent, user), turn_limit.fixed_line
+            )
+            interrupter = Interrupter(
+                lines,
+                prepared.lines,
+                vad=vad,
+                transcript=transcript,
+                gate=line_gate,
+                order=order,
+                player=self.player,
+                reply_times=self.reply_times,
+                clock=clock,
+                listening=self.listening,
+                ending=lambda: state.end_reason is not None,
+                words_while_speaking=settings.speech.stt.traits.words_while_speaking,
+            )
+            interrupters.append(interrupter)
+            line_gates.append(line_gate)
+
+            @user.event_handler("on_user_turn_stopped")
+            async def on_turn_stopped(_user: Any, _strategy: Any, _message: Any) -> None:
+                await line_gate.turn_ended()
+
         pipeline = Pipeline(
             [
                 transport_input,
-                VADProcessor(
-                    vad_analyzer=turn_models.vad(
-                        sample_rate=SAMPLE_RATE,
-                        params=VADParams(
-                            confidence=VAD_CONFIDENCE,
-                            start_secs=VAD_START_S,
-                            stop_secs=turns.vad_stop_s,
-                        ),
-                    )
-                ),
+                VADProcessor(vad_analyzer=vad),
                 self.stt,
-                aggregators.user(),
+                *interrupters,
+                user,
                 AgentTurnTap(transcript),
                 *([self.gate] if self.gate else []),
-                TurnLimit(request.max_turns, self.ending.goodbye),
+                *line_gates,
+                turn_limit,
                 self.llm,
                 GeneratedTap(transcript),
                 self.tts,

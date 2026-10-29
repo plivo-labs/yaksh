@@ -1,6 +1,8 @@
 """Sarvam: saaras speech-to-text over its streaming websocket, and bulbul speech over HTTP.
 Speech goes over HTTP because that service sends each sentence's text after its audio, as
-Yaksh's transcript needs; Sarvam's websocket service sends the text first."""
+Yaksh's transcript needs; Sarvam's websocket service sends the text first. The speech-to-text
+service sends no partials, and one final for each utterance, when Yaksh's VAD has heard the
+agent stop: so `SttTraits.words_while_speaking` is false."""
 
 import functools
 from importlib.resources import files

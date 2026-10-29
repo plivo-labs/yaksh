@@ -3,10 +3,10 @@ from collections.abc import Callable, Sequence
 from typing import Any
 
 from yaksh.domain.agent_records import AgentRecord
+from yaksh.domain.canonical import canonical, contains
 from yaksh.domain.conversations import Provenance, Role, Turn
 from yaksh.domain.evaluations import DecidedBy, ItemRole, Outcome
 from yaksh.domain.language_models import JsonModel
-from yaksh.evaluation.canonical import canonical, contains
 from yaksh.evaluation.criteria import schema
 from yaksh.evaluation.evidence import with_item
 from yaksh.evaluation.judging import Answered, Check, ItemResult, JudgeSpec, ask, prompt

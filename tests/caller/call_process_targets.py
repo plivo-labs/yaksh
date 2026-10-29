@@ -6,6 +6,7 @@ import os
 import socket
 import time
 from collections.abc import Awaitable, Callable
+from typing import cast
 
 from yaksh.caller.conversation import Ended, Heard
 from yaksh.caller.link import Kind, Link, open_link
@@ -125,6 +126,25 @@ def sends_audio(end: socket.socket, _preloaded: bool) -> None:
         await finish(link)
 
     run(end, speak)
+
+
+def echoes_speech(end: socket.socket, _preloaded: bool) -> None:
+    """Tells the worker each item of the speech made before the call, as an event that names
+    its place and what it holds, until the worker cancels."""
+
+    async def echo(link: Link) -> None:
+        while True:
+            kind, payload = await link.receive()
+            if kind is Kind.CANCEL:
+                await finish(link)
+                return
+            if kind is Kind.SPEECH:
+                index, made = cast(tuple[int, bytes | BaseException], payload)
+                held = repr(made) if isinstance(made, bytes) else type(made).__name__
+                echo = WireEvent(kind=WireEventKind.CALLER_SOUND, at_ms=0, detail=f"{index}:{held}")
+                await link.send(Kind.WIRE, echo)
+
+    run(end, echo)
 
 
 def closes_the_stream(end: socket.socket, _preloaded: bool) -> None:

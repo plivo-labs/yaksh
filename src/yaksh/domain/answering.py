@@ -74,6 +74,11 @@ class Answering(BaseModel):
     screener: Screener = Screener.IPHONE
     after_screening: AfterScreening = AfterScreening.PICKS_UP
 
+    @property
+    def picks_up(self) -> bool:
+        """The persona picks up after its call screener."""
+        return self.after_screening is AfterScreening.PICKS_UP
+
 
 def reaches(
     answered_by: AnsweredBy, *, picked_up: bool, voicemail_answered: bool

@@ -62,6 +62,8 @@ class CallerReplyWindow(BaseModel):
     machine: MachineLine | None = None
     """Audio of the persona's voicemail or call screener: not a reply that waits for the
     agent."""
+    interruption: int | None = None
+    """The line of the scenario's interruption with this number, from 1."""
 
 
 class LoopLag(BaseModel):

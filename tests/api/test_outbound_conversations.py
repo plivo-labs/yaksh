@@ -27,12 +27,14 @@ from tests.conftest import (
     receive_outbound_calls,
     report_receiving_worker,
     run_conversations,
+    save_settings,
     start,
     start_run,
 )
 from yaksh.config import Settings
-from yaksh.db.models import Conversation, PhoneNumber, RunningWorker
+from yaksh.db.models import AgentVersion, Conversation, Persona, PhoneNumber, RunningWorker
 from yaksh.db.session import create_engine, create_sessionmaker
+from yaksh.domain.agents import AgentConfig
 from yaksh.domain.answering import AnsweredBy, MachineLine
 from yaksh.domain.conversations import CallOutcome, EndReason
 from yaksh.simulation import conversations
@@ -285,6 +287,81 @@ async def test_preparing_a_call_that_a_machine_answers_plans_what_the_phone_play
     assert Path(plan.screener.prompt.file).is_file()
     assert (plan.voicemail.greeting, plan.voicemail.own_greeting) == (None, "Hi, it's Rachel.")
     assert plan.voicemail.tone is not None
+
+
+async def test_a_call_carries_the_interruptions_only_when_its_answer_reaches_the_persona(
+    client: AsyncClient, settings: Settings, db: Db
+) -> None:
+    await report_receiving_worker(settings)
+    await link_receiving_number(settings)
+    agent = await create_agent(client, **OUTBOUND_AGENT)
+    lines = [{"say": "Wait, this is {{Name}}."}]
+    played = []
+    for after in ("picks_up", "voicemail"):
+        persona = await create_persona(client, name=after, answering={"after_screening": after})
+        scenario = await create_scenario(
+            client,
+            agent["id"],
+            name=f"Screener {after}",
+            persona_id=persona["id"],
+            data_sets=WITH_AGENT_DATA,
+            interruptions=lines,
+        )
+        answers = ["caller", "voicemail", "screener"]
+        await start_run(
+            client, agent["id"], [{"scenario_id": scenario["id"], "answered_by": answers}]
+        )
+
+    async with db() as session:
+        for conversation in await session.scalars(select(Conversation)):
+            persona = await session.get_one(Persona, conversation.persona_id)
+            version = await session.get_one(AgentVersion, conversation.agent_version_id)
+            request = await conversations.call_request(
+                session,
+                APP_SETTINGS,
+                conversation,
+                RECEIVING_NUMBER,
+                AgentConfig.model_validate(version.config),
+            )
+            played.append(
+                (persona.name, request.answered_by, [item.say for item in request.interruptions])
+            )
+
+    line = ["Wait, this is Priya Raman."]
+    assert sorted(played) == [
+        ("picks_up", AnsweredBy.CALLER, line),
+        ("picks_up", AnsweredBy.SCREENER, line),
+        ("picks_up", AnsweredBy.VOICEMAIL, []),
+        ("voicemail", AnsweredBy.CALLER, line),
+        ("voicemail", AnsweredBy.SCREENER, []),
+        ("voicemail", AnsweredBy.VOICEMAIL, []),
+    ]
+
+
+async def test_a_phrase_interruption_blocks_no_run_whose_answer_never_reaches_the_persona(
+    client: AsyncClient, settings: Settings, db: Db
+) -> None:
+    await report_receiving_worker(settings)
+    await link_receiving_number(settings)
+    await save_settings(
+        db, values={"speech": {"stt": "sarvam"}}, secrets={"sarvam_api_key": "sarvam-key-0123"}
+    )
+    agent = await create_agent(client, **OUTBOUND_AGENT)
+    scenario = await create_scenario(
+        client,
+        agent["id"],
+        data_sets=WITH_AGENT_DATA,
+        interruptions=[{"say": "Wait.", "agent_says": "fee"}],
+    )
+
+    def answered_by(answer: str) -> list[str | dict[str, Any]]:
+        return [{"scenario_id": scenario["id"], "answered_by": [answer]}]
+
+    to_voicemail = await start_run(client, agent["id"], answered_by("voicemail"))
+    to_persona = await start_run(client, agent["id"], answered_by("caller"))
+
+    assert to_voicemail.status_code == 202, to_voicemail.text
+    assert to_persona.status_code == 422, to_persona.text
 
 
 async def test_a_retry_keeps_who_answers(client: AsyncClient, settings: Settings, db: Db) -> None:

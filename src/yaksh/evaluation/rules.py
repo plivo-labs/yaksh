@@ -5,6 +5,7 @@ from collections.abc import Sequence
 
 import regex
 
+from yaksh.domain.canonical import canonical, contains
 from yaksh.domain.conversations import Role, Transcript, Turn
 from yaksh.domain.evaluations import DecidedBy, Outcome
 from yaksh.domain.rules import (
@@ -15,7 +16,6 @@ from yaksh.domain.rules import (
     PhraseWhere,
     RuleGate,
 )
-from yaksh.evaluation.canonical import canonical, contains
 from yaksh.evaluation.judging import ItemResult
 from yaksh.evaluation.verdicts import RULE
 

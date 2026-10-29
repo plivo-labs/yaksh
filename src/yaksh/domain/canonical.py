@@ -148,6 +148,49 @@ def compact(text: str) -> str:
     return re.sub(r"(?<=\d) (?=\d)", "", canonical(text))
 
 
+def count(text: str, part: str) -> int:
+    """How many times part is in text as whole words, not overlapping: as written, or with
+    numbers, dates and times in one form, whichever finds more. Digits are not joined across
+    punctuation, so "fifty. Five" holds no 505, but words are: "Okay, so your total" holds
+    "okay so your total". `contains` also finds part inside a longer word, as phrase rules do."""
+    written = whole(text.casefold(), part.casefold())
+    one_form = compact(part)
+    if not one_form:
+        return written
+    pieces = re.split(r"[.,;!?](?=\s|$)", text)
+    joined = " ".join(piece for piece in map(compact, pieces) if piece)
+    return max(written, whole(joined, one_form))
+
+
+def settled(text: str) -> str:
+    """The text without the number at its end: the speech to text can still add to it, as
+    "fifty" becomes "fifty five"."""
+    words = text.split()
+    while words and (words[-1][-1].isdigit() or words[-1].casefold() in NUMBER_WORDS):
+        words.pop()
+    return " ".join(words)
+
+
+def whole(text: str, part: str) -> int:
+    """How many times part is in text, not overlapping, with no letter, combining mark or digit
+    of any script just before or after it: a vowel sign such as "ि" goes on the word."""
+    found = start = 0
+    while (at := text.find(part, start)) != -1:
+        end = at + len(part)
+        if (at and in_word(text[at - 1])) or (end < len(text) and in_word(text[end])):
+            start = at + 1
+        else:
+            found += 1
+            start = end
+    return found
+
+
+def in_word(char: str) -> bool:
+    """A letter, a combining mark or a digit, as `tokens` reads them."""
+    category = unicodedata.category(char)
+    return category[0] in "LM" or category == "Nd"
+
+
 def contains(text: str, part: str) -> bool:
     """Whether part is in text: as written, or with numbers, dates and times in one form. The
     written compare comes first, so a quote that stops inside a spoken number, such as "twenty"

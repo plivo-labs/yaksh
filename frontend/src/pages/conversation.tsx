@@ -1013,6 +1013,13 @@ function WireEvents({
                     <span className="text-muted-foreground">{clock(event.at_ms)}</span>
                   )}
                 </div>
+                {event.interruption && (
+                  <p className="text-muted-foreground">
+                    Line {event.interruption.number}:{" "}
+                    {event.interruption.reason ? words(event.interruption.reason) : "played"}
+                    {event.interruption.detail && ` (${event.interruption.detail})`}
+                  </p>
+                )}
                 {event.detail && <p className="break-all text-muted-foreground">{event.detail}</p>}
               </li>
             ))}

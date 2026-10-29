@@ -31,7 +31,9 @@ FORKED_FIELDS = (
     "data_sets",
     "first_words",
     "caller",
+    "interruptions",
 )
+INTERRUPTIONS = [{"say": "Sorry, is there a fee for that?", "agent_says": "first visit"}]
 
 
 async def test_a_scenario_fork_copies_every_field_under_a_free_name(client: AsyncClient) -> None:
@@ -46,6 +48,7 @@ async def test_a_scenario_fork_copies_every_field_under_a_free_name(client: Asyn
         unknown_facts=["Patient ID"],
         first_words="Hi, it's about my cleaning.",
         caller={"model": "gpt-6-astra", "reasoning_effort": "low"},
+        interruptions=INTERRUPTIONS,
     )
 
     first = await client.post(f"/api/v1/scenarios/{original['id']}/fork")
@@ -152,6 +155,7 @@ async def test_scenario_forks_stream_as_drafts_and_nothing_is_saved(
         category="edge_case",
         first_words="Hello?",
         caller={"model": "gpt-6-astra", "reasoning_effort": "low"},
+        interruptions=INTERRUPTIONS,
     )
     generation_model.changes = ["Madrid", "Shanghai", "madrid"]
     generation_model.write = moved_to
@@ -170,6 +174,7 @@ async def test_scenario_forks_stream_as_drafts_and_nothing_is_saved(
         (d["category"], d["persona_id"], d["first_words"], d["forked_from_id"]) for d in drafts
     } == {("edge_case", original["persona_id"], "Hello?", original["id"])}
     assert all(d["caller"] == original["caller"] for d in drafts)
+    assert all(d["interruptions"] == original["interruptions"] for d in drafts)
     assert listed == 1
 
 
@@ -486,6 +491,28 @@ def data_set_for(prompt: str) -> dict[str, Any]:
     line = prompt.rsplit("## This data set\n", 1)[1]
     city = " ".join(line.split())
     return {"name": line, "known_facts": [{"name": "moving TO", "value": city}], "agent_data": []}
+
+
+async def test_a_written_data_set_that_makes_an_interruption_too_long_is_dropped(
+    client: AsyncClient, generation_model: FakeJsonModel
+) -> None:
+    original = await create_scenario(
+        client,
+        await create_agent_id(client),
+        data_sets=TWO_SETS,
+        interruptions=[{"say": "x" * 160 + " {{Moving to}}"}],
+    )
+    generation_model.changes = ["Llanfairpwllgwyngyllgogerychwyrndrobwllllantysiliogogogoch"]
+    generation_model.write = data_set_for
+
+    response = await client.post(
+        f"/api/v1/scenarios/{original['id']}/data-sets/draft",
+        json={"instruction": "A town with a long name", "count": 1},
+    )
+
+    events = events_of(response.text)
+    assert [kind for kind, _ in events] == ["planned", "dropped"]
+    assert "the line of interruption 1 is longer than 200 characters" in events[1][1]["reason"]
 
 
 async def test_written_data_sets_keep_the_names_and_get_free_set_names(

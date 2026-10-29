@@ -1,6 +1,7 @@
 import asyncio
 import socket
 from collections.abc import AsyncIterator
+from typing import cast
 
 import pytest
 
@@ -27,12 +28,14 @@ async def test_messages_arrive_whole_and_in_order(links: tuple[Link, Link]) -> N
 
     worker.post(Kind.SOCKET, audio)
     await worker.send(Kind.STOP, None)
-    await worker.send(Kind.OWN, ValueError("no greeting"))
-    first, second, (kind, error) = await received
+    await worker.send(Kind.SPEECH, (1, ValueError("no greeting")))
+    first, second, (kind, speech) = await received
+    index, error = cast(tuple[int, Exception], speech)
 
     assert first == (Kind.SOCKET, audio)
     assert second == (Kind.STOP, None)
-    assert kind is Kind.OWN and isinstance(error, ValueError) and error.args == ("no greeting",)
+    assert (kind, index) == (Kind.SPEECH, 1)
+    assert isinstance(error, ValueError) and error.args == ("no greeting",)
 
 
 async def test_a_closed_or_cut_peer_ends_the_receiver(links: tuple[Link, Link]) -> None:

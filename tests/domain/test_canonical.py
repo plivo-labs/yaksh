@@ -1,6 +1,6 @@
 import pytest
 
-from yaksh.evaluation.canonical import canonical, contains
+from yaksh.domain.canonical import canonical, contains, count
 
 
 @pytest.mark.parametrize(
@@ -39,3 +39,19 @@ def test_a_quote_is_found_in_its_turn_however_either_writes_the_numbers() -> Non
     assert contains("It is twenty five dollars.", "twenty")
     assert not contains("booking कर दो", "booking कर दी")
     assert not contains("नहाना है", "नहीं")
+
+
+def test_a_phrase_is_counted_as_whole_words_in_the_form_that_finds_it_more_often() -> None:
+    readback = "Your card number ends in four two four two. Card number confirmed."
+
+    assert count(readback, "card number") == 2
+    assert count(readback, "4242") == 1
+    assert count("Feel free to bring coffee. There is a fee.", "fee") == 1
+    assert count("the fee is fifty five dollars", "$50") == 0
+    assert count("it costs five hundred, or one hundred fifty", "$50") == 0
+    assert count("The fee is fifty. Five dollars.", "$50") == 1
+    assert count("The fee is fifty. Five dollars.", "505") == 0
+    assert count("Okay, so your total is fifty dollars.", "okay so your total") == 1
+    assert count("at twelve thirty", "2:30") == 0
+    assert count("आपकी बुकिंग हो गई है", "बुक") == 0
+    assert count("आपका नाम क्या है", "नाम") == 1

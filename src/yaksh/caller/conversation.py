@@ -43,9 +43,11 @@ from yaksh.caller.audio import (
     Stamper,
     caller_voice,
 )
+from yaksh.caller.interruptions import TurnOrder
 from yaksh.caller.lag import LagTicker
 from yaksh.caller.listen import AudioTap, LiveAudio
 from yaksh.caller.pipeline import CallerKeys, CallState, Persona, converse
+from yaksh.caller.prepared import Prepared
 from yaksh.caller.transcript import TranscriptBuilder, WireTap
 from yaksh.caller.turn_models import TurnModels
 from yaksh.domain.conversations import (
@@ -358,8 +360,8 @@ class ConversationStart:
     stop: asyncio.Event
     clock: Clock
     dialed: Connected
-    own: asyncio.Future[bytes] | None
-    """The persona's own voicemail greeting, being spoken."""
+    prepared: Prepared
+    """The speech made before the call."""
     connected_ms: int
 
 
@@ -407,7 +409,8 @@ async def hold_conversation(start: ConversationStart, live: LiveAudio, turns: Tu
         dialed.call_uuid,
         dialed.encoding,
     )
-    transcript = TranscriptBuilder(clock, observer)
+    order = TurnOrder(observer)
+    transcript = TranscriptBuilder(clock, order)
     checkpoints = Checkpoints(dialed.stream_id, transcript)
     recording = CallRecording()
     marks = AudioMarks(clock, observer)
@@ -443,6 +446,8 @@ async def hold_conversation(start: ConversationStart, live: LiveAudio, turns: Tu
         state=state,
         turn_models=turns,
         observers=[AudioTap(transport.input(), transport.output(), live)],
+        prepared=start.prepared,
+        order=order,
     )
 
     machine: asyncio.Task[None] | None = None
@@ -452,7 +457,7 @@ async def hold_conversation(start: ConversationStart, live: LiveAudio, turns: Tu
         nonlocal machine
         if request.answering is not None:
             script = AnsweringScript(
-                request.answering, persona, state, transcript, observer, clock, start.own
+                request.answering, persona, state, transcript, observer, clock, start.prepared.own
             )
             machine = asyncio.create_task(script.run())
         elif not request.agent.agent_speaks_first:
@@ -481,6 +486,7 @@ async def hold_conversation(start: ConversationStart, live: LiveAudio, turns: Tu
             if task is not None:
                 task.cancel()
                 await asyncio.gather(task, return_exceptions=True)
+        order.flush()
     return Spoken(state, persona, recording, marks, serializer)
 
 

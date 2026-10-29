@@ -187,6 +187,39 @@ async def test_a_phone_run_cannot_start_when_the_speech_to_text_does_not_hear_th
     assert "speech to text (Sarvam) doesn't hear Spanish" in refused.text
 
 
+async def test_a_phrase_interruption_runs_only_on_a_speech_to_text_that_gives_words_early(
+    client: AsyncClient, checks: list[Any]
+) -> None:
+    agent_id = await create_agent_id(client)
+    phrase = await create_scenario(
+        client,
+        agent_id,
+        name="Phrase",
+        interruptions=[
+            {"say": "Hold on."},
+            {"say": "Wait.", "agent_says": "fee"},
+        ],
+    )
+    timed = await create_scenario(
+        client, agent_id, name="Timed", interruptions=[{"say": "Hold on."}]
+    )
+    on_deepgram = await start_run(client, agent_id, [phrase["id"]])
+    await client.put("/api/v1/settings/secrets/sarvam_api_key", json={"value": "sarvam-key-0123"})
+    values = (await client.get("/api/v1/settings")).json()["values"]
+    values["speech"]["stt"] = "sarvam"
+    await client.put("/api/v1/settings/values", json=values)
+
+    refused = await start_run(client, agent_id, [phrase["id"]])
+    timed_on_sarvam = await start_run(client, agent_id, [timed["id"]])
+
+    assert on_deepgram.status_code == 202, on_deepgram.text
+    assert refused.status_code == 422, refused.text
+    message = refused.json()["error"]["message"]
+    assert 'interruption 2 of the scenario "Phrase" waits for a phrase' in message
+    assert "speech to text (Sarvam) gives the agent's words only after it stops" in message
+    assert timed_on_sarvam.status_code == 202, timed_on_sarvam.text
+
+
 async def test_a_run_cannot_start_while_a_caller_key_is_missing(client: AsyncClient) -> None:
     agent_id = await create_agent_id(client)
     scenario = await create_scenario(client, agent_id, persona_id=await new_persona_id(client))

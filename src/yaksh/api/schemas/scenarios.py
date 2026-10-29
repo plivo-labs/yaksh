@@ -5,7 +5,7 @@ from pydantic import BaseModel, ConfigDict
 
 from yaksh.db.models import Scenario, ScenarioGeneration
 from yaksh.domain.generation import GenerationMode, GenerationStatus
-from yaksh.domain.scenarios import Category, DataSet, ScenarioConfig
+from yaksh.domain.scenarios import Category, DataSet, Interruption, ScenarioConfig
 from yaksh.domain.settings import CallerModel
 from yaksh.simulation.scenarios import config_of
 
@@ -24,6 +24,7 @@ class ScenarioRead(BaseModel):
     data_sets: list[DataSet]
     first_words: str | None
     caller: CallerModel | None
+    interruptions: list[Interruption]
     current_version: int
     forked_from_id: uuid.UUID | None
     created_at: datetime

@@ -4,6 +4,7 @@ from typing import Any
 
 import pytest
 from httpx import AsyncClient
+from sqlalchemy import select
 
 from tests.conftest import (
     SCENARIO,
@@ -15,7 +16,7 @@ from tests.conftest import (
     save_settings,
     wait_for_lock_waiters,
 )
-from yaksh.db.models import Agent
+from yaksh.db.models import Agent, Scenario, ScenarioVersion
 
 
 async def test_a_config_change_writes_a_version_but_a_rename_does_not(
@@ -298,3 +299,127 @@ async def test_a_scenario_holds_at_most_the_operator_limit_of_data_sets(
     assert grown.status_code == 422 and "at most 2 data sets" in grown.text
     assert shrunk.status_code == 200, shrunk.text
     assert kept.status_code == 200, kept.text
+
+
+async def test_interruptions_get_their_default_wait_and_a_change_writes_a_version(
+    client: AsyncClient,
+) -> None:
+    lines = [
+        {"say": "Sorry, is there a fee for that?", "agent_says": "first visit"},
+        {"say": "Sorry, can you repeat that?"},
+        {"say": "Hold on.", "agent_says": "your total", "after_s": 0.5},
+    ]
+    scenario = await create_scenario(client, await create_agent_id(client), interruptions=lines)
+    url = f"/api/v1/scenarios/{scenario['id']}"
+
+    same = await client.patch(url, json={"interruptions": scenario["interruptions"]})
+    changed = await client.patch(url, json={"interruptions": lines[:1]})
+    cleared = await client.patch(url, json={"interruptions": []})
+
+    assert [(item["after_s"], item["from_answer"]) for item in scenario["interruptions"]] == [
+        (0.0, 1),
+        (2.0, 2),
+        (0.5, 1),
+    ]
+    assert scenario["interruptions"][1] == {
+        "say": "Sorry, can you repeat that?",
+        "agent_says": None,
+        "after_s": 2.0,
+        "from_answer": 2,
+    }
+    assert same.json()["current_version"] == 1
+    assert changed.json()["current_version"] == 2
+    assert cleared.json()["interruptions"] == [] and cleared.json()["current_version"] == 3
+    first = (await client.get(f"{url}/versions/1")).json()
+    assert [item["say"] for item in first["config"]["interruptions"]] == [
+        "Sorry, is there a fee for that?",
+        "Sorry, can you repeat that?",
+        "Hold on.",
+    ]
+
+
+async def test_interruptions_are_checked_like_the_rest_of_the_scenario(
+    client: AsyncClient,
+) -> None:
+    agent = await create_agent_id(client)
+    persona = (await create_persona(client))["id"]
+    url = f"/api/v1/agents/{agent}/scenarios"
+
+    async def refused(*interruptions: dict[str, Any], **fields: Any) -> str:
+        response = await client.post(
+            url,
+            json={
+                **SCENARIO,
+                "persona_id": persona,
+                "interruptions": list(interruptions),
+                **fields,
+            },
+        )
+        assert response.status_code == 422, response.text
+        return response.json()["error"]["message"]
+
+    too_many = await refused(*({"say": f"Line {n}."} for n in range(4)))
+    unknown_fact = await refused({"say": "My name is {{Full name}}."})
+    unknown_in_phrase = await refused({"say": "Wait.", "agent_says": "{{Card}}"})
+    no_word = await refused({"say": "Wait.", "agent_says": "..."})
+    no_canonical_word = await refused({"say": "Wait.", "agent_says": "½"})
+    long_line = await refused({"say": "x" * 190 + " {{Name}}"})
+    long_phrase = await refused({"say": "Wait.", "agent_says": "x" * 190 + " {{Name}}"})
+    second_set_long = await refused(
+        {"say": "x" * 185 + " {{Name}}"},
+        data_sets=[
+            {"name": "Short", "known_facts": [{"name": "Name", "value": "Priya"}]},
+            {"name": "Long", "known_facts": [{"name": "Name", "value": "Priyadarshini Raman"}]},
+        ],
+    )
+    turn = await refused({"say": "Wait.", "from_answer": 0})
+    empty = await refused({"say": "  "})
+    scenario = await create_scenario(client, agent)
+    cleared = await client.patch(
+        f"/api/v1/scenarios/{scenario['id']}", json={"interruptions": None}
+    )
+
+    assert "at most 3" in too_many
+    assert "{{Full name}} names no known fact" in unknown_fact
+    assert "{{Card}} names no known fact" in unknown_in_phrase
+    assert "a phrase needs at least one word or number" in no_word
+    assert "a phrase needs at least one word or number" in no_canonical_word
+    too_long = "of interruption 1 is longer than 200 characters with the facts of the data set"
+    assert f'the line {too_long} "Data set 1"' in long_line
+    assert f'the phrase {too_long} "Data set 1"' in long_phrase
+    assert f'the line {too_long} "Long"' in second_set_long
+    assert "from_answer" in turn and "say" in empty
+    assert cleared.status_code == 422 and "interruptions cannot be null" in cleared.text
+
+
+async def test_a_scenario_without_interruptions_is_stored_as_older_versions_read_it(
+    client: AsyncClient, db: Db
+) -> None:
+    agent = await create_agent_id(client)
+    plain = await create_scenario(client, agent)
+    with_lines = await create_scenario(
+        client, agent, name="With lines", interruptions=[{"say": "Wait."}]
+    )
+    await client.patch(f"/api/v1/scenarios/{plain['id']}", json={"criteria": ["Says goodbye."]})
+    ids = [uuid.UUID(plain["id"]), uuid.UUID(with_lines["id"])]
+
+    async with db() as session:
+        versions = await session.execute(
+            select(
+                ScenarioVersion.scenario_id, ScenarioVersion.version, ScenarioVersion.config
+            ).where(ScenarioVersion.scenario_id.in_(ids))
+        )
+        scenarios = await session.execute(
+            select(Scenario.id, Scenario.config).where(Scenario.id.in_(ids))
+        )
+
+    stored = {(str(id_), number): "interruptions" in config for id_, number, config in versions}
+    assert stored == {
+        (plain["id"], 1): False,
+        (plain["id"], 2): False,
+        (with_lines["id"], 1): True,
+    }
+    assert {str(id_): "interruptions" in config for id_, config in scenarios} == {
+        plain["id"]: False,
+        with_lines["id"]: True,
+    }

@@ -10,7 +10,7 @@ from yaksh.domain.errors import ValidationError
 from yaksh.domain.forks import ForkRequest
 from yaksh.domain.language_models import JsonModel
 from yaksh.domain.names import free_name
-from yaksh.domain.scenarios import MAX_DATA_SET_NAME_CHARS, DataSet, normalized
+from yaksh.domain.scenarios import MAX_DATA_SET_NAME_CHARS, DataSet, ScenarioConfig, normalized
 from yaksh.domain.settings import Limits
 from yaksh.simulation.forks import Event, ScenarioSource, fork_drafts, renamed
 from yaksh.simulation.generation_prompts import FACTS, TEXT, strict_object
@@ -60,6 +60,9 @@ def data_set_drafts(
                     "known_facts": renamed(written.get("known_facts") or [], first.known_facts),
                     "agent_data": renamed(written.get("agent_data") or [], first.agent_data),
                 }
+            )
+            ScenarioConfig.model_validate(
+                {**source.config.model_dump(), "data_sets": [*data_sets, draft]}
             )
         except pydantic.ValidationError as error:
             message = error.errors()[0]["msg"]

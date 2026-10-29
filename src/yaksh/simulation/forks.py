@@ -256,12 +256,11 @@ def scenario_forks(
         try:
             draft = ScenarioCreate.model_validate(
                 {
+                    **source.config.model_dump(),
                     **texts,
                     "data_sets": data_sets,
                     "category": source.category,
                     "persona_id": source.persona_id,
-                    "first_words": source.config.first_words,
-                    "caller": source.config.caller,
                     "forked_from_id": source.id,
                 }
             )

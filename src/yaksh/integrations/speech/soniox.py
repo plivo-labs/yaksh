@@ -1,5 +1,6 @@
 """Soniox speech-to-text: real-time stt-rt-v5. The language goes as a hint; under Pipecat's
-turn detection Soniox sends its final transcript when the voice detector ends the turn."""
+turn detection Soniox sends its final transcript when the voice detector ends the turn. Until
+then it sends the words so far as partials, so `SttTraits.words_while_speaking` is true."""
 
 from pipecat.services.soniox.stt import SonioxSTTService
 from pipecat.transcriptions.language import Language as PipecatLanguage

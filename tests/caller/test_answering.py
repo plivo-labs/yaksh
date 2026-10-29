@@ -49,8 +49,8 @@ class FakePlayer:
         self.transcript = transcript
         self.played: list[tuple[MachineLine, str | None]] = []
 
-    async def play(self, pcm: bytes, text: str | None, line: MachineLine) -> None:
-        self.played.append((line, text))
+    async def play(self, pcm: bytes, text: str | None, *, machine: MachineLine) -> None:
+        self.played.append((machine, text))
         if text is None:
             return
         self.transcript.caller_started(None)
@@ -62,11 +62,11 @@ class TalkOverPlayer(FakePlayer):
     """The agent answers each screener question while the question still plays: its turn ends
     before the question does."""
 
-    async def play(self, pcm: bytes, text: str | None, line: MachineLine) -> None:
-        if line is MachineLine.SCREENER:
+    async def play(self, pcm: bytes, text: str | None, *, machine: MachineLine) -> None:
+        if machine is MachineLine.SCREENER:
             self.transcript.agent_said("Hi, this is Alex from Swift Movers, about your move.")
             await asyncio.sleep(0.01)
-        await super().play(pcm, text, line)
+        await super().play(pcm, text, machine=machine)
 
 
 class Call:
@@ -377,9 +377,9 @@ async def test_the_player_sends_a_line_as_a_reply_kept_out_of_the_persona_contex
 
     player.push_frame = push_frame  # type: ignore[method-assign]
     await player.play(
-        bytes(FRAME_BYTES * 2), "Thanks. Please stay on the line.", MachineLine.SCREENER
+        bytes(FRAME_BYTES * 2), "Thanks. Please stay on the line.", machine=MachineLine.SCREENER
     )
-    await player.play(bytes(FRAME_BYTES), None, MachineLine.TONE)
+    await player.play(bytes(FRAME_BYTES), None, machine=MachineLine.TONE)
 
     assert [type(frame) for frame in sent] == [
         TTSStartedFrame,

@@ -32,6 +32,7 @@ from yaksh.caller.lag import LagTicker
 from yaksh.caller.link import Kind, Link, open_link
 from yaksh.caller.listen import LiveAudio
 from yaksh.caller.pipeline import CallerKeys
+from yaksh.caller.prepared import Prepared
 from yaksh.caller.turn_models import TurnModels
 from yaksh.diagnostics import describe_exception
 from yaksh.domain.conversations import CallRequest, Turn, WireEvent
@@ -71,8 +72,6 @@ class ChildStart:
     call_uuid: str
     encoding: str
     connected_ms: int
-    own: bool
-    """The worker speaks the persona's own voicemail greeting and sends it when it is ready."""
     database_url: str
 
 
@@ -164,7 +163,7 @@ def leave(code: int) -> NoReturn:
 async def hold(link: Link, start: ChildStart, turns: TurnModels) -> Heard:
     inbox: asyncio.Queue[Message] = asyncio.Queue()
     stop = asyncio.Event()
-    own = asyncio.get_running_loop().create_future() if start.own else None
+    prepared = Prepared(start.request)
     clock = Clock(start.clock)
     live = LiveAudio(start.database_url, start.request.conversation_id)
     listener: asyncio.Task[None] | None = None
@@ -179,13 +178,13 @@ async def hold(link: Link, start: ChildStart, turns: TurnModels) -> Heard:
             stop,
             clock,
             dialed,
-            own,
+            prepared,
             start.connected_ms,
         )
         lag = LagTicker()
         watch = lag.watch(clock.ms)
         holding = asyncio.ensure_future(hold_conversation(conversation, live, turns))
-        listener = asyncio.create_task(listen(link, inbox, stop, own, holding))
+        listener = asyncio.create_task(listen(link, inbox, stop, prepared, holding))
         try:
             spoken = await holding
         finally:
@@ -198,6 +197,7 @@ async def hold(link: Link, start: ChildStart, turns: TurnModels) -> Heard:
         if listener is not None:
             listener.cancel()
             await asyncio.gather(listener, return_exceptions=True)
+        await prepared.close()
         await live.close()
 
 
@@ -205,7 +205,7 @@ async def listen(
     link: Link,
     inbox: asyncio.Queue[Message],
     stop: asyncio.Event,
-    own: asyncio.Future[bytes] | None,
+    prepared: Prepared,
     holding: asyncio.Future[Spoken],
 ) -> None:
     """What the worker sends during the call. A worker that goes away ends the call, and the
@@ -219,11 +219,8 @@ async def listen(
                 stop.set()
             elif kind is Kind.CANCEL:
                 holding.cancel()
-            elif kind is Kind.OWN and own is not None and not own.done():
-                if isinstance(payload, BaseException):
-                    own.set_exception(payload)
-                else:
-                    own.set_result(cast(bytes, payload))
+            elif kind is Kind.SPEECH:
+                prepared.fill(*cast(tuple[int, bytes | BaseException], payload))
     except asyncio.IncompleteReadError, OSError:
         stop.set()
         inbox.put_nowait(GONE)

@@ -1228,6 +1228,45 @@ func (e TriggerMethod) Valid() bool {
 	}
 }
 
+// Defines values for TryReason.
+const (
+	AgentQuiet           TryReason = "agent_quiet"
+	AudioFailed          TryReason = "audio_failed"
+	AudioNotReady        TryReason = "audio_not_ready"
+	CallEnding           TryReason = "call_ending"
+	CallerSpeaking       TryReason = "caller_speaking"
+	KeyPress             TryReason = "key_press"
+	NoWordsWhileSpeaking TryReason = "no_words_while_speaking"
+	OtherLine            TryReason = "other_line"
+	TurnEnded            TryReason = "turn_ended"
+)
+
+// Valid indicates whether the value is a known member of the TryReason enum.
+func (e TryReason) Valid() bool {
+	switch e {
+	case AgentQuiet:
+		return true
+	case AudioFailed:
+		return true
+	case AudioNotReady:
+		return true
+	case CallEnding:
+		return true
+	case CallerSpeaking:
+		return true
+	case KeyPress:
+		return true
+	case NoWordsWhileSpeaking:
+		return true
+	case OtherLine:
+		return true
+	case TurnEnded:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for UnsureKind.
 const (
 	UnsureKindHiddenAction       UnsureKind = "hidden_action"
@@ -1398,6 +1437,7 @@ const (
 	WireEventKindEndCall          WireEventKind = "end_call"
 	WireEventKindHandover         WireEventKind = "handover"
 	WireEventKindHoldStarted      WireEventKind = "hold_started"
+	WireEventKindInterruption     WireEventKind = "interruption"
 	WireEventKindRinging          WireEventKind = "ringing"
 	WireEventKindSilenceGreeting  WireEventKind = "silence_greeting"
 	WireEventKindStop             WireEventKind = "stop"
@@ -1432,6 +1472,8 @@ func (e WireEventKind) Valid() bool {
 	case WireEventKindHandover:
 		return true
 	case WireEventKindHoldStarted:
+		return true
+	case WireEventKindInterruption:
 		return true
 	case WireEventKindRinging:
 		return true
@@ -2182,6 +2224,31 @@ type ImportResult struct {
 	Skipped  []string     `json:"skipped"`
 }
 
+// Interruption A fixed line the caller says while the agent is still speaking, on phone calls. A start
+// is each new match of `agent_says` in the agent's words or, with no phrase, the start of each
+// answer of the agent, from answer `from_answer` on. Each start opens one wait of `after_s`.
+// The line plays when a wait ends with the agent speaking: in the turn of the match, or, with
+// no phrase, in the agent turn of that answer that is open then, also after a pause in it. A
+// line plays at most once. With a phrase, `after_s` and `from_answer` are 0 and 1 unless they
+// are set; with no phrase, they are 2 and 2.
+type Interruption struct {
+	AfterS     *float32 `json:"after_s,omitempty"`
+	AgentSays  *string  `json:"agent_says,omitempty"`
+	FromAnswer *int     `json:"from_answer,omitempty"`
+	Say        string   `json:"say"`
+}
+
+// InterruptionTry One try of an interruption: a start whose wait ended, or a miss at once.
+type InterruptionTry struct {
+	Answer        *int       `json:"answer,omitempty"`
+	Detail        *string    `json:"detail,omitempty"`
+	Number        int        `json:"number"`
+	Reason        *TryReason `json:"reason,omitempty"`
+	TurnStartedMs *int       `json:"turn_started_ms,omitempty"`
+	WindowEndMs   *int       `json:"window_end_ms,omitempty"`
+	Words         *string    `json:"words,omitempty"`
+}
+
 // ItemRead defines model for ItemRead.
 type ItemRead struct {
 	Answer       *map[string]interface{} `json:"answer"`
@@ -2734,15 +2801,16 @@ type PlanPreview struct {
 
 // PlayedScenario A scenario version as one data set plays it: placeholders filled with the set's values.
 type PlayedScenario struct {
-	AgentData    []Fact             `json:"agent_data"`
-	Caller       *CallerModel       `json:"caller"`
-	Criteria     []string           `json:"criteria"`
-	DataSetId    openapi_types.UUID `json:"data_set_id"`
-	DataSetName  string             `json:"data_set_name"`
-	FirstWords   *string            `json:"first_words"`
-	Instructions string             `json:"instructions"`
-	KnownFacts   []Fact             `json:"known_facts"`
-	UnknownFacts []string           `json:"unknown_facts"`
+	AgentData     []Fact             `json:"agent_data"`
+	Caller        *CallerModel       `json:"caller"`
+	Criteria      []string           `json:"criteria"`
+	DataSetId     openapi_types.UUID `json:"data_set_id"`
+	DataSetName   string             `json:"data_set_name"`
+	FirstWords    *string            `json:"first_words"`
+	Instructions  string             `json:"instructions"`
+	Interruptions []Interruption     `json:"interruptions"`
+	KnownFacts    []Fact             `json:"known_facts"`
+	UnknownFacts  []string           `json:"unknown_facts"`
 }
 
 // PlivoAccount defines model for PlivoAccount.
@@ -3149,12 +3217,13 @@ type SavedValue struct {
 // criteria never do: they are what the agent must say or do on the call. Agent data goes only
 // to the agent, in an outbound agent's trigger. Each data set is played as its own call.
 type ScenarioConfig struct {
-	Caller       *CallerModel `json:"caller,omitempty"`
-	Criteria     []string     `json:"criteria"`
-	DataSets     []DataSet    `json:"data_sets"`
-	FirstWords   *string      `json:"first_words,omitempty"`
-	Instructions string       `json:"instructions"`
-	UnknownFacts *[]string    `json:"unknown_facts,omitempty"`
+	Caller        *CallerModel    `json:"caller,omitempty"`
+	Criteria      []string        `json:"criteria"`
+	DataSets      []DataSet       `json:"data_sets"`
+	FirstWords    *string         `json:"first_words,omitempty"`
+	Instructions  string          `json:"instructions"`
+	Interruptions *[]Interruption `json:"interruptions,omitempty"`
+	UnknownFacts  *[]string       `json:"unknown_facts,omitempty"`
 }
 
 // ScenarioCreate defines model for ScenarioCreate.
@@ -3162,16 +3231,17 @@ type ScenarioCreate struct {
 	Caller *CallerModel `json:"caller,omitempty"`
 
 	// Category What kind of situation a scenario tests. How the caller talks comes from the persona.
-	Category     *Category           `json:"category,omitempty"`
-	Criteria     []string            `json:"criteria"`
-	DataSets     []DataSet           `json:"data_sets"`
-	Description  *string             `json:"description,omitempty"`
-	FirstWords   *string             `json:"first_words,omitempty"`
-	ForkedFromId *openapi_types.UUID `json:"forked_from_id,omitempty"`
-	Instructions string              `json:"instructions"`
-	Name         string              `json:"name"`
-	PersonaId    openapi_types.UUID  `json:"persona_id"`
-	UnknownFacts *[]string           `json:"unknown_facts,omitempty"`
+	Category      *Category           `json:"category,omitempty"`
+	Criteria      []string            `json:"criteria"`
+	DataSets      []DataSet           `json:"data_sets"`
+	Description   *string             `json:"description,omitempty"`
+	FirstWords    *string             `json:"first_words,omitempty"`
+	ForkedFromId  *openapi_types.UUID `json:"forked_from_id,omitempty"`
+	Instructions  string              `json:"instructions"`
+	Interruptions *[]Interruption     `json:"interruptions,omitempty"`
+	Name          string              `json:"name"`
+	PersonaId     openapi_types.UUID  `json:"persona_id"`
+	UnknownFacts  *[]string           `json:"unknown_facts,omitempty"`
 }
 
 // ScenarioDelete Scenarios of one agent to delete together: all of them, or none if one is missing.
@@ -3208,6 +3278,7 @@ type ScenarioRead struct {
 	GenerationId   *openapi_types.UUID `json:"generation_id"`
 	Id             openapi_types.UUID  `json:"id"`
 	Instructions   string              `json:"instructions"`
+	Interruptions  []Interruption      `json:"interruptions"`
 	Name           string              `json:"name"`
 	PersonaId      openapi_types.UUID  `json:"persona_id"`
 	UnknownFacts   []string            `json:"unknown_facts"`
@@ -3216,16 +3287,17 @@ type ScenarioRead struct {
 
 // ScenarioUpdate A partial change; lists replace the stored list as a whole.
 type ScenarioUpdate struct {
-	Caller       *CallerModel        `json:"caller,omitempty"`
-	Category     *Category           `json:"category,omitempty"`
-	Criteria     *[]string           `json:"criteria,omitempty"`
-	DataSets     *[]DataSet          `json:"data_sets,omitempty"`
-	Description  *string             `json:"description,omitempty"`
-	FirstWords   *string             `json:"first_words,omitempty"`
-	Instructions *string             `json:"instructions,omitempty"`
-	Name         *string             `json:"name,omitempty"`
-	PersonaId    *openapi_types.UUID `json:"persona_id,omitempty"`
-	UnknownFacts *[]string           `json:"unknown_facts,omitempty"`
+	Caller        *CallerModel        `json:"caller,omitempty"`
+	Category      *Category           `json:"category,omitempty"`
+	Criteria      *[]string           `json:"criteria,omitempty"`
+	DataSets      *[]DataSet          `json:"data_sets,omitempty"`
+	Description   *string             `json:"description,omitempty"`
+	FirstWords    *string             `json:"first_words,omitempty"`
+	Instructions  *string             `json:"instructions,omitempty"`
+	Interruptions *[]Interruption     `json:"interruptions,omitempty"`
+	Name          *string             `json:"name,omitempty"`
+	PersonaId     *openapi_types.UUID `json:"persona_id,omitempty"`
+	UnknownFacts  *[]string           `json:"unknown_facts,omitempty"`
 }
 
 // ScenarioVerdicts defines model for ScenarioVerdicts.
@@ -3592,6 +3664,9 @@ type Trigger struct {
 // TriggerMethod defines model for TriggerMethod.
 type TriggerMethod string
 
+// TryReason Why a start of an interruption did not play its line, or why it is missed at once.
+type TryReason string
+
 // TtsModelRead defines model for TtsModelRead.
 type TtsModelRead struct {
 	Id        *string    `json:"id"`
@@ -3614,19 +3689,20 @@ type TtsProviderRead struct {
 
 // TurnRead defines model for TurnRead.
 type TurnRead struct {
-	AudioIndex  *int             `json:"audio_index,omitempty"`
-	CallerReply *CallerReplyTime `json:"caller_reply,omitempty"`
-	Dtmf        *bool            `json:"dtmf,omitempty"`
-	EndedAtMs   int              `json:"ended_at_ms"`
-	Machine     *MachineLine     `json:"machine,omitempty"`
-	Provenance  *Provenance      `json:"provenance,omitempty"`
-	ResponseMs  *int             `json:"response_ms,omitempty"`
-	Role        Role             `json:"role"`
-	Scripted    *bool            `json:"scripted,omitempty"`
-	StartedAtMs int              `json:"started_at_ms"`
-	TalkedOver  *bool            `json:"talked_over,omitempty"`
-	Text        string           `json:"text"`
-	Tools       *[]ToolItem      `json:"tools,omitempty"`
+	AudioIndex   *int             `json:"audio_index,omitempty"`
+	CallerReply  *CallerReplyTime `json:"caller_reply,omitempty"`
+	Dtmf         *bool            `json:"dtmf,omitempty"`
+	EndedAtMs    int              `json:"ended_at_ms"`
+	Interruption *int             `json:"interruption,omitempty"`
+	Machine      *MachineLine     `json:"machine,omitempty"`
+	Provenance   *Provenance      `json:"provenance,omitempty"`
+	ResponseMs   *int             `json:"response_ms,omitempty"`
+	Role         Role             `json:"role"`
+	Scripted     *bool            `json:"scripted,omitempty"`
+	StartedAtMs  int              `json:"started_at_ms"`
+	TalkedOver   *bool            `json:"talked_over,omitempty"`
+	Text         string           `json:"text"`
+	Tools        *[]ToolItem      `json:"tools,omitempty"`
 }
 
 // TurnTaking How long the caller waits after the agent's speech before its reply starts. A section of
@@ -3787,9 +3863,10 @@ type WaitingReason string
 
 // WireEvent defines model for WireEvent.
 type WireEvent struct {
-	AtMs   int           `json:"at_ms"`
-	Detail *string       `json:"detail,omitempty"`
-	Kind   WireEventKind `json:"kind"`
+	AtMs         int              `json:"at_ms"`
+	Detail       *string          `json:"detail,omitempty"`
+	Interruption *InterruptionTry `json:"interruption,omitempty"`
+	Kind         WireEventKind    `json:"kind"`
 }
 
 // WireEventKind defines model for WireEventKind.

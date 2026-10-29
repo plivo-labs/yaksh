@@ -37,6 +37,7 @@ from yaksh.caller.conversation import Connected, Conversation, ConversationStart
 from yaksh.caller.phone import Dialer, PhoneCaller, Receiver
 from yaksh.caller.pipeline import CallerKeys, CallState
 from yaksh.caller.plivo_server import PendingStream, PlivoServer, StreamRegistry, create_app
+from yaksh.caller.prepared import Prepared
 from yaksh.domain.agents import AgentConfig, Transport
 from yaksh.domain.conversations import (
     CallerSettings,
@@ -460,14 +461,15 @@ class Hanging:
 
 def started(observer: Observer) -> ConversationStart:
     socket = cast(WebSocket, None)
+    call = request()
     return ConversationStart(
-        request(),
+        call,
         cast(CallerKeys, None),
         observer,
         asyncio.Event(),
         Clock(),
         Connected(socket, "stream-1", "call-1", "audio/x-l16"),
-        None,
+        Prepared(call),
         connected_ms=1_200,
     )
 

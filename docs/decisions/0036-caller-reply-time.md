@@ -1,7 +1,7 @@
 # 0036 Caller reply time, step by step
 
 Date: 2026-10-28
-Status: accepted
+Status: accepted. Changed by 0040 (an interruption line is a source of its own).
 
 ## Decision
 

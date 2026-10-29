@@ -32,6 +32,8 @@ PLAYOUT = "yaksh.playout"
 OFFSET = "yaksh.offset"
 MACHINE = "yaksh.machine"
 """On a TTSStartedFrame: the machine line the reply plays."""
+INTERRUPTION = "yaksh.interruption"
+"""On a TTSStartedFrame: the number of the scenario's interruption whose line the reply plays."""
 
 
 class Clock:
@@ -68,6 +70,8 @@ class Playout:
         self._words = 0
         self.machine: MachineLine | None = None
         """The machine line the reply plays; None for the persona's own words."""
+        self.interruption: int | None = None
+        """The interruption whose line the reply plays; None for the persona's own words."""
         self.audio_index: int | None = None
         """Which caller audio start of the call played it: its window in the transcript's
         caller replies. None until its audio starts."""
@@ -113,6 +117,7 @@ class Stamper:
         if isinstance(frame, TTSStartedFrame):
             self.arriving = frame.metadata[PLAYOUT] = Playout()
             self.arriving.machine = frame.metadata.get(MACHINE)
+            self.arriving.interruption = frame.metadata.get(INTERRUPTION)
         elif isinstance(frame, TTSAudioRawFrame) and self.arriving is not None:
             self.arriving.received(frame.audio, now_ns)
         elif isinstance(frame, TTSTextFrame) and self.arriving is not None:
@@ -132,6 +137,15 @@ class CallerReply:
     playout: Playout | None = None
     finished: bool = False
     """The TTS finished the reply: its playout holds all of it."""
+
+
+def first_sound_ms(pcm: bytes) -> int:
+    """Where the first frame louder than LOUD_PEAK starts, in ms; the audio's length when no
+    frame is."""
+    for at in range(0, len(pcm), FRAME_BYTES):
+        if audioop.max(pcm[at : at + FRAME_BYTES], 2) > LOUD_PEAK:
+            return bytes_ms(at)
+    return bytes_ms(len(pcm))
 
 
 def wav(pcm: bytes, channels: int) -> bytes:
@@ -165,6 +179,7 @@ def caller_voice(
                 audio_start_ms=bytes_ms(len(voice)),
                 audio_ms=bytes_ms(len(own)),
                 machine=reply.playout.machine if reply.playout else None,
+                interruption=reply.playout.interruption if reply.playout else None,
             )
         )
         voice += own

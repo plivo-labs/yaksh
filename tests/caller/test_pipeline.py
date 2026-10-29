@@ -14,6 +14,7 @@ from pipecat.frames.frames import (
     LLMMessagesAppendFrame,
     OutputDTMFUrgentFrame,
     TranscriptionFrame,
+    TTSAudioRawFrame,
     TTSSpeakFrame,
     VADUserStartedSpeakingFrame,
     VADUserStoppedSpeakingFrame,
@@ -353,6 +354,47 @@ async def test_the_idle_nudge_is_no_answer() -> None:
     ]
 
     assert await limited(1, turns, cut={0}) == (2, 1)
+
+
+class LinePlayer(FrameProcessor):
+    """Where the transport stands: an interruption line's audio reaches it, after the
+    Interrupter told the turn limit that a line plays."""
+
+    def __init__(self, limit: TurnLimit) -> None:
+        super().__init__()
+        self._limit = limit
+
+    async def process_frame(self, frame: Frame, direction: FrameDirection) -> None:
+        await super().process_frame(frame, direction)
+        await self.push_frame(frame, direction)
+        if isinstance(frame, TTSAudioRawFrame):
+            self._limit.fixed_line()
+            await self.push_frame(BotStartedSpeakingFrame(), FrameDirection.UPSTREAM)
+
+
+async def test_an_interruption_line_is_no_answer() -> None:
+    """The agent's next words cut the answer before it plays, and a line plays over them: the
+    agent's turn still has no answer."""
+    reached: list[None] = []
+
+    async def at_limit() -> None:
+        reached.append(None)
+
+    limit = TurnLimit(1, at_limit)
+    down, _ = await run_test(
+        Pipeline([limit, Speaker(cut={0}), LinePlayer(limit)]),
+        frames_to_send=spaced(
+            [
+                LLMContextFrame(context=after("This is Alex.")),
+                TTSAudioRawFrame(bytes(320), 8000, 1),
+                LLMContextFrame(context=after("This is Alex.", "When?")),
+                LLMContextFrame(context=after("This is Alex.", "When?", "Ok.")),
+            ]
+        ),
+    )
+
+    asked = [f for f in down if isinstance(f, LLMContextFrame) and not f.speculation]
+    assert (len(asked), len(reached)) == (2, 1)
 
 
 class Line:

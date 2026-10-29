@@ -18,6 +18,7 @@
     "scenario-generation",
     "languages",
     "background-noise",
+    "interruptions",
     "response-time",
     "listen",
     "cli",

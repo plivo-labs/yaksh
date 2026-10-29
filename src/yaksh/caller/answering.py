@@ -3,13 +3,13 @@ when it listens, and how it ends the call or hands it to the persona."""
 
 import asyncio
 import logging
-from collections.abc import Callable
 from pathlib import Path
 
 from pipecat.frames.frames import LLMMessagesAppendFrame
 
 from yaksh.caller.audio import Clock, bytes_ms, read_pcm
-from yaksh.caller.pipeline import CallerKeys, CallState, Persona
+from yaksh.caller.machines import POLL_S, until_played
+from yaksh.caller.pipeline import CallState, Persona
 from yaksh.caller.transcript import TranscriptBuilder
 from yaksh.diagnostics import describe_exception
 from yaksh.domain.answering import (
@@ -22,19 +22,13 @@ from yaksh.domain.answering import (
 )
 from yaksh.domain.conversations import (
     CallObserver,
-    CallRequest,
     EndReason,
     WireEvent,
     WireEventKind,
 )
-from yaksh.integrations.speech.audio import speak_once
-from yaksh.integrations.speech.tts import tts_service
 
 log = logging.getLogger(__name__)
 
-POLL_S = 0.1
-PLAY_SLACK_S = 3.0
-"""How much longer than its audio a line may take to be reported played."""
 ANSWER_CAP_S = 30.0
 """How long the screener waits at most for an agent that is still speaking."""
 HANDOVER_NOTE = (
@@ -42,24 +36,6 @@ HANDOVER_NOTE = (
     "it calls. The agent's answers to the screener are above. You have read them, and you pick "
     "up the call now."
 )
-
-
-def own_greeting(request: CallRequest, keys: CallerKeys) -> asyncio.Future[bytes] | None:
-    """Start speaking the persona's own voicemail greeting, so it is ready when the call
-    connects; None when the call plays no own greeting."""
-    plan = request.answering
-    text = plan.voicemail.own_greeting if plan and plan.voicemail else None
-    if text is None:
-        return None
-    return asyncio.ensure_future(spoken(keys.tts, request, text))
-
-
-async def spoken(key: str, request: CallRequest, text: str) -> bytes:
-    """The text in the persona's voice, through the same text-to-speech as its replies."""
-    service = tts_service(
-        request.app_settings, request.voice, request.caller_language, key, one_shot=True
-    )
-    return await speak_once(service, text)
 
 
 class AnsweringScript:
@@ -205,8 +181,8 @@ class AnsweringScript:
         """Play a line and return once Plivo reports it played, with when it ended: when the
         line closed, or now when no report came within the slack."""
         self._transcript.machine(text, line)
-        await self._player.play(pcm, text, line)
-        await self._until(lambda: self._transcript.caller_quiet, bytes_ms(len(pcm)) / 1000)
+        await self._player.play(pcm, text, machine=line)
+        await until_played(lambda: self._transcript.caller_quiet, bytes_ms(len(pcm)) / 1000)
         closed = self._transcript.caller_closed_ms
         return closed if self._transcript.caller_quiet and closed is not None else self._clock.ms()
 
@@ -214,15 +190,9 @@ class AnsweringScript:
         pcm = read_pcm(file)
         seconds = bytes_ms(len(pcm)) / 1000
         self._mark(WireEventKind.CALLER_SOUND, f"tone, {seconds:g} s")
-        await self._player.play(pcm, None, MachineLine.TONE)
+        await self._player.play(pcm, None, machine=MachineLine.TONE)
         await asyncio.sleep(seconds)
-        await self._until(lambda: self._transcript.caller_quiet, 0)
-
-    async def _until(self, done: Callable[[], bool], audio_s: float) -> None:
-        loop = asyncio.get_running_loop()
-        deadline = loop.time() + audio_s + PLAY_SLACK_S
-        while not done() and loop.time() < deadline:
-            await asyncio.sleep(POLL_S)
+        await until_played(lambda: self._transcript.caller_quiet, 0)
 
     def _end(self, reason: EndReason, why: str) -> None:
         if self._state.end(reason):

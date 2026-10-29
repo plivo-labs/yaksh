@@ -17,6 +17,7 @@ from pydantic import (
 
 from yaksh.domain.answering import AnsweredBy
 from yaksh.domain.evaluations import ItemRole
+from yaksh.domain.scenarios import can_match
 
 RuleKey = Annotated[str, StringConstraints(pattern=r"^[a-z0-9][a-z0-9_-]{0,62}$")]
 RuleName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
@@ -100,8 +101,8 @@ class PhraseRule(BaseModel):
         compile."""
         if self.match is PhraseMatch.REGEX:
             compiles(self.value)
-        elif not any(char.isalnum() for char in self.value):
-            raise ValueError("a phrase needs at least one word or number")
+        else:
+            can_match(self.value)
         return self
 
 

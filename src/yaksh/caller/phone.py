@@ -10,7 +10,6 @@ from typing import Any
 
 from fastapi import WebSocket, WebSocketDisconnect
 
-from yaksh.caller.answering import own_greeting
 from yaksh.caller.audio import Clock
 from yaksh.caller.conversation import (
     Connected,
@@ -27,6 +26,7 @@ from yaksh.caller.plivo_server import (
     PendingStream,
     StreamRegistry,
 )
+from yaksh.caller.prepared import Prepared, spoken
 from yaksh.caller.turn_models import TurnModels
 from yaksh.config import Settings
 from yaksh.domain.conversations import (
@@ -447,7 +447,8 @@ class PhoneCaller:
             return unreached(EndReason.ERROR, str(error))
         api = self._plivo_api(*credentials)
         hang_up = partial(self._hang_up, api)
-        own = own_greeting(request, keys)
+        prepared = Prepared(request)
+        prepared.make(partial(spoken, keys.tts, request))
         clock = Clock()
         observer.wire_event(WireEvent(kind=WireEventKind.CONNECT_STARTED, at_ms=clock.ms()))
         entry = self._registry.expect(request.conversation_id)
@@ -467,7 +468,9 @@ class PhoneCaller:
                     await hang_up(dialed.call_uuid)
             if isinstance(dialed, CallOutcome):
                 return dialed
-            start = ConversationStart(request, keys, observer, stop, clock, dialed, own, clock.ms())
+            start = ConversationStart(
+                request, keys, observer, stop, clock, dialed, prepared, clock.ms()
+            )
             outcome = await talk(start, seat, Line(dialed.call_uuid, entry.callbacks, hang_up))
             return outcome.model_copy(
                 update={
@@ -477,9 +480,7 @@ class PhoneCaller:
             )
         finally:
             try:
-                if own is not None:
-                    own.cancel()
-                    await asyncio.gather(own, return_exceptions=True)
+                await prepared.close()
                 self._registry.forget(request.conversation_id)
                 if trigger is not None:
                     trigger.cancel()

@@ -10211,6 +10211,129 @@
         ],
         "title": "ImportResult"
       },
+      "Interruption": {
+        "properties": {
+          "say": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Say"
+          },
+          "agent_says": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Says"
+          },
+          "after_s": {
+            "type": "number",
+            "maximum": 30.0,
+            "minimum": 0.0,
+            "title": "After S",
+            "default": 2.0
+          },
+          "from_answer": {
+            "type": "integer",
+            "maximum": 100.0,
+            "minimum": 1.0,
+            "title": "From Answer",
+            "default": 2
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "say"
+        ],
+        "title": "Interruption",
+        "description": "A fixed line the caller says while the agent is still speaking, on phone calls. A start\nis each new match of `agent_says` in the agent's words or, with no phrase, the start of each\nanswer of the agent, from answer `from_answer` on. Each start opens one wait of `after_s`.\nThe line plays when a wait ends with the agent speaking: in the turn of the match, or, with\nno phrase, in the agent turn of that answer that is open then, also after a pause in it. A\nline plays at most once. With a phrase, `after_s` and `from_answer` are 0 and 1 unless they\nare set; with no phrase, they are 2 and 2."
+      },
+      "InterruptionTry": {
+        "properties": {
+          "number": {
+            "type": "integer",
+            "title": "Number"
+          },
+          "answer": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Answer"
+          },
+          "turn_started_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turn Started Ms"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TryReason"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          },
+          "words": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Words"
+          },
+          "window_end_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Window End Ms"
+          }
+        },
+        "type": "object",
+        "required": [
+          "number"
+        ],
+        "title": "InterruptionTry",
+        "description": "One try of an interruption: a start whose wait ended, or a miss at once."
+      },
       "ItemRead": {
         "properties": {
           "item_key": {
@@ -12529,6 +12652,13 @@
                 "type": "null"
               }
             ]
+          },
+          "interruptions": {
+            "items": {
+              "$ref": "#/components/schemas/Interruption"
+            },
+            "type": "array",
+            "title": "Interruptions"
           }
         },
         "additionalProperties": false,
@@ -12542,7 +12672,8 @@
           "criteria",
           "agent_data",
           "first_words",
-          "caller"
+          "caller",
+          "interruptions"
         ],
         "title": "PlayedScenario",
         "description": "A scenario version as one data set plays it: placeholders filled with the set's values."
@@ -14693,6 +14824,14 @@
                 "type": "null"
               }
             ]
+          },
+          "interruptions": {
+            "items": {
+              "$ref": "#/components/schemas/Interruption"
+            },
+            "type": "array",
+            "maxItems": 3,
+            "title": "Interruptions"
           }
         },
         "additionalProperties": false,
@@ -14765,6 +14904,14 @@
                 "type": "null"
               }
             ]
+          },
+          "interruptions": {
+            "items": {
+              "$ref": "#/components/schemas/Interruption"
+            },
+            "type": "array",
+            "maxItems": 3,
+            "title": "Interruptions"
           },
           "name": {
             "type": "string",
@@ -14995,6 +15142,13 @@
               }
             ]
           },
+          "interruptions": {
+            "items": {
+              "$ref": "#/components/schemas/Interruption"
+            },
+            "type": "array",
+            "title": "Interruptions"
+          },
           "current_version": {
             "type": "integer",
             "title": "Current Version"
@@ -15037,6 +15191,7 @@
           "data_sets",
           "first_words",
           "caller",
+          "interruptions",
           "current_version",
           "forked_from_id",
           "created_at",
@@ -15179,6 +15334,21 @@
                 "type": "null"
               }
             ]
+          },
+          "interruptions": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/Interruption"
+                },
+                "type": "array",
+                "maxItems": 3
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Interruptions"
           }
         },
         "additionalProperties": false,
@@ -16731,6 +16901,22 @@
         ],
         "title": "TriggerMethod"
       },
+      "TryReason": {
+        "type": "string",
+        "enum": [
+          "agent_quiet",
+          "turn_ended",
+          "caller_speaking",
+          "key_press",
+          "other_line",
+          "call_ending",
+          "audio_not_ready",
+          "audio_failed",
+          "no_words_while_speaking"
+        ],
+        "title": "TryReason",
+        "description": "Why a start of an interruption did not play its line, or why it is missed at once."
+      },
       "TtsModelRead": {
         "properties": {
           "id": {
@@ -16873,6 +17059,17 @@
               }
             ],
             "title": "Audio Index"
+          },
+          "interruption": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Interruption"
           },
           "response_ms": {
             "anyOf": [
@@ -17557,6 +17754,16 @@
               }
             ],
             "title": "Detail"
+          },
+          "interruption": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/InterruptionTry"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -17586,7 +17793,8 @@
           "waiting_for_call",
           "caller_sound",
           "hold_started",
-          "handover"
+          "handover",
+          "interruption"
         ],
         "title": "WireEventKind"
       },

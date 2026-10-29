@@ -11,7 +11,7 @@ from yaksh.domain.agents import AgentConfig, Transport
 from yaksh.domain.answering import AnsweredBy, AnsweringPlan, MachineLine
 from yaksh.domain.languages import Language
 from yaksh.domain.latency import AgentMedia, CallerReplyTime, CallerReplyWindow, LoopLag
-from yaksh.domain.scenarios import Fact
+from yaksh.domain.scenarios import Fact, Interruption
 from yaksh.domain.settings import AppSettings, CallerModel
 from yaksh.domain.speech import SttProvider
 from yaksh.domain.surroundings import SoundPlan
@@ -160,6 +160,56 @@ class WireEventKind(StrEnum):
     """The call screener put the agent on hold; the detail is the hold in ms."""
     HANDOVER = "handover"
     """The persona picked up after its call screener."""
+    INTERRUPTION = "interruption"
+    """A try of a scenario's interruption, in the event's `interruption`."""
+
+
+class TryReason(StrEnum):
+    """Why a start of an interruption did not play its line, or why it is missed at once."""
+
+    AGENT_QUIET = "agent_quiet"
+    """The voice detector heard the agent stop before the wait ended, or a time start that
+    waited for the agent's next speech saw its turn end first."""
+    TURN_ENDED = "turn_ended"
+    """The agent's turn ended before the wait ended."""
+    CALLER_SPEAKING = "caller_speaking"
+    """The caller was speaking, or about to speak."""
+    KEY_PRESS = "key_press"
+    """The caller pressed keys in this turn of the agent."""
+    OTHER_LINE = "other_line"
+    """Another line was playing, or its window was open."""
+    CALL_ENDING = "call_ending"
+    """The call was ending when the wait ended, or it ended during the wait."""
+    AUDIO_NOT_READY = "audio_not_ready"
+    """The line's speech, made at the start of the call, was not ready yet."""
+    AUDIO_FAILED = "audio_failed"
+    """The line's speech could not be made; the try's detail says why."""
+    NO_WORDS_WHILE_SPEAKING = "no_words_while_speaking"
+    """The speech to text in use gives no words while the agent speaks, so a phrase cannot
+    start a wait."""
+
+
+class InterruptionTry(BaseModel):
+    """One try of an interruption: a start whose wait ended, or a miss at once."""
+
+    model_config = ConfigDict(frozen=True)
+
+    number: int
+    """The interruption's place in the scenario, from 1."""
+    answer: int | None = None
+    """The agent's answer that the start came in; None for a miss at once."""
+    turn_started_ms: int | None = None
+    """When the agent's turn of the start began, on the call clock: it finds the turn in the
+    transcript."""
+    reason: TryReason | None = None
+    """Why the line did not play; None when it played."""
+    detail: str | None = None
+    """More on the reason: for AUDIO_FAILED, the error."""
+    words: str | None = None
+    """For a line that played: the agent's words in its turn up to the line's start."""
+    window_end_ms: int | None = None
+    """For a line that played: the end of its window on the call clock, 2 s after the first
+    sound of its audio. A stop of the agent in the window is a stop for the line."""
 
 
 class ToolItem(BaseModel):
@@ -193,6 +243,9 @@ class Turn(BaseModel):
     audio_index: int | None = None
     """A caller turn that went out on a phone call: which caller audio start of the call played
     it, its window in the transcript's caller replies."""
+    interruption: int | None = None
+    """A line of the scenario's interruption with this number, from 1, not the persona's own
+    words."""
 
 
 class WireEvent(BaseModel):
@@ -201,6 +254,7 @@ class WireEvent(BaseModel):
     kind: WireEventKind
     at_ms: int
     detail: str | None = None
+    interruption: InterruptionTry | None = None
 
 
 class Validity(BaseModel):
@@ -350,6 +404,9 @@ class CallRequest(BaseModel):
     answering: AnsweringPlan | None = None
     """What the persona's phone plays before or in place of the persona; None when the persona
     answers."""
+    interruptions: list[Interruption] = []
+    """The scenario's interruptions, with the data set's facts filled; none on a text run or
+    when the answer cannot reach the persona."""
 
 
 class CallOutcome(BaseModel):
