@@ -1,7 +1,8 @@
+import asyncio
 import copy
 import json
 from collections.abc import AsyncIterator
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -37,6 +38,8 @@ class Cx:
     read: list[str] = field(default_factory=list)
     """Each run detail read, in order."""
     auth: list[str] = field(default_factory=list)
+    arrived: list[float] = field(default_factory=list)
+    """When each request came, by the event loop's clock."""
 
     def add(self, detail: dict[str, Any]) -> None:
         self.details[detail["run_uuid"]] = detail
@@ -56,6 +59,7 @@ async def cx() -> AsyncIterator[Cx]:
 
     @app.get(f"{AGENT_PATH}/Run/")
     async def runs(request: Request, limit: int, offset: int) -> Response:
+        state.arrived.append(asyncio.get_running_loop().time())
         state.auth.append(request.headers.get("authorization", ""))
         if state.status != 200:
             return Response("{}", status_code=state.status, headers=state.headers)
@@ -64,6 +68,7 @@ async def cx() -> AsyncIterator[Cx]:
 
     @app.get(f"{AGENT_PATH}/Run/{{run_id}}/")
     async def run(run_id: str) -> Response:
+        state.arrived.append(asyncio.get_running_loop().time())
         state.read.append(run_id)
         if state.status != 200:
             return Response("{}", status_code=state.status, headers=state.headers)
@@ -105,7 +110,7 @@ def run_like_live(run_id: str, caller: str, started: str, ended: str) -> dict[st
 
 
 async def find(cx: Cx, ref: CallRef) -> Found | Pending | Missing:
-    return await PlivoCxRuns(allow_private=True).find(
+    return await PlivoCxRuns(allow_private=True, request_gap_s=0).find(
         source(cx), {"Authorization": "Basic abc"}, ref
     )
 
@@ -160,6 +165,106 @@ async def test_an_inbound_call_finds_its_run_by_number_among_runs_of_the_same_se
     assert isinstance(found, Found)
     assert found.record.external_id == "run-ours"
     assert cx.read == ["run-other", "run-ours"], "the run that ends closest is read first"
+
+
+async def test_calls_placed_together_read_each_others_runs_once(cx: Cx) -> None:
+    started = "2026-10-23 12:28:26.000000+00:00"
+    cx.add(run_like_live("run-ours", YAKSH, started, "2026-10-23 12:29:30.000000+00:00"))
+    cx.add(run_like_live("run-other", "+15550100009", started, "2026-10-23 12:29:14.000000+00:00"))
+    reader = PlivoCxRuns(allow_private=True, request_gap_s=0)
+
+    async def look(ref: CallRef) -> Found | Pending | Missing:
+        return await reader.find(source(cx), {"Authorization": "Basic abc"}, ref)
+
+    ours = await look(call())
+    cx.read.clear()
+    theirs = await look(replace(call(), yaksh_number="+15550100009"))
+    again = await look(call())
+
+    assert isinstance(ours, Found) and isinstance(theirs, Found) and isinstance(again, Found)
+    assert theirs.record.external_id == "run-other"
+    assert cx.read == ["run-other", "run-ours"], "each lookup reads only its own run again"
+
+
+async def test_the_requests_of_calls_that_end_together_keep_a_gap(cx: Cx) -> None:
+    started = "2026-10-23 12:28:26.000000+00:00"
+    callers = [f"+1555010010{n}" for n in range(4)]
+    for n, number in enumerate(callers):
+        cx.add(run_like_live(f"run-{n}", number, started, f"2026-10-23 12:29:3{n}.000000+00:00"))
+    reader = PlivoCxRuns(allow_private=True, request_gap_s=0.2)
+
+    found = await asyncio.gather(
+        *(
+            reader.find(source(cx), {"Authorization": "Basic abc"}, replace(call(), yaksh_number=n))
+            for n in callers
+        )
+    )
+
+    assert all(isinstance(lookup, Found) for lookup in found)
+    gaps = [later - earlier for earlier, later in zip(cx.arrived, cx.arrived[1:], strict=False)]
+    assert min(gaps) >= 0.19, "one Auth ID gets one request each gap, from all lookups together"
+
+
+async def test_a_refusal_for_the_rate_limit_holds_the_next_request(cx: Cx) -> None:
+    reader = PlivoCxRuns(allow_private=True, request_gap_s=0)
+    cx.status, cx.headers = 429, {"Retry-After": "1"}
+    refused = await reader.find(source(cx), {"Authorization": "Basic abc"}, call())
+    cx.status, cx.headers = 200, {}
+
+    await reader.find(source(cx), {"Authorization": "Basic abc"}, call())
+
+    assert isinstance(refused, Pending)
+    assert cx.arrived[1] - cx.arrived[0] >= 0.95, "Yaksh waits as long as Plivo CX asked"
+
+
+async def test_a_long_hold_frees_the_evaluation_instead_of_waiting_in_it(cx: Cx) -> None:
+    reader = PlivoCxRuns(allow_private=True, request_gap_s=0)
+    cx.status, cx.headers = 429, {"Retry-After": "60"}
+    await reader.find(source(cx), {"Authorization": "Basic abc"}, call())
+    cx.status, cx.headers = 200, {}
+
+    held = await reader.find(source(cx), {"Authorization": "Basic abc"}, call())
+
+    assert isinstance(held, Pending) and held.retry_after_s is not None
+    assert 55 <= held.retry_after_s <= 60
+    assert len(cx.arrived) == 1, "no request while Plivo CX holds the Auth ID"
+
+
+async def test_a_hold_applies_to_requests_that_were_already_waiting(cx: Cx) -> None:
+    started = "2026-10-23 12:28:26.000000+00:00"
+    callers = [f"+1555010010{n}" for n in range(3)]
+    for n, number in enumerate(callers):
+        cx.add(run_like_live(f"run-{n}", number, started, f"2026-10-23 12:29:3{n}.000000+00:00"))
+    reader = PlivoCxRuns(allow_private=True, request_gap_s=0.3)
+    ref = replace(call(), yaksh_number=callers[0])
+    first = asyncio.create_task(reader.find(source(cx), {"Authorization": "Basic abc"}, ref))
+    await asyncio.sleep(0.05)
+    reader._pace.hold("MAXXXXXXXXXXXXXXXXXX", 1.0)
+
+    await first
+
+    gaps = [later - earlier for earlier, later in zip(cx.arrived, cx.arrived[1:], strict=False)]
+    assert gaps and max(gaps) >= 0.95, "the waiting request goes after the hold, not before"
+
+
+async def test_runs_of_other_calls_that_were_read_do_not_count_against_the_reads(cx: Cx) -> None:
+    started = "2026-10-23 12:28:26.000000+00:00"
+    for n in range(MAX_CANDIDATES + 2):
+        cx.add(
+            run_like_live(
+                f"run-{n:02}", f"+1555020{n:04}", started, f"2026-10-23 12:29:{n:02}.000000+00:00"
+            )
+        )
+    cx.add(run_like_live("run-ours", YAKSH, started, "2026-10-23 12:40:00.000000+00:00"))
+    reader = PlivoCxRuns(allow_private=True, request_gap_s=0)
+
+    async def look() -> Found | Pending | Missing:
+        return await reader.find(source(cx), {"Authorization": "Basic abc"}, call())
+
+    first, second = await look(), await look()
+
+    assert isinstance(first, Pending) and "does not read the other 3" in first.reason
+    assert isinstance(second, Found) and second.record.external_id == "run-ours"
 
 
 async def test_no_run_from_the_number_is_pending_until_one_comes(cx: Cx) -> None:
@@ -313,6 +418,9 @@ async def test_a_run_that_just_ended_waits_until_its_log_settles(cx: Cx) -> None
 
     assert isinstance(found, Pending), "Plivo CX logs lines late, after the flow ends"
     assert found.partial is not None and not found.partial.complete
+    assert found.retry_after_s is not None and 80 <= found.retry_after_s <= 90, (
+        "asked again when the log settles, not at each poll before"
+    )
 
 
 async def test_a_run_that_has_not_logged_its_caller_yet_is_waited_for(cx: Cx) -> None:

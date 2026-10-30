@@ -6,8 +6,10 @@ found among the flow's runs that started during the call, by the number Yaksh ca
 run's call UUID is another leg's, and runs of calls placed together start in the same second.
 """
 
+import asyncio
 import json
-from collections import defaultdict
+import re
+from collections import OrderedDict, defaultdict
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -43,6 +45,16 @@ MAX_PAGES = 10
 MAX_CANDIDATES = 10
 WINDOW_MARGIN = timedelta(seconds=5)
 RATE_LIMIT_WAIT_S = 60.0
+KNOWN_CALLERS = 10_000
+"""How many runs' callers a reader keeps, so that one lookup skips the runs of other calls."""
+MAX_TURN_WAIT_S = 5.0
+"""A longer wait for a request's turn ends the lookup as Pending, so that the evaluation slot is
+free for other calls while it waits."""
+REQUEST_GAP_S = 1.2
+"""The least time between two requests of one Auth ID: Plivo CX allows 60 a minute for each,
+and other clients of the account use the same budget."""
+ACCOUNT = re.compile(r"/Account/([^/]+)/")
+RATE_LIMITED = "Plivo CX allows 60 requests a minute for each Auth ID"
 RUNNING = "IN_PROGRESS"
 FLOW_ENDED = "FLOW_EXECUTION_COMPLETE"
 SETTLE = timedelta(seconds=90)
@@ -72,8 +84,10 @@ class RunSummary:
 
 
 class PlivoCxRuns:
-    def __init__(self, *, allow_private: bool) -> None:
+    def __init__(self, *, allow_private: bool, request_gap_s: float = REQUEST_GAP_S) -> None:
         self._allow_private = allow_private
+        self._callers = Callers()
+        self._pace = Pace(request_gap_s)
 
     async def find(self, source: RecordSource, headers: Mapping[str, str], call: CallRef) -> Lookup:
         agent_url = str(source.url).rstrip("/")
@@ -81,11 +95,11 @@ class PlivoCxRuns:
         if problem is not None:
             return Missing(problem)
         async with guarded_session(allow_private=self._allow_private, timeout=TIMEOUT) as session:
-            api = AgentApi(session, agent_url, dict(headers))
+            api = AgentApi(session, agent_url, dict(headers), self._pace)
             try:
                 if call.direction is Direction.OUTBOUND:
                     return await outbound_run(api, call)
-                return await inbound_run(api, call)
+                return await inbound_run(api, call, self._callers, agent_url)
             except Stop as stop:
                 return stop.lookup
             except (AttributeError, KeyError, TypeError, ValueError) as error:
@@ -97,10 +111,15 @@ class PlivoCxRuns:
 class AgentApi:
     """GET requests to one agent of the Plivo API; an answer that ends the lookup raises Stop."""
 
-    def __init__(self, session: aiohttp.ClientSession, agent_url: str, headers: dict[str, str]):
+    def __init__(
+        self, session: aiohttp.ClientSession, agent_url: str, headers: dict[str, str], pace: Pace
+    ):
         self._session = session
         self._agent_url = agent_url
         self._headers = headers
+        self._pace = pace
+        account = ACCOUNT.search(agent_url)
+        self._auth_id = account.group(1) if account else agent_url
 
     async def runs(self, offset: int) -> list[RunSummary]:
         page = await self._get(
@@ -116,6 +135,10 @@ class AgentApi:
         )
 
     async def _get(self, url: str, *, not_found: Pending | Missing) -> dict[str, Any]:
+        while (wait := self._pace.admit(self._auth_id)) > 0:
+            if wait > MAX_TURN_WAIT_S:
+                raise Stop(Pending(RATE_LIMITED, retry_after_s=wait))
+            await asyncio.sleep(wait)
         try:
             async with self._session.get(
                 url, headers=self._headers, allow_redirects=False
@@ -128,12 +151,8 @@ class AgentApi:
         if status == 404:
             raise Stop(not_found)
         if status == 429:
-            raise Stop(
-                Pending(
-                    "Plivo CX allows 60 requests a minute for each Auth ID",
-                    retry_after_s=wait_of(retry_after),
-                )
-            )
+            self._pace.hold(self._auth_id, wait_of(retry_after))
+            raise Stop(Pending(RATE_LIMITED, retry_after_s=wait_of(retry_after)))
         if status in (401, 403):
             raise Stop(Missing(f"Plivo CX refused the agent record's headers (HTTP {status})"))
         if 400 <= status < 500:
@@ -176,26 +195,78 @@ async def outbound_run(api: AgentApi, call: CallRef) -> Lookup:
     return finished(detail)
 
 
-async def inbound_run(api: AgentApi, call: CallRef) -> Lookup:
+class Pace:
+    """Spaces the requests of each Auth ID, so that the lookups of calls that end together stay
+    in Plivo CX's rate limit instead of being refused. A refusal holds that Auth ID for the time
+    Plivo CX asks. The pace is of one process: separate evaluator processes keep their own."""
+
+    def __init__(self, gap_s: float) -> None:
+        self._gap_s = gap_s
+        self._next: dict[str, float] = {}
+
+    def admit(self, auth_id: str) -> float:
+        """0 when a request of the Auth ID can go now, which takes its turn; else how long to
+        wait before asking again. Nothing is held for a request that waits."""
+        now = asyncio.get_running_loop().time()
+        wait = self._next.get(auth_id, now) - now
+        if wait > 0:
+            return wait
+        self._next = {key: at for key, at in self._next.items() if at > now}
+        self._next[auth_id] = now + self._gap_s
+        return 0.0
+
+    def hold(self, auth_id: str, seconds: float) -> None:
+        until = asyncio.get_running_loop().time() + seconds
+        self._next[auth_id] = max(self._next.get(auth_id, until), until)
+
+
+class Callers:
+    """The caller of each run that Plivo CX has logged one for, by agent. A run's caller does not
+    change, so the lookups of calls placed together read each other's runs once, not once each."""
+
+    def __init__(self) -> None:
+        self._of: OrderedDict[tuple[str, str], str] = OrderedDict()
+
+    def get(self, agent_url: str, run_id: str) -> str | None:
+        return self._of.get((agent_url, run_id))
+
+    def keep(self, agent_url: str, run_id: str, caller: str) -> None:
+        self._of[agent_url, run_id] = caller
+        self._of.move_to_end((agent_url, run_id))
+        while len(self._of) > KNOWN_CALLERS:
+            self._of.popitem(last=False)
+
+
+async def inbound_run(api: AgentApi, call: CallRef, callers: Callers, agent_url: str) -> Lookup:
     earliest, latest = call.started_at - WINDOW_MARGIN, call.ended_at + WINDOW_MARGIN
     window = f"between {call.started_at:%H:%M:%S} and {call.ended_at:%H:%M:%S} UTC"
     candidates = await runs_in_window(api, earliest, latest)
     candidates.sort(key=lambda run: distance(run, call))
-    unlogged = []
-    for run in candidates[:MAX_CANDIDATES]:
+    unlogged, unread = [], 0
+    reads = 0
+    for run in candidates:
+        known = callers.get(agent_url, run.run_id)
+        if known is not None and known != digits(call.yaksh_number):
+            continue
+        if reads == MAX_CANDIDATES:
+            unread += 1
+            continue
+        reads += 1
         detail = await api.run(run.run_id)
         caller = start_call(detail).get("call.from")
         if caller is None:
             unlogged.append(run.run_id)
-        elif digits(caller) == digits(call.yaksh_number):
+            continue
+        callers.keep(agent_url, run.run_id, digits(caller))
+        if digits(caller) == digits(call.yaksh_number):
             return finished(detail)
     if unlogged:
         return Pending(f"Plivo CX has not logged who called in run {', '.join(unlogged)} yet")
-    if len(candidates) > MAX_CANDIDATES:
+    if unread:
         return Pending(
             f"none of the {MAX_CANDIDATES} runs of this Plivo CX agent closest to the call came "
-            f"from {call.yaksh_number}, and Yaksh does not read the other "
-            f"{len(candidates) - MAX_CANDIDATES} that started {window}"
+            f"from {call.yaksh_number}, and Yaksh does not read the other {unread} that started "
+            f"{window} yet"
         )
     return Pending(f"no run of this Plivo CX agent came from {call.yaksh_number} {window}")
 
@@ -252,11 +323,32 @@ def trigger_run_id(response: str | None) -> str | None:
 
 
 def finished(detail: dict[str, Any]) -> Found | Pending:
-    record = parse_run(detail, datetime.now(UTC))
+    """The run's record once it is final. A run that ended is asked for again when its log
+    settles, not at each poll before that."""
+    now = datetime.now(UTC)
+    record = parse_run(detail, now)
     if record.complete:
         return Found(record)
+    last = last_logged(detail)
+    settles = None if not flow_ended(detail) or last is None else last + SETTLE
     return Pending(
-        f"Plivo CX has not finished run {record.external_id} (status {record.status})", record
+        f"Plivo CX has not finished run {record.external_id} (status {record.status})",
+        record,
+        retry_after_s=max((settles - now).total_seconds(), 1.0) if settles else None,
+    )
+
+
+def last_logged(detail: dict[str, Any]) -> datetime | None:
+    """The time of the run's last log line or its end, whichever is later."""
+    times = [time for entry in logs_of(detail) if (time := log_time(entry.get("timestamp")))]
+    if detail.get("ended_at"):
+        times.append(moment(str(detail["ended_at"])))
+    return max(times) if times else None
+
+
+def flow_ended(detail: dict[str, Any]) -> bool:
+    return str(detail.get("status") or "") != RUNNING and any(
+        entry.get("event_name") == FLOW_ENDED for entry in logs_of(detail)
     )
 
 
@@ -331,16 +423,12 @@ def parse_run(detail: dict[str, Any], now: datetime) -> AgentRecord:
                 )
             )
     status = str(detail.get("status") or "")
-    times = [time for entry in logs if (time := log_time(entry.get("timestamp"))) is not None]
-    if detail.get("ended_at"):
-        times.append(moment(str(detail["ended_at"])))
-    settled = bool(times) and now >= max(times) + SETTLE
-    ended = status != RUNNING and any(entry.get("event_name") == FLOW_ENDED for entry in logs)
+    last = last_logged(detail)
     return AgentRecord(
         provider=RecordProvider.PLIVO_CX,
         external_id=str(detail.get("run_uuid") or ""),
         status=status,
-        complete=ended and settled,
+        complete=flow_ended(detail) and last is not None and now >= last + SETTLE,
         turns=turns,
         saved=saved_values(saved),
         tools=tools,
