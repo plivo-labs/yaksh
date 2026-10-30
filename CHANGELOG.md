@@ -1,3 +1,12 @@
+## v0.10.3 (2026-10-30)
+
+### Fix
+
+- **records**: keep Plivo CX record reads within its rate limit when many calls end together (#39)
+  - Calls that end together no longer lose the agent's record of the call. Before, many calls to one Plivo CX agent sent more record requests than Plivo CX allows for one Auth ID (60 a minute), and some calls were judged without their record.
+  - Yaksh now reads each run of the agent once for all the calls that ended together, and it asks for a run again only when its log has settled.
+  - The requests of one Auth ID go at most about 50 a minute from one evaluator process. When Plivo CX asks Yaksh to wait, Yaksh waits that long before the next request.
+
 ## v0.10.2 (2026-10-29)
 
 ### Feat
