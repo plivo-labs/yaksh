@@ -21,6 +21,7 @@
     "background-noise",
     "interruptions",
     "response-time",
+    "agent-traces",
     "listen",
     "cli",
     "troubleshooting",

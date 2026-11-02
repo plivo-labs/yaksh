@@ -1,0 +1,195 @@
+---
+title: Agent traces
+description: Send the agent's traces to Yaksh, and see where the time of each wait goes.
+---
+
+Yaksh measures each wait from its recording: the time from the end of the speech of the caller to the start of the speech of the agent. Refer to [Response time](/docs/response-time). The recording does not show the steps inside the agent. When the agent sends its OpenTelemetry (OTel) traces to Yaksh, Yaksh divides each wait into these parts:
+
+| Part | What it measures |
+| --- | --- |
+| Network and telephony | The wait of Yaksh less the total of the agent: the audio path in the two directions, and agent time that no span measures. |
+| VAD endpointing | From the end of the speech of the caller to the time when the VAD reports it: the silence that the VAD waits for. LiveKit only. |
+| STT after VAD stop | From the VAD stop to the final transcript, when the transcript comes after it; else 0. LiveKit only. |
+| VAD and STT | When the trace does not show the VAD stop, as with no turn detector model: from the end of the speech of the caller to the last check of the turn detector, or to the end of the user turn when there is no check. LiveKit only. |
+| Turn detection | From the last check of the turn detector to the end of the user turn. LiveKit only. |
+| End of turn | From the end of the speech of the caller to the first LLM request: VAD, STT and turn detection together. Pipecat only. |
+| LLM TTFT | From each LLM request of the reply to its first token, counted after the end of the user turn. |
+| Tool execution | From a tool call of the reply to the next LLM request. |
+| Sentence aggregation | From the first token of the last LLM request to the first TTS request. Pipecat only. |
+| TTS TTFB | From the first TTS request to its first audio, counted after the end of the user turn. |
+| Unattributed | The total of the agent less the parts above. |
+
+The conversation page shows the parts in the **Agent response time** card on the **Metrics** tab, and on each agent wait in the transcript. Yaksh reads LiveKit Agents 1.8 and Pipecat 1.14 traces of phone calls. Text tests get no parts.
+
+## Set up
+
+1. In **Settings › Traces**, select **Create trace token**. Yaksh shows the token one time.
+2. Put the two values in the secret settings of the agent: `YAKSH_TRACE_ENDPOINT`, which is `https://<your Yaksh>/api/v1/otlp`, and `YAKSH_TRACE_TOKEN`.
+3. Add the code for your stack, below. It puts a link key on the spans of each call, so that Yaksh can find the call.
+4. Make one test call. Then look at the **Agent response time** card of the call.
+
+**Settings › Traces** also shows **Last used** and **Last span with a Yaksh key**. They are a quick check before a test call. When **Last used** changes and **Last span with a Yaksh key** does not, the spans arrive without a link key, or with a number that is not a number of Yaksh. Pipecat sends the key when the call ends, so for Pipecat the second value changes only after a call. The values are for all agents together.
+
+There is one trace token for each Yaksh install. **Replace token** makes a new token and stops the old one at once. **Delete** stops all traces. While a token exists, Yaksh waits 30 seconds after each phone call before it evaluates the call, so that the last spans can arrive.
+
+### Link keys
+
+Put one of these attributes on one or more spans of each test call. One span with the key is sufficient: Yaksh links the full trace.
+
+| Attribute | Value | When |
+| --- | --- | --- |
+| `yaksh.conversation_id` | The conversation ID of Yaksh. The trigger request can send it with `{{yaksh.conversation_id}}`. | The agent calls Yaksh |
+| `yaksh.number` | The phone number of Yaksh on the call, in E.164 | Yaksh calls the agent, or the agent calls Yaksh |
+
+When Yaksh calls the agent, the number of Yaksh is the number of the caller. When the agent calls Yaksh, it is the number that the agent calls. The trigger request of an outbound agent can send it with `{{yaksh.number}}`. Yaksh drops each span whose number is not one of its numbers, unless the span also has a conversation ID.
+
+A span with no link key stays: it can be part of a trace whose key arrives later. Pipecat puts the key on the conversation span only, so Yaksh keeps the other spans of each call, real calls too, with their timing values only, and deletes them after 7 days. To send Yaksh no spans of real calls, turn on tracing only for test calls. With LiveKit, the code below puts the number on each span, so Yaksh drops all spans of a real call.
+
+### The exporter, for all stacks
+
+The exporter of Yaksh gets the endpoint and the token in code. An exporter with no endpoint in code reads the standard settings `OTEL_EXPORTER_OTLP_*`, and a different tracing tool of the agent can use them. An endpoint in code is used as it is, so the code adds `/v1/traces`.
+
+```python
+import os
+
+from opentelemetry import trace
+from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
+
+
+def yaksh_provider() -> TracerProvider:
+    """The tracer provider of the agent, with an exporter for Yaksh beside its other exporters."""
+    provider = trace.get_tracer_provider()
+    if not isinstance(provider, TracerProvider):
+        provider = TracerProvider()
+    provider.add_span_processor(
+        BatchSpanProcessor(
+            OTLPSpanExporter(
+                endpoint=os.environ["YAKSH_TRACE_ENDPOINT"] + "/v1/traces",
+                headers={"Authorization": "Bearer " + os.environ["YAKSH_TRACE_TOKEN"]},
+            )
+        )
+    )
+    return provider
+```
+
+When the agent already has a tracer provider, for example for a different tracing tool, the exporter goes on that provider. Call `force_flush()` on the provider after the session closes, at the point that your stack shows below. A flush that is too early loses the spans that close last.
+
+### LiveKit Agents 1.8.10 or later, one call in each process
+
+This is the default executor on Linux and macOS. `metadata=` puts the number on each span of the job. On an inbound SIP call, `sip.phoneNumber` of the SIP participant is the number of the caller. On an outbound SIP call, it is the number that the agent calls. Thus, it is the number of Yaksh in the two directions, unless the dispatch rule hides the number.
+
+```python
+import asyncio
+
+from livekit.agents import AgentSession, JobContext
+from livekit.agents.telemetry import set_tracer_provider
+
+
+async def entrypoint(ctx: JobContext) -> None:
+    await ctx.connect()
+    participant = await ctx.wait_for_participant()
+    provider = yaksh_provider()
+    set_tracer_provider(provider, metadata={"yaksh.number": participant.attributes["sip.phoneNumber"]})
+
+    session = AgentSession(...)
+    closed = asyncio.Event()
+    session.on("close", lambda _: closed.set())
+
+    async def flush_traces() -> None:
+        await closed.wait()
+        await asyncio.to_thread(provider.force_flush)
+
+    ctx.add_shutdown_callback(flush_traces)
+    await session.start(agent=..., room=ctx.room)
+```
+
+LiveKit runs all shutdown callbacks at the same time, and the session ends its span just before its `close` event. So the flush waits for that event.
+
+### LiveKit with many calls in one process, or before 1.8.10
+
+Set the provider one time, when the process starts. A span processor puts the number of the call on each span from a context variable, which the code sets for each call before the session starts. A span that starts outside the context of the call, such as a step of the end of the session, takes the number of its parent span. LiveKit Agents 1.8.0 ignores `metadata=` in a job, but this processor works with each version. The process continues after a call, so the exporter sends the last spans within 5 seconds.
+
+```python
+from contextvars import ContextVar
+
+from livekit.agents.telemetry import set_tracer_provider
+from opentelemetry import trace
+from opentelemetry.sdk.trace import SpanProcessor
+
+call_number: ContextVar[str | None] = ContextVar("call_number", default=None)
+
+
+class YakshKey(SpanProcessor):
+    def on_start(self, span, parent_context=None) -> None:
+        parent = getattr(trace.get_current_span(parent_context), "attributes", None) or {}
+        if number := call_number.get() or parent.get("yaksh.number"):
+            span.set_attribute("yaksh.number", number)
+
+    def force_flush(self, timeout_millis: int = 30000) -> bool:
+        return True  # the default answer stops the flush before the exporter
+
+
+provider = yaksh_provider()
+provider.add_span_processor(YakshKey())
+set_tracer_provider(provider)
+
+# For each call, before session.start():
+call_number.set(number_of_yaksh)
+```
+
+### Pipecat 1.14
+
+The attribute goes on the conversation span only. This is sufficient, because one span with the key links the full trace. Turn on metrics: without them, each reply is incomplete. Pipecat's `setup_tracing` cannot replace a provider that already exists, so set the provider of Yaksh yourself, and flush it after the pipeline run returns. The `on_pipeline_finished` event is too early: Pipecat ends the conversation span after it.
+
+```python
+from opentelemetry import trace
+from pipecat.pipeline.task import PipelineParams, PipelineTask
+
+provider = yaksh_provider()
+if trace.get_tracer_provider() is not provider:
+    trace.set_tracer_provider(provider)
+
+task = PipelineTask(
+    pipeline,
+    params=PipelineParams(enable_metrics=True),
+    enable_tracing=True,
+    additional_span_attributes={"yaksh.number": number_of_yaksh},
+)
+await runner.run(task)
+provider.force_flush()
+```
+
+## What Yaksh keeps
+
+Spans can hold the content of the call: the transcript of the caller, the prompt and the answer. Yaksh does not keep the content. It keeps only the spans that its readers use, with their names, times and timing values, and the link keys. A span with a link key and a different name stays as its key only. Yaksh deletes each span 7 days after it arrives.
+
+The endpoint takes OTLP over HTTP with protobuf, with or without gzip. It takes up to 8 MB in one request, 32 MB after gzip, and 20,000 spans. A span with a bad value is rejected alone, and the answer of the endpoint names the reason.
+
+## How Yaksh finds the trace of a call
+
+Yaksh links traces when it evaluates the call, 30 seconds after the call ends.
+
+- A trace with the conversation ID of the call belongs to that call.
+- Else Yaksh looks for a trace with the number of the call and spans in the time of the call. The clock of the agent must be correct: Yaksh compares the time when each span arrived with its end on the clock of the agent. Then the speech starts of the trace must align with the speech that Yaksh heard on the call, within 2 seconds.
+- Each trace that passes links, when no two of them overlap in time: an agent can serve one call in more than one session, each with its own trace. A trace links to one call only.
+
+## The Agent response time card
+
+| Card | What happened | What to do |
+| --- | --- | --- |
+| The parts, for some of the replies | The trace linked and aligned. A reply without parts has no match in the trace, misses a span or a value, or the total of the agent is longer than the wait. | Nothing. Spans can be lost, for example when an export fails. |
+| Yaksh found no usable traces | No trace with the ID or the number of the call arrived, or two traces fit the call. Only an agent that sent traces before gets this line. | Check the link key and the number, and **Last span with a Yaksh key**. |
+| The trace could not be aligned | The trace has the ID of the call, but its speech starts do not match the recording in one clear way. | Check that the trace is of this call. |
+| The times are about N s behind (or ahead of) Yaksh's clock | A trace that matches the call arrived, but the clock of the agent is wrong, or the spans arrive late, for example through a collector that holds them. | Check NTP on the server of the agent, and the export delay. |
+| Yaksh cannot read the framework | The trace linked, but it is not a LiveKit Agents 1.8 or Pipecat 1.14 trace. | Use one of these frameworks. |
+
+## Limits
+
+- Linking by number needs the clock of the agent to be correct to approximately 1.5 seconds, as NTP gives. An exporter that holds the spans for more than 2 seconds looks like a slow clock.
+- Linking by number needs speech in the call: 2 or more speech starts of the trace must align with the recording, or 1 when the trace and the recording each have only 1.
+- An agent speech start must be within 250 ms of the speech that Yaksh heard, after the offset. A media path that holds the audio for different times on different replies, such as a tunnel to a local Yaksh, can stop some replies from pairing.
+- LiveKit sets the TTFT of an LLM request only when its stream ends. When the caller interrupts the agent before that, the reply is incomplete.
+- Speech that the agent plays without its framework's speech output, such as a recorded prompt, is not in the trace.
+- Network and telephony also holds agent time that no span measures, for example silence at the start of the TTS audio. The span names are not a standard: a new LiveKit or Pipecat version can change them.

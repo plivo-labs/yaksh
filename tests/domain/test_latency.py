@@ -123,7 +123,7 @@ def test_a_media_gap_cuts_a_wait_short_and_an_opening_by_the_caller_expects_noth
     )
 
     assert found == [
-        Wait(start_ms=1_000, answer_ms=None, until_ms=2_000, expects_answer=False),
+        Wait(start_ms=1_000, answer_ms=None, until_ms=2_000, expects_answer=False, call_start=True),
         Wait(start_ms=2_500, answer_ms=6_000, until_ms=3_000, expects_answer=True, media_gap=True),
         # nothing more before the call ended: a long wait, but not an unanswered reply
         Wait(start_ms=9_400, answer_ms=None, until_ms=30_000, expects_answer=True, ran_to_end=True),

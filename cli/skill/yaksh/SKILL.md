@@ -149,6 +149,7 @@ When the agent has both transports, use `--transport text` with `--repeats 3`: t
    - `agent_silent` (no reply to two such questions), `turn_limit` and `duration_limit` end a completed conversation, which the judges read.
 4. `yaksh conversation record <conversation-id>` is the agent's own record of a call. It can be missing or incomplete (`status`, `reason`), so a missing line does not prove that the agent did not say it. It gives 404 for a text test, a conversation that did not complete or that a user stopped, or an agent with no `record_source` at the start of the run.
 5. Only phone calls have response times: `response_p90_ms` in `yaksh run view`, and `response_ms` on agent turns. `yaksh conversation list --sort -response_p90_ms` shows the slowest first.
+6. When the agent sends traces, `agent_reply_time` in the metrics of `yaksh conversation evaluation` gives the parts of each wait (refer to "Set up traces"), and `agent_reply` on an agent turn gives the parts of that wait. `network` is Yaksh's wait less the agent's own total.
 
 ## Agent fault or test fault
 
@@ -200,6 +201,44 @@ On a phone run of an outbound agent, `--answer caller,voicemail,screener` runs e
 
 - A conversation where no caller talked has no criteria: a voicemail call, and a screener call that the screener ended or that the agent ended during the screening. The agent rules for the answers that it reached (`answered_by`, or `any`) give its verdict, in `unplayed`. Without a deciding rule, it is `not_scored`, and `--wait` exits 1. So before the run, with the user's approval, give the agent a deciding rule for each answer, with `gate: always`. Take its conditions from `config`, such as the message that the agent must leave on the voicemail.
 - A reply to the screener must end after its question ends. The screener waits 8 s for it, and up to 30 s while the agent speaks. With no reply, the screener ends the call.
+
+## Set up traces
+
+When the user asks you to make the agent send its traces to Yaksh, so that each wait gets its parts:
+
+1. Change the agent's code only when the user asks. Find its framework and version in its dependency file (`pyproject.toml`, `requirements.txt`). Yaksh reads LiveKit Agents 1.8 and Pipecat 1.14.
+2. The user makes the token in Settings › Traces and puts `YAKSH_TRACE_ENDPOINT` (`https://<Yaksh>/api/v1/otlp`) and `YAKSH_TRACE_TOKEN` in the agent's secret settings. Do not print the token or write it to a file, as for the API token.
+3. Add the shared part and the part of the stack. Each span of a test call must carry Yaksh's number on the call (`yaksh.number`, E.164) or its conversation ID (`yaksh.conversation_id`). One span with the key links the full trace.
+
+```python
+# Shared: Yaksh's exporter, with values in code, on the provider that the agent has.
+import os
+from opentelemetry import trace
+from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
+
+
+def yaksh_provider() -> TracerProvider:
+    provider = trace.get_tracer_provider()
+    if not isinstance(provider, TracerProvider):
+        provider = TracerProvider()
+    provider.add_span_processor(
+        BatchSpanProcessor(
+            OTLPSpanExporter(
+                endpoint=os.environ["YAKSH_TRACE_ENDPOINT"] + "/v1/traces",
+                headers={"Authorization": "Bearer " + os.environ["YAKSH_TRACE_TOKEN"]},
+            )
+        )
+    )
+    return provider
+```
+
+- LiveKit Agents 1.8.10 or later, one call in each process (the default): before `session.start()`, `set_tracer_provider(provider, metadata={"yaksh.number": participant.attributes["sip.phoneNumber"]})` from `livekit.agents.telemetry`. Flush in a job shutdown callback that first waits for the session's `close` event: `await asyncio.to_thread(provider.force_flush)`.
+- LiveKit with many calls in one process, or before 1.8.10: call `set_tracer_provider(provider)` once when the process starts, with a span processor that sets `yaksh.number` in `on_start` from a context variable of the call, else from the parent span, and whose `force_flush` returns `True`. Set the variable before `session.start()`.
+- Pipecat 1.14: set the provider with `trace.set_tracer_provider(provider)` when it is new, not with `setup_tracing`. Then `PipelineTask(pipeline, params=PipelineParams(enable_metrics=True), enable_tracing=True, additional_span_attributes={"yaksh.number": number})`, and `provider.force_flush()` after `runner.run(task)` returns.
+
+The full setup is in `docs/content/docs/agent-traces.mdx` in github.com/plivo-labs/yaksh. To check it, make one phone conversation and read `agent_reply_time` in `yaksh conversation evaluation`: the parts, or a `status` that gives the reason. When a new agent has no `agent_reply_time`, no trace linked and Yaksh found no clock error: check the key and the number.
 
 ## Suites in CI
 

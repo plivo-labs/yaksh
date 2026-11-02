@@ -24,4 +24,5 @@ export const NAV_GROUPS: {
 ];
 
 export const DOCS_URL = "https://github.com/plivo-labs/yaksh/tree/dev/docs/content/docs";
+export const TRACES_DOCS_URL = `${DOCS_URL}/agent-traces.mdx`;
 export const RELEASES_URL = "https://github.com/plivo-labs/yaksh/releases";

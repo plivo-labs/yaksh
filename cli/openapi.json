@@ -5258,6 +5258,114 @@
         ]
       }
     },
+    "/api/v1/settings/trace-token": {
+      "get": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Get Trace Token",
+        "description": "The trace token's hint and times; null when there is none.",
+        "operationId": "get_trace_token_api_v1_settings_trace_token_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/TraceTokenRead"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "title": "Response Get Trace Token Api V1 Settings Trace Token Get"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "The request failed. The error tells why.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "New Trace Token",
+        "description": "Make the token that opens the OTLP endpoint, in place of the old one, which stops at\nonce. The response is the only time the token is shown.",
+        "operationId": "new_trace_token_api_v1_settings_trace_token_post",
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TraceTokenCreated"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "The request failed. The error tells why.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Delete Trace Token",
+        "description": "Remove the trace token: the OTLP endpoint refuses every request, and no evaluation\nwaits for traces.",
+        "operationId": "delete_trace_token_api_v1_settings_trace_token_delete",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "4XX": {
+            "description": "The request failed. The error tells why.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/settings/providers/{provider}/test": {
       "post": {
         "tags": [
@@ -7431,6 +7539,86 @@
           "reason"
         ],
         "title": "AgentRecordStatus"
+      },
+      "AgentReplyTime": {
+        "properties": {
+          "speech_ms": {
+            "type": "integer",
+            "title": "Speech Ms"
+          },
+          "agent_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Ms"
+          },
+          "complete": {
+            "type": "boolean",
+            "title": "Complete"
+          },
+          "fits": {
+            "type": "boolean",
+            "title": "Fits"
+          },
+          "overlapping": {
+            "type": "boolean",
+            "title": "Overlapping"
+          },
+          "stt_ttfs_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stt Ttfs Ms"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "steps": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "integer"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Steps"
+          }
+        },
+        "type": "object",
+        "required": [
+          "speech_ms",
+          "agent_ms",
+          "complete",
+          "fits",
+          "overlapping",
+          "stt_ttfs_ms",
+          "reason",
+          "steps"
+        ],
+        "title": "AgentReplyTime",
+        "description": "Where the time of one agent reply went, from the agent's trace of the call: the agent's\nown total split into parts, and the rest of Yaksh's wait as network and telephony."
       },
       "AgentSource": {
         "type": "string",
@@ -16834,6 +17022,102 @@
         "title": "ToolItem",
         "description": "A tool the text agent called in its turn, as the agent reported it."
       },
+      "TraceTokenCreated": {
+        "properties": {
+          "hint": {
+            "type": "string",
+            "title": "Hint"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "last_used_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Used At"
+          },
+          "last_key_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Key At"
+          },
+          "token": {
+            "type": "string",
+            "title": "Token"
+          }
+        },
+        "type": "object",
+        "required": [
+          "hint",
+          "created_at",
+          "last_used_at",
+          "last_key_at",
+          "token"
+        ],
+        "title": "TraceTokenCreated"
+      },
+      "TraceTokenRead": {
+        "properties": {
+          "hint": {
+            "type": "string",
+            "title": "Hint"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "last_used_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Used At"
+          },
+          "last_key_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Key At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "hint",
+          "created_at",
+          "last_used_at",
+          "last_key_at"
+        ],
+        "title": "TraceTokenRead",
+        "description": "The trace token, without the token: Yaksh keeps only its hash."
+      },
       "Transport": {
         "type": "string",
         "enum": [
@@ -17091,6 +17375,16 @@
             "anyOf": [
               {
                 "$ref": "#/components/schemas/CallerReplyTime"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "agent_reply": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentReplyTime"
               },
               {
                 "type": "null"

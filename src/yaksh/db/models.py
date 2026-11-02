@@ -4,6 +4,7 @@ from enum import StrEnum
 from typing import Any
 
 from sqlalchemy import (
+    BigInteger,
     Boolean,
     CheckConstraint,
     Date,
@@ -12,6 +13,7 @@ from sqlalchemy import (
     Float,
     ForeignKey,
     ForeignKeyConstraint,
+    Identity,
     Index,
     Integer,
     SmallInteger,
@@ -87,6 +89,9 @@ class Agent(Base):
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     forked_from_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("agents.id"))
     """The agent this one was copied from."""
+    traces_linked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    """The last time that a call of this agent linked a trace: the agent sends traces, so a
+    call without one is worth a line on its card."""
 
     __table_args__ = (
         Index(
@@ -455,6 +460,79 @@ class AgentRecordRow(Base):
     record: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     reason: Mapped[str | None] = mapped_column(Text)
     fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class AgentSpan(Base):
+    """One span of an agent's trace as the OTLP endpoint kept it: its name, times, timing
+    values and link keys, never the call's content."""
+
+    __tablename__ = "agent_spans"
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(always=True), primary_key=True)
+    trace_id: Mapped[str] = mapped_column(Text)
+    span_id: Mapped[str] = mapped_column(Text)
+    parent_span_id: Mapped[str | None] = mapped_column(Text)
+    name: Mapped[str] = mapped_column(Text)
+    start_ns: Mapped[int] = mapped_column(BigInteger)
+    """On the agent's clock, in ns from the Unix epoch."""
+    end_ns: Mapped[int] = mapped_column(BigInteger)
+    attributes: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, default=dict, server_default=text("'{}'::jsonb")
+    )
+    """The kept timing attributes only; the link keys have columns of their own."""
+    link_conversation_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    link_number: Mapped[str | None] = mapped_column(Text)
+    """yaksh.number in E.164."""
+    received_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    """On Yaksh's clock."""
+
+    __table_args__ = (
+        UniqueConstraint("trace_id", "span_id"),
+        Index(
+            "ix_agent_spans_link_conversation_id",
+            "link_conversation_id",
+            postgresql_where=text("link_conversation_id IS NOT NULL"),
+        ),
+        Index(
+            "ix_agent_spans_link_number_start_ns",
+            "link_number",
+            "start_ns",
+            postgresql_where=text("link_number IS NOT NULL"),
+        ),
+        Index("ix_agent_spans_received_at", "received_at"),
+    )
+
+
+class AgentTraceOwner(Base):
+    """The call that a linked trace belongs to. A span that arrives later belongs to the same
+    call through its trace ID."""
+
+    __tablename__ = "agent_trace_owners"
+
+    trace_id: Mapped[str] = mapped_column(Text, primary_key=True)
+    conversation_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("conversations.id", ondelete="CASCADE"), index=True
+    )
+    linked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class TraceToken(Base):
+    """The token that opens the OTLP endpoint, one at most for each install, kept as its hash.
+    A new token replaces the row, so its times start empty."""
+
+    __tablename__ = "trace_tokens"
+    __table_args__ = (CheckConstraint("id = 1", name="one_row"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    token_sha256: Mapped[str] = mapped_column(Text)
+    hint: Mapped[str] = mapped_column(Text)
+    """The token's last 4 characters."""
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_key_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    """The last request that brought a kept span with a link key."""
 
 
 class Evaluation(Base):

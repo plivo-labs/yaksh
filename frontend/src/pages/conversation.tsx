@@ -16,6 +16,7 @@ import { Link, useParams, useSearchParams } from "react-router";
 
 import { ToolCalls } from "@/components/tool-calls";
 import { AgentRecordPanel } from "@/components/agent-record";
+import { AgentResponseTime } from "@/components/agent-reply-time";
 import { CallMetricsCard } from "@/components/call-metrics";
 import { CallerReplyBadge } from "@/components/caller-reply-time";
 import { CallResults } from "@/components/call-results";
@@ -241,6 +242,7 @@ function ConversationView({ id }: { id: string }) {
                     conversationId={data.id}
                     evaluation={data.evaluation}
                     transport={data.transport}
+                    yakshNumber={data.caller_number}
                   />
                 </TabsContent>
                 <TabsContent value="scenario">
@@ -891,9 +893,15 @@ const Transcript = memo(function Transcript({
                                     : "Caller"}
                               </span>
                               <span>{clock(at)}</span>
-                              {typeof turn.response_ms === "number" && (
-                                <ResponseTime ms={turn.response_ms} />
-                              )}
+                              {typeof turn.response_ms === "number" &&
+                                (turn.agent_reply?.steps ? (
+                                  <AgentResponseTime
+                                    ms={turn.response_ms}
+                                    reply={turn.agent_reply}
+                                  />
+                                ) : (
+                                  <ResponseTime ms={turn.response_ms} />
+                                ))}
                               {turn.caller_reply && <CallerReplyBadge reply={turn.caller_reply} />}
                               {turn.talked_over && <Badge>Talked over</Badge>}
                               {turn.interruption ? (

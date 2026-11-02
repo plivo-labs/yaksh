@@ -21,6 +21,7 @@ import { KeyRow, ProviderPanel, SettingRow, KeyRemovedNote } from "@/pages/setti
 import { PhoneAccountPanel } from "@/pages/settings-phone";
 import { SpeechToTextPanel, TextToSpeechPanel } from "@/pages/settings-speech";
 import { ImportExport } from "@/pages/settings-import";
+import { TracesPanel } from "@/pages/settings-traces";
 import { TriggersPanel } from "@/pages/settings-triggers";
 
 const TABS = [
@@ -28,6 +29,7 @@ const TABS = [
   { value: "models", label: "Models" },
   { value: "phone", label: "Phone" },
   { value: "limits", label: "Limits" },
+  { value: "traces", label: "Traces" },
 ] as const;
 
 type Tab = (typeof TABS)[number]["value"];
@@ -532,6 +534,10 @@ function Form({
               onValueChange={(value) => change("limits", "max_scenario_data_sets", value)}
             />
           </Panel>
+        </TabsContent>
+
+        <TabsContent value="traces" className="grid gap-5">
+          <TracesPanel />
         </TabsContent>
       </Tabs>
       <p className="text-xs-400 text-muted-foreground">

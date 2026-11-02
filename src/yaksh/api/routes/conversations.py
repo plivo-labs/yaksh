@@ -36,7 +36,7 @@ from yaksh.domain.conversations import (
     Turn,
 )
 from yaksh.domain.errors import NotFoundError
-from yaksh.domain.latency import CallerReplyTime, Latency, place
+from yaksh.domain.latency import AgentReplyTime, CallerReplyTime, Latency, place
 from yaksh.evaluation import agent_records, results
 from yaksh.simulation import conversations
 from yaksh.simulation.listen import live_audio
@@ -103,16 +103,21 @@ async def summary(
 
 
 def turns_with_replies(
-    transcript: Transcript, latency: Latency | None, caller_times: Sequence[CallerReplyTime]
+    transcript: Transcript,
+    latency: Latency | None,
+    caller_times: Sequence[CallerReplyTime],
+    agent_times: Sequence[AgentReplyTime] = (),
 ) -> list[TurnRead]:
-    """The turns, each agent turn with the reply it starts with, and each caller turn that the
-    caller's model spoke with where the time of its reply went: the reply timed at the audio
-    start that played the turn, one turn for each."""
+    """The turns, each agent turn with the reply it starts with and, from the agent's trace,
+    where its time went; and each caller turn that the caller's model spoke with where the
+    time of its reply went: the reply timed at the audio start that played the turn, one turn
+    for each."""
     replies = latency.replies if latency else []
     agent = [index for index, turn in enumerate(transcript.turns) if turn.role is Role.AGENT]
     starts = [transcript.turns[index].started_at_ms for index in agent]
     placed = dict(zip(agent, place(starts, replies), strict=True))
     timed = {reply.audio_index: reply for reply in caller_times}
+    traced = {reply.speech_ms: reply for reply in agent_times}
     turns = []
     for index, turn in enumerate(transcript.turns):
         reply = placed.get(index)
@@ -121,6 +126,7 @@ def turns_with_replies(
                 **turn.model_dump(),
                 response_ms=reply.response_ms if reply else None,
                 talked_over=reply is not None and reply.response_ms is None,
+                agent_reply=traced.get(reply.speech_ms) if reply else None,
                 caller_reply=timed.pop(turn.audio_index, None)
                 if spoken(turn) and turn.audio_index is not None
                 else None,
@@ -159,6 +165,7 @@ async def detail(session: AsyncSession, conversation: Conversation) -> Conversat
                 CallerReplyTime.model_validate(item)
                 for item in conversation.caller_reply_times or []
             ],
+            await results.agent_reply_times(session, conversation.id),
         ),
         replies=latency.replies if latency else [],
         wire_events=transcript.wire_events,

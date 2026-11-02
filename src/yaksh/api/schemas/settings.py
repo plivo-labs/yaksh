@@ -1,4 +1,6 @@
-from pydantic import BaseModel, Field, SecretStr
+from datetime import datetime
+
+from pydantic import BaseModel, ConfigDict, Field, SecretStr
 
 from yaksh.domain.evaluations import ModelReplyTime
 from yaksh.domain.settings import AppSettings, SecretName, SettingsValues
@@ -70,6 +72,26 @@ class NimbleAccount(BaseModel):
 class SigningKey(BaseModel):
     key: str
     """Shown this one time; copy it to the agent's system."""
+
+
+class TraceTokenRead(BaseModel):
+    """The trace token, without the token: Yaksh keeps only its hash."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    hint: str
+    """The token's last 4 characters."""
+    created_at: datetime
+    last_used_at: datetime | None
+    """The last request with this token; changes at most once in 30 s."""
+    last_key_at: datetime | None
+    """The last request that brought a kept span with a link key; changes at most once in
+    30 s."""
+
+
+class TraceTokenCreated(TraceTokenRead):
+    token: str
+    """Shown this one time; copy it to the agent's secret settings."""
 
 
 class ProviderTest(BaseModel):

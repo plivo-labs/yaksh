@@ -1091,7 +1091,7 @@ async def client(
                 " conversations, runs, suite_runs, suite_entry_scenario_personas,"
                 " suite_entry_scenarios, suite_entries, suites, agent_versions, agents,"
                 " persona_versions, personas, voices, scenario_versions, scenarios, workers,"
-                " documents, scenario_generations"
+                " documents, scenario_generations, agent_trace_owners, agent_spans, trace_tokens"
             )
         )
         await connection.execute(

@@ -1,7 +1,7 @@
 /** The parts of a caller reply, as Pipecat's latency breakdown names them: their labels and the
  * stage of the reply each belongs to. */
 
-export type Stage = "turn" | "llm" | "speech" | "other";
+export type Stage = "network" | "turn" | "llm" | "speech" | "other";
 
 /** Each part's label and what it measures, in Voice AI terms, in the order the parts happen. */
 const PARTS: Record<string, { label: string; tip: string }> = {
@@ -9,7 +9,10 @@ const PARTS: Record<string, { label: string; tip: string }> = {
     label: "VAD endpointing",
     tip: "Silence the VAD waits for before it reports that the agent stopped speaking (stop_secs).",
   },
-  first_request: { label: "First request", tip: "Pipeline ready to the first LLM request." },
+  first_request: {
+    label: "First request",
+    tip: "Pipeline ready to the first LLM request.",
+  },
   transcription: {
     label: "STT after VAD stop",
     tip: "Wait past the VAD stop for the final STT transcript. 0 when the transcript was already final.",
@@ -22,10 +25,22 @@ const PARTS: Record<string, { label: string; tip: string }> = {
     label: "LLM TTFT",
     tip: "Caller LLM request to the first text token of the answer. Reasoning time is inside it.",
   },
-  turn_completion: { label: "Turn completion", tip: "LLM turn-completion marker." },
-  waiting_for_user: { label: "Waiting for the agent", tip: "LLM holding for the agent to go on." },
-  llm_tool_call: { label: "LLM tool call", tip: "The LLM emitting a tool call, such as end_call." },
-  function_handler: { label: "Tool execution", tip: "The tool handler running." },
+  turn_completion: {
+    label: "Turn completion",
+    tip: "LLM turn-completion marker.",
+  },
+  waiting_for_user: {
+    label: "Waiting for the agent",
+    tip: "LLM holding for the agent to go on.",
+  },
+  llm_tool_call: {
+    label: "LLM tool call",
+    tip: "The LLM emitting a tool call, such as end_call.",
+  },
+  function_handler: {
+    label: "Tool execution",
+    tip: "The tool handler running.",
+  },
   awaiting_speakable_text: {
     label: "Awaiting speakable text",
     tip: "LLM output that TTS cannot speak yet.",
@@ -34,12 +49,18 @@ const PARTS: Record<string, { label: string; tip: string }> = {
     label: "Sentence aggregation",
     tip: "Buffering LLM tokens until the first sentence is complete for TTS.",
   },
-  speech_synthesis: { label: "TTS TTFB", tip: "TTS request to the first audio chunk." },
+  speech_synthesis: {
+    label: "TTS TTFB",
+    tip: "TTS request to the first audio chunk.",
+  },
   output_transport: {
     label: "Output transport",
     tip: "First TTS audio chunk to the first audio frame sent on the call.",
   },
-  pipeline: { label: "Unattributed", tip: "Pipeline time that no stage covers." },
+  pipeline: {
+    label: "Unattributed",
+    tip: "Pipeline time that no stage covers.",
+  },
 };
 
 /** The STT's TTFS for the agent's turn: shown beside the parts, as it overlaps them. */
@@ -65,6 +86,7 @@ const STAGES: Record<string, Stage> = {
 
 /** A part's color on the reply's bar: one per stage, from the chart palette. */
 export const STAGE_FILL: Record<Stage, string> = {
+  network: "bg-chart-category-3",
   turn: "bg-chart-category-2",
   llm: "bg-chart-category-1",
   speech: "bg-chart-category-4",
@@ -97,6 +119,102 @@ export function inOrder<T>(entries: [string, T][]): [string, T][] {
   const place = (key: string) => {
     const at = ORDER.indexOf(key);
     return at === -1 ? ORDER.length : at;
+  };
+  return [...entries].sort(([a], [b]) => place(a) - place(b) || a.localeCompare(b));
+}
+
+/** The parts of an agent reply, from the agent's trace, in the order they happen. A part has the
+ * Caller card's label only when it measures the same thing. */
+const AGENT_PARTS: Record<string, { label: string; tip: string; stage: Stage }> = {
+  network: {
+    label: "Network and telephony",
+    tip: "Yaksh's wait less the agent's own total: the audio path both ways, and agent time that no span measures.",
+    stage: "network",
+  },
+  endpointing_wait: {
+    label: "VAD endpointing",
+    tip: "Silence the VAD waits for before it reports that the caller stopped speaking.",
+    stage: "turn",
+  },
+  transcription: {
+    label: "STT after VAD stop",
+    tip: "Wait past the VAD stop for the final STT transcript. 0 when the transcript was already final.",
+    stage: "turn",
+  },
+  vad_and_stt: {
+    label: "VAD and STT",
+    tip: "End of the caller's speech to the turn detector's last check: the VAD's silence wait, and the wait for the final transcript when the STT is slower.",
+    stage: "turn",
+  },
+  end_of_turn: {
+    label: "End of turn",
+    tip: "End of the caller's speech to the first LLM request: VAD, STT and turn detection together.",
+    stage: "turn",
+  },
+  turn_detection: {
+    label: "Turn detection",
+    tip: "The turn detector's last check to the end of the user turn. Long when the model finds that the turn is not complete.",
+    stage: "turn",
+  },
+  llm_inference: {
+    label: "LLM TTFT",
+    tip: "LLM request to the first token, counted from the end of the user turn: with preemptive generation, the part before it is not a wait.",
+    stage: "llm",
+  },
+  function_handler: {
+    label: "Tool execution",
+    tip: "A tool call of the reply, to the next LLM request.",
+    stage: "llm",
+  },
+  sentence_aggregation: {
+    label: "Sentence aggregation",
+    tip: "The first token of the last LLM request to the first TTS request.",
+    stage: "speech",
+  },
+  speech_synthesis: {
+    label: "TTS TTFB",
+    tip: "TTS request to the first audio chunk.",
+    stage: "speech",
+  },
+  pipeline: {
+    label: "Unattributed",
+    tip: "The agent's total less the parts above, for example from the first TTS audio to the start of playout.",
+    stage: "other",
+  },
+};
+
+/** The STT's TTFS for the caller's turn: shown beside the agent's parts, as it overlaps them. */
+export const AGENT_STT_TTFS = {
+  label: "STT TTFS",
+  tip: "End of the caller's speech to the final STT transcript. It runs during the VAD's wait, so it adds to the reply only past the VAD stop.",
+};
+
+/** How one side names, explains and colors the parts of a reply. */
+export interface StepNames {
+  label: (key: string) => string;
+  tip: (key: string) => string;
+  stage: (key: string) => Stage;
+}
+
+export const CALLER_STEPS: StepNames = {
+  label: stepLabel,
+  tip: stepTip,
+  stage: stepStage,
+};
+
+export const AGENT_STEPS: StepNames = {
+  label: (key) => AGENT_PARTS[key]?.label ?? key.replaceAll("_", " "),
+  tip: (key) => AGENT_PARTS[key]?.tip ?? "",
+  stage: (key) => AGENT_PARTS[key]?.stage ?? "other",
+};
+
+const AGENT_ORDER = Object.keys(AGENT_PARTS);
+
+/** An agent reply's parts in the order they happen. */
+export function agentInOrder<T>(entries: [string, T][]): [string, T][] {
+  const place = (key: string) => {
+    const at = AGENT_ORDER.indexOf(key);
+    return at === -1 ? AGENT_ORDER.length : at;
   };
   return [...entries].sort(([a], [b]) => place(a) - place(b) || a.localeCompare(b));
 }

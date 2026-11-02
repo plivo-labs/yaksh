@@ -4,8 +4,10 @@ a service of its own, so its work never shares the event loop of live calls."""
 import asyncio
 import contextlib
 import logging
+import math
 import os
 import socket
+import time
 import uuid
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
@@ -33,7 +35,15 @@ from yaksh.domain.personas import PersonaConfig
 from yaksh.domain.record_sources import RecordProvider
 from yaksh.domain.scenarios import ScenarioConfig
 from yaksh.domain.settings import AppSettings, EvaluationLimits, reveal
-from yaksh.evaluation import agent_records, call, evaluations, labels
+from yaksh.evaluation import (
+    agent_records,
+    agent_traces,
+    call,
+    evaluations,
+    labels,
+    trace_store,
+)
+from yaksh.evaluation.agent_traces import AgentTraces
 from yaksh.evaluation.call import JUDGES, SOURCE_JUDGES, Judging
 from yaksh.evaluation.jev import JEV, JEV_MODEL, Jev
 from yaksh.evaluation.limit import Limit
@@ -165,6 +175,8 @@ class Evaluator:
         """Bounds the judge calls in flight across evaluations; resized when the settings
         change, so it outlives the clients."""
         self._tasks: set[asyncio.Task[None]] = set()
+        self._traces = AgentTraces(sessionmaker)
+        self._traces_cleaned_at = -math.inf
 
     async def close(self) -> None:
         for clients in self._in_use:
@@ -225,6 +237,7 @@ class Evaluator:
         log.info("evaluator %s started", self.evaluator_id)
         try:
             while not stop.is_set():
+                await self._clean_traces_if_due()
                 try:
                     claimed = await self.poll(stop)
                 except Exception:
@@ -239,6 +252,21 @@ class Evaluator:
             for task in self._tasks:
                 task.cancel()
             await asyncio.gather(*self._tasks, return_exceptions=True)
+
+    async def _clean_traces_if_due(self) -> None:
+        """Delete the spans and trace links older than 7 days, once every trace_cleanup_s. A
+        failed run waits for the next one."""
+        if time.monotonic() - self._traces_cleaned_at < self._timings.trace_cleanup_s:
+            return
+        self._traces_cleaned_at = time.monotonic()
+        try:
+            async with self._sessionmaker() as session:
+                spans, links = await trace_store.clean(session, datetime.now(UTC))
+        except Exception:
+            log.exception("deleting old traces failed")
+            return
+        if spans or links:
+            log.info("deleted %d spans and %d trace links older than 7 days", spans, links)
 
     async def poll(self, stop: asyncio.Event) -> int:
         """Claim evaluations while fewer than the settings' evaluations at once run; return how
@@ -278,6 +306,12 @@ class Evaluator:
                 persona = await persona_config(session, conversation)
                 documents = await knowledge_base(session, agent_config) if judged else []
             try:
+                await agent_traces.wait_for_traces(
+                    self._sessionmaker,
+                    conversation,
+                    now=datetime.now(UTC),
+                    wait_s=self._timings.trace_wait_s,
+                )
                 record = await self._record(conversation, agent_config, app)
             except agent_records.NotReady as wait:
                 if held.is_set():
@@ -285,7 +319,7 @@ class Evaluator:
                         await evaluations.defer(
                             session, evaluation.id, evaluation.claim_seq, wait.until
                         )
-                log.info("evaluation %s waits for the agent record: %s", evaluation.id, wait)
+                log.info("evaluation %s waits: %s", evaluation.id, wait)
                 return
             evaluated = await call.evaluate(
                 conversation,
@@ -298,6 +332,7 @@ class Evaluator:
                 judging,
                 retry_later=evaluation.attempts < evaluations.MAX_ATTEMPTS,
                 record=record,
+                traces=self._traces,
             )
             if not held.is_set():
                 return

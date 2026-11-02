@@ -1,0 +1,1117 @@
+{
+ "trace_id": "00000000000000000000000000000001",
+ "spans": [
+  {
+   "name": "user_speaking",
+   "span_id": "0000000000000001",
+   "parent_span_id": "0000000000000002",
+   "start_ns": 1793350000000000000,
+   "end_ns": 1793350000393043456,
+   "attributes": {
+    "yaksh.number": "+15550100001"
+   }
+  },
+  {
+   "name": "user_turn",
+   "span_id": "0000000000000002",
+   "parent_span_id": "0000000000000003",
+   "start_ns": 1793350000000000000,
+   "end_ns": 1793350001098348423,
+   "attributes": {
+    "yaksh.number": "+15550100001",
+    "lk.transcription_delay": 0.3650975227355957,
+    "lk.end_of_turn_delay": 0.7046551704406738
+   }
+  },
+  {
+   "name": "agent_session",
+   "span_id": "0000000000000003",
+   "parent_span_id": null,
+   "start_ns": 1793350000017579886,
+   "end_ns": 1793350047581331371,
+   "attributes": {
+    "yaksh.number": "+15550100001"
+   }
+  },
+  {
+   "name": "start_agent_activity",
+   "span_id": "0000000000000004",
+   "parent_span_id": "0000000000000003",
+   "start_ns": 1793350000020262814,
+   "end_ns": 1793350000022152140,
+   "attributes": {
+    "yaksh.number": "+15550100001"
+   }
+  },
+  {
+   "name": "on_enter",
+   "span_id": "0000000000000005",
+   "parent_span_id": "0000000000000004",
+   "start_ns": 1793350000024492942,
+   "end_ns": 1793350045629613920,
+   "attributes": {
+    "yaksh.number": "+15550100001"
+   }
+  },
+  {
+   "name": "pause_agent_activity",
+   "span_id": "0000000000000006",
+   "parent_span_id": "0000000000000003",
+   "start_ns": 1793350000024728975,
+   "end_ns": 1793350000048542375,
+   "attributes": {
+    "yaksh.number": "+15550100001"
+   }
+  },
+  {
+   "name": "start_agent_activity",
+   "span_id": "0000000000000007",
+   "parent_span_id": "0000000000000003",
+   "start_ns": 1793350000049082922,
+   "end_ns": 1793350000051120250,
+   "attributes": {
+    "yaksh.number": "+15550100001"
+   }
+  },
+  {
+   "name": "on_enter",
+   "span_id": "0000000000000008",
+   "parent_span_id": "0000000000000007",
+   "start_ns": 1793350000051675858,
+   "end_ns": 1793350013811416176,
+   "attributes": {
+    "yaksh.number": "+15550100001"
+   }
+  },
+  {
+   "name": "pause_agent_activity",
+   "span_id": "0000000000000009",
+   "parent_span_id": "0000000000000003",
+   "start_ns": 1793350000054361035,
+   "end_ns": 1793350000057846334,
+   "attributes": {
+    "yaksh.number": "+15550100001"
+   }
+  },
+  {
+   "name": "start_agent_activity",
+   "span_id": "000000000000000a",
+   "parent_span_id": "0000000000000003",
+   "start_ns": 1793350000058337050,
+   "end_ns": 1793350000060017003,
+   "attributes": {
+    "yaksh.number": "+15550100001"
+   }
+  },
+  {
+   "name": "on_enter",
+   "span_id": "000000000000000b",
+   "parent_span_id": "000000000000000a",
+   "start_ns": 1793350000060562821,
+   "end_ns": 1793350013775996776,
+   "attributes": {
+    "yaksh.number": "+15550100001"
+   }
+  },
+  {
+   "name": "pause_agent_activity",
+   "span_id": "000000000000000c",
+   "parent_span_id": "0000000000000003",
+   "start_ns": 1793350000062320895,
+   "end_ns": 1793350000071932938,
+   "attributes": {
+    "yaksh.number": "+15550100001"
+   }
+  },
+  {
+   "name": "start_agent_activity",
+   "span_id": "000000000000000d",
+   "parent_span_id": "0000000000000003",
+   "start_ns": 1793350000072458556,
+   "end_ns": 1793350000074450323,
+   "attributes": {
+    "yaksh.number": "+15550100001"
+   }
+  },
+  {
+   "name": "on_enter",
+   "span_id": "000000000000000e",
+   "parent_span_id": "000000000000000d",
+   "start_ns": 1793350000075238954,
+   "end_ns": 1793350001107695052,
+   "attributes": {
+    "yaksh.number": "+15550100001"
+   }
+  },
+  {
+   "name": "agent_turn",
+   "span_id": "000000000000000f",
+   "parent_span_id": "0000000000000003",
+   "start_ns": 1793350000760003674,
+   "end_ns": 1793350008166563942,
+   "attributes": {
+    "yaksh.number": "+15550100001",
+    "lk.generation_id": "speech_000000000001_1",
+    "lk.speech_id": "speech_000000000001",
+    "lk.e2e_latency": 3.255875587463379,
+    "lk.interrupted": false
+   }
+  },
+  {
+   "name": "llm_node",
+   "span_id": "0000000000000010",
+   "parent_span_id": "000000000000000f",
+   "start_ns": 1793350000764259962,
+   "end_ns": 1793350003526100296,
+   "attributes": {
+    "yaksh.number": "+15550100001",
+    "lk.response.ttft": 2.6096130490004725
+   }
+  },
+  {
+   "name": "llm_fallback_adapter",
+   "span_id": "0000000000000011",
+   "parent_span_id": "0000000000000010",
+   "start_ns": 1793350000766163489,
+   "end_ns": 1793350002095677725,
+   "attributes": {
+    "yaksh.number": "+15550100001"
+   }
+  },
+  {
+   "name": "llm_request_run",
+   "span_id": "0000000000000012",
+   "parent_span_id": "0000000000000011",
+   "start_ns": 1793350000766734057,
+   "end_ns": 1793350002094708022,
+   "attributes": {
+    "yaksh.number": "+15550100001"
+   }
+  },
+  {
+   "name": "llm_request",
+   "span_id": "0000000000000013",
+   "parent_span_id": "0000000000000012",
+   "start_ns": 1793350000767983364,
+   "end_ns": 1793350002094551829,
+   "attributes": {
+    "yaksh.number": "+15550100001"
+   }
+  },
+  {
+   "name": "llm_request_run",
+   "span_id": "0000000000000014",
+   "parent_span_id": "0000000000000013",
+   "start_ns": 1793350000768470930,
+   "end_ns": 1793350002091537187,
+   "attributes": {
+    "yaksh.number": "+15550100001"
+   }
+  },
+  {
+   "name": "eou_detection",
+   "span_id": "0000000000000015",
+   "parent_span_id": "0000000000000002",
+   "start_ns": 1793350001002773691,
+   "end_ns": 1793350001097956618,
+   "attributes": {
+    "yaksh.number": "+15550100001",
+    "lk.eou.source": "vad"
+   }
+  },
+  {
+   "name": "llm_fallback_adapter",
+   "span_id": "0000000000000016",
+   "parent_span_id": "0000000000000010",
+   "start_ns": 1793350002096399645,
+   "end_ns": 1793350003525842104,
+   "attributes": {
+    "yaksh.number": "+15550100001"
+   }
+  },
+  {
+   "name": "llm_request_run",
+   "span_id": "0000000000000017",
+   "parent_span_id": "0000000000000016",
+   "start_ns": 1793350002097235647,
+   "end_ns": 1793350003525382357,
+   "attributes": {
+    "yaksh.number": "+15550100001"
+   }
+  },
+  {
+   "name": "llm_request",
+   "span_id": "0000000000000018",
+   "parent_span_id": "0000000000000017",
+   "start_ns": 1793350002097873125,
+   "end_ns": 1793350003525232625,
+   "attributes": {
+    "yaksh.number": "+15550100001"
+   }
+  },
+  {
+   "name": "llm_request_run",
+   "span_id": "0000000000000019",
+   "parent_span_id": "0000000000000018",
+   "start_ns": 1793350002098422423,
+   "end_ns": 1793350003523481091,
+   "attributes": {
+    "yaksh.number": "+15550100001"
+   }
+  },
+  {
+   "name": "tts_node",
+   "span_id": "000000000000001a",
+   "parent_span_id": "000000000000000f",
+   "start_ns": 1793350003374402629,
+   "end_ns": 1793350003851219384,
+   "attributes": {
+    "yaksh.number": "+15550100001",
+    "lk.response.ttfb": 0.1604275179997785
+   }
+  },
+  {
+   "name": "tts_request",
+   "span_id": "000000000000001b",
+   "parent_span_id": "000000000000001a",
+   "start_ns": 1793350003375567425,
+   "end_ns": 1793350003850059887,
+   "attributes": {
+    "yaksh.number": "+15550100001"
+   }
+  },
+  {
+   "name": "tts_request_run",
+   "span_id": "000000000000001c",
+   "parent_span_id": "000000000000001b",
+   "start_ns": 1793350003375696087,
+   "end_ns": 1793350003800211448,
+   "attributes": {
+    "yaksh.number": "+15550100001"
+   }
+  },
+  {
+   "name": "agent_speaking",
+   "span_id": "000000000000001d",
+   "parent_span_id": "000000000000000f",
+   "start_ns": 1793350003649304064,
+   "end_ns": 1793350008165937223,
+   "attributes": {
+    "yaksh.number": "+15550100001"
+   }
+  },
+  {
+   "name": "user_turn",
+   "span_id": "000000000000001e",
+   "parent_span_id": "0000000000000003",
+   "start_ns": 1793350010323106560,
+   "end_ns": 1793350012932061865,
+   "attributes": {
+    "yaksh.number": "+15550100001",
+    "lk.transcription_delay": 0.2612895965576172,
+    "lk.end_of_turn_delay": 1.159097671508789
+   }
+  },
+  {
+   "name": "user_speaking",
+   "span_id": "000000000000001f",
+   "parent_span_id": "000000000000001e",
+   "start_ns": 1793350010323106560,
+   "end_ns": 1793350011772161536,
+   "attributes": {
+    "yaksh.number": "+15550100001"
+   }
+  },
+  {
+   "name": "agent_turn",
+   "span_id": "0000000000000020",
+   "parent_span_id": "0000000000000003",
+   "start_ns": 1793350011822592232,
+   "end_ns": 1793350012061047999,
+   "attributes": {
+    "yaksh.number": "+15550100001",
+    "lk.generation_id": "speech_000000000002_1",
+    "lk.speech_id": "speech_000000000002",
+    "lk.interrupted": true
+   }
+  },
+  {
+   "name": "llm_node",
+   "span_id": "0000000000000021",
+   "parent_span_id": "0000000000000020",
+   "start_ns": 1793350011824233724,
+   "end_ns": 1793350012060089806,
+   "attributes": {
+    "yaksh.number": "+15550100001"
+   }
+  },
+  {
+   "name": "llm_fallback_adapter",
+   "span_id": "0000000000000022",
+   "parent_span_id": "0000000000000021",
+   "start_ns": 1793350011825026295,
+   "end_ns": 1793350012059923884,
+   "attributes": {
+    "yaksh.number": "+15550100001"
+   }
+  },
+  {
+   "name": "llm_request_run",
+   "span_id": "0000000000000023",
+   "parent_span_id": "0000000000000022",
+   "start_ns": 1793350011825600653,
+   "end_ns": 1793350012059689530,
+   "attributes": {
+    "yaksh.number": "+15550100001"
+   }
+  },
+  {
+   "name": "llm_request",
+   "span_id": "0000000000000024",
+   "parent_span_id": "0000000000000023",
+   "start_ns": 1793350011826193951,
+   "end_ns": 1793350012059534149,
+   "attributes": {
+    "yaksh.number": "+15550100001"
+   }
+  },
+  {
+   "name": "llm_request_run",
+   "span_id": "0000000000000025",
+   "parent_span_id": "0000000000000024",
+   "start_ns": 1793350011826773429,
+   "end_ns": 1793350012057855936,
+   "attributes": {
+    "yaksh.number": "+15550100001"
+   }
+  },
+  {
+   "name": "agent_turn",
+   "span_id": "0000000000000026",
+   "parent_span_id": "0000000000000003",
+   "start_ns": 1793350012035506246,
+   "end_ns": 1793350013767514198,
+   "attributes": {
+    "yaksh.number": "+15550100001",
+    "lk.generation_id": "speech_000000000003_1",
+    "lk.speech_id": "speech_000000000003",
+    "lk.interrupted": false
+   }
+  },
+  {
+   "name": "llm_node",
+   "span_id": "0000000000000027",
+   "parent_span_id": "0000000000000026",
+   "start_ns": 1793350012037225120,
+   "end_ns": 1793350013765734434,
+   "attributes": {
+    "yaksh.number": "+15550100001",
+    "lk.response.ttft": 1.7078337089988054
+   }
+  },
+  {
+   "name": "llm_fallback_adapter",
+   "span_id": "0000000000000028",
+   "parent_span_id": "0000000000000027",
+   "start_ns": 1793350012038169063,
+   "end_ns": 1793350013765320688,
+   "attributes": {
+    "yaksh.number": "+15550100001"
+   }
+  },
+  {
+   "name": "llm_request_run",
+   "span_id": "0000000000000029",
+   "parent_span_id": "0000000000000028",
+   "start_ns": 1793350012038769131,
+   "end_ns": 1793350013763670235,
+   "attributes": {
+    "yaksh.number": "+15550100001"
+   }
+  },
+  {
+   "name": "llm_request",
+   "span_id": "000000000000002a",
+   "parent_span_id": "0000000000000029",
+   "start_ns": 1793350012039316928,
+   "end_ns": 1793350013763518274,
+   "attributes": {
+    "yaksh.number": "+15550100001"
+   }
+  },
+  {
+   "name": "llm_request_run",
+   "span_id": "000000000000002b",
+   "parent_span_id": "000000000000002a",
+   "start_ns": 1793350012039882976,
+   "end_ns": 1793350013760002875,
+   "attributes": {
+    "yaksh.number": "+15550100001"
+   }
+  },
+  {
+   "name": "eou_detection",
+   "span_id": "000000000000002c",
+   "parent_span_id": "000000000000001e",
+   "start_ns": 1793350012381868326,
+   "end_ns": 1793350012931689080,
+   "attributes": {
+    "yaksh.number": "+15550100001",
+    "lk.eou.source": "vad"
+   }
+  },
+  {
+   "name": "function_tool",
+   "span_id": "000000000000002d",
+   "parent_span_id": "0000000000000026",
+   "start_ns": 1793350013745543074,
+   "end_ns": 1793350013755629544,
+   "attributes": {
+    "yaksh.number": "+15550100001"
+   }
+  },
+  {
+   "name": "drain_agent_activity",
+   "span_id": "000000000000002e",
+   "parent_span_id": "0000000000000003",
+   "start_ns": 1793350013758965210,
+   "end_ns": 1793350013768635044,
+   "attributes": {
+    "yaksh.number": "+15550100001"
+   }
+  },
+  {
+   "name": "on_exit",
+   "span_id": "000000000000002f",
+   "parent_span_id": "000000000000002e",
+   "start_ns": 1793350013760415850,
+   "end_ns": 1793350013760465561,
+   "attributes": {
+    "yaksh.number": "+15550100001"
+   }
+  },
+  {
+   "name": "resume_agent_activity",
+   "span_id": "0000000000000030",
+   "parent_span_id": "0000000000000003",
+   "start_ns": 1793350013773931807,
+   "end_ns": 1793350013775565769,
+   "attributes": {
+    "yaksh.number": "+15550100001"
+   }
+  },
+  {
+   "name": "drain_agent_activity",
+   "span_id": "0000000000000031",
+   "parent_span_id": "0000000000000003",
+   "start_ns": 1793350013776643804,
+   "end_ns": 1793350013777104061,
+   "attributes": {
+    "yaksh.number": "+15550100001"
+   }
+  },
+  {
+   "name": "on_exit",
+   "span_id": "0000000000000032",
+   "parent_span_id": "0000000000000031",
+   "start_ns": 1793350013776856668,
+   "end_ns": 1793350013776883078,
+   "attributes": {
+    "yaksh.number": "+15550100001"
+   }
+  },
+  {
+   "name": "resume_agent_activity",
+   "span_id": "0000000000000033",
+   "parent_span_id": "0000000000000003",
+   "start_ns": 1793350013779026638,
+   "end_ns": 1793350013780794482,
+   "attributes": {
+    "yaksh.number": "+15550100001"
+   }
+  },
+  {
+   "name": "drain_agent_activity",
+   "span_id": "0000000000000034",
+   "parent_span_id": "0000000000000003",
+   "start_ns": 1793350013812500451,
+   "end_ns": 1793350013814482638,
+   "attributes": {
+    "yaksh.number": "+15550100001"
+   }
+  },
+  {
+   "name": "on_exit",
+   "span_id": "0000000000000035",
+   "parent_span_id": "0000000000000034",
+   "start_ns": 1793350013813302632,
+   "end_ns": 1793350013813584036,
+   "attributes": {
+    "yaksh.number": "+15550100001"
+   }
+  },
+  {
+   "name": "resume_agent_activity",
+   "span_id": "0000000000000036",
+   "parent_span_id": "0000000000000003",
+   "start_ns": 1793350013815715845,
+   "end_ns": 1793350013817460009,
+   "attributes": {
+    "yaksh.number": "+15550100001"
+   }
+  },
+  {
+   "name": "pause_agent_activity",
+   "span_id": "0000000000000037",
+   "parent_span_id": "0000000000000003",
+   "start_ns": 1793350013825809415,
+   "end_ns": 1793350013836407302,
+   "attributes": {
+    "yaksh.number": "+15550100001"
+   }
+  },
+  {
+   "name": "start_agent_activity",
+   "span_id": "0000000000000038",
+   "parent_span_id": "0000000000000003",
+   "start_ns": 1793350013836883407,
+   "end_ns": 1793350013838835344,
+   "attributes": {
+    "yaksh.number": "+15550100001"
+   }
+  },
+  {
+   "name": "on_enter",
+   "span_id": "0000000000000039",
+   "parent_span_id": "0000000000000038",
+   "start_ns": 1793350013839389833,
+   "end_ns": 1793350022352293340,
+   "attributes": {
+    "yaksh.number": "+15550100001"
+   }
+  },
+  {
+   "name": "agent_turn",
+   "span_id": "000000000000003a",
+   "parent_span_id": "0000000000000003",
+   "start_ns": 1793350013840408876,
+   "end_ns": 1793350022346642433,
+   "attributes": {
+    "yaksh.number": "+15550100001",
+    "lk.generation_id": "speech_000000000004_1",
+    "lk.speech_id": "speech_000000000004",
+    "lk.interrupted": false
+   }
+  },
+  {
+   "name": "llm_node",
+   "span_id": "000000000000003b",
+   "parent_span_id": "000000000000003a",
+   "start_ns": 1793350013842191382,
+   "end_ns": 1793350015714927100,
+   "attributes": {
+    "yaksh.number": "+15550100001",
+    "lk.response.ttft": 1.606243603000621
+   }
+  },
+  {
+   "name": "llm_fallback_adapter",
+   "span_id": "000000000000003c",
+   "parent_span_id": "000000000000003b",
+   "start_ns": 1793350013845542168,
+   "end_ns": 1793350015714434693,
+   "attributes": {
+    "yaksh.number": "+15550100001"
+   }
+  },
+  {
+   "name": "llm_request_run",
+   "span_id": "000000000000003d",
+   "parent_span_id": "000000000000003c",
+   "start_ns": 1793350013846256897,
+   "end_ns": 1793350015713832625,
+   "attributes": {
+    "yaksh.number": "+15550100001"
+   }
+  },
+  {
+   "name": "llm_request",
+   "span_id": "000000000000003e",
+   "parent_span_id": "000000000000003d",
+   "start_ns": 1793350013849176958,
+   "end_ns": 1793350015713684603,
+   "attributes": {
+    "yaksh.number": "+15550100001"
+   }
+  },
+  {
+   "name": "llm_request_run",
+   "span_id": "000000000000003f",
+   "parent_span_id": "000000000000003e",
+   "start_ns": 1793350013849852888,
+   "end_ns": 1793350015711389671,
+   "attributes": {
+    "yaksh.number": "+15550100001"
+   }
+  },
+  {
+   "name": "tts_node",
+   "span_id": "0000000000000040",
+   "parent_span_id": "000000000000003a",
+   "start_ns": 1793350015448952142,
+   "end_ns": 1793350016145849559,
+   "attributes": {
+    "yaksh.number": "+15550100001",
+    "lk.response.ttfb": 0.22716233100072714
+   }
+  },
+  {
+   "name": "tts_request",
+   "span_id": "0000000000000041",
+   "parent_span_id": "0000000000000040",
+   "start_ns": 1793350015449696762,
+   "end_ns": 1793350016144481221,
+   "attributes": {
+    "yaksh.number": "+15550100001"
+   }
+  },
+  {
+   "name": "tts_request_run",
+   "span_id": "0000000000000042",
+   "parent_span_id": "0000000000000041",
+   "start_ns": 1793350015449785123,
+   "end_ns": 1793350016065083562,
+   "attributes": {
+    "yaksh.number": "+15550100001"
+   }
+  },
+  {
+   "name": "agent_speaking",
+   "span_id": "0000000000000043",
+   "parent_span_id": "000000000000003a",
+   "start_ns": 1793350015896303360,
+   "end_ns": 1793350022345995253,
+   "attributes": {
+    "yaksh.number": "+15550100001"
+   }
+  },
+  {
+   "name": "user_speaking",
+   "span_id": "0000000000000044",
+   "parent_span_id": "0000000000000045",
+   "start_ns": 1793350024292573184,
+   "end_ns": 1793350025571979776,
+   "attributes": {
+    "yaksh.number": "+15550100001"
+   }
+  },
+  {
+   "name": "user_turn",
+   "span_id": "0000000000000045",
+   "parent_span_id": "0000000000000003",
+   "start_ns": 1793350024292573184,
+   "end_ns": 1793350027348264671,
+   "attributes": {
+    "yaksh.number": "+15550100001",
+    "lk.transcription_delay": 0.19243979454040527,
+    "lk.end_of_turn_delay": 1.7753961086273193
+   }
+  },
+  {
+   "name": "agent_turn",
+   "span_id": "0000000000000046",
+   "parent_span_id": "0000000000000003",
+   "start_ns": 1793350025766546247,
+   "end_ns": 1793350034006641752,
+   "attributes": {
+    "yaksh.number": "+15550100001",
+    "lk.generation_id": "speech_000000000005_1",
+    "lk.speech_id": "speech_000000000005",
+    "lk.e2e_latency": 2.411865234375,
+    "lk.interrupted": false
+   }
+  },
+  {
+   "name": "llm_node",
+   "span_id": "0000000000000047",
+   "parent_span_id": "0000000000000046",
+   "start_ns": 1793350025768322342,
+   "end_ns": 1793350027827138053,
+   "attributes": {
+    "yaksh.number": "+15550100001",
+    "lk.response.ttft": 1.8517021469997417
+   }
+  },
+  {
+   "name": "llm_fallback_adapter",
+   "span_id": "0000000000000048",
+   "parent_span_id": "0000000000000047",
+   "start_ns": 1793350025849600366,
+   "end_ns": 1793350027826570295,
+   "attributes": {
+    "yaksh.number": "+15550100001"
+   }
+  },
+  {
+   "name": "llm_request_run",
+   "span_id": "0000000000000049",
+   "parent_span_id": "0000000000000048",
+   "start_ns": 1793350025850609259,
+   "end_ns": 1793350027825500331,
+   "attributes": {
+    "yaksh.number": "+15550100001"
+   }
+  },
+  {
+   "name": "llm_request",
+   "span_id": "000000000000004a",
+   "parent_span_id": "0000000000000049",
+   "start_ns": 1793350025852254842,
+   "end_ns": 1793350027825312229,
+   "attributes": {
+    "yaksh.number": "+15550100001"
+   }
+  },
+  {
+   "name": "llm_request_run",
+   "span_id": "000000000000004b",
+   "parent_span_id": "000000000000004a",
+   "start_ns": 1793350025852911172,
+   "end_ns": 1793350027822700742,
+   "attributes": {
+    "yaksh.number": "+15550100001"
+   }
+  },
+  {
+   "name": "eou_detection",
+   "span_id": "000000000000004c",
+   "parent_span_id": "0000000000000045",
+   "start_ns": 1793350026181766219,
+   "end_ns": 1793350027347891526,
+   "attributes": {
+    "yaksh.number": "+15550100001",
+    "lk.eou.source": "vad"
+   }
+  },
+  {
+   "name": "tts_node",
+   "span_id": "000000000000004d",
+   "parent_span_id": "0000000000000046",
+   "start_ns": 1793350027623384725,
+   "end_ns": 1793350028218208251,
+   "attributes": {
+    "yaksh.number": "+15550100001",
+    "lk.response.ttfb": 0.1874493019968213
+   }
+  },
+  {
+   "name": "tts_request",
+   "span_id": "000000000000004e",
+   "parent_span_id": "000000000000004d",
+   "start_ns": 1793350027624609903,
+   "end_ns": 1793350028217758076,
+   "attributes": {
+    "yaksh.number": "+15550100001"
+   }
+  },
+  {
+   "name": "tts_request_run",
+   "span_id": "000000000000004f",
+   "parent_span_id": "000000000000004e",
+   "start_ns": 1793350027624707404,
+   "end_ns": 1793350028145674918,
+   "attributes": {
+    "yaksh.number": "+15550100001"
+   }
+  },
+  {
+   "name": "agent_speaking",
+   "span_id": "0000000000000050",
+   "parent_span_id": "0000000000000046",
+   "start_ns": 1793350027984484352,
+   "end_ns": 1793350034005978783,
+   "attributes": {
+    "yaksh.number": "+15550100001"
+   }
+  },
+  {
+   "name": "user_speaking",
+   "span_id": "0000000000000051",
+   "parent_span_id": "0000000000000052",
+   "start_ns": 1793350036092036864,
+   "end_ns": 1793350037131654912,
+   "attributes": {
+    "yaksh.number": "+15550100001"
+   }
+  },
+  {
+   "name": "user_turn",
+   "span_id": "0000000000000052",
+   "parent_span_id": "0000000000000003",
+   "start_ns": 1793350036092036864,
+   "end_ns": 1793350039357681993,
+   "attributes": {
+    "yaksh.number": "+15550100001",
+    "lk.transcription_delay": 0.18861865997314453,
+    "lk.end_of_turn_delay": 2.2253401279449463
+   }
+  },
+  {
+   "name": "agent_turn",
+   "span_id": "0000000000000053",
+   "parent_span_id": "0000000000000003",
+   "start_ns": 1793350037321898980,
+   "end_ns": 1793350044901946117,
+   "attributes": {
+    "yaksh.number": "+15550100001",
+    "lk.generation_id": "speech_000000000006_1",
+    "lk.speech_id": "speech_000000000006",
+    "lk.e2e_latency": 3.1340582370758057,
+    "lk.interrupted": false
+   }
+  },
+  {
+   "name": "llm_node",
+   "span_id": "0000000000000054",
+   "parent_span_id": "0000000000000053",
+   "start_ns": 1793350037323586133,
+   "end_ns": 1793350040070930467,
+   "attributes": {
+    "yaksh.number": "+15550100001",
+    "lk.response.ttft": 1.4047237470003893
+   }
+  },
+  {
+   "name": "llm_fallback_adapter",
+   "span_id": "0000000000000055",
+   "parent_span_id": "0000000000000054",
+   "start_ns": 1793350037362489911,
+   "end_ns": 1793350040070303078,
+   "attributes": {
+    "yaksh.number": "+15550100001"
+   }
+  },
+  {
+   "name": "llm_request_run",
+   "span_id": "0000000000000056",
+   "parent_span_id": "0000000000000055",
+   "start_ns": 1793350037363199301,
+   "end_ns": 1793350040068827688,
+   "attributes": {
+    "yaksh.number": "+15550100001"
+   }
+  },
+  {
+   "name": "llm_request",
+   "span_id": "0000000000000057",
+   "parent_span_id": "0000000000000056",
+   "start_ns": 1793350037365035796,
+   "end_ns": 1793350040068645885,
+   "attributes": {
+    "yaksh.number": "+15550100001"
+   }
+  },
+  {
+   "name": "llm_request_run",
+   "span_id": "0000000000000058",
+   "parent_span_id": "0000000000000057",
+   "start_ns": 1793350037365770197,
+   "end_ns": 1793350040061377145,
+   "attributes": {
+    "yaksh.number": "+15550100001"
+   }
+  },
+  {
+   "name": "eou_detection",
+   "span_id": "0000000000000059",
+   "parent_span_id": "0000000000000052",
+   "start_ns": 1793350037741262139,
+   "end_ns": 1793350039357299468,
+   "attributes": {
+    "yaksh.number": "+15550100001",
+    "lk.eou.source": "vad"
+   }
+  },
+  {
+   "name": "tts_node",
+   "span_id": "000000000000005a",
+   "parent_span_id": "0000000000000053",
+   "start_ns": 1793350039369257123,
+   "end_ns": 1793350040443388798,
+   "attributes": {
+    "yaksh.number": "+15550100001",
+    "lk.response.ttfb": 0.16912027899888926
+   }
+  },
+  {
+   "name": "tts_request",
+   "span_id": "000000000000005b",
+   "parent_span_id": "000000000000005a",
+   "start_ns": 1793350039370721604,
+   "end_ns": 1793350040441794735,
+   "attributes": {
+    "yaksh.number": "+15550100001"
+   }
+  },
+  {
+   "name": "tts_request_run",
+   "span_id": "000000000000005c",
+   "parent_span_id": "000000000000005b",
+   "start_ns": 1793350039370807935,
+   "end_ns": 1793350040319234491,
+   "attributes": {
+    "yaksh.number": "+15550100001"
+   }
+  },
+  {
+   "name": "function_tool",
+   "span_id": "000000000000005d",
+   "parent_span_id": "0000000000000053",
+   "start_ns": 1793350040031781305,
+   "end_ns": 1793350044895171043,
+   "attributes": {
+    "yaksh.number": "+15550100001"
+   }
+  },
+  {
+   "name": "llm_fallback_adapter",
+   "span_id": "000000000000005e",
+   "parent_span_id": "000000000000005d",
+   "start_ns": 1793350040035293524,
+   "end_ns": 1793350042143032273,
+   "attributes": {
+    "yaksh.number": "+15550100001"
+   }
+  },
+  {
+   "name": "llm_request_run",
+   "span_id": "000000000000005f",
+   "parent_span_id": "000000000000005e",
+   "start_ns": 1793350040036125776,
+   "end_ns": 1793350042142159161,
+   "attributes": {
+    "yaksh.number": "+15550100001"
+   }
+  },
+  {
+   "name": "llm_request",
+   "span_id": "0000000000000060",
+   "parent_span_id": "000000000000005f",
+   "start_ns": 1793350040036638543,
+   "end_ns": 1793350042141933728,
+   "attributes": {
+    "yaksh.number": "+15550100001"
+   }
+  },
+  {
+   "name": "llm_request_run",
+   "span_id": "0000000000000061",
+   "parent_span_id": "0000000000000060",
+   "start_ns": 1793350040037356583,
+   "end_ns": 1793350042138875755,
+   "attributes": {
+    "yaksh.number": "+15550100001"
+   }
+  },
+  {
+   "name": "llm_fallback_adapter",
+   "span_id": "0000000000000062",
+   "parent_span_id": "0000000000000054",
+   "start_ns": 1793350040072441168,
+   "end_ns": 1793350043702916455,
+   "attributes": {
+    "yaksh.number": "+15550100001"
+   }
+  },
+  {
+   "name": "llm_request_run",
+   "span_id": "0000000000000063",
+   "parent_span_id": "0000000000000062",
+   "start_ns": 1793350040073156528,
+   "end_ns": 1793350043702254146,
+   "attributes": {
+    "yaksh.number": "+15550100001"
+   }
+  },
+  {
+   "name": "llm_request",
+   "span_id": "0000000000000064",
+   "parent_span_id": "0000000000000063",
+   "start_ns": 1793350040074856341,
+   "end_ns": 1793350043702104273,
+   "attributes": {
+    "yaksh.number": "+15550100001"
+   }
+  },
+  {
+   "name": "llm_request_run",
+   "span_id": "0000000000000065",
+   "parent_span_id": "0000000000000064",
+   "start_ns": 1793350040075654473,
+   "end_ns": 1793350043700787465,
+   "attributes": {
+    "yaksh.number": "+15550100001"
+   }
+  },
+  {
+   "name": "agent_speaking",
+   "span_id": "0000000000000066",
+   "parent_span_id": "0000000000000053",
+   "start_ns": 1793350040266150144,
+   "end_ns": 1793350044786713903,
+   "attributes": {
+    "yaksh.number": "+15550100001"
+   }
+  },
+  {
+   "name": "drain_agent_activity",
+   "span_id": "0000000000000067",
+   "parent_span_id": "0000000000000003",
+   "start_ns": 1793350044897093960,
+   "end_ns": 1793350044910750589,
+   "attributes": {
+    "yaksh.number": "+15550100001"
+   }
+  },
+  {
+   "name": "on_exit",
+   "span_id": "0000000000000068",
+   "parent_span_id": "0000000000000067",
+   "start_ns": 1793350044899194519,
+   "end_ns": 1793350044899687256,
+   "attributes": {
+    "yaksh.number": "+15550100001"
+   }
+  },
+  {
+   "name": "resume_agent_activity",
+   "span_id": "0000000000000069",
+   "parent_span_id": "0000000000000003",
+   "start_ns": 1793350044913246953,
+   "end_ns": 1793350044914959156,
+   "attributes": {
+    "yaksh.number": "+15550100001"
+   }
+  },
+  {
+   "name": "drain_agent_activity",
+   "span_id": "000000000000006a",
+   "parent_span_id": "0000000000000003",
+   "start_ns": 1793350045575551782,
+   "end_ns": 1793350045577595820,
+   "attributes": {
+    "yaksh.number": "+15550100001"
+   }
+  },
+  {
+   "name": "on_exit",
+   "span_id": "000000000000006b",
+   "parent_span_id": "000000000000006a",
+   "start_ns": 1793350045577262485,
+   "end_ns": 1793350045577307366,
+   "attributes": {
+    "yaksh.number": "+15550100001"
+   }
+  }
+ ]
+}

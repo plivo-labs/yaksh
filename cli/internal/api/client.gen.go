@@ -1629,6 +1629,19 @@ type AgentRecordStatus struct {
 	Status RecordStatus `json:"status"`
 }
 
+// AgentReplyTime Where the time of one agent reply went, from the agent's trace of the call: the agent's
+// own total split into parts, and the rest of Yaksh's wait as network and telephony.
+type AgentReplyTime struct {
+	AgentMs     *int            `json:"agent_ms"`
+	Complete    bool            `json:"complete"`
+	Fits        bool            `json:"fits"`
+	Overlapping bool            `json:"overlapping"`
+	Reason      *string         `json:"reason"`
+	SpeechMs    int             `json:"speech_ms"`
+	Steps       *map[string]int `json:"steps"`
+	SttTtfsMs   *int            `json:"stt_ttfs_ms"`
+}
+
 // AgentSource Where an agent came from: made in Yaksh, or imported from a file or a provider.
 type AgentSource string
 
@@ -3648,6 +3661,23 @@ type ToolItem struct {
 	Output    *string `json:"output,omitempty"`
 }
 
+// TraceTokenCreated defines model for TraceTokenCreated.
+type TraceTokenCreated struct {
+	CreatedAt  time.Time  `json:"created_at"`
+	Hint       string     `json:"hint"`
+	LastKeyAt  *time.Time `json:"last_key_at"`
+	LastUsedAt *time.Time `json:"last_used_at"`
+	Token      string     `json:"token"`
+}
+
+// TraceTokenRead The trace token, without the token: Yaksh keeps only its hash.
+type TraceTokenRead struct {
+	CreatedAt  time.Time  `json:"created_at"`
+	Hint       string     `json:"hint"`
+	LastKeyAt  *time.Time `json:"last_key_at"`
+	LastUsedAt *time.Time `json:"last_used_at"`
+}
+
 // Transport How Yaksh reaches an agent.
 type Transport string
 
@@ -3689,6 +3719,7 @@ type TtsProviderRead struct {
 
 // TurnRead defines model for TurnRead.
 type TurnRead struct {
+	AgentReply   *AgentReplyTime  `json:"agent_reply,omitempty"`
 	AudioIndex   *int             `json:"audio_index,omitempty"`
 	CallerReply  *CallerReplyTime `json:"caller_reply,omitempty"`
 	Dtmf         *bool            `json:"dtmf,omitempty"`
@@ -5832,6 +5863,29 @@ type ClientInterface interface {
 	//
 	// Corresponds with POST /api/v1/settings/signing-key (the `NewSigningKeyApiV1SettingsSigningKeyPost` operationId).
 	NewSigningKeyApiV1SettingsSigningKeyPost(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeleteTraceTokenApiV1SettingsTraceTokenDelete Delete Trace Token
+	//
+	// Remove the trace token: the OTLP endpoint refuses every request, and no evaluation
+	// waits for traces.
+	//
+	// Corresponds with DELETE /api/v1/settings/trace-token (the `DeleteTraceTokenApiV1SettingsTraceTokenDelete` operationId).
+	DeleteTraceTokenApiV1SettingsTraceTokenDelete(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetTraceTokenApiV1SettingsTraceTokenGet Get Trace Token
+	//
+	// The trace token's hint and times; null when there is none.
+	//
+	// Corresponds with GET /api/v1/settings/trace-token (the `GetTraceTokenApiV1SettingsTraceTokenGet` operationId).
+	GetTraceTokenApiV1SettingsTraceTokenGet(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// NewTraceTokenApiV1SettingsTraceTokenPost New Trace Token
+	//
+	// Make the token that opens the OTLP endpoint, in place of the old one, which stops at
+	// once. The response is the only time the token is shown.
+	//
+	// Corresponds with POST /api/v1/settings/trace-token (the `NewTraceTokenApiV1SettingsTraceTokenPost` operationId).
+	NewTraceTokenApiV1SettingsTraceTokenPost(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// DeleteTriggerSecretApiV1SettingsTriggerSecretsNameDelete Delete Trigger Secret
 	//
@@ -8386,6 +8440,59 @@ func (c *Client) PutSecretApiV1SettingsSecretsNamePut(ctx context.Context, name 
 // Corresponds with POST /api/v1/settings/signing-key (the `NewSigningKeyApiV1SettingsSigningKeyPost` operationId).
 func (c *Client) NewSigningKeyApiV1SettingsSigningKeyPost(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewNewSigningKeyApiV1SettingsSigningKeyPostRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DeleteTraceTokenApiV1SettingsTraceTokenDelete Delete Trace Token
+//
+// Remove the trace token: the OTLP endpoint refuses every request, and no evaluation
+// waits for traces.
+//
+// Corresponds with DELETE /api/v1/settings/trace-token (the `DeleteTraceTokenApiV1SettingsTraceTokenDelete` operationId).
+func (c *Client) DeleteTraceTokenApiV1SettingsTraceTokenDelete(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteTraceTokenApiV1SettingsTraceTokenDeleteRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetTraceTokenApiV1SettingsTraceTokenGet Get Trace Token
+//
+// The trace token's hint and times; null when there is none.
+//
+// Corresponds with GET /api/v1/settings/trace-token (the `GetTraceTokenApiV1SettingsTraceTokenGet` operationId).
+func (c *Client) GetTraceTokenApiV1SettingsTraceTokenGet(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetTraceTokenApiV1SettingsTraceTokenGetRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// NewTraceTokenApiV1SettingsTraceTokenPost New Trace Token
+//
+// Make the token that opens the OTLP endpoint, in place of the old one, which stops at
+// once. The response is the only time the token is shown.
+//
+// Corresponds with POST /api/v1/settings/trace-token (the `NewTraceTokenApiV1SettingsTraceTokenPost` operationId).
+func (c *Client) NewTraceTokenApiV1SettingsTraceTokenPost(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewNewTraceTokenApiV1SettingsTraceTokenPostRequest(c.Server)
 	if err != nil {
 		return nil, err
 	}
@@ -13037,6 +13144,87 @@ func NewNewSigningKeyApiV1SettingsSigningKeyPostRequest(server string) (*http.Re
 	return req, nil
 }
 
+// NewDeleteTraceTokenApiV1SettingsTraceTokenDeleteRequest constructs an http.Request for the DeleteTraceTokenApiV1SettingsTraceTokenDelete method
+func NewDeleteTraceTokenApiV1SettingsTraceTokenDeleteRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/settings/trace-token")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetTraceTokenApiV1SettingsTraceTokenGetRequest constructs an http.Request for the GetTraceTokenApiV1SettingsTraceTokenGet method
+func NewGetTraceTokenApiV1SettingsTraceTokenGetRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/settings/trace-token")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewNewTraceTokenApiV1SettingsTraceTokenPostRequest constructs an http.Request for the NewTraceTokenApiV1SettingsTraceTokenPost method
+func NewNewTraceTokenApiV1SettingsTraceTokenPostRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/settings/trace-token")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewDeleteTriggerSecretApiV1SettingsTriggerSecretsNameDeleteRequest constructs an http.Request for the DeleteTriggerSecretApiV1SettingsTriggerSecretsNameDelete method
 func NewDeleteTriggerSecretApiV1SettingsTriggerSecretsNameDeleteRequest(server string, name string) (*http.Request, error) {
 	var err error
@@ -15322,6 +15510,35 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with POST /api/v1/settings/signing-key (the `NewSigningKeyApiV1SettingsSigningKeyPost` operationId).
 	NewSigningKeyApiV1SettingsSigningKeyPostWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*NewSigningKeyApiV1SettingsSigningKeyPostResponse, error)
+
+	// DeleteTraceTokenApiV1SettingsTraceTokenDeleteWithResponse Delete Trace Token
+	//
+	// Remove the trace token: the OTLP endpoint refuses every request, and no evaluation
+	// waits for traces.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with DELETE /api/v1/settings/trace-token (the `DeleteTraceTokenApiV1SettingsTraceTokenDelete` operationId).
+	DeleteTraceTokenApiV1SettingsTraceTokenDeleteWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*DeleteTraceTokenApiV1SettingsTraceTokenDeleteResponse, error)
+
+	// GetTraceTokenApiV1SettingsTraceTokenGetWithResponse Get Trace Token
+	//
+	// The trace token's hint and times; null when there is none.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/settings/trace-token (the `GetTraceTokenApiV1SettingsTraceTokenGet` operationId).
+	GetTraceTokenApiV1SettingsTraceTokenGetWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetTraceTokenApiV1SettingsTraceTokenGetResponse, error)
+
+	// NewTraceTokenApiV1SettingsTraceTokenPostWithResponse New Trace Token
+	//
+	// Make the token that opens the OTLP endpoint, in place of the old one, which stops at
+	// once. The response is the only time the token is shown.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/settings/trace-token (the `NewTraceTokenApiV1SettingsTraceTokenPost` operationId).
+	NewTraceTokenApiV1SettingsTraceTokenPostWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*NewTraceTokenApiV1SettingsTraceTokenPostResponse, error)
 
 	// DeleteTriggerSecretApiV1SettingsTriggerSecretsNameDeleteWithResponse Delete Trigger Secret
 	//
@@ -20309,6 +20526,143 @@ func (r NewSigningKeyApiV1SettingsSigningKeyPostResponse) ContentType() string {
 	return ""
 }
 
+type DeleteTraceTokenApiV1SettingsTraceTokenDeleteResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
+}
+
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r DeleteTraceTokenApiV1SettingsTraceTokenDeleteResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
+}
+
+// GetBody returns the raw response body bytes
+func (r DeleteTraceTokenApiV1SettingsTraceTokenDeleteResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r DeleteTraceTokenApiV1SettingsTraceTokenDeleteResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeleteTraceTokenApiV1SettingsTraceTokenDeleteResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r DeleteTraceTokenApiV1SettingsTraceTokenDeleteResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetTraceTokenApiV1SettingsTraceTokenGetResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *TraceTokenRead
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetTraceTokenApiV1SettingsTraceTokenGetResponse) GetJSON200() *TraceTokenRead {
+	return r.JSON200
+}
+
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r GetTraceTokenApiV1SettingsTraceTokenGetResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
+}
+
+// GetBody returns the raw response body bytes
+func (r GetTraceTokenApiV1SettingsTraceTokenGetResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetTraceTokenApiV1SettingsTraceTokenGetResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetTraceTokenApiV1SettingsTraceTokenGetResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetTraceTokenApiV1SettingsTraceTokenGetResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type NewTraceTokenApiV1SettingsTraceTokenPostResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON201 the response for an HTTP 201 `application/json` response
+	JSON201 *TraceTokenCreated
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
+}
+
+// GetJSON201 returns the response for an HTTP 201 `application/json` response
+func (r NewTraceTokenApiV1SettingsTraceTokenPostResponse) GetJSON201() *TraceTokenCreated {
+	return r.JSON201
+}
+
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r NewTraceTokenApiV1SettingsTraceTokenPostResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
+}
+
+// GetBody returns the raw response body bytes
+func (r NewTraceTokenApiV1SettingsTraceTokenPostResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r NewTraceTokenApiV1SettingsTraceTokenPostResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r NewTraceTokenApiV1SettingsTraceTokenPostResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r NewTraceTokenApiV1SettingsTraceTokenPostResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type DeleteTriggerSecretApiV1SettingsTriggerSecretsNameDeleteResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -23369,6 +23723,53 @@ func (c *ClientWithResponses) NewSigningKeyApiV1SettingsSigningKeyPostWithRespon
 		return nil, err
 	}
 	return ParseNewSigningKeyApiV1SettingsSigningKeyPostResponse(rsp)
+}
+
+// DeleteTraceTokenApiV1SettingsTraceTokenDeleteWithResponse Delete Trace Token
+//
+// Remove the trace token: the OTLP endpoint refuses every request, and no evaluation
+// waits for traces.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /api/v1/settings/trace-token (the `DeleteTraceTokenApiV1SettingsTraceTokenDelete` operationId).
+func (c *ClientWithResponses) DeleteTraceTokenApiV1SettingsTraceTokenDeleteWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*DeleteTraceTokenApiV1SettingsTraceTokenDeleteResponse, error) {
+	rsp, err := c.DeleteTraceTokenApiV1SettingsTraceTokenDelete(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeleteTraceTokenApiV1SettingsTraceTokenDeleteResponse(rsp)
+}
+
+// GetTraceTokenApiV1SettingsTraceTokenGetWithResponse Get Trace Token
+//
+// The trace token's hint and times; null when there is none.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/settings/trace-token (the `GetTraceTokenApiV1SettingsTraceTokenGet` operationId).
+func (c *ClientWithResponses) GetTraceTokenApiV1SettingsTraceTokenGetWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetTraceTokenApiV1SettingsTraceTokenGetResponse, error) {
+	rsp, err := c.GetTraceTokenApiV1SettingsTraceTokenGet(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetTraceTokenApiV1SettingsTraceTokenGetResponse(rsp)
+}
+
+// NewTraceTokenApiV1SettingsTraceTokenPostWithResponse New Trace Token
+//
+// Make the token that opens the OTLP endpoint, in place of the old one, which stops at
+// once. The response is the only time the token is shown.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/settings/trace-token (the `NewTraceTokenApiV1SettingsTraceTokenPost` operationId).
+func (c *ClientWithResponses) NewTraceTokenApiV1SettingsTraceTokenPostWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*NewTraceTokenApiV1SettingsTraceTokenPostResponse, error) {
+	rsp, err := c.NewTraceTokenApiV1SettingsTraceTokenPost(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseNewTraceTokenApiV1SettingsTraceTokenPostResponse(rsp)
 }
 
 // DeleteTriggerSecretApiV1SettingsTriggerSecretsNameDeleteWithResponse Delete Trigger Secret
@@ -27085,6 +27486,101 @@ func ParseNewSigningKeyApiV1SettingsSigningKeyPostResponse(rsp *http.Response) (
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
 		var dest SigningKey
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseDeleteTraceTokenApiV1SettingsTraceTokenDeleteResponse parses an HTTP response from a DeleteTraceTokenApiV1SettingsTraceTokenDeleteWithResponse call
+func ParseDeleteTraceTokenApiV1SettingsTraceTokenDeleteResponse(rsp *http.Response) (*DeleteTraceTokenApiV1SettingsTraceTokenDeleteResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeleteTraceTokenApiV1SettingsTraceTokenDeleteResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case rsp.StatusCode == 204:
+		break // No content-type
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetTraceTokenApiV1SettingsTraceTokenGetResponse parses an HTTP response from a GetTraceTokenApiV1SettingsTraceTokenGetWithResponse call
+func ParseGetTraceTokenApiV1SettingsTraceTokenGetResponse(rsp *http.Response) (*GetTraceTokenApiV1SettingsTraceTokenGetResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetTraceTokenApiV1SettingsTraceTokenGetResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest TraceTokenRead
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseNewTraceTokenApiV1SettingsTraceTokenPostResponse parses an HTTP response from a NewTraceTokenApiV1SettingsTraceTokenPostWithResponse call
+func ParseNewTraceTokenApiV1SettingsTraceTokenPostResponse(rsp *http.Response) (*NewTraceTokenApiV1SettingsTraceTokenPostResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &NewTraceTokenApiV1SettingsTraceTokenPostResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest TraceTokenCreated
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}

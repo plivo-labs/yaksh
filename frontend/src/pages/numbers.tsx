@@ -1,5 +1,5 @@
 import { ChevronRight } from "lucide-react";
-import { type ReactNode, useEffect, useState } from "react";
+import { type ReactNode, useState } from "react";
 import { Link } from "react-router";
 
 import { ConfirmDialog } from "@/components/confirm-dialogs";
@@ -20,6 +20,7 @@ import {
 } from "@/lib/queries";
 import type { Tone } from "@/lib/status";
 import type { PhoneNumber, PhoneNumbers } from "@/lib/types";
+import { useNow } from "@/lib/use-now";
 
 const ROW =
   "grid grid-cols-[minmax(10rem,1.2fr)_minmax(8rem,1.4fr)_minmax(8rem,1.3fr)_9rem] items-center gap-x-4 px-5";
@@ -167,16 +168,6 @@ function Groups({
       {elsewhere.length > 0 && <Elsewhere items={elsewhere} />}
     </>
   );
-}
-
-/** The time now, again every `every` ms, for times that age while the page is open. */
-function useNow(every: number): number {
-  const [now, setNow] = useState(Date.now);
-  useEffect(() => {
-    const tick = setInterval(() => setNow(Date.now()), every);
-    return () => clearInterval(tick);
-  }, [every]);
-  return now;
 }
 
 /** "Resting, 3 min left", rounded up to whole minutes. */
