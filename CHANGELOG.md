@@ -1,3 +1,20 @@
+## v0.12.0 (2026-11-02)
+
+### Feat
+
+- **records**: nodes and moves in the Plivo CX agent record (#41)
+  - For an agent whose parts pass the call to each other (nodes, states or sub-agents), the agent record now shows which node served each line and each move between nodes, with the reason for the move and its time. Plivo CX fills them.
+  - The judges read each move as its own line, such as "Agent moved to node Identity, by transfer_to_identity", so they no longer say that one node did the work of another, and a criterion can ask about the order of the nodes.
+  - The Agent record tab's transcript is now the "Agent timeline": a separator for each move and the node of each line.
+
+### Fix
+
+- **console**: show call times before the start and at a minute's end correctly (#42)
+
+### Changed
+
+- The judges read version 10 of the evidence view: the line numbers of an agent record with moves change. Records that Yaksh read before this release have no nodes. No migration.
+
 ## v0.11.0 (2026-11-02)
 
 ### Feat
