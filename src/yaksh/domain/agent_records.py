@@ -34,6 +34,11 @@ class RecordTurn(BaseModel):
     """When the provider logged the line: for Plivo CX, when its speech ended."""
     started_at: datetime | None = None
     """When its speech started, if the provider logs it."""
+    node: RecordText | None = None
+    """The part of the agent that served the line: a node, state or sub-agent, as the provider
+    names it."""
+    seq: int | None = None
+    """Its place in the provider's log: where its speech started, else where its text is."""
 
 
 class SavedValue(BaseModel):
@@ -52,6 +57,23 @@ class RecordTool(BaseModel):
     output: RecordText | None = None
     failed: bool = False
     at: datetime | None = None
+    node: RecordText | None = None
+    seq: int | None = None
+    """Its place in the provider's log."""
+
+
+class RecordMove(BaseModel):
+    """The call came to a part of the agent: a node, state or sub-agent, as the provider names
+    it. The first move is where the call started."""
+
+    model_config = ConfigDict(frozen=True)
+
+    node: RecordText
+    via: RecordText | None = None
+    """The provider's name for why the call moved."""
+    at: datetime | None = None
+    seq: int | None = None
+    """Its place in the provider's log."""
 
 
 class AgentRecord(BaseModel):
@@ -66,6 +88,7 @@ class AgentRecord(BaseModel):
     turns: list[RecordTurn] = Field(default_factory=list)
     saved: list[SavedValue] = Field(default_factory=list)
     tools: list[RecordTool] = Field(default_factory=list)
+    moves: list[RecordMove] = Field(default_factory=list)
 
 
 class RecordState(StrEnum):

@@ -7,13 +7,26 @@ The transcript shows what the caller heard. The agent's provider keeps its own r
 
 ## What Yaksh does with it
 
-- The call page gets an **Agent record** tab: the values the agent saved, and the whole call as the agent recorded it, its own words and what its speech-to-text heard, with its tool calls in place. Each line links to its turn in Yaksh's transcript.
-- The judges read a new AGENT RECORD section in the evidence view, numbered R1, R2 and so on: the call in the agent's own words, what its speech-to-text heard, its tool calls in time order, and then the saved values. The judges take the agent's words from its own text, and the caller's words from Yaksh's transcript, so a speech-to-text error in Yaksh's transcript of the agent does not fail the agent. A criterion such as "The agent saves the appointment for `{{Date}}`" gets a pass or a fail. Without a record, it ends "unsure" with the kind "hidden action".
+- The call page gets an **Agent record** tab: the values the agent saved, and the **Agent timeline**: the whole call as the agent recorded it, its own words and what its speech-to-text heard, with its tool calls and its moves between nodes in place. Each line links to its turn in Yaksh's transcript.
+- The judges read a new AGENT RECORD section in the evidence view, numbered R1, R2 and so on: the call in the agent's own words, what its speech-to-text heard, its tool calls and its moves between nodes in time order, and then the saved values. The judges take the agent's words from its own text, and the caller's words from Yaksh's transcript, so a speech-to-text error in Yaksh's transcript of the agent does not fail the agent. A criterion such as "The agent saves the appointment for `{{Date}}`" gets a pass or a fail. Without a record, it ends "unsure" with the kind "hidden action".
 - **Data the agent saved** checks each saved value against what the caller said. A value that the call clearly contradicts fails the check, but a caller turn that Yaksh did not confirm as played cannot fail it alone, and the check counts in the call's verdict with agent rules, as a deciding agent rule does. The scenario verdict and the pass rate do not change. An empty value, or one the call does not show, is not checkable.
 - **What the agent heard** compares each value that Yaksh's caller said, such as a name, a number or a date, with what the agent's speech-to-text heard. It skips a caller line that Yaksh did not confirm as played, and keys that the caller pressed on the phone keypad, which are not speech. It only reports.
 - The run's verdicts show how many calls had a record and the results of the two checks.
 
 The two checks run when the persona talked on the call. Text tests have no agent record.
+
+## Nodes and moves
+
+An agent can have parts that pass the call to each other: nodes, states or sub-agents. When the provider logs them, the record names the node that served each line, and each move between nodes: the node the call came to, the provider's name for why it moved, and when.
+
+- The judges read a move as its own line, before the lines that its node served: `Agent started in node Reception` for the first, then lines such as `Agent moved to node Identity, by transfer_to_identity`. The other lines do not change. A tool call of a node other than the one the last move came to names its node, and a line `The next line is from node …` comes before such a turn. A criterion such as "The agent checks the caller's identity before it cancels" or "The call ends through end_call" can quote a move line as evidence of an action, not as words the agent said.
+- The Agent timeline shows each move as a separator, and the node of each line as a small label.
+- Records that Yaksh read before this change have no nodes. Their calls show and judge as before.
+
+### Plivo CX
+
+- Each node the call enters is a move, with its intent as the reason. The Start node and the end of the flow are not moves. A node entered twice gives two moves.
+- Plivo CX logs the end node's last reply under the node before it. Yaksh gives a reply that started after the call entered the end node to the end node.
 
 ## Set it up
 
@@ -36,7 +49,7 @@ On the agent's **Settings**, choose **Edit** and turn on **Read the agent's reco
 
 ## When the record is ready
 
-Yaksh reads the record before it judges the call. A provider writes some of its record after the call ends: Plivo CX can add a line after the run ends, so Yaksh takes a Plivo CX run as final 90 seconds after its last line. Until then, the evaluation waits and asks again every 15 seconds, for up to 5 minutes after the call. The wait does not use one of the evaluation's attempts.
+Yaksh reads the record before it judges the call. A provider writes some of its record after the call ends: Plivo CX can add a line after the run ends, so Yaksh takes a Plivo CX run as final 90 seconds after its last line. Until then, the evaluation waits, and asks again when the run's log settles, at least 15 seconds after it last asked, for up to 5 minutes after the call. The wait does not use one of the evaluation's attempts.
 
 After 5 minutes, Yaksh keeps what it has, with a note that the record can be incomplete. With no record at all, the tab says why, such as refused credentials or no run from the number, and the call is judged without one. Yaksh reads a call's record once.
 

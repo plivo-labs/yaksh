@@ -1605,15 +1605,16 @@ type AgentRecordCounts struct {
 }
 
 // AgentRecordRead The agent's own record of the call: its lines, each speaker's in order and paired with
-// Yaksh's turns, the values it saved and its tool calls.
+// Yaksh's turns, the values it saved, its tool calls and its moves between nodes.
 type AgentRecordRead struct {
-	ExternalId     *string        `json:"external_id"`
-	FetchedAt      *time.Time     `json:"fetched_at"`
-	Provider       RecordProvider `json:"provider"`
-	ProviderLabel  string         `json:"provider_label"`
-	ProviderStatus *string        `json:"provider_status"`
-	Reason         *string        `json:"reason"`
-	Saved          []SavedValue   `json:"saved"`
+	ExternalId     *string          `json:"external_id"`
+	FetchedAt      *time.Time       `json:"fetched_at"`
+	Moves          []RecordMoveRead `json:"moves"`
+	Provider       RecordProvider   `json:"provider"`
+	ProviderLabel  string           `json:"provider_label"`
+	ProviderStatus *string          `json:"provider_status"`
+	Reason         *string          `json:"reason"`
+	Saved          []SavedValue     `json:"saved"`
 
 	// Status Where a call's agent record is, as the console shows it.
 	Status RecordStatus     `json:"status"`
@@ -2917,6 +2918,16 @@ type QueuedReview struct {
 	ScenarioName   string             `json:"scenario_name"`
 }
 
+// RecordMoveRead defines model for RecordMoveRead.
+type RecordMoveRead struct {
+	At       *time.Time `json:"at,omitempty"`
+	AtMs     *int       `json:"at_ms"`
+	Node     string     `json:"node"`
+	Position int        `json:"position"`
+	Seq      *int       `json:"seq,omitempty"`
+	Via      *string    `json:"via,omitempty"`
+}
+
 // RecordProvider defines model for RecordProvider.
 type RecordProvider string
 
@@ -2937,14 +2948,20 @@ type RecordToolRead struct {
 	AtMs      *int       `json:"at_ms"`
 	Failed    *bool      `json:"failed,omitempty"`
 	Name      string     `json:"name"`
+	Node      *string    `json:"node,omitempty"`
 	Output    *string    `json:"output,omitempty"`
+	Position  int        `json:"position"`
+	Seq       *int       `json:"seq,omitempty"`
 }
 
 // RecordTurnRead defines model for RecordTurnRead.
 type RecordTurnRead struct {
 	At          *time.Time `json:"at,omitempty"`
 	AtMs        *int       `json:"at_ms"`
+	Node        *string    `json:"node,omitempty"`
+	Position    int        `json:"position"`
 	Role        Role       `json:"role"`
+	Seq         *int       `json:"seq,omitempty"`
 	StartedAt   *time.Time `json:"started_at,omitempty"`
 	StartedAtMs *int       `json:"started_at_ms"`
 	Text        string     `json:"text"`

@@ -12,6 +12,7 @@ import type {
   AgentRecord,
   AgentRecordStatus,
   EvaluationState,
+  RecordMove,
   RecordTool,
   RecordTurn,
 } from "@/lib/types";
@@ -194,23 +195,21 @@ function SavedData({
 
 type Line =
   | { kind: "turn"; turn: RecordTurn; heard: number | null }
-  | { kind: "tool"; tool: RecordTool };
+  | { kind: "tool"; tool: RecordTool }
+  | { kind: "move"; move: RecordMove };
 
-/** The record's lines and tool calls in one list, each tool call before the first line that
- * started after it, as the judges read them. A tool call with no time comes last. */
+/** The record's lines, tool calls and moves in the order the judges read them. */
 function timeline(record: AgentRecord): Line[] {
-  const timed = record.tools.filter((tool) => tool.at_ms !== null);
-  const lines: Line[] = [];
   let heard = 0;
-  for (const turn of record.turns) {
-    const start = turn.started_at_ms ?? turn.at_ms;
-    while (timed.length && start !== null && (timed[0].at_ms as number) <= start) {
-      lines.push({ kind: "tool", tool: timed.shift() as RecordTool });
-    }
-    lines.push({ kind: "turn", turn, heard: turn.role === "caller" ? ++heard : null });
-  }
-  const rest = [...timed, ...record.tools.filter((tool) => tool.at_ms === null)];
-  return [...lines, ...rest.map((tool) => ({ kind: "tool" as const, tool }))];
+  const lines: [number, Line][] = [
+    ...record.turns.map((turn): [number, Line] => [
+      turn.position,
+      { kind: "turn", turn, heard: turn.role === "caller" ? ++heard : null },
+    ]),
+    ...record.tools.map((tool): [number, Line] => [tool.position, { kind: "tool", tool }]),
+    ...record.moves.map((move): [number, Line] => [move.position, { kind: "move", move }]),
+  ];
+  return lines.sort(([a], [b]) => a - b).map(([, line]) => line);
 }
 
 function AgentTranscript({
@@ -227,24 +226,28 @@ function AgentTranscript({
   const lines = timeline(record);
   const missing = (heard ?? []).filter((value) => value.result === "missing");
   return (
-    <section aria-label="The agent's transcript" className="grid gap-2">
+    <section aria-label="Agent timeline" className="grid gap-2">
       <h3 className="text-label text-muted-foreground">
-        The agent's transcript <span className="tabular-nums">{lines.length}</span>
+        Agent timeline <span className="tabular-nums">{lines.length}</span>
       </h3>
       <p className="text-xs-400 text-muted-foreground">
-        As the agent recorded it: its own words, what its speech-to-text heard, and its tool calls.
+        As the agent recorded it: its own words, what its speech-to-text heard, its tool calls, and
+        its moves between nodes.
       </p>
       {lines.length === 0 ? (
         <Note>The record has no lines.</Note>
       ) : (
         <ol className="divide-y overflow-hidden rounded-lg border">
           {lines.map((line, index) =>
-            line.kind === "tool" ? (
+            line.kind === "move" ? (
+              <Move key={`move-${index}`} move={line.move} connectedMs={connectedMs} />
+            ) : line.kind === "tool" ? (
               <li key={`tool-${index}`} className="grid gap-1.5 py-2.5 pr-3 pl-12">
-                <span className="text-xs-400 text-muted-foreground">
+                <span className="flex flex-wrap items-center gap-x-1.5 text-xs-400 text-muted-foreground">
                   Tool call
                   {line.tool.at_ms !== null && ` · ${clock(line.tool.at_ms - connectedMs)}`}
                   {line.tool.failed && " · failed"}
+                  {line.tool.node && <NodeLabel node={line.tool.node} />}
                 </span>
                 <ToolCalls
                   tools={[
@@ -306,12 +309,13 @@ function RecordLine({
       <span className="grid min-w-0 gap-1">
         <span
           className={cn(
-            "text-xs-500",
+            "flex flex-wrap items-center gap-x-1.5 text-xs-500",
             turn.role === "agent" ? "text-primary" : "text-muted-foreground",
           )}
         >
           {turn.role === "agent" ? "Agent" : "Caller, as heard"}
           {turn.at_ms !== null && ` · ${clock(turn.at_ms - connectedMs)}`}
+          {turn.node && <NodeLabel node={turn.node} />}
         </span>
         <span className="text-s-400 break-words">{highlighted(turn.text, wrong)}</span>
         {marks.map((mark) =>
@@ -335,6 +339,24 @@ function RecordLine({
         )}
       </span>
     </li>
+  );
+}
+
+function Move({ move, connectedMs }: { move: RecordMove; connectedMs: number }) {
+  return (
+    <li className="flex items-center gap-2 bg-muted/40 px-3 py-1.5 text-xs-500">
+      <span className="text-foreground">{move.node}</span>
+      {move.via && <span className="text-muted-foreground">{move.via}</span>}
+      {move.at_ms !== null && (
+        <span className="text-muted-foreground">{clock(move.at_ms - connectedMs)}</span>
+      )}
+    </li>
+  );
+}
+
+function NodeLabel({ node }: { node: string }) {
+  return (
+    <span className="rounded-sm bg-muted px-1.5 text-xs-400 text-muted-foreground">{node}</span>
   );
 }
 

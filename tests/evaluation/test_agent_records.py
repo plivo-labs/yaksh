@@ -26,6 +26,7 @@ from yaksh.domain.agent_records import (
     Found,
     Lookup,
     Pending,
+    RecordMove,
     RecordState,
     RecordTool,
     RecordTurn,
@@ -99,7 +100,7 @@ class Judge:
         answers: dict[str, dict[str, Any]] = {
             "criterion": {
                 "evidence": [] if self.from_record else [{"turn": 3, "quote": "next Thursday"}],
-                "record_evidence": [{"line": 3, "quote": "move_booking"}]
+                "record_evidence": [{"line": 5, "quote": "move_booking"}]
                 if self.from_record
                 else [],
                 "absence": False,
@@ -177,12 +178,27 @@ def record_of(call: Conversation) -> AgentRecord:
         status="COMPLETED",
         complete=True,
         turns=[
-            RecordTurn(role=Role.AGENT, text="Thanks for calling, this is Ava.", at=at(900)),
-            RecordTurn(role=Role.CALLER, text="Can I move my cleaning?", at=at(2400)),
-            RecordTurn(role=Role.CALLER, text="Thanks.", at=at(60_000)),
+            RecordTurn(
+                role=Role.AGENT,
+                text="Thanks for calling, this is Ava.",
+                at=at(900),
+                node="Front desk",
+            ),
+            RecordTurn(
+                role=Role.CALLER, text="Can I move my cleaning?", at=at(2400), node="Front desk"
+            ),
+            RecordTurn(role=Role.CALLER, text="Thanks.", at=at(60_000), node="Booking"),
         ],
         saved=[SavedValue(name="new_time", value="Friday 4 pm")],
-        tools=[RecordTool(name="move_booking", arguments='{"day": "Friday"}', at=at(2500))],
+        tools=[
+            RecordTool(
+                name="move_booking", arguments='{"day": "Friday"}', at=at(2500), node="Booking"
+            )
+        ],
+        moves=[
+            RecordMove(node="Front desk", via="call", at=at(100)),
+            RecordMove(node="Booking", via="move_request", at=at(2450)),
+        ],
     )
 
 
@@ -236,12 +252,14 @@ async def test_a_record_still_being_written_waits_then_the_judges_read_it(
     assert (row.state, row.external_id) == (RecordState.FOUND, "run-1")
     view = judge.views["criterion"]
     assert (
-        "[R1] Agent said: Thanks for calling, this is Ava.\n"
-        "[R2] Agent heard: Can I move my cleaning?\n"
-        '[R3] Tool call: move_booking {"day": "Friday"}, no output reported\n'
-        "[R4] Agent heard: Thanks.\n"
-        "[R5] Saved: new_time = Friday 4 pm"
-    ) in view, "the agent's own lines and tool calls in time order, then the saved values"
+        "[R1] Agent started in node Front desk\n"
+        "[R2] Agent said: Thanks for calling, this is Ava.\n"
+        "[R3] Agent heard: Can I move my cleaning?\n"
+        "[R4] Agent moved to node Booking, by move_request\n"
+        '[R5] Tool call: move_booking {"day": "Friday"}, no output reported\n'
+        "[R6] Agent heard: Thanks.\n"
+        "[R7] Saved: new_time = Friday 4 pm"
+    ) in view, "the agent's own lines, tool calls and moves in time order, then the saved values"
     assert "[H1] Can I move my cleaning?" in judge.views["heard"]
 
     shown = (await client.get(f"/api/v1/conversations/{conversation_id}")).json()
@@ -253,6 +271,15 @@ async def test_a_record_still_being_written_waits_then_the_judges_read_it(
         (None, 60_000),
     ], "a line pairs with the turn of its speaker that holds its time, or with none"
     assert [tool["at_ms"] for tool in record["tools"]] == [2500]
+    assert [(move["node"], move["via"], move["at_ms"]) for move in record["moves"]] == [
+        ("Front desk", "call", 100),
+        ("Booking", "move_request", 2450),
+    ]
+    assert [[line["position"] for line in record[key]] for key in ("moves", "turns", "tools")] == [
+        [0, 3],
+        [1, 2, 5],
+        [4],
+    ], "the console shows the lines in the judges' order"
     assert (record["provider_label"], record["saved"]) == (
         "Plivo CX",
         [{"name": "new_time", "value": "Friday 4 pm"}],

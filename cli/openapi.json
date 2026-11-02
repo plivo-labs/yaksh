@@ -7498,6 +7498,13 @@
             },
             "type": "array",
             "title": "Tools"
+          },
+          "moves": {
+            "items": {
+              "$ref": "#/components/schemas/RecordMoveRead"
+            },
+            "type": "array",
+            "title": "Moves"
           }
         },
         "type": "object",
@@ -7511,10 +7518,11 @@
           "fetched_at",
           "saved",
           "turns",
-          "tools"
+          "tools",
+          "moves"
         ],
         "title": "AgentRecordRead",
-        "description": "The agent's own record of the call: its lines, each speaker's in order and paired with\nYaksh's turns, the values it saved and its tool calls."
+        "description": "The agent's own record of the call: its lines, each speaker's in order and paired with\nYaksh's turns, the values it saved, its tool calls and its moves between nodes."
       },
       "AgentRecordStatus": {
         "properties": {
@@ -13302,6 +13310,70 @@
         ],
         "title": "QueuedReview"
       },
+      "RecordMoveRead": {
+        "properties": {
+          "node": {
+            "type": "string",
+            "title": "Node"
+          },
+          "via": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Via"
+          },
+          "at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "At"
+          },
+          "seq": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Seq"
+          },
+          "at_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "At Ms"
+          },
+          "position": {
+            "type": "integer",
+            "title": "Position"
+          }
+        },
+        "type": "object",
+        "required": [
+          "node",
+          "at_ms",
+          "position"
+        ],
+        "title": "RecordMoveRead"
+      },
       "RecordProvider": {
         "type": "string",
         "enum": [
@@ -13387,6 +13459,28 @@
             ],
             "title": "At"
           },
+          "node": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Node"
+          },
+          "seq": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Seq"
+          },
           "at_ms": {
             "anyOf": [
               {
@@ -13397,13 +13491,18 @@
               }
             ],
             "title": "At Ms"
+          },
+          "position": {
+            "type": "integer",
+            "title": "Position"
           }
         },
         "type": "object",
         "required": [
           "name",
           "arguments",
-          "at_ms"
+          "at_ms",
+          "position"
         ],
         "title": "RecordToolRead"
       },
@@ -13440,6 +13539,28 @@
             ],
             "title": "Started At"
           },
+          "node": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Node"
+          },
+          "seq": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Seq"
+          },
           "at_ms": {
             "anyOf": [
               {
@@ -13472,6 +13593,10 @@
               }
             ],
             "title": "Turn"
+          },
+          "position": {
+            "type": "integer",
+            "title": "Position"
           }
         },
         "type": "object",
@@ -13480,7 +13605,8 @@
           "text",
           "at_ms",
           "started_at_ms",
-          "turn"
+          "turn",
+          "position"
         ],
         "title": "RecordTurnRead"
       },
