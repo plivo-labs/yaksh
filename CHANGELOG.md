@@ -1,3 +1,17 @@
+## v0.11.0 (2026-11-02)
+
+### Feat
+
+- **evaluation**: agent reply time parts from the agent's OpenTelemetry traces (#40)
+  - Yaksh now shows where the agent's time goes in each wait: network and telephony, VAD endpointing, STT after VAD stop, turn detection, LLM TTFT, tool execution and TTS TTFB. The agent sends its OpenTelemetry traces to Yaksh; Yaksh reads LiveKit Agents 1.8 and Pipecat 1.14.
+  - Make a trace token in Settings > Traces, and add the snippet for your stack from the docs page "Agent traces". Yaksh links a trace to its call by the call's ID, or by Yaksh's number and the time of the call.
+  - The Metrics tab shows the p50 and p90 of each part, and the reply tag in the transcript shows the parts of that reply. While a trace token exists, Yaksh evaluates a phone call 30 s after it ends, so that the spans can arrive.
+
+### Changed
+
+- The Metrics tab is one card in five sections: agent response time, each reply, where the agent's time goes, conversation, and test run. The test run section also shows the caller's VAD stop, turn wait, cached prompt tokens and reasoning tokens. The flag tags, the repeated-answer lines and the record-problems line are no longer on the tab; the run page still shows the flags.
+- Migration 0008 adds the tables for spans, trace owners and the trace token. To roll back to 0.10.x, run `alembic downgrade 0007` first.
+
 ## v0.10.3 (2026-10-30)
 
 ### Fix

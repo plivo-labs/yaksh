@@ -2542,7 +2542,7 @@ wheels = [
 
 [[package]]
 name = "yaksh"
-version = "0.10.3"
+version = "0.11.0"
 source = { editable = "." }
 dependencies = [
     { name = "aiobotocore" },
