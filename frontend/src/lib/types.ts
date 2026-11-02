@@ -932,6 +932,9 @@ export interface Turn {
   /** On a caller turn that the caller's model spoke on a phone call: where the time of its
    * reply went. Turns that arrive live during the call do not have it. */
   caller_reply?: CallerReplyTime | null;
+  /** On an agent turn that starts a reply, when the agent's trace paired with it: where the time
+   * of the agent's reply went. */
+  agent_reply?: AgentReplyTime | null;
   /** A line of the scenario's interruption with this number, from 1. */
   interruption?: number | null;
 }
@@ -944,6 +947,25 @@ export interface CallerReplyTime {
   steps: Record<string, number>;
   /** The STT's TTFS for the agent's turn the reply answers; null when no final transcript came. */
   stt_ttfs_ms?: number | null;
+}
+
+/** Where the time of one agent reply went, from the agent's trace of the call: the agent's own
+ * total in parts, and the rest of Yaksh's wait as network and telephony. */
+export interface AgentReplyTime {
+  /** The speech start that Yaksh heard, on the call's clock. */
+  speech_ms: number;
+  /** The agent's own total; null when the trace lacks it. */
+  agent_ms: number | null;
+  complete: boolean;
+  /** The agent's total is not longer than Yaksh's wait. */
+  fits: boolean;
+  /** The parts add up to more than the agent's total, so Unattributed is 0. */
+  overlapping: boolean;
+  stt_ttfs_ms: number | null;
+  /** Why the reply is not complete. */
+  reason: string | null;
+  /** ms by part key, with network; null for a reply that is not complete or does not fit. */
+  steps: Record<string, number> | null;
 }
 
 /** The agent's response times in one call; null on a call that was not measured. */
@@ -1380,10 +1402,15 @@ export interface Usage {
     /** Null for Azure, whose voice names its model. */
     tts_model: string | null;
     voice: VoiceSettings | null;
+    /** Null on a text test and on calls from before Yaksh recorded it. */
+    vad_stop_s: number | null;
+    turn_max_wait_s: number | null;
   } | null;
   usage: {
     llm_prompt_tokens: number | null;
     llm_completion_tokens: number | null;
+    llm_reasoning_tokens: number | null;
+    llm_cache_read_tokens: number | null;
     stt_audio_seconds: number | null;
     tts_characters: number | null;
   } | null;
@@ -1432,6 +1459,29 @@ export interface ResponseTimeMetric {
   p90_ms: number | null;
 }
 
+/** The parts of the agent's waits in one call, from the agent's trace; or why there are none. */
+export type AgentReplyTimeMetric =
+  | {
+      status: "ok";
+      framework: "livekit" | "pipecat";
+      /** Answered waits that start at the end of the caller's speech, without talk-overs. */
+      eligible: number;
+      paired: number;
+      /** Paired, complete and fitting: the replies with parts. */
+      usable: number;
+      incomplete: number;
+      not_fitting: number;
+      /** Agent replies in the trace with no speech in the recording. */
+      not_heard: number;
+      overlapping: number;
+      offset_ms: number;
+      steps: { key: string; p50_ms: number; p90_ms: number }[];
+      stt_ttfs: { replies: number; p50_ms: number; p90_ms: number } | null;
+      by_reply: AgentReplyTime[];
+    }
+  | { status: "no_traces" | "not_aligned" | "unknown_framework" }
+  | { status: "clock_off"; clock_lag_ms: number };
+
 /** The caller's reply time in one call, and the same for each part, over the replies that its
  * model spoke. */
 export interface CallerReplyTimeMetric {
@@ -1471,6 +1521,7 @@ export interface ConversationEvaluation {
     speech: Metric<Record<"agent" | "caller", { start_ms: number; end_ms: number }[]>>;
     response_time: Metric<ResponseTimeMetric>;
     caller_reply_time: Metric<CallerReplyTimeMetric>;
+    agent_reply_time: Metric<AgentReplyTimeMetric>;
     turn_taking: Metric<TurnTaking>;
     speaking: Metric<Speaking>;
     agent_repetition: Metric<AgentRepetition>;
@@ -1893,6 +1944,22 @@ export type SecretName =
   | "trigger_signing_key";
 
 /** A saved secret, never its value. */
+/** The token that opens the OTLP endpoint for agents' traces; Yaksh keeps only its hash. */
+export interface TraceToken {
+  /** The token's last 4 characters. */
+  hint: string;
+  created_at: string;
+  /** The last request with this token; changes at most once in 30 s. */
+  last_used_at: string | null;
+  /** The last request that brought a kept span with a link key; changes at most once in 30 s. */
+  last_key_at: string | null;
+}
+
+/** A new trace token: the response is the only time it is shown. */
+export interface TraceTokenCreated extends TraceToken {
+  token: string;
+}
+
 export interface SecretState {
   /** The last 4 characters; null for a short value. */
   hint: string | null;

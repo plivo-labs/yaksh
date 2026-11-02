@@ -91,6 +91,8 @@ import {
   type VoiceGender,
   type VoiceInput,
   type VoiceSettings,
+  type TraceToken,
+  type TraceTokenCreated,
 } from "@/lib/types";
 
 export const keys = {
@@ -1447,6 +1449,37 @@ export function useRemoveTriggerSecret() {
         method: "DELETE",
       }),
     onSuccess: (settings) => settingsChanged(client, settings),
+  });
+}
+
+const traceTokenKey = [...settingsKey, "trace-token"] as const;
+
+/** The trace token's hint and times; null when there is none. */
+/** The trace token's times refresh while the panel is open, so a first setup shows its first
+ * spans; Yaksh writes them at most every 30 s. */
+export function useTraceToken() {
+  return useQuery({
+    queryKey: traceTokenKey,
+    queryFn: ({ signal }) => api<TraceToken | null>("/settings/trace-token", { signal }),
+    refetchInterval: (query) => (query.state.data ? 30_000 : false),
+  });
+}
+
+/** Makes a new trace token in place of the old one, which stops at once; the response is the
+ * only time it is shown. */
+export function useNewTraceToken() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: () => api<TraceTokenCreated>("/settings/trace-token", { method: "POST" }),
+    onSuccess: () => void client.invalidateQueries({ queryKey: traceTokenKey }),
+  });
+}
+
+export function useDeleteTraceToken() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: () => api<void>("/settings/trace-token", { method: "DELETE" }),
+    onSuccess: () => void client.invalidateQueries({ queryKey: traceTokenKey }),
   });
 }
 
