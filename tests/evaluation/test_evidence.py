@@ -1,10 +1,15 @@
+import json
+from collections.abc import Callable
 from dataclasses import replace
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+import pytest
+
 from yaksh.domain.agent_records import (
     AgentRecord,
+    RecordMove,
     RecordState,
     RecordTool,
     RecordTurn,
@@ -25,8 +30,10 @@ from yaksh.domain.conversations import (
 )
 from yaksh.domain.record_sources import RecordProvider
 from yaksh.domain.scenarios import Fact
-from yaksh.evaluation.evidence import CallView, render, with_item
+from yaksh.evaluation.evidence import CallView, record_lines, render, with_item
 from yaksh.evaluation.quotes import quote_problems
+from yaksh.evaluation.sources import agent_line_problems
+from yaksh.integrations.plivo_cx_runs import parse_run
 
 FIXTURES = Path(__file__).parent / "fixtures"
 LINES = [
@@ -387,3 +394,114 @@ def test_an_agent_line_said_while_a_tool_ran_comes_before_the_tools_result() -> 
         "[R2] Tool call: reschedule {}, output failed\n"
         "[R3] Agent said: I could not move it."
     ) in view
+
+
+NODES_RUN = Path(__file__).parents[1] / "integrations" / "fixtures" / "plivo_cx_run_nodes.json"
+
+
+def nodes_record(change: Callable[[list[dict[str, Any]]], object] = list) -> AgentRecord:
+    detail = json.loads(NODES_RUN.read_text())
+    change(detail["logs"])
+    return parse_run(detail, datetime.now(UTC))
+
+
+def view_of(record: AgentRecord) -> str:
+    return render(
+        replace(MAPLE_DENTAL, record=StoredRecord(state=RecordState.FOUND, record=record))
+    )
+
+
+def test_the_judge_reads_each_move_before_the_lines_its_node_served() -> None:
+    lines = record_lines(nodes_record())
+
+    assert {index: line for index, line in enumerate(lines) if "node" in line[:30]} == {
+        0: "Agent started in node Reception",
+        4: "Agent moved to node Identity, by transfer_to_identity",
+        13: "Agent moved to node Scheduling, by transfer_to_scheduling",
+        22: "Agent moved to node End call, by end_call",
+    }
+    assert lines[5:7] == [
+        "Agent said: I just need to confirm a couple of things first. Let me see if I can "
+        "find your chart using the number you are calling from.",
+        'Tool call: identify_patient {}, output {"ok": true, "data": {"candidates": [], '
+        '"count": 0}, "error_code": null, "patient_safe_message": null}',
+    ], "a line said while a tool ran comes before the tool"
+    assert lines[23].startswith("Agent said: Your appointment at the Northgate office")
+    assert lines[24].startswith("Saved: ")
+    assert 'A line "Agent started in node"' in view_of(nodes_record())
+    assert "Agent started in node" not in view_of(nodes_record().model_copy(update={"moves": []}))
+
+
+def test_a_reply_the_end_node_did_not_give_names_its_own_node() -> None:
+    lines = record_lines(nodes_record(lambda logs: logs.pop(71)))
+
+    assert lines[22:24] == [
+        "Agent moved to node End call, by end_call",
+        "The next line is from node Scheduling",
+    ]
+
+
+def at(second: float) -> datetime:
+    return datetime(2026, 10, 30, 11, 12, tzinfo=UTC) + timedelta(seconds=second)
+
+
+@pytest.mark.parametrize(
+    ("turn", "tool", "move"),
+    [
+        ({"started_at": at(2), "seq": 15}, {"at": at(2), "seq": 16}, {"at": at(2), "seq": 14}),
+        ({"seq": 15}, {"seq": 16}, {"seq": 14}),
+        ({"at": at(8), "seq": 15}, {"at": at(2), "seq": 16}, {"at": at(1), "seq": 14}),
+        ({"started_at": at(2), "seq": 3}, {"at": at(3), "seq": 1}, {"at": at(1), "seq": 2}),
+    ],
+    ids=["same time", "no time", "speech start with no time", "log and time disagree"],
+)
+def test_tools_and_moves_take_their_place_by_time_then_by_the_log(
+    turn: dict[str, Any], tool: dict[str, Any], move: dict[str, Any]
+) -> None:
+    record = AgentRecord(
+        provider=RecordProvider.PLIVO_CX,
+        external_id="run-1",
+        status="COMPLETED",
+        complete=True,
+        turns=[RecordTurn(role=Role.AGENT, text="One moment.", node="Identity", **turn)],
+        tools=[RecordTool(name="lookup", arguments="{}", node="Identity", **tool)],
+        moves=[RecordMove(node="Identity", via="call", **move)],
+    )
+
+    assert record_lines(record) == [
+        "Agent started in node Identity",
+        "Agent said: One moment.",
+        "Tool call: lookup {}, no output reported",
+    ]
+
+
+def test_a_tool_of_another_node_after_a_move_names_its_node() -> None:
+    record = AgentRecord(
+        provider=RecordProvider.PLIVO_CX,
+        external_id="run-1",
+        status="COMPLETED",
+        complete=True,
+        tools=[
+            RecordTool(name="lookup", arguments="{}", at=at(3), seq=3, node="Reception"),
+            RecordTool(name="balance", arguments="{}", at=at(4), seq=4),
+        ],
+        moves=[
+            RecordMove(node="Reception", via="call", at=at(1), seq=1),
+            RecordMove(node="Billing", via="transfer_to_billing", at=at(2), seq=2),
+        ],
+    )
+
+    assert record_lines(record)[2:] == [
+        "Tool call in node Reception: lookup {}, no output reported",
+        "Tool call in an unknown node: balance {}, no output reported",
+    ]
+
+
+def test_a_judge_can_quote_a_move_but_not_as_words_the_agent_said() -> None:
+    lines = record_lines(nodes_record())
+    found = {"call_quote": None, "record_quote": {"line": 23, "quote": "End call, by end_call"}}
+
+    assert agent_line_problems(found, [], lines) == []
+    assert agent_line_problems(found, [], lines, words_only=True) == [
+        'Record line R23 is not words the agent said. Quote an "Agent said" line.'
+    ]

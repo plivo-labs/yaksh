@@ -3,9 +3,15 @@ leaves out what must not sway a judge: the caller's own reason for ending the ca
 setting, the agent's configuration and its documents. A change to the text is a new version."""
 
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import UTC, date, datetime
 
-from yaksh.domain.agent_records import AgentRecord, RecordTool, RecordTurn, StoredRecord
+from yaksh.domain.agent_records import (
+    AgentRecord,
+    RecordMove,
+    RecordTool,
+    RecordTurn,
+    StoredRecord,
+)
 from yaksh.domain.agents import Direction, Transport
 from yaksh.domain.answering import (
     SCREENER_LABELS,
@@ -29,7 +35,8 @@ from yaksh.domain.conversations import (
 from yaksh.domain.record_sources import RECORD_PROVIDERS
 from yaksh.domain.scenarios import Fact
 
-EVIDENCE_VIEW_VERSION = 9
+EVIDENCE_VIEW_VERSION = 10
+NO_TIME = datetime.min.replace(tzinfo=UTC)
 
 TRANSCRIPTION_NOTE = {
     Transport.PHONE: (
@@ -136,28 +143,72 @@ def render(view: CallView) -> str:
 
 def record_lines(record: AgentRecord) -> list[str]:
     """The record's lines a judge can quote, numbered from 1 in the view: the call in the
-    agent's own words, with its tool calls in their place, then the values it saved. The
-    caller's lines are kept only when they are what the agent heard during the call."""
+    agent's own words, with its tool calls and its moves in their place, then the values it
+    saved. The caller's lines are kept only when they are what the agent heard during the
+    call."""
     heard = RECORD_PROVIDERS[record.provider].live_transcript
     spoken = [turn for turn in record.turns if heard or turn.role is Role.AGENT]
-    saved = [f"Saved: {value.name} = {value.value}" for value in record.saved]
-    return in_order(spoken, record.tools) + saved
-
-
-def in_order(spoken: list[RecordTurn], tools: list[RecordTool]) -> list[str]:
-    """The spoken lines in the record's order, each tool call before the first line that
-    started after it. The agent speaks while its tools run, so a line's start, not the time it
-    was logged, puts it before or after a tool call. A tool call with no time, or after every
-    line, comes last. The console's record tab follows the same rule."""
-    timed = [tool for tool in tools if tool.at is not None]
+    first = record.moves[0] if record.moves else None
+    serving = None
     lines = []
-    for turn in spoken:
-        start = turn.started_at or turn.at
-        while timed and start is not None and timed[0].at is not None and timed[0].at <= start:
-            lines.append(record_tool_line(timed.pop(0)))
-        lines.append(record_turn_line(turn))
-    rest = timed + [tool for tool in tools if tool.at is None]
-    return lines + [record_tool_line(tool) for tool in rest]
+    for line in in_order(spoken, record.tools, record.moves):
+        if isinstance(line, RecordTurn):
+            if serving is not None and line.node != serving.node:
+                lines.append(f"The next line is from {node_name(line.node)}")
+            lines.append(record_turn_line(line))
+        elif isinstance(line, RecordMove):
+            serving = line
+            lines.append(move_line(line, first))
+        else:
+            lines.append(record_tool_line(line, serving))
+    return lines + [f"Saved: {value.name} = {value.value}" for value in record.saved]
+
+
+type RecordEvent = RecordTool | RecordMove
+type RecordLine = RecordTurn | RecordEvent
+
+
+def in_order(
+    turns: list[RecordTurn], tools: list[RecordTool], moves: list[RecordMove]
+) -> list[RecordLine]:
+    """The turns in the record's order, each tool call and move before the first turn that
+    started after it, in their order in the provider's log. The agent speaks while its tools
+    run, so a turn's start, not the time it was logged, puts it before or after a tool call. An
+    equal or a missing time goes by the place in the log. A tool call with neither, or after
+    every turn, comes last. The console shows the lines in this order too."""
+    slots: list[list[RecordEvent]] = [[] for _ in range(len(turns) + 1)]
+    for event in [*tools, *moves]:
+        place = next(
+            (index for index, turn in enumerate(turns) if comes_before(event, turn)), len(turns)
+        )
+        slots[place].append(event)
+    lines: list[RecordLine] = []
+    for index, slot in enumerate(slots):
+        lines += sorted(slot, key=logged)
+        if index < len(turns):
+            lines.append(turns[index])
+    return lines
+
+
+def logged(event: RecordEvent) -> tuple[bool, int, bool, datetime]:
+    """An event's order in the provider's log, else by time; one with neither keeps its place."""
+    return (event.seq is None, event.seq or 0, event.at is None, event.at or NO_TIME)
+
+
+def comes_before(event: RecordEvent, turn: RecordTurn) -> bool:
+    if event.at is not None and turn.started_at is not None and event.at != turn.started_at:
+        return event.at < turn.started_at
+    if event.seq is not None and turn.seq is not None:
+        return event.seq < turn.seq
+    start = turn.started_at or turn.at
+    return event.at is not None and start is not None and event.at <= start
+
+
+def move_line(move: RecordMove, first: RecordMove | None) -> str:
+    if move is first:
+        return f"Agent started in node {move.node}"
+    via = f", by {move.via}" if move.via else ""
+    return f"Agent moved to node {move.node}{via}"
 
 
 AGENT_SAID = "Agent said:"
@@ -171,10 +222,17 @@ def record_turn_line(turn: RecordTurn) -> str:
     return f"{said} {turn.text}"
 
 
-def record_tool_line(tool: RecordTool) -> str:
+def record_tool_line(tool: RecordTool, serving: RecordMove | None) -> str:
+    """A tool call of a node other than the one the last move came to names its node. A turn
+    cannot: its line is the words the agent said, so a line before it names the node."""
     output = "no output reported" if tool.output is None else f"output {tool.output}"
     failed = ", and it failed" if tool.failed else ""
-    return f"Tool call: {tool.name} {tool.arguments}, {output}{failed}"
+    node = f" in {node_name(tool.node)}" if serving and tool.node != serving.node else ""
+    return f"Tool call{node}: {tool.name} {tool.arguments}, {output}{failed}"
+
+
+def node_name(node: str | None) -> str:
+    return f"node {node}" if node else "an unknown node"
 
 
 def agent_record(stored: StoredRecord) -> list[str]:
@@ -191,6 +249,15 @@ def agent_record(stored: StoredRecord) -> list[str]:
         "the transcript, and what reached the agent from what it heard. Quote a line by its "
         "number.",
     ]
+    if record.moves:
+        lines.append(
+            "A node is a part of the agent that serves the call: a node, state or sub-agent, as "
+            f'{label} names it. A line "Agent started in node" or "Agent moved to node" shows '
+            "the node that serves the lines after it, up to the next such line. A tool call of "
+            'another node names its node, and a line "The next line is from" names the node '
+            "of the line after it. The Saved lines at the end are the values at the end of the "
+            "call and belong to no node."
+        )
     if stored.reason:
         lines.append(f"The record can be incomplete: it was {stored.reason}.")
     numbered = [f"[R{number}] {line}" for number, line in enumerate(record_lines(record), 1)]

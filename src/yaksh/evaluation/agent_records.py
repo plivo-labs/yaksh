@@ -14,6 +14,7 @@ from yaksh.domain.agent_records import (
     Lookup,
     Missing,
     Pending,
+    RecordMove,
     RecordReader,
     RecordState,
     RecordStatus,
@@ -28,6 +29,7 @@ from yaksh.domain.record_sources import RecordProvider, RecordSource
 from yaksh.domain.settings import Secrets
 from yaksh.domain.triggers import Filler, RenderError
 from yaksh.evaluation.call import judged
+from yaksh.evaluation.evidence import in_order
 
 PAIR_MARGIN_MS = 4000
 """How far a record line's time can be from a Yaksh turn and still belong to it. A provider
@@ -197,12 +199,22 @@ class PairedTurn:
     """When its speech started, on the call's clock."""
     number: int | None
     """The Yaksh turn it belongs to, counted from 1."""
+    position: int
+    """Its place among the record's lines, tool calls and moves, as the judges read them."""
 
 
 @dataclass(frozen=True)
 class PlacedTool:
     tool: RecordTool
     at_ms: int | None
+    position: int
+
+
+@dataclass(frozen=True)
+class PlacedMove:
+    move: RecordMove
+    at_ms: int | None
+    position: int
 
 
 @dataclass(frozen=True)
@@ -213,6 +225,7 @@ class RecordView:
     row: AgentRecordRow | None
     turns: list[PairedTurn]
     tools: list[PlacedTool]
+    moves: list[PlacedMove]
 
 
 async def record_view(session: AsyncSession, conversation: Conversation) -> RecordView | None:
@@ -229,18 +242,31 @@ async def record_view(session: AsyncSession, conversation: Conversation) -> Reco
             select(Evaluation.state).where(Evaluation.conversation_id == conversation.id)
         )
         if state in (EvaluationState.QUEUED, EvaluationState.RUNNING):
-            return RecordView(RecordStatus.WAITING, source, None, None, [], [])
+            return RecordView(RecordStatus.WAITING, source, None, None, [], [], [])
         reason = "the evaluation ended before Yaksh read the record"
-        return RecordView(RecordStatus.MISSING, source, reason, None, [], [])
+        return RecordView(RecordStatus.MISSING, source, reason, None, [], [], [])
     kept = stored(row)
     status = RecordStatus.FOUND if kept.state is RecordState.FOUND else RecordStatus.MISSING
     if kept.record is None:
-        return RecordView(status, source, kept.reason, row, [], [])
+        return RecordView(status, source, kept.reason, row, [], [], [])
+    record = kept.record
     turns = Transcript.model_validate(conversation.transcript or {}).turns
+    position = {
+        id(line): index
+        for index, line in enumerate(in_order(record.turns, record.tools, record.moves))
+    }
     paired = []
-    for line in kept.record.turns:
+    for line in record.turns:
         at_ms = call_clock_ms(conversation, line.at)
         started_ms = call_clock_ms(conversation, line.started_at)
-        paired.append(PairedTurn(line, at_ms, started_ms, paired_turn(line, at_ms, turns)))
-    tools = [PlacedTool(tool, call_clock_ms(conversation, tool.at)) for tool in kept.record.tools]
-    return RecordView(status, source, kept.reason, row, paired, tools)
+        number = paired_turn(line, at_ms, turns)
+        paired.append(PairedTurn(line, at_ms, started_ms, number, position[id(line)]))
+    tools = [
+        PlacedTool(tool, call_clock_ms(conversation, tool.at), position[id(tool)])
+        for tool in record.tools
+    ]
+    moves = [
+        PlacedMove(move, call_clock_ms(conversation, move.at), position[id(move)])
+        for move in record.moves
+    ]
+    return RecordView(status, source, kept.reason, row, paired, tools, moves)

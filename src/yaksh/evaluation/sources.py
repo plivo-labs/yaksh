@@ -107,7 +107,7 @@ def agent_line_problems(
 ) -> list[str]:
     """The agent's line of a fail: a transcript turn of the agent in call_quote, or a line of
     its own record in record_quote, other than what it heard from the caller. With words_only,
-    the record line must be words the agent said, not a tool call or a saved value."""
+    the record line must be words the agent said, not a tool call, a move or a saved value."""
     call, recorded = found["call_quote"], found["record_quote"]
     if call is None and recorded is None:
         return ["Give the agent's line in call_quote, or a line of its record in record_quote."]

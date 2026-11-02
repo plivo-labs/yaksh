@@ -1,7 +1,7 @@
 # 0033 Read the agent's own record of each phone test
 
 Date: 2026-10-24
-Status: accepted
+Status: accepted. Changed by 0042 (nodes and moves in the record).
 
 ## Context
 

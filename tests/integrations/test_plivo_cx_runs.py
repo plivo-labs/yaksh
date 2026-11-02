@@ -1,7 +1,7 @@
 import asyncio
 import copy
 import json
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -16,11 +16,14 @@ from yaksh.domain.agents import Direction
 from yaksh.domain.conversations import Role
 from yaksh.domain.record_sources import RecordProvider, RecordSource
 from yaksh.domain.triggers import Header
-from yaksh.integrations.plivo_cx_runs import MAX_CANDIDATES, PlivoCxRuns
+from yaksh.integrations.plivo_cx_runs import MAX_CANDIDATES, PlivoCxRuns, parse_run
 
 FLOW = "c2a36ee8-4f8b-4d56-8b5f-0173ef11ff8a"
 AGENT_PATH = f"/v1/Account/MAXXXXXXXXXXXXXXXXXX/AgentFlow/{FLOW}"
-LIVE_RUN = json.loads((Path(__file__).parent / "fixtures" / "plivo_cx_run.json").read_text())
+FIXTURES = Path(__file__).parent / "fixtures"
+LIVE_RUN = json.loads((FIXTURES / "plivo_cx_run.json").read_text())
+NODES_RUN = json.loads((FIXTURES / "plivo_cx_run_nodes.json").read_text())
+"""A live run of an agent of several nodes, with only the fields Yaksh reads."""
 YAKSH = "+15550100001"
 """The number the live run's call came from: Yaksh's test number."""
 CALL_START = datetime(2026, 10, 23, 12, 28, 24, tzinfo=UTC)
@@ -404,6 +407,114 @@ async def test_a_line_starts_at_the_last_start_of_its_speaker_before_it(cx: Cx) 
     assert caller.started_at == datetime(2026, 10, 23, 12, 28, 38, 542427, tzinfo=UTC), (
         "speech that gave no line does not start the next line"
     )
+
+
+def test_a_run_of_several_nodes_reads_its_moves_and_the_node_of_each_line() -> None:
+    record = parse_run(NODES_RUN, datetime.now(UTC))
+
+    assert [(move.node, move.via, move.seq) for move in record.moves] == [
+        ("Reception", "call", 1),
+        ("Identity", "transfer_to_identity", 14),
+        ("Scheduling", "transfer_to_scheduling", 38),
+        ("End call", "end_call", 70),
+    ], "the Start node and the end of the flow are not moves"
+    assert record.moves[0].at == datetime(2026, 10, 30, 11, 11, 45, 161560, tzinfo=UTC)
+    assert [(turn.role, turn.node, turn.seq) for turn in record.turns] == [
+        (Role.AGENT, "Reception", 2),
+        (Role.CALLER, "Reception", 6),
+        (Role.AGENT, "Reception", 11),
+        (Role.AGENT, "Identity", 15),
+        (Role.AGENT, "Identity", 19),
+        (Role.CALLER, "Identity", 23),
+        (Role.AGENT, "Identity", 29),
+        (Role.AGENT, "Identity", 35),
+        (Role.AGENT, "Scheduling", 39),
+        (Role.CALLER, "Scheduling", 43),
+        (Role.AGENT, "Scheduling", 48),
+        (Role.CALLER, "Scheduling", 52),
+        (Role.AGENT, "Scheduling", 57),
+        (Role.AGENT, "Scheduling", 61),
+        (Role.CALLER, "Scheduling", 65),
+        (Role.AGENT, "End call", 71),
+    ], "the end node's reply is logged under the node before it"
+    assert [(tool.name, tool.node, tool.seq) for tool in record.tools] == [
+        ("identify_patient", "Identity", 16),
+        ("verify_identity", "Identity", 33),
+        ("get_patient_summary", "Identity", 34),
+        ("cancel_appointment", "Scheduling", 58),
+    ]
+
+
+@pytest.mark.parametrize(
+    ("change", "why"),
+    [
+        (lambda logs: logs[71].update(timestamp="2026-10-30T11:13:32.200000"), "started before"),
+        (lambda logs: logs.pop(71), "no speech start"),
+        (lambda logs: logs[73].update(node_run_uuid="another-visit"), "another visit"),
+    ],
+)
+def test_a_reply_not_shown_to_start_after_the_move_to_the_end_node_keeps_its_node(
+    change: Callable[[list[dict[str, Any]]], object], why: str
+) -> None:
+    detail = copy.deepcopy(NODES_RUN)
+    change(detail["logs"])
+
+    record = parse_run(detail, datetime.now(UTC))
+
+    assert record.turns[-1].node == "Scheduling", why
+
+
+def test_a_node_entered_twice_gives_two_moves_and_an_unknown_node_gives_none() -> None:
+    def entered(uuid: str, name: str, path: str) -> dict[str, Any]:
+        return {
+            "event_name": "NODE_EXECUTED",
+            "node_uuid": uuid,
+            "current_node": name,
+            "current_node_type": "ai_agent_v2",
+            "chosen_path": path,
+            "timestamp": "2026-10-30T11:12:00.000000",
+        }
+
+    detail = {
+        "run_uuid": "run-1",
+        "status": "COMPLETED",
+        "logs": [
+            {"event_name": "NODE_EXECUTED", "node_uuid": "s", "current_node_type": "start"},
+            entered("a", "Reception", "call"),
+            entered("b", "Billing", "transfer_to_billing"),
+            {
+                "event_name": "SYSTEM_CHUNK_CREATED",
+                "type": "TOOL_CALL_EVENT",
+                "tool_name": "get_balance",
+                "node_uuid": "c",
+                "timestamp": "2026-10-30T11:12:00.000000",
+            },
+            entered("a", "Reception", "back_to_reception"),
+            {
+                "event_name": "NODE_CHUNK_CREATED",
+                "sender": "assistant",
+                "text": "Anything else?",
+                "node_uuid": "a",
+            },
+        ],
+    }
+
+    record = parse_run(detail, datetime.now(UTC))
+
+    assert [(move.node, move.via) for move in record.moves] == [
+        ("Reception", "call"),
+        ("Billing", "transfer_to_billing"),
+        ("Reception", "back_to_reception"),
+    ]
+    assert (record.tools[0].node, record.tools[0].seq) == (None, 3)
+    assert (record.turns[0].node, record.turns[0].seq) == ("Reception", 5)
+
+
+def test_a_run_logged_without_paths_has_one_move_and_its_node_on_every_line() -> None:
+    record = parse_run(LIVE_RUN, datetime.now(UTC))
+
+    assert [(move.node, move.via) for move in record.moves] == [("Dental Front Desk", None)]
+    assert {turn.node for turn in record.turns} == {"Dental Front Desk"}
 
 
 async def test_a_run_that_just_ended_waits_until_its_log_settles(cx: Cx) -> None:

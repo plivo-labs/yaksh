@@ -4,7 +4,13 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
-from yaksh.domain.agent_records import RecordStatus, RecordTool, RecordTurn, SavedValue
+from yaksh.domain.agent_records import (
+    RecordMove,
+    RecordStatus,
+    RecordTool,
+    RecordTurn,
+    SavedValue,
+)
 from yaksh.domain.agents import Direction, Transport
 from yaksh.domain.answering import AnsweredBy, Answering
 from yaksh.domain.conversations import (
@@ -170,15 +176,23 @@ class RecordTurnRead(RecordTurn):
     """When its speech started, on the call's clock; None when the provider does not log it."""
     turn: int | None
     """The Yaksh turn the line belongs to, counted from 1; None when it pairs with none."""
+    position: int
+    """Its place among the record's lines, tool calls and moves, as the judges read them."""
 
 
 class RecordToolRead(RecordTool):
     at_ms: int | None
+    position: int
+
+
+class RecordMoveRead(RecordMove):
+    at_ms: int | None
+    position: int
 
 
 class AgentRecordRead(AgentRecordStatus):
     """The agent's own record of the call: its lines, each speaker's in order and paired with
-    Yaksh's turns, the values it saved and its tool calls."""
+    Yaksh's turns, the values it saved, its tool calls and its moves between nodes."""
 
     provider: RecordProvider
     provider_label: str
@@ -189,6 +203,7 @@ class AgentRecordRead(AgentRecordStatus):
     saved: list[SavedValue]
     turns: list[RecordTurnRead]
     tools: list[RecordToolRead]
+    moves: list[RecordMoveRead]
 
     @classmethod
     def of(cls, view: RecordView) -> AgentRecordRead:
@@ -209,12 +224,21 @@ class AgentRecordRead(AgentRecordStatus):
                     at_ms=paired.at_ms,
                     started_at_ms=paired.started_ms,
                     turn=paired.number,
+                    position=paired.position,
                 )
                 for paired in view.turns
             ],
             tools=[
-                RecordToolRead(**placed.tool.model_dump(), at_ms=placed.at_ms)
+                RecordToolRead(
+                    **placed.tool.model_dump(), at_ms=placed.at_ms, position=placed.position
+                )
                 for placed in view.tools
+            ],
+            moves=[
+                RecordMoveRead(
+                    **placed.move.model_dump(), at_ms=placed.at_ms, position=placed.position
+                )
+                for placed in view.moves
             ],
         )
 

@@ -28,6 +28,7 @@ from yaksh.domain.agent_records import (
     Lookup,
     Missing,
     Pending,
+    RecordMove,
     RecordTool,
     RecordTurn,
     SavedValue,
@@ -61,6 +62,10 @@ SETTLE = timedelta(seconds=90)
 """How long after a run's last line and its end its log can still gain lines. Plivo CX writes
 lines late: on a live call, a caller line timed before FLOW_EXECUTION_COMPLETE was not in a
 read 22 s after the call, and the agent's goodbye was timed after FLOW_EXECUTION_COMPLETE."""
+NODE_ENTERED = "NODE_EXECUTED"
+START_NODE = "start"
+"""The flow's entry point, before the first node that serves the call: not a move."""
+END_NODE = "end_conversation"
 SPEAKERS = {"user": Role.CALLER, "assistant": Role.AGENT}
 STARTED_SPEAKING = {"USER_STARTED_SPEAKING": Role.CALLER, "BOT_STARTED_SPEAKING": Role.AGENT}
 """A speaker's line is logged when its speech ends; the last of these events before it, when its
@@ -368,7 +373,7 @@ def start_call(detail: dict[str, Any]) -> dict[str, Any]:
     for entry in logs_of(detail):
         config = entry.get("node_config")
         if (
-            entry.get("event_name") == "NODE_EXECUTED"
+            entry.get("event_name") == NODE_ENTERED
             and isinstance(config, dict)
             and ("call.from" in config or "call.to" in config)
         ):
@@ -384,33 +389,54 @@ def parse_run(detail: dict[str, Any], now: datetime) -> AgentRecord:
     nodes = {
         str(entry.get("node_uuid")): str(entry.get("current_node") or "")
         for entry in logs
-        if entry.get("event_name") == "NODE_EXECUTED"
+        if entry.get("event_name") == NODE_ENTERED
     }
     turns: list[RecordTurn] = []
     tools: list[RecordTool] = []
+    entered: list[Entered] = []
     saved: dict[tuple[str, str], str] = {}
-    started: dict[Role, datetime] = {}
-    for entry in logs:
+    started: dict[Role, Started] = {}
+    for seq, entry in enumerate(logs):
         at = log_time(entry.get("timestamp"))
         event = entry.get("event_name")
-        if event == "NODE_CHUNK_CREATED":
+        uuid = str(entry.get("node_uuid"))
+        if event == NODE_ENTERED and entry.get("current_node_type") != START_NODE:
+            entered.append(
+                Entered(
+                    RecordMove(
+                        node=str(entry.get("current_node") or ""),
+                        via=str(entry.get("chosen_path") or "") or None,
+                        at=at,
+                        seq=seq,
+                    ),
+                    uuid=uuid,
+                    run=str(entry.get("node_run_uuid") or "") or None,
+                    kind=str(entry.get("current_node_type") or ""),
+                )
+            )
+        elif event == "NODE_CHUNK_CREATED":
             role = SPEAKERS.get(str(entry.get("sender")))
             text = str(entry.get("text") or "").strip()
             if role is not None and text and len(turns) < MAX_TURNS:
+                start = started.pop(role, None)
+                run = str(entry.get("node_run_uuid") or "") or None
+                end = end_node(entered, role, start, uuid, run)
                 turns.append(
                     RecordTurn(
                         role=role,
                         text=clip(text, MAX_TEXT_CHARS),
                         at=at,
-                        started_at=started.pop(role, None),
+                        started_at=start.at if start else None,
+                        node=end or nodes.get(uuid) or None,
+                        seq=start.seq if start else seq,
                     )
                 )
             config = entry.get("node_config")
             variables = config.get("variables") if isinstance(config, dict) else None
             for name, value in (variables or {}).items():
-                saved[(nodes.get(str(entry.get("node_uuid")), ""), str(name))] = shown(value)
-        elif (role := STARTED_SPEAKING.get(str(entry.get("type")))) and at is not None:
-            started[role] = at
+                saved[(nodes.get(uuid, ""), str(name))] = shown(value)
+        elif role := STARTED_SPEAKING.get(str(entry.get("type"))):
+            started[role] = Started(at, seq)
         elif event == "SYSTEM_CHUNK_CREATED" and entry.get("type") == "TOOL_CALL_EVENT":
             response = entry.get("tool_response")
             tools.append(
@@ -420,6 +446,8 @@ def parse_run(detail: dict[str, Any], now: datetime) -> AgentRecord:
                     output=None if response is None else clip(str(response), MAX_TEXT_CHARS),
                     failed=bool(entry.get("tool_call_error")),
                     at=at,
+                    node=nodes.get(uuid) or None,
+                    seq=seq,
                 )
             )
     status = str(detail.get("status") or "")
@@ -432,7 +460,43 @@ def parse_run(detail: dict[str, Any], now: datetime) -> AgentRecord:
         turns=turns,
         saved=saved_values(saved),
         tools=tools,
+        moves=[node.move for node in entered],
     )
+
+
+@dataclass(frozen=True)
+class Entered:
+    """A node the call entered, with the IDs the log gives its lines."""
+
+    move: RecordMove
+    uuid: str
+    run: str | None
+    kind: str
+
+
+@dataclass(frozen=True)
+class Started:
+    """Where a speaker's speech started in the log."""
+
+    at: datetime | None
+    seq: int
+
+
+def end_node(
+    entered: list[Entered], role: Role, start: Started | None, uuid: str, run: str | None
+) -> str | None:
+    """The end node, when an agent line is its reply: Plivo CX logs that reply with the IDs of
+    the node before the end node. Only a line whose speech started after the call entered the
+    end node is its reply."""
+    if role is not Role.AGENT or start is None or len(entered) < 2 or entered[-1].kind != END_NODE:
+        return None
+    end, before = entered[-1], entered[-2]
+    if start.at is not None and end.move.at is not None:
+        after = start.at > end.move.at
+    else:
+        after = start.seq > (end.move.seq or 0)
+    same_run = run is None or before.run is None or run == before.run
+    return end.move.node if after and uuid == before.uuid and same_run else None
 
 
 def saved_values(saved: dict[tuple[str, str], str]) -> list[SavedValue]:

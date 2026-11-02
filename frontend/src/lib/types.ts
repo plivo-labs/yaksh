@@ -1097,6 +1097,10 @@ export interface RecordTurn {
   started_at_ms: number | null;
   /** The transcript turn it belongs to, counted from 1. */
   turn: number | null;
+  /** The part of the agent that served the line: a node, state or sub-agent. */
+  node: string | null;
+  /** Its place among the record's lines, tool calls and moves, as the judges read them. */
+  position: number;
 }
 
 export interface RecordTool {
@@ -1105,6 +1109,18 @@ export interface RecordTool {
   output: string | null;
   failed: boolean;
   at_ms: number | null;
+  node: string | null;
+  position: number;
+}
+
+/** The call came to a part of the agent: a node, state or sub-agent. The first move is where
+ * the call started. */
+export interface RecordMove {
+  node: string;
+  /** The provider's name for why the call moved. */
+  via: string | null;
+  at_ms: number | null;
+  position: number;
 }
 
 export interface AgentRecord extends AgentRecordStatus {
@@ -1117,6 +1133,7 @@ export interface AgentRecord extends AgentRecordStatus {
   saved: SavedValue[];
   turns: RecordTurn[];
   tools: RecordTool[];
+  moves: RecordMove[];
 }
 
 export interface RunInput {
