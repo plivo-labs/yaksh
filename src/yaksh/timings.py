@@ -17,6 +17,11 @@ class Timings:
     """How often an evaluation asks again for an agent record that is not final."""
     record_wait_s: float = 300.0
     """How long after a call its agent record can take to be final."""
+    trace_wait_s: float = 30.0
+    """How long after a phone call its evaluation waits for the agent's traces, while a trace
+    token exists: exporters send every 5 s and try a failed send again for up to 10 s."""
+    trace_cleanup_s: float = 600.0
+    """How often an evaluator deletes the spans and links older than 7 days."""
     end_timeout_s: float = 5.0
     """How long a stopping call, server or database pool gets to end on its own."""
 

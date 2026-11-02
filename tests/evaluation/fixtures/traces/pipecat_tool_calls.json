@@ -1,0 +1,172 @@
+{
+ "trace_id": "00000000000000000000000000000001",
+ "spans": [
+  {
+   "name": "conversation",
+   "span_id": "0000000000000001",
+   "parent_span_id": null,
+   "start_ns": 1793350000000000000,
+   "end_ns": 1793350050378517000,
+   "attributes": {
+    "yaksh.number": "+15550100001"
+   }
+  },
+  {
+   "name": "turn",
+   "span_id": "0000000000000002",
+   "parent_span_id": "0000000000000001",
+   "start_ns": 1793350000018192000,
+   "end_ns": 1793350007364139000,
+   "attributes": {
+    "turn.number": 1,
+    "turn.was_interrupted": false
+   }
+  },
+  {
+   "name": "llm",
+   "span_id": "0000000000000003",
+   "parent_span_id": "0000000000000002",
+   "start_ns": 1793350001001809000,
+   "end_ns": 1793350002103458000,
+   "attributes": {
+    "metrics.ttfb": 0.9644467830657959
+   }
+  },
+  {
+   "name": "tts",
+   "span_id": "0000000000000004",
+   "parent_span_id": "0000000000000002",
+   "start_ns": 1793350002104718000,
+   "end_ns": 1793350002895251000,
+   "attributes": {
+    "metrics.ttfb": 0.7310910224914551
+   }
+  },
+  {
+   "name": "turn",
+   "span_id": "0000000000000005",
+   "parent_span_id": "0000000000000001",
+   "start_ns": 1793350007364339000,
+   "end_ns": 1793350021167547000,
+   "attributes": {
+    "turn.number": 2,
+    "turn.user_bot_latency_seconds": 3.30824613571167,
+    "turn.was_interrupted": false
+   }
+  },
+  {
+   "name": "llm",
+   "span_id": "0000000000000006",
+   "parent_span_id": "0000000000000005",
+   "start_ns": 1793350007772996000,
+   "end_ns": 1793350007822586000,
+   "attributes": {
+    "metrics.ttfb": 0.04945707321166992
+   }
+  },
+  {
+   "name": "llm",
+   "span_id": "0000000000000007",
+   "parent_span_id": "0000000000000005",
+   "start_ns": 1793350010551751000,
+   "end_ns": 1793350011559984000,
+   "attributes": {
+    "metrics.ttfb": 0.9722189903259277
+   }
+  },
+  {
+   "name": "llm",
+   "span_id": "0000000000000008",
+   "parent_span_id": "0000000000000005",
+   "start_ns": 1793350012163921000,
+   "end_ns": 1793350013293235000,
+   "attributes": {
+    "metrics.ttfb": 0.8293540477752686
+   }
+  },
+  {
+   "name": "tts",
+   "span_id": "0000000000000009",
+   "parent_span_id": "0000000000000005",
+   "start_ns": 1793350013294479000,
+   "end_ns": 1793350013668526000,
+   "attributes": {
+    "metrics.ttfb": 0.21157503128051758
+   }
+  },
+  {
+   "name": "turn",
+   "span_id": "000000000000000a",
+   "parent_span_id": "0000000000000001",
+   "start_ns": 1793350021720982000,
+   "end_ns": 1793350030823313000,
+   "attributes": {
+    "turn.number": 3,
+    "turn.user_bot_latency_seconds": 2.9680888652801514,
+    "turn.was_interrupted": false
+   }
+  },
+  {
+   "name": "llm",
+   "span_id": "000000000000000b",
+   "parent_span_id": "000000000000000a",
+   "start_ns": 1793350023674547000,
+   "end_ns": 1793350024770061000,
+   "attributes": {
+    "metrics.ttfb": 1.061844825744629
+   }
+  },
+  {
+   "name": "llm",
+   "span_id": "000000000000000c",
+   "parent_span_id": "000000000000000a",
+   "start_ns": 1793350025372828000,
+   "end_ns": 1793350026099199000,
+   "attributes": {
+    "metrics.ttfb": 0.6107079982757568
+   }
+  },
+  {
+   "name": "tts",
+   "span_id": "000000000000000d",
+   "parent_span_id": "000000000000000a",
+   "start_ns": 1793350026100395000,
+   "end_ns": 1793350026327319000,
+   "attributes": {
+    "metrics.ttfb": 0.18775391578674316
+   }
+  },
+  {
+   "name": "turn",
+   "span_id": "000000000000000e",
+   "parent_span_id": "0000000000000001",
+   "start_ns": 1793350034861210000,
+   "end_ns": 1793350044860068000,
+   "attributes": {
+    "turn.number": 4,
+    "turn.user_bot_latency_seconds": 4.127971172332764,
+    "turn.was_interrupted": false
+   }
+  },
+  {
+   "name": "llm",
+   "span_id": "000000000000000f",
+   "parent_span_id": "000000000000000e",
+   "start_ns": 1793350039885011000,
+   "end_ns": 1793350040604778000,
+   "attributes": {
+    "metrics.ttfb": 0.644556999206543
+   }
+  },
+  {
+   "name": "tts",
+   "span_id": "0000000000000010",
+   "parent_span_id": "000000000000000e",
+   "start_ns": 1793350040605325000,
+   "end_ns": 1793350040809263000,
+   "attributes": {
+    "metrics.ttfb": 0.20173001289367676
+   }
+  }
+ ]
+}

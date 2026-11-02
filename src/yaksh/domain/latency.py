@@ -123,6 +123,12 @@ class Wait(BaseModel):
     """A gap in the agent's media cut the wait short, so its length is a lower bound."""
     ran_to_end: bool = False
     """Neither an answer nor a caller reply came before the call ended."""
+    start_moved: bool = False
+    """The agent was still speaking when the caller's speech ended, so the wait starts at the
+    end of the agent's speech, not at the end of the caller's (decision 0019)."""
+    call_start: bool = False
+    """The wait for the agent's first speech, from when Yaksh's stream opened, not from a
+    caller reply."""
 
     @property
     def wait_ms(self) -> int | None:
@@ -226,6 +232,8 @@ def waits(
                 else expects_answer(began, ended, goodbye_from_ms),
                 media_gap=heard < stop,
                 ran_to_end=answer is None and index >= len(next_starts),
+                start_moved=start is not None and start != ended,
+                call_start=began is None,
             )
         )
     return found
@@ -345,3 +353,27 @@ class CallerReplyTime(BaseModel):
         so the parts of every reply count the same way."""
         known = {key: self.steps.get(key, 0) for key in STEP_KEYS}
         return known | {key: self.steps[key] for key in sorted(self.steps) if key not in known}
+
+
+class AgentReplyTime(BaseModel):
+    """Where the time of one agent reply went, from the agent's trace of the call: the agent's
+    own total split into parts, and the rest of Yaksh's wait as network and telephony."""
+
+    model_config = ConfigDict(frozen=True)
+
+    speech_ms: int
+    """The speech start that Yaksh heard, on the call's clock: the reply it belongs to."""
+    agent_ms: int | None
+    """The agent's own total; None when the trace lacks it."""
+    complete: bool
+    """The trace has every span and value that the parts need."""
+    fits: bool
+    """The agent's total is not longer than Yaksh's wait, within the voice detector's
+    error."""
+    overlapping: bool
+    """The parts add up to more than the agent's total, so the unattributed part is 0."""
+    stt_ttfs_ms: int | None
+    reason: str | None
+    """Why the reply is not complete."""
+    steps: dict[str, int] | None
+    """ms by part key, with network; None for a reply that is not complete or does not fit."""

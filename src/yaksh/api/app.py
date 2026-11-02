@@ -19,6 +19,7 @@ from yaksh.api.routes import (
     health,
     judges,
     labelers,
+    otlp,
     personas,
     phone_numbers,
     review,
@@ -36,6 +37,7 @@ from yaksh.db.migrate import upgrade_to_head
 from yaksh.db.session import create_engine, create_sessionmaker
 from yaksh.domain.documents import MAX_FILE_BYTES
 from yaksh.domain.errors import UnavailableError
+from yaksh.evaluation.trace_store import YakshNumbers
 from yaksh.settings.cipher import Cipher, SecretUnreadableError
 from yaksh.settings.store import SettingsSource
 from yaksh.simulation.generation import stop_running
@@ -88,6 +90,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.providers = Providers()
     app.state.generations = Generations(app.state.sessionmaker)
     app.state.file_store = file_store(settings)
+    app.state.yaksh_numbers = YakshNumbers()
     register_error_handlers(app)
     app.add_middleware(BodySizeLimit, max_bytes=MAX_REQUEST_BYTES)
 
@@ -100,6 +103,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     api.include_router(forks.router)
     api.include_router(judges.router)
     api.include_router(labelers.router)
+    api.include_router(otlp.router)
     api.include_router(personas.router)
     api.include_router(phone_numbers.router)
     api.include_router(phone_numbers.account_router)

@@ -5,8 +5,8 @@ from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from yaksh.api.deps import SessionDep
-from yaksh.db.models import Labeler
-from yaksh.evaluation import labels
+from yaksh.db.models import Labeler, TraceToken
+from yaksh.evaluation import labels, trace_store
 
 bearer = HTTPBearer(auto_error=False)
 
@@ -44,3 +44,26 @@ async def require_labeler(
 
 
 LabelerDep = Annotated[Labeler, Depends(require_labeler)]
+
+
+async def require_trace_token(
+    request: Request,
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer)],
+) -> TraceToken:
+    """The trace token opens the OTLP endpoint and nothing else. Its route checks it before it
+    reads the body, in a session of its own: the connection goes back to the pool before a slow
+    upload starts."""
+    token = None
+    if credentials is not None:
+        async with request.app.state.sessionmaker() as session:
+            token = await trace_store.token_with(session, credentials.credentials)
+    if token is None:
+        raise HTTPException(
+            status.HTTP_401_UNAUTHORIZED,
+            "missing or invalid trace token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return token
+
+
+TraceTokenDep = Annotated[TraceToken, Depends(require_trace_token)]

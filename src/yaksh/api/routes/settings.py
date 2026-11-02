@@ -22,6 +22,8 @@ from yaksh.api.schemas.settings import (
     SettingsImport,
     SettingsRead,
     SigningKey,
+    TraceTokenCreated,
+    TraceTokenRead,
 )
 from yaksh.domain.errors import UnavailableError, ValidationError
 from yaksh.domain.settings import (
@@ -32,7 +34,7 @@ from yaksh.domain.settings import (
     SecretName,
     SettingsValues,
 )
-from yaksh.evaluation import results
+from yaksh.evaluation import results, trace_store
 from yaksh.integrations import provider_checks
 from yaksh.integrations.openai_models import caller_effort
 from yaksh.integrations.provider_checks import ProviderCheckError
@@ -190,6 +192,28 @@ async def new_signing_key(session: SessionDep, cipher: CipherDep) -> SigningKey:
     key = f"whsec_{random_secrets.token_urlsafe(32)}"
     await store.change(session, cipher, secrets={SecretName.TRIGGER_SIGNING_KEY: key})
     return SigningKey(key=key)
+
+
+@router.get("/trace-token")
+async def get_trace_token(session: SessionDep) -> TraceTokenRead | None:
+    """The trace token's hint and times; null when there is none."""
+    row = await trace_store.current_token(session)
+    return None if row is None else TraceTokenRead.model_validate(row)
+
+
+@router.post("/trace-token", status_code=status.HTTP_201_CREATED)
+async def new_trace_token(session: SessionDep) -> TraceTokenCreated:
+    """Make the token that opens the OTLP endpoint, in place of the old one, which stops at
+    once. The response is the only time the token is shown."""
+    row, token = await trace_store.make_token(session)
+    return TraceTokenCreated(**TraceTokenRead.model_validate(row).model_dump(), token=token)
+
+
+@router.delete("/trace-token", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_trace_token(session: SessionDep) -> None:
+    """Remove the trace token: the OTLP endpoint refuses every request, and no evaluation
+    waits for traces."""
+    await trace_store.delete_token(session)
 
 
 @router.post("/providers/{provider}/test")

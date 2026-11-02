@@ -6,6 +6,7 @@ import uuid
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from functools import partial
+from typing import TYPE_CHECKING
 
 from yaksh.db.models import Conversation
 from yaksh.domain.agent_records import StoredRecord
@@ -47,6 +48,9 @@ from yaksh.evaluation.sources import (
 )
 from yaksh.evaluation.verdicts import RULE, counted, verdict
 
+if TYPE_CHECKING:
+    from yaksh.evaluation.agent_traces import AgentTraces
+
 
 @dataclass(frozen=True)
 class Judging:
@@ -83,6 +87,7 @@ async def evaluate(
     *,
     retry_later: bool,
     record: StoredRecord | None = None,
+    traces: AgentTraces | None = None,
 ) -> Evaluated:
     """Code metrics for every call. A call that completed and that no one stopped also gets its
     agent's phrase rules and, with a judge model, its judges and verdicts; any other call none.
@@ -95,7 +100,7 @@ async def evaluate(
     reached; one where the persona never talked gets no criteria, no record checks and no
     caller check, so its scenario verdict is not scored."""
     transcript = Transcript.model_validate(conversation.transcript or {})
-    found = await measure_call(conversation, store, agent.agent_speaks_first)
+    found = await measure_call(conversation, store, agent.agent_speaks_first, traces)
     if not judged(conversation):
         return Evaluated(metrics=found)
     turns = transcript.turns
@@ -353,7 +358,10 @@ def call_view(
 
 
 async def measure_call(
-    conversation: Conversation, store: FileStore, agent_speaks_first: bool
+    conversation: Conversation,
+    store: FileStore,
+    agent_speaks_first: bool,
+    traces: AgentTraces | None = None,
 ) -> dict[MetricKey, Metric]:
     """The metrics of a saved call. A call that never connected has only its usage. One that
     failed before it was saved in full, or has no recording or caller replies, has no speech
@@ -361,7 +369,8 @@ async def measure_call(
     without it, Yaksh's caller opens the call. The persona's voicemail or call screener is not
     a reply that waits for the agent, so its lines, and the call's start when it answers, have
     no response time. Neither is an interruption line, which the caller said over the agent: it
-    counts in the caller's speech, but in no wait for an answer."""
+    counts in the caller's speech, but in no wait for an answer. With traces, the agent's
+    reply time comes from the agent's trace of the call, when it sends one."""
     transcript = Transcript.model_validate(conversation.transcript or {})
     found = {
         MetricKey.USAGE: metrics.usage(
@@ -409,6 +418,10 @@ async def measure_call(
     )
     found[MetricKey.SPEECH] = Metric(value=heard.speech.model_dump(mode="json"))
     found[MetricKey.RESPONSE_TIME] = Metric(value=Latency.answered(paired).model_dump(mode="json"))
+    if traces is not None and (
+        reply_time := await traces.metric(conversation, heard.speech.agent, paired)
+    ):
+        found[MetricKey.AGENT_REPLY_TIME] = reply_time
     found[MetricKey.TURN_TAKING] = metrics.turn_taking(paired)
     found[MetricKey.SPEAKING] = metrics.speaking(heard.speech, goodbye)
     return found

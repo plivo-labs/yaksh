@@ -30,7 +30,7 @@ from yaksh.domain.evaluations import (
     Share,
     SurroundingsNumbers,
 )
-from yaksh.domain.latency import Latency, pooled
+from yaksh.domain.latency import AgentReplyTime, Latency, pooled
 from yaksh.domain.scenarios import Category
 from yaksh.domain.surroundings import Surroundings
 from yaksh.evaluation.run_verdicts import run_verdicts
@@ -40,6 +40,22 @@ class Evaluated(NamedTuple):
     state: EvaluationState
     latency: Latency | None
     """The response times, once the evaluation measured them."""
+
+
+async def agent_reply_times(
+    session: AsyncSession, conversation_id: uuid.UUID
+) -> list[AgentReplyTime]:
+    """Where the time of each paired agent reply went, from the agent's trace; empty when the
+    call has none."""
+    value = await session.scalar(
+        select(MetricValue.value)
+        .join(Evaluation, Evaluation.id == MetricValue.evaluation_id)
+        .where(
+            Evaluation.conversation_id == conversation_id,
+            MetricValue.metric_key == MetricKey.AGENT_REPLY_TIME,
+        )
+    )
+    return [AgentReplyTime.model_validate(reply) for reply in (value or {}).get("by_reply", [])]
 
 
 async def evaluated(
