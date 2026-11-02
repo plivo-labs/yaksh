@@ -7,10 +7,10 @@ import {
 } from "@/lib/types";
 
 export function clock(ms: number): string {
-  const tenths = Math.round(Math.abs(ms) / 100);
-  const minutes = Math.floor(tenths / 600);
-  const rest = (tenths - minutes * 600) / 10;
-  return `${ms < 0 && tenths > 0 ? "-" : ""}${minutes}:${rest.toFixed(1).padStart(4, "0")}`;
+  const seconds = ms / 1000;
+  const minutes = Math.floor(seconds / 60);
+  const rest = seconds - minutes * 60;
+  return `${minutes}:${rest.toFixed(1).padStart(4, "0")}`;
 }
 
 export function duration(ms: number | null): string {
