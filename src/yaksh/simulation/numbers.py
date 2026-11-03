@@ -108,13 +108,13 @@ async def lease_number(
     *,
     accept_calls_for_s: int | None = None,
 ) -> str | None:
-    """Lease the least recently used test number the conversation may use, or None when all
-    are taken. An outbound lease, the one with accept_calls_for_s, needs a rested number and
-    opens the window for the agent's call to arrive."""
+    """Lease the test number that has been free the longest of those the conversation may use,
+    or None when all are taken. An outbound lease, the one with accept_calls_for_s, needs a
+    rested number and opens the window for the agent's call to arrive."""
     candidate = (
         select(PhoneNumber.number)
         .where(free_numbers(app_id, rested=accept_calls_for_s is not None))
-        .order_by(PhoneNumber.leased_at.nulls_first(), PhoneNumber.number)
+        .order_by(PhoneNumber.released_at.nulls_first(), PhoneNumber.number)
         .limit(1)
         .with_for_update(skip_locked=True)
         .scalar_subquery()
@@ -122,7 +122,7 @@ async def lease_number(
     number = await session.scalar(
         update(PhoneNumber)
         .where(PhoneNumber.number == candidate)
-        .values(conversation_id=conversation_id, leased_at=func.statement_timestamp())
+        .values(conversation_id=conversation_id)
         .returning(PhoneNumber.number)
     )
     if number is not None:
@@ -150,6 +150,7 @@ async def release_numbers(
         .where(PhoneNumber.conversation_id.in_(conversation_ids))
         .values(
             conversation_id=None,
+            released_at=func.statement_timestamp(),
             available_after=func.statement_timestamp() + timedelta(seconds=number_rest_s),
         )
     )

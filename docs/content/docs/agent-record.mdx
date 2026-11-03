@@ -45,7 +45,7 @@ On the agent's **Settings**, choose **Edit** and turn on **Read the agent's reco
 ## How Yaksh finds the call
 
 - **The agent calls Yaksh**: the provider's response to the trigger names the run it started. For Plivo CX, it is `api_id`. Yaksh keeps the trigger's response for this.
-- **Yaksh calls the agent**: Yaksh reads the agent's runs that started during the call, the closest first, and keeps the one that came from the number Yaksh called from.
+- **Yaksh calls the agent**: Yaksh reads the agent's runs that started from 5 seconds before the call to 5 seconds after it connected, and not after it ended. It reads the closest first and keeps the one that came from the number Yaksh called from. A later run is not the call's: after the call, the next test can use the number.
 
 ## When the record is ready
 
