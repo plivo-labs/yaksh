@@ -5,7 +5,7 @@
 - **records**: give an inbound call its own run, and lease the number free the longest (#43)
   - The agent record of an inbound call is always the call's own run. Before, when the agent's run had not logged its caller yet, the record could be the run of the next test that called from the same number.
   - A test takes the number that has been free the longest. Before, an inbound test could take the number that a long call had just freed.
-  - Migration 0009 adds the release time of each number. A rollback to 0.12.0 needs `alembic downgrade 0008` first.
+  - Migration 0009 adds the release time of each number. It only adds a column, so 0.12.0 also runs on the new schema.
 
 ## v0.12.0 (2026-11-02)
 
