@@ -19,6 +19,7 @@ import { AgentRecordPanel } from "@/components/agent-record";
 import { AgentResponseTime } from "@/components/agent-reply-time";
 import { CallMetricsCard } from "@/components/call-metrics";
 import { CallerReplyBadge } from "@/components/caller-reply-time";
+import { LineStopBadge } from "@/components/line-stop";
 import { CallResults } from "@/components/call-results";
 import { CallSounds } from "@/components/call-sounds";
 import { EndCallDialog } from "@/components/confirm-dialogs";
@@ -241,6 +242,8 @@ function ConversationView({ id }: { id: string }) {
                   <CallMetricsCard
                     conversationId={data.id}
                     evaluation={data.evaluation}
+                    turns={data.transcript}
+                    connectedMs={connectedMs ?? 0}
                     transport={data.transport}
                     yakshNumber={data.caller_number}
                   />
@@ -910,6 +913,7 @@ const Transcript = memo(function Transcript({
                               ) : (
                                 turn.scripted && <Badge>Fixed line</Badge>
                               )}
+                              {turn.agent_stop && <LineStopBadge stop={turn.agent_stop} />}
                               {turn.dtmf && <Badge>DTMF</Badge>}
                               {turn.provenance === "cut" && <Badge>Cut off</Badge>}
                               {turn.provenance === "unconfirmed" && (

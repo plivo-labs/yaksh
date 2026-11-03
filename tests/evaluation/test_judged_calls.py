@@ -30,15 +30,24 @@ from yaksh.domain.answering import AnsweredBy
 from yaksh.domain.conversations import (
     CallOutcome,
     EndReason,
+    InterruptionTry,
     Role,
     Transcript,
     Turn,
     WireEvent,
     WireEventKind,
 )
-from yaksh.domain.evaluations import DecidedBy, EvaluationState, MetricKey, Outcome, Verdict
+from yaksh.domain.evaluations import (
+    DecidedBy,
+    EvaluationState,
+    Metric,
+    MetricKey,
+    Outcome,
+    Verdict,
+)
 from yaksh.domain.language_models import ModelAnswer, ModelCallError
-from yaksh.evaluation import judging
+from yaksh.domain.stops import LineStop, StopResult
+from yaksh.evaluation import call, judging, metrics
 from yaksh.evaluation.evaluations import MAX_ATTEMPTS
 
 TURNS = [
@@ -418,3 +427,75 @@ async def test_a_call_that_the_voicemail_answered_is_judged_only_by_the_rules_th
     ] == [(voicemail, "voicemail", "fail")]
     assert (verdicts["pending"], verdicts["not_judged"], verdicts["coverage"]) == (0, 0, 1.0)
     assert {rule["key"]: rule["counts"] for rule in verdicts["rules"]}["callback"] == {"fail": 1}
+
+
+class Reader(Judge):
+    """A Judge that keeps each request's evidence view."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.views: list[str] = []
+
+    async def complete_json(
+        self, *, system: str, user: str, name: str, schema: dict[str, Any]
+    ) -> ModelAnswer:
+        self.views.append(user)
+        return await super().complete_json(system=system, user=user, name=name, schema=schema)
+
+
+async def test_the_judges_see_when_the_agents_speech_stopped_after_a_line(
+    client: AsyncClient, db: Db, settings: Settings, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    agent = await create_agent_id(client, name="Clinic")
+    scenario = await create_scenario(client, agent, criteria=["The agent stops for the caller."])
+    run = await start_run(client, agent, [scenario["id"]])
+    assert run.status_code == 202, run.text
+    conversation = str(await claim(db))
+    said = Turn(
+        role=Role.CALLER,
+        text="Sorry, what time?",
+        started_at_ms=4,
+        ended_at_ms=5,
+        scripted=True,
+        interruption=1,
+    )
+    played = WireEvent(
+        kind=WireEventKind.INTERRUPTION,
+        at_ms=4,
+        interruption=InterruptionTry(number=1, answer=2, turn_started_ms=4, words="Sure, it is"),
+    )
+    transcript = Transcript(turns=[*TURNS, said], wire_events=[*CALL.wire_events, played])
+    await finish(
+        db,
+        conversation,
+        CallOutcome(connected=True, end_reason=EndReason.AGENT_HANGUP),
+        transcript=transcript,
+    )
+    measured = call.measure_call
+
+    async def with_stops(*args: Any, **kwargs: Any) -> dict[MetricKey, Metric]:
+        stop = LineStop(number=1, line_ms=10, result=StopResult.STOPPED, stop_ms=841)
+        return await measured(*args, **kwargs) | {MetricKey.STOP_TIME: metrics.stop_time([stop])}
+
+    monkeypatch.setattr(call, "measure_call", with_stops)
+    judge = Reader()
+    stop = asyncio.Event()
+    evaluator = asyncio.create_task(make_evaluator(db, settings, judge).run(stop))
+
+    async def evaluations() -> list[Evaluation]:
+        async with db() as session:
+            return list(await session.scalars(select(Evaluation)))
+
+    try:
+        await eventually(
+            evaluations, lambda found: all(e.state is EvaluationState.DONE for e in found)
+        )
+    finally:
+        stop.set()
+        await evaluator
+
+    assert judge.views
+    assert all(
+        "The agent's speech stopped 841 ms after the line's speech started." in view
+        for view in judge.views
+    )

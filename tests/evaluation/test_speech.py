@@ -1,5 +1,9 @@
+import wave
+from pathlib import Path
+
 from pipecat.audio.vad.vad_analyzer import VADState
 
+from yaksh import simulation
 from yaksh.domain.latency import CallerReplyWindow, Span, Speech
 from yaksh.evaluation.speech import Window, measure, placed_reply, segments
 
@@ -102,4 +106,34 @@ async def test_a_silent_call_has_no_speech_and_keeps_each_reply_end() -> None:
     heard = await measure(silence(3), silence(0.5), RATE, 100, replies)
 
     assert heard.speech == Speech(agent=[], caller=[])
-    assert (heard.replies, heard.end_ms) == ([(1000, 1500)], 3100)
+    assert (heard.replies, heard.reply_speech, heard.end_ms) == ([(1000, 1500)], [[]], 3100)
+
+
+SPEAKERS = Path(simulation.__file__).parent / "sounds" / "speakers"
+
+
+def clip(name: str, from_s: float, to_s: float) -> bytes:
+    with wave.open(str(SPEAKERS / f"{name}.wav")) as file:
+        file.setpos(round(RATE * from_s))
+        return file.readframes(round(RATE * (to_s - from_s)))
+
+
+async def test_each_reply_keeps_the_speech_of_its_own_audio() -> None:
+    first = clip("en_talks_to_caller_2", 0, 2.1)
+    second = clip("en_own_phone_call_2", 4.0, 6.4)
+    replies = [
+        CallerReplyWindow(
+            start_ms=1_000, end_ms=3_100, finished=True, audio_start_ms=0, audio_ms=2_100
+        ),
+        # The end of the call cut this reply off after 1 s of its audio.
+        CallerReplyWindow(
+            start_ms=8_000, end_ms=None, finished=False, audio_start_ms=2_100, audio_ms=2_400
+        ),
+    ]
+
+    heard = await measure(silence(9), first + second, RATE, 0, replies)
+
+    one, two = heard.reply_speech
+    assert one and all(1_000 <= span.start_ms < span.end_ms <= 3_100 for span in one)
+    assert len(two) == 1 and 8_000 < two[0].start_ms < 8_200 and two[0].end_ms == 9_000
+    assert heard.speech.caller == [*one, *two]

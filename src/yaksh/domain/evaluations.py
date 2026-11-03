@@ -25,6 +25,7 @@ class MetricKey(StrEnum):
     SPEAKING = "speaking"
     CALLER_REPLY_TIME = "caller_reply_time"
     AGENT_REPLY_TIME = "agent_reply_time"
+    STOP_TIME = "stop_time"
 
 
 class Outcome(StrEnum):
@@ -186,6 +187,17 @@ class RunNumbers(BaseModel):
     """Calls with a wait of 5 s or more, of the calls with turn taking."""
     dead_air: Share
     """Calls with a wait of 10 s or more, of the calls with turn taking."""
+    stop_p50_ms: int | None
+    stop_p90_ms: int | None
+    """Nearest rank over the interruption lines whose agent speech stopped within the window, of
+    all the calls, pooled."""
+    lines_played: int
+    """Interruption lines that played, whatever their stop result."""
+    lines_measured: int
+    """Interruption lines where the agent's speech stopped in time or kept on."""
+    lines_kept_talking: int
+    kept_talking: Share
+    """Calls where the agent kept talking over a line, of the calls with a measured line."""
     flags: dict[str, int]
     """How many calls raised each flag, over all metrics."""
 

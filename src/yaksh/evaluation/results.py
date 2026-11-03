@@ -32,6 +32,8 @@ from yaksh.domain.evaluations import (
 )
 from yaksh.domain.latency import AgentReplyTime, Latency, pooled
 from yaksh.domain.scenarios import Category
+from yaksh.domain.stops import LineStop, StopResult, StopTime
+from yaksh.domain.stops import pooled as pooled_stops
 from yaksh.domain.surroundings import Surroundings
 from yaksh.evaluation.run_verdicts import run_verdicts
 
@@ -56,6 +58,20 @@ async def agent_reply_times(
         )
     )
     return [AgentReplyTime.model_validate(reply) for reply in (value or {}).get("by_reply", [])]
+
+
+async def line_stops(session: AsyncSession, conversation_id: uuid.UUID) -> list[LineStop]:
+    """When the agent's speech stopped after each interruption line; empty when the call has no
+    stop time."""
+    value = await session.scalar(
+        select(MetricValue.value)
+        .join(Evaluation, Evaluation.id == MetricValue.evaluation_id)
+        .where(
+            Evaluation.conversation_id == conversation_id,
+            MetricValue.metric_key == MetricKey.STOP_TIME,
+        )
+    )
+    return [] if value is None else StopTime.model_validate(value).lines
 
 
 async def evaluated(
@@ -127,9 +143,10 @@ class CallFacts:
     flags: frozenset[str]
     turn_taking: dict[str, Any] | None
     latency: Latency | None
+    stops: StopTime | None
 
 
-SUMMED = (MetricKey.TURN_TAKING, MetricKey.RESPONSE_TIME)
+SUMMED = (MetricKey.TURN_TAKING, MetricKey.RESPONSE_TIME, MetricKey.STOP_TIME)
 """The metrics whose values run numbers read; of the others, only the flags."""
 
 
@@ -178,6 +195,7 @@ async def run_metrics(
     calls = []
     for row in rows:
         latency = summed.get((row.id, MetricKey.RESPONSE_TIME))
+        stops = summed.get((row.id, MetricKey.STOP_TIME))
         calls.append(
             CallFacts(
                 group=outcome_group(row.status, row.end_reason),
@@ -188,6 +206,7 @@ async def run_metrics(
                 flags=frozenset(flags[row.id]),
                 turn_taking=summed.get((row.id, MetricKey.TURN_TAKING)),
                 latency=None if latency is None else Latency.model_validate(latency),
+                stops=None if stops is None else StopTime.model_validate(stops),
             )
         )
     return RunMetrics(
@@ -228,6 +247,9 @@ def numbers(calls: Sequence[CallFacts]) -> RunNumbers:
     not_connected = sum(call.group is OutcomeGroup.DID_NOT_CONNECT for call in ended)
     taking = [(call.turn_taking, call.flags) for call in calls if call.turn_taking is not None]
     response = pooled([call.latency for call in calls if call.latency is not None])
+    stopped = [call.stops for call in calls if call.stops is not None]
+    stops = pooled_stops(stopped)
+    measured = [call for call in stopped if any(measured_line(line) for line in call.lines)]
     raised: dict[str, int] = defaultdict(int)
     for call in calls:
         for flag in call.flags:
@@ -251,8 +273,20 @@ def numbers(calls: Sequence[CallFacts]) -> RunNumbers:
         talked_over=calls_with(lambda value, _: value["talked_over"] > 0),
         long_wait=calls_with(lambda _, flags: "long_wait" in flags),
         dead_air=calls_with(lambda _, flags: "dead_air" in flags),
+        stop_p50_ms=stops.p50_ms,
+        stop_p90_ms=stops.p90_ms,
+        lines_played=len(stops.lines),
+        lines_measured=sum(measured_line(line) for line in stops.lines),
+        lines_kept_talking=stops.count(StopResult.KEPT_TALKING),
+        kept_talking=Share.of(
+            sum(call.count(StopResult.KEPT_TALKING) > 0 for call in measured), len(measured)
+        ),
         flags=dict(sorted(raised.items())),
     )
+
+
+def measured_line(line: LineStop) -> bool:
+    return line.result in (StopResult.STOPPED, StopResult.KEPT_TALKING)
 
 
 UNENDED = frozenset({OutcomeGroup.WAITING, OutcomeGroup.IN_PROGRESS})

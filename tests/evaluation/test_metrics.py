@@ -1,7 +1,9 @@
 import io
 import wave
+from pathlib import Path
 
 from tests.conftest import FakeFileStore
+from yaksh import simulation
 from yaksh.db.models import Conversation
 from yaksh.domain.answering import AnsweredBy
 from yaksh.domain.conversations import (
@@ -14,7 +16,7 @@ from yaksh.domain.conversations import (
     WireEvent,
     WireEventKind,
 )
-from yaksh.domain.evaluations import MetricKey
+from yaksh.domain.evaluations import Metric, MetricKey
 from yaksh.domain.latency import (
     AgentMedia,
     CallerReplyTime,
@@ -24,6 +26,7 @@ from yaksh.domain.latency import (
     Speech,
     waits,
 )
+from yaksh.domain.stops import LineStop, StopResult
 from yaksh.evaluation import call, metrics
 
 
@@ -326,3 +329,133 @@ async def test_a_phone_call_with_measured_caller_replies_gets_their_reply_time()
 
     assert found[MetricKey.CALLER_REPLY_TIME].value["p50_ms"] == 1_900
     assert MetricKey.CALLER_REPLY_TIME not in none
+
+
+SPEAKERS = Path(simulation.__file__).parent / "sounds" / "speakers"
+
+
+def clip(name: str, from_s: float, to_s: float) -> bytes:
+    with wave.open(str(SPEAKERS / f"{name}.wav")) as file:
+        assert (file.getframerate(), file.getnchannels()) == (8000, 1)
+        file.setpos(round(8000 * from_s))
+        return file.readframes(round(8000 * (to_s - from_s)))
+
+
+def wav(channels: list[bytes]) -> bytes:
+    size = max(len(pcm) for pcm in channels)
+    frames = b"".join(
+        b"".join(pcm.ljust(size, b"\0")[at : at + 2] for pcm in channels)
+        for at in range(0, size, 2)
+    )
+    buffer = io.BytesIO()
+    with wave.open(buffer, "wb") as file:
+        file.setnchannels(len(channels))
+        file.setsampwidth(2)
+        file.setframerate(8000)
+        file.writeframes(frames)
+    return buffer.getvalue()
+
+
+def quiet(seconds: float) -> bytes:
+    return bytes(2 * round(8000 * seconds))
+
+
+async def interrupted_call(media: AgentMedia) -> dict[MetricKey, Metric]:
+    """A 10 s call: the agent speaks from about 1.1 s to 3.8 s, and a line goes out from 2 s."""
+    store = FakeFileStore()
+    agent = quiet(1) + clip("en_own_phone_call_1", 4.0, 6.9) + quiet(6)
+    voice = clip("en_talks_to_caller_2", 0, 2.1)
+    await store.put("recording.wav", wav([agent, quiet(10)]), "audio/wav")
+    await store.put("caller-voice.wav", wav([voice]), "audio/wav")
+    line = CallerReplyWindow(
+        start_ms=2_000,
+        end_ms=4_100,
+        finished=True,
+        audio_start_ms=0,
+        audio_ms=2_100,
+        interruption=1,
+    )
+    transcript = Transcript(
+        stream_opened_ms=0,
+        recording_start_ms=0,
+        caller_replies=[line],
+        agent_media=media,
+        wire_events=[WireEvent(kind=WireEventKind.CONNECTED, at_ms=0)],
+    )
+    conversation = Conversation(
+        transcript=transcript.model_dump(mode="json"),
+        recording_key="recording.wav",
+        caller_voice_key="caller-voice.wav",
+        answered_by=AnsweredBy.CALLER,
+        caller_settings=None,
+        caller_usage=None,
+        line_facts=None,
+    )
+    return await call.measure_call(conversation, store, agent_speaks_first=True)
+
+
+async def test_a_line_gets_the_time_in_which_the_agents_speech_stopped_after_it() -> None:
+    found = await interrupted_call(AgentMedia(first_ms=0, last_ms=10_000, gaps=[]))
+
+    speech = Speech.model_validate(found[MetricKey.SPEECH].value)
+    [stop] = found[MetricKey.STOP_TIME].value["lines"]
+    start = speech.caller[0].start_ms
+    holding = next(span for span in speech.agent if span.start_ms <= start < span.end_ms)
+    assert 2_000 < start < 2_500, "the line's speech, not its audio start"
+    assert stop == {
+        "number": 1,
+        "line_ms": start,
+        "result": "stopped",
+        "stop_ms": holding.end_ms - start,
+        "at_least": False,
+        "reason": None,
+    }
+    assert holding.start_ms < 2_000 < 3_500 < holding.end_ms, "the speech the line came into"
+    assert found[MetricKey.STOP_TIME].value["counts"] == {
+        "stopped": 1,
+        "kept_talking": 0,
+        "not_speaking": 0,
+        "unknown": 0,
+    }
+
+
+async def test_silence_after_the_agents_media_ended_is_no_stop_of_its_speech() -> None:
+    found = await interrupted_call(AgentMedia(first_ms=0, last_ms=4_000, gaps=[]))
+
+    [stop] = found[MetricKey.STOP_TIME].value["lines"]
+    assert (stop["result"], stop["reason"]) == ("unknown", "media_gap")
+
+
+async def test_a_call_without_lines_gets_no_stop_time() -> None:
+    store = FakeFileStore()
+    await store.put("recording.wav", silence(2, 6), "audio/wav")
+    await store.put("caller-voice.wav", silence(1, 1), "audio/wav")
+    transcript = Transcript(
+        stream_opened_ms=0,
+        recording_start_ms=0,
+        caller_replies=[reply(1_000, 1_500)],
+        wire_events=[WireEvent(kind=WireEventKind.CONNECTED, at_ms=0)],
+    )
+    conversation = Conversation(
+        transcript=transcript.model_dump(mode="json"),
+        recording_key="recording.wav",
+        caller_voice_key="caller-voice.wav",
+        answered_by=AnsweredBy.CALLER,
+        caller_settings=None,
+        caller_usage=None,
+        line_facts=None,
+    )
+
+    found = await call.measure_call(conversation, store, agent_speaks_first=True)
+
+    assert MetricKey.SPEECH in found
+    assert MetricKey.STOP_TIME not in found
+
+
+def test_the_stop_time_metric_flags_a_line_the_agent_kept_talking_over() -> None:
+    kept = LineStop(number=2, line_ms=9_000, result=StopResult.KEPT_TALKING, stop_ms=5_830)
+    stopped = LineStop(number=1, line_ms=1_000, result=StopResult.STOPPED, stop_ms=788)
+
+    assert metrics.stop_time([stopped, kept]).flags == ["kept_talking"]
+    assert metrics.stop_time([stopped]).flags == []
+    assert metrics.stop_time([stopped, kept]).value["p50_ms"] == 788

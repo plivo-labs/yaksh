@@ -37,6 +37,7 @@ from yaksh.domain.conversations import (
 )
 from yaksh.domain.errors import NotFoundError
 from yaksh.domain.latency import AgentReplyTime, CallerReplyTime, Latency, place
+from yaksh.domain.stops import LineStop
 from yaksh.evaluation import agent_records, results
 from yaksh.simulation import conversations
 from yaksh.simulation.listen import live_audio
@@ -107,17 +108,20 @@ def turns_with_replies(
     latency: Latency | None,
     caller_times: Sequence[CallerReplyTime],
     agent_times: Sequence[AgentReplyTime] = (),
+    stops: Sequence[LineStop] = (),
 ) -> list[TurnRead]:
     """The turns, each agent turn with the reply it starts with and, from the agent's trace,
-    where its time went; and each caller turn that the caller's model spoke with where the
-    time of its reply went: the reply timed at the audio start that played the turn, one turn
-    for each."""
+    where its time went; each caller turn that the caller's model spoke with where the time of
+    its reply went: the reply timed at the audio start that played the turn, one turn for each;
+    and the first turn of each interruption line with when the agent's speech stopped after
+    it. A line can be two turns: the part that went out and the part that did not."""
     replies = latency.replies if latency else []
     agent = [index for index, turn in enumerate(transcript.turns) if turn.role is Role.AGENT]
     starts = [transcript.turns[index].started_at_ms for index in agent]
     placed = dict(zip(agent, place(starts, replies), strict=True))
     timed = {reply.audio_index: reply for reply in caller_times}
     traced = {reply.speech_ms: reply for reply in agent_times}
+    stopped = {stop.number: stop for stop in stops}
     turns = []
     for index, turn in enumerate(transcript.turns):
         reply = placed.get(index)
@@ -129,6 +133,9 @@ def turns_with_replies(
                 agent_reply=traced.get(reply.speech_ms) if reply else None,
                 caller_reply=timed.pop(turn.audio_index, None)
                 if spoken(turn) and turn.audio_index is not None
+                else None,
+                agent_stop=stopped.pop(turn.interruption, None)
+                if turn.interruption is not None
                 else None,
             )
         )
@@ -166,6 +173,7 @@ async def detail(session: AsyncSession, conversation: Conversation) -> Conversat
                 for item in conversation.caller_reply_times or []
             ],
             await results.agent_reply_times(session, conversation.id),
+            await results.line_stops(session, conversation.id),
         ),
         replies=latency.replies if latency else [],
         wire_events=transcript.wire_events,

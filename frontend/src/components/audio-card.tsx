@@ -12,7 +12,8 @@ import { BAND_TEXT, BAND_WASH, clock, latency, responseBand } from "@/lib/format
 import type { LiveView } from "@/lib/listen";
 import { connectedAt } from "@/lib/turns";
 import { cn } from "@/lib/utils";
-import { type Conversation, LIVE_STATUSES, type Reply } from "@/lib/types";
+import { pinTitle } from "@/lib/stops";
+import { type Conversation, LIVE_STATUSES, type LineStop, type Reply } from "@/lib/types";
 
 /** One reply as a band on the waveform: the wait in its colour, or the overlap of a talk-over. */
 function replyMark(reply: Reply, connectedMs: number): Mark {
@@ -93,13 +94,43 @@ function machineMarks(conversation: Conversation, connectedMs: number): Mark[] {
   return [...lines, ...sounds];
 }
 
-/** The bands on the recording: the persona's phone and each reply's wait. */
+const PIN_FILL: Record<LineStop["result"], string> = {
+  stopped: "border-foreground bg-foreground text-background",
+  kept_talking: "border-warning-foreground bg-warning text-warning-foreground",
+  not_speaking: "border-muted-foreground bg-card text-muted-foreground",
+  unknown: "border-muted-foreground bg-card text-muted-foreground",
+};
+
+/** A pin where each interruption line's speech started, with its result as the hover text; a
+ * line with no speech has no place to pin. */
+function lineMarks(conversation: Conversation, connectedMs: number): Mark[] {
+  return conversation.transcript.flatMap((turn): Mark[] => {
+    const stop = turn.agent_stop;
+    if (!stop || stop.line_ms === null) return [];
+    const at = Math.max(0, stop.line_ms - connectedMs) / 1000;
+    return [
+      {
+        from: at,
+        to: at,
+        label: "",
+        title: pinTitle(stop),
+        fill: PIN_FILL[stop.result],
+        text: "",
+        pin: String(stop.number),
+      },
+    ];
+  });
+}
+
+/** The bands on the recording: the persona's phone and each reply's wait; and a pin for each
+ * interruption line. */
 function callMarks(conversation: Conversation): Mark[] {
   const connectedMs = connectedAt(conversation);
   if (connectedMs === undefined) return [];
   return [
     ...machineMarks(conversation, connectedMs),
     ...conversation.replies.map((reply) => replyMark(reply, connectedMs)),
+    ...lineMarks(conversation, connectedMs),
   ];
 }
 

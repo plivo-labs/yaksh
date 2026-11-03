@@ -76,6 +76,7 @@ export function RunMetricsPanel({
   }
   const { overall, by_category, by_surroundings } = metrics.data;
   const flags = Object.entries(overall.flags);
+  const lines = !text && overall.lines_played > 0;
   return (
     <Panel className="overflow-hidden">
       <PanelHeader
@@ -89,7 +90,7 @@ export function RunMetricsPanel({
       <div
         className={cn(
           "grid grid-cols-1 gap-3 border-b bg-muted/30 px-5 py-4",
-          text ? "sm:grid-cols-2" : "sm:grid-cols-3",
+          text ? "sm:grid-cols-2" : lines ? "sm:grid-cols-2 lg:grid-cols-4" : "sm:grid-cols-3",
         )}
       >
         {!text && (
@@ -123,6 +124,7 @@ export function RunMetricsPanel({
             </p>
           </Stat>
         )}
+        {lines && <StopTimeStat numbers={overall} />}
         <Stat
           label="Connected"
           hint="Conversations where Yaksh and the agent were on the line together."
@@ -182,6 +184,13 @@ export function RunMetricsPanel({
             share={overall[problem.key]}
           />
         ))}
+        {lines && (
+          <ProblemRow
+            label="The agent kept talking over a line"
+            hint="Conversations where the agent kept speaking for more than 2 s after the caller started an interruption line."
+            share={overall.kept_talking}
+          />
+        )}
         {flags.length > 0 && (
           <div className="mt-2 flex flex-wrap items-center gap-1.5">
             <span className="mr-1 text-xs-400 text-muted-foreground">Flags</span>
@@ -207,6 +216,51 @@ export function RunMetricsPanel({
         ])}
       />
     </Panel>
+  );
+}
+
+/** When the agent's speech stopped after the lines of the run: the p50 of the lines that stopped
+ * within 2s, and how many lines it kept talking over or were not measured. */
+function StopTimeStat({ numbers }: { numbers: RunNumbers }) {
+  const unmeasured = numbers.lines_played - numbers.lines_measured;
+  const value =
+    numbers.lines_measured === 0
+      ? "No stop time"
+      : numbers.stop_p50_ms === null
+        ? "None within 2s"
+        : latency(numbers.stop_p50_ms);
+  return (
+    <Stat
+      label="Stop time"
+      hint="When the agent's speech stopped after the caller started a line, over the lines where it stopped 200ms to 2s after."
+      value={value}
+    >
+      {numbers.stop_p50_ms !== null && numbers.stop_p90_ms !== null && (
+        <p className="text-xs-400 text-muted-foreground">
+          Of the stops within 2s, half were at or below {latency(numbers.stop_p50_ms)}, nine in ten
+          at or below{" "}
+          <span className="font-medium text-foreground">{latency(numbers.stop_p90_ms)}</span>.
+        </p>
+      )}
+      {numbers.lines_measured > 0 && (
+        <p
+          className={cn(
+            "text-xs-400",
+            numbers.lines_kept_talking > 0 ? "text-status-warning-text" : "text-muted-foreground",
+          )}
+        >
+          The agent kept talking over {numbers.lines_kept_talking} of{" "}
+          {counted(numbers.lines_measured, "line", "lines")}.
+        </p>
+      )}
+      {unmeasured > 0 && (
+        <p className="text-xs-400 text-muted-foreground">
+          {numbers.lines_measured > 0
+            ? `${counted(unmeasured, "more line", "more lines")} had no stop time.`
+            : `${counted(unmeasured, "line", "lines")} had no stop time.`}
+        </p>
+      )}
+    </Stat>
   );
 }
 

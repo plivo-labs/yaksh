@@ -948,6 +948,22 @@ export interface Turn {
   agent_reply?: AgentReplyTime | null;
   /** A line of the scenario's interruption with this number, from 1. */
   interruption?: number | null;
+  /** On the first turn of an interruption line that played on a phone call: when the agent's
+   * speech stopped after the line. */
+  agent_stop?: LineStop | null;
+}
+
+/** When the agent's speech stopped after one interruption line, from the recording. */
+export interface LineStop {
+  number: number;
+  /** Where the line's speech started, on the call clock; null when it has none. */
+  line_ms: number | null;
+  result: "stopped" | "kept_talking" | "not_speaking" | "unknown";
+  /** From the line's speech start to the end of the agent's speech. */
+  stop_ms: number | null;
+  /** The agent spoke for stop_ms or longer: Yaksh did not hear it stop. */
+  at_least: boolean;
+  reason: "no_line_speech" | "media_gap" | "recording_ended" | null;
 }
 
 /** Where the time of one caller reply went, from the end of the agent's speech to the caller's
@@ -1572,6 +1588,7 @@ export const FLAG_TEXT: Record<string, string> = {
   dead_air: "Silence of 10s or more",
   media_gap: "Gap in the agent's media",
   monologue: "Monologue of 45s or more",
+  kept_talking: "Kept talking over a line",
   repetition: "Repeated answer",
   caller_error: "Caller error",
   unconfirmed_caller_turns: "Unconfirmed caller turns",
@@ -1606,6 +1623,16 @@ export interface RunNumbers {
   long_wait: Share;
   /** Calls with a wait of 10s or more. */
   dead_air: Share;
+  /** Nearest rank over the interruption lines whose agent speech stopped within 2s, pooled. */
+  stop_p50_ms: number | null;
+  stop_p90_ms: number | null;
+  /** Interruption lines that played, whatever their result. */
+  lines_played: number;
+  /** Lines where the agent's speech stopped in time or kept on. */
+  lines_measured: number;
+  lines_kept_talking: number;
+  /** Calls where the agent kept talking over a line, of the calls with a measured line. */
+  kept_talking: Share;
   /** How many calls raised each flag. */
   flags: Record<string, number>;
 }
