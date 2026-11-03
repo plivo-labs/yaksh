@@ -2,8 +2,10 @@
 call, from Plivo's public agent API.
 
 An outbound call's run is the `api_id` of the trigger's response. An inbound call's run is
-found among the flow's runs that started during the call, by the number Yaksh called from: the
-run's call UUID is another leg's, and runs of calls placed together start in the same second.
+found among the flow's runs that started from just before the call to just after it connected,
+by the number Yaksh called from: the run's call UUID is another leg's, and runs of calls placed
+together start in the same second. A later run is not the call's: the number is free again after
+the call, and the next test that uses it starts a run of its own.
 """
 
 import asyncio
@@ -243,8 +245,9 @@ class Callers:
 
 
 async def inbound_run(api: AgentApi, call: CallRef, callers: Callers, agent_url: str) -> Lookup:
-    earliest, latest = call.started_at - WINDOW_MARGIN, call.ended_at + WINDOW_MARGIN
-    window = f"between {call.started_at:%H:%M:%S} and {call.ended_at:%H:%M:%S} UTC"
+    earliest = call.started_at - WINDOW_MARGIN
+    latest = min(call.connected_at + WINDOW_MARGIN, call.ended_at)
+    window = f"between {earliest:%H:%M:%S} and {latest:%H:%M:%S} UTC"
     candidates = await runs_in_window(api, earliest, latest)
     candidates.sort(key=lambda run: distance(run, call))
     unlogged, unread = [], 0

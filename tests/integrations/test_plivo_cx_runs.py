@@ -549,6 +549,38 @@ async def test_a_run_that_has_not_logged_its_caller_yet_is_waited_for(cx: Cx) ->
     assert isinstance(found, Pending) and "run-early" in found.reason
 
 
+@pytest.mark.parametrize(
+    ("ended_after_s", "next_starts_after_s"),
+    [(51, 53), (4, 5)],
+    ids=["after-the-call", "after-a-call-shorter-than-the-margin"],
+)
+async def test_the_next_tests_run_from_the_number_is_not_the_calls_while_its_own_has_no_caller(
+    cx: Cx, ended_after_s: int, next_starts_after_s: int
+) -> None:
+    own = run_like_live(
+        "run-own",
+        YAKSH,
+        "2026-10-23 12:28:25.000000+00:00",
+        "2026-10-23 12:28:27.000000+00:00",
+    )
+    own["logs"] = own["logs"][1:]
+    cx.add(own)
+    next_start = CALL_START + timedelta(seconds=next_starts_after_s)
+    cx.add(
+        run_like_live(
+            "run-next-test",
+            YAKSH,
+            next_start.isoformat(" "),
+            (next_start + timedelta(seconds=40)).isoformat(" "),
+        )
+    )
+
+    found = await find(cx, replace(call(), ended_at=CALL_START + timedelta(seconds=ended_after_s)))
+
+    assert isinstance(found, Pending) and "run-own" in found.reason
+    assert cx.read == ["run-own"], "a run that started after the call is not read"
+
+
 async def test_runs_that_ended_are_read_before_runs_still_going(cx: Cx) -> None:
     started = "2026-10-23 12:28:26.000000+00:00"
     for number in range(MAX_CANDIDATES):

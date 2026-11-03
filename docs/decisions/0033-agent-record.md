@@ -13,7 +13,7 @@ Status: accepted. Changed by 0042 (nodes and moves in the record).
 
 - An agent has an optional `record_source`: a provider, the agent's URL in the provider's API, and headers with `{{secrets.NAME}}`. A provider table names each provider's label, default URL, URL check and whether its record holds the live transcript. Only that table and the provider's reader know a provider.
 - The evaluator reads the record before it judges a judged phone test that connected, and stores it in `agent_records`, found or missing, once. A record not final yet puts the evaluation off, without using an attempt, for up to 5 minutes after the call; then what there is is kept with a reason.
-- An outbound call's record is named by the trigger's response, which `conversations.trigger_response` keeps. An inbound call's record is the agent's run that started during the call from the number Yaksh called from.
+- An outbound call's record is named by the trigger's response, which `conversations.trigger_response` keeps. An inbound call's record is the agent's run from the number Yaksh called from that started from just before the call to just after it connected, and not after it ended. A later run is not the call's: the number is free again after the call, and the next test that uses it starts its own run.
 - The evidence view gets an AGENT RECORD section of saved values and tool calls, numbered R1 and up. Criteria and agent rules can quote it in `record_evidence`.
 - Two items: `saved_data` (deciding: counts in the conversation verdict, not the scenario verdict) and `heard` (reporting, only when the provider's transcript is live).
 - The saved values are names and values only. A step or node is left out: only Plivo CX has one.
