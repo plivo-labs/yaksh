@@ -877,7 +877,7 @@ class ScenarioVersion(Base):
 class PhoneNumber(Base):
     """A number on the Plivo account, as the last check found it. A number linked to the
     receiving application in the settings is a test number: leased to one conversation at a
-    time and rotated by last use."""
+    time and rotated by release time."""
 
     __tablename__ = "phone_numbers"
 
@@ -889,6 +889,8 @@ class PhoneNumber(Base):
     application_name: Mapped[str | None] = mapped_column(Text)
     conversation_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("conversations.id"))
     leased_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    """Not used since 0.12.1; kept for processes of 0.12.0 during a rolling deploy."""
+    released_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     available_after: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 

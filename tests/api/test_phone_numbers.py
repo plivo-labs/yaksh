@@ -104,6 +104,33 @@ async def test_concurrent_leases_get_distinct_numbers_and_a_finished_call_frees_
     await engine.dispose()
 
 
+async def test_an_inbound_test_takes_the_number_free_the_longest_not_the_one_just_freed(
+    client: AsyncClient, settings: Settings
+) -> None:
+    engine = create_engine(settings.database_url.encoded_string())
+    sessions = create_sessionmaker(engine)
+    long_call, short_call, third, fourth = [
+        await queue_phone_conversation(client) for _ in range(4)
+    ]
+    async with sessions() as session:
+        await numbers.sync_numbers(session, account(NUMBER, OTHER), {})
+        long_number = await numbers.lease_number(session, long_call, POOL_APP_ID)
+        short_number = await numbers.lease_number(session, short_call, POOL_APP_ID)
+        await numbers.release_numbers(session, [short_call], 300)
+        await session.commit()
+        await numbers.release_numbers(session, [long_call], 0)
+        await session.commit()
+        leased = [
+            await numbers.lease_number(session, third, POOL_APP_ID),
+            await numbers.lease_number(session, fourth, POOL_APP_ID),
+        ]
+    await engine.dispose()
+
+    assert leased == [short_number, long_number], (
+        "the number freed first is taken first, even when the rest was shortened since"
+    )
+
+
 async def test_reaping_a_lost_lease_frees_its_number_and_a_check_keeps_leased_ones(
     client: AsyncClient, settings: Settings
 ) -> None:
