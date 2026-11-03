@@ -225,14 +225,14 @@ function StopTimeStat({ numbers }: { numbers: RunNumbers }) {
   const unmeasured = numbers.lines_played - numbers.lines_measured;
   const value =
     numbers.lines_measured === 0
-      ? "Not measured"
+      ? "No stop time"
       : numbers.stop_p50_ms === null
         ? "None within 2s"
         : latency(numbers.stop_p50_ms);
   return (
     <Stat
       label="Stop time"
-      hint="When the agent's speech stopped after the caller started a line, over the lines where it stopped within 2s."
+      hint="When the agent's speech stopped after the caller started a line, over the lines where it stopped 200ms to 2s after."
       value={value}
     >
       {numbers.stop_p50_ms !== null && numbers.stop_p90_ms !== null && (
@@ -256,8 +256,8 @@ function StopTimeStat({ numbers }: { numbers: RunNumbers }) {
       {unmeasured > 0 && (
         <p className="text-xs-400 text-muted-foreground">
           {numbers.lines_measured > 0
-            ? `${counted(unmeasured, "more line was", "more lines were")} not measured.`
-            : `${counted(unmeasured, "line was", "lines were")} not measured.`}
+            ? `${counted(unmeasured, "more line", "more lines")} had no stop time.`
+            : `${counted(unmeasured, "line", "lines")} had no stop time.`}
         </p>
       )}
     </Stat>

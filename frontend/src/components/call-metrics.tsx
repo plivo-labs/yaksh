@@ -423,7 +423,7 @@ function InterruptionsSection({ lines, connectedMs }: { lines: LineRow[]; connec
   return (
     <section className="grid gap-3">
       <Heading aside={stoppedSummary(lines)}>
-        <Explained hint="When the agent's speech stopped after the caller started each line. A stop within 2s counts.">
+        <Explained hint="When the agent's speech stopped after the caller started each line. A stop from 200ms to 2s counts.">
           Interruptions
         </Explained>
       </Heading>
@@ -444,7 +444,7 @@ function InterruptionsSection({ lines, connectedMs }: { lines: LineRow[]; connec
               <td className="py-1.5">{line.number}</td>
               <td className="py-1.5 pr-2 text-muted-foreground">
                 “{line.words}”
-                {line.stop.result === "unknown" && (
+                {(line.stop.result === "unknown" || line.stop.result === "not_speaking") && (
                   <span className="block text-xs-400">{stopHint(line.stop)}</span>
                 )}
               </td>

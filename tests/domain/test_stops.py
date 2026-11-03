@@ -242,3 +242,27 @@ def test_a_line_with_no_speech_is_unknown_for_that_reason_first() -> None:
     [stop] = line_stops([(1, [])], [span(0, 5_000)], None, END_MS)
 
     assert stop.reason is StopReason.NO_LINE_SPEECH
+
+
+@pytest.mark.parametrize(
+    ("stop_ms", "end_ms", "result", "stopped_after"),
+    [
+        (199, END_MS, StopResult.NOT_SPEAKING, None),
+        (200, END_MS, StopResult.STOPPED, 200),
+        (150, S + 150 + 300, StopResult.UNKNOWN, None),
+    ],
+)
+def test_speech_that_ends_too_soon_to_have_heard_the_line_was_ending_by_itself(
+    stop_ms: int, end_ms: int, result: StopResult, stopped_after: int | None
+) -> None:
+    stop = one([span(S - 2_000, S + stop_ms)], end_ms=end_ms)
+
+    assert (stop.result, stop.stop_ms, stop.line_ms) == (result, stopped_after, S)
+
+
+def test_speech_that_ends_too_soon_before_a_gap_is_not_measured() -> None:
+    stop = one([span(S - 2_000, S + 199)], found=media(gaps=[span(S + 199, S + 799)]))
+
+    assert stop == LineStop(
+        number=1, line_ms=S, result=StopResult.UNKNOWN, reason=StopReason.MEDIA_GAP
+    )

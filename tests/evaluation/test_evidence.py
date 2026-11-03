@@ -304,7 +304,8 @@ def said(number: int, text: str, provenance: Provenance = Provenance.TRANSMITTED
         ),
         (
             LineStop(number=1, line_ms=2_150, result=StopResult.NOT_SPEAKING),
-            "The agent was not speaking when the line's speech started.",
+            "The agent was not speaking when the line's speech started, or its speech ended less "
+            "than 200 ms after it: too soon to stop for the line.",
         ),
         (
             LineStop(

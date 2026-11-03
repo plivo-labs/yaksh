@@ -35,7 +35,13 @@ from yaksh.domain.conversations import (
 )
 from yaksh.domain.record_sources import RECORD_PROVIDERS
 from yaksh.domain.scenarios import Fact
-from yaksh.domain.stops import STOP_WINDOW_MS, LineStop, StopReason, StopResult
+from yaksh.domain.stops import (
+    SOONEST_STOP_MS,
+    STOP_WINDOW_MS,
+    LineStop,
+    StopReason,
+    StopResult,
+)
 
 EVIDENCE_VIEW_VERSION = 11
 NO_TIME = datetime.min.replace(tzinfo=UTC)
@@ -423,7 +429,10 @@ def stop_sentence(stop: LineStop | None) -> list[str]:
                 "after the line's speech started."
             ]
         case StopResult.NOT_SPEAKING:
-            return ["The agent was not speaking when the line's speech started."]
+            return [
+                "The agent was not speaking when the line's speech started, or its speech ended "
+                f"less than {SOONEST_STOP_MS} ms after it: too soon to stop for the line."
+            ]
         case StopResult.UNKNOWN:
             assert stop.reason is not None
             return [

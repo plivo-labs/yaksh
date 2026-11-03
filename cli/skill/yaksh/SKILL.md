@@ -108,9 +108,9 @@ criteria:
 - Write a criterion with the value that the agent must give after the line, such as the answer to the question in it. The judges see where each line came.
 - After a phone call with a recording, each line that played gets a result: when the agent's speech stopped after the line's speech started.
 - Read it in `stop_time` in the metrics of `yaksh conversation evaluation`, or in `agent_stop` on the line's first turn. The run metrics have `stop_p50_ms`, `stop_p90_ms` and `kept_talking`.
-- `result` is `stopped` (within 2 s), `kept_talking`, `not_speaking` or `unknown`. `stop_ms` is null for the last two. With `at_least: true`, `stop_ms` is only the least time: Yaksh did not hear the agent stop.
+- `result` is `stopped` (200 ms to 2 s, with 0.6 s of quiet heard after), `kept_talking`, `not_speaking` (also speech that ended less than 200 ms after the line started) or `unknown`. `stop_ms` is null for the last two. With `at_least: true`, `stop_ms` is only the least time: Yaksh did not hear the agent stop.
 - The judges see each stop time in ms, so a criterion such as "The agent stops speaking within 1 s after each interruption" can check it.
-- A stop time does not tell why the speech stopped: a reply that ends by itself within 2 s also counts. Start lines early in long replies.
+- A stop time does not tell why the speech stopped: a reply that ends by itself 200 ms to 2 s after the line starts also counts. Start lines early in long replies.
 - Write lines that ask something, or that ask the agent to wait. Not lines that give a value: the caller keeps to its known facts. Backchannel lines such as "Mm-hmm." are not supported.
 - A phrase needs a speech-to-text provider that gives the agent's words while it speaks: not Sarvam.
 

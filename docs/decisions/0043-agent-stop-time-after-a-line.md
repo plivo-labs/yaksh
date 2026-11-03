@@ -16,8 +16,9 @@ After each phone call, Yaksh measures when the agent's speech stopped after each
   2. `unknown`, `media_gap`: Yaksh did not hear S.
   3. `not_speaking`: no agent speech holds S.
   4. `kept_talking`: E − S > 2 s. With no confirmed stop, `at_least` is true, with the reason `recording_ended` or `media_gap`.
-  5. `stopped`: E − S ≤ 2 s and a confirmed stop.
-  6. `unknown`: E − S ≤ 2 s and no confirmed stop, with the reason `recording_ended` or `media_gap`.
+  5. `not_speaking`: E − S < 200 ms and a confirmed stop: the speech was ending by itself.
+  6. `stopped`: E − S ≤ 2 s and a confirmed stop.
+  7. `unknown`: E − S ≤ 2 s and no confirmed stop, with the reason `recording_ended` or `media_gap`.
 - The metric `stop_time` keeps each line's result, the count of each result, and the p50 and p90 (nearest rank) of the `stopped` lines. A `kept_talking` line raises the flag `kept_talking`.
 - The run metrics pool the `stopped` lines of the calls, count the lines, and give the share of calls with a `kept_talking` line, of the calls with a `stopped` or `kept_talking` line.
 - The API puts each line's result on the first turn of the line, as `agent_stop`.
@@ -30,12 +31,13 @@ After each phone call, Yaksh measures when the agent's speech stopped after each
 - The 2 s and the 0.6 s are the values of the live check, so the two agree on most calls. They are not the same rule: the live window starts when the line starts to play, and it ignores a quiet that the agent's voice ends while the line plays.
 - Silence in the recording can be missing media. Without the heard quiet, an agent stream that dropped looks like a fast stop.
 - Speech that Yaksh heard for more than 2 s shows that the agent kept talking, also when a gap or the end of the recording comes later.
+- An agent cannot stop for a line sooner than the line reaches it and its VAD hears it. On real calls, a stop 3 ms after a line's start was speech that ended by itself. The fastest stop that the agent's own record showed as an interruption was 337 ms. Thus a stop under 200 ms is no stop for the line.
 - Whole ms let a judge compare the time with a limit in a criterion. A rounded 0.8 s can pass a limit of 800 ms that 841 ms fails.
 - One line can be two turns: the part that went out and the part that did not. The result and the judges' note go on the first.
 
 ## Cost
 
-- The stop time does not tell why the speech stopped. A turn that ends by itself within 2 s gets `stopped`, and so does an agent that stops and then continues the same reply. An end-of-turn model on the agent's audio did not separate these cases.
+- The stop time does not tell why the speech stopped. A turn that ends by itself 200 ms to 2 s after the line starts gets `stopped`, and so does an agent that stops and then continues the same reply. An end-of-turn model on the agent's audio did not separate these cases.
 - The time includes the network in both directions and the agent's audio buffers. It is not the agent's own reaction time.
 - An echo of the caller on the agent's channel counts as agent speech.
 - The percentiles leave out the lines where the agent kept talking. Their count shows them.

@@ -15,6 +15,10 @@ The live check uses the same length from the line's first sound."""
 QUIET_MS = round(VAD_STOP_S * 1000)
 """How long Yaksh must hear the agent quiet after its speech before the speech counts as
 stopped: the VAD stop of the measurement after the call."""
+SOONEST_STOP_MS = 200
+"""The shortest stop time that can be a stop for the line. The line reaches the agent over the
+network, and the agent's VAD must hear it, before the agent can stop: speech that ended sooner
+was ending by itself."""
 
 
 class StopResult(StrEnum):
@@ -23,7 +27,8 @@ class StopResult(StrEnum):
     KEPT_TALKING = "kept_talking"
     """The agent's speech went on past STOP_WINDOW_MS."""
     NOT_SPEAKING = "not_speaking"
-    """The agent was not speaking when the line's speech started."""
+    """The agent was not speaking when the line's speech started, or its speech ended less than
+    SOONEST_STOP_MS after it."""
     UNKNOWN = "unknown"
 
 
@@ -140,6 +145,8 @@ def line_stop(
             at_least=not confirmed,
             reason=reason,
         )
+    if confirmed and stop_ms < SOONEST_STOP_MS:
+        return LineStop(number=number, line_ms=start, result=StopResult.NOT_SPEAKING)
     if confirmed:
         return LineStop(number=number, line_ms=start, result=StopResult.STOPPED, stop_ms=stop_ms)
     return LineStop(number=number, line_ms=start, result=StopResult.UNKNOWN, reason=reason)

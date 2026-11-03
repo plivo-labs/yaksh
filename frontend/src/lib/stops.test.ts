@@ -51,8 +51,8 @@ test("each result has its badge label and its sentence", () => {
     ],
     [
       stop({ result: "not_speaking", stop_ms: null }),
-      "Agent not speaking",
-      "The agent was not speaking when the line started.",
+      "Agent done speaking",
+      "The agent was not speaking when the line started, or its speech ended less than 200ms after it: too soon to stop for the line.",
     ],
     [
       stop({ result: "unknown", stop_ms: null, reason: "media_gap" }),

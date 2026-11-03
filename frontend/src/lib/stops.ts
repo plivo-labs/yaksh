@@ -16,7 +16,7 @@ export function stopLabel(stop: LineStop): string {
     case "kept_talking":
       return `Kept talking ${time(stop)}`;
     case "not_speaking":
-      return "Agent not speaking";
+      return "Agent done speaking";
     case "unknown":
       return "Not measured";
   }
@@ -37,7 +37,7 @@ export function stopHint(stop: LineStop): string {
           : "Then part of its audio is missing."
       }`;
     case "not_speaking":
-      return "The agent was not speaking when the line started.";
+      return "The agent was not speaking when the line started, or its speech ended less than 200ms after it: too soon to stop for the line.";
     case "unknown":
       switch (stop.reason) {
         case "recording_ended":
