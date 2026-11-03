@@ -1,5 +1,7 @@
 """The text-to-speech of a persona's voice, speaking the caller's language."""
 
+from collections.abc import Sequence
+
 from pipecat.services.tts_service import TTSService
 
 from yaksh.domain.languages import Language
@@ -24,8 +26,12 @@ def tts_service(
     key: str,
     *,
     one_shot: bool = False,
+    also: Sequence[Language] = (),
 ) -> TTSService:
-    return VENDORS[voice.provider].service(settings, voice, language, key, one_shot=one_shot)
+    """`also` holds the caller's other languages, which the call can switch to."""
+    return VENDORS[voice.provider].service(
+        settings, voice, language, key, one_shot=one_shot, also=also
+    )
 
 
 async def check_voice(

@@ -13,8 +13,11 @@ from yaksh.domain.settings import AppSettings
 from yaksh.domain.voices import CatalogPage, CatalogQuery, ProviderVoice, VoiceSettings
 
 
-def answer_code(agent: Sequence[AgentLanguage], caller: Language) -> str:
-    """The language the agent should answer in, as the provider's setting."""
+def answer_code(
+    agent: Sequence[AgentLanguage], caller: Language, _also: Sequence[Language] = ()
+) -> str:
+    """The language the agent should answer the caller's primary language in, as the provider's
+    setting. It stays for the whole call, also for a caller that can switch languages."""
     return answer_language(agent, caller).language.value
 
 
@@ -27,6 +30,7 @@ class TtsBuilder(Protocol):
         key: str,
         *,
         one_shot: bool,
+        also: Sequence[Language] = (),
     ) -> TTSService: ...
 
 
@@ -35,15 +39,18 @@ class SttVendor:
     model: Callable[[AppSettings], str]
     service: Callable[[AppSettings, str, str], STTService]
     """The service at the call's sample rate, from the settings, the key and the language."""
-    language: Callable[[Sequence[AgentLanguage], Language], str] = answer_code
-    """The language setting that hears the agent on a call."""
+    language: Callable[[Sequence[AgentLanguage], Language, Sequence[Language]], str] = answer_code
+    """The language setting that hears the agent on a call, from the agent's languages, the
+    caller's primary language and its other languages."""
 
 
 @dataclass(frozen=True)
 class TtsVendor:
     service: TtsBuilder
     """A one-shot service, for speech outside a call, fails a reply that stalls or loses its
-    socket instead of ending it short as finished."""
+    socket instead of ending it short as finished. `also` holds the caller's other languages,
+    which the call can switch to; a provider that takes one language for all the speech uses
+    the primary one."""
     check_voice: Callable[[AppSettings, str], Awaitable[str]] | None
     """A voice the account has, found with the settings and the key, for the key check; None
     for a provider whose check uses one of Yaksh's built-in voices."""

@@ -245,6 +245,8 @@ class AgentRecordRead(AgentRecordStatus):
 
 class ConversationRead(ConversationSummary):
     instructions: str
+    additional_languages: tuple[Language, ...]
+    """The other languages the caller could switch to, from its pinned persona version."""
     answering: Answering | None
     """The persona's voicemail and call screener, as its pinned version set them; None when the
     persona answered."""

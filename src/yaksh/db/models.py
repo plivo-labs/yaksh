@@ -711,6 +711,9 @@ class Persona(Base):
     builtin_key: Mapped[str | None] = mapped_column(Text, unique=True)
     prompt: Mapped[str] = mapped_column(Text)
     language: Mapped[Language] = mapped_column(pg_enum(Language, "language"))
+    additional_languages: Mapped[list[Language]] = mapped_column(
+        ARRAY(pg_enum(Language, "language")), default=list, server_default=text("'{}'")
+    )
     voice_provider: Mapped[VoiceProvider] = mapped_column(pg_enum(VoiceProvider, "voice_provider"))
     voice_id: Mapped[str] = mapped_column(Text)
     voice_model: Mapped[str | None] = mapped_column(Text)

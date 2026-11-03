@@ -333,6 +333,7 @@ class Evaluator:
                 retry_later=evaluation.attempts < evaluations.MAX_ATTEMPTS,
                 record=record,
                 traces=self._traces,
+                additional_languages=persona.additional_languages,
             )
             if not held.is_set():
                 return

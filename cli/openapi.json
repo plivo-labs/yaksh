@@ -8882,6 +8882,13 @@
             "type": "string",
             "title": "Instructions"
           },
+          "additional_languages": {
+            "items": {
+              "$ref": "#/components/schemas/Language"
+            },
+            "type": "array",
+            "title": "Additional Languages"
+          },
           "answering": {
             "anyOf": [
               {
@@ -9001,6 +9008,7 @@
           "retry_of",
           "created_at",
           "instructions",
+          "additional_languages",
           "answering",
           "sounds",
           "scenario",
@@ -11994,6 +12002,15 @@
             "$ref": "#/components/schemas/Language",
             "default": "en"
           },
+          "additional_languages": {
+            "items": {
+              "$ref": "#/components/schemas/Language"
+            },
+            "type": "array",
+            "maxItems": 8,
+            "title": "Additional Languages",
+            "default": []
+          },
           "voice": {
             "$ref": "#/components/schemas/VoiceSettings"
           },
@@ -12055,6 +12072,15 @@
           "language": {
             "$ref": "#/components/schemas/Language",
             "default": "en"
+          },
+          "additional_languages": {
+            "items": {
+              "$ref": "#/components/schemas/Language"
+            },
+            "type": "array",
+            "maxItems": 8,
+            "title": "Additional Languages",
+            "default": []
           },
           "voice": {
             "$ref": "#/components/schemas/VoiceSettings"
@@ -12204,6 +12230,13 @@
           "language": {
             "$ref": "#/components/schemas/Language"
           },
+          "additional_languages": {
+            "items": {
+              "$ref": "#/components/schemas/Language"
+            },
+            "type": "array",
+            "title": "Additional Languages"
+          },
           "voice": {
             "$ref": "#/components/schemas/VoiceSettings"
           },
@@ -12268,6 +12301,7 @@
           "builtin_key",
           "prompt",
           "language",
+          "additional_languages",
           "voice",
           "voice_gender",
           "surroundings",
@@ -12348,6 +12382,21 @@
                 "type": "null"
               }
             ]
+          },
+          "additional_languages": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/Language"
+                },
+                "type": "array",
+                "maxItems": 8
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Additional Languages"
           },
           "voice": {
             "anyOf": [

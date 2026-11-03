@@ -150,12 +150,12 @@ async def detail(session: AsyncSession, conversation: Conversation) -> Conversat
     latency = found[conversation.id].latency if conversation.id in found else None
     base = await summary(session, conversation, found)
     record = await agent_records.record_view(session, conversation)
+    persona = await conversations.pinned_persona(session, conversation)
     return ConversationRead(
         **base.model_dump(),
         instructions=conversation.instructions,
-        answering=None
-        if conversation.answered_by is AnsweredBy.CALLER
-        else await conversations.persona_answering(session, conversation),
+        additional_languages=persona.additional_languages,
+        answering=None if conversation.answered_by is AnsweredBy.CALLER else persona.answering,
         sounds=SoundRead.all_of(conversation.sound_plan),
         scenario=await conversations.played_scenario(session, conversation),
         transcript=turns_with_replies(

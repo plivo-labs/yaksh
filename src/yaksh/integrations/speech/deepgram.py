@@ -19,12 +19,23 @@ WIDE_SETTINGS: tuple[tuple[str, frozenset[Language]], ...] = (
     ("multi", frozenset({Language.EN, Language.HI, Language.ES})),
 )
 """Settings that hear more than one language, with the languages of Yaksh's that each hears, in
-the order a tie takes them. `multi` switches between ten languages; only these are Yaksh's."""
+the order a tie takes them. `multi` is held to the three it heard before Deepgram's model of
+2026-10-23, so a caller of one language keeps the setting it had."""
+
+HINDI_AND_ENGLISH = frozenset({Language.HI, Language.EN})
 
 
-def deepgram_language(agent: Sequence[AgentLanguage], caller: Language) -> str:
-    """Of the settings that hear the language the agent should answer in, the one that hears
-    the most of the call's languages wins, and on a tie the one-language model."""
+def deepgram_language(
+    agent: Sequence[AgentLanguage], caller: Language, also: Sequence[Language] = ()
+) -> str:
+    """When the agent should answer in more than one language, `hi` for Hindi and English and
+    `multi` for any other mix: since 2026-10-23 Deepgram's hosted `multi` model hears all of
+    Yaksh's languages in one stream. Otherwise, of the settings that hear the language the agent
+    should answer in, the one that hears the most of the call's languages wins, and on a tie the
+    one-language model."""
+    spoken = {answer_language(agent, language).language for language in (caller, *also)}
+    if len(spoken) > 1:
+        return "hi" if spoken <= HINDI_AND_ENGLISH else "multi"
     own = answer_language(agent, caller)
     answer = own.language
     call = {*(language.language for language in agent), caller}

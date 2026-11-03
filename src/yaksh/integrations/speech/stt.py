@@ -21,8 +21,13 @@ VENDORS: dict[SttProvider, SttVendor] = {
 }
 
 
-def stt_language(provider: SttProvider, agent: Sequence[AgentLanguage], caller: Language) -> str:
-    return VENDORS[provider].language(agent, caller)
+def stt_language(
+    provider: SttProvider,
+    agent: Sequence[AgentLanguage],
+    caller: Language,
+    also: Sequence[Language] = (),
+) -> str:
+    return VENDORS[provider].language(agent, caller, also)
 
 
 def stt_model(settings: AppSettings, provider: SttProvider) -> str:

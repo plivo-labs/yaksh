@@ -1,5 +1,6 @@
 """Cartesia speech over its websocket, with word timestamps, and its voice list."""
 
+from collections.abc import Sequence
 from typing import Any
 
 import pydantic
@@ -33,7 +34,13 @@ CHECK_VOICE = "86e30c1d-714b-4074-a1f2-1cb6b552fb49"
 
 
 def tts(
-    settings: AppSettings, voice: VoiceSettings, language: Language, key: str, *, one_shot: bool
+    settings: AppSettings,
+    voice: VoiceSettings,
+    language: Language,
+    key: str,
+    *,
+    one_shot: bool,
+    also: Sequence[Language] = (),
 ) -> CartesiaTTSService:
     """A one-shot service does not reconnect: a dropped socket fails the speech instead of
     ending it short as finished."""

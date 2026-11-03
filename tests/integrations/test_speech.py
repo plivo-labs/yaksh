@@ -36,6 +36,7 @@ from yaksh.integrations.speech import audio
 from yaksh.integrations.speech.audio import Resample8k, speak_once
 from yaksh.integrations.speech.deepgram import deepgram_language
 from yaksh.integrations.speech.elevenlabs import SentenceDialogue
+from yaksh.integrations.speech.nimble import NimbleTTSService
 from yaksh.integrations.speech.stt import stt_service
 from yaksh.integrations.speech.tts import VENDORS as TTS_VENDORS
 from yaksh.integrations.speech.tts import tts_service
@@ -300,3 +301,32 @@ async def test_a_dialogue_voice_flushes_each_sentence_while_the_reply_is_still_c
     [flush] = [message for message in received if message.get("flush")]
     assert said["inputs"][0]["text"].strip() == "Haan ji."
     assert flush["context_id"] == said["context_id"]
+
+
+@pytest.mark.parametrize(
+    ("agent", "caller", "also", "setting"),
+    [
+        ([AgentLanguage.EN_IN, AgentLanguage.HI], Language.EN, [Language.HI], "hi"),
+        ([AgentLanguage.EN_IN, AgentLanguage.KN], Language.EN, [Language.KN], "multi"),
+        ([AgentLanguage.EN_IN, AgentLanguage.MR], Language.HI, [Language.MR], "multi"),
+        ([AgentLanguage.EN_IN], Language.EN, [Language.TA], "en-IN"),
+    ],
+)
+def test_a_caller_of_several_languages_gets_a_setting_that_hears_each_answer(
+    agent: list[AgentLanguage], caller: Language, also: list[Language], setting: str
+) -> None:
+    assert deepgram_language(agent, caller, also) == setting
+
+
+def test_a_voice_reads_the_language_from_the_text_for_a_caller_that_can_switch() -> None:
+    flash = VoiceSettings(provider=VoiceProvider.ELEVENLABS, id="v1", model="eleven_flash_v2_5")
+    nimble = VoiceSettings(provider=VoiceProvider.NIMBLE, id="v2")
+    app, also = AppSettings(), (Language.EN,)
+
+    eleven = cast(ElevenLabsTTSService, tts_service(app, flash, Language.HI, "k", also=also))
+    sent = dict(parse_qsl(urlsplit(eleven._build_websocket_url()).query))
+    switching = cast(NimbleTTSService, tts_service(app, nimble, Language.HI, "k", also=also))
+    one = cast(NimbleTTSService, tts_service(app, nimble, Language.HI, "k"))
+
+    assert "language_code" not in sent
+    assert (switching._options["language"], one._options["language"]) == ("auto", "hi")

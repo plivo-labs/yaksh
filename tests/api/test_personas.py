@@ -16,7 +16,7 @@ from tests.conftest import (
     create_scenario,
     listed_voice_id,
 )
-from yaksh.db.models import Persona, Voice
+from yaksh.db.models import Persona, PersonaVersion, Voice
 from yaksh.domain.languages import Language
 from yaksh.domain.voices import VoiceProvider
 from yaksh.simulation.personas import seed_builtin_personas
@@ -383,3 +383,36 @@ async def test_a_persona_version_shows_the_model_of_its_voice(client: AsyncClien
 
     assert listed[0]["config"]["voice"]["model"] == "eleven_flash_v2_5"
     assert first["config"]["voice"]["model"] == "eleven_flash_v2_5"
+
+
+async def test_a_persona_keeps_its_additional_languages_and_an_old_process_can_read_it_without(
+    client: AsyncClient, db: Db
+) -> None:
+    persona = await create_persona(client)
+    url = f"/api/v1/personas/{persona['id']}"
+
+    switching = await client.patch(url, json={"additional_languages": ["hi", "ta"]})
+    primary_too = await client.patch(url, json={"language": "hi"})
+    promoted = await client.patch(url, json={"language": "hi", "additional_languages": ["ta"]})
+    cleared = await client.patch(url, json={"additional_languages": []})
+    async with db() as session:
+        stored = list(
+            await session.scalars(
+                select(PersonaVersion.config)
+                .where(PersonaVersion.persona_id == uuid.UUID(persona["id"]))
+                .order_by(PersonaVersion.version)
+            )
+        )
+
+    assert persona["additional_languages"] == []
+    assert switching.json()["additional_languages"] == ["hi", "ta"]
+    assert primary_too.status_code == 422
+    assert (promoted.json()["language"], promoted.json()["additional_languages"]) == ("hi", ["ta"])
+    assert cleared.json()["additional_languages"] == []
+    assert [config.get("additional_languages") for config in stored] == [
+        None,
+        ["hi", "ta"],
+        ["ta"],
+        None,
+    ]
+    assert "additional_languages" not in stored[0]

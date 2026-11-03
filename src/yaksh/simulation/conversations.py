@@ -23,7 +23,7 @@ from yaksh.db.models import (
     ScenarioVersion,
 )
 from yaksh.domain.agents import AgentConfig, Direction, Transport
-from yaksh.domain.answering import AnsweredBy, Answering, plays_scenario
+from yaksh.domain.answering import AnsweredBy, plays_scenario
 from yaksh.domain.conversations import (
     ACTIVE_STATUSES,
     LIVE_STATUSES,
@@ -220,10 +220,10 @@ async def pinned_personas(
     return {row.id: (row.version, row.name) for row in rows}
 
 
-async def persona_answering(session: AsyncSession, conversation: Conversation) -> Answering:
-    """The voicemail and call screener of the pinned persona version."""
+async def pinned_persona(session: AsyncSession, conversation: Conversation) -> PersonaConfig:
+    """The conversation's persona as its pinned version has it."""
     version = await session.get_one(PersonaVersion, conversation.persona_version_id)
-    return PersonaConfig.model_validate(version.config).answering
+    return PersonaConfig.model_validate(version.config)
 
 
 def transcript_of(conversation: Conversation) -> Transcript:
@@ -388,6 +388,7 @@ async def call_request(
         first_words=scenario.first_words or LANGUAGES[conversation.language].first_words,
         nudge=conversation.nudge,
         caller_language=conversation.language,
+        additional_languages=persona.additional_languages,
         voice=persona.voice,
         sound_plan=with_full_paths(SoundPlan.model_validate(conversation.sound_plan)),
         caller_number=number,

@@ -5,6 +5,7 @@ service sends no partials, and one final for each utterance, when Yaksh's VAD ha
 agent stop: so `SttTraits.words_while_speaking` is false."""
 
 import functools
+from collections.abc import Sequence
 from importlib.resources import files
 from typing import Any
 
@@ -54,7 +55,13 @@ class SarvamHttpTts(SarvamHttpTTSService):
 
 
 def tts(
-    settings: AppSettings, voice: VoiceSettings, language: Language, key: str, *, one_shot: bool
+    settings: AppSettings,
+    voice: VoiceSettings,
+    language: Language,
+    key: str,
+    *,
+    one_shot: bool,
+    also: Sequence[Language] = (),
 ) -> SarvamHttpTts:
     """At 8 kHz, which the service must be told: left out, Sarvam answers at 24 kHz."""
     return SarvamHttpTts(
