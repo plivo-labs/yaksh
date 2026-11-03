@@ -2,6 +2,7 @@
 leaves out what must not sway a judge: the caller's own reason for ending the call, the noise
 setting, the agent's configuration and its documents. A change to the text is a new version."""
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
 
@@ -34,8 +35,9 @@ from yaksh.domain.conversations import (
 )
 from yaksh.domain.record_sources import RECORD_PROVIDERS
 from yaksh.domain.scenarios import Fact
+from yaksh.domain.stops import STOP_WINDOW_MS, LineStop, StopReason, StopResult
 
-EVIDENCE_VIEW_VERSION = 10
+EVIDENCE_VIEW_VERSION = 11
 NO_TIME = datetime.min.replace(tzinfo=UTC)
 
 TRANSCRIPTION_NOTE = {
@@ -98,6 +100,8 @@ class CallView:
     record: StoredRecord | None = None
     """The agent's own record of the call; None when the agent has no record source or the
     test ran over text."""
+    stops: Mapping[int, LineStop] = field(default_factory=dict)
+    """When the agent's speech stopped after each interruption line, by the line's number."""
 
 
 def render(view: CallView) -> str:
@@ -132,7 +136,7 @@ def render(view: CallView) -> str:
                 "TRANSCRIPT",
                 TRANSCRIPTION_NOTE[view.transport],
                 *([MACHINE_NOTE] if view.answered_by is not AnsweredBy.CALLER else []),
-                *transcript(view.turns, view.events),
+                *transcript(view.turns, view.events, view.stops),
             ]
         ),
     ]
@@ -317,10 +321,13 @@ def how_it_ended(view: CallView) -> str:
     return f"{ended}{source}. End reason: {reason}. Call length: {length}."
 
 
-def transcript(turns: list[Turn], events: list[WireEvent]) -> list[str]:
+def transcript(
+    turns: list[Turn], events: list[WireEvent], stops: Mapping[int, LineStop]
+) -> list[str]:
     """The numbered turns, with what the phone of Yaksh's caller did between them, and where
-    each of its interruption lines came, on lines that have no number, so a criterion's turn
-    numbers stay the turns' own."""
+    each of its interruption lines came and when the agent's speech stopped after it, on lines
+    that have no number, so a criterion's turn numbers stay the turns' own. A line that went
+    out only in part is two turns; its note follows the first."""
     marks = sorted(
         (event for event in events if event.kind in BETWEEN_TURNS), key=lambda event: event.at_ms
     )
@@ -335,7 +342,8 @@ def transcript(turns: list[Turn], events: list[WireEvent]) -> list[str]:
             lines.append(mark_line(marks.pop(0)))
         lines.append(f"[{number}] {speaker(turn)}: {turn_evidence(turn)}")
         if turn.interruption is not None and turn.interruption in played:
-            lines.append(interruption_line(played[turn.interruption], turns))
+            event = played.pop(turn.interruption)
+            lines.append(interruption_line(event, turns, stops.get(turn.interruption)))
     return lines + [mark_line(event) for event in marks]
 
 
@@ -352,32 +360,76 @@ QUOTED_WORDS = 12
 """The most words of the agent before a line that the line's note quotes."""
 
 
-def interruption_line(event: WireEvent, turns: list[Turn]) -> str:
-    """Where Yaksh's caller said a fixed line while the agent spoke. The line's turn comes after
-    the whole agent turn that it interrupted, so without this the agent's answer to the line
-    reads as if it came before the line. The interrupted turn is the stored agent turn that
-    holds the start of the agent's turn, or else the line's start: the stored turn of a turn
-    that a late transcript started begins at the agent's voice. Audio with no words, such as
-    hold music, has no stored turn."""
+def interruption_line(event: WireEvent, turns: list[Turn], stop: LineStop | None = None) -> str:
+    """Where Yaksh's caller said a fixed line while the agent spoke, and when the agent's speech
+    stopped after it. The line's turn comes after the whole agent turn that it interrupted, so
+    without this the agent's answer to the line reads as if it came before the line. The
+    interrupted turn is the stored agent turn that holds the start of the agent's turn, or else
+    the line's start: the stored turn of a turn that a late transcript started begins at the
+    agent's voice. Audio with no words, such as hold music, has no stored turn."""
     attempt = event.interruption
     assert attempt is not None
     held = holding(turns, attempt.turn_started_ms) or holding(turns, event.at_ms)
     words = attempt.words or ""
     if held is None and not words:
-        return (
-            "(Yaksh's caller said the fixed line above while the agent's side played sound with "
-            "no words.)"
+        where = (
+            "Yaksh's caller said the fixed line above while the agent's side played sound with "
+            "no words."
         )
-    parts = []
-    if held is not None:
-        number, turn = held
-        parts.append(f"{(event.at_ms - turn.started_at_ms) / 1000:.1f} s into turn [{number}]")
-    if words:
-        parts.append(f'after the words "{last_words(words)}"')
-    return (
-        "(Yaksh's caller said the fixed line above while the agent was speaking: "
-        f"{', '.join(parts)}.)"
-    )
+    else:
+        parts = []
+        if held is not None:
+            number, turn = held
+            parts.append(f"{(event.at_ms - turn.started_at_ms) / 1000:.1f} s into turn [{number}]")
+        if words:
+            parts.append(f'after the words "{last_words(words)}"')
+        where = (
+            "Yaksh's caller said the fixed line above while the agent was speaking: "
+            f"{', '.join(parts)}."
+        )
+    return f"({' '.join([where, *stop_sentence(stop)])})"
+
+
+WINDOW = f"{STOP_WINDOW_MS / 1000:g} s"
+UNMEASURED = {
+    StopReason.RECORDING_ENDED: "the recording ended right after its speech",
+    StopReason.MEDIA_GAP: "part of the agent's audio is missing",
+    StopReason.NO_LINE_SPEECH: "the line's audio has no speech",
+}
+CUT_SHORT = {
+    StopReason.RECORDING_ENDED: "and then the recording ended",
+    StopReason.MEDIA_GAP: "and then part of its audio is missing",
+}
+
+
+def stop_sentence(stop: LineStop | None) -> list[str]:
+    """When the agent's speech stopped after a line, in whole ms, so that a judge can hold it
+    against a limit; nothing for a call that has no stop time."""
+    if stop is None:
+        return []
+    match stop.result:
+        case StopResult.STOPPED:
+            return [
+                f"The agent's speech stopped {stop.stop_ms} ms after the line's speech started."
+            ]
+        case StopResult.KEPT_TALKING if stop.at_least and stop.reason in CUT_SHORT:
+            return [
+                f"The agent did not stop within {WINDOW}: it spoke for at least {stop.stop_ms} ms "
+                f"after the line's speech started, {CUT_SHORT[stop.reason]}."
+            ]
+        case StopResult.KEPT_TALKING:
+            return [
+                f"The agent did not stop within {WINDOW}: its speech went on for {stop.stop_ms} ms "
+                "after the line's speech started."
+            ]
+        case StopResult.NOT_SPEAKING:
+            return ["The agent was not speaking when the line's speech started."]
+        case StopResult.UNKNOWN:
+            assert stop.reason is not None
+            return [
+                "Yaksh could not measure when the agent's speech stopped: "
+                f"{UNMEASURED[stop.reason]}."
+            ]
 
 
 def holding(turns: list[Turn], ms: int | None) -> tuple[int, Turn] | None:

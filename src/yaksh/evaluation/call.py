@@ -30,7 +30,7 @@ from yaksh.domain.latency import CallerReplyTime, CallerReplyWindow, Latency, Sp
 from yaksh.domain.record_sources import RECORD_PROVIDERS
 from yaksh.domain.rules import LlmRule, PhraseRule, in_scope
 from yaksh.domain.scenarios import PlayedScenario
-from yaksh.domain.stops import line_stops
+from yaksh.domain.stops import LineStop, StopTime, line_stops
 from yaksh.evaluation import metrics, speech
 from yaksh.evaluation.caller_check import CALLER_CHECK, applied, check_caller
 from yaksh.evaluation.criteria import AGENT_RULE, CRITERION, judge_criterion, judge_rule, rule_text
@@ -116,7 +116,11 @@ async def evaluate(
     if judging is None:
         phrases = [phrase_item(rule, turns) for rule in agent_rules if isinstance(rule, PhraseRule)]
         return Evaluated(metrics=found, items=phrases)
-    view = render(call_view(conversation, agent, scenario, transcript, answering, record))
+    view = render(
+        call_view(
+            conversation, agent, scenario, transcript, answering, record, measured_stops(found)
+        )
+    )
     played = AnsweredBy.CALLER in reached
     criteria_text = scenario.criteria if played else []
     kept = record.record if record is not None else None
@@ -331,7 +335,8 @@ def call_view(
     scenario: PlayedScenario,
     transcript: Transcript,
     answering: Answering,
-    record: StoredRecord | None = None,
+    record: StoredRecord | None,
+    stops: Mapping[int, LineStop],
 ) -> CallView:
     line = parsed(LineFacts, conversation.line_facts)
     return CallView(
@@ -357,7 +362,16 @@ def call_view(
         answering=None if conversation.answered_by is AnsweredBy.CALLER else answering,
         events=list(transcript.wire_events),
         record=record,
+        stops=stops,
     )
+
+
+def measured_stops(found: Mapping[MetricKey, Metric]) -> dict[int, LineStop]:
+    """When the agent's speech stopped after each interruption line, by the line's number."""
+    metric = found.get(MetricKey.STOP_TIME)
+    if metric is None:
+        return {}
+    return {line.number: line for line in StopTime.model_validate(metric.value).lines}
 
 
 async def measure_call(

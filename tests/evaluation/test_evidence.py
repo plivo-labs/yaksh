@@ -30,6 +30,7 @@ from yaksh.domain.conversations import (
 )
 from yaksh.domain.record_sources import RecordProvider
 from yaksh.domain.scenarios import Fact
+from yaksh.domain.stops import LineStop, StopReason, StopResult
 from yaksh.evaluation.evidence import CallView, record_lines, render, with_item
 from yaksh.evaluation.quotes import quote_problems
 from yaksh.evaluation.sources import agent_line_problems
@@ -234,6 +235,153 @@ def test_a_line_over_sound_with_no_words_or_after_a_late_transcript_is_still_pla
         'turn [3], after the words "…is one hundred and twenty dollars and that includes the '
         'cleaning and".)'
     ) in rendered, "the stored turn starts at the agent's voice, after the late transcript"
+
+
+def interrupted(*lines: Turn) -> tuple[list[Turn], list[WireEvent]]:
+    """An agent turn and its lines, each line with the try that played it."""
+    agent = Turn(role=Role.AGENT, text="Your booking is", started_at_ms=1_000, ended_at_ms=9_000)
+    numbers = sorted({line.interruption for line in lines if line.interruption is not None})
+    events = [
+        WireEvent(
+            kind=WireEventKind.INTERRUPTION,
+            at_ms=2_000 * number,
+            interruption=InterruptionTry(
+                number=number, answer=1, turn_started_ms=1_000, words="Your booking is"
+            ),
+        )
+        for number in numbers
+    ]
+    return [agent, *lines], events
+
+
+def said(number: int, text: str, provenance: Provenance = Provenance.TRANSMITTED) -> Turn:
+    return Turn(
+        role=Role.CALLER,
+        text=text,
+        started_at_ms=2_000 * number,
+        ended_at_ms=2_000 * number + 500,
+        provenance=provenance,
+        scripted=True,
+        interruption=number,
+    )
+
+
+@pytest.mark.parametrize(
+    ("stop", "sentence"),
+    [
+        (
+            LineStop(number=1, line_ms=2_150, result=StopResult.STOPPED, stop_ms=841),
+            "The agent's speech stopped 841 ms after the line's speech started.",
+        ),
+        (
+            LineStop(number=1, line_ms=2_150, result=StopResult.KEPT_TALKING, stop_ms=9_662),
+            "The agent did not stop within 2 s: its speech went on for 9662 ms after the line's "
+            "speech started.",
+        ),
+        (
+            LineStop(
+                number=1,
+                line_ms=2_150,
+                result=StopResult.KEPT_TALKING,
+                stop_ms=3_500,
+                at_least=True,
+                reason=StopReason.RECORDING_ENDED,
+            ),
+            "The agent did not stop within 2 s: it spoke for at least 3500 ms after the line's "
+            "speech started, and then the recording ended.",
+        ),
+        (
+            LineStop(
+                number=1,
+                line_ms=2_150,
+                result=StopResult.KEPT_TALKING,
+                stop_ms=3_000,
+                at_least=True,
+                reason=StopReason.MEDIA_GAP,
+            ),
+            "The agent did not stop within 2 s: it spoke for at least 3000 ms after the line's "
+            "speech started, and then part of its audio is missing.",
+        ),
+        (
+            LineStop(number=1, line_ms=2_150, result=StopResult.NOT_SPEAKING),
+            "The agent was not speaking when the line's speech started.",
+        ),
+        (
+            LineStop(
+                number=1, line_ms=2_150, result=StopResult.UNKNOWN, reason=StopReason.MEDIA_GAP
+            ),
+            "Yaksh could not measure when the agent's speech stopped: part of the agent's audio "
+            "is missing.",
+        ),
+        (
+            LineStop(
+                number=1,
+                line_ms=2_150,
+                result=StopResult.UNKNOWN,
+                reason=StopReason.RECORDING_ENDED,
+            ),
+            "Yaksh could not measure when the agent's speech stopped: the recording ended right "
+            "after its speech.",
+        ),
+        (
+            LineStop(number=1, result=StopResult.UNKNOWN, reason=StopReason.NO_LINE_SPEECH),
+            "Yaksh could not measure when the agent's speech stopped: the line's audio has no "
+            "speech.",
+        ),
+    ],
+)
+def test_the_judges_read_when_the_agents_speech_stopped_after_a_line(
+    stop: LineStop, sentence: str
+) -> None:
+    turns, events = interrupted(said(1, "Sorry, what time?"))
+
+    rendered = render(replace(MAPLE_DENTAL, turns=turns, events=events, stops={1: stop}))
+
+    assert (
+        "[2] Caller (Yaksh's fixed line): Sorry, what time?\n"
+        "(Yaksh's caller said the fixed line above while the agent was speaking: 1.0 s into "
+        f'turn [1], after the words "Your booking is". {sentence})'
+    ) in rendered
+
+
+def test_a_line_that_went_out_in_part_gets_one_note() -> None:
+    turns, events = interrupted(
+        said(1, "Sorry,"), said(1, "what time was that?", Provenance.UNCONFIRMED)
+    )
+    stop = LineStop(number=1, line_ms=2_150, result=StopResult.STOPPED, stop_ms=788)
+
+    rendered = render(replace(MAPLE_DENTAL, turns=turns, events=events, stops={1: stop}))
+
+    assert rendered.count("Yaksh's caller said the fixed line above") == 1
+    assert (
+        "Sorry,\n(Yaksh's caller said the fixed line above while the agent was speaking: 1.0 s "
+        'into turn [1], after the words "Your booking is". The agent\'s speech stopped 788 ms '
+        "after the line's speech started.)\n[3]"
+    ) in rendered
+
+
+def test_a_line_whose_tries_did_not_play_gets_no_note() -> None:
+    turns, _ = interrupted(said(1, "Sorry, what time?"))
+    skipped = WireEvent(
+        kind=WireEventKind.INTERRUPTION,
+        at_ms=2_000,
+        interruption=InterruptionTry(number=1, answer=1, reason=TryReason.AGENT_QUIET),
+    )
+    stop = LineStop(number=1, line_ms=2_150, result=StopResult.STOPPED, stop_ms=788)
+
+    rendered = render(replace(MAPLE_DENTAL, turns=turns, events=[skipped], stops={1: stop}))
+
+    assert "Yaksh's caller said the fixed line above" not in rendered
+    assert "788 ms" not in rendered
+
+
+def test_a_call_with_no_stop_time_keeps_the_note_of_where_the_line_came() -> None:
+    turns, events = interrupted(said(1, "Sorry, what time?"))
+
+    rendered = render(replace(MAPLE_DENTAL, turns=turns, events=events))
+
+    assert 'after the words "Your booking is".)' in rendered
+    assert "speech stopped" not in rendered
 
 
 def test_a_text_conversation_has_its_own_transcript_note_and_no_phone_facts() -> None:
