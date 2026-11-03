@@ -18,6 +18,7 @@ class PersonaRead(BaseModel):
     builtin_key: str | None
     prompt: str
     language: Language
+    additional_languages: tuple[Language, ...]
     voice: VoiceSettings
     voice_gender: VoiceGender | None
     surroundings: Surroundings

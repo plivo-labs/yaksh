@@ -88,6 +88,11 @@ class Prepared:
 async def spoken(key: str, request: CallRequest, text: str) -> bytes:
     """The text in the persona's voice, through the same text-to-speech as its replies."""
     service = tts_service(
-        request.app_settings, request.voice, request.caller_language, key, one_shot=True
+        request.app_settings,
+        request.voice,
+        request.caller_language,
+        key,
+        one_shot=True,
+        also=request.additional_languages,
     )
     return await speak_once(service, text)

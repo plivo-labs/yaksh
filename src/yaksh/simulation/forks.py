@@ -423,6 +423,9 @@ def persona_forks(
                 name=name,
                 prompt=str(data.get("prompt") or "").strip() or own.prompt,
                 language=language,
+                additional_languages=tuple(
+                    other for other in own.additional_languages if other is not language
+                ),
                 voice=source.voice(language, gender, speed, asked=bool(data.get("voice_gender"))),
                 surroundings=surroundings,
                 sample_line=own.sample_line if language is own.language else None,

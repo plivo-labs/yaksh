@@ -57,15 +57,15 @@ def test_code_finds_how_the_caller_ended_the_call() -> None:
         turns=[turn(Role.AGENT, "Goodbye!", 0), turn(Role.CALLER, "Bye.", 2_000)]
     )
 
-    assert facts(waited, EndReason.CALLER_HANGUP, Language.EN) == [
+    assert facts(waited, EndReason.CALLER_HANGUP, (Language.EN,)) == [
         "The caller hung up, and the agent's last turn has no closing words.",
         "The caller hung up within 10 s of the agent saying it would check or asking it to wait.",
     ]
-    assert facts(last_word, EndReason.TURN_LIMIT, Language.EN) == [
+    assert facts(last_word, EndReason.TURN_LIMIT, (Language.EN,)) == [
         "The last turn, 2, is the caller's.",
         "The test's turn limit ended the call.",
     ]
-    assert facts(last_word, EndReason.AGENT_HANGUP, Language.EN) == [
+    assert facts(last_word, EndReason.AGENT_HANGUP, (Language.EN,)) == [
         "The last turn, 2, is the caller's."
     ]
 
@@ -118,7 +118,7 @@ async def test_the_check_reads_the_caller_side_and_names_criteria_that_exist() -
         "You are polite and give one detail at a time.",
         ["Asks for the date of birth.", "Reads it back."],
         EndReason.AGENT_HANGUP,
-        Language.EN,
+        (Language.EN,),
         slots=asyncio.Semaphore(1),
         retry_later=True,
     )
@@ -137,7 +137,7 @@ async def test_the_check_reads_the_caller_side_and_names_criteria_that_exist() -
 def test_a_call_in_another_language_gets_no_phrase_facts() -> None:
     hindi = Transcript(turns=[turn(Role.AGENT, "ठीक है, धन्यवाद। अलविदा!", 0)])
 
-    assert facts(hindi, EndReason.CALLER_HANGUP, Language.HI) == []
+    assert facts(hindi, EndReason.CALLER_HANGUP, (Language.HI,)) == []
 
 
 def test_a_failed_check_blocks_nothing_except_unmet_criteria_on_a_limit_call() -> None:
@@ -162,3 +162,30 @@ def test_any_qualifying_impact_blocks_and_a_pass_is_never_blocked() -> None:
     assert cut.outcome is Outcome.BLOCKED
     assert [item.outcome for item in kept] == [Outcome.PASS, Outcome.UNSURE]
     assert kept[0].caller_effect is not None
+
+
+async def test_a_caller_of_several_languages_is_checked_on_them_without_phrase_facts() -> None:
+    clean = {"findings": [], "impact": [], "blame_risk": "none"}
+    one, several = Scripted(clean), Scripted(clean)
+    english = Transcript(turns=[turn(Role.AGENT, "Which day suits you?", 0)])
+    languages = (Language.EN, Language.HI, Language.TA)
+
+    for model, spoken in ((one, (Language.EN,)), (several, languages)):
+        await check_caller(
+            model,
+            "VIEW",
+            english,
+            "You are polite.",
+            ["Answers in Hindi after the caller switches."],
+            EndReason.CALLER_HANGUP,
+            spoken,
+            slots=asyncio.Semaphore(1),
+            retry_later=True,
+        )
+
+    assert "CALLER LANGUAGES" not in one.requests[0]
+    block = "CALLER LANGUAGES\nMain language: English. Also speaks: Hindi, Tamil."
+    assert block in several.requests[0]
+    assert "- Wrong language:" in several.requests[0]
+    assert facts(english, EndReason.CALLER_HANGUP, (Language.EN,)) != []
+    assert facts(english, EndReason.CALLER_HANGUP, languages) == []

@@ -889,7 +889,10 @@ async def test_a_conversation_freezes_its_persona_scenario_and_prompt(
 ) -> None:
     agent_id = await create_agent_id(client)
     persona = await create_persona(
-        client, language="hi", surroundings={"sounds": [{"sound": "cafe", "db": -10}]}
+        client,
+        language="hi",
+        additional_languages=["en"],
+        surroundings={"sounds": [{"sound": "cafe", "db": -10}]},
     )
     scenario = await create_scenario(
         client, agent_id, first_words="Haan, bolo?", persona_id=persona["id"]
@@ -899,6 +902,7 @@ async def test_a_conversation_freezes_its_persona_scenario_and_prompt(
         f"/api/v1/personas/{persona['id']}",
         json={
             "prompt": "Someone else.",
+            "additional_languages": ["ta"],
             "voice": {**persona["voice"], "speed": 1.2},
             "surroundings": {},
         },
@@ -928,6 +932,8 @@ async def test_a_conversation_freezes_its_persona_scenario_and_prompt(
     assert SCENARIO["instructions"] in request.instructions and "Cancel" not in request.instructions
     assert "- Name: Priya Raman" in request.instructions and "Hinglish" in request.instructions
     assert request.voice.speed == 1.0 and request.nudge == "हेलो? आप वहाँ हैं?"
+    assert detail["additional_languages"] == ["en"]
+    assert request.additional_languages == (Language.EN,)
     assert request.first_words == detail["scenario"]["first_words"] == "Haan, bolo?"
     assert cleared.json()["first_words"] is None
     assert detail["surroundings"]["sounds"] == [{"sound": "cafe", "db": -10}]

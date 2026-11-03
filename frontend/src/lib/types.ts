@@ -190,6 +190,13 @@ export const LANGUAGE_NAMES: Record<Language, string> = {
   es: "Spanish",
 };
 
+/** A caller's languages, the primary one first: "English + Hindi", "Hindi + Marathi, English". */
+export const callerLanguages = (language: Language, additional: Language[]): string =>
+  [
+    LANGUAGE_NAMES[language],
+    ...(additional.length ? [additional.map((other) => LANGUAGE_NAMES[other]).join(", ")] : []),
+  ].join(" + ");
+
 export const LANGUAGE_ITEMS = (Object.keys(LANGUAGE_NAMES) as Language[]).map((language) => ({
   value: language,
   label: LANGUAGE_NAMES[language],
@@ -752,6 +759,7 @@ export interface PersonaInput {
   forked_from_id?: string | null;
   prompt: string;
   language: Language;
+  additional_languages: Language[];
   voice: VoiceSettings;
   surroundings: Surroundings;
   /** What the persona's previews say; null says its language's sample sentence. */
@@ -783,7 +791,10 @@ export interface Persona {
   name: string;
   builtin_key: string | null;
   prompt: string;
+  /** The primary language: the caller's main one. */
   language: Language;
+  /** Languages the caller can switch to during a call. */
+  additional_languages: Language[];
   voice: VoiceSettings;
   voice_gender: VoiceGender | null;
   surroundings: Surroundings;
@@ -1059,6 +1070,8 @@ export interface ConversationSummary {
 
 export interface Conversation extends ConversationSummary {
   instructions: string;
+  /** The other languages the caller could switch to, from its pinned persona version. */
+  additional_languages: Language[];
   /** The persona's voicemail and call screener, as its pinned version set them; null when the
    * persona answered. */
   answering: Answering | null;

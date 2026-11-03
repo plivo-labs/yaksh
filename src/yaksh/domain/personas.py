@@ -1,5 +1,5 @@
 import uuid
-from typing import Annotated, Any
+from typing import Annotated, Any, Self
 
 from pydantic import (
     BaseModel,
@@ -8,6 +8,7 @@ from pydantic import (
     StringConstraints,
     ValidationInfo,
     field_validator,
+    model_validator,
 )
 
 from yaksh.domain.answering import Answering
@@ -25,17 +26,41 @@ class PersonaSettings(BaseModel):
 
     prompt: Prompt
     language: Language = Language.EN
+    """The primary language: the caller's main one, which Yaksh's own lines also use."""
+    additional_languages: tuple[Language, ...] = Field(default=(), max_length=8)
+    """Languages the caller can switch to during a call; empty for a caller of one language."""
     voice: VoiceSettings
     surroundings: Surroundings = Surroundings()
     sample_line: SampleLine | None = None
     """What the persona's previews say; None says its language's sample sentence."""
     answering: Answering = Answering()
 
+    @property
+    def languages(self) -> tuple[Language, ...]:
+        """Every language the caller speaks, the primary first."""
+        return (self.language, *self.additional_languages)
+
+    @model_validator(mode="after")
+    def languages_are_distinct(self) -> Self:
+        if len(set(self.languages)) != len(self.languages):
+            raise ValueError("additional languages must differ from each other and from language")
+        return self
+
 
 class PersonaConfig(PersonaSettings):
     """What a persona version pins: the settings plus the voice gender from the voices list."""
 
     voice_gender: VoiceGender | None = None
+
+    def stored(self) -> dict[str, Any]:
+        """The config as a version keeps it, without the voice's model, which has its own
+        column. With no additional languages it has no `additional_languages` key: a process of
+        an older version refuses a field that it does not know, and it must still read the
+        version during a rolling deploy."""
+        exclude: dict[str, Any] = {"voice": {"model"}}
+        if not self.additional_languages:
+            exclude["additional_languages"] = True
+        return self.model_dump(mode="json", exclude=exclude)
 
 
 class PersonaCreate(PersonaSettings):
@@ -75,13 +100,23 @@ class PersonaUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=80)
     prompt: Prompt | None = None
     language: Language | None = None
+    additional_languages: tuple[Language, ...] | None = Field(default=None, max_length=8)
+    """An empty list clears them."""
     voice: VoiceSettings | None = None
     surroundings: Surroundings | None = None
     sample_line: SampleLine | None = None
     """None clears it."""
     answering: Answering | None = None
 
-    @field_validator("name", "prompt", "language", "voice", "surroundings", "answering")
+    @field_validator(
+        "name",
+        "prompt",
+        "language",
+        "additional_languages",
+        "voice",
+        "surroundings",
+        "answering",
+    )
     @classmethod
     def cannot_be_cleared(cls, value: Any, info: ValidationInfo) -> Any:
         if value is None:

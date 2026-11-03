@@ -27,7 +27,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { useSurroundingsPreview } from "@/hooks/use-surroundings-preview";
 import { surroundingsLabel } from "@/lib/format";
 import { usePersonas } from "@/lib/queries";
-import { LANGUAGE_NAMES } from "@/lib/types";
+import { callerLanguages } from "@/lib/types";
 import { NewPersonaDialog } from "@/pages/new-persona-dialog";
 
 export function PersonasPage() {
@@ -89,7 +89,9 @@ export function PersonasPage() {
                     </Link>
                   </CardTitle>
                   <CardDescription className="flex flex-wrap items-center gap-1.5">
-                    <span className="mr-1">{LANGUAGE_NAMES[item.language]}</span>
+                    <span className="mr-1">
+                      {callerLanguages(item.language, item.additional_languages)}
+                    </span>
                     {item.voice_gender && <GenderBadge gender={item.voice_gender} />}
                     {item.builtin_key && <Badge>Built-in</Badge>}
                     {surroundingsLabel(item.surroundings) && (

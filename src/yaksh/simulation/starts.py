@@ -151,8 +151,9 @@ async def snapshot(
         config = persona_config_of(persona)
         wants = scenario_config_of(scenario)
         if transport is Transport.PHONE:
-            check_heard(app.speech.stt, current.languages, config.language, persona.name)
-            check_persona_voice(app, config.voice, config.language, persona.name)
+            for language in config.languages:
+                check_heard(app.speech.stt, current.languages, language, persona.name)
+            check_persona_voice(app, config.voice, config.languages, persona.name)
             if plays_scenario(answer, picked_up=config.answering.picks_up):
                 check_words_while_speaking(app.speech.stt, wants, scenario.name)
         if trigger is not None:
@@ -219,10 +220,10 @@ def check_words_while_speaking(stt: SttProvider, scenario: ScenarioConfig, name:
 
 
 def check_persona_voice(
-    app: AppSettings, voice: VoiceSettings, language: Language, persona: str
+    app: AppSettings, voice: VoiceSettings, languages: Sequence[Language], persona: str
 ) -> None:
     """Refuse a phone call whose persona speaks with a provider that has no key, or with a
-    model that is not in Yaksh's list or does not speak the persona's language."""
+    model that is not in Yaksh's list or does not speak each of the persona's languages."""
     provider = voice.provider
     if app.tts_credential(provider) is None:
         raise ValidationError(
@@ -233,10 +234,12 @@ def check_persona_voice(
         model = voice.model_in_use
     except ValueError as error:
         raise ValidationError(f'the persona "{persona}": {error}; choose another voice') from None
-    if language not in model.languages:
+    missing = next((language for language in languages if language not in model.languages), None)
+    if missing is not None:
+        which = "the" if len(languages) == 1 else "a"
         raise ValidationError(
             f"text to speech ({provider.traits.name_of(model)}) doesn't speak "
-            f'{language.label}, the language of the persona "{persona}"; choose another voice'
+            f'{missing.label}, {which} language of the persona "{persona}"; choose another voice'
         )
 
 

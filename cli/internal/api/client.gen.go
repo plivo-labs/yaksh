@@ -1863,29 +1863,30 @@ type ConversationEvaluation struct {
 
 // ConversationRead defines model for ConversationRead.
 type ConversationRead struct {
-	AgentCallerId  *string            `json:"agent_caller_id"`
-	AgentId        openapi_types.UUID `json:"agent_id"`
-	AgentName      string             `json:"agent_name"`
-	AgentRecord    *AgentRecordStatus `json:"agent_record"`
-	AgentVersion   int                `json:"agent_version"`
-	AgentVersionId openapi_types.UUID `json:"agent_version_id"`
-	AnsweredBy     AnsweredBy         `json:"answered_by"`
-	Answering      *Answering         `json:"answering"`
-	Attempt        int                `json:"attempt"`
-	CallUuid       *string            `json:"call_uuid"`
-	CallerNumber   *string            `json:"caller_number"`
-	CallerReason   *string            `json:"caller_reason"`
-	Channel        Channel            `json:"channel"`
-	CreatedAt      time.Time          `json:"created_at"`
-	DataSetId      openapi_types.UUID `json:"data_set_id"`
-	DataSetName    string             `json:"data_set_name"`
-	Direction      Direction          `json:"direction"`
-	EndReason      *EndReason         `json:"end_reason"`
-	EndedAt        *time.Time         `json:"ended_at"`
-	Evaluation     *EvaluationState   `json:"evaluation"`
-	FailureReason  *string            `json:"failure_reason"`
-	Id             openapi_types.UUID `json:"id"`
-	Instructions   string             `json:"instructions"`
+	AdditionalLanguages []Language         `json:"additional_languages"`
+	AgentCallerId       *string            `json:"agent_caller_id"`
+	AgentId             openapi_types.UUID `json:"agent_id"`
+	AgentName           string             `json:"agent_name"`
+	AgentRecord         *AgentRecordStatus `json:"agent_record"`
+	AgentVersion        int                `json:"agent_version"`
+	AgentVersionId      openapi_types.UUID `json:"agent_version_id"`
+	AnsweredBy          AnsweredBy         `json:"answered_by"`
+	Answering           *Answering         `json:"answering"`
+	Attempt             int                `json:"attempt"`
+	CallUuid            *string            `json:"call_uuid"`
+	CallerNumber        *string            `json:"caller_number"`
+	CallerReason        *string            `json:"caller_reason"`
+	Channel             Channel            `json:"channel"`
+	CreatedAt           time.Time          `json:"created_at"`
+	DataSetId           openapi_types.UUID `json:"data_set_id"`
+	DataSetName         string             `json:"data_set_name"`
+	Direction           Direction          `json:"direction"`
+	EndReason           *EndReason         `json:"end_reason"`
+	EndedAt             *time.Time         `json:"ended_at"`
+	Evaluation          *EvaluationState   `json:"evaluation"`
+	FailureReason       *string            `json:"failure_reason"`
+	Id                  openapi_types.UUID `json:"id"`
+	Instructions        string             `json:"instructions"`
 
 	// Language A language a caller speaks.
 	Language         Language            `json:"language"`
@@ -2618,6 +2619,8 @@ type Pair struct {
 
 // PersonaConfig What a persona version pins: the settings plus the voice gender from the voices list.
 type PersonaConfig struct {
+	AdditionalLanguages *[]Language `json:"additional_languages,omitempty"`
+
 	// Answering The persona's phone, for the calls that a run sends to its voicemail or call screener.
 	Answering *Answering `json:"answering,omitempty"`
 
@@ -2638,6 +2641,8 @@ type PersonaConfig struct {
 
 // PersonaCreate defines model for PersonaCreate.
 type PersonaCreate struct {
+	AdditionalLanguages *[]Language `json:"additional_languages,omitempty"`
+
 	// Answering The persona's phone, for the calls that a run sends to its voicemail or call screener.
 	Answering    *Answering          `json:"answering,omitempty"`
 	ForkedFromId *openapi_types.UUID `json:"forked_from_id,omitempty"`
@@ -2679,6 +2684,8 @@ type PersonaIdea struct {
 
 // PersonaRead defines model for PersonaRead.
 type PersonaRead struct {
+	AdditionalLanguages []Language `json:"additional_languages"`
+
 	// Answering The persona's phone, for the calls that a run sends to its voicemail or call screener.
 	Answering      Answering           `json:"answering"`
 	BuiltinKey     *string             `json:"builtin_key"`
@@ -2714,13 +2721,14 @@ type PersonaScenario struct {
 
 // PersonaUpdate defines model for PersonaUpdate.
 type PersonaUpdate struct {
-	Answering    *Answering     `json:"answering,omitempty"`
-	Language     *Language      `json:"language,omitempty"`
-	Name         *string        `json:"name,omitempty"`
-	Prompt       *string        `json:"prompt,omitempty"`
-	SampleLine   *string        `json:"sample_line,omitempty"`
-	Surroundings *Surroundings  `json:"surroundings,omitempty"`
-	Voice        *VoiceSettings `json:"voice,omitempty"`
+	AdditionalLanguages *[]Language    `json:"additional_languages,omitempty"`
+	Answering           *Answering     `json:"answering,omitempty"`
+	Language            *Language      `json:"language,omitempty"`
+	Name                *string        `json:"name,omitempty"`
+	Prompt              *string        `json:"prompt,omitempty"`
+	SampleLine          *string        `json:"sample_line,omitempty"`
+	Surroundings        *Surroundings  `json:"surroundings,omitempty"`
+	Voice               *VoiceSettings `json:"voice,omitempty"`
 }
 
 // PersonaVersionRead defines model for PersonaVersionRead.

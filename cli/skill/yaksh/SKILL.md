@@ -111,7 +111,7 @@ criteria:
 
 ### Add them
 
-- `yaksh scenario create --agent <agent-id> -f <file>` adds a scenario. `yaksh persona list` shows the personas for its `persona_id`. A persona is a person, not one agent's caller: pick it by how it talks, and keep the role and the values in the scenario and its data sets. When none fits, ask the user to add one in the console.
+- `yaksh scenario create --agent <agent-id> -f <file>` adds a scenario. `yaksh persona list` shows the personas for its `persona_id`. A persona is a person, not one agent's caller: pick it by how it talks, and keep the role and the values in the scenario and its data sets. A persona with `additional_languages` can switch to them during the call; to test a switch, say in the instructions when the caller switches. When none fits, ask the user to add one in the console.
 - In YAML, quote a value that holds `: ` or ` #`, and in a `{name: ..., value: ...}` line, a value with a comma.
 - Write the scenarios yourself: `yaksh scenario generate` saves each scenario before you can read it, and the CLI cannot delete a scenario.
 - `yaksh scenario update <scenario-id> -f <file>` changes a scenario: a list in the file replaces the whole list. The server refuses the read-only fields of `yaksh scenario view`, such as the scenario's `id`. Keep the `id` of each data set that stays.

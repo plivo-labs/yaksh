@@ -2,6 +2,7 @@
 the speech in its region. The v3 and v4 models work only on its dialogue socket."""
 
 import time
+from collections.abc import Sequence
 
 from pipecat.services.elevenlabs.dialogue.tts import ElevenLabsDialogueTTSService
 from pipecat.services.elevenlabs.tts import ElevenLabsTTSService
@@ -30,12 +31,20 @@ class SentenceDialogue(ElevenLabsDialogueTTSService):
 
 
 def tts(
-    settings: AppSettings, voice: VoiceSettings, language: Language, key: str, *, one_shot: bool
+    settings: AppSettings,
+    voice: VoiceSettings,
+    language: Language,
+    key: str,
+    *,
+    one_shot: bool,
+    also: Sequence[Language] = (),
 ) -> ElevenLabsTTSService | SentenceDialogue:
     """A one-shot service does not reconnect: a dropped socket fails the speech instead of
     ending it short as finished. Pipecat sends the language only to a model that takes it;
-    any other reads the language from the text."""
+    any other reads the language from the text, as every model does for a caller that can
+    switch languages."""
     model = voice.model_in_use.id
+    spoken = None if also else PipecatLanguage(language.value)
     if model is not None and model.startswith(DIALOGUE_MODELS):
         return SentenceDialogue(
             api_key=key,
@@ -45,7 +54,7 @@ def tts(
                 model=model,
                 voice=voice.id,
                 stability=voice.stability,
-                language=PipecatLanguage(language.value),
+                language=spoken,
             ),
             stop_frame_timeout_s=quiet_s(one_shot),
             reconnect_on_error=not one_shot,
@@ -59,7 +68,7 @@ def tts(
             voice=voice.id,
             speed=voice.speed,
             stability=voice.stability,
-            language=PipecatLanguage(language.value),
+            language=spoken,
         ),
         stop_frame_timeout_s=quiet_s(one_shot),
         reconnect_on_error=not one_shot,

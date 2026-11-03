@@ -382,6 +382,8 @@ class CallRequest(BaseModel):
     """What the caller says first when it speaks first."""
     nudge: str
     caller_language: Language
+    additional_languages: tuple[Language, ...] = ()
+    """The caller's other languages, which it can switch to during the call."""
     voice: VoiceSettings
     sound_plan: SoundPlan = SoundPlan()
     """The sounds mixed under the caller's voice, with full file paths."""

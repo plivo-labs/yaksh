@@ -53,12 +53,16 @@ WAITING = re.compile(
 WAIT_HANGUP_MS = 10_000
 
 
-def facts(transcript: Transcript, end_reason: EndReason | None, language: Language) -> list[str]:
+def facts(
+    transcript: Transcript, end_reason: EndReason | None, languages: Sequence[Language]
+) -> list[str]:
     """What code can tell about the caller's part in how the call ended. The closing and wait
-    phrases are English, so a call in another language gets neither fact."""
+    phrases are English, so a call with a caller of another language, or of more than one, gets
+    neither fact."""
     found = []
     turns = transcript.turns
-    agent = [turn for turn in turns if turn.role is Role.AGENT] if language is Language.EN else []
+    english = tuple(languages) == (Language.EN,)
+    agent = [turn for turn in turns if turn.role is Role.AGENT] if english else []
     ended_by_caller = end_reason is EndReason.CALLER_HANGUP
     if ended_by_caller and agent and not CLOSING.search(agent[-1].text):
         found.append("The caller hung up, and the agent's last turn has no closing words.")
@@ -104,6 +108,24 @@ def problems(transcript: Transcript, criteria: int) -> Check:
     return check
 
 
+def caller_languages(languages: Sequence[Language]) -> str:
+    """The caller's languages, for a caller that can switch between them; empty for a caller
+    of one language."""
+    main, *others = languages
+    if not others:
+        return ""
+    also = ", ".join(language.label for language in others)
+    return (
+        f"CALLER LANGUAGES\nMain language: {main.label}. Also speaks: {also}. The caller was told "
+        "to switch between them as its persona and instructions say, and to switch at least once "
+        "when they do not say when. Also find this act:\n"
+        "- Wrong language: it spoke a language that is not one of these; or the moment for a "
+        "switch came, from its persona or instructions or, when they do not say when, at some "
+        "point in a call where it had several turns, the caller had a turn after that moment, and "
+        "it never spoke another of these languages.\n\n"
+    )
+
+
 async def check_caller(
     model: JsonModel,
     view: str,
@@ -111,17 +133,18 @@ async def check_caller(
     persona: str | None,
     criteria: Sequence[str],
     end_reason: EndReason | None,
-    language: Language,
+    languages: Sequence[Language],
     *,
     slots: Slots,
     retry_later: bool,
 ) -> ItemResult:
-    """`persona` is how the caller talks; the caller's instructions and facts come from the view."""
+    """`persona` is how the caller talks; the caller's instructions and facts come from the view.
+    `languages` are the ones the caller speaks, its main one first."""
     numbered = "\n".join(f"{number}. {text}" for number, text in enumerate(criteria, 1))
-    found = "\n".join(f"- {fact}" for fact in facts(transcript, end_reason, language)) or "- none"
+    found = "\n".join(f"- {fact}" for fact in facts(transcript, end_reason, languages)) or "- none"
     user = (
-        f"CALLER PERSONA\n{persona or 'none'}\n\nCRITERIA\n{numbered}\n\n"
-        f"FACTS CODE FOUND\n{found}\n\n{view}"
+        f"CALLER PERSONA\n{persona or 'none'}\n\n{caller_languages(languages)}"
+        f"CRITERIA\n{numbered}\n\nFACTS CODE FOUND\n{found}\n\n{view}"
     )
     answered = await ask(
         model,

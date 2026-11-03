@@ -515,7 +515,9 @@ class Persona:
         turns = settings.turn_taking
         self.llm = llm_service(settings, request.caller, keys, request.instructions)
         hearer = settings.speech.stt
-        hearing = stt_language(hearer, request.agent.languages, request.caller_language)
+        hearing = stt_language(
+            hearer, request.agent.languages, request.caller_language, request.additional_languages
+        )
         self.settings = CallerSettings(
             llm_model=request.caller.model,
             reasoning_effort=caller_effort(request.caller.model, request.caller.reasoning_effort),
@@ -534,7 +536,13 @@ class Persona:
             request.conversation_id, self.settings, urlsplit(str(settings.llm.base_url)).hostname
         )
         self.stt = stt_service(settings, hearer, keys.stt, hearing)
-        self.tts = tts_service(settings, request.voice, request.caller_language, keys.tts)
+        self.tts = tts_service(
+            settings,
+            request.voice,
+            request.caller_language,
+            keys.tts,
+            also=request.additional_languages,
+        )
 
         self.ending = Ending(request, state, transcript, observer, clock, self.say)
         aggregators = LLMContextAggregatorPair(

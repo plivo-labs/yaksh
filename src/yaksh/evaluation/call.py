@@ -25,6 +25,7 @@ from yaksh.domain.conversations import (
 from yaksh.domain.evaluations import DecidedBy, ItemRole, Metric, MetricKey, Outcome, UnsureKind
 from yaksh.domain.files import FileStore
 from yaksh.domain.language_models import JsonModel
+from yaksh.domain.languages import Language
 from yaksh.domain.latency import CallerReplyTime, CallerReplyWindow, Latency, Span, waits
 from yaksh.domain.record_sources import RECORD_PROVIDERS
 from yaksh.domain.rules import LlmRule, PhraseRule, in_scope
@@ -88,6 +89,7 @@ async def evaluate(
     retry_later: bool,
     record: StoredRecord | None = None,
     traces: AgentTraces | None = None,
+    additional_languages: Sequence[Language] = (),
 ) -> Evaluated:
     """Code metrics for every call. A call that completed and that no one stopped also gets its
     agent's phrase rules and, with a judge model, its judges and verdicts; any other call none.
@@ -185,7 +187,7 @@ async def evaluate(
                     persona,
                     criteria_text,
                     conversation.end_reason,
-                    conversation.language,
+                    (conversation.language, *additional_languages),
                     slots=judging.slots,
                     retry_later=retry_later,
                 )

@@ -696,3 +696,28 @@ async def test_retired_model_settings_stay_stored_for_older_processes_and_are_ig
     assert before.status_code == saved.status_code == imported.status_code == 200
     assert "model" not in before.json()["values"]["sarvam_tts"]
     assert stored == {"model": "bulbul:v3"}
+
+
+async def test_a_phone_run_cannot_start_when_the_voice_does_not_speak_an_additional_language(
+    client: AsyncClient, checks: list[Any], voice_clients: dict[VoiceProvider, FakeVoiceClient]
+) -> None:
+    await client.put("/api/v1/settings/secrets/sarvam_api_key", json={"value": "sarvam-key-0123"})
+    added = await add_sarvam_voice(client, voice_clients)
+    persona = await create_persona(
+        client,
+        name="Sarvam caller",
+        language="hi",
+        additional_languages=["es"],
+        voice={"provider": "sarvam", "id": "shubh", "speed": 1.0},
+    )
+    agent_id = await create_agent_id(client, languages=["hi"])
+    scenario = await create_scenario(client, agent_id, persona_id=persona["id"])
+
+    refused = await start_run(client, agent_id, [scenario["id"]])
+
+    assert added.status_code == 201, added.text
+    assert refused.status_code == 422
+    assert refused.json()["error"]["message"] == (
+        "text to speech (Sarvam Bulbul v4 Flash) doesn't speak Spanish, a language of the "
+        'persona "Sarvam caller"; choose another voice'
+    )

@@ -11,6 +11,7 @@ and `done`."""
 import base64
 import itertools
 import json
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -92,7 +93,7 @@ class NimbleTTSService(WebsocketTTSService):
         credential: str,
         base_url: str,
         voice: str,
-        language: Language,
+        language: Language | None,
         pace: float,
         **kwargs: Any,
     ) -> None:
@@ -331,15 +332,21 @@ class NimbleTTSService(WebsocketTTSService):
 
 
 def tts(
-    settings: AppSettings, voice: VoiceSettings, language: Language, key: str, *, one_shot: bool
+    settings: AppSettings,
+    voice: VoiceSettings,
+    language: Language,
+    key: str,
+    *,
+    one_shot: bool,
+    also: Sequence[Language] = (),
 ) -> NimbleTTSService:
     """A one-shot service does not reconnect: a dropped socket fails the speech instead of
-    ending it short as finished."""
+    ending it short as finished. A caller that can switch languages gets Nimble's `auto`."""
     return NimbleTTSService(
         credential=key,
         base_url=settings.nimble.base_url,
         voice=voice.id,
-        language=language,
+        language=None if also else language,
         pace=voice.speed,
         stop_frame_timeout_s=quiet_s(one_shot),
         reconnect_on_error=not one_shot,

@@ -28,6 +28,7 @@ def config_of(persona: Persona) -> PersonaConfig:
     return PersonaConfig(
         prompt=persona.prompt,
         language=persona.language,
+        additional_languages=tuple(persona.additional_languages),
         voice=VoiceSettings(
             provider=persona.voice_provider,
             id=persona.voice_id,
@@ -46,6 +47,7 @@ def config_columns(config: PersonaConfig) -> dict[str, Any]:
     return {
         "prompt": config.prompt,
         "language": config.language,
+        "additional_languages": list(config.additional_languages),
         "voice_provider": config.voice.provider,
         "voice_id": config.voice.id,
         "voice_model": config.voice.model,
@@ -64,7 +66,7 @@ def version_row(persona_id: uuid.UUID, version: int, config: PersonaConfig) -> P
     return PersonaVersion(
         persona_id=persona_id,
         version=version,
-        config=config.model_dump(mode="json", exclude={"voice": {"model"}}),
+        config=config.stored(),
         voice_model=config.voice.model,
     )
 

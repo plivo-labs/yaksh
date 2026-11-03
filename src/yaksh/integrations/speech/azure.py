@@ -2,6 +2,7 @@
 narrowband telephone audio."""
 
 import time
+from collections.abc import Sequence
 from typing import Any
 
 import pydantic
@@ -22,7 +23,13 @@ TELEPHONE_EFFECT = "eq_telecomhp8k"
 
 
 def tts(
-    settings: AppSettings, voice: VoiceSettings, language: Language, key: str, *, one_shot: bool
+    settings: AppSettings,
+    voice: VoiceSettings,
+    language: Language,
+    key: str,
+    *,
+    one_shot: bool,
+    also: Sequence[Language] = (),
 ) -> AzureTTSService:
     """The speed is SSML's prosody rate, a multiple of the voice's own pace."""
     return AzureTTSService(

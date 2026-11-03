@@ -6,6 +6,7 @@ import { DeleteConfirm, DiscardConfirm } from "@/components/confirm-dialogs";
 import { CopyId } from "@/components/copy-id";
 import { ForkedFrom } from "@/components/forked-from";
 import { GenderBadge } from "@/components/gender-badge";
+import { LanguagePicker } from "@/components/language-picker";
 import { SurroundingsField } from "@/components/surroundings-field";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -51,7 +52,7 @@ import { modelName, speedRange, ttsTraits } from "@/lib/speech-providers";
 import {
   type Answering,
   LANGUAGE_ITEMS,
-  LANGUAGE_NAMES,
+  callerLanguages,
   type Language,
   type Persona,
   type PersonaInput,
@@ -68,6 +69,7 @@ interface Draft {
   name: string;
   prompt: string;
   language: Language;
+  additional_languages: Language[];
   provider: VoiceProvider;
   voice_id: string;
   /** Null for a provider without a model choice. */
@@ -84,6 +86,7 @@ const EMPTY: Draft = {
   name: "",
   prompt: "",
   language: "en",
+  additional_languages: [],
   provider: "elevenlabs",
   voice_id: "",
   model: null,
@@ -101,6 +104,7 @@ function toDraft(persona: Persona): Draft {
     name: persona.name,
     prompt: persona.prompt,
     language: persona.language,
+    additional_languages: persona.additional_languages,
     provider: persona.voice.provider,
     voice_id: persona.voice.id,
     model: persona.voice.model ?? null,
@@ -117,6 +121,7 @@ function toInput(draft: Draft): PersonaInput {
     name: draft.name.trim(),
     prompt: draft.prompt.trim(),
     language: draft.language,
+    additional_languages: draft.additional_languages,
     voice: {
       provider: draft.provider,
       id: draft.voice_id.trim(),
@@ -377,7 +382,7 @@ function PersonaEditor({
           </CardTitle>
           {persona && (
             <CardDescription className="flex flex-wrap items-center gap-x-4 gap-y-1 text-s-400">
-              <span>{LANGUAGE_NAMES[persona.language]}</span>
+              <span>{callerLanguages(persona.language, persona.additional_languages)}</span>
               {persona.voice_gender && <GenderBadge gender={persona.voice_gender} />}
               <span>{surroundingsLabel(persona.surroundings) ?? "Quiet room"}</span>
               <span className="font-mono text-xs-400">Version {persona.current_version}</span>
@@ -437,11 +442,22 @@ function PersonaEditor({
                     {submitted && !input.name && <FieldError>Enter a name.</FieldError>}
                   </Field>
                   <Field>
-                    <FieldLabel htmlFor="language">Language</FieldLabel>
+                    <FieldLabel htmlFor="language">Primary language</FieldLabel>
                     <Select
                       items={LANGUAGE_ITEMS}
                       value={draft.language}
-                      onValueChange={(value) => value && set("language", value as Language)}
+                      onValueChange={(value) => {
+                        if (!value) return;
+                        const language = value as Language;
+                        save.reset();
+                        setDraft((current) => ({
+                          ...current,
+                          language,
+                          additional_languages: current.additional_languages.filter(
+                            (other) => other !== language,
+                          ),
+                        }));
+                      }}
                     >
                       <SelectTrigger id="language" className="w-full">
                         <SelectValue />
@@ -458,6 +474,19 @@ function PersonaEditor({
                     </Select>
                   </Field>
                 </div>
+                <Field>
+                  <FieldLabel htmlFor="additional-languages">Additional languages</FieldLabel>
+                  <LanguagePicker
+                    id="additional-languages"
+                    value={draft.additional_languages}
+                    exclude={draft.language}
+                    onValueChange={(languages) => set("additional_languages", languages)}
+                  />
+                  <FieldDescription>
+                    The caller can switch to these during the call. Say how it switches in Behavior,
+                    and when, in a scenario's instructions.
+                  </FieldDescription>
+                </Field>
                 <Field>
                   <FieldLabel htmlFor="prompt">Behavior</FieldLabel>
                   <Textarea

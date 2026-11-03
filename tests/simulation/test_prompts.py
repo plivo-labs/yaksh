@@ -55,3 +55,22 @@ def test_other_languages_whose_words_agree_with_the_speaker_get_their_own_forms(
 @pytest.mark.parametrize("language", list(Language))
 def test_every_language_tells_the_caller_how_to_speak_it(language: Language) -> None:
     assert LANGUAGES[language].instruction in instructions(persona(language, VoiceGender.FEMALE))
+
+
+def test_a_caller_with_additional_languages_learns_its_main_one_and_how_it_speaks_each() -> None:
+    switching = PersonaConfig(
+        prompt="You are calm.",
+        language=Language.HI,
+        additional_languages=(Language.MR, Language.EN),
+        voice=VOICE,
+        voice_gender=VoiceGender.FEMALE,
+    )
+
+    text = instructions(switching)
+
+    assert "Your main language is Hindi. You also speak Marathi and English." in text
+    hindi, marathi = LANGUAGES[Language.HI].instruction, LANGUAGES[Language.MR].instruction
+    assert f"- Hindi: {hindi} {HINDI_FORMS[VoiceGender.FEMALE]}" in text
+    assert f"- Marathi: {marathi} {SPEAKER_FORMS[VoiceGender.FEMALE]}" in text
+    assert f"- English: {LANGUAGES[Language.EN].instruction}" in text
+    assert "You also speak" not in instructions(persona(Language.HI, VoiceGender.FEMALE))
