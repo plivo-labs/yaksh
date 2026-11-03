@@ -69,10 +69,10 @@ Backchannel lines, such as "Mm-hmm.", are not supported yet. Yaksh handles them 
 
 - The transcript shows each line as a caller turn with the badge of its number, such as **Interruption 1**. Other fixed lines, such as the first words, have the badge **Fixed line**. In the API, the turn of a line has `interruption`: the number of the interruption. The line comes after the agent turn that it interrupted, because that turn stays whole.
 - Under the line, a note tells where the caller spoke, such as "3.1 s into the agent's turn at 0:27.0". When no agent turn of the transcript holds the line, the note quotes the last words of the agent before the line. A line over sound with no words from the agent has the note "Over sound with no words from the agent".
-- The judges see where each line played. After the turn of the line, a note in parentheses tells them where the caller spoke. The note gives how far into which agent turn, and after which words of the agent. The part of their view about the caller's test also lists the lines that played. Thus the check of the caller counts them as part of its test. The judges judge the call as they judge all other calls.
-- Nothing checks yet how fast the agent stopped. To check what the agent did after a line, write a criterion with the value that you expect. An example is "The agent says that a new patient visit costs $95." Refer to [Writing criteria](/docs/writing-criteria).
+- The judges see where each line played. After the turn of the line, a note in parentheses tells them where the caller spoke. The note gives how far into which agent turn, and after which words of the agent. It also gives the [stop time](#stop-time) of the line in ms. The part of their view about the caller's test also lists the lines that played. Thus the check of the caller counts them as part of its test. The judges judge the call as they judge all other calls.
+- To check what the agent did after a line, write a criterion with the value that you expect. An example is "The agent says that a new patient visit costs $95." Refer to [Writing criteria](/docs/writing-criteria). To check how fast the agent stopped, refer to [Stop time](#stop-time).
 - The recording in the **Audio** card of the call has the two sides, the agent on the left and the caller on the right. Listen to it to hear how the agent stopped.
-- The lines count in the speech of the caller (**Agent's share of the speech**). They do not count in **Agent response time**, **Longest wait** or **Spoke over the caller**, because the caller said them over the agent. Thus **Spoke over the caller** does not show an agent that talked over a line.
+- The lines count in the speech of the caller (**Agent's share of the speech**). They do not count in **Agent response time**, **Longest wait** or **Spoke over the caller**, because the caller said them over the agent. Thus **Spoke over the caller** does not show an agent that talked over a line. The [stop time](#stop-time) shows it.
 - Yaksh saves each try with the conversation. A try is a wait that ended while the line could still play, or a line that can never play. The API returns the tries in the conversation's `wire_events`, with the kind `interruption` and the try in the field `interruption`. The **Events** card of the call shows each try with its line number and its outcome.
 
 A try that played has no `reason`. Each other try has one of these reasons:
@@ -88,3 +88,30 @@ A try that played has no `reason`. Each other try has one of these reasons:
 | `audio_not_ready` | The speech of the line was not ready yet. |
 | `audio_failed` | Yaksh could not make the speech of the line, and the `detail` of the try tells why. The line never plays. |
 | `no_words_while_speaking` | The speech-to-text in Settings gives no words while the agent speaks, so the phrase can never start a wait. |
+
+## Stop time
+
+After a phone call with a recording, Yaksh measures when the speech of the agent stopped after each line that played. It uses the recording and the same voice detector as [Response time](/docs/response-time).
+
+- The time starts when the speech of the line starts. The silence that the TTS puts before the first word does not count.
+- The time ends when the speech of the agent that was going on at that moment ends. A pause shorter than 0.6 s does not end the speech.
+- Yaksh must hear 0.6 s of quiet after the speech. If a gap in the media of the agent, the end of that media or the end of the recording comes first, Yaksh cannot tell if the speech stopped.
+
+Each line gets one result:
+
+| Result | When |
+| --- | --- |
+| `stopped` | The speech of the agent stopped within 2 s of the start of the line. |
+| `kept_talking` | The speech of the agent went on for more than 2 s. When `at_least` is true, Yaksh lost the audio or the recording ended first: `stop_ms` is the least time, and the agent spoke for this time or longer. |
+| `not_speaking` | The agent was not speaking when the speech of the line started. There is no time. |
+| `unknown` | Yaksh could not measure the stop. There is no time, and `reason` tells why: `media_gap`, `recording_ended` or `no_line_speech`. |
+
+The time is what the caller hears. It includes the network in both directions, and the time that the agent needs to detect the caller and stop its audio. It does not tell why the speech stopped. When the turn of the agent ends by itself within 2 s, the result is also `stopped`. Thus start a line early in a long reply of the agent, so that the reply cannot end by itself within 2 s. An agent that stops and then continues the same reply also gets `stopped`. The transcript shows what it said next.
+
+- In the transcript, the turn of the line has a badge with the result, such as **Stopped in 841ms** or **Kept talking 9.7s**. Point to the badge, or move the focus to it, to read the result in a sentence.
+- In the **Audio** card, a pin with the number of the line shows where its speech started. Point to the pin to see the result. A line with no speech has no pin.
+- The **Metrics** tab of the call has the section **Interruptions**, with each line and its result.
+- The metrics of the run show **Stop time**: the p50 and the p90 (nearest rank) of the lines that stopped within 2 s, and how many lines the agent kept talking over. The problem **The agent kept talking over a line** counts the conversations with such a line, of the conversations with a line that stopped or kept talking. A conversation whose lines were all not measured does not count.
+- The judges get a sentence with the stop time in ms after the note of each line. Thus a criterion can check it, for example "The agent stops speaking within 1 s after each interruption."
+- In the API, `GET /api/v1/conversations/<conversation id>/evaluation` returns the metric `stop_time`, with `lines`, `counts`, `p50_ms` and `p90_ms`. `GET /api/v1/conversations/<conversation id>` puts the result of each line in `agent_stop`, on the first turn of the line. `GET /api/v1/runs/<run id>/metrics` returns `stop_p50_ms`, `stop_p90_ms`, `lines_played`, `lines_measured`, `lines_kept_talking` and `kept_talking`.
+- Calls that Yaksh evaluated before it measured stop times have no stop time.
