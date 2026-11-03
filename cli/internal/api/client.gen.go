@@ -1165,6 +1165,51 @@ func (e SpeakerKind) Valid() bool {
 	}
 }
 
+// Defines values for StopReason.
+const (
+	MediaGap       StopReason = "media_gap"
+	NoLineSpeech   StopReason = "no_line_speech"
+	RecordingEnded StopReason = "recording_ended"
+)
+
+// Valid indicates whether the value is a known member of the StopReason enum.
+func (e StopReason) Valid() bool {
+	switch e {
+	case MediaGap:
+		return true
+	case NoLineSpeech:
+		return true
+	case RecordingEnded:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for StopResult.
+const (
+	StopResultKeptTalking StopResult = "kept_talking"
+	StopResultNotSpeaking StopResult = "not_speaking"
+	StopResultStopped     StopResult = "stopped"
+	StopResultUnknown     StopResult = "unknown"
+)
+
+// Valid indicates whether the value is a known member of the StopResult enum.
+func (e StopResult) Valid() bool {
+	switch e {
+	case StopResultKeptTalking:
+		return true
+	case StopResultNotSpeaking:
+		return true
+	case StopResultStopped:
+		return true
+	case StopResultUnknown:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for SttProvider.
 const (
 	SttProviderAssemblyai SttProvider = "assemblyai"
@@ -2424,6 +2469,16 @@ type Limits struct {
 	MaxScenarioDataSets  *int `json:"max_scenario_data_sets,omitempty"`
 }
 
+// LineStop The agent's stop after one interruption line that played.
+type LineStop struct {
+	AtLeast *bool       `json:"at_least,omitempty"`
+	LineMs  *int        `json:"line_ms,omitempty"`
+	Number  int         `json:"number"`
+	Reason  *StopReason `json:"reason,omitempty"`
+	Result  StopResult  `json:"result"`
+	StopMs  *int        `json:"stop_ms,omitempty"`
+}
+
 // Llm Any API with OpenAI's Responses endpoint. The caller, scenario writing and the judges
 // use it.
 type Llm struct {
@@ -3110,12 +3165,21 @@ type RunNumbers struct {
 	Failed              int            `json:"failed"`
 	Flags               map[string]int `json:"flags"`
 
+	// KeptTalking How many of a total, with the 95% Wilson interval of the rate: few calls give a wide
+	// interval.
+	KeptTalking      Share `json:"kept_talking"`
+	LinesKeptTalking int   `json:"lines_kept_talking"`
+	LinesMeasured    int   `json:"lines_measured"`
+	LinesPlayed      int   `json:"lines_played"`
+
 	// LongWait How many of a total, with the 95% Wilson interval of the rate: few calls give a wide
 	// interval.
 	LongWait      Share `json:"long_wait"`
 	Pending       int   `json:"pending"`
 	ResponseP50Ms *int  `json:"response_p50_ms"`
 	ResponseP90Ms *int  `json:"response_p90_ms"`
+	StopP50Ms     *int  `json:"stop_p50_ms"`
+	StopP90Ms     *int  `json:"stop_p90_ms"`
 
 	// TalkedOver How many of a total, with the 95% Wilson interval of the rate: few calls give a wide
 	// interval.
@@ -3512,6 +3576,12 @@ type StartRequestDraft struct {
 	Url         string                  `json:"url"`
 }
 
+// StopReason Why a line has no stop time, or why its time is only the least it can be.
+type StopReason string
+
+// StopResult defines model for StopResult.
+type StopResult string
+
 // SttProvider defines model for SttProvider.
 type SttProvider string
 
@@ -3745,6 +3815,7 @@ type TtsProviderRead struct {
 // TurnRead defines model for TurnRead.
 type TurnRead struct {
 	AgentReply   *AgentReplyTime  `json:"agent_reply,omitempty"`
+	AgentStop    *LineStop        `json:"agent_stop,omitempty"`
 	AudioIndex   *int             `json:"audio_index,omitempty"`
 	CallerReply  *CallerReplyTime `json:"caller_reply,omitempty"`
 	Dtmf         *bool            `json:"dtmf,omitempty"`

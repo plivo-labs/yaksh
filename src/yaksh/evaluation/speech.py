@@ -45,6 +45,8 @@ class Heard:
     speech: Speech
     replies: list[tuple[int, int | None]]
     """Each caller reply's start and the end of its speech for the response time."""
+    reply_speech: list[list[Span]]
+    """Each caller reply's own speech, in the order of the replies."""
     end_ms: int
     """Where the recording ends."""
 
@@ -60,7 +62,7 @@ async def measure(
     each reply's own audio at the place its window names."""
     agent_end_ms = bytes_ms(len(agent), rate)
     agent_speech = [shifted(span, recording_start_ms) for span in await speech_in(agent, rate)]
-    caller: list[Span] = []
+    reply_speech: list[list[Span]] = []
     reply_ends: list[int | None] = []
     for reply in replies:
         own = voice[
@@ -72,11 +74,14 @@ async def measure(
         spans, last_word_ms = placed_reply(
             reply, windows, bytes_ms(len(own), rate), recording_start_ms + agent_end_ms
         )
-        caller += spans
+        reply_speech.append(spans)
         reply_ends.append(last_word_ms)
     return Heard(
-        speech=Speech(agent=agent_speech, caller=caller),
+        speech=Speech(
+            agent=agent_speech, caller=[span for spans in reply_speech for span in spans]
+        ),
         replies=[(reply.start_ms, end) for reply, end in zip(replies, reply_ends, strict=True)],
+        reply_speech=reply_speech,
         end_ms=recording_start_ms + agent_end_ms,
     )
 

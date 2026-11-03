@@ -37,7 +37,6 @@ from yaksh.caller.interruptions import (
     ANSWERED,
     GO_ON,
     NOTE,
-    STOP_WINDOW_S,
     STOPPED,
     AgentTurn,
     Interrupter,
@@ -59,6 +58,7 @@ from yaksh.domain.conversations import (
     WireEventKind,
 )
 from yaksh.domain.scenarios import Interruption
+from yaksh.domain.stops import STOP_WINDOW_MS
 
 LINE_AUDIO = bytes(3_200) + array("h", [8000, -8000] * 800).tobytes()
 """0.2 s of silence, then 0.2 s of sound."""
@@ -539,7 +539,7 @@ async def test_a_played_line_keeps_the_window_that_starts_at_its_first_sound() -
 
     [event] = [event for event in call.observer.events if event.interruption is not None]
     assert event.interruption is not None
-    window = event.at_ms + 200 + round(STOP_WINDOW_S * 1000)
+    window = event.at_ms + 200 + STOP_WINDOW_MS
     assert event.interruption.window_end_ms == window, "200 ms of silence first"
 
 
@@ -650,7 +650,7 @@ async def test_a_time_start_that_outlives_its_answer_names_the_last_turn_of_that
 async def test_a_second_line_plays_in_the_turn_once_the_first_line_window_has_ended(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(interruptions, "STOP_WINDOW_S", 0.1)
+    monkeypatch.setattr(interruptions, "STOP_WINDOW_MS", 100)
     call = Call(
         Interruption(say="Wait.", agent_says="fee", after_s=0),
         Interruption(say="Hold on.", agent_says="card", after_s=0),

@@ -229,8 +229,9 @@ async def test_the_evaluator_measures_a_saved_call_from_its_files(
 
     assert evaluation.state is EvaluationState.DONE
     found = await stored(db, evaluation.id)
-    # The agent sends no traces, so the call has no agent reply time.
-    assert set(found) == set(MetricKey) - {MetricKey.AGENT_REPLY_TIME}
+    # The agent sends no traces, so the call has no agent reply time; no interruption line
+    # played, so it has no stop time.
+    assert set(found) == set(MetricKey) - {MetricKey.AGENT_REPLY_TIME, MetricKey.STOP_TIME}
     assert found[MetricKey.SPEECH] == Metric(value={"agent": [], "caller": []})
     assert found[MetricKey.RESPONSE_TIME] == Metric(
         value={"replies": [], "p50_ms": None, "p90_ms": None}

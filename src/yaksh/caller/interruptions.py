@@ -45,6 +45,7 @@ from yaksh.domain.conversations import (
 )
 from yaksh.domain.latency import VAD_START_S, VAD_STOP_S
 from yaksh.domain.scenarios import Interruption
+from yaksh.domain.stops import STOP_WINDOW_MS
 
 NOTE = 'While the agent said the turn above, you interrupted it and said: "{line}"'
 WAIT_OVER = (
@@ -56,8 +57,6 @@ ANSWERED = "The agent stopped for you and answered you in the turn above. " + WA
     answers="answered"
 )
 GO_ON = "The agent has said nothing more. Go on with the call."
-STOP_WINDOW_S = 2.0
-"""How long after a line's first sound a stop of the agent counts as a stop for the line."""
 STOP_MS = round(VAD_STOP_S * 1000)
 """The shortest quiet of the agent that is a stop: the VAD stop of the measurement after the
 call, whatever the live VAD's stop is, so a pause between two sentences is no stop."""
@@ -190,7 +189,7 @@ class PlayingLine:
     """The agent turn that the line interrupts."""
     started_ms: int
     window_end_ms: int
-    """STOP_WINDOW_S after the first sound of the line's audio."""
+    """STOP_WINDOW_MS after the first sound of the line's audio."""
     words: str
     """The agent's words in its turn up to the line's start."""
     played: bool = False
@@ -606,7 +605,7 @@ class Interrupter(FrameProcessor):
             line.spec,
             turn,
             started_ms=started,
-            window_end_ms=started + first_sound_ms(pcm) + round(STOP_WINDOW_S * 1000),
+            window_end_ms=started + first_sound_ms(pcm) + STOP_WINDOW_MS,
             words=turn.words(),
         )
         self._order.line_started(line.number)

@@ -11267,6 +11267,61 @@
         "type": "object",
         "title": "Limits"
       },
+      "LineStop": {
+        "properties": {
+          "number": {
+            "type": "integer",
+            "title": "Number"
+          },
+          "line_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Line Ms"
+          },
+          "result": {
+            "$ref": "#/components/schemas/StopResult"
+          },
+          "stop_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stop Ms"
+          },
+          "at_least": {
+            "type": "boolean",
+            "title": "At Least",
+            "default": false
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StopReason"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "number",
+          "result"
+        ],
+        "title": "LineStop",
+        "description": "The agent's stop after one interruption line that played."
+      },
       "Llm": {
         "properties": {
           "base_url": {
@@ -14274,6 +14329,43 @@
           "dead_air": {
             "$ref": "#/components/schemas/Share"
           },
+          "stop_p50_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stop P50 Ms"
+          },
+          "stop_p90_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stop P90 Ms"
+          },
+          "lines_played": {
+            "type": "integer",
+            "title": "Lines Played"
+          },
+          "lines_measured": {
+            "type": "integer",
+            "title": "Lines Measured"
+          },
+          "lines_kept_talking": {
+            "type": "integer",
+            "title": "Lines Kept Talking"
+          },
+          "kept_talking": {
+            "$ref": "#/components/schemas/Share"
+          },
           "flags": {
             "additionalProperties": {
               "type": "integer"
@@ -14296,6 +14388,12 @@
           "talked_over",
           "long_wait",
           "dead_air",
+          "stop_p50_ms",
+          "stop_p90_ms",
+          "lines_played",
+          "lines_measured",
+          "lines_kept_talking",
+          "kept_talking",
           "flags"
         ],
         "title": "RunNumbers",
@@ -16403,6 +16501,26 @@
         "title": "StartRequestDraft",
         "description": "A start request read from a cURL command, for the person to check. `number_field` names\nthe body field or query parameter that now holds `{{yaksh.number}}`, if one looked like the\nnumber to call."
       },
+      "StopReason": {
+        "type": "string",
+        "enum": [
+          "no_line_speech",
+          "media_gap",
+          "recording_ended"
+        ],
+        "title": "StopReason",
+        "description": "Why a line has no stop time, or why its time is only the least it can be."
+      },
+      "StopResult": {
+        "type": "string",
+        "enum": [
+          "stopped",
+          "kept_talking",
+          "not_speaking",
+          "unknown"
+        ],
+        "title": "StopResult"
+      },
       "SttProvider": {
         "type": "string",
         "enum": [
@@ -17560,6 +17678,16 @@
             "anyOf": [
               {
                 "$ref": "#/components/schemas/AgentReplyTime"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "agent_stop": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LineStop"
               },
               {
                 "type": "null"

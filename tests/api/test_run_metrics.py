@@ -32,7 +32,8 @@ from yaksh.domain.evaluations import (
     Verdict,
 )
 from yaksh.domain.latency import Latency, Reply
-from yaksh.evaluation import evaluations
+from yaksh.domain.stops import LineStop, StopReason, StopResult
+from yaksh.evaluation import evaluations, metrics
 from yaksh.evaluation.criteria import AGENT_RULE, CRITERION
 from yaksh.evaluation.evaluations import MAX_ATTEMPTS, Evaluated
 from yaksh.evaluation.judging import ItemResult
@@ -103,6 +104,12 @@ async def test_run_numbers_pool_the_counted_calls_overall_and_by_category(
         "talked_over": share(1, 2),
         "long_wait": share(1, 2),
         "dead_air": share(0, 2),
+        "stop_p50_ms": None,
+        "stop_p90_ms": None,
+        "lines_played": 0,
+        "lines_measured": 0,
+        "lines_kept_talking": 0,
+        "kept_talking": share(0, 0),
         "flags": {"long_wait": 1, "repetition": 1, "unanswered": 1},
     }
     assert share(2, 3) == {"count": 2, "total": 3, "low": 0.208, "high": 0.939}
@@ -115,6 +122,66 @@ async def test_run_numbers_pool_the_counted_calls_overall_and_by_category(
     ]
     run_read = (await client.get(f"/api/v1/runs/{run['id']}")).json()
     assert (run_read["response_p50_ms"], run_read["response_p90_ms"]) == (1_000, 2_500)
+
+
+def stops(*lines: tuple[StopResult, int | None]) -> Metric:
+    return metrics.stop_time(
+        [
+            LineStop(
+                number=number,
+                line_ms=1_000 * number,
+                result=result,
+                stop_ms=stop_ms,
+                reason=StopReason.MEDIA_GAP if result is StopResult.UNKNOWN else None,
+            )
+            for number, (result, stop_ms) in enumerate(lines, 1)
+        ]
+    )
+
+
+async def test_run_numbers_pool_the_stop_times_of_the_lines_that_stopped(
+    client: AsyncClient, db: Db
+) -> None:
+    agent = await create_agent_id(client, name="Clinic")
+    scenario = await create_scenario(client, agent, name="Lines")
+    run = (await start_run(client, agent, [scenario["id"]], repeats=4)).json()
+    ids = [str(await claim(db)) for _ in range(4)]
+    connected = CallOutcome(connected=True, end_reason=EndReason.AGENT_HANGUP, stream_opened_ms=500)
+    for conversation in ids:
+        await finish(db, conversation, connected, transcript=CONNECTED)
+    first, second, third, fourth = ids
+    await evaluate_queued(
+        db,
+        {
+            first: {
+                MetricKey.STOP_TIME: stops(
+                    (StopResult.STOPPED, 800),
+                    (StopResult.KEPT_TALKING, 9_000),
+                    (StopResult.STOPPED, 600),
+                )
+            },
+            second: {MetricKey.STOP_TIME: stops((StopResult.STOPPED, 700))},
+            # only lines with no value: played, not measured
+            third: {
+                MetricKey.STOP_TIME: stops(
+                    (StopResult.UNKNOWN, None), (StopResult.NOT_SPEAKING, None)
+                )
+            },
+            # a call with no line
+            fourth: {MetricKey.TURN_TAKING: taking(1, 0, 0)},
+        },
+    )
+
+    overall = (await client.get(f"/api/v1/runs/{run['id']}/metrics")).json()["overall"]
+
+    assert (overall["stop_p50_ms"], overall["stop_p90_ms"]) == (700, 800)
+    assert (overall["lines_played"], overall["lines_measured"], overall["lines_kept_talking"]) == (
+        6,
+        4,
+        1,
+    )
+    assert overall["kept_talking"] == share(1, 2), "of the calls with a measured line"
+    assert overall["flags"] == {"kept_talking": 1}
 
 
 async def test_run_numbers_count_what_each_call_got_to(client: AsyncClient, db: Db) -> None:

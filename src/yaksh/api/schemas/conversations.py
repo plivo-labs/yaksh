@@ -34,6 +34,7 @@ from yaksh.domain.languages import Language
 from yaksh.domain.latency import AgentReplyTime, CallerReplyTime, Latency, Reply
 from yaksh.domain.record_sources import RECORD_PROVIDERS, RecordProvider
 from yaksh.domain.scenarios import PlayedScenario
+from yaksh.domain.stops import LineStop
 from yaksh.domain.surroundings import Layer, NoiseSound, SoundPlan, SpeakerKind, Surroundings
 from yaksh.evaluation.agent_records import RecordView
 from yaksh.simulation.surroundings import clip_by_file
@@ -69,6 +70,9 @@ class TurnRead(Turn):
     agent_reply: AgentReplyTime | None = None
     """On an agent turn that starts a reply, when the agent's trace of the call paired with it:
     where the time of the agent's reply went."""
+    agent_stop: LineStop | None = None
+    """On the first turn of an interruption line that played on a phone call: when the agent's
+    speech stopped after the line."""
 
 
 class ConversationSummary(BaseModel):

@@ -24,6 +24,7 @@ from yaksh.domain.latency import (
     Wait,
     nearest_rank,
 )
+from yaksh.domain.stops import LineStop, StopResult, StopTime
 
 WAIT_LIMITS_MS = (3_000, 5_000, 10_000)
 LONG_WAIT_MS = 5_000
@@ -294,4 +295,14 @@ def caller_reply_time(replies: Sequence[CallerReplyTime]) -> Metric:
             if stt
             else None,
         }
+    )
+
+
+def stop_time(lines: Sequence[LineStop]) -> Metric:
+    """When the agent's speech stopped after each interruption line, and the percentiles of the
+    lines whose speech stopped in time. A line where the agent kept talking raises a flag."""
+    found = StopTime.of(lines)
+    kept_talking = found.count(StopResult.KEPT_TALKING) > 0
+    return Metric(
+        value=found.model_dump(mode="json"), flags=["kept_talking"] if kept_talking else []
     )

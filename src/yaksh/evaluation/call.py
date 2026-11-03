@@ -30,6 +30,7 @@ from yaksh.domain.latency import CallerReplyTime, CallerReplyWindow, Latency, Sp
 from yaksh.domain.record_sources import RECORD_PROVIDERS
 from yaksh.domain.rules import LlmRule, PhraseRule, in_scope
 from yaksh.domain.scenarios import PlayedScenario
+from yaksh.domain.stops import line_stops
 from yaksh.evaluation import metrics, speech
 from yaksh.evaluation.caller_check import CALLER_CHECK, applied, check_caller
 from yaksh.evaluation.criteria import AGENT_RULE, CRITERION, judge_criterion, judge_rule, rule_text
@@ -371,8 +372,9 @@ async def measure_call(
     without it, Yaksh's caller opens the call. The persona's voicemail or call screener is not
     a reply that waits for the agent, so its lines, and the call's start when it answers, have
     no response time. Neither is an interruption line, which the caller said over the agent: it
-    counts in the caller's speech, but in no wait for an answer. With traces, the agent's
-    reply time comes from the agent's trace of the call, when it sends one."""
+    counts in the caller's speech, but in no wait for an answer; it gets the time in which the
+    agent's speech stopped after it. With traces, the agent's reply time comes from the agent's
+    trace of the call, when it sends one."""
     transcript = Transcript.model_validate(conversation.transcript or {})
     found = {
         MetricKey.USAGE: metrics.usage(
@@ -419,6 +421,15 @@ async def measure_call(
         agent_opens=agent_speaks_first and conversation.answered_by is AnsweredBy.CALLER,
     )
     found[MetricKey.SPEECH] = Metric(value=heard.speech.model_dump(mode="json"))
+    lines = [
+        (reply.interruption, own)
+        for reply, own in zip(spoken, heard.reply_speech, strict=True)
+        if reply.interruption is not None
+    ]
+    if lines:
+        found[MetricKey.STOP_TIME] = metrics.stop_time(
+            line_stops(lines, heard.speech.agent, transcript.agent_media, heard.end_ms)
+        )
     found[MetricKey.RESPONSE_TIME] = Metric(value=Latency.answered(paired).model_dump(mode="json"))
     if traces is not None and (
         reply_time := await traces.metric(conversation, heard.speech.agent, paired)
