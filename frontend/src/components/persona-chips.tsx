@@ -3,7 +3,7 @@ import { useState } from "react";
 
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
-import { LANGUAGE_NAMES, type Language, type Persona } from "@/lib/types";
+import { callerLanguages, type Language, type Persona } from "@/lib/types";
 
 /** The personas of one list as chips, in the list's order, each with a button that removes it,
  * and an "Add" button that searches the other personas. Personas in a language outside `served`
@@ -100,7 +100,7 @@ export function PersonaChips({
                         : "text-status-warning-text",
                     )}
                   >
-                    {LANGUAGE_NAMES[persona.language]}
+                    {callerLanguages(persona.language, persona.additional_languages)}
                   </span>
                 </button>
               </li>

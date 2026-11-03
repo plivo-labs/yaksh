@@ -17,7 +17,7 @@ import {
   useVoices,
 } from "@/lib/queries";
 import { modelName, ttsTraits } from "@/lib/speech-providers";
-import { LANGUAGE_NAMES, type Persona, type PersonaInput, type VoiceSettings } from "@/lib/types";
+import { callerLanguages, type Persona, type PersonaInput, type VoiceSettings } from "@/lib/types";
 
 /** Whether two voice settings use the same voice: provider, ID and model. */
 const sameVoice = (a: VoiceSettings, b: VoiceSettings) =>
@@ -73,10 +73,9 @@ export function PersonaFork({ persona }: { persona: Persona }) {
 
   const changes = (draft: PersonaInput) => {
     const lines = [];
-    if (draft.language !== persona.language)
-      lines.push(
-        changed("Language", LANGUAGE_NAMES[persona.language], LANGUAGE_NAMES[draft.language]),
-      );
+    const languages = callerLanguages(persona.language, persona.additional_languages);
+    const forked = callerLanguages(draft.language, draft.additional_languages);
+    if (forked !== languages) lines.push(changed("Languages", languages, forked));
     if (!sameVoice(draft.voice, persona.voice))
       lines.push(changed("Voice", voiceName(persona.voice), voiceName(draft.voice)));
     if (draft.voice.speed !== persona.voice.speed)

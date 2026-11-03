@@ -2,7 +2,7 @@ import { Combobox } from "@base-ui/react/combobox";
 import { CheckIcon, XIcon } from "lucide-react";
 import { useMemo, useRef } from "react";
 
-import { LANGUAGE_NAMES, type Persona } from "@/lib/types";
+import { callerLanguages, type Persona } from "@/lib/types";
 
 const personaName = (persona: Persona) => persona.name;
 
@@ -81,7 +81,7 @@ export function PersonaPicker({
                 >
                   <span className="min-w-0 flex-1 truncate">{persona.name}</span>
                   <span className="shrink-0 text-xs-400 text-muted-foreground">
-                    {LANGUAGE_NAMES[persona.language]}
+                    {callerLanguages(persona.language, persona.additional_languages)}
                   </span>
                   <Combobox.ItemIndicator className="absolute right-2 flex size-4 items-center justify-center">
                     <CheckIcon className="size-4" />

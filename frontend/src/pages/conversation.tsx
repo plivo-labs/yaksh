@@ -83,7 +83,7 @@ import {
   type Conversation,
   type EvaluationState,
   type Fact as ScenarioFact,
-  LANGUAGE_NAMES,
+  callerLanguages,
   type PlayedScenario,
   type Turn,
   WIRE_EVENT_HELP,
@@ -258,8 +258,9 @@ function ConversationView({ id }: { id: string }) {
                     <CardHeader>
                       <RailTitle role="Caller" name={data.persona_name} />
                       <CardDescription>
-                        {LANGUAGE_NAMES[data.language]}, <CallerLine conversation={data} />, up to{" "}
-                        {data.max_turns} turns and {data.max_duration_s}s once connected
+                        {callerLanguages(data.language, data.additional_languages)},{" "}
+                        <CallerLine conversation={data} />, up to {data.max_turns} turns and{" "}
+                        {data.max_duration_s}s once connected
                       </CardDescription>
                       {surroundingsLabel(data.surroundings) && (
                         <CardDescription>

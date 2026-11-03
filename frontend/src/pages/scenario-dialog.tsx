@@ -338,7 +338,8 @@ export function ScenarioDialog({
                 What the caller wants and how it reacts to the agent, written to the caller as
                 “you”. Put names, numbers and dates in the facts below, and mood in the persona.
                 Write a fact's name in double braces, such as <code>{"{{Moving to}}"}</code>, and
-                each call uses the value of its data set.
+                each call uses the value of its data set. With a persona of more than one language,
+                say here when the caller switches.
               </FieldDescription>
               {submitted && !input.instructions && (
                 <FieldError>Tell the caller what to do on this call.</FieldError>
