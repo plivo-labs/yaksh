@@ -3,7 +3,7 @@ title: Languages
 description: The languages of agents and callers, and how Yaksh hears a call.
 ---
 
-An agent serves one or more languages. A persona, which is the caller, speaks one language.
+An agent serves one or more languages. A persona, which is the caller, speaks a primary language and can have additional languages that it switches to during a call.
 
 ## Agent languages
 
@@ -20,6 +20,24 @@ The voice of a persona must speak its language. ElevenLabs' Flash and Multilingu
 A background speaker talks in the language of the persona. Only English and Hindi have their own clips; the other languages use the English clips.
 
 To test an agent in more than one language, make one run for each language, with personas that speak it. **Mix personas** in the run dialog takes the personas of one language.
+
+## A caller that switches languages
+
+Give a persona additional languages to test how an agent handles a caller who changes language during a call. The primary language is the caller's main language. The caller says Yaksh's fixed lines in it, and the voice preview, the voicemail greeting and the background speaker use it.
+
+Yaksh tells the caller its languages and to switch between them as its prompt and its instructions say. If they do not say when, the caller switches at least once. Say how the caller mixes its languages in the persona's prompt, for example "You switch to Hindi when you give numbers". Say when it switches in the scenario's instructions, for example "When the agent asks for your date of birth, answer in Hindi". Then write a criterion for what the agent must do, for example "After the caller speaks Hindi, the agent answers in Hindi".
+
+Yaksh sets the speech-to-text and the voice once for the whole call:
+
+- Deepgram uses `hi` when the agent answers only in English and Hindi, and `multi` for any other mix. Since 23 October 2026, Deepgram's hosted `multi` model hears all of Yaksh's languages. A self-hosted Deepgram can have the older `multi` model, which hears only English, Hindi and Spanish of Yaksh's languages.
+- The other speech-to-text providers keep the setting of the primary language for the whole call. Speech in another language can then come out wrong.
+- An ElevenLabs voice gets no language setting, so it reads the language of each reply from its text. A Nimble voice gets `auto`. A Sarvam, Cartesia or Azure voice keeps the primary language.
+
+A phone run is refused when the speech-to-text does not hear, or the voice does not speak, one of the persona's languages, as for a persona of one language. Yaksh does not check how well a provider handles two languages in one call: choose the providers for the languages you test.
+
+The caller check knows the persona's languages. A caller reply in another language, or a caller that never switches when it should, is a caller problem, so it does not count against the agent.
+
+When you update to the first version of Yaksh with additional languages, finish the update before you give a persona additional languages. A worker of an older version cannot read such a persona.
 
 ## Phrase rules
 
