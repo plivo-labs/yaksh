@@ -1,3 +1,17 @@
+## v0.13.0 (2026-11-03)
+
+### Feat
+
+- measure how long the agent speaks after an interruption line (#45)
+  - After each phone call, Yaksh measures when the agent's speech stopped after each interruption line: stopped from 200 ms to 2 s after the line started (with its time), kept talking, agent done speaking, or not measured. It uses the recording that the call already stores.
+  - The transcript shows the result on each line, the waveform has a pin where each line started, the Metrics tab lists the lines, and the run metrics show the stop time (p50 and p90) and a problem row for lines that the agent kept talking over.
+  - The judges see each stop time in ms, so a criterion such as "The agent stops speaking within 1 s after each interruption" can check it.
+
+### Changed
+
+- The judges' view of a call with interruption lines now has the stop time of each line, so a verdict on such a call can change. A line that went out only in part no longer gets its note twice.
+- Calls evaluated before this release have no stop time.
+
 ## v0.12.2 (2026-11-03)
 
 ### Feat
