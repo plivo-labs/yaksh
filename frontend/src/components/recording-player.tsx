@@ -122,7 +122,8 @@ export interface PlayerHandle {
 /** The call recording as one waveform lane per channel: the agent on the left channel, the
  * caller on the right. `start` opens it at that second, for links to a moment. */
 /** A stretch of the call to mark on the waveform, in seconds of the recording: a short label
- * for the ruler, a sentence for the hover time, and the classes that colour band and label. */
+ * for the ruler, a sentence for the hover time, and the classes that colour band and label. A
+ * mark with a pin is a moment, not a stretch: a numbered pin at `from`, coloured by `fill`. */
 export interface Mark {
   from: number;
   to: number;
@@ -130,10 +131,13 @@ export interface Mark {
   title: string;
   fill: string;
   text: string;
+  pin?: string;
 }
 
 /** How near a band, in pixels, the pointer counts as on it: a short wait is a narrow band. */
 const MARK_REACH_PX = 4;
+/** Half a pin's width: within it, the pin gets the hover, also over a band. */
+const PIN_REACH_PX = 8;
 
 /** Centres a label on a point at `fraction` of the timeline, moved inward where it would pass
  * an end: past the right end it would widen the scroll area that times are measured on. */
@@ -377,16 +381,24 @@ function Player({
     const width = event.currentTarget.getBoundingClientRect().width;
     const distance = (mark: Mark) =>
       Math.max(mark.from / duration - fraction, fraction - mark.to / duration, 0) * width;
-    const nearest = marks.reduce<Mark | undefined>(
-      (best, mark) => (best && distance(best) <= distance(mark) ? best : mark),
-      undefined,
-    );
+    const nearestOf = (found: Mark[]) =>
+      found.reduce<Mark | undefined>(
+        (best, mark) => (best && distance(best) <= distance(mark) ? best : mark),
+        undefined,
+      );
+    const pin = nearestOf(marks.filter((mark) => mark.pin));
+    const band = nearestOf(marks.filter((mark) => !mark.pin));
     const view = viewport.current;
     const box = view?.getBoundingClientRect();
     if (box) {
       setHover({
         fraction,
-        mark: nearest && distance(nearest) <= MARK_REACH_PX ? nearest : undefined,
+        mark:
+          pin && distance(pin) <= PIN_REACH_PX
+            ? pin
+            : band && distance(band) <= MARK_REACH_PX
+              ? band
+              : undefined,
         x: Math.min(Math.max(event.clientX, box.left), box.right),
         top: box.top,
         left: box.left,
@@ -734,6 +746,24 @@ function Player({
 
 /** A mark on the waveform: its band, and in the full player its label on the ruler. */
 function MarkBand({ mark, duration, compact }: { mark: Mark; duration: number; compact: boolean }) {
+  if (mark.pin) {
+    return (
+      <span
+        aria-hidden
+        className={cn(
+          "pointer-events-none absolute flex size-4 items-center justify-center rounded-xs border text-xxs-600 tabular-nums",
+          mark.fill,
+        )}
+        style={{
+          left: `${(mark.from / duration) * 100}%`,
+          top: compact ? 0 : RULER_PX,
+          translate: inside(mark.from / duration),
+        }}
+      >
+        {mark.pin}
+      </span>
+    );
+  }
   return (
     <span
       aria-hidden

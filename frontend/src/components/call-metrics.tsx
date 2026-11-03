@@ -1,6 +1,7 @@
 import { type ReactNode, useState } from "react";
 
 import { TRACES_DOCS_URL } from "@/app/nav";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Explained } from "@/components/verdict-ui";
@@ -26,12 +27,14 @@ import {
   type StepNames,
 } from "@/lib/reply-steps";
 import { sttProvider, ttsProvider } from "@/lib/speech-providers";
+import { type LineRow, lineRows, stopHint, stopLabel, stoppedSummary } from "@/lib/stops";
 import {
   type AgentReplyTimeMetric,
   type ConversationEvaluation,
   type EvaluationState,
   type Reply,
   type Transport,
+  type Turn,
   evaluationPending,
 } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -45,12 +48,18 @@ export function CallMetricsCard({
   evaluation,
   transport,
   yakshNumber,
+  turns,
+  connectedMs,
 }: {
   conversationId: string;
   evaluation: EvaluationState | null;
   transport: Transport;
   /** Yaksh's number on the call: the key that the agent's trace can carry. */
   yakshNumber: string | null;
+  /** The call's turns: each interruption line's first turn holds its stop. */
+  turns: Turn[];
+  /** Turn times count from the dial; they show from the connect, as the transcript does. */
+  connectedMs: number;
 }) {
   const found = useConversationEvaluation(conversationId, evaluation);
   if (evaluation === null) return null;
@@ -68,6 +77,8 @@ export function CallMetricsCard({
           metrics={found.data.metrics}
           transport={transport}
           yakshNumber={yakshNumber}
+          lines={lineRows(turns)}
+          connectedMs={connectedMs}
         />
       </div>
     );
@@ -94,10 +105,14 @@ function MetricSections({
   metrics,
   transport,
   yakshNumber,
+  lines,
+  connectedMs,
 }: {
   metrics: Metrics;
   transport: Transport;
   yakshNumber: string | null;
+  lines: LineRow[];
+  connectedMs: number;
 }) {
   const { response_time, agent_reply_time } = metrics;
   const replies = response_time?.value.replies ?? [];
@@ -122,6 +137,7 @@ function MetricSections({
             <ReplyBars replies={replies} />
           </section>
         )}
+        {lines.length > 0 && <InterruptionsSection lines={lines} connectedMs={connectedMs} />}
         {agent_reply_time && (
           <AgentParts metric={agent_reply_time.value} yakshNumber={yakshNumber} />
         )}
@@ -398,6 +414,53 @@ function StepTable({
         )}
       </tbody>
     </table>
+  );
+}
+
+/** When the agent's speech stopped after each interruption line: one row for each line, with
+ * its words and its time in the transcript; a line with no measure says why. */
+function InterruptionsSection({ lines, connectedMs }: { lines: LineRow[]; connectedMs: number }) {
+  return (
+    <section className="grid gap-3">
+      <Heading aside={stoppedSummary(lines)}>
+        <Explained hint="When the agent's speech stopped after the caller started each line. A stop within 2s counts.">
+          Interruptions
+        </Explained>
+      </Heading>
+      <table className="text-s-400 tabular-nums">
+        <thead className="text-xs-400 text-muted-foreground">
+          <tr>
+            <th className="w-10 py-1 text-left font-normal">Line</th>
+            <th className="py-1 text-left font-normal">
+              <span className="sr-only">Words</span>
+            </th>
+            <th className="py-1 pr-2 text-right font-normal">At</th>
+            <th className="py-1 text-right font-normal">Agent</th>
+          </tr>
+        </thead>
+        <tbody>
+          {lines.map((line) => (
+            <tr key={line.number} className="border-t align-top">
+              <td className="py-1.5">{line.number}</td>
+              <td className="py-1.5 pr-2 text-muted-foreground">
+                “{line.words}”
+                {line.stop.result === "unknown" && (
+                  <span className="block text-xs-400">{stopHint(line.stop)}</span>
+                )}
+              </td>
+              <td className="py-1.5 pr-2 text-right">
+                {clock(Math.max(0, line.at_ms - connectedMs))}
+              </td>
+              <td className="py-1 text-right">
+                <Badge variant={line.stop.result === "kept_talking" ? "warning" : "tag"}>
+                  {stopLabel(line.stop)}
+                </Badge>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </section>
   );
 }
 
