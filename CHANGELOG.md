@@ -1,3 +1,17 @@
+## v0.12.2 (2026-11-03)
+
+### Feat
+
+- **personas**: callers that switch between a persona's languages during a call (#44)
+  - A persona has a primary language and can now have additional languages. During a call, the caller switches between them as the persona's behavior and the scenario's instructions say. If they do not say when, it switches at least once. The persona page has a "Primary language" select and an "Additional languages" multi-select.
+  - Yaksh sets the speech-to-text and the voice once for each call. Deepgram uses `multi`, or `hi` for English and Hindi, when the agent answers in more than one of the caller's languages. An ElevenLabs voice gets no language setting, so it reads the language of each reply from its text, and a Nimble voice gets `auto`. Other providers keep the primary language.
+  - A phone run checks each of the persona's languages against the speech-to-text and the voice, as it did for one language. The caller check knows the persona's languages: a reply in another language, or a caller that never switches when it should, is a caller problem.
+
+### Changed
+
+- A persona with no additional languages works as before: the same prompt, settings, checks and judging.
+- Migration 0010 adds the additional languages of a persona. 0.12.1 runs on the new schema, but its workers cannot read a persona version with additional languages, so finish the update before you add them.
+
 ## v0.12.1 (2026-11-03)
 
 ### Fix
