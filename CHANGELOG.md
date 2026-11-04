@@ -1,3 +1,17 @@
+## v0.13.1 (2026-11-04)
+
+### Fix
+
+- **caller**: write numbers in words, so the caller's voice speaks every digit (#46)
+  - On a phone test, the caller now says every number in words. It says an ID, a code or a phone number one character at a time, in short groups, with every character of the fact. It says an amount, a count, a date or a time the way a person says it.
+  - Before, the caller wrote a number as digits, and a small TTS model could drop digits from a long digit string. The agent then heard a different number, and the test failed the agent.
+
+### Changed
+
+- Text tests get the same rule, so the caller's messages now hold numbers in words.
+- Keypad input does not change: the caller still presses digits.
+- There is no migration. 0.13.0 runs on the same schema.
+
 ## v0.13.0 (2026-11-03)
 
 ### Feat
