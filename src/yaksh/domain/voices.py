@@ -140,7 +140,7 @@ TTS = {
         "Nimble",
         word_timestamps=True,
         lookup=True,
-        models=(TtsModel(None, "Nimble", (0.7, 1.0), INDIAN_AND_ENGLISH),),
+        models=(TtsModel(None, "Nimble", (0.7, 1.2), INDIAN_AND_ENGLISH),),
     ),
 }
 

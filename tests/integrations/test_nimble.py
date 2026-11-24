@@ -19,6 +19,7 @@ from pipecat.frames.frames import (
 )
 from pipecat.pipeline.worker import PipelineParams
 from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
+from pydantic import ValidationError
 
 from yaksh.caller.plivo_server import PlivoServer
 from yaksh.domain.languages import Language
@@ -102,16 +103,19 @@ class Frames(FrameProcessor):
         await self.push_frame(frame, direction)
 
 
-@pytest.mark.parametrize(("language", "sent"), [(Language.HI, "hi"), (Language.EN, None)])
+@pytest.mark.parametrize(
+    ("language", "also", "sent"),
+    [(Language.HI, (), "hi"), (Language.EN, (), None), (Language.TA, (Language.HI,), None)],
+)
 async def test_a_reply_goes_to_the_realtime_api_with_the_voice_and_comes_back_timed(
-    plivo: Plivo, language: Language, sent: str | None
+    plivo: Plivo, language: Language, also: tuple[Language, ...], sent: str | None
 ) -> None:
     """English goes with no language: Plivo refuses English without its region, and reads it
-    in the voice's own region."""
+    in the voice's own region. A caller that can switch sends none: Plivo finds the language of
+    each sentence."""
     frames = Frames()
-    service = tts(
-        AppSettings(nimble=Nimble(base_url=plivo.url)), VOICE, language, KEY, one_shot=True
-    )
+    settings = AppSettings(nimble=Nimble(base_url=plivo.url))
+    service = tts(settings, VOICE, language, KEY, one_shot=True, also=also)
     async with one_shot([service, frames], PARAMS, frames.stopped) as run:
         await run.worker.queue_frame(TTSSpeakFrame("Haan ji."))
         async with asyncio.timeout(5):
@@ -137,3 +141,9 @@ async def test_the_voice_list_names_english_by_its_language_whatever_its_region(
         ("v1", "Karan", VoiceGender.MALE, (Language.EN,)),
         ("v2", "Meera", VoiceGender.FEMALE, (Language.HI,)),
     ]
+
+
+def test_a_nimble_voice_takes_the_pace_the_api_takes() -> None:
+    assert VoiceSettings(provider=VoiceProvider.NIMBLE, id="t4", speed=1.2).speed == 1.2
+    with pytest.raises(ValidationError, match=r"Nimble takes a speed from 0\.7 to 1\.2"):
+        VoiceSettings(provider=VoiceProvider.NIMBLE, id="t4", speed=1.25)

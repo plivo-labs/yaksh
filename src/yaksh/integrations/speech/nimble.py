@@ -1,8 +1,6 @@
 """Nimble, Plivo's text-to-speech: Pipecat's Plivo service over its Realtime API, and the
 account's voices."""
 
-import base64
-import json
 from collections.abc import Sequence
 from typing import Any
 
@@ -10,7 +8,6 @@ import aiohttp
 from pipecat.services.plivo.tts import PlivoTTSService
 from pipecat.transcriptions.language import Language as PipecatLanguage
 
-from yaksh.diagnostics import describe_exception
 from yaksh.domain.errors import UnavailableError
 from yaksh.domain.languages import Language
 from yaksh.domain.settings import AppSettings
@@ -23,7 +20,7 @@ from yaksh.domain.voices import (
     VoiceSettings,
 )
 from yaksh.integrations.speech.audio import SAMPLE_RATE, quiet_s
-from yaksh.integrations.speech.catalog import page_of
+from yaksh.integrations.speech.catalog import get_json, page_of
 from yaksh.integrations.speech.vendor import TtsVendor
 
 LANGUAGES = VoiceProvider.NIMBLE.traits.languages
@@ -31,18 +28,12 @@ LANGUAGES = VoiceProvider.NIMBLE.traits.languages
 NAMED = LANGUAGES - {Language.EN}
 """The languages sent by name. Nimble takes English only with its region, which Yaksh's English
 does not have, so English goes with no language: Nimble reads it in the voice's own region."""
-TIMEOUT = aiohttp.ClientTimeout(total=10)
 
 
 def websocket_of(base_url: str) -> str:
-    """The gateway's websocket address: wss for https, ws for http."""
+    """The gateway's websocket address: wss for https or wss, ws for http or ws."""
     scheme, rest = base_url.rstrip("/").split("://", 1)
-    return f"{'wss' if scheme == 'https' else 'ws'}://{rest}"
-
-
-def basic_auth(credential: str) -> str:
-    """`credential` is the Auth ID and Auth token as `id:token`, as Basic auth sends them."""
-    return "Basic " + base64.b64encode(credential.encode()).decode()
+    return f"{'wss' if scheme in {'https', 'wss'} else 'ws'}://{rest}"
 
 
 def tts(
@@ -73,27 +64,14 @@ def tts(
 async def voices(settings: AppSettings, key: str) -> list[ProviderVoice]:
     """The voices the account can use; this also proves the Auth ID, the token and that this
     server's IP is allowed."""
-    auth_id = key.partition(":")[0]
+    auth_id, _, auth_token = key.partition(":")
     url = f"{settings.nimble.base_url.rstrip('/')}/v1/Account/{auth_id}/TTS/Voices"
+    headers = {"Authorization": aiohttp.encode_basic_auth(auth_id, auth_token)}
+    body = await get_json("Nimble", url, {}, headers)
     try:
-        async with (
-            aiohttp.ClientSession(timeout=TIMEOUT) as session,
-            session.get(url, headers={"Authorization": basic_auth(key)}) as response,
-        ):
-            status, body = response.status, await response.text()
-    except (aiohttp.ClientError, TimeoutError) as error:
-        raise UnavailableError(f"Nimble did not answer: {describe_exception(error)}") from None
-    if status == 401:
-        raise UnavailableError(
-            "Nimble refused the Auth ID and token (401); check them, and this server's IP on the "
-            "account's IP allow list"
-        )
-    if status >= 400:
-        raise UnavailableError(f"Nimble answered {status}")
-    try:
-        listed = json.loads(body)["objects"]
-    except ValueError, KeyError, TypeError:
-        raise UnavailableError("Nimble sent a voice list that is not JSON") from None
+        listed = body["objects"]
+    except KeyError, TypeError:
+        raise UnavailableError("Nimble sent a voice list in an unknown shape") from None
     return [provider_voice(entry) for entry in listed]
 
 

@@ -137,3 +137,11 @@ def test_an_unfinished_turn_ends_after_the_max_wait_of_silence(max_wait_s: float
         quiet += 1
 
     assert quiet * FRAME_S == pytest.approx(max_wait_s)
+
+
+def test_the_shared_end_of_turn_model_sets_what_pipecats_own_sets() -> None:
+    """The shared model skips the analyzer's own __init__: an attribute that a Pipecat upgrade
+    adds there must be set here too."""
+    shared = TurnModels().end_of_turn(max_wait_s=TURNS.turn_max_wait_s)
+
+    assert set(vars(shared)) == set(vars(LocalSmartTurnAnalyzerV3()))
