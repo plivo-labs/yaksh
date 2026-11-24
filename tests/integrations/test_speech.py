@@ -20,6 +20,7 @@ from pipecat.pipeline.worker import PipelineParams
 from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
 from pipecat.services.elevenlabs.tts import ElevenLabsTTSService
 from pipecat.services.gladia.config import LanguageConfig
+from pipecat.services.plivo.tts import PlivoTTSService
 from pipecat.services.tts_service import TTSService, WebsocketTTSService
 from pipecat.tests.utils import run_test
 from pipecat.transcriptions.language import Language as PipecatLanguage
@@ -36,7 +37,6 @@ from yaksh.integrations.speech import audio
 from yaksh.integrations.speech.audio import Resample8k, speak_once
 from yaksh.integrations.speech.deepgram import deepgram_language
 from yaksh.integrations.speech.elevenlabs import SentenceDialogue
-from yaksh.integrations.speech.nimble import NimbleTTSService
 from yaksh.integrations.speech.stt import stt_service
 from yaksh.integrations.speech.tts import VENDORS as TTS_VENDORS
 from yaksh.integrations.speech.tts import tts_service
@@ -325,8 +325,8 @@ def test_a_voice_reads_the_language_from_the_text_for_a_caller_that_can_switch()
 
     eleven = cast(ElevenLabsTTSService, tts_service(app, flash, Language.HI, "k", also=also))
     sent = dict(parse_qsl(urlsplit(eleven._build_websocket_url()).query))
-    switching = cast(NimbleTTSService, tts_service(app, nimble, Language.HI, "k", also=also))
-    one = cast(NimbleTTSService, tts_service(app, nimble, Language.HI, "k"))
+    switching = cast(PlivoTTSService, tts_service(app, nimble, Language.HI, "k", also=also))
+    one = cast(PlivoTTSService, tts_service(app, nimble, Language.HI, "k"))
 
     assert "language_code" not in sent
-    assert (switching._options["language"], one._options["language"]) == ("auto", "hi")
+    assert (switching._settings.language, one._settings.language) == (None, "hi")

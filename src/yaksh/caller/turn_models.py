@@ -58,4 +58,5 @@ class SharedSmartTurn(LocalSmartTurnAnalyzerV3):
     def __init__(self, session: InferenceSession, *, params: SmartTurnParams) -> None:
         BaseSmartTurn.__init__(self, params=params)
         self._log_data = False
+        self._resampler = None
         self._session = session

@@ -82,7 +82,7 @@ class SarvamTts(Section):
 
 
 class Nimble(Section):
-    base_url: Address = "https://in.tts.plivo.com"
+    base_url: Address = "https://api.plivo.com"
     """The gateway of the region the speech should stay in."""
 
 

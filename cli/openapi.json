@@ -11522,7 +11522,7 @@
             "type": "string",
             "pattern": "^(https?|wss?)://\\S+$",
             "title": "Base Url",
-            "default": "https://in.tts.plivo.com"
+            "default": "https://api.plivo.com"
           }
         },
         "additionalProperties": false,
@@ -16111,7 +16111,7 @@
           "nimble": {
             "$ref": "#/components/schemas/Nimble",
             "default": {
-              "base_url": "https://in.tts.plivo.com"
+              "base_url": "https://api.plivo.com"
             }
           },
           "caller": {

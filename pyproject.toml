@@ -18,7 +18,7 @@ dependencies = [
     "jinja2>=3.1.6",
     "openai>=3.14.1",
     "opentelemetry-proto>=1.39",
-    "pipecat-ai[assemblyai,azure,cartesia,deepgram,elevenlabs,gladia,openai,sarvam,silero,soniox,typesafe]>=1.14.0",
+    "pipecat-ai[assemblyai,azure,cartesia,deepgram,elevenlabs,gladia,openai,plivo,sarvam,silero,soniox,typesafe]>=1.17.0",
     "pydantic>=2.12",
     "pydantic-settings>=2.15.0",
     "pypdf>=6.21.2",
@@ -56,6 +56,11 @@ dev = [
     "types-aiobotocore-s3>=3.9.1",
     "types-regex>=2026.9.10.20260911",
 ]
+
+[tool.uv.sources]
+# Pipecat's Plivo TTS service (pipecat-ai/pipecat#6987) is not released yet: Pipecat v1.17.0 with
+# that pull request's commits.
+pipecat-ai = { git = "https://github.com/plivo-labs/pipecat", rev = "8fd6f5f77b2cffb1a9fe750a37b6fc1252e655aa" }
 
 [tool.ruff]
 line-length = 100
