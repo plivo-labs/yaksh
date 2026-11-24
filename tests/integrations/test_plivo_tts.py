@@ -1,5 +1,6 @@
-"""Nimble through Pipecat's Plivo service: Yaksh's settings reach Plivo's Realtime API, and the
-voice list comes from its Voices route. The service itself is tested in Pipecat."""
+"""Koyal, Plivo's text to speech, through Pipecat's Plivo service: Yaksh's settings reach Plivo's
+Realtime API, and the voice list comes from its Voices route. The service itself is tested in
+Pipecat."""
 
 import asyncio
 import base64
@@ -23,20 +24,33 @@ from pydantic import ValidationError
 
 from yaksh.caller.plivo_server import PlivoServer
 from yaksh.domain.languages import Language
-from yaksh.domain.settings import AppSettings, Nimble
+from yaksh.domain.settings import AppSettings, PlivoTts, Secrets
 from yaksh.domain.voices import VoiceGender, VoiceProvider, VoiceSettings
 from yaksh.integrations.speech.audio import one_shot
-from yaksh.integrations.speech.nimble import tts, voices
+from yaksh.integrations.speech.plivo import tts, voices
 
 KEY = "MAID:token"
 AUTHORIZATION = "Basic " + base64.b64encode(KEY.encode()).decode()
-VOICE = VoiceSettings(provider=VoiceProvider.NIMBLE, id="t4", speed=0.9)
+VOICE = VoiceSettings(provider=VoiceProvider.PLIVO, id="t4", speed=0.9)
 PARAMS = PipelineParams(audio_out_sample_rate=8000)
 AUDIO = bytes(16000)
 """One second of 8 kHz PCM16, so that both words are played."""
 LISTED = [
-    {"voice_id": "v1", "name": "Karan", "gender": "male", "languages": ["en-IN", "en-US"]},
-    {"voice_id": "v2", "name": "Meera", "gender": "female", "languages": ["hi"]},
+    {
+        "voice_id": voice_id,
+        "is_owner": False,
+        "name": name,
+        "gender": gender,
+        "languages": languages,
+        "accent_type": "Indian",
+        "description": f"{name}, calm",
+        "sample_url": None,
+        "created_at": "2026-11-20T10:00:00Z",
+    }
+    for voice_id, name, gender, languages in (
+        ("v1", "Karan", "male", ["en-IN", "en-US"]),
+        ("v2", "Meera", "female", ["hi"]),
+    )
 ]
 
 
@@ -75,12 +89,27 @@ async def plivo() -> AsyncIterator[Plivo]:
                         "duration_ms": [80] * 7,
                     }
                 )
-                await socket.send_json({"type": "done", "context_id": context_id})
+                await socket.send_json(
+                    {
+                        "type": "done",
+                        "context_id": context_id,
+                        "reason": "complete",
+                        "continued": False,
+                        "normalized_text": "Haan ji.",
+                        "characters": 8,
+                        "tokens": 25,
+                        "audio_seconds": 1.0,
+                        "spoken_chars": 7,
+                        "ttfb_ms": 90,
+                        "api_id": "a2",
+                    }
+                )
 
     @app.get("/v1/Account/{auth_id}/TTS/Voices")
     async def listed(auth_id: str, request: Request) -> JSONResponse:
         fake.requests.append((auth_id, request.headers["authorization"]))
-        return JSONResponse({"api_id": "a1", "meta": {"total_count": 2}, "objects": LISTED})
+        meta = {"limit": 2, "next": None, "offset": 0, "previous": None, "total_count": 2}
+        return JSONResponse({"api_id": "a1", "meta": meta, "objects": LISTED})
 
     server = PlivoServer(app, port=0)
     await server.start()
@@ -114,8 +143,7 @@ async def test_a_reply_goes_to_the_realtime_api_with_the_voice_and_comes_back_ti
     in the voice's own region. A caller that can switch sends none: Plivo finds the language of
     each sentence."""
     frames = Frames()
-    settings = AppSettings(nimble=Nimble(base_url=plivo.url))
-    service = tts(settings, VOICE, language, KEY, one_shot=True, also=also)
+    service = tts(at(plivo), VOICE, language, KEY, one_shot=True, also=also)
     async with one_shot([service, frames], PARAMS, frames.stopped) as run:
         await run.worker.queue_frame(TTSSpeakFrame("Haan ji."))
         async with asyncio.timeout(5):
@@ -124,7 +152,12 @@ async def test_a_reply_goes_to_the_realtime_api_with_the_voice_and_comes_back_ti
     assert run.errors == []
     assert plivo.requests == [("MAID", AUTHORIZATION)]
     opening = plivo.messages[0]
-    assert (opening["voice_id"], opening["pace"], opening.get("language")) == ("t4", 0.9, sent)
+    assert (opening["model_id"], opening["voice_id"], opening["pace"], opening.get("language")) == (
+        "koyal-v1",
+        "t4",
+        0.9,
+        sent,
+    )
     assert opening["output_format"]["sample_rate"] == 8000
     audio = b"".join(frame.audio for frame in frames.seen if isinstance(frame, TTSAudioRawFrame))
     words = [frame.text for frame in frames.seen if isinstance(frame, TTSTextFrame)]
@@ -134,16 +167,34 @@ async def test_a_reply_goes_to_the_realtime_api_with_the_voice_and_comes_back_ti
 async def test_the_voice_list_names_english_by_its_language_whatever_its_region(
     plivo: Plivo,
 ) -> None:
-    listed = await voices(AppSettings(nimble=Nimble(base_url=plivo.url)), KEY)
+    listed = await voices(at(plivo), KEY)
 
     assert plivo.requests == [("MAID", AUTHORIZATION)]
-    assert [(v.id, v.name, v.gender, v.listed_languages) for v in listed] == [
-        ("v1", "Karan", VoiceGender.MALE, (Language.EN,)),
-        ("v2", "Meera", VoiceGender.FEMALE, (Language.HI,)),
+    assert [(v.id, v.name, v.gender, v.accent, v.listed_languages) for v in listed] == [
+        ("v1", "Karan", VoiceGender.MALE, "Indian", (Language.EN,)),
+        ("v2", "Meera", VoiceGender.FEMALE, "Indian", (Language.HI,)),
     ]
 
 
-def test_a_nimble_voice_takes_the_pace_the_api_takes() -> None:
-    assert VoiceSettings(provider=VoiceProvider.NIMBLE, id="t4", speed=1.2).speed == 1.2
-    with pytest.raises(ValidationError, match=r"Nimble takes a speed from 0\.7 to 1\.2"):
-        VoiceSettings(provider=VoiceProvider.NIMBLE, id="t4", speed=1.25)
+def test_a_koyal_voice_takes_the_pace_the_api_takes() -> None:
+    assert VoiceSettings(provider=VoiceProvider.PLIVO, id="t4", speed=1.2).speed == 1.2
+    with pytest.raises(ValidationError, match=r"Plivo takes a speed from 0\.7 to 1\.2"):
+        VoiceSettings(provider=VoiceProvider.PLIVO, id="t4", speed=1.25)
+
+
+@pytest.mark.parametrize("address", ["http://api.plivo.com", "wss://api.plivo.com"])
+def test_koyal_takes_only_an_https_address(address: str) -> None:
+    """The voice list is an HTTPS request, and the Auth ID and Auth token go with it."""
+    with pytest.raises(ValidationError, match="https"):
+        PlivoTts(base_url=address)
+
+
+def test_koyal_speaks_with_the_plivo_account() -> None:
+    secrets = Secrets.model_validate({"plivo_auth_id": "MAID", "plivo_auth_token": "token"})
+
+    assert AppSettings(secrets=secrets).tts_credential(VoiceProvider.PLIVO) == KEY
+
+
+def at(plivo: Plivo) -> AppSettings:
+    """The stand-in serves plain HTTP, which a saved address may not use."""
+    return AppSettings(plivo_tts=PlivoTts.model_construct(base_url=plivo.url))

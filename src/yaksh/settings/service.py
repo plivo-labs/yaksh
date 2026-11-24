@@ -26,6 +26,7 @@ from yaksh.domain.voices import VoiceProvider
 from yaksh.evaluation.jev import JEV_MODEL
 from yaksh.integrations import provider_checks as checks
 from yaksh.integrations.openai_models import caller_effort
+from yaksh.integrations.plivo import PLIVO_API
 from yaksh.integrations.provider_checks import ProviderCheckError
 from yaksh.integrations.speech.tts import check_voice as tts_check_voice
 from yaksh.settings.store import DEFAULTS, RETIRED, changed_values
@@ -52,7 +53,7 @@ class Provider(StrEnum):
     CARTESIA = "cartesia"
     SARVAM_TTS = "sarvam_tts"
     AZURE = "azure"
-    NIMBLE = "nimble"
+    PLIVO_TTS = "plivo_tts"
     TYPESAFE = "typesafe"
     PLIVO = "plivo"
 
@@ -71,11 +72,11 @@ TTS_TESTS = {
     Provider.CARTESIA: VoiceProvider.CARTESIA,
     Provider.SARVAM_TTS: VoiceProvider.SARVAM,
     Provider.AZURE: VoiceProvider.AZURE,
-    Provider.NIMBLE: VoiceProvider.NIMBLE,
+    Provider.PLIVO_TTS: VoiceProvider.PLIVO,
 }
 """The text-to-speech test of each provider, which speaks one word."""
 TTS_OF_KEY = {names[0]: provider for provider, names in TTS_KEYS.items() if len(names) == 1}
-"""The voice provider of each single key; Nimble's pair is checked as a Pair."""
+"""The voice provider of each single key; the Plivo account's pair is checked as a Pair."""
 
 CHECK_CLIP = SOUNDS / "answering" / "iphone_screen_ack.wav"
 """8 kHz speech that every speech-to-text provider must transcribe to pass its check."""
@@ -127,7 +128,7 @@ async def test_provider(settings: AppSettings, provider: Provider) -> str:
             | Provider.CARTESIA
             | Provider.SARVAM_TTS
             | Provider.AZURE
-            | Provider.NIMBLE
+            | Provider.PLIVO_TTS
         ):
             tts = TTS_TESTS[provider]
             credential = settings.tts_credential(tts)
@@ -164,19 +165,16 @@ class Pair:
     """Checks the account with the new Auth ID and Auth token."""
 
 
-async def _check_plivo_account(_candidate: AppSettings, auth_id: str, auth_token: str) -> None:
+async def _check_plivo_account(candidate: AppSettings, auth_id: str, auth_token: str) -> None:
+    """The account lists its numbers at Plivo's API. Koyal at another address speaks one word
+    there too: the pair goes only where it was checked."""
     await checks.check_plivo(auth_id, auth_token)
-
-
-async def _check_nimble_account(candidate: AppSettings, auth_id: str, auth_token: str) -> None:
-    await check_tts(candidate, VoiceProvider.NIMBLE, f"{auth_id}:{auth_token}")
+    if candidate.plivo_tts.base_url != PLIVO_API:
+        await check_tts(candidate, VoiceProvider.PLIVO, f"{auth_id}:{auth_token}")
 
 
 PLIVO = Pair("Plivo", (SecretName.PLIVO_AUTH_ID, SecretName.PLIVO_AUTH_TOKEN), _check_plivo_account)
-NIMBLE = Pair(
-    "Nimble", (SecretName.NIMBLE_AUTH_ID, SecretName.NIMBLE_AUTH_TOKEN), _check_nimble_account
-)
-PAIRS = (PLIVO, NIMBLE)
+PAIRS = (PLIVO,)
 PAIRED = {name: pair for pair in PAIRS for name in pair.names}
 
 

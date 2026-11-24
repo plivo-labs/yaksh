@@ -865,8 +865,8 @@ const (
 	ProviderElevenlabs Provider = "elevenlabs"
 	ProviderGladia     Provider = "gladia"
 	ProviderLlm        Provider = "llm"
-	ProviderNimble     Provider = "nimble"
 	ProviderPlivo      Provider = "plivo"
+	ProviderPlivoTts   Provider = "plivo_tts"
 	ProviderSarvamStt  Provider = "sarvam_stt"
 	ProviderSarvamTts  Provider = "sarvam_tts"
 	ProviderSoniox     Provider = "soniox"
@@ -890,9 +890,9 @@ func (e Provider) Valid() bool {
 		return true
 	case ProviderLlm:
 		return true
-	case ProviderNimble:
-		return true
 	case ProviderPlivo:
+		return true
+	case ProviderPlivoTts:
 		return true
 	case ProviderSarvamStt:
 		return true
@@ -1096,8 +1096,6 @@ const (
 	ElevenlabsApiKey  SecretName = "elevenlabs_api_key"
 	GladiaApiKey      SecretName = "gladia_api_key"
 	LlmApiKey         SecretName = "llm_api_key"
-	NimbleAuthId      SecretName = "nimble_auth_id"
-	NimbleAuthToken   SecretName = "nimble_auth_token"
 	PlivoAuthId       SecretName = "plivo_auth_id"
 	PlivoAuthToken    SecretName = "plivo_auth_token"
 	SarvamApiKey      SecretName = "sarvam_api_key"
@@ -1122,10 +1120,6 @@ func (e SecretName) Valid() bool {
 	case GladiaApiKey:
 		return true
 	case LlmApiKey:
-		return true
-	case NimbleAuthId:
-		return true
-	case NimbleAuthToken:
 		return true
 	case PlivoAuthId:
 		return true
@@ -1398,7 +1392,7 @@ const (
 	VoiceProviderAzure      VoiceProvider = "azure"
 	VoiceProviderCartesia   VoiceProvider = "cartesia"
 	VoiceProviderElevenlabs VoiceProvider = "elevenlabs"
-	VoiceProviderNimble     VoiceProvider = "nimble"
+	VoiceProviderPlivo      VoiceProvider = "plivo"
 	VoiceProviderSarvam     VoiceProvider = "sarvam"
 )
 
@@ -1411,7 +1405,7 @@ func (e VoiceProvider) Valid() bool {
 		return true
 	case VoiceProviderElevenlabs:
 		return true
-	case VoiceProviderNimble:
+	case VoiceProviderPlivo:
 		return true
 	case VoiceProviderSarvam:
 		return true
@@ -2532,18 +2526,6 @@ type Models struct {
 	Models []string `json:"models"`
 }
 
-// Nimble defines model for Nimble.
-type Nimble struct {
-	BaseUrl *string `json:"base_url,omitempty"`
-}
-
-// NimbleAccount defines model for NimbleAccount.
-type NimbleAccount struct {
-	AuthId    string  `json:"auth_id"`
-	AuthToken string  `json:"auth_token"`
-	BaseUrl   *string `json:"base_url,omitempty"`
-}
-
 // NoiseSound defines model for NoiseSound.
 type NoiseSound string
 
@@ -2892,8 +2874,9 @@ type PlayedScenario struct {
 
 // PlivoAccount defines model for PlivoAccount.
 type PlivoAccount struct {
-	AuthId    string `json:"auth_id"`
-	AuthToken string `json:"auth_token"`
+	AuthId    string  `json:"auth_id"`
+	AuthToken string  `json:"auth_token"`
+	BaseUrl   *string `json:"base_url,omitempty"`
 }
 
 // PlivoCxFlow defines model for PlivoCxFlow.
@@ -2924,6 +2907,11 @@ type PlivoCxFlowSearch struct {
 	AuthToken string  `json:"auth_token"`
 	Name      *string `json:"name,omitempty"`
 	Offset    *int    `json:"offset,omitempty"`
+}
+
+// PlivoTts Koyal, Plivo's text to speech, speaks with the Plivo account's Auth ID and Auth token.
+type PlivoTts struct {
+	BaseUrl *string `json:"base_url,omitempty"`
 }
 
 // Provenance defines model for Provenance.
@@ -3482,9 +3470,11 @@ type SettingsValues struct {
 
 	// Llm Any API with OpenAI's Responses endpoint. The caller, scenario writing and the judges
 	// use it.
-	Llm    *Llm    `json:"llm,omitempty"`
-	Nimble *Nimble `json:"nimble,omitempty"`
-	Phone  *Phone  `json:"phone,omitempty"`
+	Llm   *Llm   `json:"llm,omitempty"`
+	Phone *Phone `json:"phone,omitempty"`
+
+	// PlivoTts Koyal, Plivo's text to speech, speaks with the Plivo account's Auth ID and Auth token.
+	PlivoTts *PlivoTts `json:"plivo_tts,omitempty"`
 
 	// SarvamStt Sarvam's speech-to-text host is fixed by its SDK, so it has no address.
 	SarvamStt *SarvamStt `json:"sarvam_stt,omitempty"`
@@ -4236,9 +4226,6 @@ type DraftScenarioForksApiV1ScenariosScenarioIdForksDraftPostJSONRequestBody = S
 
 // ImportSettingsApiV1SettingsImportPostJSONRequestBody defines body for ImportSettingsApiV1SettingsImportPost for application/json ContentType.
 type ImportSettingsApiV1SettingsImportPostJSONRequestBody = SettingsImport
-
-// PutNimbleAccountApiV1SettingsNimblePutJSONRequestBody defines body for PutNimbleAccountApiV1SettingsNimblePut for application/json ContentType.
-type PutNimbleAccountApiV1SettingsNimblePutJSONRequestBody = NimbleAccount
 
 // PutPlivoAccountApiV1SettingsPlivoPutJSONRequestBody defines body for PutPlivoAccountApiV1SettingsPlivoPut for application/json ContentType.
 type PutPlivoAccountApiV1SettingsPlivoPutJSONRequestBody = PlivoAccount
@@ -5867,31 +5854,6 @@ type ClientInterface interface {
 	// Corresponds with GET /api/v1/settings/models/{model}/efforts (the `ModelEffortsApiV1SettingsModelsModelEffortsGet` operationId).
 	ModelEffortsApiV1SettingsModelsModelEffortsGet(ctx context.Context, model string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// DeleteNimbleAccountApiV1SettingsNimbleDelete Delete Nimble Account
-	//
-	// Corresponds with DELETE /api/v1/settings/nimble (the `DeleteNimbleAccountApiV1SettingsNimbleDelete` operationId).
-	DeleteNimbleAccountApiV1SettingsNimbleDelete(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// PutNimbleAccountApiV1SettingsNimblePutWithBody Put Nimble Account
-	//
-	// Save Nimble's Auth ID and Auth token together, after Nimble speaks with them; with
-	// `base_url`, they are checked at that gateway and saved with it.
-	//
-	// Takes any type of body and a specified content type.
-	//
-	// Corresponds with PUT /api/v1/settings/nimble (the `PutNimbleAccountApiV1SettingsNimblePut` operationId).
-	PutNimbleAccountApiV1SettingsNimblePutWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// PutNimbleAccountApiV1SettingsNimblePut Put Nimble Account
-	//
-	// Save Nimble's Auth ID and Auth token together, after Nimble speaks with them; with
-	// `base_url`, they are checked at that gateway and saved with it.
-	//
-	// Takes a body of the `application/json` content type.
-	//
-	// Corresponds with PUT /api/v1/settings/nimble (the `PutNimbleAccountApiV1SettingsNimblePut` operationId).
-	PutNimbleAccountApiV1SettingsNimblePut(ctx context.Context, body PutNimbleAccountApiV1SettingsNimblePutJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
-
 	// DeletePlivoAccountApiV1SettingsPlivoDelete Delete Plivo Account
 	//
 	// Corresponds with DELETE /api/v1/settings/plivo (the `DeletePlivoAccountApiV1SettingsPlivoDelete` operationId).
@@ -5900,7 +5862,8 @@ type ClientInterface interface {
 	// PutPlivoAccountApiV1SettingsPlivoPutWithBody Put Plivo Account
 	//
 	// Save the Auth ID and Auth token of a Plivo account together, after Plivo accepts them;
-	// this is how to move to another account.
+	// this is how to move to another account. Koyal speaks with them too: with `base_url`, they
+	// are checked at that address and saved with it.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -5910,7 +5873,8 @@ type ClientInterface interface {
 	// PutPlivoAccountApiV1SettingsPlivoPut Put Plivo Account
 	//
 	// Save the Auth ID and Auth token of a Plivo account together, after Plivo accepts them;
-	// this is how to move to another account.
+	// this is how to move to another account. Koyal speaks with them too: with `base_url`, they
+	// are checked at that address and saved with it.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -5927,7 +5891,7 @@ type ClientInterface interface {
 
 	// DeleteSecretApiV1SettingsSecretsNameDelete Delete Secret
 	//
-	// Remove one key; the halves of a Plivo or Nimble account are removed together.
+	// Remove one key; the halves of the Plivo account are removed together.
 	//
 	// Corresponds with DELETE /api/v1/settings/secrets/{name} (the `DeleteSecretApiV1SettingsSecretsNameDelete` operationId).
 	DeleteSecretApiV1SettingsSecretsNameDelete(ctx context.Context, name SecretName, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -8343,61 +8307,6 @@ func (c *Client) ModelEffortsApiV1SettingsModelsModelEffortsGet(ctx context.Cont
 	return c.Client.Do(req)
 }
 
-// DeleteNimbleAccountApiV1SettingsNimbleDelete Delete Nimble Account
-//
-// Corresponds with DELETE /api/v1/settings/nimble (the `DeleteNimbleAccountApiV1SettingsNimbleDelete` operationId).
-func (c *Client) DeleteNimbleAccountApiV1SettingsNimbleDelete(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewDeleteNimbleAccountApiV1SettingsNimbleDeleteRequest(c.Server)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// PutNimbleAccountApiV1SettingsNimblePutWithBody Put Nimble Account
-//
-// Save Nimble's Auth ID and Auth token together, after Nimble speaks with them; with
-// `base_url`, they are checked at that gateway and saved with it.
-//
-// Takes any type of body and a specified content type.
-//
-// Corresponds with PUT /api/v1/settings/nimble (the `PutNimbleAccountApiV1SettingsNimblePut` operationId).
-func (c *Client) PutNimbleAccountApiV1SettingsNimblePutWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewPutNimbleAccountApiV1SettingsNimblePutRequestWithBody(c.Server, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// PutNimbleAccountApiV1SettingsNimblePut Put Nimble Account
-//
-// Save Nimble's Auth ID and Auth token together, after Nimble speaks with them; with
-// `base_url`, they are checked at that gateway and saved with it.
-//
-// Takes a body of the `application/json` content type.
-//
-// Corresponds with PUT /api/v1/settings/nimble (the `PutNimbleAccountApiV1SettingsNimblePut` operationId).
-func (c *Client) PutNimbleAccountApiV1SettingsNimblePut(ctx context.Context, body PutNimbleAccountApiV1SettingsNimblePutJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewPutNimbleAccountApiV1SettingsNimblePutRequest(c.Server, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
 // DeletePlivoAccountApiV1SettingsPlivoDelete Delete Plivo Account
 //
 // Corresponds with DELETE /api/v1/settings/plivo (the `DeletePlivoAccountApiV1SettingsPlivoDelete` operationId).
@@ -8416,7 +8325,8 @@ func (c *Client) DeletePlivoAccountApiV1SettingsPlivoDelete(ctx context.Context,
 // PutPlivoAccountApiV1SettingsPlivoPutWithBody Put Plivo Account
 //
 // Save the Auth ID and Auth token of a Plivo account together, after Plivo accepts them;
-// this is how to move to another account.
+// this is how to move to another account. Koyal speaks with them too: with `base_url`, they
+// are checked at that address and saved with it.
 //
 // Takes any type of body and a specified content type.
 //
@@ -8436,7 +8346,8 @@ func (c *Client) PutPlivoAccountApiV1SettingsPlivoPutWithBody(ctx context.Contex
 // PutPlivoAccountApiV1SettingsPlivoPut Put Plivo Account
 //
 // Save the Auth ID and Auth token of a Plivo account together, after Plivo accepts them;
-// this is how to move to another account.
+// this is how to move to another account. Koyal speaks with them too: with `base_url`, they
+// are checked at that address and saved with it.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -8473,7 +8384,7 @@ func (c *Client) TestProviderApiV1SettingsProvidersProviderTestPost(ctx context.
 
 // DeleteSecretApiV1SettingsSecretsNameDelete Delete Secret
 //
-// Remove one key; the halves of a Plivo or Nimble account are removed together.
+// Remove one key; the halves of the Plivo account are removed together.
 //
 // Corresponds with DELETE /api/v1/settings/secrets/{name} (the `DeleteSecretApiV1SettingsSecretsNameDelete` operationId).
 func (c *Client) DeleteSecretApiV1SettingsSecretsNameDelete(ctx context.Context, name SecretName, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -12964,73 +12875,6 @@ func NewModelEffortsApiV1SettingsModelsModelEffortsGetRequest(server string, mod
 	return req, nil
 }
 
-// NewDeleteNimbleAccountApiV1SettingsNimbleDeleteRequest constructs an http.Request for the DeleteNimbleAccountApiV1SettingsNimbleDelete method
-func NewDeleteNimbleAccountApiV1SettingsNimbleDeleteRequest(server string) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/api/v1/settings/nimble")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewPutNimbleAccountApiV1SettingsNimblePutRequest calls the generic PutNimbleAccountApiV1SettingsNimblePut builder with application/json body
-func NewPutNimbleAccountApiV1SettingsNimblePutRequest(server string, body PutNimbleAccountApiV1SettingsNimblePutJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewPutNimbleAccountApiV1SettingsNimblePutRequestWithBody(server, "application/json", bodyReader)
-}
-
-// NewPutNimbleAccountApiV1SettingsNimblePutRequestWithBody constructs an http.Request for the PutNimbleAccountApiV1SettingsNimblePut method, with any body, and a specified content type
-func NewPutNimbleAccountApiV1SettingsNimblePutRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/api/v1/settings/nimble")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPut, queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	return req, nil
-}
-
 // NewDeletePlivoAccountApiV1SettingsPlivoDeleteRequest constructs an http.Request for the DeletePlivoAccountApiV1SettingsPlivoDelete method
 func NewDeletePlivoAccountApiV1SettingsPlivoDeleteRequest(server string) (*http.Request, error) {
 	var err error
@@ -15504,33 +15348,6 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with GET /api/v1/settings/models/{model}/efforts (the `ModelEffortsApiV1SettingsModelsModelEffortsGet` operationId).
 	ModelEffortsApiV1SettingsModelsModelEffortsGetWithResponse(ctx context.Context, model string, reqEditors ...RequestEditorFn) (*ModelEffortsApiV1SettingsModelsModelEffortsGetResponse, error)
 
-	// DeleteNimbleAccountApiV1SettingsNimbleDeleteWithResponse Delete Nimble Account
-	//
-	// Returns a wrapper object for the known response body format(s).
-	//
-	// Corresponds with DELETE /api/v1/settings/nimble (the `DeleteNimbleAccountApiV1SettingsNimbleDelete` operationId).
-	DeleteNimbleAccountApiV1SettingsNimbleDeleteWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*DeleteNimbleAccountApiV1SettingsNimbleDeleteResponse, error)
-
-	// PutNimbleAccountApiV1SettingsNimblePutWithBodyWithResponse Put Nimble Account
-	//
-	// Save Nimble's Auth ID and Auth token together, after Nimble speaks with them; with
-	// `base_url`, they are checked at that gateway and saved with it.
-	//
-	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
-	//
-	// Corresponds with PUT /api/v1/settings/nimble (the `PutNimbleAccountApiV1SettingsNimblePut` operationId).
-	PutNimbleAccountApiV1SettingsNimblePutWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PutNimbleAccountApiV1SettingsNimblePutResponse, error)
-
-	// PutNimbleAccountApiV1SettingsNimblePutWithResponse Put Nimble Account
-	//
-	// Save Nimble's Auth ID and Auth token together, after Nimble speaks with them; with
-	// `base_url`, they are checked at that gateway and saved with it.
-	//
-	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
-	//
-	// Corresponds with PUT /api/v1/settings/nimble (the `PutNimbleAccountApiV1SettingsNimblePut` operationId).
-	PutNimbleAccountApiV1SettingsNimblePutWithResponse(ctx context.Context, body PutNimbleAccountApiV1SettingsNimblePutJSONRequestBody, reqEditors ...RequestEditorFn) (*PutNimbleAccountApiV1SettingsNimblePutResponse, error)
-
 	// DeletePlivoAccountApiV1SettingsPlivoDeleteWithResponse Delete Plivo Account
 	//
 	// Returns a wrapper object for the known response body format(s).
@@ -15541,7 +15358,8 @@ type ClientWithResponsesInterface interface {
 	// PutPlivoAccountApiV1SettingsPlivoPutWithBodyWithResponse Put Plivo Account
 	//
 	// Save the Auth ID and Auth token of a Plivo account together, after Plivo accepts them;
-	// this is how to move to another account.
+	// this is how to move to another account. Koyal speaks with them too: with `base_url`, they
+	// are checked at that address and saved with it.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -15551,7 +15369,8 @@ type ClientWithResponsesInterface interface {
 	// PutPlivoAccountApiV1SettingsPlivoPutWithResponse Put Plivo Account
 	//
 	// Save the Auth ID and Auth token of a Plivo account together, after Plivo accepts them;
-	// this is how to move to another account.
+	// this is how to move to another account. Koyal speaks with them too: with `base_url`, they
+	// are checked at that address and saved with it.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -15570,7 +15389,7 @@ type ClientWithResponsesInterface interface {
 
 	// DeleteSecretApiV1SettingsSecretsNameDeleteWithResponse Delete Secret
 	//
-	// Remove one key; the halves of a Plivo or Nimble account are removed together.
+	// Remove one key; the halves of the Plivo account are removed together.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -20238,102 +20057,6 @@ func (r ModelEffortsApiV1SettingsModelsModelEffortsGetResponse) ContentType() st
 	return ""
 }
 
-type DeleteNimbleAccountApiV1SettingsNimbleDeleteResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	// JSON200 the response for an HTTP 200 `application/json` response
-	JSON200 *SettingsRead
-	// JSON4XX the response for an HTTP 4XX `application/json` response
-	JSON4XX *ErrorResponse
-}
-
-// GetJSON200 returns the response for an HTTP 200 `application/json` response
-func (r DeleteNimbleAccountApiV1SettingsNimbleDeleteResponse) GetJSON200() *SettingsRead {
-	return r.JSON200
-}
-
-// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
-func (r DeleteNimbleAccountApiV1SettingsNimbleDeleteResponse) GetJSON4XX() *ErrorResponse {
-	return r.JSON4XX
-}
-
-// GetBody returns the raw response body bytes
-func (r DeleteNimbleAccountApiV1SettingsNimbleDeleteResponse) GetBody() []byte {
-	return r.Body
-}
-
-// Status returns HTTPResponse.Status
-func (r DeleteNimbleAccountApiV1SettingsNimbleDeleteResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r DeleteNimbleAccountApiV1SettingsNimbleDeleteResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r DeleteNimbleAccountApiV1SettingsNimbleDeleteResponse) ContentType() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Header.Get("Content-Type")
-	}
-	return ""
-}
-
-type PutNimbleAccountApiV1SettingsNimblePutResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	// JSON200 the response for an HTTP 200 `application/json` response
-	JSON200 *SettingsRead
-	// JSON4XX the response for an HTTP 4XX `application/json` response
-	JSON4XX *ErrorResponse
-}
-
-// GetJSON200 returns the response for an HTTP 200 `application/json` response
-func (r PutNimbleAccountApiV1SettingsNimblePutResponse) GetJSON200() *SettingsRead {
-	return r.JSON200
-}
-
-// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
-func (r PutNimbleAccountApiV1SettingsNimblePutResponse) GetJSON4XX() *ErrorResponse {
-	return r.JSON4XX
-}
-
-// GetBody returns the raw response body bytes
-func (r PutNimbleAccountApiV1SettingsNimblePutResponse) GetBody() []byte {
-	return r.Body
-}
-
-// Status returns HTTPResponse.Status
-func (r PutNimbleAccountApiV1SettingsNimblePutResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r PutNimbleAccountApiV1SettingsNimblePutResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r PutNimbleAccountApiV1SettingsNimblePutResponse) ContentType() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Header.Get("Content-Type")
-	}
-	return ""
-}
-
 type DeletePlivoAccountApiV1SettingsPlivoDeleteResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -23652,51 +23375,6 @@ func (c *ClientWithResponses) ModelEffortsApiV1SettingsModelsModelEffortsGetWith
 	return ParseModelEffortsApiV1SettingsModelsModelEffortsGetResponse(rsp)
 }
 
-// DeleteNimbleAccountApiV1SettingsNimbleDeleteWithResponse Delete Nimble Account
-//
-// Returns a wrapper object for the known response body format(s).
-//
-// Corresponds with DELETE /api/v1/settings/nimble (the `DeleteNimbleAccountApiV1SettingsNimbleDelete` operationId).
-func (c *ClientWithResponses) DeleteNimbleAccountApiV1SettingsNimbleDeleteWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*DeleteNimbleAccountApiV1SettingsNimbleDeleteResponse, error) {
-	rsp, err := c.DeleteNimbleAccountApiV1SettingsNimbleDelete(ctx, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseDeleteNimbleAccountApiV1SettingsNimbleDeleteResponse(rsp)
-}
-
-// PutNimbleAccountApiV1SettingsNimblePutWithBodyWithResponse Put Nimble Account
-//
-// Save Nimble's Auth ID and Auth token together, after Nimble speaks with them; with
-// `base_url`, they are checked at that gateway and saved with it.
-//
-// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
-//
-// Corresponds with PUT /api/v1/settings/nimble (the `PutNimbleAccountApiV1SettingsNimblePut` operationId).
-func (c *ClientWithResponses) PutNimbleAccountApiV1SettingsNimblePutWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PutNimbleAccountApiV1SettingsNimblePutResponse, error) {
-	rsp, err := c.PutNimbleAccountApiV1SettingsNimblePutWithBody(ctx, contentType, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParsePutNimbleAccountApiV1SettingsNimblePutResponse(rsp)
-}
-
-// PutNimbleAccountApiV1SettingsNimblePutWithResponse Put Nimble Account
-//
-// Save Nimble's Auth ID and Auth token together, after Nimble speaks with them; with
-// `base_url`, they are checked at that gateway and saved with it.
-//
-// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
-//
-// Corresponds with PUT /api/v1/settings/nimble (the `PutNimbleAccountApiV1SettingsNimblePut` operationId).
-func (c *ClientWithResponses) PutNimbleAccountApiV1SettingsNimblePutWithResponse(ctx context.Context, body PutNimbleAccountApiV1SettingsNimblePutJSONRequestBody, reqEditors ...RequestEditorFn) (*PutNimbleAccountApiV1SettingsNimblePutResponse, error) {
-	rsp, err := c.PutNimbleAccountApiV1SettingsNimblePut(ctx, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParsePutNimbleAccountApiV1SettingsNimblePutResponse(rsp)
-}
-
 // DeletePlivoAccountApiV1SettingsPlivoDeleteWithResponse Delete Plivo Account
 //
 // Returns a wrapper object for the known response body format(s).
@@ -23713,7 +23391,8 @@ func (c *ClientWithResponses) DeletePlivoAccountApiV1SettingsPlivoDeleteWithResp
 // PutPlivoAccountApiV1SettingsPlivoPutWithBodyWithResponse Put Plivo Account
 //
 // Save the Auth ID and Auth token of a Plivo account together, after Plivo accepts them;
-// this is how to move to another account.
+// this is how to move to another account. Koyal speaks with them too: with `base_url`, they
+// are checked at that address and saved with it.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -23729,7 +23408,8 @@ func (c *ClientWithResponses) PutPlivoAccountApiV1SettingsPlivoPutWithBodyWithRe
 // PutPlivoAccountApiV1SettingsPlivoPutWithResponse Put Plivo Account
 //
 // Save the Auth ID and Auth token of a Plivo account together, after Plivo accepts them;
-// this is how to move to another account.
+// this is how to move to another account. Koyal speaks with them too: with `base_url`, they
+// are checked at that address and saved with it.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -23760,7 +23440,7 @@ func (c *ClientWithResponses) TestProviderApiV1SettingsProvidersProviderTestPost
 
 // DeleteSecretApiV1SettingsSecretsNameDeleteWithResponse Delete Secret
 //
-// Remove one key; the halves of a Plivo or Nimble account are removed together.
+// Remove one key; the halves of the Plivo account are removed together.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -27329,72 +27009,6 @@ func ParseModelEffortsApiV1SettingsModelsModelEffortsGetResponse(rsp *http.Respo
 			return nil, err
 		}
 		response.JSON503 = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParseDeleteNimbleAccountApiV1SettingsNimbleDeleteResponse parses an HTTP response from a DeleteNimbleAccountApiV1SettingsNimbleDeleteWithResponse call
-func ParseDeleteNimbleAccountApiV1SettingsNimbleDeleteResponse(rsp *http.Response) (*DeleteNimbleAccountApiV1SettingsNimbleDeleteResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &DeleteNimbleAccountApiV1SettingsNimbleDeleteResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest SettingsRead
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
-		var dest ErrorResponse
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON4XX = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParsePutNimbleAccountApiV1SettingsNimblePutResponse parses an HTTP response from a PutNimbleAccountApiV1SettingsNimblePutWithResponse call
-func ParsePutNimbleAccountApiV1SettingsNimblePutResponse(rsp *http.Response) (*PutNimbleAccountApiV1SettingsNimblePutResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &PutNimbleAccountApiV1SettingsNimblePutResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest SettingsRead
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
-		var dest ErrorResponse
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON4XX = &dest
 
 	}
 

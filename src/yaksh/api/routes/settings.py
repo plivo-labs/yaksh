@@ -15,7 +15,6 @@ from yaksh.api.schemas.settings import (
     ImportResult,
     ModelReplyTimeRead,
     Models,
-    NimbleAccount,
     PlivoAccount,
     ProviderTest,
     SecretWrite,
@@ -94,25 +93,13 @@ async def put_plivo_account(
     account: PlivoAccount, settings: AppSettingsDep, session: SessionDep, cipher: CipherDep
 ) -> SettingsRead:
     """Save the Auth ID and Auth token of a Plivo account together, after Plivo accepts them;
-    this is how to move to another account."""
+    this is how to move to another account. Koyal speaks with them too: with `base_url`, they
+    are checked at that address and saved with it."""
     secrets: dict[str, str | None] = {
         SecretName.PLIVO_AUTH_ID: account.auth_id,
         SecretName.PLIVO_AUTH_TOKEN: account.auth_token,
     }
-    return SettingsRead.of(await checked_change(settings, session, cipher, secrets=secrets))
-
-
-@router.put("/nimble")
-async def put_nimble_account(
-    account: NimbleAccount, settings: AppSettingsDep, session: SessionDep, cipher: CipherDep
-) -> SettingsRead:
-    """Save Nimble's Auth ID and Auth token together, after Nimble speaks with them; with
-    `base_url`, they are checked at that gateway and saved with it."""
-    secrets: dict[str, str | None] = {
-        SecretName.NIMBLE_AUTH_ID: account.auth_id,
-        SecretName.NIMBLE_AUTH_TOKEN: account.auth_token,
-    }
-    values = None if account.base_url is None else {"nimble": {"base_url": account.base_url}}
+    values = None if account.base_url is None else {"plivo_tts": {"base_url": account.base_url}}
     return SettingsRead.of(
         await checked_change(settings, session, cipher, values=values, secrets=secrets)
     )
@@ -122,21 +109,8 @@ async def put_nimble_account(
 async def delete_plivo_account(
     settings: AppSettingsDep, session: SessionDep, cipher: CipherDep
 ) -> SettingsRead:
-    return SettingsRead.of(await remove_pair(service.PLIVO, settings, session, cipher))
-
-
-@router.delete("/nimble")
-async def delete_nimble_account(
-    settings: AppSettingsDep, session: SessionDep, cipher: CipherDep
-) -> SettingsRead:
-    return SettingsRead.of(await remove_pair(service.NIMBLE, settings, session, cipher))
-
-
-async def remove_pair(
-    pair: service.Pair, settings: AppSettings, session: AsyncSession, cipher: Cipher
-) -> AppSettings:
-    secrets: dict[str, str | None] = dict.fromkeys(pair.names)
-    return await checked_change(settings, session, cipher, secrets=secrets)
+    secrets: dict[str, str | None] = dict.fromkeys(service.PLIVO.names)
+    return SettingsRead.of(await checked_change(settings, session, cipher, secrets=secrets))
 
 
 async def checked_change(
@@ -161,7 +135,7 @@ async def checked_change(
 async def delete_secret(
     name: SecretName, settings: AppSettingsDep, session: SessionDep, cipher: CipherDep
 ) -> SettingsRead:
-    """Remove one key; the halves of a Plivo or Nimble account are removed together."""
+    """Remove one key; the halves of the Plivo account are removed together."""
     secrets: dict[str, str | None] = {name: None}
     return SettingsRead.of(await checked_change(settings, session, cipher, secrets=secrets))
 

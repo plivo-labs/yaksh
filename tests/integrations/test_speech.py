@@ -238,7 +238,7 @@ async def test_a_one_shot_pipeline_left_before_it_starts_still_ends() -> None:
 
 
 @pytest.mark.parametrize(
-    "provider", [VoiceProvider.ELEVENLABS, VoiceProvider.CARTESIA, VoiceProvider.NIMBLE]
+    "provider", [VoiceProvider.ELEVENLABS, VoiceProvider.CARTESIA, VoiceProvider.PLIVO]
 )
 def test_one_shot_speech_does_not_reconnect_a_dropped_socket(provider: VoiceProvider) -> None:
     voice = VoiceSettings(provider=provider, id="v1")

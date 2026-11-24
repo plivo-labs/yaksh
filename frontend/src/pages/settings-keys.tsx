@@ -275,9 +275,10 @@ export function RemoveButton({
 
 /** Two secrets that change together, such as an Auth ID and Auth token: a check never pairs a
  * new half with the other half of the old pair. `shown` is the saved pair's hint, null while
- * it is not saved; `children` are controls beside the change button, such as Remove. */
+ * it is not saved. */
 export function CredentialPairRow({
   label,
+  help,
   inputId,
   shown,
   change,
@@ -286,9 +287,9 @@ export function CredentialPairRow({
   error,
   onSave,
   onReset,
-  children,
 }: {
   label: string;
+  help?: ReactNode;
   inputId: string;
   shown: string | null;
   change: string;
@@ -297,7 +298,6 @@ export function CredentialPairRow({
   error?: string;
   onSave: (pair: { auth_id: string; auth_token: string }, done: () => void) => void;
   onReset: () => void;
-  children?: ReactNode;
 }) {
   const [editing, setEditing] = useState(false);
   const [authId, setAuthId] = useState("");
@@ -309,7 +309,7 @@ export function CredentialPairRow({
     onReset();
   };
   return (
-    <SettingRow label={label} htmlFor={editing ? inputId : undefined}>
+    <SettingRow label={label} help={help} htmlFor={editing ? inputId : undefined}>
       {editing ? (
         <form
           className={`grid gap-2 ${REVEAL}`}
@@ -355,7 +355,6 @@ export function CredentialPairRow({
             <Badge>Not set</Badge>
           )}
           <span className="flex-1" />
-          {children}
           <Button size="sm" variant="outline" onClick={() => setEditing(true)}>
             {shown !== null ? change : add}
           </Button>
@@ -365,20 +364,28 @@ export function CredentialPairRow({
   );
 }
 
-/** The Plivo account: its Auth ID and Auth token change together. */
-export function PlivoAccountRow({ settings }: { settings: AppSettings }) {
+/** The Plivo account: its Auth ID and Auth token change together. Koyal speaks with them too;
+ * with `baseUrl`, Koyal's address, they are checked there and saved with it. */
+export function PlivoAccountRow({
+  settings,
+  baseUrl,
+}: {
+  settings: AppSettings;
+  baseUrl?: string;
+}) {
   const save = useSavePlivoAccount();
   const id = settings.secrets.plivo_auth_id;
   return (
     <CredentialPairRow
       label="Auth ID and Auth token"
+      help={baseUrl === undefined ? undefined : "Also the phone account."}
       inputId="plivo-auth-id"
       shown={id && settings.secrets.plivo_auth_token ? `••••••••${id.hint ?? ""}` : null}
       change="Change account"
       add="Add account"
       pending={save.isPending}
       error={save.isError ? save.error.message : undefined}
-      onSave={(pair, done) => save.mutate(pair, { onSuccess: done })}
+      onSave={(pair, done) => save.mutate({ ...pair, base_url: baseUrl }, { onSuccess: done })}
       onReset={save.reset}
     />
   );

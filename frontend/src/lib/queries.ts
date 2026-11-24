@@ -1391,31 +1391,13 @@ export function useSaveSecret() {
   });
 }
 
-/** Saves a Plivo account's Auth ID and Auth token together, after Plivo accepts them. */
+/** Saves a Plivo account's Auth ID and Auth token together, after Plivo accepts them; with
+ * `base_url`, Koyal's new address, they are checked there and saved with it. */
 export function useSavePlivoAccount() {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: (account: { auth_id: string; auth_token: string }) =>
-      api<AppSettings>("/settings/plivo", { method: "PUT", json: account }),
-    onSuccess: (settings) => settingsChanged(client, settings),
-  });
-}
-
-/** Nimble's Auth ID and Auth token, checked and saved together; with `base_url`, at that
- * gateway. */
-export function useSaveNimbleAccount() {
-  const client = useQueryClient();
-  return useMutation({
     mutationFn: (account: { auth_id: string; auth_token: string; base_url?: string }) =>
-      api<AppSettings>("/settings/nimble", { method: "PUT", json: account }),
-    onSuccess: (settings) => settingsChanged(client, settings),
-  });
-}
-
-export function useRemoveNimbleAccount() {
-  const client = useQueryClient();
-  return useMutation({
-    mutationFn: () => api<AppSettings>("/settings/nimble", { method: "DELETE" }),
+      api<AppSettings>("/settings/plivo", { method: "PUT", json: account }),
     onSuccess: (settings) => settingsChanged(client, settings),
   });
 }

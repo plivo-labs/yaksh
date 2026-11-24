@@ -50,7 +50,7 @@ class Call:
                 reasoning_effort="low",
                 stt_provider=SttProvider.SARVAM,
                 stt_language="en-US",
-                voice=VoiceSettings(provider=VoiceProvider.NIMBLE, id="t4"),
+                voice=VoiceSettings(provider=VoiceProvider.PLIVO, id="t4"),
             ),
             "llm.example.com",
             now=lambda: self.now,
@@ -255,7 +255,7 @@ async def test_each_reply_is_logged_on_one_line_with_every_part(
         "llm.example.com",
         "en-US",
     )
-    assert (fields["stt_provider"], fields["tts_provider"]) == ("sarvam", "nimble")
+    assert (fields["stt_provider"], fields["tts_provider"]) == ("sarvam", "plivo")
     assert fields["reply"] == 0
     assert fields["total_ms"] == 1900
     assert fields["llm_inference_ms"] == 700

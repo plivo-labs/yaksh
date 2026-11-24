@@ -83,7 +83,7 @@ export const STT_LANGUAGES: Record<SttProvider, readonly string[]> = {
 /** A text-to-speech provider's settings and key. How its voices behave, and the models they
  * use, come from the server's list of providers (`useVoiceProviders`). */
 export interface TtsProvider extends Omit<SpeechProvider<VoiceProvider>, "address" | "secret"> {
-  /** Its key, or Nimble's Auth ID and Auth token, which are saved together. */
+  /** Its key, or the Plivo account's Auth ID and Auth token, which are saved together. */
   secrets: readonly SecretName[];
   /** The section's address field; Azure's is its region. */
   address: "base_url" | "url" | "region";
@@ -123,12 +123,12 @@ export const TTS_PROVIDERS: TtsProvider[] = [
     test: "azure",
   },
   {
-    value: "nimble",
-    label: "Nimble",
-    section: "nimble",
+    value: "plivo",
+    label: "Plivo",
+    section: "plivo_tts",
     address: "base_url",
-    secrets: ["nimble_auth_id", "nimble_auth_token"],
-    test: "nimble",
+    secrets: ["plivo_auth_id", "plivo_auth_token"],
+    test: "plivo_tts",
   },
 ];
 

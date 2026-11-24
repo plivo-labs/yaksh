@@ -12,14 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  useAgents,
-  usePersonas,
-  useRemoveNimbleAccount,
-  useSaveNimbleAccount,
-  useVoiceProviders,
-  useVoices,
-} from "@/lib/queries";
+import { useAgents, usePersonas, useVoiceProviders, useVoices } from "@/lib/queries";
 import {
   CUTS_AT_SENTENCES,
   STT_LANGUAGES,
@@ -40,11 +33,10 @@ import {
 } from "@/lib/types";
 import type { Change } from "@/pages/settings";
 import {
-  CredentialPairRow,
   KeyRemovedNote,
   KeyRow,
+  PlivoAccountRow,
   ProviderPanel,
-  RemoveButton,
   SettingRow,
 } from "@/pages/settings-keys";
 
@@ -316,47 +308,9 @@ function TtsProviderPanel({
             removeWarning={removeWarning}
           />
         ) : (
-          <NimbleAccountRow settings={settings} baseUrl={address} removeWarning={removeWarning} />
+          <PlivoAccountRow settings={settings} baseUrl={address} />
         )}
       </ProviderPanel>
     </div>
-  );
-}
-
-/** Nimble's Auth ID and Auth token: checked at the base URL the form shows, and saved with it. */
-function NimbleAccountRow({
-  settings,
-  baseUrl,
-  removeWarning,
-}: {
-  settings: AppSettings;
-  baseUrl: string;
-  removeWarning?: { title: string; description: string };
-}) {
-  const save = useSaveNimbleAccount();
-  const remove = useRemoveNimbleAccount();
-  const id = settings.secrets.nimble_auth_id;
-  const token = settings.secrets.nimble_auth_token;
-  const shown = id && token ? `••••${id.hint ?? ""} / ••••${token.hint ?? ""}` : null;
-  return (
-    <CredentialPairRow
-      label="Auth ID and token"
-      inputId="nimble-auth-id"
-      shown={shown}
-      change="Replace"
-      add="Add"
-      pending={save.isPending}
-      error={save.isError ? save.error.message : undefined}
-      onSave={(pair, done) => save.mutate({ ...pair, base_url: baseUrl }, { onSuccess: done })}
-      onReset={save.reset}
-    >
-      <RemoveButton
-        saved={shown !== null}
-        warning={removeWarning}
-        pending={remove.isPending}
-        error={remove.error?.message}
-        onRemove={(done) => remove.mutate(undefined, { onSuccess: done })}
-      />
-    </CredentialPairRow>
   );
 }

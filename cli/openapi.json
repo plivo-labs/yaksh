@@ -4913,7 +4913,7 @@
           "settings"
         ],
         "summary": "Delete Secret",
-        "description": "Remove one key; the halves of a Plivo or Nimble account are removed together.",
+        "description": "Remove one key; the halves of the Plivo account are removed together.",
         "operationId": "delete_secret_api_v1_settings_secrets__name__delete",
         "security": [
           {
@@ -4960,7 +4960,7 @@
           "settings"
         ],
         "summary": "Put Plivo Account",
-        "description": "Save the Auth ID and Auth token of a Plivo account together, after Plivo accepts them;\nthis is how to move to another account.",
+        "description": "Save the Auth ID and Auth token of a Plivo account together, after Plivo accepts them;\nthis is how to move to another account. Koyal speaks with them too: with `base_url`, they\nare checked at that address and saved with it.",
         "operationId": "put_plivo_account_api_v1_settings_plivo_put",
         "requestBody": {
           "content": {
@@ -5006,87 +5006,6 @@
         ],
         "summary": "Delete Plivo Account",
         "operationId": "delete_plivo_account_api_v1_settings_plivo_delete",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SettingsRead"
-                }
-              }
-            }
-          },
-          "4XX": {
-            "description": "The request failed. The error tells why.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ]
-      }
-    },
-    "/api/v1/settings/nimble": {
-      "put": {
-        "tags": [
-          "settings"
-        ],
-        "summary": "Put Nimble Account",
-        "description": "Save Nimble's Auth ID and Auth token together, after Nimble speaks with them; with\n`base_url`, they are checked at that gateway and saved with it.",
-        "operationId": "put_nimble_account_api_v1_settings_nimble_put",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/NimbleAccount"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SettingsRead"
-                }
-              }
-            }
-          },
-          "4XX": {
-            "description": "The request failed. The error tells why.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ]
-      },
-      "delete": {
-        "tags": [
-          "settings"
-        ],
-        "summary": "Delete Nimble Account",
-        "operationId": "delete_nimble_account_api_v1_settings_nimble_delete",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -11516,53 +11435,6 @@
         ],
         "title": "Models"
       },
-      "Nimble": {
-        "properties": {
-          "base_url": {
-            "type": "string",
-            "pattern": "^(https?|wss?)://\\S+$",
-            "title": "Base Url",
-            "default": "https://api.plivo.com"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "title": "Nimble"
-      },
-      "NimbleAccount": {
-        "properties": {
-          "auth_id": {
-            "type": "string",
-            "maxLength": 200,
-            "minLength": 1,
-            "title": "Auth Id"
-          },
-          "auth_token": {
-            "type": "string",
-            "maxLength": 4000,
-            "minLength": 1,
-            "title": "Auth Token"
-          },
-          "base_url": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 2000
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Base Url"
-          }
-        },
-        "type": "object",
-        "required": [
-          "auth_id",
-          "auth_token"
-        ],
-        "title": "NimbleAccount"
-      },
       "NoiseSound": {
         "type": "string",
         "enum": [
@@ -12991,6 +12863,18 @@
             "maxLength": 4000,
             "minLength": 1,
             "title": "Auth Token"
+          },
+          "base_url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Url"
           }
         },
         "type": "object",
@@ -13150,6 +13034,20 @@
         ],
         "title": "PlivoCxFlowSearch"
       },
+      "PlivoTts": {
+        "properties": {
+          "base_url": {
+            "type": "string",
+            "pattern": "^https://\\S+$",
+            "title": "Base Url",
+            "default": "https://api.plivo.com"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "PlivoTts",
+        "description": "Koyal, Plivo's text to speech, speaks with the Plivo account's Auth ID and Auth token."
+      },
       "Provenance": {
         "type": "string",
         "enum": [
@@ -13172,7 +13070,7 @@
           "cartesia",
           "sarvam_tts",
           "azure",
-          "nimble",
+          "plivo_tts",
           "typesafe",
           "plivo"
         ],
@@ -15916,8 +15814,6 @@
           "elevenlabs_api_key",
           "cartesia_api_key",
           "azure_api_key",
-          "nimble_auth_id",
-          "nimble_auth_token",
           "typesafe_api_key",
           "plivo_auth_id",
           "plivo_auth_token",
@@ -16108,8 +16004,8 @@
               "region": "eastus"
             }
           },
-          "nimble": {
-            "$ref": "#/components/schemas/Nimble",
+          "plivo_tts": {
+            "$ref": "#/components/schemas/PlivoTts",
             "default": {
               "base_url": "https://api.plivo.com"
             }
@@ -18125,7 +18021,7 @@
           "cartesia",
           "sarvam",
           "azure",
-          "nimble"
+          "plivo"
         ],
         "title": "VoiceProvider",
         "description": "A text-to-speech provider that voices personas."

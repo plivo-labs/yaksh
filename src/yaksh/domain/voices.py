@@ -24,7 +24,7 @@ class VoiceProvider(StrEnum):
     CARTESIA = "cartesia"
     SARVAM = "sarvam"
     AZURE = "azure"
-    NIMBLE = "nimble"
+    PLIVO = "plivo"
 
     @property
     def label(self) -> str:
@@ -40,8 +40,7 @@ class TtsModel:
     """A text-to-speech model that a voice can use."""
 
     id: str | None
-    """None for a provider without a model choice: Azure's voice name carries its model, and
-    Nimble has one."""
+    """None for a provider without a model choice: Azure's voice name carries its model."""
     label: str
     speed: tuple[float, float]
     """The range of the speed or pace; 1.0 is the voice's natural pace."""
@@ -136,11 +135,11 @@ TTS = {
         lookup=False,
         models=(TtsModel(None, "Azure", (0.5, 2.0), INDIAN_ENGLISH_AND_SPANISH),),
     ),
-    VoiceProvider.NIMBLE: TtsTraits(
-        "Nimble",
+    VoiceProvider.PLIVO: TtsTraits(
+        "Plivo",
         word_timestamps=True,
         lookup=True,
-        models=(TtsModel(None, "Nimble", (0.7, 1.2), INDIAN_AND_ENGLISH),),
+        models=(TtsModel("koyal-v1", "Koyal v1", (0.7, 1.2), INDIAN_AND_ENGLISH),),
     ),
 }
 

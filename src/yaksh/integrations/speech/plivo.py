@@ -1,4 +1,4 @@
-"""Nimble, Plivo's text-to-speech: Pipecat's Plivo service over its Realtime API, and the
+"""Koyal, Plivo's text to speech: Pipecat's Plivo service over its Realtime API, and the
 account's voices."""
 
 from collections.abc import Sequence
@@ -23,17 +23,11 @@ from yaksh.integrations.speech.audio import SAMPLE_RATE, quiet_s
 from yaksh.integrations.speech.catalog import get_json, page_of
 from yaksh.integrations.speech.vendor import TtsVendor
 
-LANGUAGES = VoiceProvider.NIMBLE.traits.languages
-"""The languages Nimble pins; it speaks no other of Yaksh's."""
+LANGUAGES = VoiceProvider.PLIVO.traits.languages
+"""The languages Koyal speaks; it speaks no other of Yaksh's."""
 NAMED = LANGUAGES - {Language.EN}
-"""The languages sent by name. Nimble takes English only with its region, which Yaksh's English
-does not have, so English goes with no language: Nimble reads it in the voice's own region."""
-
-
-def websocket_of(base_url: str) -> str:
-    """The gateway's websocket address: wss for https or wss, ws for http or ws."""
-    scheme, rest = base_url.rstrip("/").split("://", 1)
-    return f"{'wss' if scheme in {'https', 'wss'} else 'ws'}://{rest}"
+"""The languages sent by name. Koyal takes English only with its region, which Yaksh's English
+does not have, so English goes with no language: Koyal reads it in the voice's own region."""
 
 
 def tts(
@@ -47,15 +41,18 @@ def tts(
 ) -> PlivoTTSService:
     """A one-shot service does not reconnect: a dropped socket fails the speech instead of
     ending it short as finished. A caller that can switch languages sends no language, so
-    Nimble finds the language of each sentence."""
+    Koyal finds the language of each sentence."""
     auth_id, _, auth_token = key.partition(":")
     spoken = PipecatLanguage(language.value) if language in NAMED and not also else None
     return PlivoTTSService(
         auth_id=auth_id,
         auth_token=auth_token,
-        url=websocket_of(settings.nimble.base_url),
+        # https://host is wss://host.
+        url=settings.plivo_tts.base_url.rstrip("/").replace("http", "ws", 1),
         sample_rate=SAMPLE_RATE,
-        settings=PlivoTTSService.Settings(voice=voice.id, language=spoken, speed=voice.speed),
+        settings=PlivoTTSService.Settings(
+            model=voice.model_in_use.id, voice=voice.id, language=spoken, speed=voice.speed
+        ),
         stop_frame_timeout_s=quiet_s(one_shot),
         reconnect_on_error=not one_shot,
     )
@@ -65,25 +62,23 @@ async def voices(settings: AppSettings, key: str) -> list[ProviderVoice]:
     """The voices the account can use; this also proves the Auth ID, the token and that this
     server's IP is allowed."""
     auth_id, _, auth_token = key.partition(":")
-    url = f"{settings.nimble.base_url.rstrip('/')}/v1/Account/{auth_id}/TTS/Voices"
+    url = f"{settings.plivo_tts.base_url.rstrip('/')}/v1/Account/{auth_id}/TTS/Voices"
     headers = {"Authorization": aiohttp.encode_basic_auth(auth_id, auth_token)}
-    body = await get_json("Nimble", url, {}, headers)
+    body = await get_json("Plivo", url, {}, headers)
     try:
-        listed = body["objects"]
-    except KeyError, TypeError:
-        raise UnavailableError("Nimble sent a voice list in an unknown shape") from None
-    return [provider_voice(entry) for entry in listed]
+        return [provider_voice(entry) for entry in body["objects"]]
+    except (KeyError, TypeError, ValueError) as error:
+        raise UnavailableError(f"Plivo sent a voice list in an unknown shape: {error}") from None
 
 
 def provider_voice(entry: dict[str, Any]) -> ProviderVoice:
     """English is listed with its region, such as `en-IN`: it is Yaksh's English."""
-    gender = entry.get("gender")
-    codes = {code.split("-")[0] for code in entry.get("languages", [])}
+    codes = {code.split("-")[0] for code in entry["languages"]}
     return ProviderVoice(
         id=entry["voice_id"],
-        name=entry.get("name") or entry["voice_id"],
-        gender=VoiceGender(gender) if gender in {"male", "female"} else None,
-        accent=entry.get("accent_type"),
+        name=entry["name"],
+        gender=VoiceGender(entry["gender"]),
+        accent=entry["accent_type"],
         listed_languages=tuple(
             language for language in Language if language in LANGUAGES and language in codes
         ),
@@ -95,10 +90,10 @@ async def lookup(settings: AppSettings, key: str, voice_id: str) -> ProviderVoic
 
 
 async def check_voice(settings: AppSettings, key: str) -> str:
-    """The first voice the account lists: the roster differs between gateways."""
+    """The first voice the account lists: the roster differs between addresses."""
     listed = await voices(settings, key)
     if not listed:
-        raise UnavailableError("the Nimble account lists no voices")
+        raise UnavailableError("the Plivo account lists no voices")
     return listed[0].id
 
 

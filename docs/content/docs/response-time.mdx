@@ -83,7 +83,7 @@ caller_reply_time {"conversation_id":"…","caller_model":"…","reasoning_effor
 
 - `reply` is the number of the caller audio start in the call, from 0.
 - `llm_host` is the host of the LLM base URL. The line has no path and no key.
-- `stt_provider` and `tts_provider` name the speech providers of the call. `tts_model` is `null` for a text-to-speech provider that has no model setting, such as Azure or Nimble.
+- `stt_provider` and `tts_provider` name the speech providers of the call. `tts_model` is `null` for a text-to-speech provider that has no model setting, such as Azure.
 - Each part is a field, as in the table of parts. A part that the reply did not have is 0, so all replies count each part the same way. The line also has `first_request_ms`, `turn_completion_ms`, `waiting_for_user_ms` and `awaiting_speakable_text_ms`. These are parts of Pipecat that the caller of Yaksh does not use, so they are always 0.
 - `stt_ttfs_ms` is the STT TTFS. It is `null` when no final transcript came after the agent last started to speak.
 - `version` is the version of Yaksh. A Pipecat update can change the time that a part covers.
