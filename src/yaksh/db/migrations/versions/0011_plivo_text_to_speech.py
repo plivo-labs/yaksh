@@ -25,9 +25,9 @@ VOICE_COPIES = (("persona_versions", "config"), ("conversations", "caller_settin
 
 
 def upgrade() -> None:
-    """The voices get Koyal's model and the provider gets Plivo's name. Its own Auth ID, Auth
-    token and address are deleted: Koyal speaks with the Plivo account's Auth ID and Auth token,
-    which were never checked at that address."""
+    """The voices get Koyal's model and the provider gets Plivo's name. Its own address, Auth ID
+    and Auth token are deleted: Koyal speaks at Plivo's API with the Plivo account's Auth ID and
+    Auth token."""
     set_model("nimble", MODEL)
     rename("nimble", "plivo")
     op.execute(
@@ -37,8 +37,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    """The deleted Auth ID, Auth token and address do not come back: save them again."""
-    op.execute("UPDATE app_settings SET values = values - 'plivo_tts'")
+    """The deleted address, Auth ID and Auth token do not come back: save them again."""
     set_model("plivo", None)
     rename("plivo", "nimble")
 

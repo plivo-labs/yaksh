@@ -613,33 +613,26 @@ async def test_a_phone_run_cannot_start_when_the_persona_voice_model_left_the_li
     )
 
 
-async def test_koyal_speaks_with_the_plivo_account_checked_at_its_address(
+async def test_koyal_speaks_with_the_plivo_account_that_plivo_checked(
     client: AsyncClient, monkeypatch: pytest.MonkeyPatch, checks: list[Any]
 ) -> None:
-    """At Plivo's API the account's own check covers the pair; at another address Koyal also
-    speaks there, and a new address without the pair removes it."""
-    spoken: list[tuple[str, VoiceProvider, str]] = []
+    """Koyal is at Plivo's API, so the account's own check covers it: saving the account
+    speaks no word, and the Test button speaks one with the account's Auth ID and Auth token."""
+    spoken: list[tuple[VoiceProvider, str]] = []
 
-    async def check_tts(settings: Any, provider: VoiceProvider, credential: str) -> None:
-        spoken.append((settings.plivo_tts.base_url, provider, credential))
+    async def check_tts(_settings: Any, provider: VoiceProvider, credential: str) -> None:
+        spoken.append((provider, credential))
 
     monkeypatch.setattr(service, "check_tts", check_tts)
-    pair = {"auth_id": "MAID", "auth_token": "token"}
     saved = await client.put(
-        "/api/v1/settings/plivo", json=pair | {"base_url": "https://koyal.example"}
+        "/api/v1/settings/plivo", json={"auth_id": "MAID", "auth_token": "token"}
     )
     test = await client.post("/api/v1/settings/providers/plivo_tts/test")
-    values = saved.json()["values"]
-    values["plivo_tts"]["base_url"] = "https://elsewhere.example"
-    moved = await client.put("/api/v1/settings/values", json=values)
 
     assert saved.status_code == 200, saved.text
     assert checks == [("check_plivo", ("MAID", "token"))]
     assert test.json()["detail"] == "Plivo spoke a test word."
-    credential = "MAID:token"
-    assert spoken == [("https://koyal.example", VoiceProvider.PLIVO, credential)] * 2
-    assert saved.json()["values"]["plivo_tts"]["base_url"] == "https://koyal.example"
-    assert not {"plivo_auth_id", "plivo_auth_token"} & set(moved.json()["secrets"])
+    assert spoken == [(VoiceProvider.PLIVO, "MAID:token")]
 
 
 async def test_half_of_the_plivo_account_is_never_removed_or_replaced_alone(

@@ -41,7 +41,6 @@ import {
 } from "@/pages/settings-keys";
 
 type Fields = { model: string; base_url?: string; url?: string };
-type TtsFields = Partial<Record<TtsProvider["address"], string>>;
 
 /** The one provider that hears the agent on every call, with its own address, model and key. */
 export function SpeechToTextPanel({
@@ -251,12 +250,13 @@ function TtsProviderPanel({
   cutsAtSentences: boolean;
   onBack: () => void;
 }) {
-  const fields = draft[provider.section] as TtsFields;
-  const saved = settings.values[provider.section] as TtsFields;
-  const address = fields[provider.address] ?? "";
-  const moved = address !== saved[provider.address];
+  const at = provider.address;
+  const addressIn = (values: SettingsValues) =>
+    at && (values[at.section] as Record<string, string>)[at.field];
+  const address = addressIn(draft);
+  const moved = address !== addressIn(settings.values);
   const key = hasCredential(provider, settings.secrets);
-  const region = provider.address === "region";
+  const region = at?.field === "region";
   const removeWarning =
     voices + personas > 0
       ? {
@@ -264,8 +264,6 @@ function TtsProviderPanel({
           description: `${voices} ${voices === 1 ? "voice" : "voices"} and ${personas} ${personas === 1 ? "persona" : "personas"} use ${provider.label}. Their phone tests can't start until you add a key again.`,
         }
       : undefined;
-  const edit = (field: string, value: string) =>
-    change(provider.section, field as never, value as never);
   return (
     <div className="grid gap-3">
       <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-s-400">
@@ -281,34 +279,38 @@ function TtsProviderPanel({
         title={provider.label}
         provider={provider.test}
         canTest={key}
-        edits={JSON.stringify(fields)}
+        edits={address ?? undefined}
         description={cutsAtSentences ? CUTS_AT_SENTENCES.tip : undefined}
       >
-        <SettingRow
-          label={region ? "Region" : "Base URL"}
-          htmlFor="tts-address"
-          help={moved && key ? <KeyRemovedNote address={region ? "region" : "URL"} /> : undefined}
-        >
-          <Input
-            id="tts-address"
-            className={region ? "max-w-56 font-mono" : undefined}
-            value={address}
-            onChange={(event) => edit(provider.address, event.target.value.trim())}
-          />
-        </SettingRow>
+        {at !== null && (
+          <SettingRow
+            label={region ? "Region" : "Base URL"}
+            htmlFor="tts-address"
+            help={moved && key ? <KeyRemovedNote address={region ? "region" : "URL"} /> : undefined}
+          >
+            <Input
+              id="tts-address"
+              className={region ? "max-w-56 font-mono" : undefined}
+              value={address ?? ""}
+              onChange={(event) =>
+                change(at.section, at.field as never, event.target.value.trim() as never)
+              }
+            />
+          </SettingRow>
+        )}
         {provider.secrets.length === 1 ? (
           <KeyRow
             name={provider.secrets[0]}
             label="API key"
             help={provider.value === "sarvam" ? "Also Sarvam's speech to text key." : undefined}
             state={settings.secrets[provider.secrets[0]]}
-            url={address}
+            url={address ?? undefined}
             checked
             removable
             removeWarning={removeWarning}
           />
         ) : (
-          <PlivoAccountRow settings={settings} baseUrl={address} />
+          <PlivoAccountRow settings={settings} />
         )}
       </ProviderPanel>
     </div>

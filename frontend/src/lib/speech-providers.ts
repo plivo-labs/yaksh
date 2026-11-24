@@ -82,51 +82,50 @@ export const STT_LANGUAGES: Record<SttProvider, readonly string[]> = {
 
 /** A text-to-speech provider's settings and key. How its voices behave, and the models they
  * use, come from the server's list of providers (`useVoiceProviders`). */
-export interface TtsProvider extends Omit<SpeechProvider<VoiceProvider>, "address" | "secret"> {
+export interface TtsProvider extends Omit<
+  SpeechProvider<VoiceProvider>,
+  "section" | "address" | "secret"
+> {
   /** Its key, or the Plivo account's Auth ID and Auth token, which are saved together. */
   secrets: readonly SecretName[];
-  /** The section's address field; Azure's is its region. */
-  address: "base_url" | "url" | "region";
+  /** The setting that holds its address, where its key goes; Azure's is its region. Null for
+   * Plivo, which speaks at Plivo's API. */
+  address: { section: Section; field: "base_url" | "url" | "region" } | null;
 }
 
 export const TTS_PROVIDERS: TtsProvider[] = [
   {
     value: "elevenlabs",
     label: "ElevenLabs",
-    section: "elevenlabs",
-    address: "url",
+    address: { section: "elevenlabs", field: "url" },
     secrets: ["elevenlabs_api_key"],
     test: "elevenlabs",
   },
   {
     value: "cartesia",
     label: "Cartesia",
-    section: "cartesia",
-    address: "url",
+    address: { section: "cartesia", field: "url" },
     secrets: ["cartesia_api_key"],
     test: "cartesia",
   },
   {
     value: "sarvam",
     label: "Sarvam",
-    section: "sarvam_tts",
-    address: "base_url",
+    address: { section: "sarvam_tts", field: "base_url" },
     secrets: ["sarvam_api_key"],
     test: "sarvam_tts",
   },
   {
     value: "azure",
     label: "Azure",
-    section: "azure",
-    address: "region",
+    address: { section: "azure", field: "region" },
     secrets: ["azure_api_key"],
     test: "azure",
   },
   {
     value: "plivo",
     label: "Plivo",
-    section: "plivo_tts",
-    address: "base_url",
+    address: null,
     secrets: ["plivo_auth_id", "plivo_auth_token"],
     test: "plivo_tts",
   },

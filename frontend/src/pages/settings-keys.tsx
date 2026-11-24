@@ -230,7 +230,7 @@ export function KeyRow({
 
 /** Remove, shown only while something is saved. With `warning`, it asks first; the dialog
  * stays mounted, so it closes smoothly after the saved value is gone. */
-export function RemoveButton({
+function RemoveButton({
   saved,
   warning,
   pending,
@@ -273,53 +273,33 @@ export function RemoveButton({
   );
 }
 
-/** Two secrets that change together, such as an Auth ID and Auth token: a check never pairs a
- * new half with the other half of the old pair. `shown` is the saved pair's hint, null while
- * it is not saved. */
-export function CredentialPairRow({
-  label,
-  help,
-  inputId,
-  shown,
-  change,
-  add,
-  pending,
-  error,
-  onSave,
-  onReset,
-}: {
-  label: string;
-  help?: ReactNode;
-  inputId: string;
-  shown: string | null;
-  change: string;
-  add: string;
-  pending: boolean;
-  error?: string;
-  onSave: (pair: { auth_id: string; auth_token: string }, done: () => void) => void;
-  onReset: () => void;
-}) {
+/** The Plivo account: its Auth ID and Auth token change together, so a check never pairs the
+ * new half with the old account's other half. Koyal speaks with them too. */
+export function PlivoAccountRow({ settings }: { settings: AppSettings }) {
   const [editing, setEditing] = useState(false);
   const [authId, setAuthId] = useState("");
   const [token, setToken] = useState("");
+  const save = useSavePlivoAccount();
+  const id = settings.secrets.plivo_auth_id;
+  const saved = id && settings.secrets.plivo_auth_token;
   const close = () => {
     setEditing(false);
     setAuthId("");
     setToken("");
-    onReset();
+    save.reset();
   };
   return (
-    <SettingRow label={label} help={help} htmlFor={editing ? inputId : undefined}>
+    <SettingRow label="Auth ID and Auth token" htmlFor={editing ? "plivo-auth-id" : undefined}>
       {editing ? (
         <form
           className={`grid gap-2 ${REVEAL}`}
           onSubmit={(event) => {
             event.preventDefault();
-            onSave({ auth_id: authId.trim(), auth_token: token.trim() }, close);
+            save.mutate({ auth_id: authId.trim(), auth_token: token.trim() }, { onSuccess: close });
           }}
         >
           <Input
-            id={inputId}
+            id="plivo-auth-id"
             autoComplete="off"
             placeholder="Auth ID"
             value={authId}
@@ -333,10 +313,14 @@ export function CredentialPairRow({
             value={token}
             onChange={(event) => setToken(event.target.value)}
           />
-          {error && <p className="text-xs-400 text-destructive">{error}</p>}
+          {save.isError && <p className="text-xs-400 text-destructive">{save.error.message}</p>}
           <div className="flex flex-wrap items-center gap-2">
-            <Button type="submit" size="sm" disabled={!authId.trim() || !token.trim() || pending}>
-              {pending && <Spinner />}
+            <Button
+              type="submit"
+              size="sm"
+              disabled={!authId.trim() || !token.trim() || save.isPending}
+            >
+              {save.isPending && <Spinner />}
               Check and save
             </Button>
             <Button type="button" size="sm" variant="ghost" onClick={close}>
@@ -346,9 +330,9 @@ export function CredentialPairRow({
         </form>
       ) : (
         <div className="flex flex-wrap items-center gap-2">
-          {shown !== null ? (
+          {saved ? (
             <>
-              <span className="font-mono text-s-400">{shown}</span>
+              <span className="font-mono text-s-400">••••••••{id.hint ?? ""}</span>
               <Badge variant="success">Saved</Badge>
             </>
           ) : (
@@ -356,38 +340,11 @@ export function CredentialPairRow({
           )}
           <span className="flex-1" />
           <Button size="sm" variant="outline" onClick={() => setEditing(true)}>
-            {shown !== null ? change : add}
+            {saved ? "Change account" : "Add account"}
           </Button>
         </div>
       )}
     </SettingRow>
-  );
-}
-
-/** The Plivo account: its Auth ID and Auth token change together. Koyal speaks with them too;
- * with `baseUrl`, Koyal's address, they are checked there and saved with it. */
-export function PlivoAccountRow({
-  settings,
-  baseUrl,
-}: {
-  settings: AppSettings;
-  baseUrl?: string;
-}) {
-  const save = useSavePlivoAccount();
-  const id = settings.secrets.plivo_auth_id;
-  return (
-    <CredentialPairRow
-      label="Auth ID and Auth token"
-      help={baseUrl === undefined ? undefined : "Also the phone account."}
-      inputId="plivo-auth-id"
-      shown={id && settings.secrets.plivo_auth_token ? `••••••••${id.hint ?? ""}` : null}
-      change="Change account"
-      add="Add account"
-      pending={save.isPending}
-      error={save.isError ? save.error.message : undefined}
-      onSave={(pair, done) => save.mutate({ ...pair, base_url: baseUrl }, { onSuccess: done })}
-      onReset={save.reset}
-    />
   );
 }
 

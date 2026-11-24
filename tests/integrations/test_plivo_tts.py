@@ -24,10 +24,10 @@ from pydantic import ValidationError
 
 from yaksh.caller.plivo_server import PlivoServer
 from yaksh.domain.languages import Language
-from yaksh.domain.settings import AppSettings, PlivoTts, Secrets
+from yaksh.domain.settings import AppSettings, Secrets
 from yaksh.domain.voices import VoiceGender, VoiceProvider, VoiceSettings
+from yaksh.integrations.speech import plivo as koyal
 from yaksh.integrations.speech.audio import one_shot
-from yaksh.integrations.speech.plivo import tts, voices
 
 KEY = "MAID:token"
 AUTHORIZATION = "Basic " + base64.b64encode(KEY.encode()).decode()
@@ -50,6 +50,7 @@ LISTED = [
     for voice_id, name, gender, languages in (
         ("v1", "Karan", "male", ["en-IN", "en-US"]),
         ("v2", "Meera", "female", ["hi"]),
+        ("v3", "Kavya", None, ["ta"]),
     )
 ]
 
@@ -59,14 +60,13 @@ class Plivo:
     """A stand-in for Plivo's TTS API. The Realtime API answers each finished context with its
     audio, its words' timestamps and `done`."""
 
-    url: str = ""
     requests: list[tuple[str, str]] = field(default_factory=list)
     """The Auth ID in each request's path, and its Authorization header."""
     messages: list[dict[str, Any]] = field(default_factory=list)
 
 
 @pytest.fixture
-async def plivo() -> AsyncIterator[Plivo]:
+async def plivo(monkeypatch: pytest.MonkeyPatch) -> AsyncIterator[Plivo]:
     fake = Plivo()
     app = FastAPI()
 
@@ -108,12 +108,12 @@ async def plivo() -> AsyncIterator[Plivo]:
     @app.get("/v1/Account/{auth_id}/TTS/Voices")
     async def listed(auth_id: str, request: Request) -> JSONResponse:
         fake.requests.append((auth_id, request.headers["authorization"]))
-        meta = {"limit": 2, "next": None, "offset": 0, "previous": None, "total_count": 2}
+        meta = {"limit": 3, "next": None, "offset": 0, "previous": None, "total_count": 3}
         return JSONResponse({"api_id": "a1", "meta": meta, "objects": LISTED})
 
     server = PlivoServer(app, port=0)
     await server.start()
-    fake.url = f"http://127.0.0.1:{server.port}"
+    monkeypatch.setattr(koyal, "PLIVO_API", f"http://127.0.0.1:{server.port}")
     yield fake
     await server.stop(2.0)
 
@@ -143,7 +143,7 @@ async def test_a_reply_goes_to_the_realtime_api_with_the_voice_and_comes_back_ti
     in the voice's own region. A caller that can switch sends none: Plivo finds the language of
     each sentence."""
     frames = Frames()
-    service = tts(at(plivo), VOICE, language, KEY, one_shot=True, also=also)
+    service = koyal.tts(AppSettings(), VOICE, language, KEY, one_shot=True, also=also)
     async with one_shot([service, frames], PARAMS, frames.stopped) as run:
         await run.worker.queue_frame(TTSSpeakFrame("Haan ji."))
         async with asyncio.timeout(5):
@@ -167,12 +167,14 @@ async def test_a_reply_goes_to_the_realtime_api_with_the_voice_and_comes_back_ti
 async def test_the_voice_list_names_english_by_its_language_whatever_its_region(
     plivo: Plivo,
 ) -> None:
-    listed = await voices(at(plivo), KEY)
+    """A voice without a gender is listed without one."""
+    listed = await koyal.voices(KEY)
 
     assert plivo.requests == [("MAID", AUTHORIZATION)]
     assert [(v.id, v.name, v.gender, v.accent, v.listed_languages) for v in listed] == [
         ("v1", "Karan", VoiceGender.MALE, "Indian", (Language.EN,)),
         ("v2", "Meera", VoiceGender.FEMALE, "Indian", (Language.HI,)),
+        ("v3", "Kavya", None, "Indian", (Language.TA,)),
     ]
 
 
@@ -182,19 +184,7 @@ def test_a_koyal_voice_takes_the_pace_the_api_takes() -> None:
         VoiceSettings(provider=VoiceProvider.PLIVO, id="t4", speed=1.25)
 
 
-@pytest.mark.parametrize("address", ["http://api.plivo.com", "wss://api.plivo.com"])
-def test_koyal_takes_only_an_https_address(address: str) -> None:
-    """The voice list is an HTTPS request, and the Auth ID and Auth token go with it."""
-    with pytest.raises(ValidationError, match="https"):
-        PlivoTts(base_url=address)
-
-
 def test_koyal_speaks_with_the_plivo_account() -> None:
     secrets = Secrets.model_validate({"plivo_auth_id": "MAID", "plivo_auth_token": "token"})
 
     assert AppSettings(secrets=secrets).tts_credential(VoiceProvider.PLIVO) == KEY
-
-
-def at(plivo: Plivo) -> AppSettings:
-    """The stand-in serves plain HTTP, which a saved address may not use."""
-    return AppSettings(plivo_tts=PlivoTts.model_construct(base_url=plivo.url))

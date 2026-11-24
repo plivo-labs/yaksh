@@ -1947,7 +1947,6 @@ export interface SettingsValues {
   cartesia: { url: string };
   sarvam_tts: { base_url: string };
   azure: { region: string };
-  plivo_tts: { base_url: string };
   caller: CallerModel;
   turn_taking: { vad_stop_s: number; turn_max_wait_s: number };
   generation: { model: string | null; reasoning_effort: string | null; timeout_s: number };

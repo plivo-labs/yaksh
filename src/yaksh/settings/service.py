@@ -4,7 +4,7 @@ it is saved, test the saved settings, and import or export them as a YAML docume
 import asyncio
 import re
 import wave
-from collections.abc import Callable, Coroutine, Mapping
+from collections.abc import Coroutine, Mapping
 from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Any
@@ -26,7 +26,6 @@ from yaksh.domain.voices import VoiceProvider
 from yaksh.evaluation.jev import JEV_MODEL
 from yaksh.integrations import provider_checks as checks
 from yaksh.integrations.openai_models import caller_effort
-from yaksh.integrations.plivo import PLIVO_API
 from yaksh.integrations.provider_checks import ProviderCheckError
 from yaksh.integrations.speech.tts import check_voice as tts_check_voice
 from yaksh.settings.store import DEFAULTS, RETIRED, changed_values
@@ -76,7 +75,7 @@ TTS_TESTS = {
 }
 """The text-to-speech test of each provider, which speaks one word."""
 TTS_OF_KEY = {names[0]: provider for provider, names in TTS_KEYS.items() if len(names) == 1}
-"""The voice provider of each single key; the Plivo account's pair is checked as a Pair."""
+"""The voice provider of each single key; the Plivo account's pair has its own check."""
 
 CHECK_CLIP = SOUNDS / "answering" / "iphone_screen_ack.wav"
 """8 kHz speech that every speech-to-text provider must transcribe to pass its check."""
@@ -154,34 +153,15 @@ def required(secret: Any, what: str) -> str:
     return secret.get_secret_value()
 
 
-@dataclass(frozen=True)
-class Pair:
-    """An Auth ID and an Auth token that work only together. A change saves both or removes
-    both: a check never pairs a new half with an old one, and no half is left alone."""
-
-    label: str
-    names: tuple[SecretName, SecretName]
-    check: Callable[[AppSettings, str, str], Coroutine[Any, Any, object]]
-    """Checks the account with the new Auth ID and Auth token."""
-
-
-async def _check_plivo_account(candidate: AppSettings, auth_id: str, auth_token: str) -> None:
-    """The account lists its numbers at Plivo's API. Koyal at another address speaks one word
-    there too: the pair goes only where it was checked."""
-    await checks.check_plivo(auth_id, auth_token)
-    if candidate.plivo_tts.base_url != PLIVO_API:
-        await check_tts(candidate, VoiceProvider.PLIVO, f"{auth_id}:{auth_token}")
-
-
-PLIVO = Pair("Plivo", (SecretName.PLIVO_AUTH_ID, SecretName.PLIVO_AUTH_TOKEN), _check_plivo_account)
-PAIRS = (PLIVO,)
-PAIRED = {name: pair for pair in PAIRS for name in pair.names}
+PLIVO_SECRETS = (SecretName.PLIVO_AUTH_ID, SecretName.PLIVO_AUTH_TOKEN)
+"""The Plivo account's Auth ID and Auth token work only together. A change saves both or
+removes both: a check never pairs a new half with an old one, and no half is left alone."""
 
 
 @dataclass(frozen=True)
 class Failure:
     names: list[str]
-    """The keys one check covered: one key, or the halves of a Pair in the change."""
+    """The keys one check covered: one key, or the Plivo Auth ID and Auth token together."""
     reason: str
 
     def __str__(self) -> str:
@@ -195,7 +175,7 @@ async def failed_secrets(
     around it. Returns one Failure for each check that failed."""
     checks_to_run: list[tuple[list[str], Coroutine[Any, Any, object]]] = []
     for name, value in changed.items():
-        if value is None or name in PAIRED:
+        if value is None or name in PLIVO_SECRETS:
             continue
         if name in STT_OF_KEY or name in TTS_OF_KEY:
             checks_to_run.append(([name], _check_speech_key(candidate, name, value)))
@@ -208,10 +188,9 @@ async def failed_secrets(
             case _:
                 continue
         checks_to_run.append(([name], check))
-    for pair in PAIRS:
-        halves: list[str] = [name for name in pair.names if name in changed]
-        if halves:
-            checks_to_run.append((halves, _check_pair(pair, candidate, changed)))
+    plivo: list[str] = [name for name in PLIVO_SECRETS if name in changed]
+    if plivo:
+        checks_to_run.append((plivo, _check_plivo_account(changed)))
     async with asyncio.TaskGroup() as group:
         tasks = [
             (names, group.create_task(_failure_reason(check))) for names, check in checks_to_run
@@ -251,15 +230,14 @@ async def _check_speech_key(candidate: AppSettings, name: str, key: str) -> None
         await check_tts(candidate, TTS_OF_KEY[name], key)
 
 
-async def _check_pair(
-    pair: Pair, candidate: AppSettings, changed: Mapping[str, str | None]
-) -> None:
-    auth_id, auth_token = (changed.get(name) for name in pair.names)
-    if auth_id is None and auth_token is None and all(name in changed for name in pair.names):
+async def _check_plivo_account(changed: Mapping[str, str | None]) -> None:
+    """The account lists its numbers at Plivo's API, where Koyal speaks with it too."""
+    auth_id, auth_token = (changed.get(name) for name in PLIVO_SECRETS)
+    if auth_id is None and auth_token is None and all(name in changed for name in PLIVO_SECRETS):
         return
     if auth_id is None or auth_token is None:
-        raise ProviderCheckError(f"save or remove the {pair.label} Auth ID and Auth token together")
-    await pair.check(candidate, auth_id, auth_token)
+        raise ProviderCheckError("save or remove the Plivo Auth ID and Auth token together")
+    await checks.check_plivo(auth_id, auth_token)
 
 
 async def _failure_reason(check: Coroutine[Any, Any, object]) -> str | None:

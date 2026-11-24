@@ -93,23 +93,22 @@ async def put_plivo_account(
     account: PlivoAccount, settings: AppSettingsDep, session: SessionDep, cipher: CipherDep
 ) -> SettingsRead:
     """Save the Auth ID and Auth token of a Plivo account together, after Plivo accepts them;
-    this is how to move to another account. Koyal speaks with them too: with `base_url`, they
-    are checked at that address and saved with it."""
+    this is how to move to another account. Koyal speaks with them too."""
     secrets: dict[str, str | None] = {
         SecretName.PLIVO_AUTH_ID: account.auth_id,
         SecretName.PLIVO_AUTH_TOKEN: account.auth_token,
     }
-    values = None if account.base_url is None else {"plivo_tts": {"base_url": account.base_url}}
-    return SettingsRead.of(
-        await checked_change(settings, session, cipher, values=values, secrets=secrets)
-    )
+    return SettingsRead.of(await checked_change(settings, session, cipher, secrets=secrets))
 
 
 @router.delete("/plivo")
 async def delete_plivo_account(
     settings: AppSettingsDep, session: SessionDep, cipher: CipherDep
 ) -> SettingsRead:
-    secrets: dict[str, str | None] = dict.fromkeys(service.PLIVO.names)
+    secrets: dict[str, str | None] = {
+        SecretName.PLIVO_AUTH_ID: None,
+        SecretName.PLIVO_AUTH_TOKEN: None,
+    }
     return SettingsRead.of(await checked_change(settings, session, cipher, secrets=secrets))
 
 

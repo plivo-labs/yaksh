@@ -4960,7 +4960,7 @@
           "settings"
         ],
         "summary": "Put Plivo Account",
-        "description": "Save the Auth ID and Auth token of a Plivo account together, after Plivo accepts them;\nthis is how to move to another account. Koyal speaks with them too: with `base_url`, they\nare checked at that address and saved with it.",
+        "description": "Save the Auth ID and Auth token of a Plivo account together, after Plivo accepts them;\nthis is how to move to another account. Koyal speaks with them too.",
         "operationId": "put_plivo_account_api_v1_settings_plivo_put",
         "requestBody": {
           "content": {
@@ -12863,18 +12863,6 @@
             "maxLength": 4000,
             "minLength": 1,
             "title": "Auth Token"
-          },
-          "base_url": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 2000
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Base Url"
           }
         },
         "type": "object",
@@ -13033,20 +13021,6 @@
           "auth_token"
         ],
         "title": "PlivoCxFlowSearch"
-      },
-      "PlivoTts": {
-        "properties": {
-          "base_url": {
-            "type": "string",
-            "pattern": "^https://\\S+$",
-            "title": "Base Url",
-            "default": "https://api.plivo.com"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "title": "PlivoTts",
-        "description": "Koyal, Plivo's text to speech, speaks with the Plivo account's Auth ID and Auth token."
       },
       "Provenance": {
         "type": "string",
@@ -16002,12 +15976,6 @@
             "$ref": "#/components/schemas/Azure",
             "default": {
               "region": "eastus"
-            }
-          },
-          "plivo_tts": {
-            "$ref": "#/components/schemas/PlivoTts",
-            "default": {
-              "base_url": "https://api.plivo.com"
             }
           },
           "caller": {

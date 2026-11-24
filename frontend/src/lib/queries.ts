@@ -1391,12 +1391,11 @@ export function useSaveSecret() {
   });
 }
 
-/** Saves a Plivo account's Auth ID and Auth token together, after Plivo accepts them; with
- * `base_url`, Koyal's new address, they are checked there and saved with it. */
+/** Saves a Plivo account's Auth ID and Auth token together, after Plivo accepts them. */
 export function useSavePlivoAccount() {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: (account: { auth_id: string; auth_token: string; base_url?: string }) =>
+    mutationFn: (account: { auth_id: string; auth_token: string }) =>
       api<AppSettings>("/settings/plivo", { method: "PUT", json: account }),
     onSuccess: (settings) => settingsChanged(client, settings),
   });

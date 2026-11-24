@@ -18,7 +18,6 @@ TRIGGER_SECRET_NAME = re.compile(r"[A-Z][A-Z0-9_]{0,63}")
 Url = Annotated[str, StringConstraints(strip_whitespace=True, pattern=r"^https?://\S+$")]
 Address = Annotated[str, StringConstraints(strip_whitespace=True, pattern=r"^(https?|wss?)://\S+$")]
 """The address of a speech provider: an HTTP or a websocket URL."""
-HttpsUrl = Annotated[str, StringConstraints(strip_whitespace=True, pattern=r"^https://\S+$")]
 AzureRegion = Annotated[str, StringConstraints(strip_whitespace=True, pattern=r"^[a-z0-9]{2,40}$")]
 """An Azure region, such as centralindia, which names the Speech resource's address."""
 ModelName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
@@ -80,12 +79,6 @@ class Cartesia(Section):
 
 class SarvamTts(Section):
     base_url: Address = "https://api.sarvam.ai"
-
-
-class PlivoTts(Section):
-    """Koyal, Plivo's text to speech, speaks with the Plivo account's Auth ID and Auth token."""
-
-    base_url: HttpsUrl = "https://api.plivo.com"
 
 
 class Azure(Section):
@@ -318,8 +311,6 @@ KEY_URLS = {
     SecretName.ELEVENLABS_API_KEY: ("elevenlabs", "url"),
     SecretName.CARTESIA_API_KEY: ("cartesia", "url"),
     SecretName.AZURE_API_KEY: ("azure", "region"),
-    SecretName.PLIVO_AUTH_ID: ("plivo_tts", "base_url"),
-    SecretName.PLIVO_AUTH_TOKEN: ("plivo_tts", "base_url"),
 }
 """The address each key is sent to. A new address removes the key, unless the same change
 saves a key for it: the key goes only where it was checked."""
@@ -339,7 +330,7 @@ TTS_KEYS: dict[VoiceProvider, tuple[SecretName, ...]] = {
     VoiceProvider.PLIVO: (SecretName.PLIVO_AUTH_ID, SecretName.PLIVO_AUTH_TOKEN),
 }
 """The secrets of each voice provider. Plivo speaks with the Plivo account's Auth ID and Auth
-token, which go as one `id:token` credential, as Basic auth sends them."""
+token: its key is the two joined as `id:token`, which its service and its voice list split."""
 
 
 class SettingsValues(Section):
@@ -356,7 +347,6 @@ class SettingsValues(Section):
     cartesia: Cartesia = Cartesia()
     sarvam_tts: SarvamTts = SarvamTts()
     azure: Azure = Azure()
-    plivo_tts: PlivoTts = PlivoTts()
     caller: CallerModel = CallerModel()
     turn_taking: TurnTaking = TurnTaking()
     generation: GenerationModel = GenerationModel()

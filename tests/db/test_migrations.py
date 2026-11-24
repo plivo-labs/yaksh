@@ -6,14 +6,24 @@ from alembic import command
 from alembic.autogenerate import compare_metadata
 from alembic.config import Config
 from alembic.migration import MigrationContext
-from sqlalchemy import Connection, inspect, text
+from sqlalchemy import Connection, inspect, select, text
 from sqlalchemy.ext.asyncio import AsyncConnection, create_async_engine
 
 from yaksh.db.base import Base
 from yaksh.db.migrate import MIGRATIONS_DIR
+from yaksh.db.models import Conversation
+from yaksh.db.session import create_sessionmaker
+from yaksh.domain.conversations import CallerSettings
+from yaksh.domain.voices import VoiceProvider, VoiceSettings
+from yaksh.evaluation.call import parsed
 
 UPGRADE = "import sys; from yaksh.db.migrate import upgrade_to_head; upgrade_to_head(sys.argv[1])"
 PHONE = {"phone": {"timezone": "Asia/Kolkata"}}
+NIMBLE_CALLER = {
+    "llm_model": "gpt-6-luna",
+    "reasoning_effort": None,
+    "voice": {"provider": "nimble", "id": "t4", "speed": 0.9},
+}
 
 
 def diff_against_models(connection: Connection) -> list[object]:
@@ -111,8 +121,8 @@ async def test_each_voice_gets_the_model_its_provider_had_in_settings(database_u
 
 
 async def test_nimble_voices_become_plivo_voices_of_koyal(database_url: str) -> None:
-    """Nimble's own address, Auth ID and Auth token go: Koyal speaks with the Plivo account's
-    Auth ID and Auth token, which were never checked at that address."""
+    """Nimble's own address, Auth ID and Auth token go: Koyal speaks at Plivo's API with the
+    Plivo account's Auth ID and Auth token. A call's stored voice reads as a Plivo voice."""
     url = await database_at(database_url, "plivo_voices", "0010")
     secrets = ("nimble_auth_id", "nimble_auth_token", "plivo_auth_id", "plivo_auth_token")
     engine = create_async_engine(url)
@@ -129,6 +139,9 @@ async def test_nimble_voices_become_plivo_voices_of_koyal(database_url: str) -> 
         )
         for provider, voice_id in (("nimble", "t4"), ("azure", "sara")):
             await add_voice(connection, provider, voice_id)
+        await connection.execute(
+            text(CONVERSATIONS), {"voice": "t4", "nimble": json.dumps(NIMBLE_CALLER)}
+        )
 
     await asyncio.to_thread(migrate, url, "head")
 
@@ -137,10 +150,18 @@ async def test_nimble_voices_become_plivo_voices_of_koyal(database_url: str) -> 
         values, stored = (
             await connection.execute(text("SELECT values, secrets FROM app_settings"))
         ).one()
+    async with create_sessionmaker(engine)() as session:
+        calls = await session.scalars(select(Conversation).order_by(Conversation.repeat))
+        callers = [parsed(CallerSettings, call.caller_settings) for call in calls]
     await engine.dispose()
     assert voices == personas == versions == {"plivo": "koyal-v1", "azure": None}
     assert values == PHONE
     assert set(stored) == {"plivo_auth_id", "plivo_auth_token"}
+    voice = VoiceSettings(provider=VoiceProvider.PLIVO, id="t4", speed=0.9)
+    assert callers == [
+        CallerSettings(llm_model="gpt-6-luna", reasoning_effort=None, voice=voice),
+        None,
+    ]
 
 
 async def add_voice(connection: AsyncConnection, provider: str, voice_id: str) -> None:
@@ -170,6 +191,42 @@ async def add_voice(connection: AsyncConnection, provider: str, voice_id: str) -
         ),
         {"persona": persona_id, "config": json.dumps({"voice": voice})},
     )
+
+
+CONVERSATIONS = """
+WITH persona AS (
+  SELECT persona_id, id FROM persona_versions WHERE config -> 'voice' ->> 'id' = :voice
+), agent AS (
+  INSERT INTO agents (name, source, direction, agent_number, agent_speaks_first, languages,
+    brief, current_version)
+  VALUES ('Agent', 'manual', 'inbound', '+15550100000', true, '{en-US}', '', 1) RETURNING id
+), version AS (
+  INSERT INTO agent_versions (agent_id, version, config) SELECT id, 1, '{}' FROM agent
+  RETURNING id, agent_id
+), run AS (
+  INSERT INTO runs (agent_id, agent_version_id, transport, repeats, max_duration_s, max_turns,
+    max_retries) SELECT agent_id, id, 'phone', 2, 60, 20, 0 FROM version
+  RETURNING id, agent_id, agent_version_id
+), scenario AS (
+  INSERT INTO scenarios (agent_id, persona_id, name, config, current_version)
+  SELECT agent.id, persona.persona_id, 'Scenario', '{}', 1 FROM agent, persona RETURNING id
+), scenario_version AS (
+  INSERT INTO scenario_versions (scenario_id, version, config) SELECT id, 1, '{}' FROM scenario
+  RETURNING id, scenario_id
+)
+INSERT INTO conversations (agent_id, agent_version_id, run_id, repeat, attempt, persona_id,
+  persona_version_id, scenario_id, scenario_version_id, data_set_id, data_set_name, channel,
+  direction, transport, language, instructions, nudge, today, time_zone, max_duration_s,
+  max_turns, surroundings, sound_plan, status, caller_settings)
+SELECT run.agent_id, run.agent_version_id, run.id, caller.repeat, 1, persona.persona_id,
+  persona.id, scenario_version.scenario_id, scenario_version.id, gen_random_uuid(), 'Default',
+  'voice', 'inbound', 'phone', 'en', '', '', '2026-11-25', 'UTC', 60, 20, '{}', '{}',
+  'completed', caller.settings
+FROM run, persona, scenario_version,
+  (VALUES (1, CAST(:nimble AS jsonb)), (2, NULL)) AS caller (repeat, settings)
+"""
+"""A run of two calls with the persona of a voice: one with a Nimble voice in its caller
+settings, as 0.13 saved it, and one with none."""
 
 
 async def voice_models(connection: AsyncConnection) -> list[dict[str, str | None]]:

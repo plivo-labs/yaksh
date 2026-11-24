@@ -15,10 +15,10 @@ from yaksh.domain.voices import (
     CatalogPage,
     CatalogQuery,
     ProviderVoice,
-    VoiceGender,
     VoiceProvider,
     VoiceSettings,
 )
+from yaksh.integrations.plivo import PLIVO_API
 from yaksh.integrations.speech.audio import SAMPLE_RATE, quiet_s
 from yaksh.integrations.speech.catalog import get_json, page_of
 from yaksh.integrations.speech.vendor import TtsVendor
@@ -48,7 +48,7 @@ def tts(
         auth_id=auth_id,
         auth_token=auth_token,
         # https://host is wss://host.
-        url=settings.plivo_tts.base_url.rstrip("/").replace("http", "ws", 1),
+        url=PLIVO_API.replace("http", "ws", 1),
         sample_rate=SAMPLE_RATE,
         settings=PlivoTTSService.Settings(
             model=voice.model_in_use.id, voice=voice.id, language=spoken, speed=voice.speed
@@ -58,11 +58,11 @@ def tts(
     )
 
 
-async def voices(settings: AppSettings, key: str) -> list[ProviderVoice]:
+async def voices(key: str) -> list[ProviderVoice]:
     """The voices the account can use; this also proves the Auth ID, the token and that this
     server's IP is allowed."""
     auth_id, _, auth_token = key.partition(":")
-    url = f"{settings.plivo_tts.base_url.rstrip('/')}/v1/Account/{auth_id}/TTS/Voices"
+    url = f"{PLIVO_API}/v1/Account/{auth_id}/TTS/Voices"
     headers = {"Authorization": aiohttp.encode_basic_auth(auth_id, auth_token)}
     body = await get_json("Plivo", url, {}, headers)
     try:
@@ -77,7 +77,7 @@ def provider_voice(entry: dict[str, Any]) -> ProviderVoice:
     return ProviderVoice(
         id=entry["voice_id"],
         name=entry["name"],
-        gender=VoiceGender(entry["gender"]),
+        gender=entry["gender"],
         accent=entry["accent_type"],
         listed_languages=tuple(
             language for language in Language if language in LANGUAGES and language in codes
@@ -85,20 +85,20 @@ def provider_voice(entry: dict[str, Any]) -> ProviderVoice:
     )
 
 
-async def lookup(settings: AppSettings, key: str, voice_id: str) -> ProviderVoice | None:
-    return next((voice for voice in await voices(settings, key) if voice.id == voice_id), None)
+async def lookup(_settings: AppSettings, key: str, voice_id: str) -> ProviderVoice | None:
+    return next((voice for voice in await voices(key) if voice.id == voice_id), None)
 
 
-async def check_voice(settings: AppSettings, key: str) -> str:
-    """The first voice the account lists: the roster differs between addresses."""
-    listed = await voices(settings, key)
+async def check_voice(_settings: AppSettings, key: str) -> str:
+    """The first voice the account lists."""
+    listed = await voices(key)
     if not listed:
         raise UnavailableError("the Plivo account lists no voices")
     return listed[0].id
 
 
-async def catalog(settings: AppSettings, key: str, query: CatalogQuery) -> CatalogPage:
-    return page_of(await voices(settings, key), query)
+async def catalog(_settings: AppSettings, key: str, query: CatalogQuery) -> CatalogPage:
+    return page_of(await voices(key), query)
 
 
 TTS = TtsVendor(service=tts, check_voice=check_voice, catalog=catalog, lookup=lookup)
