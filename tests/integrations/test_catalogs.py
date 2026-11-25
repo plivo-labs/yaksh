@@ -10,6 +10,7 @@ from yaksh.domain.languages import Language
 from yaksh.domain.settings import AppSettings, Azure, Cartesia, PlivoTts
 from yaksh.domain.voices import CatalogQuery, VoiceGender
 from yaksh.integrations.speech import azure, cartesia, plivo, sarvam
+from yaksh.integrations.speech.catalog import rest_address
 
 AZURE_VOICES = [
     {
@@ -153,3 +154,17 @@ async def test_plivo_lists_the_account_voices_and_any_english_region_as_english(
         ("p3", None, "Indian", (Language.TA,)),
     ]
     assert seen == [{"plivo": ("MAID", "Basic TUFJRDp0b2tlbg==")}]
+
+
+@pytest.mark.parametrize(
+    ("url", "rest"),
+    [
+        ("wss://api.plivo.com", "https://api.plivo.com"),
+        ("https://tts.example/v1", "https://tts.example"),
+        ("ws://127.0.0.1:8080/tts", "http://127.0.0.1:8080"),
+    ],
+)
+def test_a_voice_list_goes_to_the_host_of_the_address_and_keeps_its_tls(
+    url: str, rest: str
+) -> None:
+    assert rest_address(url) == rest

@@ -642,6 +642,31 @@ async def test_plivo_tts_credentials_are_saved_together_and_checked_at_their_add
     assert {"plivo_tts_auth_id", "plivo_tts_auth_token"} <= set(saved["secrets"])
 
 
+async def test_the_phone_account_and_plivos_text_to_speech_are_saved_and_removed_apart(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch, checks: list[Any]
+) -> None:
+    async def check_tts(*_args: Any) -> None:
+        return None
+
+    monkeypatch.setattr(service, "check_tts", check_tts)
+    phone = {"auth_id": "PHONEID01", "auth_token": "phone-token-01"}
+    tts = {"auth_id": "TTSID01", "auth_token": "tts-token-01"}
+    saved = [
+        (await client.put("/api/v1/settings/plivo", json=phone)).status_code,
+        (await client.put("/api/v1/settings/plivo_tts", json=tts)).status_code,
+    ]
+
+    without_tts = (await client.delete("/api/v1/settings/plivo_tts")).json()["secrets"]
+    saved.append((await client.put("/api/v1/settings/plivo_tts", json=tts)).status_code)
+    without_phone = (await client.delete("/api/v1/settings/plivo")).json()["secrets"]
+
+    phone_pair = {"plivo_auth_id", "plivo_auth_token"}
+    tts_pair = {"plivo_tts_auth_id", "plivo_tts_auth_token"}
+    assert saved == [200, 200, 200]
+    assert phone_pair <= set(without_tts) and not tts_pair & set(without_tts)
+    assert tts_pair <= set(without_phone) and not phone_pair & set(without_phone)
+
+
 @pytest.mark.parametrize(
     ("account", "label"), [("plivo", "Plivo"), ("plivo_tts", "Plivo text to speech")]
 )
