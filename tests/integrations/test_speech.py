@@ -154,7 +154,7 @@ def test_elevenlabs_speaks_with_the_voice_model_and_sends_a_language_only_where_
     assert (sent["model_id"], sent.get("language_code")) == (model, code)
 
 
-def test_plivo_speaks_with_the_plivo_account_and_sends_english_with_no_language() -> None:
+def test_plivo_speaks_with_the_voice_model_and_sends_english_with_no_language() -> None:
     voice = VoiceSettings(provider=VoiceProvider.PLIVO, id="v1", speed=0.9)
 
     service = cast(PlivoTTSService, tts_service(AppSettings(), voice, Language.EN, "MAID:token"))

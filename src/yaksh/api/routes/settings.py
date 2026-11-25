@@ -16,6 +16,7 @@ from yaksh.api.schemas.settings import (
     ModelReplyTimeRead,
     Models,
     PlivoAccount,
+    PlivoTtsAccount,
     ProviderTest,
     SecretWrite,
     SettingsImport,
@@ -27,7 +28,6 @@ from yaksh.api.schemas.settings import (
 from yaksh.domain.errors import UnavailableError, ValidationError
 from yaksh.domain.settings import (
     KEY_URLS,
-    PLIVO_SECRETS,
     TRIGGER_SECRET,
     TRIGGER_SECRET_NAME,
     AppSettings,
@@ -94,7 +94,7 @@ async def put_plivo_account(
     account: PlivoAccount, settings: AppSettingsDep, session: SessionDep, cipher: CipherDep
 ) -> SettingsRead:
     """Save the Auth ID and Auth token of a Plivo account together, after Plivo accepts them;
-    this is how to move to another account. Plivo voices speak with them too."""
+    this is how to move to another account."""
     secrets: dict[str, str | None] = {
         SecretName.PLIVO_AUTH_ID: account.auth_id,
         SecretName.PLIVO_AUTH_TOKEN: account.auth_token,
@@ -102,12 +102,41 @@ async def put_plivo_account(
     return SettingsRead.of(await checked_change(settings, session, cipher, secrets=secrets))
 
 
+@router.put("/plivo_tts")
+async def put_plivo_tts_account(
+    account: PlivoTtsAccount, settings: AppSettingsDep, session: SessionDep, cipher: CipherDep
+) -> SettingsRead:
+    """Save the Auth ID and Auth token of Plivo's text to speech together, after Plivo speaks with
+    them; with `url`, they are checked at that address and saved with it."""
+    secrets: dict[str, str | None] = {
+        SecretName.PLIVO_TTS_AUTH_ID: account.auth_id,
+        SecretName.PLIVO_TTS_AUTH_TOKEN: account.auth_token,
+    }
+    values = None if account.url is None else {"plivo_tts": {"url": account.url}}
+    return SettingsRead.of(
+        await checked_change(settings, session, cipher, values=values, secrets=secrets)
+    )
+
+
 @router.delete("/plivo")
 async def delete_plivo_account(
     settings: AppSettingsDep, session: SessionDep, cipher: CipherDep
 ) -> SettingsRead:
-    secrets: dict[str, str | None] = dict.fromkeys(PLIVO_SECRETS)
-    return SettingsRead.of(await checked_change(settings, session, cipher, secrets=secrets))
+    return SettingsRead.of(await remove_pair(service.PLIVO, settings, session, cipher))
+
+
+@router.delete("/plivo_tts")
+async def delete_plivo_tts_account(
+    settings: AppSettingsDep, session: SessionDep, cipher: CipherDep
+) -> SettingsRead:
+    return SettingsRead.of(await remove_pair(service.PLIVO_TTS, settings, session, cipher))
+
+
+async def remove_pair(
+    pair: service.Pair, settings: AppSettings, session: AsyncSession, cipher: Cipher
+) -> AppSettings:
+    secrets: dict[str, str | None] = dict.fromkeys(pair.names)
+    return await checked_change(settings, session, cipher, secrets=secrets)
 
 
 async def checked_change(
@@ -132,7 +161,7 @@ async def checked_change(
 async def delete_secret(
     name: SecretName, settings: AppSettingsDep, session: SessionDep, cipher: CipherDep
 ) -> SettingsRead:
-    """Remove one key; the halves of the Plivo account are removed together."""
+    """Remove one key; the halves of a Plivo account are removed together."""
     secrets: dict[str, str | None] = {name: None}
     return SettingsRead.of(await checked_change(settings, session, cipher, secrets=secrets))
 

@@ -7,7 +7,7 @@ from fastapi.responses import JSONResponse
 
 from yaksh.caller.plivo_server import PlivoServer
 from yaksh.domain.languages import Language
-from yaksh.domain.settings import AppSettings, Azure, Cartesia
+from yaksh.domain.settings import AppSettings, Azure, Cartesia, PlivoTts
 from yaksh.domain.voices import CatalogQuery, VoiceGender
 from yaksh.integrations.speech import azure, cartesia, plivo, sarvam
 
@@ -139,13 +139,13 @@ async def test_sarvam_lists_the_speakers_of_the_model_that_speak_the_language() 
 
 
 async def test_plivo_lists_the_account_voices_and_any_english_region_as_english(
-    provider_api: tuple[str, list[dict[str, Any]]], monkeypatch: pytest.MonkeyPatch
+    provider_api: tuple[str, list[dict[str, Any]]],
 ) -> None:
     """A voice without a gender is listed without one."""
     base_url, seen = provider_api
-    monkeypatch.setattr(plivo, "PLIVO_API", base_url)
+    settings = AppSettings(plivo_tts=PlivoTts(url=base_url.replace("http", "ws")))
 
-    page = await plivo.catalog(AppSettings(), "MAID:token", CatalogQuery())
+    page = await plivo.catalog(settings, "MAID:token", CatalogQuery())
 
     assert [(v.id, v.gender, v.accent, v.listed_languages) for v in page.items] == [
         ("p1", VoiceGender.MALE, "Indian", (Language.EN,)),

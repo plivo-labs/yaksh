@@ -1098,6 +1098,8 @@ const (
 	LlmApiKey         SecretName = "llm_api_key"
 	PlivoAuthId       SecretName = "plivo_auth_id"
 	PlivoAuthToken    SecretName = "plivo_auth_token"
+	PlivoTtsAuthId    SecretName = "plivo_tts_auth_id"
+	PlivoTtsAuthToken SecretName = "plivo_tts_auth_token"
 	SarvamApiKey      SecretName = "sarvam_api_key"
 	SonioxApiKey      SecretName = "soniox_api_key"
 	TriggerSigningKey SecretName = "trigger_signing_key"
@@ -1124,6 +1126,10 @@ func (e SecretName) Valid() bool {
 	case PlivoAuthId:
 		return true
 	case PlivoAuthToken:
+		return true
+	case PlivoTtsAuthId:
+		return true
+	case PlivoTtsAuthToken:
 		return true
 	case SarvamApiKey:
 		return true
@@ -2908,6 +2914,18 @@ type PlivoCxFlowSearch struct {
 	Offset    *int    `json:"offset,omitempty"`
 }
 
+// PlivoTts defines model for PlivoTts.
+type PlivoTts struct {
+	Url *string `json:"url,omitempty"`
+}
+
+// PlivoTtsAccount defines model for PlivoTtsAccount.
+type PlivoTtsAccount struct {
+	AuthId    string  `json:"auth_id"`
+	AuthToken string  `json:"auth_token"`
+	Url       *string `json:"url,omitempty"`
+}
+
 // Provenance defines model for Provenance.
 type Provenance string
 
@@ -3464,8 +3482,9 @@ type SettingsValues struct {
 
 	// Llm Any API with OpenAI's Responses endpoint. The caller, scenario writing and the judges
 	// use it.
-	Llm   *Llm   `json:"llm,omitempty"`
-	Phone *Phone `json:"phone,omitempty"`
+	Llm      *Llm      `json:"llm,omitempty"`
+	Phone    *Phone    `json:"phone,omitempty"`
+	PlivoTts *PlivoTts `json:"plivo_tts,omitempty"`
 
 	// SarvamStt Sarvam's speech-to-text host is fixed by its SDK, so it has no address.
 	SarvamStt *SarvamStt `json:"sarvam_stt,omitempty"`
@@ -4220,6 +4239,9 @@ type ImportSettingsApiV1SettingsImportPostJSONRequestBody = SettingsImport
 
 // PutPlivoAccountApiV1SettingsPlivoPutJSONRequestBody defines body for PutPlivoAccountApiV1SettingsPlivoPut for application/json ContentType.
 type PutPlivoAccountApiV1SettingsPlivoPutJSONRequestBody = PlivoAccount
+
+// PutPlivoTtsAccountApiV1SettingsPlivoTtsPutJSONRequestBody defines body for PutPlivoTtsAccountApiV1SettingsPlivoTtsPut for application/json ContentType.
+type PutPlivoTtsAccountApiV1SettingsPlivoTtsPutJSONRequestBody = PlivoTtsAccount
 
 // PutSecretApiV1SettingsSecretsNamePutJSONRequestBody defines body for PutSecretApiV1SettingsSecretsNamePut for application/json ContentType.
 type PutSecretApiV1SettingsSecretsNamePutJSONRequestBody = SecretWrite
@@ -5853,7 +5875,7 @@ type ClientInterface interface {
 	// PutPlivoAccountApiV1SettingsPlivoPutWithBody Put Plivo Account
 	//
 	// Save the Auth ID and Auth token of a Plivo account together, after Plivo accepts them;
-	// this is how to move to another account. Plivo voices speak with them too.
+	// this is how to move to another account.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -5863,12 +5885,37 @@ type ClientInterface interface {
 	// PutPlivoAccountApiV1SettingsPlivoPut Put Plivo Account
 	//
 	// Save the Auth ID and Auth token of a Plivo account together, after Plivo accepts them;
-	// this is how to move to another account. Plivo voices speak with them too.
+	// this is how to move to another account.
 	//
 	// Takes a body of the `application/json` content type.
 	//
 	// Corresponds with PUT /api/v1/settings/plivo (the `PutPlivoAccountApiV1SettingsPlivoPut` operationId).
 	PutPlivoAccountApiV1SettingsPlivoPut(ctx context.Context, body PutPlivoAccountApiV1SettingsPlivoPutJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeletePlivoTtsAccountApiV1SettingsPlivoTtsDelete Delete Plivo Tts Account
+	//
+	// Corresponds with DELETE /api/v1/settings/plivo_tts (the `DeletePlivoTtsAccountApiV1SettingsPlivoTtsDelete` operationId).
+	DeletePlivoTtsAccountApiV1SettingsPlivoTtsDelete(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PutPlivoTtsAccountApiV1SettingsPlivoTtsPutWithBody Put Plivo Tts Account
+	//
+	// Save the Auth ID and Auth token of Plivo's text to speech together, after Plivo speaks with
+	// them; with `url`, they are checked at that address and saved with it.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PUT /api/v1/settings/plivo_tts (the `PutPlivoTtsAccountApiV1SettingsPlivoTtsPut` operationId).
+	PutPlivoTtsAccountApiV1SettingsPlivoTtsPutWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PutPlivoTtsAccountApiV1SettingsPlivoTtsPut Put Plivo Tts Account
+	//
+	// Save the Auth ID and Auth token of Plivo's text to speech together, after Plivo speaks with
+	// them; with `url`, they are checked at that address and saved with it.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PUT /api/v1/settings/plivo_tts (the `PutPlivoTtsAccountApiV1SettingsPlivoTtsPut` operationId).
+	PutPlivoTtsAccountApiV1SettingsPlivoTtsPut(ctx context.Context, body PutPlivoTtsAccountApiV1SettingsPlivoTtsPutJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// TestProviderApiV1SettingsProvidersProviderTestPost Test Provider
 	//
@@ -5880,7 +5927,7 @@ type ClientInterface interface {
 
 	// DeleteSecretApiV1SettingsSecretsNameDelete Delete Secret
 	//
-	// Remove one key; the halves of the Plivo account are removed together.
+	// Remove one key; the halves of a Plivo account are removed together.
 	//
 	// Corresponds with DELETE /api/v1/settings/secrets/{name} (the `DeleteSecretApiV1SettingsSecretsNameDelete` operationId).
 	DeleteSecretApiV1SettingsSecretsNameDelete(ctx context.Context, name SecretName, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -8314,7 +8361,7 @@ func (c *Client) DeletePlivoAccountApiV1SettingsPlivoDelete(ctx context.Context,
 // PutPlivoAccountApiV1SettingsPlivoPutWithBody Put Plivo Account
 //
 // Save the Auth ID and Auth token of a Plivo account together, after Plivo accepts them;
-// this is how to move to another account. Plivo voices speak with them too.
+// this is how to move to another account.
 //
 // Takes any type of body and a specified content type.
 //
@@ -8334,13 +8381,68 @@ func (c *Client) PutPlivoAccountApiV1SettingsPlivoPutWithBody(ctx context.Contex
 // PutPlivoAccountApiV1SettingsPlivoPut Put Plivo Account
 //
 // Save the Auth ID and Auth token of a Plivo account together, after Plivo accepts them;
-// this is how to move to another account. Plivo voices speak with them too.
+// this is how to move to another account.
 //
 // Takes a body of the `application/json` content type.
 //
 // Corresponds with PUT /api/v1/settings/plivo (the `PutPlivoAccountApiV1SettingsPlivoPut` operationId).
 func (c *Client) PutPlivoAccountApiV1SettingsPlivoPut(ctx context.Context, body PutPlivoAccountApiV1SettingsPlivoPutJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewPutPlivoAccountApiV1SettingsPlivoPutRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DeletePlivoTtsAccountApiV1SettingsPlivoTtsDelete Delete Plivo Tts Account
+//
+// Corresponds with DELETE /api/v1/settings/plivo_tts (the `DeletePlivoTtsAccountApiV1SettingsPlivoTtsDelete` operationId).
+func (c *Client) DeletePlivoTtsAccountApiV1SettingsPlivoTtsDelete(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeletePlivoTtsAccountApiV1SettingsPlivoTtsDeleteRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PutPlivoTtsAccountApiV1SettingsPlivoTtsPutWithBody Put Plivo Tts Account
+//
+// Save the Auth ID and Auth token of Plivo's text to speech together, after Plivo speaks with
+// them; with `url`, they are checked at that address and saved with it.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PUT /api/v1/settings/plivo_tts (the `PutPlivoTtsAccountApiV1SettingsPlivoTtsPut` operationId).
+func (c *Client) PutPlivoTtsAccountApiV1SettingsPlivoTtsPutWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPutPlivoTtsAccountApiV1SettingsPlivoTtsPutRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PutPlivoTtsAccountApiV1SettingsPlivoTtsPut Put Plivo Tts Account
+//
+// Save the Auth ID and Auth token of Plivo's text to speech together, after Plivo speaks with
+// them; with `url`, they are checked at that address and saved with it.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PUT /api/v1/settings/plivo_tts (the `PutPlivoTtsAccountApiV1SettingsPlivoTtsPut` operationId).
+func (c *Client) PutPlivoTtsAccountApiV1SettingsPlivoTtsPut(ctx context.Context, body PutPlivoTtsAccountApiV1SettingsPlivoTtsPutJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPutPlivoTtsAccountApiV1SettingsPlivoTtsPutRequest(c.Server, body)
 	if err != nil {
 		return nil, err
 	}
@@ -8371,7 +8473,7 @@ func (c *Client) TestProviderApiV1SettingsProvidersProviderTestPost(ctx context.
 
 // DeleteSecretApiV1SettingsSecretsNameDelete Delete Secret
 //
-// Remove one key; the halves of the Plivo account are removed together.
+// Remove one key; the halves of a Plivo account are removed together.
 //
 // Corresponds with DELETE /api/v1/settings/secrets/{name} (the `DeleteSecretApiV1SettingsSecretsNameDelete` operationId).
 func (c *Client) DeleteSecretApiV1SettingsSecretsNameDelete(ctx context.Context, name SecretName, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -12929,6 +13031,73 @@ func NewPutPlivoAccountApiV1SettingsPlivoPutRequestWithBody(server string, conte
 	return req, nil
 }
 
+// NewDeletePlivoTtsAccountApiV1SettingsPlivoTtsDeleteRequest constructs an http.Request for the DeletePlivoTtsAccountApiV1SettingsPlivoTtsDelete method
+func NewDeletePlivoTtsAccountApiV1SettingsPlivoTtsDeleteRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/settings/plivo_tts")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewPutPlivoTtsAccountApiV1SettingsPlivoTtsPutRequest calls the generic PutPlivoTtsAccountApiV1SettingsPlivoTtsPut builder with application/json body
+func NewPutPlivoTtsAccountApiV1SettingsPlivoTtsPutRequest(server string, body PutPlivoTtsAccountApiV1SettingsPlivoTtsPutJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewPutPlivoTtsAccountApiV1SettingsPlivoTtsPutRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewPutPlivoTtsAccountApiV1SettingsPlivoTtsPutRequestWithBody constructs an http.Request for the PutPlivoTtsAccountApiV1SettingsPlivoTtsPut method, with any body, and a specified content type
+func NewPutPlivoTtsAccountApiV1SettingsPlivoTtsPutRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/settings/plivo_tts")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPut, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 // NewTestProviderApiV1SettingsProvidersProviderTestPostRequest constructs an http.Request for the TestProviderApiV1SettingsProvidersProviderTestPost method
 func NewTestProviderApiV1SettingsProvidersProviderTestPostRequest(server string, provider Provider) (*http.Request, error) {
 	var err error
@@ -15345,7 +15514,7 @@ type ClientWithResponsesInterface interface {
 	// PutPlivoAccountApiV1SettingsPlivoPutWithBodyWithResponse Put Plivo Account
 	//
 	// Save the Auth ID and Auth token of a Plivo account together, after Plivo accepts them;
-	// this is how to move to another account. Plivo voices speak with them too.
+	// this is how to move to another account.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -15355,12 +15524,39 @@ type ClientWithResponsesInterface interface {
 	// PutPlivoAccountApiV1SettingsPlivoPutWithResponse Put Plivo Account
 	//
 	// Save the Auth ID and Auth token of a Plivo account together, after Plivo accepts them;
-	// this is how to move to another account. Plivo voices speak with them too.
+	// this is how to move to another account.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with PUT /api/v1/settings/plivo (the `PutPlivoAccountApiV1SettingsPlivoPut` operationId).
 	PutPlivoAccountApiV1SettingsPlivoPutWithResponse(ctx context.Context, body PutPlivoAccountApiV1SettingsPlivoPutJSONRequestBody, reqEditors ...RequestEditorFn) (*PutPlivoAccountApiV1SettingsPlivoPutResponse, error)
+
+	// DeletePlivoTtsAccountApiV1SettingsPlivoTtsDeleteWithResponse Delete Plivo Tts Account
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with DELETE /api/v1/settings/plivo_tts (the `DeletePlivoTtsAccountApiV1SettingsPlivoTtsDelete` operationId).
+	DeletePlivoTtsAccountApiV1SettingsPlivoTtsDeleteWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*DeletePlivoTtsAccountApiV1SettingsPlivoTtsDeleteResponse, error)
+
+	// PutPlivoTtsAccountApiV1SettingsPlivoTtsPutWithBodyWithResponse Put Plivo Tts Account
+	//
+	// Save the Auth ID and Auth token of Plivo's text to speech together, after Plivo speaks with
+	// them; with `url`, they are checked at that address and saved with it.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /api/v1/settings/plivo_tts (the `PutPlivoTtsAccountApiV1SettingsPlivoTtsPut` operationId).
+	PutPlivoTtsAccountApiV1SettingsPlivoTtsPutWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PutPlivoTtsAccountApiV1SettingsPlivoTtsPutResponse, error)
+
+	// PutPlivoTtsAccountApiV1SettingsPlivoTtsPutWithResponse Put Plivo Tts Account
+	//
+	// Save the Auth ID and Auth token of Plivo's text to speech together, after Plivo speaks with
+	// them; with `url`, they are checked at that address and saved with it.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /api/v1/settings/plivo_tts (the `PutPlivoTtsAccountApiV1SettingsPlivoTtsPut` operationId).
+	PutPlivoTtsAccountApiV1SettingsPlivoTtsPutWithResponse(ctx context.Context, body PutPlivoTtsAccountApiV1SettingsPlivoTtsPutJSONRequestBody, reqEditors ...RequestEditorFn) (*PutPlivoTtsAccountApiV1SettingsPlivoTtsPutResponse, error)
 
 	// TestProviderApiV1SettingsProvidersProviderTestPostWithResponse Test Provider
 	//
@@ -15374,7 +15570,7 @@ type ClientWithResponsesInterface interface {
 
 	// DeleteSecretApiV1SettingsSecretsNameDeleteWithResponse Delete Secret
 	//
-	// Remove one key; the halves of the Plivo account are removed together.
+	// Remove one key; the halves of a Plivo account are removed together.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -20138,6 +20334,102 @@ func (r PutPlivoAccountApiV1SettingsPlivoPutResponse) ContentType() string {
 	return ""
 }
 
+type DeletePlivoTtsAccountApiV1SettingsPlivoTtsDeleteResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *SettingsRead
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r DeletePlivoTtsAccountApiV1SettingsPlivoTtsDeleteResponse) GetJSON200() *SettingsRead {
+	return r.JSON200
+}
+
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r DeletePlivoTtsAccountApiV1SettingsPlivoTtsDeleteResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
+}
+
+// GetBody returns the raw response body bytes
+func (r DeletePlivoTtsAccountApiV1SettingsPlivoTtsDeleteResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r DeletePlivoTtsAccountApiV1SettingsPlivoTtsDeleteResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeletePlivoTtsAccountApiV1SettingsPlivoTtsDeleteResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r DeletePlivoTtsAccountApiV1SettingsPlivoTtsDeleteResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type PutPlivoTtsAccountApiV1SettingsPlivoTtsPutResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *SettingsRead
+	// JSON4XX the response for an HTTP 4XX `application/json` response
+	JSON4XX *ErrorResponse
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r PutPlivoTtsAccountApiV1SettingsPlivoTtsPutResponse) GetJSON200() *SettingsRead {
+	return r.JSON200
+}
+
+// GetJSON4XX returns the response for an HTTP 4XX `application/json` response
+func (r PutPlivoTtsAccountApiV1SettingsPlivoTtsPutResponse) GetJSON4XX() *ErrorResponse {
+	return r.JSON4XX
+}
+
+// GetBody returns the raw response body bytes
+func (r PutPlivoTtsAccountApiV1SettingsPlivoTtsPutResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r PutPlivoTtsAccountApiV1SettingsPlivoTtsPutResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r PutPlivoTtsAccountApiV1SettingsPlivoTtsPutResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r PutPlivoTtsAccountApiV1SettingsPlivoTtsPutResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type TestProviderApiV1SettingsProvidersProviderTestPostResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -23376,7 +23668,7 @@ func (c *ClientWithResponses) DeletePlivoAccountApiV1SettingsPlivoDeleteWithResp
 // PutPlivoAccountApiV1SettingsPlivoPutWithBodyWithResponse Put Plivo Account
 //
 // Save the Auth ID and Auth token of a Plivo account together, after Plivo accepts them;
-// this is how to move to another account. Plivo voices speak with them too.
+// this is how to move to another account.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -23392,7 +23684,7 @@ func (c *ClientWithResponses) PutPlivoAccountApiV1SettingsPlivoPutWithBodyWithRe
 // PutPlivoAccountApiV1SettingsPlivoPutWithResponse Put Plivo Account
 //
 // Save the Auth ID and Auth token of a Plivo account together, after Plivo accepts them;
-// this is how to move to another account. Plivo voices speak with them too.
+// this is how to move to another account.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -23403,6 +23695,51 @@ func (c *ClientWithResponses) PutPlivoAccountApiV1SettingsPlivoPutWithResponse(c
 		return nil, err
 	}
 	return ParsePutPlivoAccountApiV1SettingsPlivoPutResponse(rsp)
+}
+
+// DeletePlivoTtsAccountApiV1SettingsPlivoTtsDeleteWithResponse Delete Plivo Tts Account
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /api/v1/settings/plivo_tts (the `DeletePlivoTtsAccountApiV1SettingsPlivoTtsDelete` operationId).
+func (c *ClientWithResponses) DeletePlivoTtsAccountApiV1SettingsPlivoTtsDeleteWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*DeletePlivoTtsAccountApiV1SettingsPlivoTtsDeleteResponse, error) {
+	rsp, err := c.DeletePlivoTtsAccountApiV1SettingsPlivoTtsDelete(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeletePlivoTtsAccountApiV1SettingsPlivoTtsDeleteResponse(rsp)
+}
+
+// PutPlivoTtsAccountApiV1SettingsPlivoTtsPutWithBodyWithResponse Put Plivo Tts Account
+//
+// Save the Auth ID and Auth token of Plivo's text to speech together, after Plivo speaks with
+// them; with `url`, they are checked at that address and saved with it.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /api/v1/settings/plivo_tts (the `PutPlivoTtsAccountApiV1SettingsPlivoTtsPut` operationId).
+func (c *ClientWithResponses) PutPlivoTtsAccountApiV1SettingsPlivoTtsPutWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PutPlivoTtsAccountApiV1SettingsPlivoTtsPutResponse, error) {
+	rsp, err := c.PutPlivoTtsAccountApiV1SettingsPlivoTtsPutWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePutPlivoTtsAccountApiV1SettingsPlivoTtsPutResponse(rsp)
+}
+
+// PutPlivoTtsAccountApiV1SettingsPlivoTtsPutWithResponse Put Plivo Tts Account
+//
+// Save the Auth ID and Auth token of Plivo's text to speech together, after Plivo speaks with
+// them; with `url`, they are checked at that address and saved with it.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /api/v1/settings/plivo_tts (the `PutPlivoTtsAccountApiV1SettingsPlivoTtsPut` operationId).
+func (c *ClientWithResponses) PutPlivoTtsAccountApiV1SettingsPlivoTtsPutWithResponse(ctx context.Context, body PutPlivoTtsAccountApiV1SettingsPlivoTtsPutJSONRequestBody, reqEditors ...RequestEditorFn) (*PutPlivoTtsAccountApiV1SettingsPlivoTtsPutResponse, error) {
+	rsp, err := c.PutPlivoTtsAccountApiV1SettingsPlivoTtsPut(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePutPlivoTtsAccountApiV1SettingsPlivoTtsPutResponse(rsp)
 }
 
 // TestProviderApiV1SettingsProvidersProviderTestPostWithResponse Test Provider
@@ -23423,7 +23760,7 @@ func (c *ClientWithResponses) TestProviderApiV1SettingsProvidersProviderTestPost
 
 // DeleteSecretApiV1SettingsSecretsNameDeleteWithResponse Delete Secret
 //
-// Remove one key; the halves of the Plivo account are removed together.
+// Remove one key; the halves of a Plivo account are removed together.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -27040,6 +27377,72 @@ func ParsePutPlivoAccountApiV1SettingsPlivoPutResponse(rsp *http.Response) (*Put
 	}
 
 	response := &PutPlivoAccountApiV1SettingsPlivoPutResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest SettingsRead
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseDeletePlivoTtsAccountApiV1SettingsPlivoTtsDeleteResponse parses an HTTP response from a DeletePlivoTtsAccountApiV1SettingsPlivoTtsDeleteWithResponse call
+func ParseDeletePlivoTtsAccountApiV1SettingsPlivoTtsDeleteResponse(rsp *http.Response) (*DeletePlivoTtsAccountApiV1SettingsPlivoTtsDeleteResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeletePlivoTtsAccountApiV1SettingsPlivoTtsDeleteResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest SettingsRead
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode/100 == 4:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON4XX = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParsePutPlivoTtsAccountApiV1SettingsPlivoTtsPutResponse parses an HTTP response from a PutPlivoTtsAccountApiV1SettingsPlivoTtsPutWithResponse call
+func ParsePutPlivoTtsAccountApiV1SettingsPlivoTtsPutResponse(rsp *http.Response) (*PutPlivoTtsAccountApiV1SettingsPlivoTtsPutResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &PutPlivoTtsAccountApiV1SettingsPlivoTtsPutResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}

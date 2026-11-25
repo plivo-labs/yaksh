@@ -4913,7 +4913,7 @@
           "settings"
         ],
         "summary": "Delete Secret",
-        "description": "Remove one key; the halves of the Plivo account are removed together.",
+        "description": "Remove one key; the halves of a Plivo account are removed together.",
         "operationId": "delete_secret_api_v1_settings_secrets__name__delete",
         "security": [
           {
@@ -4960,7 +4960,7 @@
           "settings"
         ],
         "summary": "Put Plivo Account",
-        "description": "Save the Auth ID and Auth token of a Plivo account together, after Plivo accepts them;\nthis is how to move to another account. Plivo voices speak with them too.",
+        "description": "Save the Auth ID and Auth token of a Plivo account together, after Plivo accepts them;\nthis is how to move to another account.",
         "operationId": "put_plivo_account_api_v1_settings_plivo_put",
         "requestBody": {
           "content": {
@@ -5006,6 +5006,87 @@
         ],
         "summary": "Delete Plivo Account",
         "operationId": "delete_plivo_account_api_v1_settings_plivo_delete",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingsRead"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "The request failed. The error tells why.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/settings/plivo_tts": {
+      "put": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Put Plivo Tts Account",
+        "description": "Save the Auth ID and Auth token of Plivo's text to speech together, after Plivo speaks with\nthem; with `url`, they are checked at that address and saved with it.",
+        "operationId": "put_plivo_tts_account_api_v1_settings_plivo_tts_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlivoTtsAccount"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingsRead"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "The request failed. The error tells why.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Delete Plivo Tts Account",
+        "operationId": "delete_plivo_tts_account_api_v1_settings_plivo_tts_delete",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -13022,6 +13103,53 @@
         ],
         "title": "PlivoCxFlowSearch"
       },
+      "PlivoTts": {
+        "properties": {
+          "url": {
+            "type": "string",
+            "pattern": "^(https?|wss?)://\\S+$",
+            "title": "Url",
+            "default": "wss://api.plivo.com"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "PlivoTts"
+      },
+      "PlivoTtsAccount": {
+        "properties": {
+          "auth_id": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Auth Id"
+          },
+          "auth_token": {
+            "type": "string",
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Auth Token"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          }
+        },
+        "type": "object",
+        "required": [
+          "auth_id",
+          "auth_token"
+        ],
+        "title": "PlivoTtsAccount"
+      },
       "Provenance": {
         "type": "string",
         "enum": [
@@ -15788,6 +15916,8 @@
           "elevenlabs_api_key",
           "cartesia_api_key",
           "azure_api_key",
+          "plivo_tts_auth_id",
+          "plivo_tts_auth_token",
           "typesafe_api_key",
           "plivo_auth_id",
           "plivo_auth_token",
@@ -15976,6 +16106,12 @@
             "$ref": "#/components/schemas/Azure",
             "default": {
               "region": "eastus"
+            }
+          },
+          "plivo_tts": {
+            "$ref": "#/components/schemas/PlivoTts",
+            "default": {
+              "url": "wss://api.plivo.com"
             }
           },
           "caller": {

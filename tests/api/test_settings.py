@@ -613,48 +613,66 @@ async def test_a_phone_run_cannot_start_when_the_persona_voice_model_left_the_li
     )
 
 
-async def test_plivo_voices_speak_with_the_plivo_account_that_plivo_checked(
-    client: AsyncClient, monkeypatch: pytest.MonkeyPatch, checks: list[Any]
+async def test_plivo_tts_credentials_are_saved_together_and_checked_at_their_address(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Plivo's text to speech is at Plivo's API, so the account's own check covers it: saving
-    the account speaks no word, and the Test button speaks one with the account's Auth ID and
-    Auth token."""
-    spoken: list[tuple[VoiceProvider, str]] = []
+    checked: list[tuple[str, str]] = []
 
-    async def check_tts(_settings: Any, provider: VoiceProvider, credential: str) -> None:
-        spoken.append((provider, credential))
+    async def check_tts(settings: Any, provider: VoiceProvider, credential: str) -> None:
+        checked.append((settings.plivo_tts.url, credential))
 
     monkeypatch.setattr(service, "check_tts", check_tts)
-    saved = await client.put(
-        "/api/v1/settings/plivo", json={"auth_id": "MAID", "auth_token": "token"}
+    half = await client.put(
+        "/api/v1/settings/secrets/plivo_tts_auth_id", json={"value": "TTSID0123"}
     )
-    test = await client.post("/api/v1/settings/providers/plivo_tts/test")
+    both = await client.put(
+        "/api/v1/settings/plivo_tts",
+        json={
+            "auth_id": "TTSID0123",
+            "auth_token": "tts-token-0123",
+            "url": "wss://tts.example",
+        },
+    )
 
-    assert saved.status_code == 200, saved.text
-    assert checks == [("check_plivo", ("MAID", "token"))]
-    assert test.json()["detail"] == "Plivo spoke a test word."
-    assert spoken == [(VoiceProvider.PLIVO, "MAID:token")]
+    assert half.status_code == 422 and "together" in half.text
+    assert both.status_code == 200, both.text
+    assert checked == [("wss://tts.example", "TTSID0123:tts-token-0123")]
+    saved = both.json()
+    assert saved["values"]["plivo_tts"]["url"] == "wss://tts.example"
+    assert {"plivo_tts_auth_id", "plivo_tts_auth_token"} <= set(saved["secrets"])
 
 
-async def test_half_of_the_plivo_account_is_never_removed_or_replaced_alone(
-    client: AsyncClient, checks: list[Any]
+@pytest.mark.parametrize(
+    ("account", "label"), [("plivo", "Plivo"), ("plivo_tts", "Plivo text to speech")]
+)
+async def test_half_of_an_account_is_never_removed_or_replaced_alone(
+    client: AsyncClient,
+    monkeypatch: pytest.MonkeyPatch,
+    checks: list[Any],
+    account: str,
+    label: str,
 ) -> None:
+    async def check_tts(*_args: Any) -> None:
+        return None
+
+    monkeypatch.setattr(service, "check_tts", check_tts)
     pair = {"auth_id": "MAACCOUNT0123", "auth_token": "account-token-0123"}
-    await client.put("/api/v1/settings/plivo", json=pair)
-    document = "secrets:\n  plivo_auth_id: null\n  plivo_auth_token: token-4567\n"
+    await client.put(f"/api/v1/settings/{account}", json=pair)
+    document = f"secrets:\n  {account}_auth_id: null\n  {account}_auth_token: token-4567\n"
 
     imported = await client.post("/api/v1/settings/import", json={"document": document})
-    deleted = await client.delete("/api/v1/settings/secrets/plivo_auth_id")
-    removed = await client.delete("/api/v1/settings/plivo")
+    deleted = await client.delete(f"/api/v1/settings/secrets/{account}_auth_id")
+    removed = await client.delete(f"/api/v1/settings/{account}")
 
     assert imported.status_code == 200, imported.text
     assert imported.json()["failed"] == [
-        "plivo_auth_id, plivo_auth_token: save or remove the Plivo Auth ID and Auth token together"
+        f"{account}_auth_id, {account}_auth_token: "
+        f"save or remove the {label} Auth ID and Auth token together"
     ]
-    assert imported.json()["settings"]["secrets"]["plivo_auth_token"] == {"hint": "0123"}
+    assert imported.json()["settings"]["secrets"][f"{account}_auth_token"] == {"hint": "0123"}
     assert deleted.status_code == 422
     assert removed.status_code == 200, removed.text
-    assert not {"plivo_auth_id", "plivo_auth_token"} & set(removed.json()["secrets"])
+    assert not {f"{account}_auth_id", f"{account}_auth_token"} & set(removed.json()["secrets"])
 
 
 async def test_retired_model_settings_stay_stored_for_older_processes_and_are_ignored(

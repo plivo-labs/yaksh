@@ -25,9 +25,9 @@ VOICE_COPIES = (("persona_versions", "config"), ("conversations", "caller_settin
 
 
 def upgrade() -> None:
-    """The voices get the model `koyal-v1` and the provider gets Plivo's name. Its own address,
-    Auth ID and Auth token are deleted: a Plivo voice speaks at Plivo's API with the Plivo
-    account's Auth ID and Auth token."""
+    """The voices get the model `koyal-v1` and the provider gets Plivo's name. Nimble's address,
+    Auth ID and Auth token are deleted: that address answers 404, and a key goes only to the
+    address it was checked at, so Plivo's Auth ID and Auth token are saved again."""
     set_model("nimble", MODEL)
     rename("nimble", "plivo")
     op.execute(

@@ -62,6 +62,13 @@ class PlivoAccount(BaseModel):
     auth_token: str = Field(min_length=1, max_length=4000)
 
 
+class PlivoTtsAccount(BaseModel):
+    auth_id: str = Field(min_length=1, max_length=200)
+    auth_token: str = Field(min_length=1, max_length=4000)
+    url: str | None = Field(default=None, max_length=2000)
+    """A new address, saved with the pair; None keeps the saved one."""
+
+
 class SigningKey(BaseModel):
     key: str
     """Shown this one time; copy it to the agent's system."""

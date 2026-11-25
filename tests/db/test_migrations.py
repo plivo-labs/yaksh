@@ -121,8 +121,8 @@ async def test_each_voice_gets_the_model_its_provider_had_in_settings(database_u
 
 
 async def test_nimble_voices_become_plivo_voices(database_url: str) -> None:
-    """Nimble's own address, Auth ID and Auth token go: a Plivo voice speaks at Plivo's API with
-    the Plivo account's Auth ID and Auth token. A call's stored voice reads as a Plivo voice."""
+    """Nimble's address, Auth ID and Auth token go: Plivo's are saved again, at Plivo's address.
+    A call's stored voice reads as a Plivo voice."""
     url = await database_at(database_url, "plivo_voices", "0010")
     secrets = ("nimble_auth_id", "nimble_auth_token", "plivo_auth_id", "plivo_auth_token")
     engine = create_async_engine(url)

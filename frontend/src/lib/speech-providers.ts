@@ -82,52 +82,53 @@ export const STT_LANGUAGES: Record<SttProvider, readonly string[]> = {
 
 /** A text-to-speech provider's settings and key. How its voices behave, and the models they
  * use, come from the server's list of providers (`useVoiceProviders`). */
-export interface TtsProvider extends Omit<
-  SpeechProvider<VoiceProvider>,
-  "section" | "address" | "secret"
-> {
-  /** Its key, or the Plivo account's Auth ID and Auth token, which are saved together. */
+export interface TtsProvider extends Omit<SpeechProvider<VoiceProvider>, "address" | "secret"> {
+  /** Its key, or Plivo's Auth ID and Auth token, which are saved together. */
   secrets: readonly SecretName[];
-  /** The setting that holds its address, where its key goes; Azure's is its region. Null for
-   * Plivo, which speaks at Plivo's API. */
-  address: { section: Section; field: "base_url" | "url" | "region" } | null;
+  /** The section's address field; Azure's is its region. */
+  address: "base_url" | "url" | "region";
 }
 
 export const TTS_PROVIDERS: TtsProvider[] = [
   {
+    value: "plivo",
+    label: "Plivo",
+    section: "plivo_tts",
+    address: "url",
+    secrets: ["plivo_tts_auth_id", "plivo_tts_auth_token"],
+    test: "plivo_tts",
+  },
+  {
     value: "elevenlabs",
     label: "ElevenLabs",
-    address: { section: "elevenlabs", field: "url" },
+    section: "elevenlabs",
+    address: "url",
     secrets: ["elevenlabs_api_key"],
     test: "elevenlabs",
   },
   {
     value: "cartesia",
     label: "Cartesia",
-    address: { section: "cartesia", field: "url" },
+    section: "cartesia",
+    address: "url",
     secrets: ["cartesia_api_key"],
     test: "cartesia",
   },
   {
     value: "sarvam",
     label: "Sarvam",
-    address: { section: "sarvam_tts", field: "base_url" },
+    section: "sarvam_tts",
+    address: "base_url",
     secrets: ["sarvam_api_key"],
     test: "sarvam_tts",
   },
   {
     value: "azure",
     label: "Azure",
-    address: { section: "azure", field: "region" },
+    section: "azure",
+    address: "region",
     secrets: ["azure_api_key"],
     test: "azure",
-  },
-  {
-    value: "plivo",
-    label: "Plivo",
-    address: null,
-    secrets: ["plivo_auth_id", "plivo_auth_token"],
-    test: "plivo_tts",
   },
 ];
 

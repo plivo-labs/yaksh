@@ -12,7 +12,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useAgents, usePersonas, useVoiceProviders, useVoices } from "@/lib/queries";
+import {
+  useAgents,
+  usePersonas,
+  useRemovePlivoTtsAccount,
+  useSavePlivoTtsAccount,
+  useVoiceProviders,
+  useVoices,
+} from "@/lib/queries";
 import {
   CUTS_AT_SENTENCES,
   STT_LANGUAGES,
@@ -33,14 +40,16 @@ import {
 } from "@/lib/types";
 import type { Change } from "@/pages/settings";
 import {
+  CredentialPairRow,
   KeyRemovedNote,
   KeyRow,
-  PlivoAccountRow,
   ProviderPanel,
+  RemoveButton,
   SettingRow,
 } from "@/pages/settings-keys";
 
 type Fields = { model: string; base_url?: string; url?: string };
+type TtsFields = Partial<Record<TtsProvider["address"], string>>;
 
 /** The one provider that hears the agent on every call, with its own address, model and key. */
 export function SpeechToTextPanel({
@@ -250,13 +259,12 @@ function TtsProviderPanel({
   cutsAtSentences: boolean;
   onBack: () => void;
 }) {
-  const at = provider.address;
-  const addressIn = (values: SettingsValues) =>
-    at && (values[at.section] as Record<string, string>)[at.field];
-  const address = addressIn(draft);
-  const moved = address !== addressIn(settings.values);
+  const fields = draft[provider.section] as TtsFields;
+  const saved = settings.values[provider.section] as TtsFields;
+  const address = fields[provider.address] ?? "";
+  const moved = address !== saved[provider.address];
   const key = hasCredential(provider, settings.secrets);
-  const region = at?.field === "region";
+  const region = provider.address === "region";
   const removeWarning =
     voices + personas > 0
       ? {
@@ -264,6 +272,8 @@ function TtsProviderPanel({
           description: `${voices} ${voices === 1 ? "voice" : "voices"} and ${personas} ${personas === 1 ? "persona" : "personas"} use ${provider.label}. Their phone tests can't start until you add a key again.`,
         }
       : undefined;
+  const edit = (field: string, value: string) =>
+    change(provider.section, field as never, value as never);
   return (
     <div className="grid gap-3">
       <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-s-400">
@@ -279,40 +289,74 @@ function TtsProviderPanel({
         title={provider.label}
         provider={provider.test}
         canTest={key}
-        edits={address ?? undefined}
+        edits={JSON.stringify(fields)}
         description={cutsAtSentences ? CUTS_AT_SENTENCES.tip : undefined}
       >
-        {at !== null && (
-          <SettingRow
-            label={region ? "Region" : "Base URL"}
-            htmlFor="tts-address"
-            help={moved && key ? <KeyRemovedNote address={region ? "region" : "URL"} /> : undefined}
-          >
-            <Input
-              id="tts-address"
-              className={region ? "max-w-56 font-mono" : undefined}
-              value={address ?? ""}
-              onChange={(event) =>
-                change(at.section, at.field as never, event.target.value.trim() as never)
-              }
-            />
-          </SettingRow>
-        )}
-        {provider.value === "plivo" ? (
-          <PlivoAccountRow settings={settings} help="The Plivo account of Settings > Phone." />
-        ) : (
+        <SettingRow
+          label={region ? "Region" : "Base URL"}
+          htmlFor="tts-address"
+          help={moved && key ? <KeyRemovedNote address={region ? "region" : "URL"} /> : undefined}
+        >
+          <Input
+            id="tts-address"
+            className={region ? "max-w-56 font-mono" : undefined}
+            value={address}
+            onChange={(event) => edit(provider.address, event.target.value.trim())}
+          />
+        </SettingRow>
+        {provider.secrets.length === 1 ? (
           <KeyRow
             name={provider.secrets[0]}
             label="API key"
             help={provider.value === "sarvam" ? "Also Sarvam's speech to text key." : undefined}
             state={settings.secrets[provider.secrets[0]]}
-            url={address ?? undefined}
+            url={address}
             checked
             removable
             removeWarning={removeWarning}
           />
+        ) : (
+          <PlivoTtsAccountRow settings={settings} url={address} removeWarning={removeWarning} />
         )}
       </ProviderPanel>
     </div>
+  );
+}
+
+/** Plivo's Auth ID and Auth token: checked at the address the form shows, and saved with it. */
+function PlivoTtsAccountRow({
+  settings,
+  url,
+  removeWarning,
+}: {
+  settings: AppSettings;
+  url: string;
+  removeWarning?: { title: string; description: string };
+}) {
+  const save = useSavePlivoTtsAccount();
+  const remove = useRemovePlivoTtsAccount();
+  const id = settings.secrets.plivo_tts_auth_id;
+  const token = settings.secrets.plivo_tts_auth_token;
+  const shown = id && token ? `••••${id.hint ?? ""} / ••••${token.hint ?? ""}` : null;
+  return (
+    <CredentialPairRow
+      label="Auth ID and token"
+      inputId="plivo-tts-auth-id"
+      shown={shown}
+      change="Replace"
+      add="Add"
+      pending={save.isPending}
+      error={save.isError ? save.error.message : undefined}
+      onSave={(pair, done) => save.mutate({ ...pair, url }, { onSuccess: done })}
+      onReset={save.reset}
+    >
+      <RemoveButton
+        saved={shown !== null}
+        warning={removeWarning}
+        pending={remove.isPending}
+        error={remove.error?.message}
+        onRemove={(done) => remove.mutate(undefined, { onSuccess: done })}
+      />
+    </CredentialPairRow>
   );
 }

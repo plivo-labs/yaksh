@@ -1401,6 +1401,25 @@ export function useSavePlivoAccount() {
   });
 }
 
+/** The Auth ID and Auth token of Plivo's text to speech, checked and saved together; with
+ * `url`, at that address. */
+export function useSavePlivoTtsAccount() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (account: { auth_id: string; auth_token: string; url?: string }) =>
+      api<AppSettings>("/settings/plivo_tts", { method: "PUT", json: account }),
+    onSuccess: (settings) => settingsChanged(client, settings),
+  });
+}
+
+export function useRemovePlivoTtsAccount() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: () => api<AppSettings>("/settings/plivo_tts", { method: "DELETE" }),
+    onSuccess: (settings) => settingsChanged(client, settings),
+  });
+}
+
 export function useRemoveSecret() {
   const client = useQueryClient();
   return useMutation({

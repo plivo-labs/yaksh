@@ -81,6 +81,10 @@ class SarvamTts(Section):
     base_url: Address = "https://api.sarvam.ai"
 
 
+class PlivoTts(Section):
+    url: Address = "wss://api.plivo.com"
+
+
 class Azure(Section):
     region: AzureRegion = "eastus"
 
@@ -215,6 +219,8 @@ class SecretName(StrEnum):
     ELEVENLABS_API_KEY = "elevenlabs_api_key"
     CARTESIA_API_KEY = "cartesia_api_key"
     AZURE_API_KEY = "azure_api_key"
+    PLIVO_TTS_AUTH_ID = "plivo_tts_auth_id"
+    PLIVO_TTS_AUTH_TOKEN = "plivo_tts_auth_token"
     TYPESAFE_API_KEY = "typesafe_api_key"
     """Jev, TypeSafe's classifier, answers criteria and agent rules before the judges; call
     transcripts are sent to TypeSafe."""
@@ -248,6 +254,8 @@ class Secrets(Section):
     elevenlabs_api_key: SecretStr | None = None
     cartesia_api_key: SecretStr | None = None
     azure_api_key: SecretStr | None = None
+    plivo_tts_auth_id: SecretStr | None = None
+    plivo_tts_auth_token: SecretStr | None = None
     typesafe_api_key: SecretStr | None = None
     plivo_auth_id: SecretStr | None = None
     plivo_auth_token: SecretStr | None = None
@@ -311,6 +319,8 @@ KEY_URLS = {
     SecretName.ELEVENLABS_API_KEY: ("elevenlabs", "url"),
     SecretName.CARTESIA_API_KEY: ("cartesia", "url"),
     SecretName.AZURE_API_KEY: ("azure", "region"),
+    SecretName.PLIVO_TTS_AUTH_ID: ("plivo_tts", "url"),
+    SecretName.PLIVO_TTS_AUTH_TOKEN: ("plivo_tts", "url"),
 }
 """The address each key is sent to. A new address removes the key, unless the same change
 saves a key for it: the key goes only where it was checked."""
@@ -322,18 +332,15 @@ STT_KEYS = {
     SttProvider.SONIOX: SecretName.SONIOX_API_KEY,
     SttProvider.GLADIA: SecretName.GLADIA_API_KEY,
 }
-PLIVO_SECRETS = (SecretName.PLIVO_AUTH_ID, SecretName.PLIVO_AUTH_TOKEN)
-"""The Plivo account's Auth ID and Auth token work only together. A change saves both or
-removes both: a check never pairs a new half with an old one, and no half is left alone."""
 TTS_KEYS: dict[VoiceProvider, tuple[SecretName, ...]] = {
     VoiceProvider.ELEVENLABS: (SecretName.ELEVENLABS_API_KEY,),
     VoiceProvider.CARTESIA: (SecretName.CARTESIA_API_KEY,),
     VoiceProvider.SARVAM: (SecretName.SARVAM_API_KEY,),
     VoiceProvider.AZURE: (SecretName.AZURE_API_KEY,),
-    VoiceProvider.PLIVO: PLIVO_SECRETS,
+    VoiceProvider.PLIVO: (SecretName.PLIVO_TTS_AUTH_ID, SecretName.PLIVO_TTS_AUTH_TOKEN),
 }
-"""The secrets of each voice provider. Plivo speaks with the Plivo account's Auth ID and Auth
-token: its key is the two joined as `id:token`, which its service and its voice list split."""
+"""The secrets of each voice provider. Plivo's Auth ID and Auth token are saved and checked
+together, and go as one `id:token` credential, as Basic auth sends them."""
 
 
 class SettingsValues(Section):
@@ -350,6 +357,7 @@ class SettingsValues(Section):
     cartesia: Cartesia = Cartesia()
     sarvam_tts: SarvamTts = SarvamTts()
     azure: Azure = Azure()
+    plivo_tts: PlivoTts = PlivoTts()
     caller: CallerModel = CallerModel()
     turn_taking: TurnTaking = TurnTaking()
     generation: GenerationModel = GenerationModel()
