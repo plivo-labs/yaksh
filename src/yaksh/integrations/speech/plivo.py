@@ -47,7 +47,6 @@ def tts(
     return PlivoTTSService(
         auth_id=auth_id,
         auth_token=auth_token,
-        # https://host is wss://host.
         url=PLIVO_API.replace("http", "ws", 1),
         sample_rate=SAMPLE_RATE,
         settings=PlivoTTSService.Settings(

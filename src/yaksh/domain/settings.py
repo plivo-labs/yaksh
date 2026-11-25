@@ -322,12 +322,15 @@ STT_KEYS = {
     SttProvider.SONIOX: SecretName.SONIOX_API_KEY,
     SttProvider.GLADIA: SecretName.GLADIA_API_KEY,
 }
+PLIVO_SECRETS = (SecretName.PLIVO_AUTH_ID, SecretName.PLIVO_AUTH_TOKEN)
+"""The Plivo account's Auth ID and Auth token work only together. A change saves both or
+removes both: a check never pairs a new half with an old one, and no half is left alone."""
 TTS_KEYS: dict[VoiceProvider, tuple[SecretName, ...]] = {
     VoiceProvider.ELEVENLABS: (SecretName.ELEVENLABS_API_KEY,),
     VoiceProvider.CARTESIA: (SecretName.CARTESIA_API_KEY,),
     VoiceProvider.SARVAM: (SecretName.SARVAM_API_KEY,),
     VoiceProvider.AZURE: (SecretName.AZURE_API_KEY,),
-    VoiceProvider.PLIVO: (SecretName.PLIVO_AUTH_ID, SecretName.PLIVO_AUTH_TOKEN),
+    VoiceProvider.PLIVO: PLIVO_SECRETS,
 }
 """The secrets of each voice provider. Plivo speaks with the Plivo account's Auth ID and Auth
 token: its key is the two joined as `id:token`, which its service and its voice list split."""

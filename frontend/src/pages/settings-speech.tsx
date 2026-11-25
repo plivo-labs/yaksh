@@ -298,7 +298,9 @@ function TtsProviderPanel({
             />
           </SettingRow>
         )}
-        {provider.secrets.length === 1 ? (
+        {provider.value === "plivo" ? (
+          <PlivoAccountRow settings={settings} />
+        ) : (
           <KeyRow
             name={provider.secrets[0]}
             label="API key"
@@ -309,8 +311,6 @@ function TtsProviderPanel({
             removable
             removeWarning={removeWarning}
           />
-        ) : (
-          <PlivoAccountRow settings={settings} />
         )}
       </ProviderPanel>
     </div>

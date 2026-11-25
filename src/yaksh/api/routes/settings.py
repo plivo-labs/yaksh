@@ -27,6 +27,7 @@ from yaksh.api.schemas.settings import (
 from yaksh.domain.errors import UnavailableError, ValidationError
 from yaksh.domain.settings import (
     KEY_URLS,
+    PLIVO_SECRETS,
     TRIGGER_SECRET,
     TRIGGER_SECRET_NAME,
     AppSettings,
@@ -105,10 +106,7 @@ async def put_plivo_account(
 async def delete_plivo_account(
     settings: AppSettingsDep, session: SessionDep, cipher: CipherDep
 ) -> SettingsRead:
-    secrets: dict[str, str | None] = {
-        SecretName.PLIVO_AUTH_ID: None,
-        SecretName.PLIVO_AUTH_TOKEN: None,
-    }
+    secrets: dict[str, str | None] = dict.fromkeys(PLIVO_SECRETS)
     return SettingsRead.of(await checked_change(settings, session, cipher, secrets=secrets))
 
 

@@ -14,6 +14,7 @@ import yaml
 from yaksh.domain.errors import UnavailableError, ValidationError
 from yaksh.domain.settings import (
     KEY_URLS,
+    PLIVO_SECRETS,
     STT_KEYS,
     TRIGGER_SECRET,
     TTS_KEYS,
@@ -151,11 +152,6 @@ def required(secret: Any, what: str) -> str:
     if secret is None:
         raise ProviderCheckError(f"{what} is not saved")
     return secret.get_secret_value()
-
-
-PLIVO_SECRETS = (SecretName.PLIVO_AUTH_ID, SecretName.PLIVO_AUTH_TOKEN)
-"""The Plivo account's Auth ID and Auth token work only together. A change saves both or
-removes both: a check never pairs a new half with an old one, and no half is left alone."""
 
 
 @dataclass(frozen=True)
