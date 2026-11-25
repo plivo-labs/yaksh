@@ -22,6 +22,13 @@ def rest_address(url: str) -> str:
     return f"{'https' if scheme in ('wss', 'https') else 'http'}://{rest.split('/', 1)[0]}"
 
 
+def websocket_address(url: str) -> str:
+    """The websocket API at an address, wss for https or wss, as an address is often given
+    with https; with no trailing slash, as a service appends its path."""
+    scheme, rest = url.split("://", 1)
+    return f"{'wss' if scheme in ('wss', 'https') else 'ws'}://{rest.rstrip('/')}"
+
+
 async def get_json(
     provider: str, url: str, params: Mapping[str, str], headers: Mapping[str, str]
 ) -> Any:

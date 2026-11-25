@@ -19,7 +19,7 @@ from yaksh.domain.voices import (
     VoiceSettings,
 )
 from yaksh.integrations.speech.audio import SAMPLE_RATE, quiet_s
-from yaksh.integrations.speech.catalog import get_json, page_of, rest_address
+from yaksh.integrations.speech.catalog import get_json, page_of, rest_address, websocket_address
 from yaksh.integrations.speech.vendor import TtsVendor
 
 LANGUAGES = VoiceProvider.PLIVO.traits.languages
@@ -46,7 +46,7 @@ def tts(
     return PlivoTTSService(
         auth_id=auth_id,
         auth_token=auth_token,
-        url=settings.plivo_tts.url,
+        url=websocket_address(settings.plivo_tts.url),
         sample_rate=SAMPLE_RATE,
         settings=PlivoTTSService.Settings(
             model=voice.model_in_use.id, voice=voice.id, language=spoken, speed=voice.speed

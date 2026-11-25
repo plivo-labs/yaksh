@@ -10,7 +10,7 @@ from yaksh.domain.languages import Language
 from yaksh.domain.settings import AppSettings, Azure, Cartesia, PlivoTts
 from yaksh.domain.voices import CatalogQuery, VoiceGender
 from yaksh.integrations.speech import azure, cartesia, plivo, sarvam
-from yaksh.integrations.speech.catalog import rest_address
+from yaksh.integrations.speech.catalog import rest_address, websocket_address
 
 AZURE_VOICES = [
     {
@@ -168,3 +168,15 @@ def test_a_voice_list_goes_to_the_host_of_the_address_and_keeps_its_tls(
     url: str, rest: str
 ) -> None:
     assert rest_address(url) == rest
+
+
+@pytest.mark.parametrize(
+    ("url", "socket"),
+    [
+        ("https://api.plivo.com/", "wss://api.plivo.com"),
+        ("wss://tts.example:8443/proxy", "wss://tts.example:8443/proxy"),
+        ("http://127.0.0.1:8080/", "ws://127.0.0.1:8080"),
+    ],
+)
+def test_a_speech_socket_opens_at_the_websocket_of_the_address(url: str, socket: str) -> None:
+    assert websocket_address(url) == socket

@@ -7,6 +7,7 @@ import pytest
 from pipecat.frames.frames import (
     CancelFrame,
     Frame,
+    LLMFullResponseEndFrame,
     LLMFullResponseStartFrame,
     LLMTextFrame,
     StartFrame,
@@ -28,7 +29,7 @@ from websockets.asyncio.server import ServerConnection, serve
 
 from yaksh.domain.errors import UnavailableError
 from yaksh.domain.languages import AgentLanguage, Language
-from yaksh.domain.settings import AppSettings, ElevenLabs, SarvamStt
+from yaksh.domain.settings import AppSettings, ElevenLabs, PlivoTts, SarvamStt
 from yaksh.domain.speech import SttProvider
 from yaksh.domain.voices import VoiceProvider, VoiceSettings
 from yaksh.integrations import provider_checks
@@ -168,6 +169,31 @@ def test_plivo_speaks_with_the_voice_model_and_sends_english_with_no_language() 
     )
     assert service._url == "wss://api.plivo.com/v1/Account/MAID/TTS/Realtime"
     assert service._headers["Authorization"] == "Basic TUFJRDp0b2tlbg=="
+
+
+@pytest.mark.parametrize("form", ["http://{host}/", "ws://{host}"])
+async def test_plivo_speaks_at_the_websocket_of_its_address(form: str) -> None:
+    opened: list[str] = []
+    asked = asyncio.Event()
+
+    async def handle(socket: ServerConnection) -> None:
+        assert socket.request is not None  # set once the handshake is done
+        opened.append(socket.request.path)
+        async for _ in socket:
+            asked.set()
+
+    async with serve(handle, "127.0.0.1", 0) as server:
+        host = f"127.0.0.1:{server.sockets[0].getsockname()[1]}"
+        settings = AppSettings(plivo_tts=PlivoTts(url=form.format(host=host)))
+        voice = VoiceSettings(provider=VoiceProvider.PLIVO, id="v1")
+        service = tts_service(settings, voice, Language.HI, "MAID:token")
+        reply = [LLMFullResponseStartFrame(), LLMTextFrame("Haan ji. "), LLMFullResponseEndFrame()]
+        async with audio.one_shot([service], PipelineParams(), asyncio.Event()) as run:
+            await run.worker.queue_frames(reply)
+            async with asyncio.timeout(5):
+                await asked.wait()
+
+    assert opened == ["/v1/Account/MAID/TTS/Realtime"]
 
 
 async def test_speech_at_another_rate_reaches_the_call_at_8_khz() -> None:
