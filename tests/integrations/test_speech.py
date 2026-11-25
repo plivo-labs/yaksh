@@ -20,6 +20,7 @@ from pipecat.pipeline.worker import PipelineParams
 from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
 from pipecat.services.elevenlabs.tts import ElevenLabsTTSService
 from pipecat.services.gladia.config import LanguageConfig
+from pipecat.services.plivo.tts import PlivoTTSService
 from pipecat.services.tts_service import TTSService, WebsocketTTSService
 from pipecat.tests.utils import run_test
 from pipecat.transcriptions.language import Language as PipecatLanguage
@@ -151,6 +152,22 @@ def test_elevenlabs_speaks_with_the_voice_model_and_sends_a_language_only_where_
     sent = dict(parse_qsl(urlsplit(service._build_websocket_url()).query))
     assert (settings.voice, settings.speed, settings.stability) == ("v1", 0.8, 0.3)
     assert (sent["model_id"], sent.get("language_code")) == (model, code)
+
+
+def test_plivo_speaks_with_the_plivo_account_and_sends_english_with_no_language() -> None:
+    voice = VoiceSettings(provider=VoiceProvider.PLIVO, id="v1", speed=0.9)
+
+    service = cast(PlivoTTSService, tts_service(AppSettings(), voice, Language.EN, "MAID:token"))
+
+    settings = service._settings
+    assert (settings.model, settings.voice, settings.speed, settings.language) == (
+        "koyal-v1",
+        "v1",
+        0.9,
+        None,
+    )
+    assert service._url == "wss://api.plivo.com/v1/Account/MAID/TTS/Realtime"
+    assert service._headers["Authorization"] == "Basic TUFJRDp0b2tlbg=="
 
 
 async def test_speech_at_another_rate_reaches_the_call_at_8_khz() -> None:
@@ -321,9 +338,13 @@ def test_a_caller_of_several_languages_gets_a_setting_that_hears_each_answer(
 
 def test_a_voice_reads_the_language_from_the_text_for_a_caller_that_can_switch() -> None:
     flash = VoiceSettings(provider=VoiceProvider.ELEVENLABS, id="v1", model="eleven_flash_v2_5")
+    plivo = VoiceSettings(provider=VoiceProvider.PLIVO, id="v2")
     app, also = AppSettings(), (Language.EN,)
 
     eleven = cast(ElevenLabsTTSService, tts_service(app, flash, Language.HI, "k", also=also))
     sent = dict(parse_qsl(urlsplit(eleven._build_websocket_url()).query))
+    switching = cast(PlivoTTSService, tts_service(app, plivo, Language.HI, "k", also=also))
+    one = cast(PlivoTTSService, tts_service(app, plivo, Language.HI, "k"))
 
     assert "language_code" not in sent
+    assert (switching._settings.language, one._settings.language) == (None, "hi")

@@ -1,5 +1,5 @@
-"""Koyal, Plivo's text to speech: Pipecat's Plivo service over its Realtime API, and the
-account's voices."""
+"""Plivo's text to speech over its Realtime API, with word timestamps, and the account's voice
+list."""
 
 from collections.abc import Sequence
 from typing import Any
@@ -24,10 +24,10 @@ from yaksh.integrations.speech.catalog import get_json, page_of
 from yaksh.integrations.speech.vendor import TtsVendor
 
 LANGUAGES = VoiceProvider.PLIVO.traits.languages
-"""The languages Koyal speaks; it speaks no other of Yaksh's."""
+"""The languages Plivo speaks; it speaks no other of Yaksh's."""
 NAMED = LANGUAGES - {Language.EN}
-"""The languages sent by name. Koyal takes English only with its region, which Yaksh's English
-does not have, so English goes with no language: Koyal reads it in the voice's own region."""
+"""The languages sent by name. Plivo takes English only with its region, which Yaksh's English
+does not have, so English goes with no language: Plivo reads it in the voice's own region."""
 
 
 def tts(
@@ -41,13 +41,12 @@ def tts(
 ) -> PlivoTTSService:
     """A one-shot service does not reconnect: a dropped socket fails the speech instead of
     ending it short as finished. A caller that can switch languages sends no language, so
-    Koyal finds the language of each sentence."""
+    Plivo finds the language of each sentence."""
     auth_id, _, auth_token = key.partition(":")
     spoken = PipecatLanguage(language.value) if language in NAMED and not also else None
     return PlivoTTSService(
         auth_id=auth_id,
         auth_token=auth_token,
-        url=PLIVO_API.replace("http", "ws", 1),
         sample_rate=SAMPLE_RATE,
         settings=PlivoTTSService.Settings(
             model=voice.model_in_use.id, voice=voice.id, language=spoken, speed=voice.speed

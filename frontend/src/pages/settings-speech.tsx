@@ -299,7 +299,7 @@ function TtsProviderPanel({
           </SettingRow>
         )}
         {provider.value === "plivo" ? (
-          <PlivoAccountRow settings={settings} />
+          <PlivoAccountRow settings={settings} help="The Plivo account of Settings > Phone." />
         ) : (
           <KeyRow
             name={provider.secrets[0]}

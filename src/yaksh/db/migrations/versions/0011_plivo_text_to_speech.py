@@ -1,4 +1,4 @@
-"""Plivo's text to speech, Koyal, under Plivo's name
+"""nimble voices become plivo voices
 
 Revision ID: 0011
 Revises: 0010
@@ -25,9 +25,9 @@ VOICE_COPIES = (("persona_versions", "config"), ("conversations", "caller_settin
 
 
 def upgrade() -> None:
-    """The voices get Koyal's model and the provider gets Plivo's name. Its own address, Auth ID
-    and Auth token are deleted: Koyal speaks at Plivo's API with the Plivo account's Auth ID and
-    Auth token."""
+    """The voices get the model `koyal-v1` and the provider gets Plivo's name. Its own address,
+    Auth ID and Auth token are deleted: a Plivo voice speaks at Plivo's API with the Plivo
+    account's Auth ID and Auth token."""
     set_model("nimble", MODEL)
     rename("nimble", "plivo")
     op.execute(

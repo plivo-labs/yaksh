@@ -227,7 +227,7 @@ async def _check_speech_key(candidate: AppSettings, name: str, key: str) -> None
 
 
 async def _check_plivo_account(changed: Mapping[str, str | None]) -> None:
-    """The account lists its numbers at Plivo's API, where Koyal speaks with it too."""
+    """The account lists its numbers at Plivo's API, where its Plivo voices speak too."""
     auth_id, auth_token = (changed.get(name) for name in PLIVO_SECRETS)
     if auth_id is None and auth_token is None and all(name in changed for name in PLIVO_SECRETS):
         return

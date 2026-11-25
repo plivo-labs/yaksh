@@ -274,8 +274,8 @@ function RemoveButton({
 }
 
 /** The Plivo account: its Auth ID and Auth token change together, so a check never pairs the
- * new half with the old account's other half. Koyal speaks with them too. */
-export function PlivoAccountRow({ settings }: { settings: AppSettings }) {
+ * new half with the old account's other half. Plivo voices speak with them too. */
+export function PlivoAccountRow({ settings, help }: { settings: AppSettings; help?: string }) {
   const [editing, setEditing] = useState(false);
   const [authId, setAuthId] = useState("");
   const [token, setToken] = useState("");
@@ -289,7 +289,11 @@ export function PlivoAccountRow({ settings }: { settings: AppSettings }) {
     save.reset();
   };
   return (
-    <SettingRow label="Auth ID and Auth token" htmlFor={editing ? "plivo-auth-id" : undefined}>
+    <SettingRow
+      label="Auth ID and Auth token"
+      htmlFor={editing ? "plivo-auth-id" : undefined}
+      help={help}
+    >
       {editing ? (
         <form
           className={`grid gap-2 ${REVEAL}`}

@@ -5853,7 +5853,7 @@ type ClientInterface interface {
 	// PutPlivoAccountApiV1SettingsPlivoPutWithBody Put Plivo Account
 	//
 	// Save the Auth ID and Auth token of a Plivo account together, after Plivo accepts them;
-	// this is how to move to another account. Koyal speaks with them too.
+	// this is how to move to another account. Plivo voices speak with them too.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -5863,7 +5863,7 @@ type ClientInterface interface {
 	// PutPlivoAccountApiV1SettingsPlivoPut Put Plivo Account
 	//
 	// Save the Auth ID and Auth token of a Plivo account together, after Plivo accepts them;
-	// this is how to move to another account. Koyal speaks with them too.
+	// this is how to move to another account. Plivo voices speak with them too.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -8314,7 +8314,7 @@ func (c *Client) DeletePlivoAccountApiV1SettingsPlivoDelete(ctx context.Context,
 // PutPlivoAccountApiV1SettingsPlivoPutWithBody Put Plivo Account
 //
 // Save the Auth ID and Auth token of a Plivo account together, after Plivo accepts them;
-// this is how to move to another account. Koyal speaks with them too.
+// this is how to move to another account. Plivo voices speak with them too.
 //
 // Takes any type of body and a specified content type.
 //
@@ -8334,7 +8334,7 @@ func (c *Client) PutPlivoAccountApiV1SettingsPlivoPutWithBody(ctx context.Contex
 // PutPlivoAccountApiV1SettingsPlivoPut Put Plivo Account
 //
 // Save the Auth ID and Auth token of a Plivo account together, after Plivo accepts them;
-// this is how to move to another account. Koyal speaks with them too.
+// this is how to move to another account. Plivo voices speak with them too.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -15345,7 +15345,7 @@ type ClientWithResponsesInterface interface {
 	// PutPlivoAccountApiV1SettingsPlivoPutWithBodyWithResponse Put Plivo Account
 	//
 	// Save the Auth ID and Auth token of a Plivo account together, after Plivo accepts them;
-	// this is how to move to another account. Koyal speaks with them too.
+	// this is how to move to another account. Plivo voices speak with them too.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -15355,7 +15355,7 @@ type ClientWithResponsesInterface interface {
 	// PutPlivoAccountApiV1SettingsPlivoPutWithResponse Put Plivo Account
 	//
 	// Save the Auth ID and Auth token of a Plivo account together, after Plivo accepts them;
-	// this is how to move to another account. Koyal speaks with them too.
+	// this is how to move to another account. Plivo voices speak with them too.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -23376,7 +23376,7 @@ func (c *ClientWithResponses) DeletePlivoAccountApiV1SettingsPlivoDeleteWithResp
 // PutPlivoAccountApiV1SettingsPlivoPutWithBodyWithResponse Put Plivo Account
 //
 // Save the Auth ID and Auth token of a Plivo account together, after Plivo accepts them;
-// this is how to move to another account. Koyal speaks with them too.
+// this is how to move to another account. Plivo voices speak with them too.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -23392,7 +23392,7 @@ func (c *ClientWithResponses) PutPlivoAccountApiV1SettingsPlivoPutWithBodyWithRe
 // PutPlivoAccountApiV1SettingsPlivoPutWithResponse Put Plivo Account
 //
 // Save the Auth ID and Auth token of a Plivo account together, after Plivo accepts them;
-// this is how to move to another account. Koyal speaks with them too.
+// this is how to move to another account. Plivo voices speak with them too.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //

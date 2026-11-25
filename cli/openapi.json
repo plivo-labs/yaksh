@@ -4960,7 +4960,7 @@
           "settings"
         ],
         "summary": "Put Plivo Account",
-        "description": "Save the Auth ID and Auth token of a Plivo account together, after Plivo accepts them;\nthis is how to move to another account. Koyal speaks with them too.",
+        "description": "Save the Auth ID and Auth token of a Plivo account together, after Plivo accepts them;\nthis is how to move to another account. Plivo voices speak with them too.",
         "operationId": "put_plivo_account_api_v1_settings_plivo_put",
         "requestBody": {
           "content": {

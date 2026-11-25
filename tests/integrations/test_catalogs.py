@@ -9,7 +9,7 @@ from yaksh.caller.plivo_server import PlivoServer
 from yaksh.domain.languages import Language
 from yaksh.domain.settings import AppSettings, Azure, Cartesia
 from yaksh.domain.voices import CatalogQuery, VoiceGender
-from yaksh.integrations.speech import azure, cartesia, sarvam
+from yaksh.integrations.speech import azure, cartesia, plivo, sarvam
 
 AZURE_VOICES = [
     {
@@ -28,11 +28,25 @@ AZURE_VOICES = [
         "SecondaryLocaleList": ["es-ES"],
     },
 ]
+PLIVO_VOICES = [
+    {
+        "voice_id": voice_id,
+        "name": name,
+        "gender": gender,
+        "languages": languages,
+        "accent_type": "Indian",
+    }
+    for voice_id, name, gender, languages in (
+        ("p1", "Karan", "male", ["en-IN", "en-US"]),
+        ("p2", "Meera", "female", ["hi"]),
+        ("p3", "Kavya", None, ["ta"]),
+    )
+]
 
 
 @pytest.fixture
 async def provider_api() -> AsyncIterator[tuple[str, list[dict[str, Any]]]]:
-    """A stand-in for Cartesia's and Azure's voice lists that records requests."""
+    """A stand-in for Cartesia's, Azure's and Plivo's voice lists that records requests."""
     seen: list[dict[str, Any]] = []
     app = FastAPI()
 
@@ -57,6 +71,11 @@ async def provider_api() -> AsyncIterator[tuple[str, list[dict[str, Any]]]]:
     async def azure_voices(request: Request) -> Response:
         seen.append({"azure": request.headers.get("ocp-apim-subscription-key")})
         return JSONResponse(AZURE_VOICES)
+
+    @app.get("/v1/Account/{auth_id}/TTS/Voices")
+    async def plivo_voices(auth_id: str, request: Request) -> Response:
+        seen.append({"plivo": (auth_id, request.headers.get("authorization"))})
+        return JSONResponse({"objects": PLIVO_VOICES})
 
     server = PlivoServer(app, port=0)
     await server.start()
@@ -117,3 +136,20 @@ async def test_sarvam_lists_the_speakers_of_the_model_that_speak_the_language() 
     assert len(v3.items) == 30 and v3.next_cursor == "30"
     assert not {voice.id for voice in flash.items} & {voice.id for voice in v3.items}
     assert not any("_pa_" in voice.id for voice in sarvam.speaker_lists()["bulbul:v4-flash"])
+
+
+async def test_plivo_lists_the_account_voices_and_any_english_region_as_english(
+    provider_api: tuple[str, list[dict[str, Any]]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A voice without a gender is listed without one."""
+    base_url, seen = provider_api
+    monkeypatch.setattr(plivo, "PLIVO_API", base_url)
+
+    page = await plivo.catalog(AppSettings(), "MAID:token", CatalogQuery())
+
+    assert [(v.id, v.gender, v.accent, v.listed_languages) for v in page.items] == [
+        ("p1", VoiceGender.MALE, "Indian", (Language.EN,)),
+        ("p2", VoiceGender.FEMALE, "Indian", (Language.HI,)),
+        ("p3", None, "Indian", (Language.TA,)),
+    ]
+    assert seen == [{"plivo": ("MAID", "Basic TUFJRDp0b2tlbg==")}]

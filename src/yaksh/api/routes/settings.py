@@ -94,7 +94,7 @@ async def put_plivo_account(
     account: PlivoAccount, settings: AppSettingsDep, session: SessionDep, cipher: CipherDep
 ) -> SettingsRead:
     """Save the Auth ID and Auth token of a Plivo account together, after Plivo accepts them;
-    this is how to move to another account. Koyal speaks with them too."""
+    this is how to move to another account. Plivo voices speak with them too."""
     secrets: dict[str, str | None] = {
         SecretName.PLIVO_AUTH_ID: account.auth_id,
         SecretName.PLIVO_AUTH_TOKEN: account.auth_token,

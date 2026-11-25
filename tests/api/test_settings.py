@@ -613,11 +613,12 @@ async def test_a_phone_run_cannot_start_when_the_persona_voice_model_left_the_li
     )
 
 
-async def test_koyal_speaks_with_the_plivo_account_that_plivo_checked(
+async def test_plivo_voices_speak_with_the_plivo_account_that_plivo_checked(
     client: AsyncClient, monkeypatch: pytest.MonkeyPatch, checks: list[Any]
 ) -> None:
-    """Koyal is at Plivo's API, so the account's own check covers it: saving the account
-    speaks no word, and the Test button speaks one with the account's Auth ID and Auth token."""
+    """Plivo's text to speech is at Plivo's API, so the account's own check covers it: saving
+    the account speaks no word, and the Test button speaks one with the account's Auth ID and
+    Auth token."""
     spoken: list[tuple[VoiceProvider, str]] = []
 
     async def check_tts(_settings: Any, provider: VoiceProvider, credential: str) -> None:
