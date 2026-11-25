@@ -613,36 +613,63 @@ async def test_a_phone_run_cannot_start_when_the_persona_voice_model_left_the_li
     )
 
 
-async def test_nimble_credentials_are_saved_together_and_checked_at_their_gateway(
+async def test_plivo_tts_credentials_are_saved_together_and_checked_at_their_address(
     client: AsyncClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     checked: list[tuple[str, str]] = []
 
     async def check_tts(settings: Any, provider: VoiceProvider, credential: str) -> None:
-        checked.append((settings.nimble.base_url, credential))
+        checked.append((settings.plivo_tts.url, credential))
 
     monkeypatch.setattr(service, "check_tts", check_tts)
     half = await client.put(
-        "/api/v1/settings/secrets/nimble_auth_id", json={"value": "MANIMBLE01234"}
+        "/api/v1/settings/secrets/plivo_tts_auth_id", json={"value": "TTSID0123"}
     )
     both = await client.put(
-        "/api/v1/settings/nimble",
+        "/api/v1/settings/plivo_tts",
         json={
-            "auth_id": "MANIMBLE01234",
-            "auth_token": "nimble-token-0123",
-            "base_url": "https://gateway.example",
+            "auth_id": "TTSID0123",
+            "auth_token": "tts-token-0123",
+            "url": "wss://tts.example",
         },
     )
 
     assert half.status_code == 422 and "together" in half.text
     assert both.status_code == 200, both.text
-    assert checked == [("https://gateway.example", "MANIMBLE01234:nimble-token-0123")]
+    assert checked == [("wss://tts.example", "TTSID0123:tts-token-0123")]
     saved = both.json()
-    assert saved["values"]["nimble"]["base_url"] == "https://gateway.example"
-    assert {"nimble_auth_id", "nimble_auth_token"} <= set(saved["secrets"])
+    assert saved["values"]["plivo_tts"]["url"] == "wss://tts.example"
+    assert {"plivo_tts_auth_id", "plivo_tts_auth_token"} <= set(saved["secrets"])
 
 
-@pytest.mark.parametrize(("account", "label"), [("plivo", "Plivo"), ("nimble", "Nimble")])
+async def test_the_phone_account_and_plivos_text_to_speech_are_saved_and_removed_apart(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch, checks: list[Any]
+) -> None:
+    async def check_tts(*_args: Any) -> None:
+        return None
+
+    monkeypatch.setattr(service, "check_tts", check_tts)
+    phone = {"auth_id": "PHONEID01", "auth_token": "phone-token-01"}
+    tts = {"auth_id": "TTSID01", "auth_token": "tts-token-01"}
+    saved = [
+        (await client.put("/api/v1/settings/plivo", json=phone)).status_code,
+        (await client.put("/api/v1/settings/plivo_tts", json=tts)).status_code,
+    ]
+
+    without_tts = (await client.delete("/api/v1/settings/plivo_tts")).json()["secrets"]
+    saved.append((await client.put("/api/v1/settings/plivo_tts", json=tts)).status_code)
+    without_phone = (await client.delete("/api/v1/settings/plivo")).json()["secrets"]
+
+    phone_pair = {"plivo_auth_id", "plivo_auth_token"}
+    tts_pair = {"plivo_tts_auth_id", "plivo_tts_auth_token"}
+    assert saved == [200, 200, 200]
+    assert phone_pair <= set(without_tts) and not tts_pair & set(without_tts)
+    assert tts_pair <= set(without_phone) and not phone_pair & set(without_phone)
+
+
+@pytest.mark.parametrize(
+    ("account", "label"), [("plivo", "Plivo"), ("plivo_tts", "Plivo text to speech")]
+)
 async def test_half_of_an_account_is_never_removed_or_replaced_alone(
     client: AsyncClient,
     monkeypatch: pytest.MonkeyPatch,

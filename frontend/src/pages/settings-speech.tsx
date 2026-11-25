@@ -15,8 +15,8 @@ import {
 import {
   useAgents,
   usePersonas,
-  useRemoveNimbleAccount,
-  useSaveNimbleAccount,
+  useRemovePlivoTtsAccount,
+  useSavePlivoTtsAccount,
   useVoiceProviders,
   useVoices,
 } from "@/lib/queries";
@@ -316,38 +316,38 @@ function TtsProviderPanel({
             removeWarning={removeWarning}
           />
         ) : (
-          <NimbleAccountRow settings={settings} baseUrl={address} removeWarning={removeWarning} />
+          <PlivoTtsAccountRow settings={settings} url={address} removeWarning={removeWarning} />
         )}
       </ProviderPanel>
     </div>
   );
 }
 
-/** Nimble's Auth ID and Auth token: checked at the base URL the form shows, and saved with it. */
-function NimbleAccountRow({
+/** Plivo's Auth ID and Auth token: checked at the address the form shows, and saved with it. */
+function PlivoTtsAccountRow({
   settings,
-  baseUrl,
+  url,
   removeWarning,
 }: {
   settings: AppSettings;
-  baseUrl: string;
+  url: string;
   removeWarning?: { title: string; description: string };
 }) {
-  const save = useSaveNimbleAccount();
-  const remove = useRemoveNimbleAccount();
-  const id = settings.secrets.nimble_auth_id;
-  const token = settings.secrets.nimble_auth_token;
+  const save = useSavePlivoTtsAccount();
+  const remove = useRemovePlivoTtsAccount();
+  const id = settings.secrets.plivo_tts_auth_id;
+  const token = settings.secrets.plivo_tts_auth_token;
   const shown = id && token ? `••••${id.hint ?? ""} / ••••${token.hint ?? ""}` : null;
   return (
     <CredentialPairRow
       label="Auth ID and token"
-      inputId="nimble-auth-id"
+      inputId="plivo-tts-auth-id"
       shown={shown}
       change="Replace"
       add="Add"
       pending={save.isPending}
       error={save.isError ? save.error.message : undefined}
-      onSave={(pair, done) => save.mutate({ ...pair, base_url: baseUrl }, { onSuccess: done })}
+      onSave={(pair, done) => save.mutate({ ...pair, url }, { onSuccess: done })}
       onReset={save.reset}
     >
       <RemoveButton

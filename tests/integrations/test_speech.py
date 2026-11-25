@@ -7,6 +7,7 @@ import pytest
 from pipecat.frames.frames import (
     CancelFrame,
     Frame,
+    LLMFullResponseEndFrame,
     LLMFullResponseStartFrame,
     LLMTextFrame,
     StartFrame,
@@ -20,6 +21,7 @@ from pipecat.pipeline.worker import PipelineParams
 from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
 from pipecat.services.elevenlabs.tts import ElevenLabsTTSService
 from pipecat.services.gladia.config import LanguageConfig
+from pipecat.services.plivo.tts import PlivoTTSService
 from pipecat.services.tts_service import TTSService, WebsocketTTSService
 from pipecat.tests.utils import run_test
 from pipecat.transcriptions.language import Language as PipecatLanguage
@@ -27,7 +29,7 @@ from websockets.asyncio.server import ServerConnection, serve
 
 from yaksh.domain.errors import UnavailableError
 from yaksh.domain.languages import AgentLanguage, Language
-from yaksh.domain.settings import AppSettings, ElevenLabs, SarvamStt
+from yaksh.domain.settings import AppSettings, ElevenLabs, PlivoTts, SarvamStt
 from yaksh.domain.speech import SttProvider
 from yaksh.domain.voices import VoiceProvider, VoiceSettings
 from yaksh.integrations import provider_checks
@@ -36,7 +38,6 @@ from yaksh.integrations.speech import audio
 from yaksh.integrations.speech.audio import Resample8k, speak_once
 from yaksh.integrations.speech.deepgram import deepgram_language
 from yaksh.integrations.speech.elevenlabs import SentenceDialogue
-from yaksh.integrations.speech.nimble import NimbleTTSService
 from yaksh.integrations.speech.stt import stt_service
 from yaksh.integrations.speech.tts import VENDORS as TTS_VENDORS
 from yaksh.integrations.speech.tts import tts_service
@@ -154,6 +155,47 @@ def test_elevenlabs_speaks_with_the_voice_model_and_sends_a_language_only_where_
     assert (sent["model_id"], sent.get("language_code")) == (model, code)
 
 
+def test_plivo_speaks_with_the_voice_model_and_sends_english_with_no_language() -> None:
+    voice = VoiceSettings(provider=VoiceProvider.PLIVO, id="v1", speed=0.9)
+
+    service = cast(PlivoTTSService, tts_service(AppSettings(), voice, Language.EN, "MAID:token"))
+
+    settings = service._settings
+    assert (settings.model, settings.voice, settings.speed, settings.language) == (
+        "koyal-v1",
+        "v1",
+        0.9,
+        None,
+    )
+    assert service._url == "wss://api.plivo.com/v1/Account/MAID/TTS/Realtime"
+    assert service._headers["Authorization"] == "Basic TUFJRDp0b2tlbg=="
+
+
+@pytest.mark.parametrize("form", ["http://{host}/", "ws://{host}"])
+async def test_plivo_speaks_at_the_websocket_of_its_address(form: str) -> None:
+    opened: list[str] = []
+    asked = asyncio.Event()
+
+    async def handle(socket: ServerConnection) -> None:
+        assert socket.request is not None  # set once the handshake is done
+        opened.append(socket.request.path)
+        async for _ in socket:
+            asked.set()
+
+    async with serve(handle, "127.0.0.1", 0) as server:
+        host = f"127.0.0.1:{server.sockets[0].getsockname()[1]}"
+        settings = AppSettings(plivo_tts=PlivoTts(url=form.format(host=host)))
+        voice = VoiceSettings(provider=VoiceProvider.PLIVO, id="v1")
+        service = tts_service(settings, voice, Language.HI, "MAID:token")
+        reply = [LLMFullResponseStartFrame(), LLMTextFrame("Haan ji. "), LLMFullResponseEndFrame()]
+        async with audio.one_shot([service], PipelineParams(), asyncio.Event()) as run:
+            await run.worker.queue_frames(reply)
+            async with asyncio.timeout(5):
+                await asked.wait()
+
+    assert opened == ["/v1/Account/MAID/TTS/Realtime"]
+
+
 async def test_speech_at_another_rate_reaches_the_call_at_8_khz() -> None:
     second_at_24k = TTSAudioRawFrame(bytes(24_000 * 2), 24_000, 1)
 
@@ -238,7 +280,9 @@ async def test_a_one_shot_pipeline_left_before_it_starts_still_ends() -> None:
                 raise RuntimeError("left at once")
 
 
-@pytest.mark.parametrize("provider", [VoiceProvider.ELEVENLABS, VoiceProvider.CARTESIA])
+@pytest.mark.parametrize(
+    "provider", [VoiceProvider.ELEVENLABS, VoiceProvider.CARTESIA, VoiceProvider.PLIVO]
+)
 def test_one_shot_speech_does_not_reconnect_a_dropped_socket(provider: VoiceProvider) -> None:
     voice = VoiceSettings(provider=provider, id="v1")
 
@@ -320,13 +364,13 @@ def test_a_caller_of_several_languages_gets_a_setting_that_hears_each_answer(
 
 def test_a_voice_reads_the_language_from_the_text_for_a_caller_that_can_switch() -> None:
     flash = VoiceSettings(provider=VoiceProvider.ELEVENLABS, id="v1", model="eleven_flash_v2_5")
-    nimble = VoiceSettings(provider=VoiceProvider.NIMBLE, id="v2")
+    plivo = VoiceSettings(provider=VoiceProvider.PLIVO, id="v2")
     app, also = AppSettings(), (Language.EN,)
 
     eleven = cast(ElevenLabsTTSService, tts_service(app, flash, Language.HI, "k", also=also))
     sent = dict(parse_qsl(urlsplit(eleven._build_websocket_url()).query))
-    switching = cast(NimbleTTSService, tts_service(app, nimble, Language.HI, "k", also=also))
-    one = cast(NimbleTTSService, tts_service(app, nimble, Language.HI, "k"))
+    switching = cast(PlivoTTSService, tts_service(app, plivo, Language.HI, "k", also=also))
+    one = cast(PlivoTTSService, tts_service(app, plivo, Language.HI, "k"))
 
     assert "language_code" not in sent
-    assert (switching._options["language"], one._options["language"]) == ("auto", "hi")
+    assert (switching._settings.language, one._settings.language) == (None, "hi")

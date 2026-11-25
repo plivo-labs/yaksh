@@ -16,10 +16,17 @@ TIMEOUT = aiohttp.ClientTimeout(total=15)
 
 
 def rest_address(url: str) -> str:
-    """The REST API at the host of a websocket address, https for wss: a key goes only to the
-    host it was checked at."""
+    """The REST API at the host of an address, https for wss or https: a key goes only to the
+    host it was checked at, and never over plain HTTP from a TLS address."""
     scheme, rest = url.split("://", 1)
-    return f"{'https' if scheme == 'wss' else 'http'}://{rest.split('/', 1)[0]}"
+    return f"{'https' if scheme in ('wss', 'https') else 'http'}://{rest.split('/', 1)[0]}"
+
+
+def websocket_address(url: str) -> str:
+    """The websocket API at an address, wss for https or wss, as an address is often given
+    with https; with no trailing slash, as a service appends its path."""
+    scheme, rest = url.split("://", 1)
+    return f"{'wss' if scheme in ('wss', 'https') else 'ws'}://{rest.rstrip('/')}"
 
 
 async def get_json(

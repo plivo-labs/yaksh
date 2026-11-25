@@ -7,7 +7,7 @@ from pipecat.services.tts_service import TTSService
 from yaksh.domain.languages import Language
 from yaksh.domain.settings import AppSettings
 from yaksh.domain.voices import VoiceProvider, VoiceSettings
-from yaksh.integrations.speech import azure, cartesia, elevenlabs, nimble, sarvam
+from yaksh.integrations.speech import azure, cartesia, elevenlabs, plivo, sarvam
 from yaksh.integrations.speech.vendor import TtsVendor
 
 VENDORS: dict[VoiceProvider, TtsVendor] = {
@@ -15,7 +15,7 @@ VENDORS: dict[VoiceProvider, TtsVendor] = {
     VoiceProvider.CARTESIA: cartesia.TTS,
     VoiceProvider.SARVAM: sarvam.TTS,
     VoiceProvider.AZURE: azure.TTS,
-    VoiceProvider.NIMBLE: nimble.TTS,
+    VoiceProvider.PLIVO: plivo.TTS,
 }
 
 

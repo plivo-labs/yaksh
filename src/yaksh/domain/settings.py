@@ -81,9 +81,8 @@ class SarvamTts(Section):
     base_url: Address = "https://api.sarvam.ai"
 
 
-class Nimble(Section):
-    base_url: Address = "https://in.tts.plivo.com"
-    """The gateway of the region the speech should stay in."""
+class PlivoTts(Section):
+    url: Address = "wss://api.plivo.com"
 
 
 class Azure(Section):
@@ -220,8 +219,8 @@ class SecretName(StrEnum):
     ELEVENLABS_API_KEY = "elevenlabs_api_key"
     CARTESIA_API_KEY = "cartesia_api_key"
     AZURE_API_KEY = "azure_api_key"
-    NIMBLE_AUTH_ID = "nimble_auth_id"
-    NIMBLE_AUTH_TOKEN = "nimble_auth_token"
+    PLIVO_TTS_AUTH_ID = "plivo_tts_auth_id"
+    PLIVO_TTS_AUTH_TOKEN = "plivo_tts_auth_token"
     TYPESAFE_API_KEY = "typesafe_api_key"
     """Jev, TypeSafe's classifier, answers criteria and agent rules before the judges; call
     transcripts are sent to TypeSafe."""
@@ -255,8 +254,8 @@ class Secrets(Section):
     elevenlabs_api_key: SecretStr | None = None
     cartesia_api_key: SecretStr | None = None
     azure_api_key: SecretStr | None = None
-    nimble_auth_id: SecretStr | None = None
-    nimble_auth_token: SecretStr | None = None
+    plivo_tts_auth_id: SecretStr | None = None
+    plivo_tts_auth_token: SecretStr | None = None
     typesafe_api_key: SecretStr | None = None
     plivo_auth_id: SecretStr | None = None
     plivo_auth_token: SecretStr | None = None
@@ -320,8 +319,8 @@ KEY_URLS = {
     SecretName.ELEVENLABS_API_KEY: ("elevenlabs", "url"),
     SecretName.CARTESIA_API_KEY: ("cartesia", "url"),
     SecretName.AZURE_API_KEY: ("azure", "region"),
-    SecretName.NIMBLE_AUTH_ID: ("nimble", "base_url"),
-    SecretName.NIMBLE_AUTH_TOKEN: ("nimble", "base_url"),
+    SecretName.PLIVO_TTS_AUTH_ID: ("plivo_tts", "url"),
+    SecretName.PLIVO_TTS_AUTH_TOKEN: ("plivo_tts", "url"),
 }
 """The address each key is sent to. A new address removes the key, unless the same change
 saves a key for it: the key goes only where it was checked."""
@@ -338,9 +337,9 @@ TTS_KEYS: dict[VoiceProvider, tuple[SecretName, ...]] = {
     VoiceProvider.CARTESIA: (SecretName.CARTESIA_API_KEY,),
     VoiceProvider.SARVAM: (SecretName.SARVAM_API_KEY,),
     VoiceProvider.AZURE: (SecretName.AZURE_API_KEY,),
-    VoiceProvider.NIMBLE: (SecretName.NIMBLE_AUTH_ID, SecretName.NIMBLE_AUTH_TOKEN),
+    VoiceProvider.PLIVO: (SecretName.PLIVO_TTS_AUTH_ID, SecretName.PLIVO_TTS_AUTH_TOKEN),
 }
-"""The secrets of each voice provider. Nimble's Auth ID and Auth token are saved and checked
+"""The secrets of each voice provider. Plivo's Auth ID and Auth token are saved and checked
 together, and go as one `id:token` credential, as Basic auth sends them."""
 
 
@@ -358,7 +357,7 @@ class SettingsValues(Section):
     cartesia: Cartesia = Cartesia()
     sarvam_tts: SarvamTts = SarvamTts()
     azure: Azure = Azure()
-    nimble: Nimble = Nimble()
+    plivo_tts: PlivoTts = PlivoTts()
     caller: CallerModel = CallerModel()
     turn_taking: TurnTaking = TurnTaking()
     generation: GenerationModel = GenerationModel()
@@ -394,7 +393,7 @@ class AppSettings(SettingsValues):
         ]
 
     def tts_credential(self, provider: VoiceProvider) -> str | None:
-        """The provider's key, or Nimble's `id:token`; None while one part is not saved."""
+        """The provider's key, or Plivo's `id:token`; None while one part is not saved."""
         parts = [reveal(getattr(self.secrets, name.value)) for name in TTS_KEYS[provider]]
         if any(part is None for part in parts):
             return None

@@ -6,6 +6,8 @@ COPY frontend/ ./
 RUN bun run build
 
 FROM python:3.14-slim-trixie AS backend
+# uv fetches Pipecat from a Git commit (pyproject.toml, tool.uv.sources); git stays in this stage.
+RUN apt-get update && apt-get install -y --no-install-recommends git && rm -rf /var/lib/apt/lists/*
 COPY --from=ghcr.io/astral-sh/uv:0.12.15 /uv /uvx /bin/
 ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy UV_PYTHON_DOWNLOADS=0
 WORKDIR /app
